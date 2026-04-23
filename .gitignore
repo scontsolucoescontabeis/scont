@@ -16,6 +16,9 @@ __pycache__/
 # Dependências Node.js
 node_modules/
 
+# Claude Code (configurações locais do editor)
+.claude/
+
 # Arquivos de sistema
 .DS_Store
 Thumbs.db
