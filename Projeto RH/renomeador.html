@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Renomeador de Arquivos - SCONT</title>
+    <style>
+        :root {
+            --primary-color: #8B3A3A;
+            --primary-hover: #6B2A2A;
+            --secondary-color: #2C3E50;
+            --background-color: #F4F7F6;
+            --card-bg: #FFFFFF;
+            --text-primary: #2C3E50;
+            --text-secondary: #7F8C8D;
+            --border-color: #E0E6ED;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--background-color); color: var(--text-primary); line-height: 1.6; }
+        
+        .header { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); color: white; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .header-container { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+        .logo { height: 50px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        .header-info h1 { font-size: 24px; margin: 0; }
+        .header-subtitle { font-size: 14px; opacity: 0.9; }
+        .btn-small { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-small:hover { background: rgba(255,255,255,0.3); }
+
+        .renomeador-container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+        .step-card { background: var(--card-bg); border-radius: 12px; padding: 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border: 1px solid var(--border-color); }
+        .step-title { color: var(--primary-color); font-size: 18px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #F5F5F5; padding-bottom: 10px; }
+        .step-title span { background: var(--primary-color); color: white; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 14px; font-weight: bold; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: var(--secondary-color); font-size: 13px; }
+        .form-group input { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; }
+        .form-group input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(139, 58, 58, 0.1); }
+        
+        .upload-area { border: 2px dashed var(--primary-color); border-radius: 8px; padding: 40px 20px; text-align: center; background: #FDF8F8; cursor: pointer; transition: all 0.3s ease; }
+        .upload-area:hover, .upload-area.dragover { background: #F9EBEB; border-color: var(--primary-hover); }
+        .upload-icon { font-size: 48px; margin-bottom: 15px; }
+        .upload-text { color: var(--secondary-color); font-weight: 600; margin-bottom: 5px; }
+        .upload-hint { font-size: 12px; color: var(--text-secondary); }
+        
+        .btn-action { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-action:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(139, 58, 58, 0.2); }
+        .btn-action:disabled { background: #BDC3C7; cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 20px; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .data-table th { background: #F8F9FA; padding: 12px; text-align: left; font-weight: 600; color: var(--secondary-color); border-bottom: 2px solid var(--border-color); }
+        .data-table td { padding: 12px; border-bottom: 1px solid var(--border-color); color: var(--secondary-color); }
+        
+        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+        .status-ok { background: #D4EDDA; color: #155724; }
+        .status-error { background: #F8D7DA; color: #721C24; }
+        .status-warning { background: #FFF3CD; color: #856404; }
+        
+        .info-box { background: #E8F4F8; border-left: 4px solid #3498DB; padding: 15px; border-radius: 4px; margin-bottom: 20px; font-size: 13px; color: var(--secondary-color); }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; width: 90%; max-width: 400px; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { margin: 0; color: var(--primary-color); font-size: 16px; }
+        .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary); }
+        .modal-body { padding: 20px; font-size: 14px; }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid var(--border-color); text-align: right; background: #F8F9FA; }
+        .btn-primary { background: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-container">
+            <img src="https://scontdf.com.br/wp-content/uploads/elementor/thumbs/LogoScont-peic298y16fua1mv1zkur66kgxw0v6rzhu846yyg3k.png" alt="SCONT" class="logo">
+            <div class="header-info">
+                <h1>Renomeador de Arquivos</h1>
+                <div class="header-subtitle">Organização e padronização automática de documentos</div>
+            </div>
+            <div class="header-actions">
+                <button type="button" class="btn-small" onclick="window.location.href='../portal.html'">← Voltar ao Portal</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="renomeador-container">
+        
+        <div class="info-box">
+            <strong>Como funciona:</strong> Faça o upload dos arquivos originais. O sistema aplicará as regras, criará a estrutura de pastas e gerará um arquivo <strong>.ZIP</strong> contendo duas pastas: uma para o EXPRESS e outra para o caminho Dinâmico.
+        </div>
+
+        <!-- PASSO 1: PARÂMETROS -->
+        <div class="step-card">
+            <h2 class="step-title"><span>1</span> Parâmetros de Destino</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label for="renCompetencia">Competência (MM/AAAA) *</label>
+                    <input type="text" id="renCompetencia" placeholder="Ex: 04/2026" maxlength="7">
+                </div>
+                <div class="form-group">
+                    <label for="caminhoExpress">Caminho Lógico EXPRESS *</label>
+                    <input type="text" id="caminhoExpress" placeholder="Ex: Z:\SCONT\EXPRESS" value="Z:\SCONT\EXPRESS">
+                </div>
+                <div class="form-group">
+                    <label for="caminhoDinamico">Caminho Dinâmico *</label>
+                    <input type="text" id="caminhoDinamico" placeholder="Ex: {CODIGO_EMPRESA}\{AAAA}\{MM}" value="{CODIGO_EMPRESA}\{AAAA}\{MM}">
+                </div>
+            </div>
+        </div>
+
+        <!-- PASSO 2: UPLOAD DE ARQUIVOS -->
+        <div class="step-card">
+            <h2 class="step-title"><span>2</span> Upload dos Arquivos Originais</h2>
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📂</div>
+                <div class="upload-text">Clique aqui ou arraste os arquivos que deseja renomear</div>
+                <div class="upload-hint">Você pode selecionar múltiplos arquivos de uma vez.</div>
+            </div>
+            <input type="file" id="fileInput" multiple style="display: none;" onchange="handleFileSelect(event)">
+            
+            <div id="fileCountInfo" style="margin-top: 15px; font-weight: bold; color: var(--primary-color); display: none;">
+                <span id="fileCount">0</span> arquivo(s) carregado(s) na memória.
+            </div>
+            
+            <div style="margin-top: 20px; text-align: right;">
+                <button type="button" class="btn-action" id="btnAnalisar" onclick="analisarArquivos()" disabled>
+                    🔍 Analisar e Aplicar Regras
+                </button>
+            </div>
+        </div>
+
+        <!-- PASSO 3: PRÉVIA E EXECUÇÃO -->
+        <div class="step-card" id="step3" style="display: none;">
+            <h2 class="step-title"><span>3</span> Prévia e Download</h2>
+            
+            <div id="avisoErros" style="background: #FFF3CD; color: #856404; padding: 15px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; display: none; border: 1px solid #FFEEBA;">
+                ⚠️ <strong>Atenção:</strong> Alguns arquivos não puderam ser processados. Verifique a coluna "Status" abaixo.
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Arquivo Original</th>
+                            <th>Novo Nome</th>
+                            <th>Destino EXPRESS</th>
+                            <th>Destino Dinâmico</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewBody">
+                        <!-- Preenchido via JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 25px; text-align: right;">
+                <button type="button" class="btn-action" id="btnGerarZip" onclick="gerarZip()" style="background: #27AE60;">
+                    📦 Gerar e Baixar Arquivo .ZIP
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL DE MENSAGEM -->
+    <div id="messageModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="messageTitle">Mensagem</h3>
+                <button type="button" class="modal-close" onclick="fecharModalMensagem()">×</button>
+            </div>
+            <div class="modal-body"><p id="messageText"></p></div>
+            <div class="modal-footer"><button type="button" class="btn-primary" onclick="fecharModalMensagem()">OK</button></div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="../supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Biblioteca JSZip para criar o arquivo compactado -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="../portal-auth-guard.js"></script>
+    <script src="renomeador.js"></script>
+    <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
+    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+</body>
+</html>

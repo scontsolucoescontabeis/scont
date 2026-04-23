@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Formulários - SCONT</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="Logo SCONT" class="company-logo">
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" onclick="filterByType('', this)">
+                    <span class="icon">📋</span>
+                    <span>Todos os Formulários</span>
+                </a>
+                <a href="#" class="nav-item" onclick="filterByType('registro', this)">
+                    <span class="icon">🏢</span>
+                    <span>Registro de Empresa</span>
+                </a>
+                <a href="#" class="nav-item" onclick="filterByType('alteracao', this)">
+                    <span class="icon">📝</span>
+                    <span>Alteração de Empresa</span>
+                </a>
+                <a href="#" class="nav-item" onclick="filterByType('empregado', this)">
+                    <span class="icon">👤</span>
+                    <span>Registro de Empregado</span>
+                </a>
+                <div style="height: 1px; background: var(--border-color); margin: var(--spacing-md) 0;"></div>
+                <a href="#" class="nav-item" onclick="openCnaeModal('')">
+                    <span class="icon">🔍</span>
+                    <span>Consulta CNAE</span>
+                </a>
+                <a href="historico.html" class="nav-item">
+                    <span class="icon">📊</span>
+                    <span>Histórico de Edições</span>
+                </a>
+                <a href="documentos.html" class="nav-item">
+                    <span class="icon">📁</span>
+                    <span>Central de Documentos</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <!-- TOPBAR -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h1 id="pageTitle">Todos os Formulários</h1>
+                    <p>Gestão, validação e auditoria de registros</p>
+                </div>
+                <div class="topbar-right">
+                    <button class="btn btn-secondary" onclick="syncSupabase()">🔄 Sincronizar</button>
+                </div>
+            </header>
+
+            <!-- FILTERS -->
+            <section class="filters-section">
+                <div class="filter-group" style="flex: 2;">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        class="search-input" 
+                        placeholder="Buscar por nome, CPF ou e-mail..."
+                        onkeyup="filterForms()"
+                    >
+                </div>
+                <div class="filter-group">
+                    <select id="statusFilter" class="filter-select" onchange="filterForms()">
+                        <option value="">Todos os Status</option>
+                        <option value="recebido">Recebido</option>
+                        <option value="validado">Validado</option>
+                        <option value="rejeitado">Rejeitado</option>
+                    </select>
+                </div>
+            </section>
+
+            <!-- FORMS GRID -->
+            <section class="forms-grid" id="formsContainer">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Carregando formulários...</p>
+                </div>
+            </section>
+
+            <!-- EMPTY STATE -->
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-icon">📭</div>
+                <h3>Nenhum formulário encontrado</h3>
+                <p>Tente ajustar seus filtros de busca</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL DE DETALHES -->
+    <div id="detailsModal" class="modal" style="display: none;">
+        <div class="modal-overlay" onclick="closeModal()"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="modalTitle">Detalhes do Formulário</h2>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Conteúdo dinâmico -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Fechar</button>
+                <button class="btn btn-primary" onclick="editFormCard(window.currentFormId)">Editar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE EDIÇÃO -->
+    <div id="editModal" class="modal" style="display: none; z-index: 1000;">
+        <div class="modal-overlay" onclick="closeEditModal()"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>Editar Formulário</h2>
+                <button class="modal-close" onclick="closeEditModal()">✕</button>
+            </div>
+            <div class="modal-body" id="editModalBody">
+                <!-- Formulário dinâmico -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEditModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveChanges()">Salvar Alterações</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE DOCUMENTOS -->
+    <div id="documentsModal" class="modal" style="display: none; z-index: 1000;">
+        <div class="modal-overlay" onclick="closeDocumentsModal()"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="documentsTitle">📁 Documentos do Formulário</h2>
+                <button class="modal-close" onclick="closeDocumentsModal()">✕</button>
+            </div>
+            <div class="modal-body" id="documentsBody">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Carregando documentos...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDocumentsModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CNAEs -->
+    <div id="cnaeModal" class="modal" style="display: none; z-index: 1100;"> <!-- z-index maior para ficar acima do modal de edição -->
+        <div class="modal-overlay" onclick="closeCnaeModal()"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>📋 Consulta de CNAEs</h2>
+                <button class="modal-close" onclick="closeCnaeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="filter-group" style="margin-bottom: var(--spacing-md);">
+                    <input type="text" id="searchCnaeInput" class="search-input" placeholder="Buscar CNAE por código ou descrição..." onkeyup="filterCnaes()">
+                </div>
+                <div class="table-wrapper" style="max-height: 400px; overflow-y: auto;">
+                    <table class="history-table" id="cnaeTable">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Descrição</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cnaeTableBody">
+                            <tr>
+                                <td colspan="3" class="text-center">
+                                    <div class="loading-spinner">
+                                        <div class="spinner"></div>
+                                        <p>Carregando CNAEs...</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeCnaeModal()">Fechar</button>
+            </div>
+        </div>
+    </div>
+<!-- Adicione esta linha no seu index.html se ela não existir -->
+<script src="../supabase-config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../portal-auth-guard.js"></script>
+    <script src="utils.js"></script>
+    <script src="cnaes.js"></script> <!-- Arquivo com a variável window.CNAE_DATA -->
+    <script src="app.js"></script>
+    <script>
+        // Inicializar ao carregar
+        document.addEventListener('DOMContentLoaded', function() {
+            initSupabase();
+            loadForms();
+        });
+    </script>
+    <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
+    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+</body>
+</html>

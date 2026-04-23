@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulário de Registro de Empresa - SCONT</title>
+    <script src="../supabase-config.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../portal-auth-guard.js"></script>
+    <style>
+        /* ===== RESET E VARIÁVEIS ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        :root {
+            --primary-color: #8B3A3A;
+            --primary-light: #A85252;
+            --primary-dark: #6B2C2C;
+            --secondary-color: #70AD47;
+            --gray-50: #F5F5F5;
+            --gray-100: #ECECEC;
+            --gray-150: #E3E3E3;
+            --gray-200: #DADADA;
+            --gray-300: #CCCCCC;
+            --gray-400: #BBBDC0;
+            --gray-500: #8B8D91;
+            --gray-600: #6B6D71;
+            --gray-700: #4A4C50;
+            --border-radius: 8px;
+            --transition: all 0.3s ease;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--gray-50);
+            color: var(--gray-700);
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .logo-section h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        .logo-section p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .form-wrapper {
+            background: white;
+            padding: 30px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        .form-section {
+            margin-bottom: 30px;
+        }
+        .section-title {
+            font-size: 18px;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--secondary-color);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--gray-700);
+        }
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group input[type="tel"],
+        .form-group input[type="number"],
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            transition: var(--transition);
+        }
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(139, 58, 58, 0.1);
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0;
+            font-weight: 400;
+        }
+        .radio-group input[type="radio"] {
+            margin-right: 10px;
+        }
+        .socio-card {
+            background-color: var(--gray-50);
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin-bottom: 20px;
+            border-left: 4px solid var(--primary-color);
+        }
+        .socio-card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+        .btn-secondary {
+            background-color: var(--gray-400);
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: var(--gray-500);
+        }
+        .btn-add-socio {
+            background-color: var(--secondary-color);
+            color: white;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .btn-add-socio:hover {
+            background-color: #5a8c3a;
+        }
+        .btn-remove-socio {
+            background-color: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+        .btn-remove-socio:hover {
+            background-color: #c82333;
+        }
+        .button-section {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        .legal-text {
+            background-color: var(--gray-50);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            font-size: 13px;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+        .legal-text p {
+            margin-bottom: 10px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: var(--border-radius);
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .modal-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            border-radius: var(--border-radius) var(--border-radius) 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            gap: 10px;
+        }
+        .btn-modal {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .btn-modal-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .btn-modal-primary:hover {
+            background-color: var(--primary-dark);
+        }
+        .btn-modal-secondary {
+            background-color: var(--gray-400);
+            color: white;
+        }
+        .btn-modal-secondary:hover {
+            background-color: var(--gray-500);
+        }
+        .close {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        .close:hover {
+            color: var(--gray-100);
+        }
+        .file-preview {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: var(--border-radius);
+            margin-top: 10px;
+        }
+        .hidden {
+            display: none;
+        }
+        small {
+            display: block;
+            color: var(--gray-500);
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .header {
+                padding: 20px;
+            }
+            .logo-section h1 {
+                font-size: 22px;
+            }
+            .form-wrapper {
+                padding: 20px;
+            }
+            .button-section {
+                flex-direction: column;
+            }
+            .btn {
+                width: 100%;
+            }
+        }
+        @media print {
+            .form-section {
+                page-break-inside: avoid;
+            }
+            .button-section {
+                display: none;
+            }
+            .modal {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header class="header">
+        <div class="logo-section">
+            <h1>FORMULÁRIO DE REGISTRO DE EMPRESA</h1>
+            <p>SCONT Soluções Contábeis</p>
+        </div>
+    </header>
+    <div class="form-wrapper">
+        <form id="registroForm">
+            <!-- SEÇÃO 1: INFORMAÇÕES DA EMPRESA -->
+            <section class="form-section">
+                <h2 class="section-title">INFORMAÇÕES DA EMPRESA</h2>
+                <div class="form-group">
+                    <label for="nomeEmpresa">Nome da Empresa (Preferência)*</label>
+                    <input type="text" id="nomeEmpresa" name="nomeEmpresa" placeholder="Digite o nome principal da empresa" required>
+                </div>
+                <div class="form-group">
+                    <label>Propostas de Nomes Alternativos*</label>
+                    <input type="text" id="nomeProposta1" name="nomeProposta1" placeholder="Opção 1" required>
+                    <input type="text" id="nomeProposta2" name="nomeProposta2" placeholder="Opção 2" required>
+                </div>
+                <div class="form-group">
+                    <label for="nomeFantasia">Nome Fantasia</label>
+                    <input type="text" id="nomeFantasia" name="nomeFantasia" placeholder="Digite o nome fantasia (opcional)">
+                </div>
+                <div class="form-group">
+                    <label for="porteEmpresa">Porte da Empresa (Previsão de faturamento anual) *</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="porteEmpresa" value="microempresa" required> Microempresa (até R$ 360 mil/ano)</label>
+                        <label><input type="radio" name="porteEmpresa" value="pequeno_porte"> Pequeno Porte (até R$ 4.800.000/ano)</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="capitalSocial">Capital Social (R$) *</label>
+                    <input type="number" id="capitalSocial" name="capitalSocial" placeholder="0.00" step="0.01" min="0" required>
+                </div>
+            </section>
+
+            <!-- SEÇÃO 2: SEDE DO ESTABELECIMENTO -->
+            <section class="form-section">
+                <h2 class="section-title">SEDE DO ESTABELECIMENTO</h2>
+                <div class="form-group">
+                    <label for="endereco">Endereço *</label>
+                    <input type="text" id="endereco" name="endereco" placeholder="Rua, número, complemento" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="cep">CEP *</label>
+                        <input type="text" id="cep" name="cep" placeholder="00000-000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="iptu">IPTU *</label>
+                        <input type="text" id="iptu" name="iptu" placeholder="Digite o IPTU" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="metragem">Metragem (m²) *</label>
+                        <input type="number" id="metragem" name="metragem" placeholder="0" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="horario">Horário de Funcionamento *</label>
+                        <input type="text" id="horario" name="horario" placeholder="Ex: 09:00 - 18:00" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="emailComercial">E-mail Comercial *</label>
+                        <input type="email" id="emailComercial" name="emailComercial" placeholder="email@empresa.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="telefoneComercial">Telefone Comercial *</label>
+                        <input type="tel" id="telefoneComercial" name="telefoneComercial" placeholder="(61) 3333-3333" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="formaAtuacao">Forma de Atuação da Empresa *</label>
+                    <textarea id="formaAtuacao" name="formaAtuacao" placeholder="Ex: residência ou coworking; com atendimento pela internet ou em estabelecimentos de terceiros; em local fixo com atendimento ao público" required></textarea>
+                </div>
+            </section>
+
+            <!-- SEÇÃO 3: ATIVIDADES -->
+            <section class="form-section">
+                <h2 class="section-title">ATIVIDADES</h2>
+                <div class="form-group">
+                    <label for="atividadePrincipal">Atividade Principal *</label>
+                    <input type="text" id="atividadePrincipal" name="atividadePrincipal" required>
+                </div>
+                <div class="form-group">
+                    <label for="atividadesSecundarias">Atividades Secundárias</label>
+                    <textarea id="atividadesSecundarias" name="atividadesSecundarias" placeholder="Digite as atividades secundárias (uma por linha)"></textarea>
+                </div>
+            </section>
+
+            <!-- SEÇÃO 4: DADOS DOS SÓCIOS -->
+            <section class="form-section">
+                <h2 class="section-title">DADOS DOS SÓCIOS</h2>
+                <div id="sociosContainer"></div>
+                <button type="button" id="addSocioBtn" class="btn btn-add-socio">+ ADICIONAR SÓCIO</button>
+            </section>
+
+            <!-- SEÇÃO 5: CLÁUSULA DE RESPONSABILIDADE -->
+            <section class="form-section">
+                <h2 class="section-title">CLÁUSULA DE RESPONSABILIDADE PELO CONTEÚDO CONTRATUAL</h2>
+                <div class="legal-text">
+                    <p>A elaboração dos instrumentos contratuais pela SCONT Soluções Contábeis – sejam atos constitutivos ou alterações contratuais – segue estritamente os modelos padronizados e as diretrizes estabelecidas pela Junta Comercial e demais órgãos de registro.</p>
+                    <p><strong>I – RESPONSABILIDADE DO CLIENTE:</strong> O cliente é responsável pela veracidade, exatidão e legalidade de todas as informações fornecidas neste formulário.</p>
+                    <p><strong>II – FINALIDADE DO TRATAMENTO:</strong> A finalidade do tratamento de dados ora consentido visa à elaboração do contrato social da pessoa jurídica e sócios, com o fim de realizar o competente Registro na JUCIS/DF, além da obtenção do CNPJ, registro junto à Secretaria de Estado de Fazenda do DF para obtenção da Inscrição Estadual, registro no DF Legal (quando necessário) e Licença de Funcionamento-RLE com suas respectivas vistorias para sua obtenção, junto aos órgãos e entidades governamentais.</p>
+                    <p><strong>III – DA PRIVACIDADE E SIGILO:</strong> A SCONT SOLUÇÕES CONTÁBEIS LTDA. se compromete perante o Titular de Dados Pessoais a tratar os dados recebidos, observando a boa-fé e os princípios da Lei nº 13.709/2018, adotando no tratamento os cuidados e medidas de segurança aptas a proteger os dados pessoais de acessos não autorizados e de situações acidentais ou ilícitas de destruição, perda, alteração, comunicação ou difusão.</p>
+                    <p><strong>IV - DEMAIS DISPOSIÇÕES:</strong></p>
+                    <p><strong>a)</strong> O cliente reconhece que a SCONT não fornece análise jurídica e recomenda a consulta com um advogado para análise dos documentos contratuais.</p>
+                </div>
+            </section>
+
+            <!-- SEÇÃO 6: TERMO DE CONSENTIMENTO - LGPD -->
+            <section class="form-section">
+                <h2 class="section-title">TERMO DE CONSENTIMENTO - LGPD</h2>
+                <div class="legal-text">
+                    <p><strong>I – DADOS PESSOAIS COLETADOS:</strong> Nome completo, CPF, RG, CNH, endereço residencial, CEP, e-mail, telefone celular, estado civil, regime de partilha, naturalidade e profissão.</p>
+                    <p><strong>II – FINALIDADE DO TRATAMENTO:</strong> A finalidade do tratamento de dados ora consentido visa à elaboração do contrato social da pessoa jurídica e sócios, com o fim de realizar o competente Registro na JUCIS/DF, além da obtenção do CNPJ, registro junto à Secretaria de Estado de Fazenda do DF para obtenção da Inscrição Estadual, registro no DF Legal (quando necessário) e Licença de Funcionamento-RLE com suas respectivas vistorias para sua obtenção, junto aos órgãos e entidades governamentais.</p>
+                    <p><strong>III – DA PRIVACIDADE E SIGILO:</strong> A SCONT SOLUÇÕES CONTÁBEIS LTDA. se compromete perante o Titular de Dados Pessoais a tratar os dados recebidos, observando a boa-fé e os princípios da Lei nº 13.709/2018, adotando no tratamento os cuidados e medidas de segurança aptas a proteger os dados pessoais de acessos não autorizados e de situações acidentais ou ilícitas de destruição, perda, alteração, comunicação ou difusão.</p>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="consentimentoLGPD" name="consentimentoLGPD" required> Declaro que li e concordo com o Termo de Consentimento LGPD *</label>
+                </div>
+            </section>
+
+            <!-- BOTÕES DE AÇÃO -->
+            <section class="form-section button-section">
+                <button type="submit" class="btn btn-primary" id="submitBtn">SALVAR E ENVIAR</button>
+                <button type="reset" class="btn btn-secondary">LIMPAR FORMULÁRIO</button>
+            </section>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL DE SUCESSO -->
+<div id="shareModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            ✅ Formulário Enviado com Sucesso!
+            <span class="close" id="modalClose">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p>Seu formulário de registro de empresa foi recebido e processado com sucesso.</p>
+            <p><strong>ID da Submissão:</strong> <span id="submissionId">-</span></p>
+            <p>Em breve você receberá um contato de nossa equipe para prosseguir com os próximos passos.</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" id="shareWhatsapp" class="btn-modal btn-modal-primary">Compartilhar via WhatsApp</button>
+            <button type="button" id="closeModal" class="btn-modal btn-modal-secondary">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ===== CONFIGURAÇÃO SUPABASE =====
+    let supabaseClient = null;
+
+    // ===== ELEMENTOS DO DOM =====
+    const form = document.getElementById('registroForm');
+    const shareModal = document.getElementById('shareModal');
+    const modalClose = document.getElementById('modalClose');
+    const closeModalBtn = document.getElementById('closeModal');
+    const shareWhatsapp = document.getElementById('shareWhatsapp');
+    const sociosContainer = document.getElementById('sociosContainer');
+    const addSocioBtn = document.getElementById('addSocioBtn');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // ===== DADOS DO FORMULÁRIO =====
+    let formData = {};
+    let sociosCount = 0;
+    let uploadedDocuments = {};
+    let submissionId = null;
+    let isSubmitting = false;
+
+    // ===== INICIALIZAÇÃO =====
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('✅ Formulário carregado');
+        initSupabase();
+        addInitialSocio();
+        form.addEventListener('submit', handleFormSubmit);
+        addSocioBtn.addEventListener('click', addSocio);
+        modalClose.addEventListener('click', closeModal);
+        closeModalBtn.addEventListener('click', closeModal);
+        shareWhatsapp.addEventListener('click', shareViaWhatsapp);
+    });
+
+    // ===== INICIALIZAR SUPABASE =====
+    function initSupabase() {
+        if (typeof window.supabase !== 'undefined') {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            console.log('✅ Supabase inicializado');
+        } else {
+            console.warn('⚠️ Supabase não carregado');
+        }
+    }
+
+    // ===== ADICIONAR PRIMEIRO SÓCIO =====
+    function addInitialSocio() {
+        sociosCount = 1;
+        addSocioCard(1);
+        console.log('✅ Sócio inicial adicionado');
+    }
+
+    // ===== ADICIONAR SÓCIO =====
+    function addSocio(e) {
+        e.preventDefault();
+        sociosCount++;
+        addSocioCard(sociosCount);
+        console.log('✅ Sócio #' + sociosCount + ' adicionado');
+    }
+
+    // ===== CRIAR CARD DO SÓCIO =====
+    function addSocioCard(index) {
+        const socioCard = document.createElement('div');
+        socioCard.className = 'socio-card';
+        socioCard.id = 'socio' + index + 'Card';
+        socioCard.innerHTML = `
+            <div class="socio-card-title">
+                Sócio #${index}
+                <button type="button" class="btn-remove-socio" onclick="removeSocio(${index})">Remover</button>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="socio${index}Nome">Nome Completo *</label>
+                    <input type="text" id="socio${index}Nome" name="socio${index}Nome" placeholder="Digite o nome completo" required>
+                </div>
+                <div class="form-group">
+                    <label for="socio${index}CPF">CPF *</label>
+                    <input type="text" id="socio${index}CPF" name="socio${index}CPF" placeholder="000.000.000-00" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="socio${index}RG">RG</label>
+                    <input type="text" id="socio${index}RG" name="socio${index}RG" placeholder="0000000">
+                </div>
+                <div class="form-group">
+                    <label for="socio${index}CNH">CNH</label>
+                    <input type="text" id="socio${index}CNH" name="socio${index}CNH" placeholder="00000000000">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="socio${index}EnderecoResidencial">Endereço Residencial</label>
+                    <input type="text" id="socio${index}EnderecoResidencial" name="socio${index}EnderecoResidencial" placeholder="Rua, número, complemento">
+                </div>
+                <div class="form-group">
+                    <label for="socio${index}CEP">CEP</label>
+                    <input type="text" id="socio${index}CEP" name="socio${index}CEP" placeholder="00000-000">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="socio${index}EstadoCivil">Estado Civil</label>
+                    <select id="socio${index}EstadoCivil" name="socio${index}EstadoCivil" onchange="toggleRegimePartilha(${index})">
+                        <option value="">Selecione...</option>
+                        <option value="solteiro">Solteiro(a)</option>
+                        <option value="casado">Casado(a)</option>
+                        <option value="divorciado">Divorciado(a)</option>
+                        <option value="viuvo">Viúvo(a)</option>
+                        <option value="uniao_estavel">União Estável</option>
+                    </select>
+                </div>
+                <div class="form-group" id="socio${index}Regime" class="hidden">
+                    <label for="socio${index}RegimePartilha">Regime de Partilha</label>
+                    <select id="socio${index}RegimePartilha" name="socio${index}RegimePartilha">
+                        <option value="">Selecione...</option>
+                        <option value="comunhao_universal">Comunhão Universal</option>
+                        <option value="comunhao_parcial">Comunhão Parcial</option>
+                        <option value="separacao_bens">Separação de Bens</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="socio${index}Naturalidade">Naturalidade</label>
+                    <input type="text" id="socio${index}Naturalidade" name="socio${index}Naturalidade" placeholder="Cidade/Estado">
+                </div>
+                <div class="form-group">
+                    <label for="socio${index}Profissao">Profissão</label>
+                    <input type="text" id="socio${index}Profissao" name="socio${index}Profissao" placeholder="Digite a profissão">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="socio${index}Email">E-mail</label>
+                    <input type="email" id="socio${index}Email" name="socio${index}Email" placeholder="email@exemplo.com">
+                </div>
+                <div class="form-group">
+                    <label for="socio${index}Celular">Celular</label>
+                    <input type="tel" id="socio${index}Celular" name="socio${index}Celular" placeholder="(61) 99999-9999">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="socio${index}Admin">É Administrador? *</label>
+                    <select id="socio${index}Admin" name="socio${index}Admin" required>
+                        <option value="">Selecione...</option>
+                        <option value="sim">Sim</option>
+                        <option value="nao">Não</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="socio${index}CNPJ" name="socio${index}CNPJ"> Responsável pelo CNPJ</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="socio${index}Participacao">Participação Societária (%) *</label>
+                <input type="number" id="socio${index}Participacao" name="socio${index}Participacao" placeholder="0" step="0.01" min="0" max="100" required>
+            </div>
+            <div class="form-group">
+                <label for="socio${index}Documento">Upload de Documento de Identificação (RG, CPF ou CNH) *</label>
+                <input type="file" id="socio${index}Documento" name="socio${index}Documento" accept=".pdf,.jpg,.jpeg,.png" required onchange="handleFileUpload(event, ${index})">
+                <small>Formatos aceitos: PDF, JPG, PNG (máx. 5MB)</small>
+                <div id="socio${index}DocumentoPreview"></div>
+            </div>
+        `;
+        sociosContainer.appendChild(socioCard);
+    }
+
+    // ===== REMOVER SÓCIO =====
+    function removeSocio(index) {
+        const card = document.getElementById('socio' + index + 'Card');
+        if (card) {
+            card.remove();
+            delete uploadedDocuments['socio' + index];
+            console.log('✅ Sócio #' + index + ' removido');
+        }
+    }
+
+    // ===== TOGGLE REGIME PARTILHA =====
+    function toggleRegimePartilha(index) {
+        const estadoCivil = document.getElementById('socio' + index + 'EstadoCivil').value;
+        const regimeDiv = document.getElementById('socio' + index + 'Regime');
+        if (estadoCivil === 'casado' || estadoCivil === 'uniao_estavel') {
+            regimeDiv.classList.remove('hidden');
+        } else {
+            regimeDiv.classList.add('hidden');
+        }
+    }
+
+    // ===== UPLOAD DE ARQUIVO =====
+    function handleFileUpload(event, socioIndex) {
+        const file = event.target.files[0];
+        const previewDiv = document.getElementById('socio' + socioIndex + 'DocumentoPreview');
+
+        if (!file) {
+            previewDiv.innerHTML = '';
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Arquivo muito grande. Máximo 5MB.');
+            event.target.value = '';
+            previewDiv.innerHTML = '';
+            return;
+        }
+
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Tipo de arquivo não permitido. Use PDF, JPG ou PNG.');
+            event.target.value = '';
+            previewDiv.innerHTML = '';
+            return;
+        }
+
+        uploadedDocuments['socio' + socioIndex] = file;
+        previewDiv.innerHTML = '<div class="file-preview">✅ ' + file.name + ' (' + (file.size / 1024).toFixed(2) + ' KB)</div>';
+    }
+
+    // ===== COLETA DE DADOS DO FORMULÁRIO =====
+    function collectFormData() {
+        const formElements = form.elements;
+        formData = {};
+        for (let i = 0; i < formElements.length; i++) {
+            const element = formElements[i];
+            if (element.type === 'checkbox') {
+                formData[element.name] = element.checked;
+            } else if (element.type === 'radio') {
+                if (element.checked) {
+                    formData[element.name] = element.value;
+                }
+            } else if (element.name && !element.disabled && element.type !== 'file') {
+                formData[element.name] = element.value;
+            }
+        }
+        const tempo = formatarDataHora();
+        formData.dataPreenchimento = tempo.dataCompleta;
+        formData.horaPreenchimento = tempo.horaCompleta;
+        return formData;
+    }
+
+    // ===== VALIDAÇÃO DO FORMULÁRIO =====
+    function validateForm() {
+        const requiredFields = ['nomeEmpresa', 'porteEmpresa', 'capitalSocial', 'endereco', 'cep', 'iptu', 'metragem', 'horario', 'emailComercial', 'telefoneComercial', 'formaAtuacao', 'atividadePrincipal'];
+        for (let field of requiredFields) {
+            const element = form.elements[field];
+            if (!element) continue;
+            if (element.type === 'radio') {
+                const checked = document.querySelector('input[name="' + field + '"]:checked');
+                if (!checked) {
+                    alert('Por favor, preencha o campo obrigatório: ' + (element.labels[0] ? element.labels[0].textContent : field));
+                    element.focus();
+                    return false;
+                }
+            } else if (!element.value.trim()) {
+                alert('Por favor, preencha o campo obrigatório: ' + (element.labels[0] ? element.labels[0].textContent : field));
+                element.focus();
+                return false;
+            }
+        }
+
+        const requiredPropostas = ['nomeProposta1', 'nomeProposta2'];
+        for (let field of requiredPropostas) {
+            const element = form.elements[field];
+            if (!element.value.trim()) {
+                alert('Por favor, preencha as propostas de nomes alternativos.');
+                element.focus();
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // ===== VALIDAÇÃO DOS SÓCIOS =====
+    function getSociosCount() {
+        let count = 0;
+        for (let i = 1; i <= 10; i++) {
+            const nomeField = form.elements['socio' + i + 'Nome'];
+            if (!nomeField || !nomeField.value.trim()) break;
+            count++;
+        }
+        return count;
+    }
+
+    function validateSocios() {
+        const sociosCount = getSociosCount();
+        for (let i = 1; i <= sociosCount; i++) {
+            const nome = form.elements['socio' + i + 'Nome']?.value;
+            const cpf = form.elements['socio' + i + 'CPF']?.value;
+            const admin = form.elements['socio' + i + 'Admin']?.value;
+            const participacao = form.elements['socio' + i + 'Participacao']?.value;
+            const docInput = form.elements['socio' + i + 'Documento'];
+
+            if (!nome || !nome.trim()) {
+                alert('Por favor, preencha o nome do Sócio #' + i);
+                return false;
+            }
+            if (!cpf || !cpf.trim()) {
+                alert('Por favor, preencha o CPF do Sócio #' + i);
+                return false;
+            }
+            if (!admin) {
+                alert('Por favor, indique se o Sócio #' + i + ' é administrador');
+                return false;
+            }
+            if (!participacao || parseFloat(participacao) <= 0) {
+                alert('Por favor, preencha a participação do Sócio #' + i);
+                return false;
+            }
+            if (!uploadedDocuments['socio' + i]) {
+                alert('Por favor, faça upload do documento de identificação do Sócio #' + i);
+                if (docInput) docInput.focus();
+                return false;
+            }
+        }
+
+        if (!form.elements['consentimentoLGPD'].checked) {
+            alert('Por favor, aceite o Termo de Consentimento LGPD.');
+            return false;
+        }
+
+        let totalParticipacao = 0;
+        for (let i = 1; i <= sociosCount; i++) {
+            totalParticipacao += parseFloat(form.elements['socio' + i + 'Participacao']?.value || 0);
+        }
+        if (Math.abs(totalParticipacao - 100) > 0.01) {
+            alert(`Soma das participações deve ser 100% (atual: ${totalParticipacao.toFixed(2)}%).`);
+            return false;
+        }
+
+        return true;
+    }
+
+    // ===== SUBMISSÃO DO FORMULÁRIO =====
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+        if (isSubmitting) {
+            console.warn('⚠️ Submissão em andamento...');
+            return;
+        }
+
+        if (!validateForm()) return;
+        if (!validateSocios()) return;
+
+        const originalText = submitBtn.innerHTML;
+        isSubmitting = true;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '⏳ Processando...';
+
+        try {
+            // 1. Coletar dados
+            collectFormData();
+
+            // 2. Gerar PDF
+            console.log('📄 Gerando PDF...');
+            const pdfBlob = await generatePDF();
+
+            // 3. Upload PDF
+            console.log('📤 Fazendo upload do PDF...');
+            const nomeFormulario = gerarNomeFormulario(formData.nomeEmpresa);
+            await uploadArquivo(pdfBlob, 'formulario', nomeFormulario);
+
+            // 4. Upload documentos dos sócios
+           
+
+            // 5. Salvar formulário no banco
+            console.log('💾 Salvando dados no banco de dados...');
+            if (!supabaseClient) {
+                console.warn('⚠️ Supabase não configurado. Simulando...');
+                submissionId = 'SIM-' + Date.now();
+                showModal();
+                return;
+            }
+
+            const { data: formulario, error: formularioError } = await supabaseClient
+                .from('formularios')
+                .insert([{
+                    tipo_formulario: 'registro',
+                    nome_empresa: formData.nomeEmpresa,
+                    nome_proposta1: formData.nomeProposta1,
+                    nome_proposta2: formData.nomeProposta2,
+                    nome_fantasia: formData.nomeFantasia || null,
+                    porte_empresa: formData.porteEmpresa || null,
+                    capital_social: formData.capitalSocial ? parseFloat(formData.capitalSocial) : null,
+                    endereco: formData.endereco || null,
+                    cep: formData.cep || null,
+                    iptu: formData.iptu || null,
+                    metragem: formData.metragem ? parseFloat(formData.metragem) : null,
+                    horario: formData.horario || null,
+                    email_comercial: formData.emailComercial || null,
+                    telefone_comercial: formData.telefoneComercial || null,
+                    forma_atuacao: formData.formaAtuacao || null,
+                    atividade_principal: formData.atividadePrincipal || null,
+                    atividades_secundarias: formData.atividadesSecundarias || null,
+                    data_preenchimento: formData.dataPreenchimento,
+                    hora_preenchimento: formData.horaPreenchimento,
+                    status: 'recebido'
+                }])
+                .select();
+
+            if (formularioError) {
+                console.error('❌ Erro ao salvar formulário:', formularioError);
+                throw formularioError;
+            }
+
+            submissionId = formulario[0].id;
+            console.log('✅ Formulário salvo com ID:', submissionId);
+
+            // 6. Salvar sócios
+           // 6. Salvar sócios
+try {
+    console.log('💾 Salvando sócios...');
+    const sociosCount = getSociosCount();
+    const sociosData = [];
+    
+    for (let i = 1; i <= sociosCount; i++) {
+        const nomeField = form.elements['socio' + i + 'Nome'];
+        if (!nomeField?.value.trim()) continue;
+        
+        // Obter URL e nome do documento
+        let documentoUrl = null;
+        let documentoNome = null;
+        
+        if (uploadedDocuments['socio' + i]) {
+            const arquivo = uploadedDocuments['socio' + i];
+            const nomeDoc = sanitizarNomeArquivo(nomeField.value) + '_' + formatarDataHora().dataHora;
+            const uploadResult = await uploadArquivo(arquivo, 'documento', nomeDoc);
+            documentoUrl = uploadResult.url;
+            documentoNome = arquivo.name;
+        }
+        
+        sociosData.push({
+            formulario_id: submissionId,
+            numero_socio: i,
+            nome: form.elements['socio' + i + 'Nome'].value.trim(),
+            administrador: form.elements['socio' + i + 'Admin']?.value === 'sim',
+            responsavel_cnpj: !!form.elements['socio' + i + 'CNPJ']?.checked,
+            estado_civil: form.elements['socio' + i + 'EstadoCivil']?.value || null,
+            regime_partilha: form.elements['socio' + i + 'RegimePartilha']?.value?.trim() || null,
+            naturalidade: form.elements['socio' + i + 'Naturalidade']?.value?.trim() || null,
+            profissao: form.elements['socio' + i + 'Profissao']?.value?.trim() || null,
+            endereco_residencial: form.elements['socio' + i + 'EnderecoResidencial']?.value?.trim() || null,
+            cep: form.elements['socio' + i + 'CEP']?.value?.trim() || null,
+            celular: form.elements['socio' + i + 'Celular']?.value?.trim() || null,
+            email: form.elements['socio' + i + 'Email']?.value?.trim() || null,
+            participacao: parseFloat(form.elements['socio' + i + 'Participacao'].value),
+            documento_url: documentoUrl,
+            documento_nome: documentoNome,
+            created_at: new Date().toISOString()
+        });
+    }
+
+    if (sociosData.length > 0) {
+        const { data: socios, error: sociosError } = await supabaseClient
+            .from('socios')
+            .insert(sociosData)
+            .select();
+
+        if (sociosError) {
+            console.error('❌ Erro ao salvar sócios:', sociosError);
+            throw new Error(`Falha nos sócios: ${sociosError.message}`);
+        }
+        console.log(`✅ ${sociosData.length} sócios salvos com sucesso.`);
+    } else {
+        console.warn('⚠️ Nenhum sócio válido encontrado.');
+    }
+} catch (sociosError) {
+    console.error('❌ Erro nos sócios:', sociosError);
+    alert('Dados da empresa salvos, mas houve erro ao salvar sócios. Verifique logs e contate suporte.');
+}
+
+            // 7. Mostrar modal
+            showModal();
+
+        } catch (error) {
+            console.error('❌ Erro geral:', error);
+            alert('Erro ao processar: ' + error.message);
+        } finally {
+            isSubmitting = false;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    }
+
+    // ===== GERAR PDF DO FORMULÁRIO =====
+    async function generatePDF() {
+        return new Promise((resolve, reject) => {
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
+                const margin = 15;
+                const contentWidth = pageWidth - 2 * margin;
+                let yPosition = margin;
+                const primaryColor = [139, 58, 58];
+                const grayLight = [240, 241, 243];
+                const textColor = [45, 46, 49];
+
+                const addSection = (title) => {
+                    if (yPosition > pageHeight - 30) {
+                        doc.addPage();
+                        yPosition = margin;
+                    }
+                    doc.setFontSize(14);
+                    doc.setTextColor(...primaryColor);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(title, margin, yPosition);
+                    yPosition += 8;
+                    doc.setDrawColor(...primaryColor);
+                    doc.line(margin, yPosition, pageWidth - margin, yPosition);
+                    yPosition += 5;
+                };
+
+                const addDataLine = (label, value) => {
+                    if (yPosition > pageHeight - 15) {
+                        doc.addPage();
+                        yPosition = margin;
+                    }
+                    doc.setFontSize(10);
+                    doc.setTextColor(...textColor);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(label, margin, yPosition);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(String(value || '-'), margin + 50, yPosition);
+                    yPosition += 6;
+                };
+
+                // CABEÇALHO
+                doc.setFontSize(16);
+                doc.setTextColor(...primaryColor);
+                doc.setFont(undefined, 'bold');
+                doc.text('FORMULÁRIO DE REGISTRO DE EMPRESA', margin, yPosition);
+                yPosition += 8;
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                doc.text('SCONT Soluções Contábeis', margin, yPosition);
+                yPosition += 10;
+
+                // INFORMAÇÕES DA EMPRESA
+                addSection('INFORMAÇÕES DA EMPRESA');
+                addDataLine('Nome da Empresa (Preferência):', formData.nomeEmpresa);
+                addDataLine('Proposta 1:', formData.nomeProposta1);
+                addDataLine('Proposta 2:', formData.nomeProposta2);
+                addDataLine('Nome Fantasia:', formData.nomeFantasia || '-');
+                addDataLine('Porte:', formData.porteEmpresa);
+                addDataLine('Capital Social:', 'R$ ' + (formData.capitalSocial || '0'));
+                yPosition += 3;
+
+                // SEDE DO ESTABELECIMENTO
+                addSection('SEDE DO ESTABELECIMENTO');
+                addDataLine('Endereço:', formData.endereco);
+                addDataLine('CEP:', formData.cep);
+                addDataLine('IPTU:', formData.iptu);
+                addDataLine('Metragem:', formData.metragem + ' m²');
+                addDataLine('Horário:', formData.horario);
+                addDataLine('E-mail Comercial:', formData.emailComercial);
+                addDataLine('Telefone Comercial:', formData.telefoneComercial);
+                addDataLine('Forma de Atuação:', formData.formaAtuacao);
+                yPosition += 3;
+
+                // ATIVIDADES
+                addSection('ATIVIDADES');
+                addDataLine('Atividade Principal:', formData.atividadePrincipal);
+                const atividades = formData.atividadesSecundarias ? formData.atividadesSecundarias.replace(/\n/g, ', ') : '-';
+                addDataLine('Atividades Secundárias:', atividades);
+                yPosition += 3;
+
+                // SÓCIOS
+                addSection('SÓCIOS');
+                const sociosCount = getSociosCount();
+                for (let i = 1; i <= sociosCount; i++) {
+                    const nomeField = form.elements['socio' + i + 'Nome'];
+                    if (nomeField && nomeField.value) {
+                        addDataLine('Sócio #' + i + ' - Nome:', nomeField.value);
+                        addDataLine('Administrador:', form.elements['socio' + i + 'Admin'].value === 'sim' ? 'Sim' : 'Não');
+                        addDataLine('Responsável CNPJ:', form.elements['socio' + i + 'CNPJ'].checked ? 'Sim' : 'Não');
+                        addDataLine('Estado Civil:', form.elements['socio' + i + 'EstadoCivil'].value || '-');
+                        addDataLine('Naturalidade:', form.elements['socio' + i + 'Naturalidade'].value || '-');
+                        addDataLine('Profissão:', form.elements['socio' + i + 'Profissao'].value || '-');
+                        addDataLine('Endereço Residencial:', form.elements['socio' + i + 'EnderecoResidencial'].value || '-');
+                        addDataLine('CEP:', form.elements['socio' + i + 'CEP'].value || '-');
+                        addDataLine('E-mail:', form.elements['socio' + i + 'Email'].value || '-');
+                        addDataLine('Celular:', form.elements['socio' + i + 'Celular'].value || '-');
+                        addDataLine('Participação (%):', form.elements['socio' + i + 'Participacao'].value || '0');
+                        yPosition += 3;
+                    }
+                }
+
+                // RODAPÉ
+                if (yPosition > pageHeight - 20) {
+                    doc.addPage();
+                    yPosition = margin;
+                }
+                yPosition = pageHeight - 20;
+                doc.setFontSize(8);
+                doc.setTextColor(150, 150, 150);
+                doc.text('Gerado em: ' + formData.dataPreenchimento + ' às ' + formData.horaPreenchimento, margin, yPosition);
+
+                resolve(doc.output('blob'));
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    // ===== UPLOAD DE ARQUIVO =====
+    async function uploadArquivo(arquivo, tipo, nomeArquivo) {
+        try {
+            const nomeArquivoCompleto = nomeArquivo + (tipo === 'formulario' ? '.pdf' : '');
+            const caminhoCompleto = gerarCaminhoCompleto(formData.nomeEmpresa, tipo, nomeArquivoCompleto);
+            console.log('📁 Caminho para upload:', caminhoCompleto);
+
+            const { data: uploadData, error: uploadError } = await supabaseClient.storage
+                .from('documentos')
+                .upload(caminhoCompleto, arquivo, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            if (uploadError) {
+                console.error('❌ Erro no upload:', uploadError);
+                throw uploadError;
+            }
+
+            console.log('✅ Arquivo enviado com sucesso:', uploadData);
+
+            const { data: publicUrl } = supabaseClient.storage
+                .from('documentos')
+                .getPublicUrl(caminhoCompleto);
+
+            console.log('🔗 URL pública:', publicUrl.publicUrl);
+
+            return {
+                sucesso: true,
+                caminho: caminhoCompleto,
+                url: publicUrl.publicUrl
+            };
+        } catch (error) {
+            console.error('❌ ERRO NO UPLOAD:', error);
+            throw error;
+        }
+    }
+
+    // ===== MODAL =====
+    function showModal() {
+        document.getElementById('submissionId').textContent = submissionId;
+        shareModal.style.display = 'block';
+    }
+
+    function closeModal() {
+        shareModal.style.display = 'none';
+        form.reset();
+        sociosContainer.innerHTML = '';
+        uploadedDocuments = {};
+        sociosCount = 0;
+        addInitialSocio();
+    }
+
+    function shareViaWhatsapp() {
+        const mensagem = `Olá! Meu formulário de registro de empresa foi enviado com sucesso. ID: ${submissionId}`;
+        const numeroWhatsapp = '5561999999999';
+        const url = `https://wa.me/${numeroWhatsapp}?text=${encodeURIComponent(mensagem)}`;
+        window.open(url, '_blank');
+    }
+
+    // ===== FUNÇÕES AUXILIARES =====
+    function formatarDataHora() {
+        const agora = new Date();
+        const dia = String(agora.getDate()).padStart(2, '0');
+        const mes = String(agora.getMonth() + 1).padStart(2, '0');
+        const ano = agora.getFullYear();
+        const horas = String(agora.getHours()).padStart(2, '0');
+        const minutos = String(agora.getMinutes()).padStart(2, '0');
+        const segundos = String(agora.getSeconds()).padStart(2, '0');
+
+        return {
+            dataCompleta: `${dia}/${mes}/${ano}`,
+            horaCompleta: `${horas}:${minutos}:${segundos}`,
+            dataHora: `${dia}${mes}${ano}_${horas}${minutos}${segundos}`
+        };
+    }
+
+    function sanitizarNomeArquivo(nome) {
+        const nome_sanitizado = nome
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_+|_+$/g, '');
+        return nome_sanitizado;
+    }
+
+    function gerarCaminhoCompleto(nomeEmpresa, tipo, nomeArquivo) {
+        const empresaSanitizada = sanitizarNomeArquivo(nomeEmpresa);
+        const caminho = 'Registro/' + empresaSanitizada + '/' + tipo + '/' + nomeArquivo;
+        return caminho;
+    }
+
+    function gerarNomeFormulario(nomeEmpresa) {
+        const tempo = formatarDataHora();
+        const empresaSanitizada = sanitizarNomeArquivo(nomeEmpresa);
+        const nomeBase = empresaSanitizada + '_' + tempo.dataHora;
+        return nomeBase;
+    }
+</script>
+    <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
+    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+</body>
+</html>

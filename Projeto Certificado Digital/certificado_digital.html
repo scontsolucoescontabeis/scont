@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCONT - Gerenciador de Certificados Digitais</title>
+    <style>
+        :root {
+            /* TEMA CORPORATIVO */
+            --primary: #8B3A3A;
+            --primary-hover: #6B2A2A;
+            --secondary: #2C3E50;
+            --bg: #F4F7F6;
+            --card: #FFFFFF;
+            --text: #2C3E50;
+            --muted: #7F8C8D;
+            --border: #E0E6ED;
+            --success: #27AE60;
+            --warning: #F39C12;
+            --danger: #E74C3C;
+            --info: #3498DB;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+            --radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+            flex-direction: column;
+        }
+
+        /* ============================================
+           TOPBAR
+           ============================================ */
+        .topbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .topbar-logo {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .topbar-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .btn-back {
+            padding: 8px 16px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            transition: var(--transition);
+        }
+
+        .btn-back:hover {
+            background: var(--border);
+        }
+
+        .btn-logout {
+            padding: 8px 16px;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .btn-logout:hover {
+            background: #c0392b;
+        }
+
+        /* ============================================
+           MAIN CONTENT
+           ============================================ */
+        .main {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* ============================================
+           HEADER SEÇÃO
+           ============================================ */
+        .section-header {
+            margin-bottom: 24px;
+        }
+
+        .section-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .section-header p {
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        /* ============================================
+           STATS GRID
+           ============================================ */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--card), rgba(255, 255, 255, 0.5));
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .stat-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        /* ============================================
+           CARDS E SEÇÕES
+           ============================================ */
+        .card {
+            background: var(--card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-md);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(135deg, var(--bg) 0%, rgba(244, 247, 246, 0.5) 100%);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .card-body {
+            padding: 24px;
+        }
+
+        /* ============================================
+           TOOLBAR
+           ============================================ */
+        .toolbar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .field label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .field input,
+        .field select {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            transition: var(--transition);
+        }
+
+        .field input:focus,
+        .field select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(139, 58, 58, 0.1);
+        }
+
+        /* ============================================
+           TABELAS
+           ============================================ */
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        thead {
+            background: linear-gradient(135deg, var(--bg) 0%, rgba(244, 247, 246, 0.5) 100%);
+            border-bottom: 2px solid var(--border);
+        }
+
+        th {
+            padding: 14px;
+            text-align: left;
+            font-weight: 700;
+            color: var(--text);
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody tr {
+            transition: var(--transition);
+        }
+
+        tbody tr:hover {
+            background: var(--bg);
+        }
+
+        /* ============================================
+           BADGES
+           ============================================ */
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-success {
+            background: rgba(39, 174, 96, 0.1);
+            color: var(--success);
+        }
+
+        .badge-warning {
+            background: rgba(243, 156, 18, 0.1);
+            color: var(--warning);
+        }
+
+        .badge-danger {
+            background: rgba(231, 76, 60, 0.1);
+            color: var(--danger);
+        }
+
+        .badge-info {
+            background: rgba(52, 152, 219, 0.1);
+            color: var(--info);
+        }
+
+        /* ============================================
+           BOTÕES
+           ============================================ */
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            color: white;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn-secondary {
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* ============================================
+           MODAIS
+           ============================================ */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, var(--bg) 0%, rgba(244, 247, 246, 0.5) 100%);
+        }
+
+        .modal-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--muted);
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            color: var(--text);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        /* ============================================
+           EMPTY STATE
+           ============================================ */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        /* ============================================
+           FOOTER
+           ============================================ */
+        .footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            background: var(--bg);
+            text-align: center;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        /* ============================================
+           RESPONSIVIDADE
+           ============================================ */
+        @media (max-width: 768px) {
+            .topbar {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .toolbar {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            th, td {
+                padding: 10px;
+            }
+
+            .modal-content {
+                width: 95%;
+            }
+        }
+    </style>
+
+
+</head>
+<body>
+    <div class="app-container">
+        <!-- TOPBAR -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <div class="topbar-logo">🔐 SCONT</div>
+                <div class="topbar-title">Gerenciador de Certificados Digitais</div>
+            </div>
+            <div class="topbar-right">
+                <button class="btn-back" onclick="window.location.href='portal.html'">← Voltar ao Portal</button>
+                <button class="btn-logout" id="logoutBtn">Sair</button>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <main class="main">
+            <div class="container">
+                <!-- HEADER SEÇÃO -->
+                <div class="section-header">
+                    <h1>Gestão de Certificados Digitais</h1>
+                    <p>Controle rigoroso, histórico completo e alertas visuais para certificados digitais</p>
+                </div>
+
+                <!-- STATS -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value" id="totalCerts">0</div>
+                        <div class="stat-label">Total de Certificados</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">✅</div>
+                        <div class="stat-value" id="activeCerts">0</div>
+                        <div class="stat-label">Certificados Ativos</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⏰</div>
+                        <div class="stat-value" id="expiringSoon">0</div>
+                        <div class="stat-label">Vencimento Próximo</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🔴</div>
+                        <div class="stat-value" id="expiredCerts">0</div>
+                        <div class="stat-label">Certificados Vencidos</div>
+                    </div>
+                </div>
+
+                <!-- CERTIFICADOS SECTION -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Certificados Digitais</h2>
+                        <button class="btn btn-primary" id="btnNewCert">+ Novo Certificado</button>
+                    </div>
+                    <div class="card-body">
+                        <!-- FILTROS -->
+                        <div class="toolbar">
+                            <div class="field">
+                                <label>Empresa</label>
+                                <input id="filterEmpresa" type="text" placeholder="Nome da empresa">
+                            </div>
+                            <div class="field">
+                                <label>Tipo</label>
+                                <select id="filterTipo">
+                                    <option value="">Todos</option>
+                                    <option value="A1">A1</option>
+                                    <option value="A3">A3</option>
+                                    <option value="e-CNPJ">e-CNPJ</option>
+                                    <option value="e-CPF">e-CPF</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Situação</label>
+                                <select id="filterSituacao">
+                                    <option value="">Todas</option>
+                                    <option value="Ativo">Ativo</option>
+                                    <option value="Vencido">Vencido</option>
+                                    <option value="Agendado">Agendado</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                                <button class="btn btn-primary" id="btnFilter" style="flex: 1;">Filtrar</button>
+                                <button class="btn btn-secondary" id="btnClearFilter" style="flex: 1;">Limpar</button>
+                            </div>
+                        </div>
+
+                        <!-- TABELA -->
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Empresa</th>
+                                        <th>Tipo</th>
+                                        <th>Vencimento</th>
+                                        <th>Emissão</th>
+                                        <th>Situação</th>
+                                        <th>Responsável</th>
+                                        <th>Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="certTable">
+                                    <tr>
+                                        <td colspan="7" style="text-align: center; padding: 40px;">
+                                            <div class="empty-state">
+                                                <div class="empty-state-icon">📋</div>
+                                                <p>⏳ Carregando certificados...</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- PAGINAÇÃO -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+                            <div style="font-size: 13px; color: var(--muted);">
+                                Página <span id="currentPage">1</span> de <span id="totalPages">1</span> • <span id="totalRecords">0</span> registro(s)
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-secondary btn-small" id="prevPage">← Anterior</button>
+                                <button class="btn btn-secondary btn-small" id="nextPage">Próxima →</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ALERTAS SECTION -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Alertas Críticos</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Empresa</th>
+                                        <th>Vencimento</th>
+                                        <th>Dias Restantes</th>
+                                        <th>Situação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alertsTable">
+                                    <tr>
+                                        <td colspan="4" style="text-align: center; padding: 40px;">
+                                            <div class="empty-state">
+                                                <div class="empty-state-icon">✅</div>
+                                                <p>Nenhum alerta crítico no momento</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="footer">
+            <p><strong>SCONT Soluções Contábeis LTDA</strong> • Gerenciador de Certificados Digitais • © 2026</p>
+        </footer>
+    </div>
+
+    <!-- MODAL: NOVO/EDITAR CERTIFICADO -->
+    <div class="modal" id="certModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="certModalTitle">Novo Certificado</h2>
+                <button class="modal-close" onclick="closeModal('certModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="certForm">
+                    <input id="certId" type="hidden">
+                    
+                    <div class="field">
+                        <label>Empresa *</label>
+                        <input id="empresa" type="text" required placeholder="Nome da empresa">
+                    </div>
+
+                    <div class="field">
+                        <label>CPF/CNPJ</label>
+                        <input id="cpfcnpj" type="text" placeholder="00.000.000/0000-00">
+                    </div>
+
+                    <div class="field">
+                        <label>Tipo *</label>
+                        <select id="tipo" required>
+                            <option value="">Selecione</option>
+                            <option value="A1">A1</option>
+                            <option value="A3">A3</option>
+                            <option value="e-CNPJ">e-CNPJ</option>
+                            <option value="e-CPF">e-CPF</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Autoridade Certificadora</label>
+                        <input id="autoridade" type="text" placeholder="Ex: Certisign, ICP-Brasil">
+                    </div>
+
+                    <div class="field">
+                        <label>Data de Emissão</label>
+                        <input id="emissao" type="date">
+                    </div>
+
+                    <div class="field">
+                        <label>Data de Vencimento *</label>
+                        <input id="vencimento" type="date" required>
+                    </div>
+
+                    <div class="field">
+                        <label>Senha *</label>
+                        <input id="senha" type="password" required placeholder="••••••••">
+                    </div>
+
+                    <div class="field">
+                        <label>Situação *</label>
+                        <select id="situacao" required>
+                            <option value="Ativo">Ativo</option>
+                            <option value="Agendado">Agendado</option>
+                            <option value="Vencido">Vencido</option>
+                            <option value="Aguardando Contato">Aguardando Contato</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label>Data de Agendamento</label>
+                        <input id="agendamento" type="date">
+                    </div>
+
+                    <div class="field">
+                        <label>Responsável Interno</label>
+                        <input id="responsavel" type="text" placeholder="Nome do responsável">
+                    </div>
+
+                    <div class="field">
+                        <label>E-mail</label>
+                        <input id="email" type="email" placeholder="email@empresa.com.br">
+                    </div>
+
+                    <div class="field">
+                        <label>Telefone</label>
+                        <input id="telefone" type="tel" placeholder="(61) 99999-9999">
+                    </div>
+
+                    <div class="field">
+                        <label>Informações Adicionais</label>
+                        <textarea id="info" style="min-height: 80px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit;" placeholder="Observações importantes..."></textarea>
+                    </div>
+
+                    <div class="field">
+                        <label>Observação de Risco</label>
+                        <textarea id="risco" style="min-height: 80px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit;" placeholder="Riscos identificados..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('certModal')">Cancelar</button>
+                <button type="submit" class="btn btn-primary" form="certForm">Salvar Certificado</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DETALHES -->
+    <div class="modal" id="detailsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Detalhes do Certificado</h2>
+                <button class="modal-close" onclick="closeModal('detailsModal')">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="detailsContent"></div>
+            </div>
+        </div>
+    </div>
+    <script src="js/auth-guard.js"></script>
+    <script>
+        window.authGuard = new AuthGuard({
+            requiredTool: 'certificados',
+            portalUrl: 'portal.html',
+            redirectDelay: 2000,
+            debug: false
+        });
+    </script>
+    <!-- API Client -->
+    <script src="js/api.js"></script>
+
+    <script>
+        // ============================================
+        // VARIÁVEIS GLOBAIS
+        // ============================================
+        let certificatesData = [];
+        let filteredData = [];
+        let currentPage = 1;
+        const pageSize = 10;
+        let currentEditId = null;
+
+        // ============================================
+        // VERIFICAÇÃO DE AUTENTICAÇÃO
+        // ============================================
+        function checkAuth() {
+            const userAuth = sessionStorage.getItem('userAuth');
+            if (!userAuth) {
+                window.location.href = 'portal.html';
+                return;
+            }
+            const user = JSON.parse(userAuth);
+            
+            // Verificar se tem acesso à ferramenta
+            if (!user.ferramentas || !user.ferramentas.includes('certificados')) {
+                alert('❌ Você não tem permissão para acessar esta ferramenta.');
+                window.location.href = 'portal.html';
+            }
+        }
+
+        // ============================================
+        // CARREGAR CERTIFICADOS
+        // ============================================
+        async function loadCertificates() {
+            try {
+                // Simular carregamento de dados (em produção, seria via API)
+                const stored = localStorage.getItem('certificates');
+                if (stored) {
+                    certificatesData = JSON.parse(stored);
+                } else {
+                    certificatesData = [];
+                }
+                
+                filteredData = [...certificatesData];
+                updateStats();
+                renderTable();
+                renderAlerts();
+            } catch (error) {
+                console.error('Erro ao carregar certificados:', error);
+                alert('Erro ao carregar certificados: ' + error.message);
+            }
+        }
+
+        // ============================================
+        // ATUALIZAR ESTATÍSTICAS
+        // ============================================
+        function updateStats() {
+            const total = certificatesData.length;
+            const active = certificatesData.filter(c => c.situacao === 'Ativo').length;
+            const expired = certificatesData.filter(c => {
+                const days = daysLeft(c.vencimento);
+                return days !== null && days < 0;
+            }).length;
+            const expiring = certificatesData.filter(c => {
+                const days = daysLeft(c.vencimento);
+                return days !== null && days >= 0 && days <= 30;
+            }).length;
+
+            document.getElementById('totalCerts').textContent = total;
+            document.getElementById('activeCerts').textContent = active;
+            document.getElementById('expiredCerts').textContent = expired;
+            document.getElementById('expiringSoon').textContent = expiring;
+        }
+
+        // ============================================
+        // CALCULAR DIAS RESTANTES
+        // ============================================
+        function daysLeft(dateString) {
+            if (!dateString) return null;
+            const vencimento = new Date(dateString);
+            const hoje = new Date();
+            const diff = vencimento - hoje;
+            return Math.ceil(diff / (1000 * 60 * 60 * 24));
+        }
+
+        // ============================================
+        // FORMATAR DATA
+        // ============================================
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR');
+        }
+
+        // ============================================
+        // RENDERIZAR TABELA
+        // ============================================
+        function renderTable() {
+            const tbody = document.getElementById('certTable');
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            const paginated = filteredData.slice(start, end);
+
+            if (paginated.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 40px;">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📋</div>
+                                <p>Nenhum certificado encontrado</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = paginated.map(c => {
+                const days = daysLeft(c.vencimento);
+                let statusBadge = '';
+                
+                if (c.situacao === 'Ativo') {
+                    statusBadge = '<span class="badge badge-success">Ativo</span>';
+                } else if (c.situacao === 'Vencido' || (days !== null && days < 0)) {
+                    statusBadge = '<span class="badge badge-danger">Vencido</span>';
+                } else if (days !== null && days <= 30) {
+                    statusBadge = '<span class="badge badge-warning">Vencimento Próximo</span>';
+                } else {
+                    statusBadge = '<span class="badge badge-info">' + c.situacao + '</span>';
+                }
+
+                return `
+                    <tr>
+                        <td><strong>${c.empresa}</strong></td>
+                        <td>${c.tipo}</td>
+                        <td>${formatDate(c.vencimento)}</td>
+                        <td>${formatDate(c.emissao)}</td>
+                        <td>${statusBadge}</td>
+                        <td>${c.responsavel || '-'}</td>
+                        <td>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn btn-secondary btn-small" onclick="openDetails('${c.id}')">👁️ Ver</button>
+                                <button class="btn btn-secondary btn-small" onclick="editCert('${c.id}')">✏️ Editar</button>
+                                <button class="btn btn-danger btn-small" onclick="deleteCert('${c.id}')">🗑️ Deletar</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Atualizar paginação
+            const totalPages = Math.ceil(filteredData.length / pageSize);
+            document.getElementById('currentPage').textContent = currentPage;
+            document.getElementById('totalPages').textContent = totalPages;
+            document.getElementById('totalRecords').textContent = filteredData.length;
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = currentPage === totalPages;
+        }
+
+        // ============================================
+        // RENDERIZAR ALERTAS
+        // ============================================
+        function renderAlerts() {
+            const tbody = document.getElementById('alertsTable');
+            const alerts = certificatesData
+                .filter(c => {
+                    const days = daysLeft(c.vencimento);
+                    return days !== null && days <= 30;
+                })
+                .sort((a, b) => daysLeft(a.vencimento) - daysLeft(b.vencimento))
+                .slice(0, 10);
+
+            if (alerts.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 40px;">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">✅</div>
+                                <p>Nenhum alerta crítico no momento</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = alerts.map(c => {
+                const days = daysLeft(c.vencimento);
+                let badge = '';
+                
+                if (days < 0) {
+                    badge = '<span class="badge badge-danger">VENCIDO</span>';
+                } else if (days <= 7) {
+                    badge = '<span class="badge badge-danger">CRÍTICO</span>';
+                } else if (days <= 15) {
+                    badge = '<span class="badge badge-warning">ATENÇÃO</span>';
+                } else {
+                    badge = '<span class="badge badge-info">PRÓXIMO</span>';
+                }
+
+                return `
+                    <tr>
+                        <td><strong>${c.empresa}</strong></td>
+                        <td>${formatDate(c.vencimento)}</td>
+                        <td><strong>${days} dias</strong></td>
+                        <td>${badge}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // ============================================
+        // ABRIR DETALHES
+        // ============================================
+        function openDetails(id) {
+            const cert = certificatesData.find(c => c.id === id);
+            if (!cert) return;
+
+            const days = daysLeft(cert.vencimento);
+            const detailsHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px;">Empresa</div>
+                        <div style="font-size: 14px; font-weight: 600;">${cert.empresa}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px;">Tipo</div>
+                        <div style="font-size: 14px; font-weight: 600;">${cert.tipo}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px;">Vencimento</div>
+                        <div style="font-size: 14px; font-weight: 600;">${formatDate(cert.vencimento)}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px;">Dias Restantes</div>
+                        <div style="font-size: 14px; font-weight: 600; color: ${days < 0 ? 'var(--danger)' : days <= 30 ? 'var(--warning)' : 'var(--success)'};">${days} dias</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px;">Emissão</div>
+                        <div style="font-size: 14px; font-weight: 600;">${formatDate(cert.emissao)}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px;">Situação</div>
+                        <div style="font-size: 14px; font-weight: 600;">${cert.situacao}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px;">Responsável</div>
+                        <div style="font-size: 14px; font-weight: 600;">${cert.responsavel || '-'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px;">E-mail</div>
+                        <div style="font-size: 14px; font-weight: 600;">${cert.email || '-'}</div>
+                    </div>
+                    <div style="grid-column: 1 / -1;">
+                        <div style="font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 4px;">Informações Adicionais</div>
+                        <div style="font-size: 13px; color: var(--text);">${cert.info || '-'}</div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detailsContent').innerHTML = detailsHTML;
+            openModal('detailsModal');
+        }
+
+        // ============================================
+        // EDITAR CERTIFICADO
+        // ============================================
+        function editCert(id) {
+            const cert = certificatesData.find(c => c.id === id);
+            if (!cert) return;
+
+            currentEditId = id;
+            document.getElementById('certModalTitle').textContent = 'Editar Certificado';
+            document.getElementById('certId').value = cert.id;
+            document.getElementById('empresa').value = cert.empresa;
+            document.getElementById('cpfcnpj').value = cert.cpf_cnpj || '';
+            document.getElementById('tipo').value = cert.tipo;
+            document.getElementById('autoridade').value = cert.autoridade || '';
+            document.getElementById('emissao').value = cert.emissao || '';
+            document.getElementById('vencimento').value = cert.vencimento;
+            document.getElementById('senha').value = cert.senha || '';
+            document.getElementById('situacao').value = cert.situacao;
+            document.getElementById('agendamento').value = cert.agendamento || '';
+            document.getElementById('responsavel').value = cert.responsavel || '';
+            document.getElementById('email').value = cert.email || '';
+            document.getElementById('telefone').value = cert.telefone || '';
+            document.getElementById('info').value = cert.info || '';
+            document.getElementById('risco').value = cert.risco || '';
+
+            openModal('certModal');
+        }
+
+        // ============================================
+        // DELETAR CERTIFICADO
+        // ============================================
+        function deleteCert(id) {
+            if (!confirm('Tem certeza que deseja deletar este certificado?')) return;
+
+            certificatesData = certificatesData.filter(c => c.id !== id);
+            localStorage.setItem('certificates', JSON.stringify(certificatesData));
+            loadCertificates();
+            alert('✅ Certificado deletado com sucesso!');
+        }
+
+        // ============================================
+        // SALVAR CERTIFICADO
+        // ============================================
+        document.getElementById('certForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const id = document.getElementById('certId').value;
+            const cert = {
+                id: id || 'cert_' + Date.now(),
+                empresa: document.getElementById('empresa').value,
+                cpf_cnpj: document.getElementById('cpfcnpj').value,
+                tipo: document.getElementById('tipo').value,
+                autoridade: document.getElementById('autoridade').value,
+                emissao: document.getElementById('emissao').value,
+                vencimento: document.getElementById('vencimento').value,
+                senha: document.getElementById('senha').value,
+                situacao: document.getElementById('situacao').value,
+                agendamento: document.getElementById('agendamento').value,
+                responsavel: document.getElementById('responsavel').value,
+                email: document.getElementById('email').value,
+                telefone: document.getElementById('telefone').value,
+                info: document.getElementById('info').value,
+                risco: document.getElementById('risco').value
+            };
+
+            if (id) {
+                const index = certificatesData.findIndex(c => c.id === id);
+                if (index !== -1) {
+                    certificatesData[index] = cert;
+                }
+            } else {
+                certificatesData.push(cert);
+            }
+
+            localStorage.setItem('certificates', JSON.stringify(certificatesData));
+            closeModal('certModal');
+            loadCertificates();
+            alert('✅ Certificado salvo com sucesso!');
+        });
+
+        // ============================================
+        // FILTROS
+        // ============================================
+        document.getElementById('btnFilter').addEventListener('click', () => {
+            const empresa = document.getElementById('filterEmpresa').value.toLowerCase();
+            const tipo = document.getElementById('filterTipo').value;
+            const situacao = document.getElementById('filterSituacao').value;
+
+            filteredData = certificatesData.filter(c => 
+                (!empresa || c.empresa.toLowerCase().includes(empresa)) &&
+                (!tipo || c.tipo === tipo) &&
+                (!situacao || c.situacao === situacao)
+            );
+
+            currentPage = 1;
+            renderTable();
+        });
+
+        document.getElementById('btnClearFilter').addEventListener('click', () => {
+            document.getElementById('filterEmpresa').value = '';
+            document.getElementById('filterTipo').value = '';
+            document.getElementById('filterSituacao').value = '';
+            filteredData = [...certificatesData];
+            currentPage = 1;
+            renderTable();
+        });
+
+        // ============================================
+        // PAGINAÇÃO
+        // ============================================
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderTable();
+            }
+        });
+
+        document.getElementById('nextPage').addEventListener('click', () => {
+            const totalPages = Math.ceil(filteredData.length / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderTable();
+            }
+        });
+
+        // ============================================
+        // NOVO CERTIFICADO
+        // ============================================
+        document.getElementById('btnNewCert').addEventListener('click', () => {
+            currentEditId = null;
+            document.getElementById('certModalTitle').textContent = 'Novo Certificado';
+            document.getElementById('certForm').reset();
+            document.getElementById('certId').value = '';
+            openModal('certModal');
+        });
+
+        // ============================================
+        // MODAIS
+        // ============================================
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // ============================================
+        // LOGOUT
+        // ============================================
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            if (confirm('Deseja realmente sair?')) {
+                sessionStorage.removeItem('userAuth');
+                window.location.href = 'portal.html';
+            }
+        });
+
+        // ============================================
+        // INICIALIZAÇÃO
+        // ============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            loadCertificates();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

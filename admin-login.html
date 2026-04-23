@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCONT - Login Administrativo</title>
+    <script src="supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary:#8B3A3A; --primary-hover:#6B2A2A; --secondary:#2C3E50;
+            --danger:#E74C3C; --success:#27AE60; --info:#3498DB;
+            --card:#FFFFFF; --text:#2C3E50; --muted:#7F8C8D; --border:#E0E6ED;
+            --shadow-md:0 4px 12px rgba(0,0,0,.08); --radius:12px; --transition:all .3s ease;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+        }
+        .login-container { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow-md); max-width:400px; width:100%; padding:40px; }
+        .login-header { text-align:center; margin-bottom:28px; }
+        .login-logo { font-size:44px; margin-bottom:14px; }
+        .login-header h1 { font-size:22px; font-weight:700; color:var(--text); margin-bottom:6px; }
+        .login-header p { font-size:13px; color:var(--muted); }
+        .form-group { margin-bottom:15px; }
+        .form-group label { display:block; margin-bottom:6px; font-weight:600; font-size:13px; color:var(--text); }
+        .form-group input { width:100%; padding:11px 12px; border:1px solid var(--border); border-radius:6px; font-size:14px; transition:var(--transition); }
+        .form-group input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(139,58,58,.1); }
+        .btn-login {
+            width:100%; padding:12px;
+            background:linear-gradient(135deg,var(--primary),var(--primary-hover));
+            color:white; border:none; border-radius:6px; font-weight:700; font-size:14px;
+            cursor:pointer; transition:var(--transition); margin-top:18px;
+        }
+        .btn-login:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); }
+        .btn-login:disabled { opacity:.6; cursor:not-allowed; transform:none; }
+        .alert { padding:11px 14px; border-radius:6px; font-size:13px; margin-bottom:14px; display:none; border-left:4px solid; }
+        .alert.show { display:block; }
+        .alert-error   { background:rgba(231,76,60,.1);  color:var(--danger);  border-left-color:var(--danger); }
+        .alert-success { background:rgba(39,174,96,.1);  color:var(--success); border-left-color:var(--success); }
+        .loading { display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; margin-right:6px; vertical-align:middle; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .back-link { text-align:center; margin-top:18px; }
+        .back-link a { color:var(--primary); text-decoration:none; font-size:13px; font-weight:600; }
+        .back-link a:hover { text-decoration:underline; }
+    </style>
+</head>
+<body>
+<div class="login-container">
+    <div class="login-header">
+        <div class="login-logo">🛡️</div>
+        <h1>Painel Administrativo</h1>
+        <p>SCONT Soluções Contábeis</p>
+    </div>
+
+    <div class="alert alert-error"   id="errorMsg"></div>
+    <div class="alert alert-success" id="successMsg"></div>
+
+    <form id="loginForm">
+        <div class="form-group">
+            <label>E-mail</label>
+            <input id="email" type="email" required placeholder="admin@scontdf.com.br" autocomplete="email">
+        </div>
+        <div class="form-group">
+            <label>Senha</label>
+            <input id="password" type="password" required placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn-login" id="btnLogin">Entrar</button>
+    </form>
+
+    <div class="back-link"><a href="login.html">← Voltar ao Login</a></div>
+</div>
+
+<script>
+// ─── CONFIG ────────────────────────────────────────────────
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function sanitize(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn      = document.getElementById('btnLogin');
+    const errEl    = document.getElementById('errorMsg');
+    const okEl     = document.getElementById('successMsg');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading"></span>Autenticando...';
+    errEl.classList.remove('show');
+    okEl.classList.remove('show');
+
+    try {
+        // 1. Autenticar
+        const { data: authData, error: authErr } = await sb.auth.signInWithPassword({ email, password });
+        if (authErr) throw new Error(authErr.message);
+
+        // 2. Verificar is_admin na tabela usuarios
+        const { data: user, error: userErr } = await sb
+            .from('usuarios')
+            .select('nome, is_admin')
+            .eq('id', authData.user.id)
+            .single();
+
+        if (userErr || !user) {
+            await sb.auth.signOut();
+            throw new Error('Usuário não encontrado no sistema.');
+        }
+
+        if (!user.is_admin) {
+            await sb.auth.signOut();
+            throw new Error('Acesso restrito a administradores.');
+        }
+
+        // 3. Salvar sessão admin
+        sessionStorage.setItem('adminAuth', JSON.stringify({
+            authUserId: authData.user.id,
+            email:      authData.user.email,
+            nome:       user.nome,
+            loginTime:  new Date().toISOString()
+        }));
+
+        okEl.textContent = '✅ Login realizado! Redirecionando...';
+        okEl.classList.add('show');
+        setTimeout(() => { window.location.href = 'admin-dashboard.html'; }, 1000);
+
+    } catch (err) {
+        errEl.textContent = '❌ ' + sanitize(err.message);
+        errEl.classList.add('show');
+        btn.disabled = false;
+        btn.innerHTML = 'Entrar';
+    }
+});
+
+// ─── REDIRECT SE JÁ LOGADO ─────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    const saved = sessionStorage.getItem('adminAuth');
+    if (session && saved)  { window.location.href = 'admin-dashboard.html'; return; }
+    if (!session && saved)   sessionStorage.removeItem('adminAuth');
+});
+</script>
+</body>
+</html>

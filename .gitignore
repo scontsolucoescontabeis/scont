@@ -1,0 +1,31 @@
+# Variáveis de ambiente com credenciais reais
+.env
+*.env
+
+# Ambiente virtual Python
+venv/
+.venv/
+env/
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Dependências Node.js
+node_modules/
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Arquivos temporários / backups de editor
+*.tmp
+*.bak
+*.swp
+*~

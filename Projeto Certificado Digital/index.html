@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCONT Soluções Contábeis | Gestão de Certificados Digitais</title>
+  
+  <script src="../supabase-config.js"></script>
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../portal-auth-guard.js"></script>
+  
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <!-- VERIFICAÇÃO DE AUTENTICAÇÃO (Loading) -->
+  <div class="auth-check-container" id="authCheckContainer">
+    <div class="loading-spinner">
+      <div class="spinner"></div>
+      <p>Verificando autenticação...</p>
+    </div>
+  </div>
+
+  <!-- APLICAÇÃO PRINCIPAL (Oculta até autenticação) -->
+  <div id="app" style="display: none;">
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span>🔐</span>
+        <span>SCONT</span>
+      </div>
+      <nav class="nav">
+        <button class="active" data-page="dashboard">
+          <span>🏠</span>
+          <span>Dashboard</span>
+        </button>
+        <button data-page="certificados">
+          <span>📄</span>
+          <span>Certificados</span>
+        </button>
+        <button data-page="relatorios">
+          <span>📊</span>
+          <span>Relatórios</span>
+        </button>
+        <button data-page="agenda">
+          <span>📅</span>
+          <span>Agenda</span>
+        </button>
+        <button data-page="historico">
+          <span>🕓</span>
+          <span>Histórico</span>
+        </button>
+        <button data-page="seguranca">
+          <span>🔒</span>
+          <span>Segurança</span>
+        </button>
+        <button data-page="configuracoes">
+          <span>⚙️</span>
+          <span>Configurações</span>
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        Controle rigoroso, histórico completo e alertas visuais para certificados digitais.
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <div class="top-left">
+          <button class="collapse-btn" id="sidebarCollapseBtn">☰</button>
+          <div class="page-info">
+            <h1 id="pageTitle">Dashboard</h1>
+            <div class="meta" id="pageSubtitle">Visão geral operacional da carteira</div>
+          </div>
+        </div>
+        <div class="top-actions">
+          <div class="pill" id="statusConnection">
+            <span class="status-badge disconnected">⚫ Conectando...</span>
+          </div>
+          <div class="pill" id="themeLabel">🌙 Tema claro</div>
+          <div class="notif" id="notifBtn" data-count="0" title="Alertas">🔔</div>
+          
+          <!-- MENU DO USUÁRIO -->
+          <div class="user-menu">
+            <button class="user-menu-btn" id="userMenuBtn">
+              <div class="user-avatar" id="userAvatar">SC</div>
+              <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px;">
+                <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);" id="userName">Usuário</div>
+                <div style="font-size: 11px; color: var(--text-muted);" id="userEmail">email@example.com</div>
+              </div>
+            </button>
+            <div class="user-dropdown" id="userDropdown">
+              <div class="user-dropdown-item" id="profileItem">👤 Meu perfil</div>
+              <div class="user-dropdown-item" id="settingsItem">⚙️ Configurações</div>
+              <div class="user-dropdown-item" id="securityItem">🔒 Segurança</div>
+              <div class="user-dropdown-item" id="backPortalItem">🏠 Voltar ao Portal</div>
+              <div class="user-dropdown-item danger" id="logoutItem">🚪 Sair</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- CONTENT -->
+      <section class="content">
+        <!-- DASHBOARD -->
+        <section class="page active" id="page-dashboard">
+          <div class="grid-cards" id="cards"></div>
+
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>Alertas críticos</h2>
+                <div class="meta">Vencimentos mais próximos, atrasos e pendências financeiras</div>
+              </div>
+            </div>
+            <div class="section-body">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>Vencimento</th>
+                      <th>Situação</th>
+                      <th>Dias restantes</th>
+                    </tr>
+                  </thead>
+                  <tbody id="alertsTable"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>Agenda rápida</h2>
+                <div class="meta">Compromissos e contatos programados</div>
+              </div>
+            </div>
+            <div class="section-body">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>Agendamento</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="agendaTable"></tbody>
+                </table>
+              </div>
+              <h3 style="margin-top: 32px; margin-bottom: 16px; font-size: 16px; font-weight: 700;">Histórico recente</h3>
+              <div class="timeline" id="timeline"></div>
+            </div>
+          </section>
+        </section>
+
+        <!-- CERTIFICADOS -->
+        <section class="page" id="page-certificados">
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>Certificados digitais</h2>
+                <div class="meta">Gestão completa de certificados A1, A3, e-CNPJ, e-CPF</div>
+              </div>
+              <button class="btn btn-primary" id="btnNewCert">+ Novo certificado</button>
+            </div>
+            <div class="section-body">
+              <div class="toolbar" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                <div class="field">
+                  <label>Empresa</label>
+                  <input id="filterEmpresa" type="text" placeholder="Nome da empresa" />
+                </div>
+                <div class="field">
+                  <label>Tipo</label>
+                  <select id="filterTipo">
+                    <option value="">Todos</option>
+                    <option value="A1">A1</option>
+                    <option value="A3">A3</option>
+                    <option value="e-CNPJ">e-CNPJ</option>
+                    <option value="e-CPF">e-CPF</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Situação</label>
+                  <select id="filterSituacao">
+                    <option value="">Todas</option>
+                    <option value="Ativo">Ativo</option>
+                    <option value="Agendado">Agendado</option>
+                    <option value="Renovado">Renovado</option>
+                    <option value="Aguardando Contato">Aguardando Contato</option>
+                    <option value="Vencido">Vencido</option>
+                  </select>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: flex-end;">
+                  <button class="btn btn-primary" id="btnFilterCert" style="flex: 1;">Filtrar</button>
+                  <button class="btn btn-secondary" id="btnClearFilter" style="flex: 1;">Limpar</button>
+                </div>
+              </div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>Tipo</th>
+                      <th>Vencimento</th>
+                      <th>Emissão</th>
+                      <th>Situação</th>
+                      <th>Responsável</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="certTable"></tbody>
+                </table>
+              </div>
+
+              <div class="pagination" style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px;">
+                <div class="pagination-info" style="font-size: 13px; color: var(--text-muted);">
+                  Página <span id="currentPage">1</span> de <span id="totalPages">1</span> • <span id="totalRecords">0</span> registro(s)
+                </div>
+                <div class="pagination-actions" style="display: flex; gap: 8px;">
+                  <button class="btn btn-secondary" id="prevPage">← Anterior</button>
+                  <button class="btn btn-secondary" id="nextPage">Próxima →</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <!-- RELATÓRIOS -->
+        <section class="page" id="page-relatorios">
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>Relatórios avançados</h2>
+                <div class="meta">Análise completa de certificados com múltiplos filtros</div>
+              </div>
+            </div>
+            <div class="section-body">
+              <p style="color: var(--text-muted);">Conteúdo de relatórios será carregado aqui...</p>
+            </div>
+          </section>
+        </section>
+
+        <!-- AGENDA -->
+        <section class="page" id="page-agenda">
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>Agenda de renovações</h2>
+                <div class="meta">Compromissos e contatos programados para renovação</div>
+              </div>
+            </div>
+            <div class="section-body">
+              <p style="color: var(--text-muted);">Conteúdo de agenda será carregado aqui...</p>
+            </div>
+          </section>
+        </section>
+
+        <!-- HISTÓRICO -->
+        <section class="page" id="page-historico">
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>Histórico de atividades</h2>
+                <div class="meta">Registro completo de todas as operações realizadas</div>
+              </div>
+            </div>
+            <div class="section-body">
+              <div class="timeline" id="historyTimeline"></div>
+            </div>
+          </section>
+        </section>
+
+        <!-- SEGURANÇA -->
+        <section class="page" id="page-seguranca">
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>Segurança e criptografia local</h2>
+                <div class="meta">Proteção de senhas e dados sensíveis em front-end</div>
+              </div>
+            </div>
+            <div class="section-body">
+              <p style="color: var(--text-muted);">Conteúdo de segurança será carregado aqui...</p>
+            </div>
+          </section>
+        </section>
+
+        <!-- CONFIGURAÇÕES -->
+        <section class="page" id="page-configuracoes">
+          <section class="section">
+            <div class="section-head">
+              <div>
+                <h2>Configurações da interface</h2>
+                <div class="meta">Preferências visuais e parâmetros operacionais</div>
+              </div>
+            </div>
+            <div class="section-body">
+              <p style="color: var(--text-muted);">Conteúdo de configurações será carregado aqui...</p>
+            </div>
+          </section>
+        </section>
+      </section>
+
+      <!-- FOOTER -->
+      <div class="footer">
+        SCONT Soluções Contábeis • Gestão de Certificados Digitais • Pronto para produção
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL CERTIFICADO -->
+  <div class="modal" id="certModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="certModalTitle">Novo certificado</h3>
+        <button class="modal-close" id="closeCertModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="certForm">
+          <input id="certId" type="hidden">
+          <div class="field">
+            <label>Empresa *</label>
+            <input id="empresa" type="text" required>
+          </div>
+          <div class="field">
+            <label>CPF/CNPJ</label>
+            <input id="cpfcnpj" type="text">
+          </div>
+          <div class="field">
+            <label>Tipo *</label>
+            <select id="tipo" required>
+              <option value="">Selecione</option>
+              <option value="A1">A1</option>
+              <option value="A3">A3</option>
+              <option value="e-CNPJ">e-CNPJ</option>
+              <option value="e-CPF">e-CPF</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Autoridade certificadora</label>
+            <input id="autoridade" type="text">
+          </div>
+          <div class="field">
+            <label>Data de emissão</label>
+            <input id="emissao" type="date">
+          </div>
+          <div class="field">
+            <label>Data de vencimento *</label>
+            <input id="vencimento" type="date" required>
+          </div>
+          <div class="field">
+            <label>Senha *</label>
+            <input id="senha" type="password" required>
+          </div>
+          <div class="field">
+            <label>Situação *</label>
+            <select id="situacao" required>
+              <option value="Ativo">Ativo</option>
+              <option value="Agendado">Agendado</option>
+              <option value="Renovado">Renovado</option>
+              <option value="Aguardando Contato">Aguardando Contato</option>
+              <option value="Vencido">Vencido</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Data de agendamento</label>
+            <input id="agendamento" type="date">
+          </div>
+          <div class="field">
+            <label>Responsável interno</label>
+            <input id="responsavel" type="text">
+          </div>
+          <div class="field">
+            <label>E-mail</label>
+            <input id="email" type="email">
+          </div>
+          <div class="field">
+            <label>Telefone</label>
+            <input id="telefone" type="tel">
+          </div>
+          <div class="field">
+            <label>Informações adicionais</label>
+            <textarea id="info"></textarea>
+          </div>
+          <div class="field">
+            <label>Observação de risco</label>
+            <textarea id="risco"></textarea>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 24px;">
+            <button type="button" class="btn btn-secondary" id="cancelCertForm" style="flex: 1;">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex: 1;">Salvar certificado</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DETALHES -->
+  <div class="modal" id="detailsModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>Detalhes do certificado</h3>
+        <button class="modal-close" id="closeDetailsModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="detailsContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

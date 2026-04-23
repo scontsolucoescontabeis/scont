@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCONT - Portal</title>
+    <script src="supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #8B3A3A;
+            --primary-hover: #6B2A2A;
+            --primary-light: #A85252;
+            --secondary: #2C3E50;
+            --secondary-light: #34495E;
+            --success: #27AE60;
+            --danger: #E74C3C;
+            --info: #3498DB;
+            --bg: #F0F2F5;
+            --bg-light: #F8F9FA;
+            --card: #FFFFFF;
+            --text: #2C3E50;
+            --text-light: #5A6C7D;
+            --muted: #8B95A5;
+            --border: #E0E6ED;
+            --border-light: #EBF0F7;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+            --radius: 10px;
+            --radius-sm: 8px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        /* ─── SIDEBAR ─── */
+        .sidebar {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 28px 20px;
+            position: fixed;
+            width: 260px;
+            height: 100vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            transition: left 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            text-align: center;
+            margin-bottom: 32px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .sidebar-header img {
+            max-width: 140px;
+            height: auto;
+            margin: 0 auto 14px;
+            display: block;
+            filter: brightness(1.1);
+        }
+
+        .sidebar-header h2 {
+            font-size: 17px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            letter-spacing: 0.3px;
+        }
+
+        .sidebar-header p {
+            font-size: 12px;
+            opacity: 0.85;
+            font-weight: 500;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .user-info {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 14px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 14px;
+            font-size: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .user-info strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .user-info span {
+            opacity: 0.9;
+            word-break: break-word;
+        }
+
+        .logout-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+            font-size: 13px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .logout-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+            background: linear-gradient(135deg, var(--primary-hover), #5A1F1F);
+        }
+
+        /* ─── MAIN CONTENT ─── */
+        .main-content {
+            margin-left: 260px;
+            padding: 36px;
+            min-height: 100vh;
+            background: var(--bg);
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card);
+            padding: 28px 32px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 32px;
+            border-left: 5px solid var(--primary);
+        }
+
+        .page-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+
+        .page-header-info {
+            text-align: right;
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        .page-header-info p {
+            margin: 4px 0;
+            font-weight: 500;
+        }
+
+        /* ─── CARDS ─── */
+        .card {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 24px;
+            overflow: hidden;
+            border: 1px solid var(--border-light);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary);
+            padding: 24px 32px;
+            border-bottom: 2px solid var(--border-light);
+            background: linear-gradient(90deg, rgba(139, 58, 58, 0.04) 0%, transparent 100%);
+            letter-spacing: 0.2px;
+        }
+
+        .card-body {
+            padding: 32px;
+        }
+
+        /* ─── GRID DE FERRAMENTAS ─── */
+        .ferramentas-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .ferramenta-card {
+            background: var(--card);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius);
+            padding: 28px;
+            text-align: center;
+            transition: var(--transition);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 220px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .ferramenta-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--primary-light));
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+        }
+
+        .ferramenta-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-6px);
+        }
+
+        .ferramenta-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .ferramenta-icon {
+            font-size: 56px;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, rgba(139, 58, 58, 0.1) 0%, rgba(139, 58, 58, 0.05) 100%);
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            border: 1px solid rgba(139, 58, 58, 0.15);
+        }
+
+        .ferramenta-card:hover .ferramenta-icon {
+            background: linear-gradient(135deg, rgba(139, 58, 58, 0.15) 0%, rgba(139, 58, 58, 0.08) 100%);
+            transform: scale(1.08);
+            border-color: var(--primary);
+        }
+
+        .ferramenta-nome {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 8px;
+            letter-spacing: 0.2px;
+        }
+
+        .ferramenta-desc {
+            font-size: 13px;
+            color: var(--text-light);
+            margin-bottom: 16px;
+            flex: 1;
+            line-height: 1.5;
+        }
+
+        .btn-acessar {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-hover));
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            transition: var(--transition);
+            box-shadow: var(--shadow-sm);
+            letter-spacing: 0.3px;
+        }
+
+        .btn-acessar:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+            background: linear-gradient(135deg, var(--primary-hover), #5A1F1F);
+        }
+
+        .btn-acessar:active {
+            transform: translateY(0);
+        }
+
+        /* ─── EMPTY STATE ─── */
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--muted);
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+            display: block;
+        }
+
+        .empty-state p {
+            font-size: 15px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-light);
+        }
+
+        .empty-state p:last-child {
+            font-size: 13px;
+            color: var(--muted);
+            margin-top: 12px;
+        }
+
+        /* ─── ALERTS ─── */
+        .alert {
+            padding: 14px 18px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 20px;
+            font-size: 13px;
+            display: none;
+            border-left: 4px solid;
+            font-weight: 500;
+        }
+
+        .alert.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        .alert-error {
+            background: rgba(231, 76, 60, 0.12);
+            color: var(--danger);
+            border-left-color: var(--danger);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ─── HAMBURGER ─── */
+        .hamburger {
+            display: none;
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 1100;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            padding: 10px 13px;
+            font-size: 19px;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition);
+        }
+
+        .hamburger:hover {
+            background: var(--primary-hover);
+            transform: scale(1.05);
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 999;
+            backdrop-filter: blur(2px);
+        }
+
+        .overlay.show {
+            display: block;
+        }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-width: 768px) {
+            .sidebar {
+                left: -260px;
+            }
+
+            .sidebar.open {
+                left: 0;
+            }
+
+            .hamburger {
+                display: block;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 20px;
+                padding-top: 70px;
+            }
+
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+                padding: 20px 24px;
+            }
+
+            .page-header h1 {
+                font-size: 24px;
+            }
+
+            .page-header-info {
+                text-align: left;
+                width: 100%;
+            }
+
+            .ferramentas-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .card-body {
+                padding: 20px;
+            }
+
+            .card-title {
+                padding: 18px 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .page-header h1 {
+                font-size: 20px;
+            }
+
+            .ferramenta-card {
+                padding: 20px;
+                min-height: 200px;
+            }
+
+            .ferramenta-icon {
+                width: 70px;
+                height: 70px;
+                font-size: 48px;
+            }
+
+            .main-content {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+    <div class="overlay" id="overlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+            <h2>Portal SCONT</h2>
+            <p>Suas Ferramentas</p>
+        </div>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <strong id="sidebarNome">—</strong>
+                <span id="sidebarEmail">—</span>
+            </div>
+            <button class="logout-btn" id="btnLogout">🚪 Sair</button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="page-header">
+            <div>
+                <h1 id="welcomeMsg">Bem-vindo!</h1>
+            </div>
+            <div class="page-header-info">
+                <p id="headerEmail">—</p>
+                <p id="headerLogin">Login: —</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">🔧 Suas Ferramentas Autorizadas</div>
+            <div class="card-body">
+                <div id="alertPortal" class="alert alert-error"></div>
+                <div class="ferramentas-grid" id="ferramentasGrid">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⏳</div>
+                        <p>Carregando ferramentas...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ─── CONFIG ────────────────────────────────────────────────
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // ─── HAMBURGER ─────────────────────────────────────────────
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        document.getElementById('hamburger').addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('show');
+        });
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('show');
+        });
+
+        // ─── AUTH ──────────────────────────────────────────────────
+        async function checkAuth() {
+            const saved = sessionStorage.getItem('userAuth');
+            if (!saved) {
+                window.location.href = 'login.html';
+                return null;
+            }
+            let auth;
+            try {
+                auth = JSON.parse(saved);
+            } catch {
+                window.location.href = 'login.html';
+                return null;
+            }
+            const { data: { session } } = await sb.auth.getSession();
+            if (!session) {
+                sessionStorage.removeItem('userAuth');
+                window.location.href = 'login.html';
+                return null;
+            }
+            return auth;
+        }
+
+        // ─── CARREGAR FERRAMENTAS ──────────────────────────────────
+        async function loadFerramentas(userId) {
+            try {
+                const { data, error } = await sb
+                    .from('usuario_ferramentas')
+                    .select('ferramentas ( id, nome, descricao, icone, url_base, ativa, ordem )');
+                if (error) throw error;
+                const ferramentas = (data || [])
+                    .map(row => row.ferramentas)
+                    .filter(f => f && f.ativa)
+                    .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+                ferramentas.length ? renderFerramentas(ferramentas) : renderVazio();
+            } catch (err) {
+                console.error('Erro ao carregar ferramentas:', err);
+                const el = document.getElementById('alertPortal');
+                el.textContent = '❌ Erro ao carregar ferramentas. Tente recarregar a página.';
+                el.classList.add('show');
+                renderVazio();
+            }
+        }
+
+        // ─── RENDER FERRAMENTAS ────────────────────────────────────
+        function renderFerramentas(ferramentas) {
+            const grid = document.getElementById('ferramentasGrid');
+            grid.innerHTML = '';
+            ferramentas.forEach(f => {
+                const card = document.createElement('div');
+                card.className = 'ferramenta-card';
+                const icon = document.createElement('div');
+                icon.className = 'ferramenta-icon';
+                icon.textContent = f.icone || '🔧';
+                const nome = document.createElement('div');
+                nome.className = 'ferramenta-nome';
+                nome.textContent = f.nome;
+                const desc = document.createElement('div');
+                desc.className = 'ferramenta-desc';
+                desc.textContent = f.descricao || 'Clique para acessar';
+                const btn = document.createElement('button');
+                btn.className = 'btn-acessar';
+                btn.textContent = 'Acessar →';
+                const acessar = () => abrirFerramenta(f.url_base);
+                card.addEventListener('click', acessar);
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    acessar();
+                });
+                card.appendChild(icon);
+                card.appendChild(nome);
+                card.appendChild(desc);
+                card.appendChild(btn);
+                grid.appendChild(card);
+            });
+        }
+
+        function renderVazio() {
+            const grid = document.getElementById('ferramentasGrid');
+            grid.innerHTML = `
+                <div style="grid-column:1/-1">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔐</div>
+                        <p>Você ainda não tem ferramentas autorizadas.</p>
+                        <p>Aguarde a aprovação do administrador.</p>
+                    </div>
+                </div>`;
+        }
+
+        // ─── ABRIR FERRAMENTA ──────────────────────────────────────
+        function abrirFerramenta(url) {
+            if (!url) { alert('URL não configurada para esta ferramenta.'); return; }
+            // Abre no mesmo tab para preservar sessionStorage nas ferramentas internas
+            try {
+                window.location.href = new URL(url, window.location.href).href;
+            } catch {
+                alert('URL inválida para esta ferramenta.');
+            }
+        }
+
+        // ─── REALTIME: atualiza grid quando admin concede/revoga acesso ou altera ferramentas ──
+        function subscribeFerramentas() {
+            sb.channel('portal-realtime')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'usuario_ferramentas' }, () => {
+                    loadFerramentas();
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'ferramentas' }, () => {
+                    loadFerramentas();
+                })
+                .subscribe();
+        }
+
+        // ─── LOGOUT ────────────────────────────────────────────────
+        document.getElementById('btnLogout').addEventListener('click', async () => {
+            if (!confirm('Deseja sair?')) return;
+            sessionStorage.removeItem('userAuth');
+            await sb.auth.signOut();
+            window.location.href = 'login.html';
+        });
+
+        // ─── INICIALIZAR ───────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', async () => {
+            const auth = await checkAuth();
+            if (!auth) return;
+            const nome = auth.userData?.nome ?? auth.email;
+            document.getElementById('welcomeMsg').textContent = `Bem-vindo, ${nome.split(' ')[0]}!`;
+            document.getElementById('sidebarNome').textContent = nome;
+            document.getElementById('sidebarEmail').textContent = auth.email;
+            document.getElementById('headerEmail').textContent = auth.email;
+            document.getElementById('headerLogin').textContent =
+                `Login: ${new Date(auth.loginTime).toLocaleTimeString('pt-BR')}`;
+            loadFerramentas(auth.userId);
+            subscribeFerramentas();
+        });
+    </script>
+</body>
+</html>

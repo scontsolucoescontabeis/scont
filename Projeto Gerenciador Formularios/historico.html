@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico de Edições - SCONT</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+    <div class="logo-container">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="Logo SCONT" class="company-logo">
+    </div>
+    <!-- Removi o h2 e o p porque a logo já tem o nome da empresa -->
+</div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <span class="icon">📋</span>
+                    <span>Formulários</span>
+                </a>
+                <a href="historico.html" class="nav-item active">
+                    <span class="icon">📊</span>
+                    <span>Histórico de Edições</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <!-- TOPBAR -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h1>Histórico de Edições</h1>
+                    <p>Auditoria completa de alterações</p>
+                </div>
+            </header>
+
+            <!-- FILTERS -->
+            <section class="filters-section">
+                <div class="filter-group">
+                    <input 
+                        type="text" 
+                        id="searchHistory" 
+                        class="search-input" 
+                        placeholder="Buscar por responsável, campo ou formulário..."
+                        onkeyup="filterHistory()"
+                    >
+                </div>
+                <div class="filter-group">
+                    <input 
+                        type="date" 
+                        id="dateFilter" 
+                        class="filter-select"
+                        onchange="filterHistory()"
+                    >
+                </div>
+            </section>
+
+            <!-- HISTORY TABLE -->
+            <section class="history-section">
+                <div class="table-wrapper">
+                    <table class="history-table" id="historyTable">
+                        <thead>
+                            <tr>
+                                <th>Data/Hora</th>
+                                <th>Responsável</th>
+                                <th>Formulário</th>
+                                <th>Campo Editado</th>
+                                <th>Valor Anterior</th>
+                                <th>Novo Valor</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center">
+                                    <div class="loading-spinner">
+                                        <div class="spinner"></div>
+                                        <p>Carregando histórico...</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- EMPTY STATE -->
+            <div id="emptyHistoryState" class="empty-state" style="display: none;">
+                <div class="empty-icon">📭</div>
+                <h3>Nenhuma edição encontrada</h3>
+                <p>Ainda não há histórico de alterações</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="utils.js"></script>
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initSupabase();
+            loadHistory();
+        });
+    </script>
+</body>
+</html>

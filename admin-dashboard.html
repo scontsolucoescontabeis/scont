@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCONT - Painel Administrativo</title>
+    <script src="supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary:#8B3A3A; --primary-hover:#6B2A2A; --secondary:#2C3E50;
+            --success:#27AE60; --warning:#F39C12; --danger:#E74C3C; --info:#3498DB;
+            --bg:#F4F7F6; --card:#FFFFFF; --text:#2C3E50; --muted:#7F8C8D; --border:#E0E6ED;
+            --shadow-md:0 4px 12px rgba(0,0,0,.08); --shadow-lg:0 8px 24px rgba(0,0,0,.12);
+            --radius:12px; --transition:all .3s cubic-bezier(.25,.8,.25,1);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:var(--text); }
+
+        /* SIDEBAR */
+        .admin-container { display:flex; min-height:100vh; }
+        .sidebar { width:270px; background:linear-gradient(135deg,var(--primary),var(--primary-hover)); color:white; padding:28px 18px; box-shadow:var(--shadow-lg); position:fixed; height:100vh; overflow-y:auto; z-index:100; }
+        .sidebar-logo { text-align:center; margin-bottom:26px; padding-bottom:18px; border-bottom:1px solid rgba(255,255,255,.2); }
+        .sidebar-logo img { max-width:110px; margin-bottom:8px; filter:brightness(0) invert(1); }
+        .sidebar-logo h2 { font-size:15px; font-weight:600; }
+        .sidebar-menu { list-style:none; margin-bottom:36px; }
+        .sidebar-menu li { margin-bottom:8px; }
+        .sidebar-menu button { width:100%; padding:11px 14px; background:rgba(255,255,255,.1); border:none; color:white; border-radius:var(--radius); cursor:pointer; text-align:left; transition:var(--transition); font-size:14px; font-weight:500; display:flex; align-items:center; gap:9px; }
+        .sidebar-menu button:hover { background:rgba(255,255,255,.2); transform:translateX(3px); }
+        .sidebar-menu button.active { background:rgba(255,255,255,.3); border-left:4px solid white; padding-left:10px; }
+        .sidebar-footer { position:absolute; bottom:18px; left:18px; right:18px; padding-top:16px; border-top:1px solid rgba(255,255,255,.2); }
+        .logout-btn { width:100%; padding:9px; background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3); color:white; border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:600; transition:var(--transition); display:flex; align-items:center; justify-content:center; gap:7px; }
+        .logout-btn:hover { background:rgba(255,255,255,.28); }
+        .admin-info { text-align:center; margin-bottom:18px; font-size:12px; opacity:.85; }
+
+        /* MAIN */
+        .main-content { flex:1; margin-left:270px; padding:28px; overflow-y:auto; }
+        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:26px; padding-bottom:18px; border-bottom:2px solid var(--border); }
+        .header h1 { font-size:26px; color:var(--text); font-weight:700; }
+        .header-info { text-align:right; }
+        .header-info p { color:var(--muted); font-size:13px; margin:3px 0; }
+
+        /* TABS */
+        .tabs { display:flex; gap:8px; margin-bottom:26px; border-bottom:2px solid var(--border); flex-wrap:wrap; }
+        .tab-btn { padding:11px 18px; background:none; border:none; border-bottom:3px solid transparent; color:var(--muted); cursor:pointer; font-weight:600; transition:var(--transition); font-size:14px; }
+        .tab-btn:hover { color:var(--text); }
+        .tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; animation:fadeIn .25s ease; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+        /* CARDS */
+        .card { background:var(--card); border-radius:var(--radius); padding:22px; box-shadow:var(--shadow-md); margin-bottom:18px; border:1px solid var(--border); }
+        .card h3 { margin-bottom:18px; color:var(--text); font-size:17px; font-weight:700; }
+
+        /* TABELAS */
+        .table-wrap { overflow-x:auto; }
+        table { width:100%; border-collapse:collapse; }
+        thead { background:var(--bg); border-bottom:2px solid var(--border); }
+        th { padding:12px; text-align:left; font-weight:700; color:var(--text); font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+        td { padding:12px; border-bottom:1px solid var(--border); font-size:13px; vertical-align:middle; }
+        tbody tr:hover { background:var(--bg); }
+
+        /* BADGES */
+        .badge { display:inline-block; padding:5px 11px; border-radius:20px; font-size:11px; font-weight:700; text-transform:uppercase; }
+        .badge-pending  { background:#FEF3C7; color:#92400E; }
+        .badge-approved { background:#DCFCE7; color:#166534; }
+        .badge-rejected { background:#FEE2E2; color:#991B1B; }
+        .badge-active   { background:#DCFCE7; color:#166534; }
+        .badge-inactive { background:#F3F4F6; color:#6B7280; }
+
+        /* BOTÕES */
+        .btn-sm { padding:5px 11px; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:var(--transition); display:inline-flex; align-items:center; gap:4px; margin:2px; }
+        .btn-approve { background:var(--success); color:white; }
+        .btn-approve:hover { background:#229954; }
+        .btn-reject  { background:var(--danger);  color:white; }
+        .btn-reject:hover  { background:#C0392B; }
+        .btn-edit    { background:var(--warning); color:white; }
+        .btn-edit:hover    { background:#D68910; }
+        .btn-primary-sm { background:var(--primary); color:white; padding:8px 14px; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; transition:var(--transition); }
+        .btn-primary-sm:hover { background:var(--primary-hover); }
+
+        /* STATS */
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:18px; }
+        .stat-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; text-align:center; }
+        .stat-value { font-size:26px; font-weight:700; color:var(--primary); margin-bottom:4px; }
+        .stat-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+
+        /* MODAL */
+        .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; align-items:center; justify-content:center; padding:20px; }
+        .modal.active { display:flex; animation:fadeIn .25s ease; }
+        .modal-content { background:var(--card); border-radius:var(--radius); padding:28px; max-width:560px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:var(--shadow-lg); }
+        .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; padding-bottom:12px; border-bottom:2px solid var(--border); }
+        .modal-header h2 { font-size:18px; font-weight:700; }
+        .modal-close { background:none; border:none; font-size:22px; cursor:pointer; color:var(--muted); }
+        .modal-close:hover { color:var(--text); }
+        .form-group { margin-bottom:13px; }
+        .form-group label { display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:var(--text); }
+        .form-group input, .form-group select, .form-group textarea { width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit; transition:var(--transition); }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(139,58,58,.1); }
+        .form-group textarea { resize:vertical; min-height:75px; }
+        .checkbox-group { display:flex; flex-direction:column; gap:9px; margin-top:8px; }
+        .checkbox-item { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; }
+        .checkbox-item input { width:16px; height:16px; cursor:pointer; }
+        .modal-actions { display:flex; gap:9px; margin-top:18px; justify-content:flex-end; }
+        .btn-modal { padding:9px 18px; border:none; border-radius:6px; cursor:pointer; font-weight:600; font-size:13px; transition:var(--transition); }
+        .btn-modal-primary { background:var(--primary); color:white; }
+        .btn-modal-primary:hover { background:var(--primary-hover); }
+        .btn-modal-secondary { background:var(--border); color:var(--text); }
+
+        .empty-cell { text-align:center; padding:36px; color:var(--muted); font-size:14px; }
+
+        @media (max-width:768px) {
+            .sidebar { width:100%; height:auto; position:relative; padding:18px; }
+            .main-content { margin-left:0; padding:18px; }
+            .admin-container { flex-direction:column; }
+            .sidebar-footer { position:static; margin-top:16px; border-top:1px solid rgba(255,255,255,.2); padding-top:16px; }
+            .stats-grid { grid-template-columns:1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="admin-container">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+        <h2>Admin Panel</h2>
+    </div>
+    <div class="admin-info" id="adminInfo">—</div>
+    <ul class="sidebar-menu">
+        <li><button class="menu-btn active" data-tab="solicitacoes">📋 Solicitações</button></li>
+        <li><button class="menu-btn" data-tab="usuarios">👥 Usuários</button></li>
+        <li><button class="menu-btn" data-tab="ferramentas">🔧 Ferramentas</button></li>
+        <li><button class="menu-btn" data-tab="acessos">🔐 Acessos</button></li>
+    </ul>
+    <div class="sidebar-footer">
+        <button class="logout-btn" id="logoutBtn">🚪 Sair</button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="header">
+        <h1>Painel Administrativo</h1>
+        <div class="header-info">
+            <p id="adminEmail">—</p>
+            <p id="loginTime">—</p>
+        </div>
+    </div>
+
+    <!-- SOLICITAÇÕES -->
+    <div id="solicitacoes" class="tab-content active">
+        <div class="stats-grid">
+            <div class="stat-card"><div class="stat-value" id="cntPendente">0</div><div class="stat-label">Pendentes</div></div>
+            <div class="stat-card"><div class="stat-value" id="cntAprovado">0</div><div class="stat-label">Aprovadas</div></div>
+            <div class="stat-card"><div class="stat-value" id="cntRejeitado">0</div><div class="stat-label">Rejeitadas</div></div>
+        </div>
+        <div class="tabs">
+            <button class="tab-btn active" data-filter="pendente">Pendentes</button>
+            <button class="tab-btn" data-filter="aprovado">Aprovadas</button>
+            <button class="tab-btn" data-filter="rejeitado">Rejeitadas</button>
+        </div>
+        <div class="card">
+            <h3>Solicitações de Acesso</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Nome</th><th>E-mail</th><th>Empresa</th><th>Cargo</th><th>Data</th><th>Status</th><th>Ações</th></tr></thead>
+                    <tbody id="tblSolicitacoes_acesso"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- USUÁRIOS -->
+    <div id="usuarios" class="tab-content">
+        <div class="card">
+            <h3>Usuários Aprovados</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Nome</th><th>E-mail</th><th>Empresa</th><th>Cargo</th><th>Aprovado em</th><th>Ações</th></tr></thead>
+                    <tbody id="tblUsuarios"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- FERRAMENTAS -->
+    <div id="ferramentas" class="tab-content">
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h3 style="margin:0">Ferramentas do Portal</h3>
+                <button class="btn-primary-sm" id="btnNovaFerramenta">➕ Nova Ferramenta</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Ícone</th><th>Nome</th><th>Descrição</th><th>URL</th><th>Ordem</th><th>Status</th><th>Ações</th></tr></thead>
+                    <tbody id="tblFerramentas"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACESSOS -->
+    <div id="acessos" class="tab-content">
+        <div class="card">
+            <h3>Controle de Acessos</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Usuário</th><th>E-mail</th><th>Ferramenta</th><th>Concedido em</th><th>Ações</th></tr></thead>
+                    <tbody id="tblAcessos"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL APROVAR -->
+<div class="modal" id="modalAprovar">
+  <div class="modal-content">
+    <div class="modal-header"><h2>Aprovar Solicitação</h2><button class="modal-close" data-close="modalAprovar">✕</button></div>
+    <form id="formAprovar">
+        <div class="form-group"><label>Nome</label><input id="apNome" type="text" readonly></div>
+        <div class="form-group"><label>E-mail</label><input id="apEmail" type="email" readonly></div>
+        <div class="form-group"><label>Empresa</label><input id="apEmpresa" type="text" readonly></div>
+        <div class="form-group"><label>Cargo</label><input id="apCargo" type="text" readonly></div>
+        <div class="form-group">
+            <label>Ferramentas de Acesso</label>
+            <div class="checkbox-group" id="apFerramentas"></div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-modal btn-modal-secondary" data-close="modalAprovar">Cancelar</button>
+            <button type="submit" class="btn-modal btn-modal-primary">✅ Aprovar e Liberar Acesso</button>
+        </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL REJEITAR -->
+<div class="modal" id="modalRejeitar">
+  <div class="modal-content">
+    <div class="modal-header"><h2>Rejeitar Solicitação</h2><button class="modal-close" data-close="modalRejeitar">✕</button></div>
+    <form id="formRejeitar">
+        <div class="form-group"><label>Solicitante</label><input id="rjNome" type="text" readonly></div>
+        <div class="form-group"><label>E-mail</label><input id="rjEmail" type="email" readonly></div>
+        <div class="form-group"><label>Motivo da Rejeição *</label><textarea id="rjMotivo" required placeholder="Explique o motivo..."></textarea></div>
+        <div class="modal-actions">
+            <button type="button" class="btn-modal btn-modal-secondary" data-close="modalRejeitar">Cancelar</button>
+            <button type="submit" class="btn-modal btn-modal-primary">❌ Rejeitar</button>
+        </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL EDITAR ACESSO -->
+<div class="modal" id="modalEditar">
+  <div class="modal-content">
+    <div class="modal-header"><h2>Editar Acessos</h2><button class="modal-close" data-close="modalEditar">✕</button></div>
+    <form id="formEditar">
+        <div class="form-group"><label>Usuário</label><input id="edNome" type="text" readonly></div>
+        <div class="form-group"><label>E-mail</label><input id="edEmail" type="email" readonly></div>
+        <div class="form-group">
+            <label>Ferramentas Autorizadas</label>
+            <div class="checkbox-group" id="edFerramentas"></div>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-modal btn-modal-secondary" data-close="modalEditar">Cancelar</button>
+            <button type="submit" class="btn-modal btn-modal-primary">💾 Salvar</button>
+        </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL NOVA FERRAMENTA -->
+<div class="modal" id="modalFerramenta">
+  <div class="modal-content">
+    <div class="modal-header"><h2 id="ferramentaModalTitle">Nova Ferramenta</h2><button class="modal-close" data-close="modalFerramenta">✕</button></div>
+    <form id="formFerramenta">
+        <div class="form-group"><label>Nome *</label><input id="fNome" type="text" required placeholder="Ex: Microsoft 365"></div>
+        <div class="form-group"><label>Descrição</label><textarea id="fDescricao" placeholder="Descrição da ferramenta" rows="2"></textarea></div>
+        <div class="form-group"><label>Ícone (emoji)</label><input id="fIcone" type="text" placeholder="📊" maxlength="4"></div>
+        <div class="form-group"><label>URL</label><input id="fUrl" type="url" placeholder="https://..."></div>
+        <div class="form-group"><label>Ordem (número)</label><input id="fOrdem" type="number" placeholder="1" min="0"></div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="fAtiva" checked style="width:16px;height:16px;">
+            <label for="fAtiva" style="font-weight:500;text-transform:none;">Ferramenta ativa</label>
+        </div>
+        <div class="modal-actions">
+            <button type="button" class="btn-modal btn-modal-secondary" data-close="modalFerramenta">Cancelar</button>
+            <button type="submit" class="btn-modal btn-modal-primary">Salvar</button>
+        </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ────────────────────────────────────────────────
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── UTILS ─────────────────────────────────────────────────
+function sanitize(s) { const d = document.createElement('div'); d.textContent = String(s ?? '—'); return d.innerHTML; }
+function fmtDate(iso) { return iso ? new Date(iso).toLocaleDateString('pt-BR') : '—'; }
+function openModal(id)  { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// Fechar modal por atributo data-close
+document.querySelectorAll('[data-close]').forEach(btn =>
+    btn.addEventListener('click', () => closeModal(btn.dataset.close)));
+document.querySelectorAll('.modal').forEach(m =>
+    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+
+// ─── ESTADO ────────────────────────────────────────────────
+let solicitacoes = [];
+let ferramentas  = [];
+let currentSolId = null;   // solicitacoes_acesso.id atual no modal
+let editingFId   = null;   // ferramenta.id em edição (null = nova)
+
+// ─── AUTH ──────────────────────────────────────────────────
+async function checkAuth() {
+    const saved = sessionStorage.getItem('adminAuth');
+    if (!saved) { window.location.href = 'admin-login.html'; return null; }
+    let auth;
+    try { auth = JSON.parse(saved); } catch { window.location.href = 'admin-login.html'; return null; }
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { sessionStorage.removeItem('adminAuth'); window.location.href = 'admin-login.html'; return null; }
+    return auth;
+}
+
+// ─── CARREGAR DADOS ────────────────────────────────────────
+async function loadSolicitacoes() {
+    const tbody = document.getElementById('tblSolicitacoes_acesso');
+    const { data, error } = await sb
+        .from('solicitacoes_acesso')
+        .select('id, nome, email, empresa, cargo, status, data_solicitacao, data_avaliacao')
+        .order('data_solicitacao', { ascending: false });
+    if (error) {
+        console.error('loadSolicitacoes:', error);
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-cell" style="color:var(--danger)">⚠️ Erro ao carregar solicitações: ${sanitize(error.message)}</td></tr>`;
+        return;
+    }
+    solicitacoes = data || [];
+    renderSolicitacoes();
+    updateStats();
+}
+
+async function loadFerramentas() {
+    const tbody = document.getElementById('tblFerramentas');
+    const { data, error } = await sb
+        .from('ferramentas')
+        .select('id, nome, descricao, icone, url_base, ativa, ordem')
+        .order('ordem', { ascending: true });
+    if (error) {
+        console.error('loadFerramentas:', error);
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-cell" style="color:var(--danger)">⚠️ Erro ao carregar ferramentas: ${sanitize(error.message)}</td></tr>`;
+        return;
+    }
+    ferramentas = data || [];
+    renderFerramentas();
+}
+
+async function loadUsuarios() {
+    const tbody = document.getElementById('tblUsuarios');
+    const { data, error } = await sb
+        .from('solicitacoes_acesso')
+        .select('id, nome, email, empresa, cargo, data_avaliacao')
+        .eq('status', 'aprovado')
+        .order('data_avaliacao', { ascending: false });
+    if (error) {
+        console.error('loadUsuarios:', error);
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-cell" style="color:var(--danger)">⚠️ Erro ao carregar usuários: ${sanitize(error.message)}</td></tr>`;
+        return;
+    }
+    renderUsuarios(data || []);
+}
+
+async function loadAcessos() {
+    const tbody = document.getElementById('tblAcessos');
+    const { data, error } = await sb
+        .from('usuario_ferramentas')
+        .select(`
+            id, data_acesso,
+            solicitacoes_acesso ( nome, email ),
+            ferramentas ( nome )
+        `)
+        .order('data_acesso', { ascending: false });
+    if (error) {
+        console.error('loadAcessos:', error);
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-cell" style="color:var(--danger)">⚠️ Erro ao carregar acessos: ${sanitize(error.message)}</td></tr>`;
+        return;
+    }
+    renderAcessos(data || []);
+}
+
+// ─── RENDERIZAR SOLICITAÇÕES ───────────────────────────────
+function renderSolicitacoes() {
+    const filtro = document.querySelector('.tab-btn.active')?.dataset.filter || 'pendente';
+    const filtradas = solicitacoes.filter(s => s.status === filtro);
+    const tbody = document.getElementById('tblSolicitacoes_acesso');
+    tbody.innerHTML = '';
+
+    if (!filtradas.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-cell">Nenhuma solicitação ${filtro}.</td></tr>`;
+        return;
+    }
+
+    const badgeMap = {
+        pendente:  'badge-pending',
+        aprovado:  'badge-approved',
+        rejeitado: 'badge-rejected'
+    };
+
+    filtradas.forEach(sol => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${sanitize(sol.nome)}</strong></td>
+            <td>${sanitize(sol.email)}</td>
+            <td>${sanitize(sol.empresa || '—')}</td>
+            <td>${sanitize(sol.cargo || '—')}</td>
+            <td>${fmtDate(sol.data_solicitacao)}</td>
+            <td><span class="badge ${badgeMap[sol.status]}">${sanitize(sol.status)}</span></td>
+            <td class="acts"></td>`;
+
+        if (sol.status === 'pendente') {
+            const btnA = document.createElement('button');
+            btnA.className = 'btn-sm btn-approve';
+            btnA.textContent = '✓ Aprovar';
+            btnA.onclick = () => abrirModalAprovar(sol);
+
+            const btnR = document.createElement('button');
+            btnR.className = 'btn-sm btn-reject';
+            btnR.textContent = '✕ Rejeitar';
+            btnR.onclick = () => abrirModalRejeitar(sol);
+
+            tr.querySelector('.acts').append(btnA, btnR);
+        }
+
+        tbody.appendChild(tr);
+    });
+}
+
+// ─── RENDERIZAR USUÁRIOS ───────────────────────────────────
+function renderUsuarios(data) {
+    const tbody = document.getElementById('tblUsuarios');
+    tbody.innerHTML = '';
+    if (!data.length) { tbody.innerHTML = `<tr><td colspan="6" class="empty-cell">Nenhum usuário aprovado.</td></tr>`; return; }
+
+    data.forEach(u => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${sanitize(u.nome)}</strong></td>
+            <td>${sanitize(u.email)}</td>
+            <td>${sanitize(u.empresa || '—')}</td>
+            <td>${sanitize(u.cargo || '—')}</td>
+            <td>${fmtDate(u.data_avaliacao)}</td>
+            <td class="acts"></td>`;
+
+        const btn = document.createElement('button');
+        btn.className = 'btn-sm btn-edit';
+        btn.textContent = '✎ Editar Acesso';
+        btn.onclick = () => abrirModalEditar(u);
+        tr.querySelector('.acts').appendChild(btn);
+
+        tbody.appendChild(tr);
+    });
+}
+
+// ─── RENDERIZAR FERRAMENTAS ────────────────────────────────
+function renderFerramentas() {
+    const tbody = document.getElementById('tblFerramentas');
+    tbody.innerHTML = '';
+    if (!ferramentas.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty-cell">Nenhuma ferramenta cadastrada.</td></tr>`; return; }
+
+    ferramentas.forEach(f => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="font-size:22px">${sanitize(f.icone || '🔧')}</td>
+            <td><strong>${sanitize(f.nome)}</strong></td>
+            <td>${sanitize(f.descricao || '—')}</td>
+            <td style="font-size:12px;word-break:break-all">${sanitize(f.url_base || '—')}</td>
+            <td>${sanitize(f.ordem)}</td>
+            <td><span class="badge ${f.ativa ? 'badge-active' : 'badge-inactive'}">${f.ativa ? 'Ativa' : 'Inativa'}</span></td>
+            <td class="acts"></td>`;
+
+        const btnE = document.createElement('button');
+        btnE.className = 'btn-sm btn-edit';
+        btnE.textContent = '✎ Editar';
+        btnE.onclick = () => abrirModalFerramenta(f);
+
+        const btnD = document.createElement('button');
+        btnD.className = 'btn-sm btn-reject';
+        btnD.textContent = '🗑️';
+        btnD.onclick = () => deletarFerramenta(f.id, f.nome);
+
+        tr.querySelector('.acts').append(btnE, btnD);
+        tbody.appendChild(tr);
+    });
+}
+
+// ─── RENDERIZAR ACESSOS ────────────────────────────────────
+function renderAcessos(data) {
+    const tbody = document.getElementById('tblAcessos');
+    tbody.innerHTML = '';
+    if (!data.length) { tbody.innerHTML = `<tr><td colspan="5" class="empty-cell">Nenhum acesso registrado.</td></tr>`; return; }
+
+    data.forEach(a => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${sanitize(a.solicitacoes_acesso?.nome || '—')}</strong></td>
+            <td>${sanitize(a.solicitacoes_acesso?.email || '—')}</td>
+            <td>${sanitize(a.ferramentas?.nome || '—')}</td>
+            <td>${fmtDate(a.data_acesso)}</td>
+            <td class="acts"></td>`;
+
+        const btn = document.createElement('button');
+        btn.className = 'btn-sm btn-reject';
+        btn.textContent = '🗑️ Remover';
+        btn.onclick = () => removerAcesso(a.id);
+        tr.querySelector('.acts').appendChild(btn);
+
+        tbody.appendChild(tr);
+    });
+}
+
+// ─── STATS ─────────────────────────────────────────────────
+function updateStats() {
+    ['pendente','aprovado','rejeitado'].forEach(s =>
+        document.getElementById('cnt' + s.charAt(0).toUpperCase() + s.slice(1)).textContent =
+            solicitacoes.filter(x => x.status === s).length);
+}
+
+// ─── MODAL: APROVAR ────────────────────────────────────────
+function abrirModalAprovar(sol) {
+    currentSolId = sol.id;
+    document.getElementById('apNome').value    = sol.nome;
+    document.getElementById('apEmail').value   = sol.email;
+    document.getElementById('apEmpresa').value = sol.empresa || '';
+    document.getElementById('apCargo').value   = sol.cargo || '';
+
+    const cont = document.getElementById('apFerramentas');
+    cont.innerHTML = '';
+    const ativas = ferramentas.filter(f => f.ativa);
+    if (!ativas.length) {
+        cont.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:8px 0;">Nenhuma ferramenta ativa disponível. Cadastre ferramentas na aba Ferramentas antes de aprovar.</p>';
+    } else {
+        ativas.forEach(f => {
+            const lbl = document.createElement('label');
+            lbl.className = 'checkbox-item';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.value = f.id; cb.className = 'cb-aprovar';
+            const sp = document.createElement('span');
+            sp.textContent = `${f.icone || '🔧'} ${f.nome}`;
+            lbl.append(cb, sp);
+            cont.appendChild(lbl);
+        });
+    }
+
+    openModal('modalAprovar');
+}
+
+document.getElementById('formAprovar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const selecionadas = [...document.querySelectorAll('.cb-aprovar:checked')].map(c => c.value);
+    if (!selecionadas.length) { alert('Selecione ao menos uma ferramenta.'); return; }
+
+    const auth = JSON.parse(sessionStorage.getItem('adminAuth'));
+
+    try {
+        // 1. Atualizar status — .select() retorna as linhas afetadas; 0 linhas = permissão negada
+        const { data: updated, error: updErr } = await sb.from('solicitacoes_acesso').update({
+            status: 'aprovado',
+            data_avaliacao: new Date().toISOString(),
+            avaliado_por: auth.email
+        }).eq('id', currentSolId).select('id');
+        if (updErr) throw updErr;
+        if (!updated || updated.length === 0)
+            throw new Error('Nenhuma linha atualizada. Verifique se o usuário tem is_admin = TRUE na tabela "usuarios".');
+
+        // 2. Inserir acessos — um registro por ferramenta
+        //    usuario_id = solicitacoes_acesso.id  (mesmo id que o portal usa para buscar)
+        const inserts = selecionadas.map(fId => ({
+            usuario_id:    currentSolId,
+            ferramenta_id: fId,
+            data_acesso:   new Date().toISOString()
+        }));
+        const { error: insErr } = await sb.from('usuario_ferramentas').insert(inserts);
+        if (insErr) throw insErr;
+
+        closeModal('modalAprovar');
+        alert('✅ Solicitação aprovada e acessos liberados!');
+        loadSolicitacoes();
+        loadAcessos();
+
+    } catch (err) {
+        alert('Erro ao aprovar: ' + err.message);
+    }
+});
+
+// ─── MODAL: REJEITAR ───────────────────────────────────────
+function abrirModalRejeitar(sol) {
+    currentSolId = sol.id;
+    document.getElementById('rjNome').value  = sol.nome;
+    document.getElementById('rjEmail').value = sol.email;
+    document.getElementById('rjMotivo').value = '';
+    openModal('modalRejeitar');
+}
+
+document.getElementById('formRejeitar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const motivo = document.getElementById('rjMotivo').value.trim();
+    const auth = JSON.parse(sessionStorage.getItem('adminAuth'));
+
+    try {
+        const { data: updated, error } = await sb.from('solicitacoes_acesso').update({
+            status: 'rejeitado',
+            motivo_rejeicao: motivo,
+            data_avaliacao: new Date().toISOString(),
+            avaliado_por: auth.email
+        }).eq('id', currentSolId).select('id');
+        if (error) throw error;
+        if (!updated || updated.length === 0)
+            throw new Error('Nenhuma linha atualizada. Verifique se o usuário tem is_admin = TRUE na tabela "usuarios".');
+
+        closeModal('modalRejeitar');
+        alert('Solicitação rejeitada.');
+        loadSolicitacoes();
+
+    } catch (err) {
+        alert('Erro ao rejeitar: ' + err.message);
+    }
+});
+
+// ─── MODAL: EDITAR ACESSO ──────────────────────────────────
+async function abrirModalEditar(user) {
+    currentSolId = user.id;
+    document.getElementById('edNome').value  = user.nome;
+    document.getElementById('edEmail').value = user.email;
+
+    // Buscar acessos atuais do usuário
+    const { data: atuais } = await sb
+        .from('usuario_ferramentas')
+        .select('ferramenta_id')
+        .eq('usuario_id', user.id);
+    const idsAtuais = new Set((atuais || []).map(a => a.ferramenta_id));
+
+    // Listar todas as ferramentas com checkbox marcado se já tem acesso
+    const cont = document.getElementById('edFerramentas');
+    cont.innerHTML = '';
+    ferramentas.filter(f => f.ativa).forEach(f => {
+        const lbl = document.createElement('label');
+        lbl.className = 'checkbox-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.value = f.id; cb.className = 'cb-editar';
+        cb.checked = idsAtuais.has(f.id);
+        const sp = document.createElement('span');
+        sp.textContent = `${f.icone || '🔧'} ${f.nome}`;
+        lbl.append(cb, sp);
+        cont.appendChild(lbl);
+    });
+
+    openModal('modalEditar');
+}
+
+document.getElementById('formEditar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const selecionadas = [...document.querySelectorAll('.cb-editar:checked')].map(c => c.value);
+
+    try {
+        // Remover acessos antigos
+        const { error: delErr } = await sb.from('usuario_ferramentas').delete().eq('usuario_id', currentSolId);
+        if (delErr) throw delErr;
+
+        // Inserir novos acessos
+        if (selecionadas.length) {
+            const inserts = selecionadas.map(fId => ({
+                usuario_id:    currentSolId,
+                ferramenta_id: fId,
+                data_acesso:   new Date().toISOString()
+            }));
+            const { error: insErr } = await sb.from('usuario_ferramentas').insert(inserts);
+            if (insErr) throw insErr;
+        }
+
+        closeModal('modalEditar');
+        alert('✅ Acessos atualizados!');
+        loadAcessos();
+        loadUsuarios();
+
+    } catch (err) {
+        alert('Erro ao atualizar: ' + err.message);
+    }
+});
+
+// ─── MODAL: FERRAMENTA (CRIAR / EDITAR) ────────────────────
+function abrirModalFerramenta(f = null) {
+    editingFId = f ? f.id : null;
+    document.getElementById('ferramentaModalTitle').textContent = f ? 'Editar Ferramenta' : 'Nova Ferramenta';
+    document.getElementById('fNome').value     = f?.nome     || '';
+    document.getElementById('fDescricao').value= f?.descricao|| '';
+    document.getElementById('fIcone').value    = f?.icone    || '';
+    document.getElementById('fUrl').value      = f?.url_base || '';
+    document.getElementById('fOrdem').value    = f?.ordem    ?? '';
+    document.getElementById('fAtiva').checked  = f ? f.ativa : true;
+    openModal('modalFerramenta');
+}
+
+document.getElementById('btnNovaFerramenta').addEventListener('click', () => abrirModalFerramenta());
+
+document.getElementById('formFerramenta').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+        nome:      document.getElementById('fNome').value.trim(),
+        descricao: document.getElementById('fDescricao').value.trim() || null,
+        icone:     document.getElementById('fIcone').value.trim()     || null,
+        url_base:  document.getElementById('fUrl').value.trim()       || null,
+        ordem:     parseInt(document.getElementById('fOrdem').value)  || 0,
+        ativa:     document.getElementById('fAtiva').checked
+    };
+    if (!payload.nome) { alert('Informe o nome.'); return; }
+
+    try {
+        if (editingFId) {
+            const { error } = await sb.from('ferramentas').update(payload).eq('id', editingFId);
+            if (error) throw error;
+        } else {
+            const { error } = await sb.from('ferramentas').insert([payload]);
+            if (error) throw error;
+        }
+        closeModal('modalFerramenta');
+        alert('✅ Ferramenta salva!');
+        loadFerramentas();
+    } catch (err) {
+        alert('Erro: ' + err.message);
+    }
+});
+
+// ─── REMOVER ACESSO ────────────────────────────────────────
+async function removerAcesso(id) {
+    if (!confirm('Remover este acesso?')) return;
+    const { error } = await sb.from('usuario_ferramentas').delete().eq('id', id);
+    if (error) { alert('Erro: ' + error.message); return; }
+    alert('✅ Acesso removido.');
+    loadAcessos();
+}
+
+// ─── DELETAR FERRAMENTA ────────────────────────────────────
+async function deletarFerramenta(id, nome) {
+    if (!confirm(`Remover a ferramenta "${nome}"? Todos os acessos vinculados serão removidos.`)) return;
+    const { error } = await sb.from('ferramentas').delete().eq('id', id);
+    if (error) { alert('Erro: ' + error.message); return; }
+    alert('✅ Ferramenta removida.');
+    loadFerramentas();
+    loadAcessos();
+}
+
+// ─── LOGOUT ────────────────────────────────────────────────
+document.getElementById('logoutBtn').addEventListener('click', async () => {
+    if (!confirm('Deseja sair?')) return;
+    sessionStorage.removeItem('adminAuth');
+    await sb.auth.signOut();
+    window.location.href = 'login.html';
+});
+
+// ─── NAVEGAÇÃO ─────────────────────────────────────────────
+document.querySelectorAll('.menu-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById(tab).classList.add('active');
+    if (tab === 'usuarios')    loadUsuarios();
+    if (tab === 'ferramentas') loadFerramentas();
+    if (tab === 'acessos')     loadAcessos();
+}));
+
+document.querySelectorAll('.tab-btn[data-filter]').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn[data-filter]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderSolicitacoes();
+}));
+
+// ─── INICIALIZAR ───────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+    const auth = await checkAuth();
+    if (!auth) return;
+
+    // Confirmar is_admin = TRUE no banco (causa raiz de leituras/updates silenciosos vazios)
+    const { data: usuario, error: userErr } = await sb
+        .from('usuarios')
+        .select('is_admin')
+        .eq('id', auth.authUserId)
+        .maybeSingle();
+    if (userErr || !usuario?.is_admin) {
+        const msg = usuario
+            ? 'Seu usuário não tem privilégio de administrador (is_admin = FALSE).\n\nExecute no Supabase SQL Editor:\nUPDATE public.usuarios SET is_admin = TRUE WHERE email = \'' + auth.email + '\';'
+            : 'Usuário não encontrado na tabela "usuarios". Verifique o trigger handle_new_user ou insira manualmente.';
+        alert('⚠️ Acesso insuficiente ao banco de dados.\n\n' + msg);
+        sessionStorage.removeItem('adminAuth');
+        await sb.auth.signOut();
+        window.location.href = 'admin-login.html';
+        return;
+    }
+
+    document.getElementById('adminEmail').textContent = auth.email;
+    document.getElementById('adminInfo').textContent  = auth.nome || auth.email;
+    document.getElementById('loginTime').textContent  =
+        `Login: ${new Date(auth.loginTime).toLocaleTimeString('pt-BR')}`;
+
+    await loadFerramentas();   // carregar primeiro (usado nos modais)
+    loadSolicitacoes();
+
+    setInterval(loadSolicitacoes, 30000);   // refresh automático a cada 30s
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCONT - Sistema de Gestão de Ponto e Folha de Pagamento</title>
+    
+    <script src="../supabase-config.js"></script>
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../portal-auth-guard.js"></script>
+    <!-- SheetJS para Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-container">
+            <img src="https://scontdf.com.br/wp-content/uploads/elementor/thumbs/LogoScont-peic298y16fua1mv1zkur66kgxw0v6rzhu846yyg3k.png" alt="SCONT" class="logo">
+            <div class="header-info">
+                <h1>SCONT</h1>
+                <div class="header-subtitle">Sistema de Gestão de Ponto e Folha de Pagamento</div>
+            </div>
+            <div class="header-actions" id="headerActions">
+                <!-- Botão de voltar ao portal -->
+                <a href="../portal.html" class="btn btn-small" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); text-decoration: none; padding: 8px 15px; border-radius: 6px;">← Voltar ao Portal</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTAINER PRINCIPAL -->
+    <div class="container">
+
+        <!-- TELA DE SELEÇÃO (Competência e Empresa) -->
+        <div id="selectionScreen" class="card" style="max-width: 500px; margin: 40px auto;">
+            <div class="card-icon">📋</div>
+            <h2 style="text-align: center; color: var(--primary-color); margin-bottom: 10px;">Folha de Ponto</h2>
+            <p class="card-subtitle" style="text-align: center; margin-bottom: 30px;">Selecione a competência e empresa</p>
+            
+            <form id="selectionForm">
+                <div class="form-group">
+                    <label for="competencia">Competência *</label>
+                    <input type="text" id="competencia" placeholder="MM/AAAA (ex: 02/2026)" maxlength="7" required>
+                    <small>Mês e ano do preenchimento</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="codigoEmpresa">Código da Empresa *</label>
+                    <select id="codigoEmpresa" required>
+                        <option value="">Carregando empresas...</option>
+                    </select>
+                    <small>Selecione a empresa</small>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">▶️ Continuar</button>
+            </form>
+            
+            <div style="margin-top: 20px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="abrirModalExportacaoTXT()" style="width: 100%; font-size: 13px;">
+                    📄 Exportar dados para lançamento na folha (TXT)
+                </button>
+            </div>
+        </div>
+
+        <!-- TELA PRINCIPAL (Preenchimento) -->
+        <div id="mainScreen" style="display: none;">
+            
+            <!-- Sistema de Abas (Empregados) -->
+            <div class="tabs-header">
+                <div class="tabs-nav" id="tabsNav">
+                    <!-- Abas geradas via JS -->
+                </div>
+		<button type="button" class="btn btn-secondary btn-small" id="addTabBtn" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-weight: 500;">➕ Nova Folha</button>                
+            </div>
+
+            <div class="tabs-content" id="tabsContent">
+                <!-- Conteúdo da aba ativa gerado via JS -->
+            </div>
+
+            <!-- CONFIGURAÇÕES -->
+            <div class="settings-section">
+                <h3>⚙️ Configurações</h3>
+                <div class="settings-grid">
+                    <div class="setting-card">
+                        <h4>Jornada de Trabalho</h4>
+                        <input type="text" id="jornada" value="08:00" maxlength="5" placeholder="HH:MM">
+                        <small>Horas diárias de trabalho</small>
+                    </div>
+                   <div class="setting-card">
+    <h4>Horas Extras</h4>
+    <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox" id="ruleExtra100Optional" style="width: 18px; height: 18px; cursor: pointer;">
+        <label for="ruleExtra100Optional" style="font-size: 13px; cursor: pointer; margin: 0;">Aplicar Hora Extra 100% a partir da 3ª hora</label>
+    </div>
+    <small style="display: block; margin-top: 5px;">Primeiras 2h = 50%, A partir da 3ª = 100%</small>
+</div>
+                    <div class="setting-card">
+                        <h4>Feriados</h4>
+                        <button type="button" class="btn btn-secondary btn-small" id="openFeriadosBtn" style="margin-top: 5px; width: 100%;">📅 Gerenciar Feriados</button>
+                        <small style="display: block; margin-top: 5px;">Adicione feriados específicos</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTÕES DE AÇÃO -->
+            <div class="action-buttons">
+                <!-- ✅ ALTERADO: Agora chama iniciarSalvamento() em vez de processarFolhaComSalvamento() -->
+                <button type="button" class="btn btn-primary" onclick="iniciarSalvamento()">✅ Processar e Salvar Folha</button>
+                <button type="button" class="btn btn-danger" id="resetBtn">🔄 Limpar Dados</button>
+            </div>
+        </div>
+
+        <!-- TELA DE RESULTADOS -->
+        <div id="resultsScreen" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+                <h2 style="color: var(--primary-color); margin: 0;">📊 Resultados do Processamento</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-success" id="exportXlsxBtn">📥 Exportar Excel</button>
+                    <button type="button" class="btn btn-secondary" id="backToEditBtn">✏️ Voltar para Edição</button>
+                </div>
+            </div>
+
+            <div id="consolidadoContainer"></div>
+            <div id="tabelasContainer"></div>
+        </div>
+
+    </div>
+
+    <!-- ================= MODAIS ================= -->
+
+    <!-- MODAL: EXPORTAÇÃO TXT -->
+    <div id="exportTxtModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 style="color: var(--primary-color); margin: 0;">📄 Exportar para Folha (TXT)</h3>
+                <button type="button" class="modal-close" onclick="fecharModalExportacaoTXT()">×</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div class="form-group">
+                    <label for="exportCompetencia">Competência (MM/AAAA) *</label>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="exportCompetencia" placeholder="Ex: 02/2026" maxlength="7" style="flex: 1;">
+                        <button type="button" class="btn btn-secondary" onclick="buscarEmpresasParaExportacao()">Buscar</button>
+                    </div>
+                </div>
+
+                <div id="exportEmpresasContainer" style="display: none; margin-top: 20px;">
+                    <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 5px;">Selecione as Empresas *</label>
+                    <div id="exportEmpresasList" style="border: 1px solid var(--border-color); border-radius: 6px; max-height: 150px; overflow-y: auto; padding: 10px; background: var(--background-color); margin-bottom: 15px;">
+                        <!-- Preenchido via JS -->
+                    </div>
+
+                    <div class="form-group">
+                        <label for="exportTipoProcesso">Tipo do Processo *</label>
+                        <select id="exportTipoProcesso">
+                            <option value="11">11 - Mensal</option>
+                            <option value="41">41 - Adiantamento</option>
+                            <option value="42">42 - Complementar</option>
+                            <option value="51">51 - Adiantamento 13º</option>
+                            <option value="52">52 - 13º Salário</option>
+                            <option value="70">70 - Participação de Lucros</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 15px 20px; border-top: 1px solid #eee;">
+                <button type="button" class="btn btn-secondary" onclick="fecharModalExportacaoTXT()">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnGerarTXT" onclick="gerarArquivoTXT()" style="display: none;">Gerar TXT</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE FERIADOS -->
+    <div id="feriadosModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 style="color: var(--primary-color); margin: 0;">📅 Gerenciar Feriados</h3>
+                <button type="button" class="modal-close" id="closeFeriadosBtnTop">×</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div style="background: var(--background-color); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0; margin-bottom: 15px; font-size: 14px;">Adicionar Novo Feriado</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="novaDataFeriado">Data (DD/MM/AAAA) *</label>
+                            <input type="text" id="novaDataFeriado" placeholder="DD/MM/AAAA" maxlength="10">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="novaDescricaoFeriado">Descrição *</label>
+                            <input type="text" id="novaDescricaoFeriado" placeholder="Ex: Feriado Municipal">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-small" id="addFeriadoBtn" style="margin-top: 10px; width: 100%;">➕ Adicionar Feriado</button>
+                </div>
+
+                <h4 style="font-size: 14px; margin-bottom: 10px;">Feriados Cadastrados</h4>
+                <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead style="background: var(--background-color); position: sticky; top: 0;">
+                            <tr>
+                                <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">Data</th>
+                                <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">Descrição</th>
+                                <th style="padding: 8px; text-align: center; border-bottom: 1px solid var(--border-color);">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="feriadosTbody">
+                            <tr><td colspan="3" style="text-align: center; padding: 10px; color: var(--text-secondary);">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #eee; text-align: right;">
+                <button type="button" class="btn btn-secondary" id="closeFeriadosBtn">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE MENSAGEM -->
+    <div id="messageModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="messageTitle">Mensagem</h3>
+                <button type="button" class="modal-close" onclick="fecharModalMensagem()">×</button>
+            </div>
+            <div class="modal-body">
+                <p id="messageText"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="messageOk" onclick="fecharModalMensagem()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE CONFIRMAÇÃO -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="confirmTitle">Confirmação</h3>
+                <button type="button" class="modal-close" onclick="fecharModalConfirmacao()">×</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="confirmNo" onclick="fecharModalConfirmacao()">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmYes" onclick="confirmarAcao()">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ NOVO: MODAL DE ASSINATURA (IDENTIFICAÇÃO) -->
+    <div id="signatureModal" class="modal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <div class="modal-header">
+                <h3 style="color: var(--primary-color); margin: 0;">Identificação Necessária</h3>
+                <button type="button" class="modal-close" onclick="fecharModalAssinatura()">×</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 20px;">
+                    Para processar e salvar as alterações nesta folha de ponto, por favor, identifique-se.
+                </p>
+                <div class="form-group" style="text-align: left;">
+                    <label for="nomeResponsavel">Seu Nome ou E-mail *</label>
+                    <input type="text" id="nomeResponsavel" placeholder="Ex: João do RH" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 15px 20px; border-top: 1px solid #eee;">
+                <button type="button" class="btn btn-secondary" onclick="fecharModalAssinatura()">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="confirmarSalvamentoComAssinatura()">Confirmar e Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE PREENCHIMENTOS ANTERIORES -->
+    <div id="preenchimentosModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 style="color: var(--primary-color); margin: 0;">Retomar Preenchimento</h3>
+                <button type="button" class="modal-close" onclick="fecharModalPreenchimentos()">×</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 15px;">
+                    Encontramos dados salvos para esta empresa e competência. Deseja continuar de onde parou ou iniciar uma nova folha em branco?
+                </p>
+                <div id="listaPreenchimentos" style="max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 20px;">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; padding: 15px 20px; border-top: 1px solid #eee;">
+                <button type="button" class="btn btn-secondary" onclick="fecharModalPreenchimentos()">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnNovoPreenchimento">Iniciar Nova Folha (Em Branco)</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
+    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+</body>
+</html>

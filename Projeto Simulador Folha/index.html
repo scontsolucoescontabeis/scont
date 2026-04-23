@@ -1,0 +1,3041 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Folha - SCONT Soluções Contábeis</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="../supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../portal-auth-guard.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6B2C3E;
+            --primary-light: #8B3A52;
+            --primary-dark: #4A1F2E;
+            --secondary: #A0522D;
+            --accent: #D4A574;
+            --accent-light: #E8C4A0;
+            --success: #27AE60;
+            --warning: #E67E22;
+            --danger: #C0392B;
+            --info: #3498DB;
+            --bg-dark: #F5F3F0;
+            --bg-light: #FAFAF8;
+            --bg-card: #FFFFFF;
+            --text-primary: #2C2C2C;
+            --text-secondary: #666666;
+            --text-light: #FFFFFF;
+            --shadow-sm: 0 2px 8px rgba(107, 44, 62, 0.08);
+            --shadow-md: 0 8px 24px rgba(107, 44, 62, 0.12);
+            --shadow-lg: 0 16px 48px rgba(107, 44, 62, 0.15);
+            --shadow-xl: 0 24px 64px rgba(107, 44, 62, 0.2);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #FFFFFF; /* Fundo branco aplicado */
+            color: var(--text-primary);
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* ==================== LOGO SCONT ==================== */
+        .logo-scont {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 999;
+            opacity: 0.9;
+            transition: var(--transition);
+        }
+
+        .logo-scont:hover {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+
+        .logo-scont img {
+            height: 60px;
+            width: auto;
+            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+        }
+
+                /* ==================== HEADER / HERO BANNER ==================== */
+        /* ==================== HEADER / HERO BANNER ==================== */
+        .header {
+            background: linear-gradient(135deg, #FFFFFF 0%, #F8F9FA 50%, #F0F2F5 100%);
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(107, 44, 62, 0.08);
+            color: var(--text-light);
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 3rem;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            flex: 0 0 auto;
+        }
+
+        .logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .logo:hover img {
+            filter: drop-shadow(0 4px 12px rgba(107, 44, 62, 0.25));
+            transform: scale(1.05);
+        }
+
+        .logo img {
+            height: 50px;
+            width: auto;
+            filter: drop-shadow(0 2px 6px rgba(107, 44, 62, 0.15));
+            transition: var(--transition);
+        }
+
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.1rem;
+        }
+
+        .logo-text-company {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .logo-text-main {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 0.5rem;
+            list-style: none;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            flex: 1;
+        }
+
+        .nav-tabs button {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 0.75rem 1.25rem;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 600;
+            transition: var(--transition);
+            position: relative;
+            border-radius: 6px;
+        }
+
+        .nav-tabs button:hover {
+            color: var(--primary);
+            background: rgba(107, 44, 62, 0.05);
+        }
+
+        .nav-tabs button.active {
+            color: var(--primary);
+            background: rgba(107, 44, 62, 0.08);
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .nav-tabs button i {
+            margin-right: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        /* Responsivo para mobile */
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .header-left {
+                gap: 1rem;
+            }
+
+            .logo img {
+                height: 40px;
+            }
+
+            .logo-text-company {
+                font-size: 0.7rem;
+            }
+
+            .logo-text-main {
+                font-size: 0.9rem;
+            }
+
+            .nav-tabs {
+                width: 100%;
+                justify-content: center;
+                gap: 0.25rem;
+            }
+
+            .nav-tabs button {
+                padding: 0.6rem 0.9rem;
+                font-size: 0.85rem;
+            }
+
+            .nav-tabs button i {
+                display: none;
+            }
+        }
+
+        /* ==================== CONTAINER ==================== */
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* ==================== CARDS ==================== */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid rgba(107, 44, 62, 0.08);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition);
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .card:hover {
+            border-color: rgba(107, 44, 62, 0.15);
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-title i {
+            color: var(--accent);
+            font-size: 1.5rem;
+        }
+
+        /* ==================== GRID ==================== */
+        .grid {
+            display: grid;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+
+        /* ==================== PARAMETER ROW (INLINE) ==================== */
+        .params-inline {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .param-inline {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .param-inline label {
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .param-inline .label-desc {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: normal;
+        }
+
+        .param-inline input,
+        .param-inline select {
+            padding: 0.75rem 1rem;
+            background: linear-gradient(135deg, rgba(107, 44, 62, 0.02), rgba(160, 82, 45, 0.01));
+            border: 2px solid rgba(107, 44, 62, 0.1);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: var(--transition);
+            font-family: 'Courier New', monospace;
+        }
+
+        .param-inline input:focus,
+        .param-inline select:focus {
+            outline: none;
+            background: var(--bg-card);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(107, 44, 62, 0.1);
+        }
+
+        /* ==================== EMPLOYEE CARD (PREMIUM) ==================== */
+        .employee-card {
+            background: linear-gradient(135deg, rgba(107, 44, 62, 0.02), rgba(160, 82, 45, 0.01));
+            border: 2px solid rgba(107, 44, 62, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .employee-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+        }
+
+        .employee-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-4px);
+        }
+
+        .employee-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(107, 44, 62, 0.1);
+        }
+
+        .employee-name-input {
+            font-weight: 700;
+            color: var(--primary);
+            border: none;
+            background: transparent;
+            font-size: 1.1rem;
+            padding: 0;
+            width: 200px;
+            font-family: inherit;
+        }
+
+        .employee-name-input:focus {
+            outline: none;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .employee-field {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .employee-field-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .employee-field-label {
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .employee-field-desc {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+        }
+
+        .employee-field input,
+        .employee-field select {
+            padding: 0.6rem 0.8rem;
+            background: rgba(107, 44, 62, 0.02);
+            border: 1px solid rgba(107, 44, 62, 0.1);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: var(--transition);
+            font-family: 'Courier New', monospace;
+        }
+
+        .employee-field input:focus,
+        .employee-field select:focus {
+            outline: none;
+            background: var(--bg-card);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(107, 44, 62, 0.1);
+        }
+
+        .remove-btn {
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, #C0392B, #E74C3C);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-weight: 600;
+        }
+
+        .remove-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(192, 57, 43, 0.3);
+        }
+
+        /* ==================== BUTTONS ==================== */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            box-shadow: 0 4px 15px rgba(107, 44, 62, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(107, 44, 62, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--bg-light);
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #C0392B, #E74C3C);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(192, 57, 43, 0.4);
+        }
+
+        .w-100 {
+            width: 100%;
+        }
+
+        .flex {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* ==================== REGIME SELECTOR ==================== */
+        .regime-option {
+            padding: 1.5rem;
+            border: 2px solid rgba(107, 44, 62, 0.1);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+            background: var(--bg-card);
+        }
+
+        .regime-option:hover {
+            border-color: var(--primary);
+            background: rgba(107, 44, 62, 0.02);
+        }
+
+        .regime-option.active {
+            border-color: var(--primary);
+            background: rgba(107, 44, 62, 0.05);
+            box-shadow: var(--shadow-md);
+        }
+
+        .regime-option input[type="radio"] {
+            margin-right: 0.5rem;
+        }
+
+        .regime-option label {
+            cursor: pointer;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .regime-desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        /* ==================== METRICS ==================== */
+        .metric-card {
+            background: linear-gradient(135deg, rgba(107, 44, 62, 0.05), rgba(160, 82, 45, 0.03));
+            border: 2px solid rgba(107, 44, 62, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .metric-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-4px);
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            color: var(--primary);
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            font-family: 'Courier New', monospace;
+        }
+
+        .metric-change {
+            font-size: 0.85rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            display: inline-block;
+            font-weight: 600;
+        }
+
+        .metric-change.positive {
+            background: rgba(39, 174, 96, 0.15);
+            color: #27AE60;
+        }
+
+        .metric-change.negative {
+            background: rgba(192, 57, 43, 0.15);
+            color: #C0392B;
+        }
+
+        /* ==================== COMPARISON CARDS ==================== */
+        .comparison-card {
+            background: linear-gradient(135deg, rgba(107, 44, 62, 0.02), rgba(160, 82, 45, 0.01));
+            border: 2px solid rgba(107, 44, 62, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: var(--transition);
+        }
+
+        .comparison-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-4px);
+        }
+
+        .comparison-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .comparison-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .comparison-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(107, 44, 62, 0.05);
+        }
+
+        .comparison-row:last-child {
+            border-bottom: none;
+        }
+
+        .comparison-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .comparison-value {
+            color: var(--primary);
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+        }
+
+        /* ==================== MEMORY SECTION ==================== */
+        .memory-section {
+            background: linear-gradient(135deg, rgba(107, 44, 62, 0.02), rgba(160, 82, 45, 0.01));
+            border-left: 4px solid var(--primary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .memory-section h4 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .memory-formula {
+            background: var(--bg-card);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            border-left: 3px solid var(--accent);
+            line-height: 1.6;
+        }
+
+        .memory-result {
+            background: rgba(39, 174, 96, 0.08);
+            padding: 1rem;
+            border-radius: 8px;
+            color: #27AE60;
+            font-weight: 600;
+            margin-top: 0.5rem;
+            border-left: 3px solid #27AE60;
+        }
+
+        /* ==================== TABS ==================== */
+        .tab-content {
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* ==================== EFFICIENCY INDICATOR ==================== */
+        .efficiency-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(107, 44, 62, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+        }
+
+        .efficiency-fill {
+            height: 100%;
+            transition: var(--transition);
+        }
+
+        .efficiency-fill.saudavel {
+            background: linear-gradient(90deg, #27AE60, #2ECC71);
+        }
+
+        .efficiency-fill.atencao {
+            background: linear-gradient(90deg, #E67E22, #F39C12);
+        }
+
+        .efficiency-fill.critico {
+            background: linear-gradient(90deg, #C0392B, #E74C3C);
+        }
+
+        /* ==================== BADGES ==================== */
+        .badge {
+            display: inline-block;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-success {
+            background: rgba(39, 174, 96, 0.15);
+            color: #27AE60;
+        }
+
+        .badge-warning {
+            background: rgba(230, 126, 34, 0.15);
+            color: #E67E22;
+        }
+
+        .badge-danger {
+            background: rgba(192, 57, 43, 0.15);
+            color: #C0392B;
+        }
+
+        /* ==================== RESPONSIVE ==================== */
+        @media (max-width: 1024px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .params-inline {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .card {
+                padding: 1.5rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .nav-tabs {
+                justify-content: center;
+            }
+
+            .params-inline {
+                grid-template-columns: 1fr;
+            }
+
+            .employee-field {
+                grid-template-columns: 1fr;
+            }
+
+            .metric-value {
+                font-size: 1.5rem;
+            }
+
+            .comparison-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .logo-scont {
+                top: 10px;
+                right: 10px;
+            }
+
+            .logo-scont img {
+                height: 50px;
+            }
+        }
+
+        .mb-1 { margin-bottom: 0.5rem; }
+        .mb-2 { margin-bottom: 1rem; }
+        .mb-3 { margin-bottom: 1.5rem; }
+        .mb-4 { margin-bottom: 2rem; }
+
+        .mt-1 { margin-top: 0.5rem; }
+        .mt-2 { margin-top: 1rem; }
+        .mt-3 { margin-top: 1.5rem; }
+        .mt-4 { margin-top: 2rem; }
+
+
+        /* ==================== MODAL SYSTEM ==================== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: 16px;
+            box-shadow: var(--shadow-xl);
+            max-width: 500px;
+            width: 90%;
+            animation: slideUp 0.3s ease-out;
+            border: 1px solid rgba(107, 44, 62, 0.1);
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .modal-header i {
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        .modal-header.success i {
+            color: #27AE60;
+        }
+
+        .modal-header.warning i {
+            color: #E67E22;
+        }
+
+        .modal-header.error i {
+            color: #C0392B;
+        }
+
+        .modal-header.info i {
+            color: #3498DB;
+        }
+
+        .modal-header h3 {
+            color: var(--primary);
+            font-size: 1.1rem;
+            margin: 0;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .modal-footer {
+            padding: 1.5rem;
+            border-top: 1px solid rgba(107, 44, 62, 0.1);
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .modal-footer .btn {
+            flex: 1;
+            text-align: center;
+            justify-content: center;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--bg-light);
+            border: 2px solid rgba(107, 44, 62, 0.1);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            margin-top: 1rem;
+            transition: var(--transition);
+        }
+
+        .modal-input:focus {
+            outline: none;
+            background: var(--bg-card);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(107, 44, 62, 0.1);
+        }
+
+        @media (max-width: 768px) {
+            .modal {
+                width: 95%;
+            }
+
+            .modal-footer {
+                flex-direction: column;
+            }
+
+            .modal-footer .btn {
+                width: 100%;
+            }
+        }
+
+        /* ==================== CONFIGURAÇÕES ==================== */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .config-card {
+            background: linear-gradient(135deg, rgba(107, 44, 62, 0.02), rgba(160, 82, 45, 0.01));
+            border: 2px solid rgba(107, 44, 62, 0.1);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: var(--transition);
+        }
+
+        .config-card:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-md);
+        }
+
+        .config-card h4 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .config-card h4 i {
+            color: var(--accent);
+            font-size: 1.25rem;
+        }
+
+        .config-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-card);
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            border: 1px solid rgba(107, 44, 62, 0.08);
+        }
+
+        .config-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .config-label {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .config-label-main {
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .config-label-desc {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .config-input-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .config-input {
+            width: 100px;
+            padding: 0.6rem 0.8rem;
+            background: var(--bg-light);
+            border: 2px solid rgba(107, 44, 62, 0.1);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            transition: var(--transition);
+        }
+
+        .config-input:focus {
+            outline: none;
+            background: var(--bg-card);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(107, 44, 62, 0.1);
+        }
+
+        .config-unit {
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.9rem;
+            min-width: 25px;
+        }
+
+        .config-total {
+            background: rgba(39, 174, 96, 0.08);
+            border: 2px solid rgba(39, 174, 96, 0.2);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .config-total-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .config-total-value {
+            color: #27AE60;
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+
+        .config-fgts-fixed {
+            background: rgba(52, 152, 219, 0.08);
+            border: 2px solid rgba(52, 152, 219, 0.2);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .config-fgts-fixed-label {
+            color: #3498DB;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .config-fgts-fixed-value {
+            color: #3498DB;
+            font-size: 1.25rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+
+        .config-aliquota-section {
+            background: rgba(230, 126, 34, 0.08);
+            border: 2px solid rgba(230, 126, 34, 0.2);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-top: 2rem;
+        }
+
+        .config-aliquota-section h4 {
+            color: #E67E22;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+
+        .config-aliquota-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            background: var(--bg-card);
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            border: 1px solid rgba(230, 126, 34, 0.1);
+        }
+
+        .config-aliquota-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .config-aliquota-label {
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .config-aliquota-input {
+            width: 80px;
+            padding: 0.5rem 0.6rem;
+            background: var(--bg-light);
+            border: 2px solid rgba(230, 126, 34, 0.2);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-align: right;
+            font-family: 'Courier New', monospace;
+            transition: var(--transition);
+        }
+
+        .config-aliquota-input:focus {
+            outline: none;
+            background: var(--bg-card);
+            border-color: #E67E22;
+            box-shadow: 0 0 0 2px rgba(230, 126, 34, 0.1);
+        }
+
+        .config-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+            justify-content: flex-end;
+        }
+
+        @media (max-width: 768px) {
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .config-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+
+            .config-input-group {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .config-input {
+                width: 80px;
+            }
+        }
+        /* ==================== GERENCIAMENTO DE CARGOS ==================== */
+        .cargo-list {
+            display: grid;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .cargo-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-card);
+            border: 1px solid rgba(107, 44, 62, 0.1);
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .cargo-item:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .cargo-item-name {
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .cargo-item-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .cargo-btn {
+            padding: 0.5rem 0.75rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .cargo-btn-edit {
+            background: rgba(52, 152, 219, 0.15);
+            color: #3498DB;
+        }
+
+        .cargo-btn-edit:hover {
+            background: rgba(52, 152, 219, 0.25);
+        }
+
+        .cargo-btn-delete {
+            background: rgba(192, 57, 43, 0.15);
+            color: #C0392B;
+        }
+
+        .cargo-btn-delete:hover {
+            background: rgba(192, 57, 43, 0.25);
+        }
+
+        .cargo-input-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .cargo-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: var(--bg-light);
+            border: 2px solid rgba(107, 44, 62, 0.1);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: var(--transition);
+        }
+
+        .cargo-input:focus {
+            outline: none;
+            background: var(--bg-card);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(107, 44, 62, 0.1);
+        }
+
+        .cargo-btn-add {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+        }
+
+        .cargo-btn-add:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(107, 44, 62, 0.3);
+        }
+    </style>
+</head>
+<body>
+    
+    <!-- SISTEMA DE MODAIS CUSTOMIZADOS -->
+    <div id="modalOverlay" class="modal-overlay">
+        <div id="modalContent" class="modal"></div>
+    </div>
+
+     <!-- HERO BANNER / HEADER -->
+    <!-- HERO BANNER / HEADER -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-left">
+                <a href="#" class="logo">
+                    <img src="https://scontdf.com.br/wp-content/uploads/elementor/thumbs/LogoScont-peic298y16fua1mv1zkur66kgxw0v6rzhu846yyg3k.png" alt="SCONT Soluções Contábeis" title="SCONT Soluções Contábeis">
+                </a>
+                <div class="logo-text">
+                    <div class="logo-text-company">SCONT - Soluções Contábeis</div>
+                    <div class="logo-text-main">Simulador de Folha</div>
+                </div>
+            </div>
+            <ul class="nav-tabs">
+                <li><button class="nav-btn" data-tab="cenarios"><i class="fas fa-cogs"></i> Cenários</button></li>
+                <li><button class="nav-btn" data-tab="comparacao"><i class="fas fa-balance-scale"></i> Comparação</button></li>
+                <li><button class="nav-btn active" data-tab="dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</button></li>
+                <li><button class="nav-btn" data-tab="memoria"><i class="fas fa-book"></i> Memória</button></li>
+                <li><button class="nav-btn" data-tab="configuracoes"><i class="fas fa-cog"></i> Configurações</button></li>
+                <li><button class="nav-btn" onclick="window.location.href='../portal.html'" style="background:rgba(107,44,62,0.08);border:1px solid rgba(107,44,62,0.2);"><i class="fas fa-arrow-left"></i> Portal</button></li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <div class="container">
+        <!-- DASHBOARD TAB -->
+        <div id="dashboard" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-tachometer-alt"></i>
+                        Dashboard Executivo
+                    </div>
+                </div>
+                <div id="dashboardContent"></div>
+            </div>
+        </div>
+
+        <!-- CENÁRIOS TAB -->
+        <div id="cenarios" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-cogs"></i>
+                        Construtor de Cenários
+                    </div>
+                </div>
+
+                <!-- REGIME TRIBUTÁRIO -->
+                <div class="mb-4">
+                    <label style="font-weight: 700; color: var(--primary); margin-bottom: 1rem; display: block;">
+                        <i class="fas fa-landmark"></i> Regime Tributário
+                    </label>
+                    <div class="grid grid-2">
+                        <div class="regime-option active" onclick="selecionarRegime(this, 'simples')" id="regime-simples">
+                            <input type="radio" name="regime" value="simples" checked>
+                            <label>Simples Nacional</label>
+                            <div class="regime-desc">
+                                Alíquota: 6% | FGTS: 8%<br>
+                                Sem INSS, RAT, Terceiros
+                            </div>
+                        </div>
+                        <div class="regime-option" onclick="selecionarRegime(this, 'lucro')" id="regime-lucro">
+                            <input type="radio" name="regime" value="lucro">
+                            <label>Lucro Presumido</label>
+                            <div class="regime-desc">
+                                Alíquota: 15% | FGTS: 8%<br>
+                                INSS: 20%, RAT: 5%, Terceiros: 1,8%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PARÂMETROS GERAIS (INLINE) -->
+                <div class="mb-4">
+                    <label style="font-weight: 700; color: var(--primary); margin-bottom: 1rem; display: block;">
+                        <i class="fas fa-sliders-h"></i> Parâmetros Gerais
+                    </label>
+                    <div class="params-inline">
+                        <div class="param-inline">
+                            <label>Faturamento Mensal</label>
+                            <div class="label-desc">Receita total da loja no mês</div>
+                            <input type="number" id="faturamentoMensal" value="605000.00" min="0" step="1000">
+                        </div>
+                        <div class="param-inline">
+                            <label>Dias Úteis no Mês</label>
+                            <div class="label-desc">Dias de funcionamento</div>
+                            <input type="number" id="diasUteis" value="22" min="1" max="31">
+                        </div>
+                        <div class="param-inline">
+                            <label>Vale Alimentação</label>
+                            <div class="label-desc">Valor por dia útil trabalhado</div>
+                            <input type="number" id="valeAlimentacao" value="33.00" min="0" step="0.01">
+                        </div>
+                        <div class="param-inline">
+                            <label>Plano de Saúde</label>
+                            <div class="label-desc">Mensalidade por colaborador</div>
+                            <input type="number" id="planosaude" value="280.00" min="0" step="0.01">
+                        </div>
+                        <div class="param-inline">
+                            <label>AV_Alvo</label>
+                            <div class="label-desc">Parâmetro de eficiência desejado (%)</div>
+                            <input type="number" id="avAlvo" value="10.00" min="0" step="0.1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ESTRUTURA DE PESSOAL -->
+                <div class="mb-4">
+                    <label style="font-weight: 700; color: var(--primary); margin-bottom: 1rem; display: block;">
+                        <i class="fas fa-users"></i> Estrutura de Pessoal
+                    </label>
+                    <div id="employeesList" class="grid grid-2"></div>
+                    <button class="btn btn-primary" onclick="adicionarColaborador()">
+                        <i class="fas fa-plus"></i> Adicionar Colaborador
+                    </button>
+                </div>
+
+                <!-- BOTÕES DE AÇÃO -->
+                <div class="flex">
+                    <button class="btn btn-primary" onclick="criarCenario()">
+                        <i class="fas fa-save"></i> Criar Cenário
+                    </button>
+                    <button class="btn btn-secondary" onclick="limparFormulario()">
+                        <i class="fas fa-redo"></i> Limpar
+                    </button>
+                </div>
+            </div>
+
+            <!-- CENÁRIOS CRIADOS -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-list"></i>
+                        Cenários Criados
+                    </div>
+                </div>
+                <div id="scenariosList"></div>
+            </div>
+        </div>
+
+        <!-- COMPARAÇÃO TAB -->
+        <div id="comparacao" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-balance-scale"></i>
+                        Análise Comparativa Detalhada
+                    </div>
+                </div>
+                <div id="comparisonContent"></div>
+            </div>
+        </div>
+
+        <!-- MEMÓRIA TAB -->
+        <div id="memoria" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-book"></i>
+                        Memória de Cálculo
+                    </div>
+                </div>
+                <div id="memoriaContent"></div>
+            </div>
+        </div>
+    </div>
+
+            <!-- CONFIGURAÇÕES TAB -->
+        <div id="configuracoes" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fas fa-sliders-h"></i>
+                        Configurações de Encargos Sociais
+                    </div>
+                </div>
+
+                <p style="color: var(--text-secondary); margin-bottom: 2rem; line-height: 1.6;">
+                    Configure os percentuais de encargos sociais por regime tributário. O FGTS é fixo em 8% e o total é calculado automaticamente. 
+                    Qualquer alteração refletirá imediatamente em todos os cenários e cálculos.
+                </p>
+
+                <div class="config-grid">
+                    <!-- SIMPLES NACIONAL -->
+                    <div class="config-card">
+                        <h4><i class="fas fa-leaf"></i> Simples Nacional</h4>
+                        
+                        <div class="config-fgts-fixed">
+                            <div class="config-fgts-fixed-label">
+                                <span>FGTS (Fixo)</span>
+                                <span class="config-fgts-fixed-value">8.00%</span>
+                            </div>
+                        </div>
+
+                        <div style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1rem; padding: 0.75rem; background: rgba(52, 152, 219, 0.08); border-radius: 6px;">
+                            <i class="fas fa-info-circle"></i> No regime Simples Nacional, apenas FGTS é aplicado.
+                        </div>
+
+                        <div class="config-total">
+                            <div class="config-total-label">Total de Encargos</div>
+                            <div class="config-total-value" id="totalSimples">8.00%</div>
+                        </div>
+                    </div>
+
+                    <!-- LUCRO PRESUMIDO -->
+                    <div class="config-card">
+                        <h4><i class="fas fa-chart-line"></i> Lucro Presumido</h4>
+                        
+                        <div class="config-fgts-fixed">
+                            <div class="config-fgts-fixed-label">
+                                <span>FGTS (Fixo)</span>
+                                <span class="config-fgts-fixed-value">8.00%</span>
+                            </div>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-label">
+                                <div class="config-label-main">INSS Patronal</div>
+                                <div class="config-label-desc">Contribuição ao INSS</div>
+                            </div>
+                            <div class="config-input-group">
+                                <input type="number" id="configINSS" class="config-input" value="20" min="0" step="0.01" onchange="atualizarConfiguracao()">
+                                <span class="config-unit">%</span>
+                            </div>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-label">
+                                <div class="config-label-main">RAT</div>
+                                <div class="config-label-desc">Risco Ambiental do Trabalho</div>
+                            </div>
+                            <div class="config-input-group">
+                                <input type="number" id="configRAT" class="config-input" value="2" min="0" step="0.01" onchange="atualizarConfiguracao()">
+                                <span class="config-unit">%</span>
+                            </div>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-label">
+                                <div class="config-label-main">Terceiros</div>
+                                <div class="config-label-desc">Contribuição a Terceiros</div>
+                            </div>
+                            <div class="config-input-group">
+                                <input type="number" id="configTerceiros" class="config-input" value="1.8" min="0" step="0.01" onchange="atualizarConfiguracao()">
+                                <span class="config-unit">%</span>
+                            </div>
+                        </div>
+
+                        <div class="config-total">
+                            <div class="config-total-label">Total de Encargos</div>
+                            <div class="config-total-value" id="totalLucro">31.80%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GERENCIAMENTO DE CARGOS -->
+                <div style="background: linear-gradient(135deg, rgba(107, 44, 62, 0.02), rgba(160, 82, 45, 0.01)); border: 2px solid rgba(107, 44, 62, 0.1); border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem;">
+                    <h4 style="color: var(--primary); margin-bottom: 1.5rem; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem;">
+                        <i class="fas fa-briefcase" style="color: var(--accent); font-size: 1.25rem;"></i>
+                        Gerenciamento de Cargos
+                    </h4>
+
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem; line-height: 1.6;">
+                        Personalize a lista de cargos disponíveis para seus colaboradores. Adicione, edite ou remova cargos conforme necessário.
+                    </p>
+
+                    <div class="cargo-input-group">
+                        <input type="text" id="novoCargoInput" class="cargo-input" placeholder="Digite o nome do novo cargo...">
+                        <button class="cargo-btn-add" onclick="adicionarNovoCargoConfig()">
+                            <i class="fas fa-plus"></i> Adicionar
+                        </button>
+                    </div>
+
+                    <div class="cargo-list" id="cargosList"></div>
+                </div>
+
+                <!-- ALÍQUOTAS TRIBUTÁRIAS -->
+                <div class="config-aliquota-section">
+                    <h4><i class="fas fa-percent"></i> Alíquotas Tributárias</h4>
+                    
+                    <div class="config-aliquota-row">
+                        <div class="config-aliquota-label">Simples Nacional</div>
+                        <div class="config-input-group">
+                            <input type="number" id="configAliquotaSimples" class="config-aliquota-input" value="6" min="0" step="0.1" onchange="atualizarConfiguracao()">
+                            <span class="config-unit">%</span>
+                        </div>
+                    </div>
+
+                    <div class="config-aliquota-row">
+                        <div class="config-aliquota-label">Lucro Presumido</div>
+                        <div class="config-input-group">
+                            <input type="number" id="configAliquotaLucro" class="config-aliquota-input" value="15" min="0" step="0.1" onchange="atualizarConfiguracao()">
+                            <span class="config-unit">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="config-actions">
+                    <button class="btn btn-secondary" onclick="restaurarConfiguracoesParadrao()">
+                        <i class="fas fa-undo"></i> Restaurar Padrão
+                    </button>
+                    <button class="btn btn-primary" onclick="salvarConfiguracoesAvancadas()">
+                        <i class="fas fa-save"></i> Salvar Configurações
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    <script>
+        // ==================== DADOS GLOBAIS ====================
+        let cenarios = [];
+        let regimeAtual = 'simples';
+        let colaboradores = [];
+        let contadorColaboradores = 0;
+        let editandoCenarioId   = null; // UUID do cenário em edição; null = novo
+        let editandoCenarioNome = null;
+
+        // ==================== SUPABASE ====================
+        const sbSim = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let _simUsuarioId = null;
+
+        function getSimUsuarioId() {
+            if (_simUsuarioId) return _simUsuarioId;
+            try {
+                const auth = JSON.parse(sessionStorage.getItem('userAuth') || '{}');
+                _simUsuarioId = auth.userId || null;
+            } catch(e) {}
+            return _simUsuarioId;
+        }
+
+        const encargos = {
+            simples: {
+                fgts: 0.08,
+                inss: 0,
+                rat: 0,
+                terceiros: 0,
+                total: 0.08
+            },
+            lucro: {
+                fgts: 0.08,
+                inss: 0.20,
+                rat: 0.018,
+                terceiros: 0.05,
+                total: 0.348
+            }
+        };
+
+        // ==================== INICIALIZAÇÃO ====================
+        document.addEventListener('DOMContentLoaded', async function() {
+            configurarNavegacao();
+            await carregarConfiguracoesAvancadas();
+            await carregarCargosPersonalizados();
+            adicionarColaborador();
+            adicionarColaborador();
+            adicionarColaborador();
+            await carregarCenarios();
+            atualizarDashboard();
+        });
+
+        // ==================== NAVEGAÇÃO ====================
+        function configurarNavegacao() {
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const tabName = this.getAttribute('data-tab');
+                    mostrarTab(tabName);
+                    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+        }
+
+        function mostrarTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        // ==================== SELEÇÃO DE REGIME ====================
+        function selecionarRegime(element, regime) {
+            document.querySelectorAll('.regime-option').forEach(el => {
+                el.classList.remove('active');
+            });
+            element.classList.add('active');
+            element.querySelector('input[type="radio"]').checked = true;
+            regimeAtual = regime;
+        }
+
+        // ==================== GERENCIAMENTO DE COLABORADORES ====================
+        function gerarOpcoesCargoHtml(cargoAtual) {
+            const lista = cargosPersonalizados.length > 0 ? cargosPersonalizados : ['Vendedor', 'Gerente', 'Supervisor'];
+            return lista.map(cargo => {
+                const val = cargo.toLowerCase().replace(/\s+/g, '_');
+                return `<option value="${val}" ${val === cargoAtual ? 'selected' : ''}>${cargo}</option>`;
+            }).join('');
+        }
+
+        function adicionarColaborador() {
+            contadorColaboradores++;
+            const id = Date.now() + Math.random();
+            const nomeDefault = contadorColaboradores === 1 ? 'Vendedora 1' : 
+                               contadorColaboradores === 2 ? 'Vendedora 2' : 
+                               contadorColaboradores === 3 ? 'Vendedora 3' : 
+                               contadorColaboradores === 4 ? 'Vendedora 4' : 
+                               contadorColaboradores === 5 ? 'Gerente' : 'Supervisora';
+            
+            const cargoDefault = contadorColaboradores <= 4 ? 'vendedor' : 
+                                contadorColaboradores === 5 ? 'gerente' : 'supervisor';
+            
+            const comissaoDefault = contadorColaboradores <= 4 ? '3.50' : 
+                                   contadorColaboradores === 5 ? '1.50' : '0.80';
+
+            const html = `
+                <div class="employee-card" id="employee-${id}">
+                    <div class="employee-header">
+                        <input type="text" class="employee-name-input" placeholder="Nome" value="${nomeDefault}">
+                        <button class="remove-btn" onclick="removerColaborador('${id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+
+                    <div class="employee-field">
+                        <div class="employee-field-item">
+                            <div class="employee-field-label">Cargo</div>
+                            <div class="employee-field-desc">Posição na empresa</div>
+                            <select class="employee-role">
+                                ${gerarOpcoesCargoHtml(cargoDefault)}
+                            </select>
+                        </div>
+                        <div class="employee-field-item">
+                            <div class="employee-field-label">Modalidade</div>
+                            <div class="employee-field-desc">Tipo de contratação</div>
+                            <select class="employee-type">
+                                <option value="celetista" selected>Celetista</option>
+                                <option value="comissionado">Comissionado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="employee-field">
+                        <div class="employee-field-item">
+                            <div class="employee-field-label">Salário/Piso</div>
+                            <div class="employee-field-desc">Base fixa ou piso mínimo</div>
+                            <input type="number" placeholder="1.681,00" class="employee-salary" value="1681.00" min="0" step="0.01">
+                        </div>
+                        <div class="employee-field-item">
+                            <div class="employee-field-label">% Comissão</div>
+                            <div class="employee-field-desc">Percentual sobre venda</div>
+                            <input type="number" placeholder="3,50" class="employee-comissao" value="${comissaoDefault}" min="0" step="0.1">
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('employeesList').insertAdjacentHTML('beforeend', html);
+            colaboradores.push({ id });
+        }
+
+        function removerColaborador(id) {
+            document.getElementById(`employee-${id}`).remove();
+            colaboradores = colaboradores.filter(c => c.id !== parseFloat(id));
+            contadorColaboradores--;
+        }
+
+        // ==================== SISTEMA DE MODAIS ====================
+        function mostrarModal(tipo, titulo, mensagem, callback = null, inputDefault = '') {
+            const overlay = document.getElementById('modalOverlay');
+            const modalContent = document.getElementById('modalContent');
+            
+            let icone = '';
+            let classeHeader = '';
+            
+            switch(tipo) {
+                case 'sucesso':
+                    icone = 'fas fa-check-circle';
+                    classeHeader = 'success';
+                    break;
+                case 'aviso':
+                    icone = 'fas fa-exclamation-circle';
+                    classeHeader = 'warning';
+                    break;
+                case 'erro':
+                    icone = 'fas fa-times-circle';
+                    classeHeader = 'error';
+                    break;
+                case 'info':
+                    icone = 'fas fa-info-circle';
+                    classeHeader = 'info';
+                    break;
+                default:
+                    icone = 'fas fa-bell';
+                    classeHeader = 'info';
+            }
+            
+            let html = `
+                <div class="modal-header ${classeHeader}">
+                    <i class="${icone}"></i>
+                    <h3>${titulo}</h3>
+                </div>
+                <div class="modal-body">
+                    ${mensagem}
+            `;
+            
+            if (tipo === 'confirmacao' || tipo === 'prompt') {
+                if (tipo === 'prompt') {
+                    html += `<input type="text" id="modalInput" class="modal-input" value="${inputDefault}" placeholder="Digite aqui...">`;
+                }
+                html += `
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+                    <button class="btn btn-primary" onclick="confirmarModal('${tipo}')">Confirmar</button>
+                </div>
+                `;
+            } else {
+                html += `
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" style="width: 100%; text-align: center; justify-content: center;" onclick="fecharModal()">OK</button>
+                </div>
+                `;
+            }
+            
+            modalContent.innerHTML = html;
+            overlay.classList.add('active');
+            
+            window.modalCallback = callback;
+            window.modalTipo = tipo;
+            
+            if (tipo === 'prompt') {
+                setTimeout(() => {
+                    document.getElementById('modalInput').focus();
+                }, 100);
+            }
+        }
+
+        function fecharModal() {
+            const overlay = document.getElementById('modalOverlay');
+            overlay.classList.remove('active');
+            window.modalCallback = null;
+        }
+
+        function confirmarModal(tipo) {
+            if (tipo === 'prompt') {
+                const input = document.getElementById('modalInput');
+                const valor = input.value.trim();
+                
+                if (valor === '') {
+                    input.style.borderColor = '#C0392B';
+                    return;
+                }
+                
+                if (window.modalCallback) {
+                    window.modalCallback(valor);
+                }
+            } else if (tipo === 'confirmacao') {
+                if (window.modalCallback) {
+                    window.modalCallback(true);
+                }
+            }
+            
+            fecharModal();
+        }
+
+        // Funções customizadas para substituir alert, confirm e prompt
+        function mostrarAlerta(titulo, mensagem) {
+            mostrarModal('info', titulo, mensagem);
+        }
+
+        function mostrarSucesso(titulo, mensagem) {
+            mostrarModal('sucesso', titulo, mensagem);
+        }
+
+        function mostrarErro(titulo, mensagem) {
+            mostrarModal('erro', titulo, mensagem);
+        }
+
+        function mostrarAviso(titulo, mensagem) {
+            mostrarModal('aviso', titulo, mensagem);
+        }
+
+        function mostrarConfirmacao(titulo, mensagem, callback) {
+            mostrarModal('confirmacao', titulo, mensagem, callback);
+        }
+
+        function mostrarPrompt(titulo, mensagem, callback, valorPadrao = '') {
+            mostrarModal('prompt', titulo, `${mensagem}<br><small style="color: var(--text-secondary);">Digite o valor abaixo:</small>`, callback, valorPadrao);
+        }
+
+        // ==================== GERENCIAMENTO DE CARGOS ====================
+        let cargosPersonalizados = [
+            'Vendedor',
+            'Gerente',
+            'Supervisor'
+        ];
+
+        async function carregarCargosPersonalizados() {
+            const uid = getSimUsuarioId();
+            if (uid) {
+                const { data } = await sbSim.from('sim_cargos').select('nome').eq('usuario_id', uid).order('ordem');
+                if (data && data.length > 0) cargosPersonalizados = data.map(r => r.nome);
+            }
+            atualizarListaCargosUI();
+        }
+
+        function atualizarListaCargosUI() {
+            const cargosList = document.getElementById('cargosList');
+            if (!cargosList) return;
+
+            let html = '';
+            cargosPersonalizados.forEach((cargo, index) => {
+                html += `
+                    <div class="cargo-item">
+                        <div class="cargo-item-name">${cargo}</div>
+                        <div class="cargo-item-actions">
+                            <button class="cargo-btn cargo-btn-edit" onclick="editarCargoConfig(${index})">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                            <button class="cargo-btn cargo-btn-delete" onclick="deletarCargoConfig(${index})">
+                                <i class="fas fa-trash"></i> Deletar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            cargosList.innerHTML = html;
+        }
+
+        async function adicionarNovoCargoConfig() {
+            const input = document.getElementById('novoCargoInput');
+            const nomeCargo = input.value.trim();
+
+            if (nomeCargo === '') { mostrarErro('Campo Vazio', 'Digite o nome do cargo antes de adicionar.'); return; }
+            if (cargosPersonalizados.includes(nomeCargo)) { mostrarAviso('Cargo Duplicado', 'Este cargo já existe na lista.'); return; }
+
+            cargosPersonalizados.push(nomeCargo);
+            input.value = '';
+            atualizarListaCargosUI();
+            await salvarCargosPersonalizados();
+            mostrarSucesso('Cargo Adicionado', `O cargo "${nomeCargo}" foi adicionado com sucesso.`);
+        }
+
+        function editarCargoConfig(index) {
+            const cargoAtual = cargosPersonalizados[index];
+            mostrarPrompt(
+                'Editar Cargo',
+                'Digite o novo nome para o cargo:',
+                async (novoNome) => {
+                    if (cargosPersonalizados.includes(novoNome) && novoNome !== cargoAtual) {
+                        mostrarAviso('Cargo Duplicado', 'Este cargo já existe na lista.');
+                        return;
+                    }
+                    cargosPersonalizados[index] = novoNome;
+                    atualizarListaCargosUI();
+                    await salvarCargosPersonalizados();
+                    mostrarSucesso('Cargo Atualizado', `O cargo foi renomeado para "${novoNome}".`);
+                },
+                cargoAtual
+            );
+        }
+
+        function deletarCargoConfig(index) {
+            const cargo = cargosPersonalizados[index];
+            mostrarConfirmacao(
+                'Deletar Cargo',
+                `Deseja realmente deletar o cargo "${cargo}"?`,
+                async (confirmado) => {
+                    if (confirmado) {
+                        cargosPersonalizados.splice(index, 1);
+                        atualizarListaCargosUI();
+                        await salvarCargosPersonalizados();
+                        mostrarSucesso('Cargo Deletado', `O cargo "${cargo}" foi removido.`);
+                    }
+                }
+            );
+        }
+
+        async function salvarCargosPersonalizados() {
+            const uid = getSimUsuarioId();
+            if (!uid) return;
+            await sbSim.from('sim_cargos').delete().eq('usuario_id', uid);
+            if (cargosPersonalizados.length > 0) {
+                const inserts = cargosPersonalizados.map((nome, ordem) => ({ usuario_id: uid, nome, ordem }));
+                await sbSim.from('sim_cargos').insert(inserts);
+            }
+        }
+
+        // ==================== CONFIGURAÇÕES AVANÇADAS ====================
+        let configuracoesAvancadas = {
+            simples: {
+                fgts: 0.08,
+                inss: 0,
+                rat: 0,
+                terceiros: 0,
+                aliquota: 0.06
+            },
+            lucro: {
+                fgts: 0.08,
+                inss: 0.20,
+                rat: 0.02,
+                terceiros: 0.018,
+                aliquota: 0.15
+            }
+        };
+
+        async function carregarConfiguracoesAvancadas() {
+            const uid = getSimUsuarioId();
+            if (!uid) { atualizarUIConfiguracao(); return; }
+            const { data } = await sbSim.from('sim_configuracoes').select('*').eq('usuario_id', uid).maybeSingle();
+            if (data) {
+                configuracoesAvancadas.simples.aliquota = data.aliquota_simples;
+                configuracoesAvancadas.lucro.aliquota   = data.aliquota_lucro;
+                configuracoesAvancadas.lucro.inss       = data.inss_lucro;
+                configuracoesAvancadas.lucro.rat        = data.rat_lucro;
+                configuracoesAvancadas.lucro.terceiros  = data.terceiros_lucro;
+                atualizarUIConfiguracao();
+                atualizarConfiguracao();
+            }
+        }
+
+        function atualizarUIConfiguracao() {
+            // Atualizar inputs
+            document.getElementById('configINSS').value = (configuracoesAvancadas.lucro.inss * 100).toFixed(2);
+            document.getElementById('configRAT').value = (configuracoesAvancadas.lucro.rat * 100).toFixed(2);
+            document.getElementById('configTerceiros').value = (configuracoesAvancadas.lucro.terceiros * 100).toFixed(2);
+            document.getElementById('configAliquotaSimples').value = (configuracoesAvancadas.simples.aliquota * 100).toFixed(1);
+            document.getElementById('configAliquotaLucro').value = (configuracoesAvancadas.lucro.aliquota * 100).toFixed(1);
+
+            // Atualizar totais
+            atualizarTotaisConfiguracao();
+        }
+
+        function atualizarTotaisConfiguracao() {
+            const totalSimples = (configuracoesAvancadas.simples.fgts * 100).toFixed(2);
+            const totalLucro = ((configuracoesAvancadas.lucro.fgts + configuracoesAvancadas.lucro.inss + configuracoesAvancadas.lucro.rat + configuracoesAvancadas.lucro.terceiros) * 100).toFixed(2);
+
+            document.getElementById('totalSimples').textContent = `${totalSimples}%`;
+            document.getElementById('totalLucro').textContent = `${totalLucro}%`;
+        }
+
+        function atualizarConfiguracao() {
+            // Ler valores dos inputs
+            configuracoesAvancadas.lucro.inss = parseFloat(document.getElementById('configINSS').value) / 100;
+            configuracoesAvancadas.lucro.rat = parseFloat(document.getElementById('configRAT').value) / 100;
+            configuracoesAvancadas.lucro.terceiros = parseFloat(document.getElementById('configTerceiros').value) / 100;
+            configuracoesAvancadas.simples.aliquota = parseFloat(document.getElementById('configAliquotaSimples').value) / 100;
+            configuracoesAvancadas.lucro.aliquota = parseFloat(document.getElementById('configAliquotaLucro').value) / 100;
+
+            // Atualizar totais
+            atualizarTotaisConfiguracao();
+
+            // Atualizar encargos global
+            encargos.simples = {
+                fgts: configuracoesAvancadas.simples.fgts,
+                inss: 0,
+                rat: 0,
+                terceiros: 0,
+                total: configuracoesAvancadas.simples.fgts
+            };
+
+            encargos.lucro = {
+                fgts: configuracoesAvancadas.lucro.fgts,
+                inss: configuracoesAvancadas.lucro.inss,
+                rat: configuracoesAvancadas.lucro.rat,
+                terceiros: configuracoesAvancadas.lucro.terceiros,
+                total: configuracoesAvancadas.lucro.fgts + configuracoesAvancadas.lucro.inss + configuracoesAvancadas.lucro.rat + configuracoesAvancadas.lucro.terceiros
+            };
+        }
+
+        function restaurarConfiguracoesParadrao() {
+            mostrarConfirmacao(
+                'Restaurar Padrão',
+                'Deseja restaurar todas as configurações para os valores padrão?',
+                (confirmado) => {
+                    if (confirmado) {
+                        configuracoesAvancadas = {
+                            simples: {
+                                fgts: 0.08,
+                                inss: 0,
+                                rat: 0,
+                                terceiros: 0,
+                                aliquota: 0.06
+                            },
+                            lucro: {
+                                fgts: 0.08,
+                                inss: 0.20,
+                                rat: 0.02,
+                                terceiros: 0.018,
+                                aliquota: 0.15
+                            }
+                        };
+                        atualizarUIConfiguracao();
+                        atualizarConfiguracao();
+                        (async () => {
+                            const uid = getSimUsuarioId();
+                            if (uid) await sbSim.from('sim_configuracoes').delete().eq('usuario_id', uid);
+                        })();
+                        mostrarSucesso('Restaurado!', 'Configurações restauradas para os valores padrão.');
+                    }
+                }
+            );
+        }
+
+        async function salvarConfiguracoesAvancadas() {
+            atualizarConfiguracao();
+
+            const uid = getSimUsuarioId();
+            if (uid) {
+                await sbSim.from('sim_configuracoes').upsert({
+                    usuario_id:       uid,
+                    aliquota_simples: configuracoesAvancadas.simples.aliquota,
+                    aliquota_lucro:   configuracoesAvancadas.lucro.aliquota,
+                    inss_lucro:       configuracoesAvancadas.lucro.inss,
+                    rat_lucro:        configuracoesAvancadas.lucro.rat,
+                    terceiros_lucro:  configuracoesAvancadas.lucro.terceiros,
+                    atualizado_em:    new Date().toISOString()
+                }, { onConflict: 'usuario_id' });
+            }
+
+            if (cenarios.length > 0) {
+                cenarios.forEach(cenario => {
+                    Object.assign(cenario, calcularCenario(
+                        cenario.colaboradores, cenario.regime, cenario.faturamento,
+                        cenario.diasUteis, cenario.valeAlimentacao, cenario.planosaude,
+                        cenario.avAlvo, cenario.vendaIndividual
+                    ));
+                });
+                atualizarListaCenarios();
+                atualizarComparacao();
+                atualizarMemoria();
+                atualizarDashboard();
+            }
+
+            mostrarSucesso('Configurações Salvas!', 'As configurações foram atualizadas e todos os cenários foram recalculados.');
+        }
+
+
+        // ==================== CRIAR / ATUALIZAR CENÁRIO ====================
+        async function criarCenario() {
+            const regime          = regimeAtual;
+            const faturamento     = parseFloat(document.getElementById('faturamentoMensal').value);
+            const diasUteis       = parseFloat(document.getElementById('diasUteis').value);
+            const valeAlimentacao = parseFloat(document.getElementById('valeAlimentacao').value);
+            const planosaude      = parseFloat(document.getElementById('planosaude').value);
+            const avAlvo          = parseFloat(document.getElementById('avAlvo').value) / 100;
+
+            const colaboradoresData = [];
+            document.querySelectorAll('.employee-card').forEach(row => {
+                colaboradoresData.push({
+                    nome:     row.querySelector('.employee-name-input').value,
+                    cargo:    row.querySelector('.employee-role').value,
+                    tipo:     row.querySelector('.employee-type').value,
+                    salario:  parseFloat(row.querySelector('.employee-salary').value),
+                    comissao: parseFloat(row.querySelector('.employee-comissao').value)
+                });
+            });
+
+            if (colaboradoresData.length === 0) {
+                mostrarErro('Atenção', 'Adicione pelo menos um colaborador antes de criar o cenário!');
+                return;
+            }
+
+            const vendaIndividual  = faturamento / colaboradoresData.length;
+            const nomePromptPadrao = editandoCenarioId ? (editandoCenarioNome || 'Cenário') : `Cenário ${cenarios.length + 1}`;
+
+            mostrarPrompt('Nomear Cenário', 'Digite um nome para este cenário:', async (nomeCenario) => {
+                const uid = getSimUsuarioId();
+                if (!uid) { mostrarErro('Erro', 'Usuário não identificado. Faça login novamente.'); return; }
+
+                const calculo = calcularCenario(colaboradoresData, regime, faturamento, diasUteis, valeAlimentacao, planosaude, avAlvo, vendaIndividual);
+
+                const cabecalho = {
+                    usuario_id: uid, nome: nomeCenario, regime,
+                    faturamento, dias_uteis: diasUteis,
+                    vale_alimentacao: valeAlimentacao, plano_saude: planosaude, av_alvo: avAlvo
+                };
+
+                let cenarioId = editandoCenarioId;
+
+                if (editandoCenarioId) {
+                    // UPDATE: atualiza linha + substitui colaboradores
+                    await sbSim.from('sim_cenarios').update({ ...cabecalho, atualizado_em: new Date().toISOString() }).eq('id', editandoCenarioId);
+                    await sbSim.from('sim_colaboradores').delete().eq('cenario_id', editandoCenarioId);
+                    editandoCenarioId = null;
+                    editandoCenarioNome = null;
+                } else {
+                    // INSERT novo cenário
+                    const { data, error } = await sbSim.from('sim_cenarios').insert([cabecalho]).select('id').single();
+                    if (error || !data) { mostrarErro('Erro', 'Falha ao salvar cenário no banco de dados.'); return; }
+                    cenarioId = data.id;
+                }
+
+                const colabsPayload = colaboradoresData.map((c, i) => ({
+                    cenario_id: cenarioId, ordem: i,
+                    nome: c.nome, cargo: c.cargo, tipo: c.tipo,
+                    salario: c.salario, comissao: c.comissao
+                }));
+                await sbSim.from('sim_colaboradores').insert(colabsPayload);
+
+                const cenario = { id: cenarioId, nome: nomeCenario, regime, colaboradores: colaboradoresData, faturamento, diasUteis, valeAlimentacao, planosaude, avAlvo, vendaIndividual, ...calculo };
+                cenarios = cenarios.filter(c => c.id !== cenarioId); // remove versão antiga se editando
+                cenarios.push(cenario);
+                atualizarListaCenarios();
+                atualizarComparacao();
+                atualizarMemoria();
+                atualizarDashboard();
+                mostrarSucesso('Sucesso!', `Cenário "${nomeCenario}" salvo com sucesso!`);
+            }, nomePromptPadrao);
+        }
+
+        // ==================== CÁLCULO DE CENÁRIO ====================
+        function calcularCenario(colaboradores, regime, faturamento, diasUteis, valeAlimentacao, planosaude, avAlvo, vendaIndividual) {
+            const encargosRegime = encargos[regime];
+            const aliquotaTributaria = regime === 'simples' ? configuracoesAvancadas.simples.aliquota : configuracoesAvancadas.lucro.aliquota;
+            let remuneracaoTotal = 0;
+            let comissaoTotal = 0;
+            let encargosTotal = 0;
+            let dsrTotal = 0;
+            let feriasTotal = 0;
+            let tercoTotal = 0;
+            let decimoTotal = 0;
+            let rescisaoTotal = 0;
+            let beneficiosTotal = 0;
+            let detalhes = [];
+
+            colaboradores.forEach(colab => {
+                let remuneracao = 0;
+                let comissao = 0;
+                let dsr = 0;
+
+                comissao = vendaIndividual * (colab.comissao / 100);
+
+                          if (colab.tipo === 'celetista') {
+                    remuneracao = colab.salario + comissao;
+                    // Celetista NÃO recebe DSR avulso
+                    dsr = 0;
+                } else {
+                    // Comissionado recebe o maior entre comissão e salário
+                    remuneracao = Math.max(comissao, colab.salario);
+                    // Comissionado recebe DSR
+                    dsr = comissao / diasUteis;
+                }
+
+                const baseEncargos = remuneracao + dsr;
+                const encargosColab = baseEncargos * encargosRegime.total;
+                encargosTotal += encargosColab;
+                remuneracaoTotal += remuneracao;
+                comissaoTotal += comissao;
+                dsrTotal += dsr;
+
+                const ferias = baseEncargos / 12;
+                const terco = ferias / 3;
+                const decimo = baseEncargos / 12;
+                const fgts13 = decimo * 0.08;
+                const fgtsFerias = ferias * 0.08;
+                const fgtsTerco = terco * 0.08;
+                const multa40 = (fgts13 + fgtsFerias + fgtsTerco) * 0.40;
+                const rescisao = fgts13 + fgtsFerias + fgtsTerco + multa40;
+
+                feriasTotal += ferias;
+                tercoTotal += terco;
+                decimoTotal += decimo;
+                rescisaoTotal += rescisao;
+
+                detalhes.push({
+                    nome: colab.nome,
+                    cargo: colab.cargo,
+                    tipo: colab.tipo,
+                    venda: vendaIndividual,
+                    comissao,
+                    remuneracao,
+                    dsr,
+                    encargos: encargosColab,
+                    ferias,
+                    terco,
+                    decimo,
+                    rescisao
+                });
+            });
+
+            beneficiosTotal = valeAlimentacao * diasUteis * colaboradores.length + planosaude * colaboradores.length;
+
+            const custoMensal = remuneracaoTotal + encargosTotal + dsrTotal + feriasTotal + tercoTotal + decimoTotal + rescisaoTotal + beneficiosTotal;
+            const custoAnual = custoMensal * 12;
+
+            const faturamentoAnual = faturamento * 12;
+           
+            const impostoAnual = faturamentoAnual * aliquotaTributaria;
+
+            const custoTotalAnual = custoAnual + impostoAnual;
+
+            const av = custoMensal / faturamento;
+            let statusEficiencia = 'saudavel';
+            if (av > avAlvo + 0.02) {
+                statusEficiencia = 'critico';
+            } else if (av > avAlvo) {
+                statusEficiencia = 'atencao';
+            }
+
+            return {
+                remuneracaoMensal: remuneracaoTotal,
+                comissaoTotal,
+                dsr: dsrTotal,
+                encargos: encargosTotal,
+                ferias: feriasTotal,
+                terco: tercoTotal,
+                decimo: decimoTotal,
+                rescisao: rescisaoTotal,
+                beneficios: beneficiosTotal,
+                custoMensal,
+                custoAnual,
+                impostoAnual,
+                custoTotalAnual,
+                av,
+                avAlvo,
+                statusEficiencia,
+                detalhes
+            };
+        }
+
+                
+        // ==================== ATUALIZAR LISTA DE CENÁRIOS ====================
+        function atualizarListaCenarios() {
+            let html = '';
+
+            cenarios.forEach((cenario, index) => {
+                const regimeBadge = cenario.regime === 'simples' 
+                    ? '<span class="badge badge-success">Simples Nacional</span>'
+                    : '<span class="badge badge-warning">Lucro Presumido</span>';
+
+                const celetistas = cenario.colaboradores.filter(c => c.tipo === 'celetista').length;
+                const comissionados = cenario.colaboradores.filter(c => c.tipo === 'comissionado').length;
+
+                const statusClass = cenario.statusEficiencia;
+                const statusText = cenario.statusEficiencia === 'saudavel' ? '✓ Saudável' : 
+                                   cenario.statusEficiencia === 'atencao' ? '⚠ Atenção' : '✗ Crítico';
+
+                html += `
+                    <div class="card" style="background: rgba(107, 44, 62, 0.02); border: 2px solid rgba(107, 44, 62, 0.1); margin-bottom: 1.5rem;">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">${cenario.nome}</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                                    ${celetistas} Celetista(s) | ${comissionados} Comissionado(s)
+                                </div>
+                            </div>
+                            ${regimeBadge}
+                        </div>
+
+                        <div class="grid grid-4">
+                            <div class="metric-card">
+                                <div class="metric-label">Custo Mensal</div>
+                                <div class="metric-value">${formatarMoeda(cenario.custoMensal)}</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Custo Anual</div>
+                                <div class="metric-value">${formatarMoeda(cenario.custoAnual)}</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Imposto Anual</div>
+                                <div class="metric-value">${formatarMoeda(cenario.impostoAnual)}</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">Custo Total</div>
+                                <div class="metric-value" style="color: #27AE60;">${formatarMoeda(cenario.custoTotalAnual)}</div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid rgba(107, 44, 62, 0.1);">
+                            <div style="margin-bottom: 1rem;">
+                                <strong style="color: var(--primary);">Parâmetro de Eficiência (AV)</strong>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                    Custo Folha / Faturamento: ${(cenario.av * 100).toFixed(2)}% (Alvo: ${(cenario.avAlvo * 100).toFixed(1)}%)
+                                </div>
+                                <div class="efficiency-bar">
+                                    <div class="efficiency-fill ${cenario.statusEficiencia}" style="width: ${Math.min(cenario.av * 100, 100)}%"></div>
+                                </div>
+                                <div style="margin-top: 0.5rem; font-size: 0.85rem;">
+                                    <span class="badge ${cenario.statusEficiencia === 'saudavel' ? 'badge-success' : cenario.statusEficiencia === 'atencao' ? 'badge-warning' : 'badge-danger'}">
+                                        ${statusText}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(107, 44, 62, 0.08);">
+                            <strong style="color: var(--primary); font-size: 0.9rem;">Colaboradores:</strong>
+                            <div style="margin-top: 0.5rem;">
+                                ${cenario.detalhes.map(d => `
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+                                        • ${d.nome} (${d.cargo} - ${d.tipo}) - Venda: ${formatarMoeda(d.venda)} | Comissão: ${formatarMoeda(d.comissao)} | Remuneração: ${formatarMoeda(d.remuneracao)}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="flex mt-3">
+                            <button class="btn btn-secondary" onclick="renomearCenario('${cenario.id}')">
+                                <i class="fas fa-edit"></i> Renomear
+                            </button>
+                            <button class="btn btn-secondary" onclick="editarCenario('${cenario.id}')">
+                                <i class="fas fa-pencil-alt"></i> Editar
+                            </button>
+                            <button class="btn btn-danger" onclick="deletarCenario('${cenario.id}')">
+                                <i class="fas fa-trash"></i> Deletar
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('scenariosList').innerHTML = html || '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Nenhum cenário criado ainda. Crie um novo cenário acima!</p>';
+        }
+
+         // ==================== COMPARAÇÃO DE CENÁRIOS ====================
+        function atualizarComparacao() {
+            if (cenarios.length === 0) {
+                document.getElementById('comparisonContent').innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Crie pelo menos um cenário para comparar.</p>';
+                return;
+            }
+
+            let html = '<div class="grid grid-2 mb-4">';
+
+            cenarios.forEach((cenario, index) => {
+                const regimeBadge = cenario.regime === 'simples' ? 'Simples Nacional' : 'Lucro Presumido';
+                const celetistas = cenario.colaboradores.filter(c => c.tipo === 'celetista').length;
+                const comissionados = cenario.colaboradores.filter(c => c.tipo === 'comissionado').length;
+
+                html += `
+                    <div class="comparison-card">
+                        <div class="comparison-header">
+                            <div class="comparison-title">${cenario.nome}</div>
+                            <span class="badge ${cenario.regime === 'simples' ? 'badge-success' : 'badge-warning'}">${regimeBadge}</span>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">Colaboradores</div>
+                            <div class="comparison-value">${cenario.colaboradores.length} (${celetistas}C | ${comissionados}Co)</div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">Venda Individual</div>
+                            <div class="comparison-value">${formatarMoeda(cenario.vendaIndividual)}</div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">Remuneração Mensal</div>
+                            <div class="comparison-value">${formatarMoeda(cenario.remuneracaoMensal)}</div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">Comissões Totais</div>
+                            <div class="comparison-value">${formatarMoeda(cenario.comissaoTotal)}</div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">DSR</div>
+                            <div class="comparison-value">${formatarMoeda(cenario.dsr)}</div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">Encargos Sociais</div>
+                            <div class="comparison-value">${formatarMoeda(cenario.encargos)}</div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">Férias (1/12)</div>
+                            <div class="comparison-value">${formatarMoeda(cenario.ferias)}</div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">1/3 Constitucional</div>
+                            <div class="comparison-value">${formatarMoeda(cenario.terco)}</div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">13º Salário (1/12)</div>
+                            <div class="comparison-value">${formatarMoeda(cenario.decimo)}</div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">Provisão Rescisão</div>
+                            <div class="comparison-value">${formatarMoeda(cenario.rescisao)}</div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label">Benefícios</div>
+                            <div class="comparison-value">${formatarMoeda(cenario.beneficios)}</div>
+                        </div>
+
+                        <div class="comparison-row" style="border-top: 2px solid rgba(107, 44, 62, 0.1); padding-top: 1rem; margin-top: 1rem;">
+                            <div class="comparison-label"><strong>Custo Mensal</strong></div>
+                            <div class="comparison-value"><strong>${formatarMoeda(cenario.custoMensal)}</strong></div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label"><strong>Custo Anual</strong></div>
+                            <div class="comparison-value"><strong>${formatarMoeda(cenario.custoAnual)}</strong></div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label"><strong>Imposto Anual</strong></div>
+                            <div class="comparison-value"><strong>${formatarMoeda(cenario.impostoAnual)}</strong></div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label"><strong>Custo Total Anual</strong></div>
+                            <div class="comparison-value" style="color: #27AE60;"><strong>${formatarMoeda(cenario.custoTotalAnual)}</strong></div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label"><strong>AV (%)</strong></div>
+                            <div class="comparison-value"><strong>${(cenario.av * 100).toFixed(2)}%</strong></div>
+                        </div>
+
+                        <div class="comparison-row">
+                            <div class="comparison-label"><strong>Status</strong></div>
+                            <div class="comparison-value">
+                                <span class="badge ${cenario.statusEficiencia === 'saudavel' ? 'badge-success' : cenario.statusEficiencia === 'atencao' ? 'badge-warning' : 'badge-danger'}">
+                                    ${cenario.statusEficiencia === 'saudavel' ? '✓ Saudável' : cenario.statusEficiencia === 'atencao' ? '⚠ Atenção' : '✗ Crítico'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+
+            // Ranking
+            const ranking = [...cenarios].sort((a, b) => a.custoTotalAnual - b.custoTotalAnual);
+            html += '<div style="margin-top: 2rem;"><h3 style="color: var(--primary); margin-bottom: 1rem; font-size: 1.1rem;">Ranking de Eficiência Financeira</h3>';
+            ranking.forEach((c, i) => {
+                const economia = ranking[ranking.length - 1].custoTotalAnual - c.custoTotalAnual;
+                const percentual = (economia / ranking[ranking.length - 1].custoTotalAnual * 100).toFixed(1);
+                const cor = i === 0 ? '#27AE60' : i === 1 ? '#E67E22' : '#C0392B';
+                html += `
+                    <div style="padding: 1.5rem; background: var(--bg-light); border-radius: 12px; margin-bottom: 1rem; border-left: 4px solid ${cor};">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong style="color: var(--primary); font-size: 1rem;">${i + 1}º - ${c.nome}</strong>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                    ${c.regime === 'simples' ? 'Simples Nacional' : 'Lucro Presumido'} | ${c.colaboradores.length} colaborador(es)
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">${formatarMoeda(c.custoTotalAnual)}</div>
+                                <div style="font-size: 0.85rem; color: #27AE60; font-weight: 600;">Economia: ${formatarMoeda(economia)} (${percentual}%)</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            document.getElementById('comparisonContent').innerHTML = html;
+        }
+
+               // ==================== MEMÓRIA DE CÁLCULO ====================
+        function atualizarMemoria() {
+            if (cenarios.length === 0) {
+                document.getElementById('memoriaContent').innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Crie um cenário para visualizar a memória de cálculo.</p>';
+                return;
+            }
+
+            let html = '';
+
+            cenarios.forEach((cenario, index) => {
+                html += `
+                    <div style="margin-bottom: 2rem;">
+                        <h3 style="color: var(--primary); margin-bottom: 1rem; font-size: 1.1rem;">${cenario.nome}</h3>
+
+                        <div class="memory-section">
+                            <h4>1. VENDA INDIVIDUAL (Cálculo Automático)</h4>
+                            <div class="memory-formula">
+                                Venda Individual = Faturamento Mensal ÷ Quantidade de Colaboradores<br>
+                                Venda Individual = ${formatarMoeda(cenario.faturamento)} ÷ ${cenario.colaboradores.length}<br>
+                                <strong>Venda Individual = ${formatarMoeda(cenario.vendaIndividual)}</strong>
+                            </div>
+                        </div>
+
+                        <div class="memory-section">
+                            <h4>2. COMISSÕES</h4>
+                            <div class="memory-formula">
+                                ${cenario.detalhes.map((d, i) => {
+                                    const percentualComissao = (d.comissao / d.venda * 100).toFixed(2);
+                                    return `
+                                        ${d.nome}:<br>
+                                        Comissão = ${formatarMoeda(d.venda)} × ${percentualComissao}% = ${formatarMoeda(d.comissao)}<br>
+                                    `;
+                                }).join('')}
+                                <strong>Total de Comissões = ${formatarMoeda(cenario.comissaoTotal)}</strong>
+                            </div>
+                        </div>
+
+                        <div class="memory-section">
+                            <h4>3. DSR (DESCANSO SEMANAL REMUNERADO)</h4>
+                            <div class="memory-formula">
+                                DSR = Comissão ÷ Dias Úteis × 1 dia<br>
+                                ${cenario.detalhes.map((d, i) => `
+                                    ${d.nome}: ${formatarMoeda(d.comissao)} ÷ ${cenario.diasUteis} = ${formatarMoeda(d.dsr)}<br>
+                                `).join('')}
+                                <strong>Total DSR = ${formatarMoeda(cenario.dsr)}</strong>
+                            </div>
+                        </div>
+
+                        <div class="memory-section">
+                            <h4>4. ENCARGOS SOCIAIS</h4>
+                            <div class="memory-formula">
+                                Regime: ${cenario.regime === 'simples' ? 'Simples Nacional' : 'Lucro Presumido'}<br>
+                                ${cenario.regime === 'simples' ? 
+                                    `FGTS: ${(configuracoesAvancadas.simples.fgts * 100).toFixed(2)}%` : 
+                                    `INSS: ${(configuracoesAvancadas.lucro.inss * 100).toFixed(2)}% + FGTS: ${(configuracoesAvancadas.lucro.fgts * 100).toFixed(2)}% + RAT: ${(configuracoesAvancadas.lucro.rat * 100).toFixed(2)}% + Terceiros: ${(configuracoesAvancadas.lucro.terceiros * 100).toFixed(2)}% = ${(encargos[cenario.regime].total * 100).toFixed(2)}%`}<br>
+                                Base de Encargos = Remuneração + DSR<br>
+                                ${cenario.detalhes.map((d, i) => `
+                                    ${d.nome}: (${formatarMoeda(d.remuneracao)} + ${formatarMoeda(d.dsr)}) × ${(encargos[cenario.regime].total * 100).toFixed(2)}% = ${formatarMoeda(d.encargos)}<br>
+                                `).join('')}
+                                <strong>Total Encargos = ${formatarMoeda(cenario.encargos)}</strong>
+                            </div>
+                        </div>
+
+                        <div class="memory-section">
+                            <h4>5. FÉRIAS, 13º E RESCISÃO</h4>
+                            <div class="memory-formula">
+                                Férias (1/12) = (Remuneração + DSR) ÷ 12<br>
+                                1/3 Constitucional = Férias ÷ 3<br>
+                                13º Salário (1/12) = (Remuneração + DSR) ÷ 12<br>
+                                <br>
+                                <strong style="color: var(--primary);">Cálculo por Colaborador:</strong><br>
+                                ${cenario.detalhes.map((d, i) => `
+                                    ${d.nome}:<br>
+                                    • Férias: (${formatarMoeda(d.remuneracao)} + ${formatarMoeda(d.dsr)}) ÷ 12 = ${formatarMoeda(d.ferias)}<br>
+                                    • 1/3 Const.: ${formatarMoeda(d.ferias)} ÷ 3 = ${formatarMoeda(d.terco)}<br>
+                                    • 13º Salário: (${formatarMoeda(d.remuneracao)} + ${formatarMoeda(d.dsr)}) ÷ 12 = ${formatarMoeda(d.decimo)}<br>
+                                    • Rescisão: (FGTS 13º + FGTS Férias + FGTS 1/3) + Multa 40% = ${formatarMoeda(d.rescisao)}<br>
+                                    <br>
+                                `).join('')}
+                                <strong>Total Férias = ${formatarMoeda(cenario.ferias)}</strong><br>
+                                <strong>Total 1/3 = ${formatarMoeda(cenario.terco)}</strong><br>
+                                <strong>Total 13º = ${formatarMoeda(cenario.decimo)}</strong><br>
+                                <strong>Total Rescisão = ${formatarMoeda(cenario.rescisao)}</strong>
+                            </div>
+                        </div>
+
+                        <div class="memory-section">
+                            <h4>6. BENEFÍCIOS</h4>
+                            <div class="memory-formula">
+                                Vale Alimentação = ${formatarMoeda(cenario.valeAlimentacao)} × ${cenario.diasUteis} dias × ${cenario.colaboradores.length} colaboradores = ${formatarMoeda(cenario.valeAlimentacao * cenario.diasUteis * cenario.colaboradores.length)}<br>
+                                Plano de Saúde = ${formatarMoeda(cenario.planosaude)} × ${cenario.colaboradores.length} colaboradores = ${formatarMoeda(cenario.planosaude * cenario.colaboradores.length)}<br>
+                                <strong>Total Benefícios = ${formatarMoeda(cenario.beneficios)}</strong>
+                            </div>
+                        </div>
+
+                        <div class="memory-section">
+                            <h4>7. CUSTO TOTAL MENSAL</h4>
+                            <div class="memory-formula">
+                                Custo Mensal = Remuneração + Encargos + DSR + Férias + 1/3 + 13º + Rescisão + Benefícios<br>
+                                Custo Mensal = ${formatarMoeda(cenario.remuneracaoMensal)} + ${formatarMoeda(cenario.encargos)} + ${formatarMoeda(cenario.dsr)} + ${formatarMoeda(cenario.ferias)} + ${formatarMoeda(cenario.terco)} + ${formatarMoeda(cenario.decimo)} + ${formatarMoeda(cenario.rescisao)} + ${formatarMoeda(cenario.beneficios)}<br>
+                                <strong>Custo Mensal = ${formatarMoeda(cenario.custoMensal)}</strong>
+                            </div>
+                            <div class="memory-result">
+                                Custo Anual = ${formatarMoeda(cenario.custoMensal)} × 12 = ${formatarMoeda(cenario.custoAnual)}
+                            </div>
+                        </div>
+
+                        <div class="memory-section">
+                            <h4>8. IMPOSTOS</h4>
+                            <div class="memory-formula">
+                                Regime: ${cenario.regime === 'simples' ? 'Simples Nacional (6%)' : 'Lucro Presumido (15%)'}<br>
+                                Faturamento Anual = ${formatarMoeda(cenario.faturamento)} × 12 = ${formatarMoeda(cenario.faturamento * 12)}<br>
+                                Imposto Anual = ${formatarMoeda(cenario.faturamento * 12)} × ${cenario.regime === 'simples' ? '6' : '15'}% = ${formatarMoeda(cenario.impostoAnual)}
+                            </div>
+                        </div>
+
+                        <div class="memory-section">
+                            <h4>9. CUSTO TOTAL ANUAL</h4>
+                            <div class="memory-formula">
+                                Custo Total Anual = Custo Anual + Imposto Anual<br>
+                                Custo Total Anual = ${formatarMoeda(cenario.custoAnual)} + ${formatarMoeda(cenario.impostoAnual)}<br>
+                                <strong>Custo Total Anual = ${formatarMoeda(cenario.custoTotalAnual)}</strong>
+                            </div>
+                        </div>
+
+                        <div class="memory-section">
+                            <h4>10. PARÂMETRO DE EFICIÊNCIA (AV)</h4>
+                            <div class="memory-formula">
+                                AV = Custo Folha Mensal ÷ Faturamento Mensal<br>
+                                AV = ${formatarMoeda(cenario.custoMensal)} ÷ ${formatarMoeda(cenario.faturamento)}<br>
+                                <strong>AV = ${(cenario.av * 100).toFixed(2)}%</strong><br>
+                                <br>
+                                Alvo: ${(cenario.avAlvo * 100).toFixed(1)}%<br>
+                                Limite Crítico: ${((cenario.avAlvo + 0.02) * 100).toFixed(1)}%<br>
+                                <strong>Status: ${cenario.statusEficiencia === 'saudavel' ? '✓ SAUDÁVEL' : cenario.statusEficiencia === 'atencao' ? '⚠ ATENÇÃO' : '✗ CRÍTICO'}</strong>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('memoriaContent').innerHTML = html;
+        }
+
+        // ==================== DASHBOARD ====================
+        function atualizarDashboard() {
+            if (cenarios.length === 0) {
+                document.getElementById('dashboardContent').innerHTML = `
+                    <div style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                        <i class="fas fa-chart-bar" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p style="font-size: 1.1rem;">Nenhum cenário criado ainda.</p>
+                        <p style="margin-top: 0.5rem;">Acesse a aba "Cenários" para criar seu primeiro cenário.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const melhorCenario = cenarios.reduce((a, b) => a.custoTotalAnual < b.custoTotalAnual ? a : b);
+            const piorCenario = cenarios.reduce((a, b) => a.custoTotalAnual > b.custoTotalAnual ? a : b);
+            const economiaTotal = piorCenario.custoTotalAnual - melhorCenario.custoTotalAnual;
+            const percentualEconomia = (economiaTotal / piorCenario.custoTotalAnual * 100).toFixed(1);
+
+            let html = `
+                <div class="grid grid-4 mb-4">
+                    <div class="metric-card">
+                        <div class="metric-label">Melhor Cenário</div>
+                        <div class="metric-value" style="font-size: 1.25rem;">${melhorCenario.nome}</div>
+                        <div class="metric-change positive">${formatarMoeda(melhorCenario.custoTotalAnual)}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Pior Cenário</div>
+                        <div class="metric-value" style="font-size: 1.25rem;">${piorCenario.nome}</div>
+                        <div class="metric-change negative">${formatarMoeda(piorCenario.custoTotalAnual)}</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Economia Total</div>
+                        <div class="metric-value">${formatarMoeda(economiaTotal)}</div>
+                        <div class="metric-change positive">${percentualEconomia}%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Cenários Analisados</div>
+                        <div class="metric-value">${cenarios.length}</div>
+                        <div class="metric-change positive"><i class="fas fa-check"></i> Ativos</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-2 mb-4">
+                    <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 16px; border-left: 4px solid var(--primary);">
+                        <h4 style="color: var(--primary); margin-bottom: 1rem;">Análise por Regime Tributário</h4>
+                        <div style="display: grid; gap: 1rem;">
+                            ${cenarios.map(c => `
+                                <div style="padding: 1rem; background: var(--bg-card); border-radius: 12px; border-left: 3px solid ${c.regime === 'simples' ? '#27AE60' : '#E67E22'};">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <div>
+                                            <strong style="color: var(--primary);">${c.nome}</strong>
+                                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                                ${c.regime === 'simples' ? 'Simples Nacional (6%)' : 'Lucro Presumido (15%)'}
+                                            </div>
+                                        </div>
+                                        <div style="text-align: right;">
+                                            <div style="font-weight: 700; color: var(--primary);">${formatarMoeda(c.custoTotalAnual)}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 16px; border-left: 4px solid var(--primary);">
+                        <h4 style="color: var(--primary); margin-bottom: 1rem;">Análise por Modalidade de Contratação</h4>
+                        <div style="display: grid; gap: 1rem;">
+                            ${cenarios.map(c => {
+                                const celetistas = c.colaboradores.filter(col => col.tipo === 'celetista').length;
+                                const comissionados = c.colaboradores.filter(col => col.tipo === 'comissionado').length;
+                                return `
+                                    <div style="padding: 1rem; background: var(--bg-card); border-radius: 12px; border-left: 3px solid var(--accent);">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <div>
+                                                <strong style="color: var(--primary);">${c.nome}</strong>
+                                                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                                    ${celetistas} Celetista(s) | ${comissionados} Comissionado(s)
+                                                </div>
+                                            </div>
+                                            <div style="text-align: right;">
+                                                <div style="font-weight: 700; color: var(--primary);">${formatarMoeda(c.custoMensal)}/mês</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: var(--bg-light); padding: 1.5rem; border-radius: 16px; border-left: 4px solid var(--primary);">
+                    <h4 style="color: var(--primary); margin-bottom: 1rem;">Parâmetro de Eficiência (AV) - Análise Detalhada</h4>
+                    <div style="display: grid; gap: 1rem;">
+                        ${cenarios.map(c => {
+                            const statusClass = c.statusEficiencia;
+                            const statusText = c.statusEficiencia === 'saudavel' ? '✓ Saudável' : 
+                                              c.statusEficiencia === 'atencao' ? '⚠ Atenção' : '✗ Crítico';
+                            return `
+                                <div style="padding: 1rem; background: var(--bg-card); border-radius: 12px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                        <strong style="color: var(--primary);">${c.nome}</strong>
+                                        <span class="badge ${c.statusEficiencia === 'saudavel' ? 'badge-success' : c.statusEficiencia === 'atencao' ? 'badge-warning' : 'badge-danger'}">${statusText}</span>
+                                    </div>
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                                        AV: ${(c.av * 100).toFixed(2)}% | Alvo: ${(c.avAlvo * 100).toFixed(1)}% | Limite Crítico: ${((c.avAlvo + 0.02) * 100).toFixed(1)}%
+                                    </div>
+                                    <div class="efficiency-bar">
+                                        <div class="efficiency-fill ${statusClass}" style="width: ${Math.min(c.av * 100, 100)}%"></div>
+                                    </div>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                                        Custo Folha: ${formatarMoeda(c.custoAnual)}/ano | Faturamento: ${formatarMoeda(c.faturamento * 12)}/ano
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('dashboardContent').innerHTML = html;
+        }
+
+        // ==================== FUNÇÕES AUXILIARES ====================
+              // Substitua as funções editarCenario e deletarCenario por estas:
+
+        function editarCenario(id) {
+            const cenario = cenarios.find(c => c.id === id);
+            if (!cenario) return;
+
+            selecionarRegime(document.getElementById(`regime-${cenario.regime}`), cenario.regime);
+            document.getElementById('faturamentoMensal').value = cenario.faturamento;
+            document.getElementById('diasUteis').value         = cenario.diasUteis;
+            document.getElementById('valeAlimentacao').value   = cenario.valeAlimentacao;
+            document.getElementById('planosaude').value        = cenario.planosaude;
+            document.getElementById('avAlvo').value            = cenario.avAlvo * 100;
+
+            document.getElementById('employeesList').innerHTML = '';
+            colaboradores = [];
+            contadorColaboradores = 0;
+
+            cenario.colaboradores.forEach(colab => {
+                contadorColaboradores++;
+                const colabId = Date.now() + Math.random();
+                const html = `
+                    <div class="employee-card" id="employee-${colabId}">
+                        <div class="employee-header">
+                            <input type="text" class="employee-name-input" placeholder="Nome" value="${colab.nome}">
+                            <button class="remove-btn" onclick="removerColaborador('${colabId}')"><i class="fas fa-trash"></i></button>
+                        </div>
+                        <div class="employee-field">
+                            <div class="employee-field-item">
+                                <div class="employee-field-label">Cargo</div>
+                                <div class="employee-field-desc">Posição na empresa</div>
+                                <select class="employee-role">${gerarOpcoesCargoHtml(colab.cargo)}</select>
+                            </div>
+                            <div class="employee-field-item">
+                                <div class="employee-field-label">Modalidade</div>
+                                <div class="employee-field-desc">Tipo de contratação</div>
+                                <select class="employee-type">
+                                    <option value="celetista" ${colab.tipo === 'celetista' ? 'selected' : ''}>Celetista</option>
+                                    <option value="comissionado" ${colab.tipo === 'comissionado' ? 'selected' : ''}>Comissionado</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="employee-field">
+                            <div class="employee-field-item">
+                                <div class="employee-field-label">Salário/Piso</div>
+                                <div class="employee-field-desc">Base fixa ou piso mínimo</div>
+                                <input type="number" class="employee-salary" value="${colab.salario}" min="0" step="0.01">
+                            </div>
+                            <div class="employee-field-item">
+                                <div class="employee-field-label">% Comissão</div>
+                                <div class="employee-field-desc">Percentual sobre venda</div>
+                                <input type="number" class="employee-comissao" value="${colab.comissao}" min="0" step="0.1">
+                            </div>
+                        </div>
+                    </div>`;
+                document.getElementById('employeesList').insertAdjacentHTML('beforeend', html);
+                colaboradores.push({ id: colabId });
+            });
+
+            // Marca o cenário como "em edição" e remove da lista visual (sem deletar do DB)
+            editandoCenarioId   = id;
+            editandoCenarioNome = cenario.nome;
+            cenarios = cenarios.filter(c => c.id !== id);
+            atualizarListaCenarios();
+            atualizarComparacao();
+            atualizarMemoria();
+            atualizarDashboard();
+
+            mostrarTab('cenarios');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            alert('Cenário carregado para edição. Faça as alterações e clique em "Criar Cenário" para salvar.');
+        }
+
+        async function deletarCenario(id) {
+            mostrarConfirmacao(
+                'Deletar Cenário',
+                'Tem certeza que deseja deletar este cenário? Esta ação não pode ser desfeita.',
+                async (confirmado) => {
+                    if (!confirmado) return;
+                    const uid = getSimUsuarioId();
+                    if (uid) {
+                        const { error } = await sbSim.from('sim_cenarios').delete().eq('id', id).eq('usuario_id', uid);
+                        if (error) { mostrarErro('Erro', 'Falha ao remover cenário do banco de dados.'); return; }
+                    }
+                    cenarios = cenarios.filter(c => c.id !== id);
+                    atualizarListaCenarios();
+                    atualizarComparacao();
+                    atualizarMemoria();
+                    atualizarDashboard();
+                    mostrarSucesso('Deletado!', 'Cenário removido com sucesso.');
+                }
+            );
+        }
+
+        function renomearCenario(id) {
+            const cenario = cenarios.find(c => c.id === id);
+            if (!cenario) return;
+
+            mostrarPrompt(
+                'Renomear Cenário',
+                'Digite o novo nome para o cenário:',
+                async (novoNome) => {
+                    const uid = getSimUsuarioId();
+                    if (uid) {
+                        await sbSim.from('sim_cenarios')
+                            .update({ nome: novoNome, atualizado_em: new Date().toISOString() })
+                            .eq('id', id);
+                    }
+                    cenario.nome = novoNome;
+                    atualizarListaCenarios();
+                    atualizarComparacao();
+                    atualizarMemoria();
+                    atualizarDashboard();
+                    mostrarSucesso('Sucesso!', `Cenário renomeado para "${novoNome}"`);
+                },
+                cenario.nome
+            );
+        }
+
+        function limparFormulario() {
+            document.getElementById('employeesList').innerHTML = '';
+            colaboradores = [];
+            contadorColaboradores = 0;
+            adicionarColaborador();
+        }
+
+        function formatarMoeda(valor) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(valor);
+        }
+
+        function salvarCenarios() {
+            // Persistência migrada para Supabase.
+            // Cada operação CRUD (criar/editar/deletar/renomear) salva diretamente.
+        }
+
+        async function carregarCenarios() {
+            const uid = getSimUsuarioId();
+            if (!uid) { atualizarListaCenarios(); atualizarComparacao(); atualizarMemoria(); return; }
+
+            const { data, error } = await sbSim
+                .from('sim_cenarios')
+                .select(`*, sim_colaboradores ( id, nome, cargo, tipo, salario, comissao, ordem )`)
+                .eq('usuario_id', uid)
+                .order('criado_em');
+
+            if (error || !data) { atualizarListaCenarios(); return; }
+
+            cenarios = data.map(row => {
+                const colabs = (row.sim_colaboradores || [])
+                    .sort((a, b) => a.ordem - b.ordem)
+                    .map(c => ({ nome: c.nome, cargo: c.cargo, tipo: c.tipo, salario: Number(c.salario), comissao: Number(c.comissao) }));
+
+                const vi = colabs.length > 0 ? Number(row.faturamento) / colabs.length : 0;
+                const calculo = calcularCenario(colabs, row.regime, Number(row.faturamento), row.dias_uteis, Number(row.vale_alimentacao), Number(row.plano_saude), Number(row.av_alvo), vi);
+
+                return {
+                    id:             row.id,
+                    nome:           row.nome,
+                    regime:         row.regime,
+                    colaboradores:  colabs,
+                    faturamento:    Number(row.faturamento),
+                    diasUteis:      row.dias_uteis,
+                    valeAlimentacao: Number(row.vale_alimentacao),
+                    planosaude:     Number(row.plano_saude),
+                    avAlvo:         Number(row.av_alvo),
+                    vendaIndividual: vi,
+                    ...calculo
+                };
+            });
+
+            atualizarListaCenarios();
+            atualizarComparacao();
+            atualizarMemoria();
+        }
+    </script>
+    <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
+    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+</body>
+</html>

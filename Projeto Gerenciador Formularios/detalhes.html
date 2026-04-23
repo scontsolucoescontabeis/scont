@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalhes do Formulário - SCONT</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+         <div class="sidebar-header">
+    <div class="logo-container">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="Logo SCONT" class="company-logo">
+    </div>
+    <!-- Removi o h2 e o p porque a logo já tem o nome da empresa -->
+</div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <span class="icon">📋</span>
+                    <span>Formulários</span>
+                </a>
+                <a href="historico.html" class="nav-item">
+                    <span class="icon">📊</span>
+                    <span>Histórico de Edições</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <!-- TOPBAR -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <a href="index.html" class="back-link">← Voltar</a>
+                    <h1 id="pageTitle">Detalhes do Formulário</h1>
+                </div>
+            </header>
+
+            <!-- FORM DETAILS -->
+            <section class="form-details" id="formDetails">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Carregando detalhes...</p>
+                </div>
+            </section>
+
+            <!-- EDIT MODAL -->
+            <div id="editModal" class="modal" style="display: none;">
+                <div class="modal-overlay" onclick="closeEditModal()"></div>
+                <div class="modal-content modal-large">
+                    <div class="modal-header">
+                        <h2>Editar Formulário</h2>
+                        <button class="modal-close" onclick="closeEditModal()">✕</button>
+                    </div>
+                    <div class="modal-body" id="editModalBody">
+                        <!-- Formulário dinâmico -->
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="closeEditModal()">Cancelar</button>
+                        <button class="btn btn-primary" onclick="saveChanges()">Salvar Alterações</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="utils.js"></script>
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initSupabase();
+            const formId = new URLSearchParams(window.location.search).get('id');
+            if (formId) {
+                loadFormDetails(formId);
+            } else {
+                window.location.href = 'index.html';
+            }
+        });
+    </script>
+</body>
+</html>
