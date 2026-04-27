@@ -156,14 +156,22 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             .maybeSingle();
 
         if (usuario?.is_admin) {
+            const loginTime = new Date().toISOString();
             sessionStorage.setItem('adminAuth', JSON.stringify({
                 authUserId: authData.user.id,
                 email:      authData.user.email,
                 nome:       usuario.nome,
-                loginTime:  new Date().toISOString()
+                loginTime
+            }));
+            sessionStorage.setItem('userAuth', JSON.stringify({
+                authUserId: authData.user.id,
+                email:      authData.user.email,
+                loginTime,
+                isAdmin:    true,
+                userData:   { nome: usuario.nome }
             }));
             showAlert(alertEl, '✅ Acesso admin liberado! Redirecionando...', 'success');
-            setTimeout(() => { window.location.href = 'admin-dashboard.html'; }, 1200);
+            setTimeout(() => { window.location.href = 'portal.html'; }, 1200);
             return;
         }
 

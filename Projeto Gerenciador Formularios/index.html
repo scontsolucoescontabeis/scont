@@ -45,6 +45,11 @@
                     <span class="icon">📁</span>
                     <span>Central de Documentos</span>
                 </a>
+                <div style="height:1px;background:var(--border-color);margin:var(--spacing-md) 0;"></div>
+                <a href="../portal.html" class="nav-item">
+                    <span class="icon">🏠</span>
+                    <span>Voltar ao Portal</span>
+                </a>
             </nav>
         </aside>
 
@@ -57,7 +62,7 @@
                     <p>Gestão, validação e auditoria de registros</p>
                 </div>
                 <div class="topbar-right">
-                    <button class="btn btn-secondary" onclick="syncSupabase()">🔄 Sincronizar</button>
+                    <button class="btn btn-secondary" onclick="syncSupabase(this)">🔄 Sincronizar</button>
                 </div>
             </header>
 
@@ -194,22 +199,22 @@
             </div>
         </div>
     </div>
-<!-- Adicione esta linha no seu index.html se ela não existir -->
-<script src="../supabase-config.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="../supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="../portal-auth-guard.js"></script>
     <script src="utils.js"></script>
-    <script src="cnaes.js"></script> <!-- Arquivo com a variável window.CNAE_DATA -->
+    <script src="cnaes.js"></script>
     <script src="app.js"></script>
     <script>
-        // Inicializar ao carregar
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
+            const auth = await window.PortalAuthGuard.init(1);
+            if (!auth) return;
+            document.getElementById('portalAuthOverlay').remove();
             initSupabase();
             loadForms();
         });
     </script>
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
-    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
 </body>
 </html>

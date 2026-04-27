@@ -507,7 +507,7 @@
         </div>
 
         <div class="card">
-            <div class="card-title">🔧 Suas Ferramentas Autorizadas</div>
+            <div class="card-title" id="cardTitleFerramentas">🔧 Suas Ferramentas Autorizadas</div>
             <div class="card-body">
                 <div id="alertPortal" class="alert alert-error"></div>
                 <div class="ferramentas-grid" id="ferramentasGrid">
@@ -560,17 +560,37 @@
         }
 
         // ─── CARREGAR FERRAMENTAS ──────────────────────────────────
-        async function loadFerramentas(userId) {
+        let _isAdmin = false;
+
+        async function loadFerramentas(auth) {
+            const isAdmin = auth ? auth.isAdmin : _isAdmin;
+            if (auth) _isAdmin = !!isAdmin;
             try {
-                const { data, error } = await sb
-                    .from('usuario_ferramentas')
-                    .select('ferramentas ( id, nome, descricao, icone, url_base, ativa, ordem )');
-                if (error) throw error;
-                const ferramentas = (data || [])
-                    .map(row => row.ferramentas)
-                    .filter(f => f && f.ativa)
-                    .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
-                ferramentas.length ? renderFerramentas(ferramentas) : renderVazio();
+                let ferramentas;
+                if (isAdmin) {
+                    const { data, error } = await sb
+                        .from('ferramentas')
+                        .select('id, nome, descricao, icone, url_base, ativa, ordem')
+                        .eq('ativa', true)
+                        .order('ordem');
+                    if (error) throw error;
+                    ferramentas = data || [];
+                } else {
+                    const { data, error } = await sb
+                        .from('usuario_ferramentas')
+                        .select('ferramentas ( id, nome, descricao, icone, url_base, ativa, ordem )');
+                    if (error) throw error;
+                    ferramentas = (data || [])
+                        .map(row => row.ferramentas)
+                        .filter(f => f && f.ativa)
+                        .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+                }
+                if (isAdmin) {
+                    document.getElementById('cardTitleFerramentas').textContent = '🔧 Todas as Ferramentas';
+                    renderFerramentas(ferramentas, true);
+                } else {
+                    ferramentas.length ? renderFerramentas(ferramentas, false) : renderVazio();
+                }
             } catch (err) {
                 console.error('Erro ao carregar ferramentas:', err);
                 const el = document.getElementById('alertPortal');
@@ -581,36 +601,52 @@
         }
 
         // ─── RENDER FERRAMENTAS ────────────────────────────────────
-        function renderFerramentas(ferramentas) {
+        function criarCardFerramenta(f) {
+            const card = document.createElement('div');
+            card.className = 'ferramenta-card';
+            const icon = document.createElement('div');
+            icon.className = 'ferramenta-icon';
+            icon.textContent = f.icone || '🔧';
+            const nome = document.createElement('div');
+            nome.className = 'ferramenta-nome';
+            nome.textContent = f.nome;
+            const desc = document.createElement('div');
+            desc.className = 'ferramenta-desc';
+            desc.textContent = f.descricao || 'Clique para acessar';
+            const btn = document.createElement('button');
+            btn.className = 'btn-acessar';
+            btn.textContent = 'Acessar →';
+            const acessar = () => abrirFerramenta(f.url_base);
+            card.addEventListener('click', acessar);
+            btn.addEventListener('click', (e) => { e.stopPropagation(); acessar(); });
+            card.appendChild(icon);
+            card.appendChild(nome);
+            card.appendChild(desc);
+            card.appendChild(btn);
+            return card;
+        }
+
+        function criarCardAdmin() {
+            const card = document.createElement('div');
+            card.className = 'ferramenta-card';
+            card.style.cssText = 'border: 2px solid var(--primary); background: linear-gradient(135deg, #fff8f8, #fff);';
+            card.innerHTML = `
+                <div class="ferramenta-icon">⚙️</div>
+                <div class="ferramenta-nome">Painel Administrativo</div>
+                <div class="ferramenta-desc">Gerenciar usuários, ferramentas e acessos</div>
+                <button class="btn-acessar" style="background: var(--primary);">Acessar →</button>
+            `;
+            const acessar = () => { window.location.href = 'admin-dashboard.html'; };
+            card.addEventListener('click', acessar);
+            card.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); acessar(); });
+            return card;
+        }
+
+        function renderFerramentas(ferramentas, isAdmin) {
             const grid = document.getElementById('ferramentasGrid');
             grid.innerHTML = '';
-            ferramentas.forEach(f => {
-                const card = document.createElement('div');
-                card.className = 'ferramenta-card';
-                const icon = document.createElement('div');
-                icon.className = 'ferramenta-icon';
-                icon.textContent = f.icone || '🔧';
-                const nome = document.createElement('div');
-                nome.className = 'ferramenta-nome';
-                nome.textContent = f.nome;
-                const desc = document.createElement('div');
-                desc.className = 'ferramenta-desc';
-                desc.textContent = f.descricao || 'Clique para acessar';
-                const btn = document.createElement('button');
-                btn.className = 'btn-acessar';
-                btn.textContent = 'Acessar →';
-                const acessar = () => abrirFerramenta(f.url_base);
-                card.addEventListener('click', acessar);
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    acessar();
-                });
-                card.appendChild(icon);
-                card.appendChild(nome);
-                card.appendChild(desc);
-                card.appendChild(btn);
-                grid.appendChild(card);
-            });
+            if (isAdmin) grid.appendChild(criarCardAdmin());
+            ferramentas.forEach(f => grid.appendChild(criarCardFerramenta(f)));
         }
 
         function renderVazio() {
@@ -640,10 +676,10 @@
         function subscribeFerramentas() {
             sb.channel('portal-realtime')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'usuario_ferramentas' }, () => {
-                    loadFerramentas();
+                    loadFerramentas(null);
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'ferramentas' }, () => {
-                    loadFerramentas();
+                    loadFerramentas(null);
                 })
                 .subscribe();
         }
@@ -667,7 +703,7 @@
             document.getElementById('headerEmail').textContent = auth.email;
             document.getElementById('headerLogin').textContent =
                 `Login: ${new Date(auth.loginTime).toLocaleTimeString('pt-BR')}`;
-            loadFerramentas(auth.userId);
+            loadFerramentas(auth);
             subscribeFerramentas();
         });
     </script>

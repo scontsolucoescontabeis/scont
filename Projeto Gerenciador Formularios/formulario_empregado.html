@@ -7,7 +7,6 @@
     <script src="../supabase-config.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../portal-auth-guard.js"></script>
     <style>
         /* ===== RESET E VARIÁVEIS ===== */
         * {
@@ -711,7 +710,6 @@
                         <li>Carteira de Trabalho digital ou física</li>
                         <li>Foto da carteira de identidade, CPF e título de eleitor</li>
                         <li>Cartão do PIS</li>
-                        <li>Foto 3x4 (atual)</li>
                         <li>Certificado de Reservista (homens)</li>
                     </ul>
                 </div>
@@ -742,11 +740,7 @@
     <div class="document-preview" id="preview_docPIS"></div>
 </div>
 
-                    <div class="document-item">
-                        <label><input type="checkbox" name="docFoto3x4"> Foto 3x4 (Atual)</label>
-                        <input type="file" name="docFoto3x4" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docFoto3x4')">
-                        <div class="document-preview" id="preview_docFoto3x4"></div>
-                    </div>
+                 
 
                     <div class="document-item">
                         <label><input type="checkbox" name="docReservista"> Certificado de Reservista (Homens)</label>
@@ -1663,8 +1657,7 @@ const { data: empregadoData, error: empregadoError } = await supabase
         console.log('✅ Formulário de Empregado carregado com sucesso!');
     });
 </script>
-    <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
-    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+
 </body>
 </html>
      

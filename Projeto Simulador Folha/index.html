@@ -268,6 +268,43 @@
             gap: 0.75rem;
         }
 
+        .card-header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-export {
+            background: transparent;
+            border: 1.5px solid var(--primary);
+            color: var(--primary);
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-export:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-export.pdf {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .btn-export.pdf:hover {
+            background: var(--danger);
+            color: white;
+        }
+
         .card-title i {
             color: var(--accent);
             font-size: 1.5rem;
@@ -1365,6 +1402,10 @@
                         <i class="fas fa-tachometer-alt"></i>
                         Dashboard Executivo
                     </div>
+                    <div class="card-header-actions">
+                        <button class="btn-export" onclick="exportarCSV('dashboard')"><i class="fas fa-file-csv"></i> CSV</button>
+                        <button class="btn-export pdf" onclick="imprimirPDF('dashboard')"><i class="fas fa-print"></i> PDF</button>
+                    </div>
                 </div>
                 <div id="dashboardContent"></div>
             </div>
@@ -1481,6 +1522,10 @@
                         <i class="fas fa-balance-scale"></i>
                         Análise Comparativa Detalhada
                     </div>
+                    <div class="card-header-actions">
+                        <button class="btn-export" onclick="exportarCSV('comparacao')"><i class="fas fa-file-csv"></i> CSV</button>
+                        <button class="btn-export pdf" onclick="imprimirPDF('comparacao')"><i class="fas fa-print"></i> PDF</button>
+                    </div>
                 </div>
                 <div id="comparisonContent"></div>
             </div>
@@ -1493,6 +1538,10 @@
                     <div class="card-title">
                         <i class="fas fa-book"></i>
                         Memória de Cálculo
+                    </div>
+                    <div class="card-header-actions">
+                        <button class="btn-export" onclick="exportarCSV('memoria')"><i class="fas fa-file-csv"></i> CSV</button>
+                        <button class="btn-export pdf" onclick="imprimirPDF('memoria')"><i class="fas fa-print"></i> PDF</button>
                     </div>
                 </div>
                 <div id="memoriaContent"></div>
@@ -1763,7 +1812,7 @@
                         <div class="employee-field-item">
                             <div class="employee-field-label">Modalidade</div>
                             <div class="employee-field-desc">Tipo de contratação</div>
-                            <select class="employee-type">
+                            <select class="employee-type" onchange="atualizarTipoColaborador(this)">
                                 <option value="celetista" selected>Celetista</option>
                                 <option value="comissionado">Comissionado</option>
                             </select>
@@ -1772,13 +1821,13 @@
 
                     <div class="employee-field">
                         <div class="employee-field-item">
-                            <div class="employee-field-label">Salário/Piso</div>
-                            <div class="employee-field-desc">Base fixa ou piso mínimo</div>
+                            <div class="employee-field-label salary-label">Salário Base</div>
+                            <div class="employee-field-desc salary-desc">Salário fixo mensal</div>
                             <input type="number" placeholder="1.681,00" class="employee-salary" value="1681.00" min="0" step="0.01">
                         </div>
                         <div class="employee-field-item">
                             <div class="employee-field-label">% Comissão</div>
-                            <div class="employee-field-desc">Percentual sobre venda</div>
+                            <div class="employee-field-desc">Percentual sobre vendas do colaborador</div>
                             <input type="number" placeholder="3,50" class="employee-comissao" value="${comissaoDefault}" min="0" step="0.1">
                         </div>
                     </div>
@@ -1792,6 +1841,230 @@
             document.getElementById(`employee-${id}`).remove();
             colaboradores = colaboradores.filter(c => c.id !== parseFloat(id));
             contadorColaboradores--;
+        }
+
+        function atualizarTipoColaborador(selectEl) {
+            const card = selectEl.closest('.employee-card');
+            const label = card.querySelector('.salary-label');
+            const desc  = card.querySelector('.salary-desc');
+            if (selectEl.value === 'celetista') {
+                label.textContent = 'Salário Base';
+                desc.textContent  = 'Salário fixo mensal';
+            } else {
+                label.textContent = 'Piso Salarial';
+                desc.textContent  = 'Mínimo garantido ao colaborador';
+            }
+        }
+
+        function exportarCSV(aba) {
+            if (cenarios.length === 0) { mostrarModal('aviso', 'Aviso', 'Nenhum cenário disponível para exportar.'); return; }
+            let linhas = [];
+            if (aba === 'memoria') {
+                linhas.push(['Cenário','Colaborador','Tipo','Piso (R$)','Venda (R$)','Comissão (R$)','Remuneração (R$)','DSR (R$)','Encargos (R$)','Férias (R$)','1/3 (R$)','13º (R$)','Rescisão (R$)']);
+                cenarios.forEach(c => {
+                    c.detalhes.forEach(d => {
+                        linhas.push([c.nome, d.nome, d.tipo,
+                            (d.piso||0).toFixed(2), d.venda.toFixed(2), d.comissao.toFixed(2),
+                            d.remuneracao.toFixed(2), d.dsr.toFixed(2), d.encargos.toFixed(2),
+                            d.ferias.toFixed(2), d.terco.toFixed(2), d.decimo.toFixed(2), d.rescisao.toFixed(2)]);
+                    });
+                });
+            } else {
+                linhas.push(['Cenário','Regime','Colaboradores','Faturamento (R$)','Remuneração (R$)','Comissão Total (R$)','DSR (R$)','Encargos (R$)','Férias (R$)','1/3 (R$)','13º (R$)','Rescisão (R$)','Benefícios (R$)','Custo Mensal (R$)','Imposto Anual (R$)','Custo Total Anual (R$)','AV (%)']);
+                cenarios.forEach(c => {
+                    linhas.push([c.nome, c.regime, c.colaboradores.length,
+                        c.faturamento.toFixed(2), c.remuneracaoMensal.toFixed(2), c.comissaoTotal.toFixed(2),
+                        c.dsr.toFixed(2), c.encargos.toFixed(2), c.ferias.toFixed(2),
+                        c.terco.toFixed(2), c.decimo.toFixed(2), c.rescisao.toFixed(2),
+                        c.beneficios.toFixed(2), c.custoMensal.toFixed(2), c.impostoAnual.toFixed(2),
+                        c.custoTotalAnual.toFixed(2), (c.av * 100).toFixed(2)]);
+                });
+            }
+            const csv = linhas.map(l => l.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+            const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `simulador_${aba}_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function imprimirPDF(aba) {
+            if (cenarios.length === 0) { mostrarModal('aviso', 'Aviso', 'Nenhum dado disponível para imprimir.'); return; }
+
+            const mapaTitulo = { dashboard: 'Dashboard Executivo', comparacao: 'Análise Comparativa', memoria: 'Memória de Cálculo' };
+            const dataHora   = new Date().toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+            const cabecalho  = `
+                <div style="text-align:center;margin-bottom:20px;border-bottom:2px solid #6B2C3E;padding-bottom:12px;">
+                    <strong style="font-size:17px;color:#6B2C3E;">SCONT Soluções Contábeis</strong><br>
+                    <span style="font-size:13px;font-weight:600;">${mapaTitulo[aba]}</span><br>
+                    <small style="color:#666;">${dataHora}</small>
+                </div>`;
+
+            const css = `
+                body { font-family:'Segoe UI',sans-serif; font-size:11px; color:#2c2c2c; margin:20px; background:#fff; }
+                h3 { color:#6B2C3E; font-size:13px; margin:18px 0 6px; border-bottom:1px solid #ddd; padding-bottom:4px; }
+                h4 { color:#6B2C3E; font-size:11px; margin:10px 0 4px; }
+                table { width:100%; border-collapse:collapse; margin-bottom:14px; page-break-inside:avoid; }
+                thead th { background:#6B2C3E; color:#fff; padding:7px 8px; font-size:10px; text-align:left; }
+                tbody td { border:1px solid #ddd; padding:5px 8px; vertical-align:top; }
+                tbody tr:nth-child(even) td { background:#f9f5f5; }
+                .val  { text-align:right; font-variant-numeric:tabular-nums; }
+                .tot  { font-weight:700; background:#f0e8ea !important; }
+                .badge-s { color:#155724; background:#d4edda; padding:1px 6px; border-radius:10px; font-size:10px; }
+                .badge-l { color:#856404; background:#fff3cd; padding:1px 6px; border-radius:10px; font-size:10px; }
+                .badge-ok  { color:#155724; background:#d4edda; padding:1px 6px; border-radius:10px; }
+                .badge-at  { color:#856404; background:#fff3cd; padding:1px 6px; border-radius:10px; }
+                .badge-cr  { color:#721c24; background:#f8d7da; padding:1px 6px; border-radius:10px; }
+                .rank-block { border-left:4px solid #ccc; padding:6px 10px; margin-bottom:8px; background:#fafafa; }
+                .rank-1 { border-color:#27AE60; }
+                .rank-2 { border-color:#E67E22; }
+                .rank-3 { border-color:#C0392B; }
+                .memory-section { border-left:3px solid #6B2C3E; padding:8px 12px; margin-bottom:10px; background:#fdf8f8; page-break-inside:avoid; }
+                .memory-formula { font-family:monospace; font-size:10px; line-height:1.8; }
+                @media print { @page { margin:12mm 15mm; size:A4; } body { font-size:10px; } }`;
+
+            let corpo = '';
+
+            // ── COMPARAÇÃO ──────────────────────────────────────────────────
+            if (aba === 'comparacao') {
+                // Tabela principal: linhas = campos, colunas = cenários
+                const campos = [
+                    ['Regime',              c => c.regime === 'simples' ? '<span class="badge-s">Simples Nacional</span>' : '<span class="badge-l">Lucro Presumido</span>', false],
+                    ['Colaboradores',       c => `${c.colaboradores.length} (${c.colaboradores.filter(x=>x.tipo==='celetista').length}C | ${c.colaboradores.filter(x=>x.tipo==='comissionado').length}Co)`, false],
+                    ['Faturamento Mensal',  c => formatarMoeda(c.faturamento),          true],
+                    ['Venda Individual',    c => formatarMoeda(c.vendaIndividual),       true],
+                    ['Remuneração Mensal',  c => formatarMoeda(c.remuneracaoMensal),    true],
+                    ['Comissões Totais',    c => formatarMoeda(c.comissaoTotal),         true],
+                    ['DSR',                 c => formatarMoeda(c.dsr),                  true],
+                    ['Encargos Sociais',    c => formatarMoeda(c.encargos),             true],
+                    ['Férias (1/12)',        c => formatarMoeda(c.ferias),               true],
+                    ['1/3 Constitucional',  c => formatarMoeda(c.terco),                true],
+                    ['13º Salário (1/12)',  c => formatarMoeda(c.decimo),               true],
+                    ['Provisão Rescisão',   c => formatarMoeda(c.rescisao),             true],
+                    ['Benefícios',          c => formatarMoeda(c.beneficios),           true],
+                    ['Custo Mensal',        c => formatarMoeda(c.custoMensal),          true, true],
+                    ['Custo Anual',         c => formatarMoeda(c.custoAnual),           true, true],
+                    ['Imposto Anual',       c => formatarMoeda(c.impostoAnual),         true, true],
+                    ['Custo Total Anual',   c => formatarMoeda(c.custoTotalAnual),      true, true],
+                    ['AV (%)',              c => `${(c.av*100).toFixed(2)}%`,           true],
+                    ['Status',              c => {
+                        const s = c.statusEficiencia;
+                        return `<span class="${s==='saudavel'?'badge-ok':s==='atencao'?'badge-at':'badge-cr'}">${s==='saudavel'?'✓ Saudável':s==='atencao'?'⚠ Atenção':'✗ Crítico'}</span>`;
+                    }, false],
+                ];
+
+                corpo += `<h3>Comparativo de Cenários</h3>
+                <table>
+                    <thead><tr>
+                        <th style="width:160px;">Campo</th>
+                        ${cenarios.map(c => `<th>${c.nome}</th>`).join('')}
+                    </tr></thead>
+                    <tbody>
+                        ${campos.map(([label, fn, isVal, isTot]) => `
+                        <tr>
+                            <td style="font-weight:600;background:#f8f5f5;">${label}</td>
+                            ${cenarios.map(c => `<td class="${isVal?'val':''} ${isTot?'tot':''}">${fn(c)}</td>`).join('')}
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+
+                // Detalhes de colaboradores por cenário
+                corpo += `<h3>Detalhes por Colaborador</h3>`;
+                cenarios.forEach(c => {
+                    corpo += `<h4>${c.nome} — ${c.regime==='simples'?'Simples Nacional':'Lucro Presumido'}</h4>
+                    <table>
+                        <thead><tr>
+                            <th>Nome</th><th>Tipo</th><th>Cargo</th>
+                            <th class="val">Venda</th><th class="val">Comissão</th>
+                            <th class="val">DSR</th><th class="val">Remuneração</th><th class="val">Encargos</th>
+                        </tr></thead>
+                        <tbody>
+                            ${c.detalhes.map(d=>`<tr>
+                                <td>${d.nome}</td><td>${d.tipo}</td><td>${d.cargo}</td>
+                                <td class="val">${formatarMoeda(d.venda)}</td>
+                                <td class="val">${formatarMoeda(d.comissao)}</td>
+                                <td class="val">${formatarMoeda(d.dsr)}</td>
+                                <td class="val">${formatarMoeda(d.remuneracao)}</td>
+                                <td class="val">${formatarMoeda(d.encargos)}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+                });
+
+                // Ranking
+                const ranking = [...cenarios].sort((a,b) => a.custoTotalAnual - b.custoTotalAnual);
+                corpo += `<h3>Ranking de Eficiência Financeira</h3>`;
+                ranking.forEach((c, i) => {
+                    const economia = ranking[ranking.length-1].custoTotalAnual - c.custoTotalAnual;
+                    const pct = (economia / ranking[ranking.length-1].custoTotalAnual * 100).toFixed(1);
+                    corpo += `<div class="rank-block rank-${Math.min(i+1,3)}">
+                        <strong>${i+1}º — ${c.nome}</strong>
+                        &nbsp;|&nbsp; ${c.regime==='simples'?'Simples Nacional':'Lucro Presumido'}
+                        &nbsp;|&nbsp; ${c.colaboradores.length} colaborador(es)
+                        &nbsp;|&nbsp; Custo Total: <strong>${formatarMoeda(c.custoTotalAnual)}</strong>
+                        &nbsp;|&nbsp; Economia: <strong style="color:#27AE60;">${formatarMoeda(economia)} (${pct}%)</strong>
+                    </div>`;
+                });
+
+            // ── DASHBOARD ────────────────────────────────────────────────────
+            } else if (aba === 'dashboard') {
+                const melhor = cenarios.reduce((a,b) => a.custoTotalAnual < b.custoTotalAnual ? a : b);
+                const pior   = cenarios.reduce((a,b) => a.custoTotalAnual > b.custoTotalAnual ? a : b);
+                const econ   = pior.custoTotalAnual - melhor.custoTotalAnual;
+                corpo += `<h3>Resumo Geral</h3>
+                <table style="width:auto;margin-bottom:16px;">
+                    <tbody>
+                        <tr><td style="font-weight:600;">Melhor Cenário</td><td>${melhor.nome} — ${formatarMoeda(melhor.custoTotalAnual)}</td></tr>
+                        <tr><td style="font-weight:600;">Pior Cenário</td><td>${pior.nome} — ${formatarMoeda(pior.custoTotalAnual)}</td></tr>
+                        <tr><td style="font-weight:600;">Economia Potencial</td><td>${formatarMoeda(econ)} (${(econ/pior.custoTotalAnual*100).toFixed(1)}%)</td></tr>
+                        <tr><td style="font-weight:600;">Cenários Analisados</td><td>${cenarios.length}</td></tr>
+                    </tbody>
+                </table>
+                <h3>Todos os Cenários</h3>
+                <table>
+                    <thead><tr>
+                        <th>Cenário</th><th>Regime</th><th>Colab.</th>
+                        <th class="val">Custo Mensal</th><th class="val">Custo Anual</th>
+                        <th class="val">Imposto Anual</th><th class="val">Custo Total Anual</th><th class="val">AV%</th><th>Status</th>
+                    </tr></thead>
+                    <tbody>
+                        ${cenarios.map(c=>`<tr>
+                            <td>${c.nome}</td>
+                            <td>${c.regime==='simples'?'Simples':'Lucro'}</td>
+                            <td style="text-align:center;">${c.colaboradores.length}</td>
+                            <td class="val">${formatarMoeda(c.custoMensal)}</td>
+                            <td class="val">${formatarMoeda(c.custoAnual)}</td>
+                            <td class="val">${formatarMoeda(c.impostoAnual)}</td>
+                            <td class="val tot">${formatarMoeda(c.custoTotalAnual)}</td>
+                            <td class="val">${(c.av*100).toFixed(2)}%</td>
+                            <td><span class="${c.statusEficiencia==='saudavel'?'badge-ok':c.statusEficiencia==='atencao'?'badge-at':'badge-cr'}">${c.statusEficiencia==='saudavel'?'✓ Saudável':c.statusEficiencia==='atencao'?'⚠ Atenção':'✗ Crítico'}</span></td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+
+            // ── MEMÓRIA ───────────────────────────────────────────────────────
+            } else if (aba === 'memoria') {
+                const elMemoria = document.getElementById('memoriaContent');
+                if (!elMemoria || !elMemoria.innerHTML.trim()) { mostrarModal('aviso','Aviso','Nenhum dado disponível para imprimir.'); return; }
+                corpo = elMemoria.innerHTML;
+            }
+
+            const janela = window.open('', '_blank');
+            janela.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
+                <meta charset="UTF-8">
+                <title>SCONT – ${mapaTitulo[aba]}</title>
+                <style>${css}</style>
+            </head><body>
+                ${cabecalho}
+                ${corpo}
+            </body></html>`);
+            janela.document.close();
+            janela.focus();
+            setTimeout(() => janela.print(), 600);
         }
 
         // ==================== SISTEMA DE MODAIS ====================
@@ -2256,6 +2529,7 @@
             let beneficiosTotal = 0;
             let detalhes = [];
 
+            const diasNaoUteis = 30 - diasUteis;
             colaboradores.forEach(colab => {
                 let remuneracao = 0;
                 let comissao = 0;
@@ -2263,15 +2537,13 @@
 
                 comissao = vendaIndividual * (colab.comissao / 100);
 
-                          if (colab.tipo === 'celetista') {
+                if (colab.tipo === 'celetista') {
                     remuneracao = colab.salario + comissao;
-                    // Celetista NÃO recebe DSR avulso
-                    dsr = 0;
+                    dsr = (comissao / diasUteis) * diasNaoUteis;
                 } else {
-                    // Comissionado recebe o maior entre comissão e salário
                     remuneracao = Math.max(comissao, colab.salario);
-                    // Comissionado recebe DSR
-                    dsr = comissao / diasUteis;
+                    const baseDSR = comissao > colab.salario ? comissao : colab.salario;
+                    dsr = (baseDSR / diasUteis) * diasNaoUteis;
                 }
 
                 const baseEncargos = remuneracao + dsr;
@@ -2299,6 +2571,7 @@
                     nome: colab.nome,
                     cargo: colab.cargo,
                     tipo: colab.tipo,
+                    piso: colab.salario,
                     venda: vendaIndividual,
                     comissao,
                     remuneracao,
@@ -2629,10 +2902,23 @@
                         <div class="memory-section">
                             <h4>3. DSR (DESCANSO SEMANAL REMUNERADO)</h4>
                             <div class="memory-formula">
-                                DSR = Comissão ÷ Dias Úteis × 1 dia<br>
-                                ${cenario.detalhes.map((d, i) => `
-                                    ${d.nome}: ${formatarMoeda(d.comissao)} ÷ ${cenario.diasUteis} = ${formatarMoeda(d.dsr)}<br>
-                                `).join('')}
+                                Mês base: 30 dias | Dias úteis: ${cenario.diasUteis} | Dias não úteis: ${30 - cenario.diasUteis}<br>
+                                Celetista: DSR = (Comissão ÷ Dias Úteis) × Dias Não Úteis<br>
+                                Comissionado (comissão &gt; piso): DSR = (Comissão ÷ Dias Úteis) × Dias Não Úteis<br>
+                                Comissionado (comissão ≤ piso): DSR = (Piso ÷ Dias Úteis) × Dias Não Úteis<br>
+                                <br>
+                                ${cenario.detalhes.map(d => {
+                                    const dnu = 30 - cenario.diasUteis;
+                                    let baseLabel, baseVal;
+                                    if (d.tipo === 'celetista') {
+                                        baseLabel = 'comissão'; baseVal = d.comissao;
+                                    } else {
+                                        const usouPiso = (d.piso || 0) >= d.comissao;
+                                        baseLabel = usouPiso ? 'piso' : 'comissão';
+                                        baseVal = usouPiso ? (d.piso || 0) : d.comissao;
+                                    }
+                                    return `${d.nome} (${d.tipo}): (${formatarMoeda(baseVal)} [${baseLabel}] ÷ ${cenario.diasUteis}) × ${dnu} = ${formatarMoeda(d.dsr)}<br>`;
+                                }).join('')}
                                 <strong>Total DSR = ${formatarMoeda(cenario.dsr)}</strong>
                             </div>
                         </div>
@@ -2891,7 +3177,7 @@
                             <div class="employee-field-item">
                                 <div class="employee-field-label">Modalidade</div>
                                 <div class="employee-field-desc">Tipo de contratação</div>
-                                <select class="employee-type">
+                                <select class="employee-type" onchange="atualizarTipoColaborador(this)">
                                     <option value="celetista" ${colab.tipo === 'celetista' ? 'selected' : ''}>Celetista</option>
                                     <option value="comissionado" ${colab.tipo === 'comissionado' ? 'selected' : ''}>Comissionado</option>
                                 </select>
@@ -2899,13 +3185,13 @@
                         </div>
                         <div class="employee-field">
                             <div class="employee-field-item">
-                                <div class="employee-field-label">Salário/Piso</div>
-                                <div class="employee-field-desc">Base fixa ou piso mínimo</div>
+                                <div class="employee-field-label salary-label">${colab.tipo === 'celetista' ? 'Salário Base' : 'Piso Salarial'}</div>
+                                <div class="employee-field-desc salary-desc">${colab.tipo === 'celetista' ? 'Salário fixo mensal' : 'Mínimo garantido ao colaborador'}</div>
                                 <input type="number" class="employee-salary" value="${colab.salario}" min="0" step="0.01">
                             </div>
                             <div class="employee-field-item">
                                 <div class="employee-field-label">% Comissão</div>
-                                <div class="employee-field-desc">Percentual sobre venda</div>
+                                <div class="employee-field-desc">Percentual sobre vendas do colaborador</div>
                                 <input type="number" class="employee-comissao" value="${colab.comissao}" min="0" step="0.1">
                             </div>
                         </div>

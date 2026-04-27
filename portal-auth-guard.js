@@ -58,6 +58,9 @@ window.PortalAuthGuard = (function () {
         }
 
         // 3. Autorização para esta ferramenta
+        // Admin tem acesso irrestrito
+        if (auth.isAdmin) return auth;
+
         const { data, error } = await sb
             .from('usuario_ferramentas')
             .select('ferramentas ( url_base )');
@@ -73,7 +76,11 @@ window.PortalAuthGuard = (function () {
                 .toLowerCase()
             );
 
-        const autorizado = urlsAutorizadas.some(u => u === paginaAtual());
+        const atual = paginaAtual();
+        const pastaAtual = atual.split('/')[0];
+
+        // Acesso permitido se: URL exata autorizada OU qualquer ferramenta da mesma pasta está autorizada
+        const autorizado = urlsAutorizadas.some(u => u === atual || u.startsWith(pastaAtual + '/'));
         if (!autorizado) { redirecionar(depthToRoot); return null; }
 
         return auth;

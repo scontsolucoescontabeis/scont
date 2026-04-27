@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCONT Mobile - Gestão de Certificados</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #eef1f5;
+      --bg-soft: #f7f9fc;
+      --card: #ffffff;
+      --line: #d9e0ea;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --brand: #6f1d1b;
+      --brand-2: #8b2d2b;
+      --brand-3: #a94442;
+      --success: #198754;
+      --warning: #d39e00;
+      --danger: #c62828;
+      --info: #0d6efd;
+      --critical: #dc2626;
+      --critical-light: #fee2e2;
+      --urgent: #ea580c;
+      --urgent-light: #ffedd5;
+      --caution: #d97706;
+      --caution-light: #fef3c7;
+      --shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+      --shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.05);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --transition: 0.22s ease;
+    }
+    [data-theme="dark"] {
+      --bg: #0f172a;
+      --bg-soft: #111827;
+      --card: #1e293b;
+      --line: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --critical-light: #7f1d1d;
+      --urgent-light: #7c2d12;
+      --caution-light: #78350f;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .mobile-app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .mobile-header {
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-soft);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .mobile-header-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .mobile-header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .mobile-header-btn {
+      background: transparent;
+      border: 0;
+      font-size: 18px;
+      cursor: pointer;
+      color: var(--text);
+      transition: var(--transition);
+      padding: 4px 8px;
+      position: relative;
+    }
+    .mobile-header-btn:active {
+      transform: scale(0.95);
+    }
+    .mobile-status {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(25, 135, 84, 0.1);
+      color: var(--success);
+    }
+    .mobile-status.disconnected {
+      background: rgba(198, 40, 40, 0.1);
+      color: var(--danger);
+    }
+    .mobile-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .mobile-tabs {
+      display: flex;
+      gap: 8px;
+      background: var(--card);
+      padding: 8px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      margin-bottom: 8px;
+      overflow-x: auto;
+    }
+    .mobile-tab-btn {
+      padding: 8px 12px;
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .mobile-tab-btn.active {
+      background: var(--brand);
+      color: white;
+      border-color: var(--brand);
+    }
+    .mobile-tab-content {
+      display: none;
+    }
+    .mobile-tab-content.active {
+      display: block;
+    }
+    .mobile-card {
+      background: var(--card);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      padding: 12px;
+      box-shadow: var(--shadow-soft);
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .mobile-card:active {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+    .mobile-card.critical {
+      border-left: 4px solid var(--critical);
+      background: linear-gradient(135deg, var(--card) 0%, var(--critical-light) 100%);
+    }
+    .mobile-card.urgent {
+      border-left: 4px solid var(--urgent);
+      background: linear-gradient(135deg, var(--card) 0%, var(--urgent-light) 100%);
+    }
+    .mobile-card.caution {
+      border-left: 4px solid var(--caution);
+      background: linear-gradient(135deg, var(--card) 0%, var(--caution-light) 100%);
+    }
+    .mobile-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .mobile-card-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .mobile-card-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(220, 38, 38, 0.1);
+      color: var(--critical);
+    }
+    .mobile-card-badge.success {
+      background: rgba(25, 135, 84, 0.1);
+      color: var(--success);
+    }
+    .mobile-card-badge.warning {
+      background: var(--urgent-light);
+      color: var(--urgent);
+    }
+    .mobile-card-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .mobile-card-info-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .mobile-card-info-label {
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.02em;
+    }
+    .mobile-card-info-value {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .mobile-card-info-value.critical {
+      color: var(--critical);
+    }
+    .mobile-card-info-value.urgent {
+      color: var(--urgent);
+    }
+    .mobile-card-footer {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+    .mobile-btn {
+      flex: 1;
+      padding: 8px 12px;
+      border: 0;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .mobile-btn-primary {
+      background: var(--brand);
+      color: white;
+    }
+    .mobile-btn-primary:active {
+      background: var(--brand-2);
+    }
+    .mobile-btn-secondary {
+      background: var(--bg-soft);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .mobile-btn-secondary:active {
+      background: var(--line);
+    }
+    .mobile-empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .mobile-loading {
+      text-align: center;
+      padding: 20px;
+      color: var(--muted);
+    }
+    .mobile-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid var(--line);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .mobile-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: flex-end;
+    }
+    .mobile-modal.open {
+      display: flex;
+    }
+    .mobile-modal-content {
+      background: var(--card);
+      width: 100%;
+      max-height: 90vh;
+      border-radius: var(--radius) var(--radius) 0 0;
+      overflow-y: auto;
+      animation: slideUp 0.3s ease;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .mobile-modal-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      background: var(--card);
+      z-index: 10;
+    }
+    .mobile-modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .mobile-modal-close {
+      background: transparent;
+      border: 0;
+      font-size: 20px;
+      cursor: pointer;
+      color: var(--muted);
+    }
+    .mobile-modal-body {
+      padding: 16px;
+    }
+    .mobile-details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .mobile-details-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .mobile-details-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .mobile-details-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .mobile-report-section {
+      background: var(--bg-soft);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .mobile-report-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+    .mobile-report-filters {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .mobile-report-filter {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .mobile-report-filter label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .mobile-report-filter input,
+    .mobile-report-filter select {
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--card);
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+    }
+    .mobile-report-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .mobile-report-stat {
+      background: var(--card);
+      padding: 12px;
+      border-radius: 6px;
+      text-align: center;
+      border-left: 3px solid var(--line);
+    }
+    .mobile-report-stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .mobile-report-stat-label {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .mobile-report-table {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .mobile-report-row {
+      background: var(--card);
+      padding: 12px;
+      border-radius: 6px;
+      border-left: 3px solid var(--line);
+      cursor: pointer;
+    }
+    .mobile-report-row.critical {
+      border-left-color: var(--critical);
+      background: linear-gradient(135deg, var(--card) 0%, var(--critical-light) 100%);
+    }
+    .mobile-report-row-header {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .mobile-report-row-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .mobile-report-row-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .mobile-report-row-label {
+      font-size: 10px;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .mobile-report-row-value {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .mobile-footer {
+      background: var(--card);
+      border-top: 1px solid var(--line);
+      padding: 12px 16px;
+      display: flex;
+      gap: 8px;
+      position: sticky;
+      bottom: 0;
+    }
+    .mobile-footer-btn {
+      flex: 1;
+      padding: 10px;
+      border: 0;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .mobile-footer-btn-primary {
+      background: var(--brand);
+      color: white;
+    }
+    .mobile-footer-btn-primary:active {
+      background: var(--brand-2);
+    }
+    .mobile-footer-btn-secondary {
+      background: var(--bg-soft);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .mobile-footer-btn-secondary:active {
+      background: var(--line);
+    }
+    .mobile-notif-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: var(--critical);
+      color: white;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="mobile-app" id="mobileApp">
+    <!-- HEADER -->
+    <div class="mobile-header">
+      <div class="mobile-header-title">🔐 SCONT Mobile</div>
+      <div class="mobile-header-actions">
+        <div class="mobile-status" id="connectionStatus">🔄 Conectando...</div>
+        <button class="mobile-header-btn" id="mobileThemeBtn" title="Alternar tema">🌙</button>
+        <button class="mobile-header-btn" id="mobileNotifBtn" title="Alertas" style="position: relative;">
+          🔔
+          <span class="mobile-notif-badge" id="mobileNotifCount">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="mobile-tabs">
+      <button class="mobile-tab-btn active" data-tab="alerts">🚨 Alertas</button>
+      <button class="mobile-tab-btn" data-tab="agenda">📅 Agenda</button>
+      <button class="mobile-tab-btn" data-tab="reports">📊 Relatórios</button>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="mobile-content">
+      <!-- ABA ALERTAS -->
+      <div class="mobile-tab-content active" id="tab-alerts">
+        <div id="alertsList"></div>
+      </div>
+
+      <!-- ABA AGENDA -->
+      <div class="mobile-tab-content" id="tab-agenda">
+        <div id="agendaList"></div>
+      </div>
+
+      <!-- ABA RELATÓRIOS -->
+      <div class="mobile-tab-content" id="tab-reports">
+        <div class="mobile-report-section">
+          <div class="mobile-report-title">📅 Filtro por Vencimento</div>
+          <div class="mobile-report-filters">
+            <div class="mobile-report-filter">
+              <label>Período</label>
+              <select id="reportPeriod">
+                <option value="">Todos</option>
+                <option value="7">Próximos 7 dias</option>
+                <option value="15">Próximos 15 dias</option>
+                <option value="30">Próximos 30 dias</option>
+                <option value="-1">Vencidos</option>
+              </select>
+            </div>
+          </div>
+          <button class="mobile-btn mobile-btn-primary" id="btnGenerateReport" style="width: 100%; margin-bottom: 12px;">Gerar Relatório</button>
+          <div id="reportStats" class="mobile-report-stats"></div>
+          <div id="reportTable" class="mobile-report-table"></div>
+        </div>
+
+        <div class="mobile-report-section">
+          <div class="mobile-report-title">📋 Filtro por Situação</div>
+          <div class="mobile-report-filters">
+            <div class="mobile-report-filter">
+              <label>Situação</label>
+              <select id="reportSituation">
+                <option value="">Todos</option>
+                <option value="Ativo">Ativo</option>
+                <option value="Agendado">Agendado</option>
+                <option value="Renovado">Renovado</option>
+                <option value="Vencido">Vencido</option>
+              </select>
+            </div>
+          </div>
+          <button class="mobile-btn mobile-btn-primary" id="btnGenerateReport2" style="width: 100%; margin-bottom: 12px;">Gerar Relatório</button>
+          <div id="reportStats2" class="mobile-report-stats"></div>
+          <div id="reportTable2" class="mobile-report-table"></div>
+        </div>
+
+        <div class="mobile-report-section">
+          <div class="mobile-report-title">💰 Filtro Financeiro</div>
+          <div class="mobile-report-filters">
+            <div class="mobile-report-filter">
+              <label>Situação Financeira</label>
+              <select id="reportFinancial">
+                <option value="">Todos</option>
+                <option value="Pago">Pago</option>
+                <option value="Em Aberto">Em Aberto</option>
+              </select>
+            </div>
+          </div>
+          <button class="mobile-btn mobile-btn-primary" id="btnGenerateReport3" style="width: 100%; margin-bottom: 12px;">Gerar Relatório</button>
+          <div id="reportStats3" class="mobile-report-stats"></div>
+          <div id="reportTable3" class="mobile-report-table"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DETALHES -->
+  <div class="mobile-modal" id="detailsModal">
+    <div class="mobile-modal-content">
+      <div class="mobile-modal-header">
+        <div class="mobile-modal-title">Detalhes do Certificado</div>
+        <button class="mobile-modal-close" id="closeDetailsModal">✕</button>
+      </div>
+      <div class="mobile-modal-body">
+        <div id="detailsContent"></div>
+        <div class="mobile-footer" style="position: static; margin-top: 16px;">
+          <button class="mobile-footer-btn mobile-footer-btn-secondary" id="btnEditCert">✏️ Editar</button>
+          <button class="mobile-footer-btn mobile-footer-btn-primary" id="btnCloseCert">Fechar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===========================
+    // CONFIGURAÇÃO SUPABASE (MESMA DO PROGRAMA PRINCIPAL)
+    // ===========================
+    const SUPABASE_URL = "https://graxaoomeffhsazuzkvg.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyYXhhb29tZWZmaHNhenV6a3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MTUxMDUsImV4cCI6MjA5MDI5MTEwNX0.ZpbVoNVS4momTyf7NME4mcYuI4oCQUvNFSDbORCHktI";
+    const TABLE_NAME = "certificados";
+    const { createClient } = supabase;
+    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ===========================
+    // CONFIGURAÇÃO INICIAL
+    // ===========================
+    const q = (sel) => document.querySelector(sel);
+    const qa = (sel) => document.querySelectorAll(sel);
+    const appToday = new Date();
+    appToday.setHours(0, 0, 0, 0);
+    let certificates = [];
+    let selectedCertId = null;
+    let isConnected = false;
+
+    console.log('🚀 SCONT Mobile iniciando...');
+    console.log('🔗 Supabase URL:', SUPABASE_URL);
+    console.log('📊 Tabela:', TABLE_NAME);
+
+    // ===========================
+    // UTILITÁRIOS
+    // ===========================
+    function fmt(dateStr) {
+      if (!dateStr) return '-';
+      const d = new Date(dateStr + 'T00:00:00');
+      return d.toLocaleDateString('pt-BR');
+    }
+
+    function daysLeft(dateStr) {
+      if (!dateStr) return 999;
+      const d = new Date(dateStr + 'T00:00:00');
+      const diff = d - appToday;
+      return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    }
+
+    function getStatusVisual(cert) {
+      const left = daysLeft(cert.vencimento);
+      if (left < 0) return { status: 'Vencido', icon: '⚠️', class: 'critical' };
+      if (left <= 7) return { status: 'Crítico', icon: '🔴', class: 'urgent' };
+      if (left <= 15) return { status: 'Atenção', icon: '🟠', class: 'caution' };
+      if (left <= 30) return { status: 'Próximo', icon: '🟡', class: 'warning' };
+      return { status: 'OK', icon: '✅', class: 'success' };
+    }
+
+    // ===========================
+    // SUPABASE - FETCH
+    // ===========================
+    async function fetchCertificates() {
+      try {
+        console.log('📥 Buscando certificados do Supabase...');
+        const { data, error } = await client
+          .from(TABLE_NAME)
+          .select('*');
+        
+        if (error) throw error;
+        
+        certificates = data || [];
+        console.log('✅ Certificados carregados:', certificates.length);
+        certificates.forEach(c => {
+          console.log(`  - ${c.empresa} (${c.tipo}) - Vencimento: ${fmt(c.vencimento)}`);
+        });
+        
+        isConnected = true;
+        updateConnectionStatus(true);
+        renderAlerts();
+        renderAgenda();
+        updateNotifications();
+        return true;
+      } catch (err) {
+        console.error('❌ Erro ao buscar certificados:', err);
+        isConnected = false;
+        updateConnectionStatus(false);
+        q('#alertsList').innerHTML = '<div class="mobile-empty">❌ Erro ao conectar com Supabase</div>';
+        return false;
+      }
+    }
+
+    function updateConnectionStatus(connected) {
+      const statusEl = q('#connectionStatus');
+      if (connected) {
+        statusEl.textContent = '🟢 Conectado';
+        statusEl.classList.remove('disconnected');
+        console.log('✅ Status: Conectado ao Supabase');
+      } else {
+        statusEl.textContent = '🔴 Desconectado';
+        statusEl.classList.add('disconnected');
+        console.log('❌ Status: Desconectado do Supabase');
+      }
+    }
+
+    // ===========================
+    // RENDERIZAÇÃO ALERTAS
+    // ===========================
+    function renderAlerts() {
+      const alerts = certificates
+        .filter(c => daysLeft(c.vencimento) <= 30)
+        .sort((a, b) => daysLeft(a.vencimento) - daysLeft(b.vencimento));
+
+      if (!alerts.length) {
+        q('#alertsList').innerHTML = '<div class="mobile-empty">✅ Nenhum alerta crítico.</div>';
+        return;
+      }
+
+      q('#alertsList').innerHTML = alerts.map(c => {
+        const left = daysLeft(c.vencimento);
+        const visual = getStatusVisual(c);
+        const cardClass = visual.class === 'critical' ? 'critical' : visual.class === 'urgent' ? 'urgent' : 'caution';
+
+        return `
+          <div class="mobile-card ${cardClass}" onclick="openDetails('${c.id}')">
+            <div class="mobile-card-header">
+              <div class="mobile-card-title">${c.empresa}</div>
+              <div class="mobile-card-badge ${visual.class === 'success' ? 'success' : visual.class === 'urgent' ? 'warning' : ''}">
+                ${visual.icon} ${visual.status}
+              </div>
+            </div>
+            <div class="mobile-card-info">
+              <div class="mobile-card-info-item">
+                <div class="mobile-card-info-label">Tipo</div>
+                <div class="mobile-card-info-value">${c.tipo}</div>
+              </div>
+              <div class="mobile-card-info-item">
+                <div class="mobile-card-info-label">Vencimento</div>
+                <div class="mobile-card-info-value">${fmt(c.vencimento)}</div>
+              </div>
+              <div class="mobile-card-info-item">
+                <div class="mobile-card-info-label">Dias Restantes</div>
+                <div class="mobile-card-info-value ${left < 0 ? 'critical' : left <= 7 ? 'urgent' : ''}">
+                  ${left < 0 ? '⚠️ VENCIDO' : left + ' dias'}
+                </div>
+              </div>
+              <div class="mobile-card-info-item">
+                <div class="mobile-card-info-label">Situação</div>
+                <div class="mobile-card-info-value">${c.situacao}</div>
+              </div>
+            </div>
+            <div class="mobile-card-footer">
+              <button class="mobile-btn mobile-btn-secondary" onclick="openDetails('${c.id}'); event.stopPropagation();">Ver Detalhes</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ===========================
+    // RENDERIZAÇÃO AGENDA
+    // ===========================
+    function renderAgenda() {
+      const agenda = certificates
+        .filter(c => c.agendamento)
+        .sort((a, b) => new Date(a.agendamento) - new Date(b.agendamento));
+
+      if (!agenda.length) {
+        q('#agendaList').innerHTML = '<div class="mobile-empty">✅ Nenhum agendamento próximo.</div>';
+        return;
+      }
+
+      q('#agendaList').innerHTML = agenda.map(c => {
+        return `
+          <div class="mobile-card" onclick="openDetails('${c.id}')">
+            <div class="mobile-card-header">
+              <div class="mobile-card-title">${c.empresa}</div>
+              <div class="mobile-card-badge success">📅 Agendado</div>
+            </div>
+            <div class="mobile-card-info">
+              <div class="mobile-card-info-item">
+                <div class="mobile-card-info-label">Data Agendada</div>
+                <div class="mobile-card-info-value">${fmt(c.agendamento)}</div>
+              </div>
+              <div class="mobile-card-info-item">
+                <div class="mobile-card-info-label">Responsável</div>
+                <div class="mobile-card-info-value">${c.responsavel || '-'}</div>
+              </div>
+              <div class="mobile-card-info-item">
+                <div class="mobile-card-info-label">Contato</div>
+                <div class="mobile-card-info-value">${c.contato || '-'}</div>
+              </div>
+              <div class="mobile-card-info-item">
+                <div class="mobile-card-info-label">Canal</div>
+                <div class="mobile-card-info-value">${c.canal}</div>
+              </div>
+            </div>
+            <div class="mobile-card-footer">
+              <button class="mobile-btn mobile-btn-secondary" onclick="openDetails('${c.id}'); event.stopPropagation();">Ver Detalhes</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ===========================
+    // RELATÓRIOS
+    // ===========================
+    function generateReport(filterType, filterValue) {
+      let lista = certificates;
+
+      if (filterType === 'period') {
+        if (filterValue === '-1') {
+          lista = certificates.filter(c => daysLeft(c.vencimento) < 0);
+        } else if (filterValue) {
+          const days = parseInt(filterValue);
+          lista = certificates.filter(c => {
+            const left = daysLeft(c.vencimento);
+            return left >= 0 && left <= days;
+          });
+        }
+      } else if (filterType === 'situation') {
+        if (filterValue) {
+          lista = certificates.filter(c => c.situacao === filterValue);
+        }
+      } else if (filterType === 'financial') {
+        if (filterValue) {
+          lista = certificates.filter(c => c.financeiro === filterValue);
+        }
+      }
+
+      const total = lista.length;
+      const ativos = lista.filter(c => c.situacao === 'Ativo').length;
+      const vencidos = lista.filter(c => daysLeft(c.vencimento) < 0).length;
+      const emAberto = lista.filter(c => c.financeiro === 'Em Aberto').length;
+
+      return { lista, stats: { total, ativos, vencidos, emAberto } };
+    }
+
+    function renderReportStats(stats, containerId) {
+      q('#' + containerId).innerHTML = `
+        <div class="mobile-report-stat">
+          <div class="mobile-report-stat-value">${stats.total}</div>
+          <div class="mobile-report-stat-label">Total</div>
+        </div>
+        <div class="mobile-report-stat">
+          <div class="mobile-report-stat-value" style="color: var(--success);">${stats.ativos}</div>
+          <div class="mobile-report-stat-label">Ativos</div>
+        </div>
+        <div class="mobile-report-stat">
+          <div class="mobile-report-stat-value" style="color: var(--danger);">${stats.vencidos}</div>
+          <div class="mobile-report-stat-label">Vencidos</div>
+        </div>
+        <div class="mobile-report-stat">
+          <div class="mobile-report-stat-value" style="color: var(--warning);">${stats.emAberto}</div>
+          <div class="mobile-report-stat-label">Em Aberto</div>
+        </div>
+      `;
+    }
+
+    function renderReportTable(lista, containerId) {
+      if (!lista.length) {
+        q('#' + containerId).innerHTML = '<div class="mobile-empty">Nenhum resultado encontrado.</div>';
+        return;
+      }
+
+      q('#' + containerId).innerHTML = lista.map(c => {
+        const left = daysLeft(c.vencimento);
+        const isCritical = left < 0 ? 'critical' : '';
+
+        return `
+          <div class="mobile-report-row ${isCritical}" onclick="openDetails('${c.id}')">
+            <div class="mobile-report-row-header">${c.empresa}</div>
+            <div class="mobile-report-row-content">
+              <div class="mobile-report-row-item">
+                <div class="mobile-report-row-label">Tipo</div>
+                <div class="mobile-report-row-value">${c.tipo}</div>
+              </div>
+              <div class="mobile-report-row-item">
+                <div class="mobile-report-row-label">Vencimento</div>
+                <div class="mobile-report-row-value">${fmt(c.vencimento)}</div>
+              </div>
+              <div class="mobile-report-row-item">
+                <div class="mobile-report-row-label">Dias Restantes</div>
+                <div class="mobile-report-row-value">${left < 0 ? '⚠️ VENCIDO' : left + ' dias'}</div>
+              </div>
+              <div class="mobile-report-row-item">
+                <div class="mobile-report-row-label">Situação</div>
+                <div class="mobile-report-row-value">${c.situacao}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ===========================
+    // MODAL DETALHES
+    // ===========================
+    function openDetails(certId) {
+      selectedCertId = certId;
+      const cert = certificates.find(c => c.id === certId);
+      if (!cert) return;
+
+      const left = daysLeft(cert.vencimento);
+
+      q('#detailsContent').innerHTML = `
+        <div class="mobile-details-grid">
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Empresa</div>
+            <div class="mobile-details-value">${cert.empresa}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Tipo</div>
+            <div class="mobile-details-value">${cert.tipo}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">CPF/CNPJ</div>
+            <div class="mobile-details-value">${cert.cpf_cnpj || '-'}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Autoridade</div>
+            <div class="mobile-details-value">${cert.autoridade || '-'}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Emissão</div>
+            <div class="mobile-details-value">${fmt(cert.emissao)}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Vencimento</div>
+            <div class="mobile-details-value">${fmt(cert.vencimento)}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Dias Restantes</div>
+            <div class="mobile-details-value" style="color: ${left < 0 ? 'var(--critical)' : left <= 7 ? 'var(--urgent)' : 'var(--text)'};">
+              ${left < 0 ? '⚠️ VENCIDO' : left + ' dias'}
+            </div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Situação</div>
+            <div class="mobile-details-value">${cert.situacao}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Financeiro</div>
+            <div class="mobile-details-value">${cert.financeiro}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Responsável</div>
+            <div class="mobile-details-value">${cert.responsavel || '-'}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Contato</div>
+            <div class="mobile-details-value">${cert.contato || '-'}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">E-mail</div>
+            <div class="mobile-details-value">${cert.email || '-'}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Telefone</div>
+            <div class="mobile-details-value">${cert.telefone || '-'}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Canal</div>
+            <div class="mobile-details-value">${cert.canal}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Prioridade</div>
+            <div class="mobile-details-value">${cert.prioridade}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Status Contato</div>
+            <div class="mobile-details-value">${cert.status_contato}</div>
+          </div>
+          <div class="mobile-details-item">
+            <div class="mobile-details-label">Agendamento</div>
+            <div class="mobile-details-value">${fmt(cert.agendamento)}</div>
+          </div>
+          ${cert.info ? `
+            <div class="mobile-details-item" style="grid-column: 1 / -1;">
+              <div class="mobile-details-label">Informações Adicionais</div>
+              <div class="mobile-details-value">${cert.info}</div>
+            </div>
+          ` : ''}
+          ${cert.risco ? `
+            <div class="mobile-details-item" style="grid-column: 1 / -1;">
+              <div class="mobile-details-label">Observação de Risco</div>
+              <div class="mobile-details-value" style="color: var(--danger);">${cert.risco}</div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      q('#detailsModal').classList.add('open');
+    }
+
+    function closeDetails() {
+      q('#detailsModal').classList.remove('open');
+      selectedCertId = null;
+    }
+
+    // ===========================
+    // EVENT LISTENERS
+    // ===========================
+    function setupEventListeners() {
+      // Tabs
+      qa('.mobile-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          qa('.mobile-tab-btn').forEach(b => b.classList.remove('active'));
+          qa('.mobile-tab-content').forEach(c => c.classList.remove('active'));
+          btn.classList.add('active');
+          q('#tab-' + btn.dataset.tab).classList.add('active');
+        });
+      });
+
+      // Tema
+      q('#mobileThemeBtn').addEventListener('click', () => {
+        const theme = document.documentElement.getAttribute('data-theme');
+        const newTheme = theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        q('#mobileThemeBtn').textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        localStorage.setItem('mobileTheme', newTheme);
+      });
+
+      // Modal
+      q('#closeDetailsModal').addEventListener('click', closeDetails);
+      q('#btnCloseCert').addEventListener('click', closeDetails);
+      q('#btnEditCert').addEventListener('click', () => {
+        alert('Abra a versão desktop (certificado_digital.html) para editar certificados.');
+        closeDetails();
+      });
+
+      // Relatórios
+      q('#btnGenerateReport').addEventListener('click', () => {
+        const period = q('#reportPeriod').value;
+        const { lista, stats } = generateReport('period', period);
+        renderReportStats(stats, 'reportStats');
+        renderReportTable(lista, 'reportTable');
+      });
+
+      q('#btnGenerateReport2').addEventListener('click', () => {
+        const situation = q('#reportSituation').value;
+        const { lista, stats } = generateReport('situation', situation);
+        renderReportStats(stats, 'reportStats2');
+        renderReportTable(lista, 'reportTable2');
+      });
+
+      q('#btnGenerateReport3').addEventListener('click', () => {
+        const financial = q('#reportFinancial').value;
+        const { lista, stats } = generateReport('financial', financial);
+        renderReportStats(stats, 'reportStats3');
+        renderReportTable(lista, 'reportTable3');
+      });
+
+      // Fechar modal ao clicar fora
+      q('#detailsModal').addEventListener('click', (e) => {
+        if (e.target === q('#detailsModal')) {
+          closeDetails();
+        }
+      });
+    }
+
+    function updateNotifications() {
+      const criticalCount = certificates.filter(c => daysLeft(c.vencimento) <= 0).length +
+                           certificates.filter(c => daysLeft(c.vencimento) <= 7).length;
+      q('#mobileNotifCount').textContent = criticalCount;
+    }
+
+    // ===========================
+    // INICIALIZAÇÃO
+    // ===========================
+    async function init() {
+      console.log('🚀 Iniciando SCONT Mobile...');
+      console.log('📅 Data atual:', new Date().toLocaleString('pt-BR'));
+      
+      setupEventListeners();
+      
+      // Restaurar tema
+      const savedTheme = localStorage.getItem('mobileTheme') || 'light';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      q('#mobileThemeBtn').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+      
+      // Carregar dados do Supabase
+      const connected = await fetchCertificates();
+      if (!connected) {
+        console.error('❌ Falha ao conectar com Supabase');
+      }
+      
+      console.log('✅ SCONT Mobile inicializado com sucesso');
+    }
+
+    // Expor funções globais
+    window.openDetails = openDetails;
+    window.closeDetails = closeDetails;
+
+    // Iniciar quando DOM estiver pronto
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

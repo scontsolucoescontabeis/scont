@@ -11,11 +11,10 @@
         <!-- SIDEBAR -->
         <aside class="sidebar">
             <div class="sidebar-header">
-    <div class="logo-container">
-        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="Logo SCONT" class="company-logo">
-    </div>
-    <!-- Removi o h2 e o p porque a logo já tem o nome da empresa -->
-</div>
+                <div class="logo-container">
+                    <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="Logo SCONT" class="company-logo">
+                </div>
+            </div>
             <nav class="sidebar-nav">
                 <a href="index.html" class="nav-item">
                     <span class="icon">📋</span>
@@ -24,6 +23,15 @@
                 <a href="historico.html" class="nav-item active">
                     <span class="icon">📊</span>
                     <span>Histórico de Edições</span>
+                </a>
+                <a href="documentos.html" class="nav-item">
+                    <span class="icon">📁</span>
+                    <span>Central de Documentos</span>
+                </a>
+                <div style="height:1px;background:var(--border-color);margin:var(--spacing-md) 0;"></div>
+                <a href="../portal.html" class="nav-item">
+                    <span class="icon">🏠</span>
+                    <span>Voltar ao Portal</span>
                 </a>
             </nav>
         </aside>
@@ -97,14 +105,20 @@
         </main>
     </div>
 
+    <script src="../supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../portal-auth-guard.js"></script>
     <script src="utils.js"></script>
     <script src="app.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            const auth = await window.PortalAuthGuard.init(1);
+            if (!auth) return;
+            document.getElementById('portalAuthOverlay').remove();
             initSupabase();
             loadHistory();
         });
     </script>
+    <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
 </body>
 </html>

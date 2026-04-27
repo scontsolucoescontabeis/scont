@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCONT - Central de Documentos</title>
+    
+    <!-- Supabase JS -->
+    <script src="../supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #8B3A3A;
+            --primary-hover: #6B2A2A;
+            --secondary-color: #2C3E50;
+            --success-color: #70AD47;
+            --danger-color: #E74C3C;
+            --background-color: #F4F7F6;
+            --card-bg: #FFFFFF;
+            --text-primary: #2C3E50;
+            --text-secondary: #7F8C8D;
+            --border-color: #E0E6ED;
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+
+        body { background-color: var(--background-color); color: var(--text-primary); line-height: 1.6; }
+
+        /* --- HEADER --- */
+        .header { background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%); color: white; padding: 20px 0; box-shadow: var(--shadow-md); position: sticky; top: 0; z-index: 100; }
+        .header-container { max-width: 1200px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; }
+        .header-brand { display: flex; align-items: center; gap: 15px; }
+        .header-logo img { height: 40px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        .header-title h1 { font-size: 22px; font-weight: 700; margin: 0; }
+        .header-title p { font-size: 13px; opacity: 0.9; margin: 0; }
+        .btn-back-header { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 16px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+        .btn-back-header:hover { background: rgba(255,255,255,0.25); }
+
+        /* --- MAIN CONTAINER --- */
+        .container { max-width: 1200px; margin: 30px auto; padding: 0 20px; }
+
+        /* --- BREADCRUMB (Navegação) --- */
+        .breadcrumb-container { background: var(--card-bg); padding: 15px 20px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); margin-bottom: 25px; display: flex; align-items: center; gap: 10px; overflow-x: auto; white-space: nowrap; }
+        .breadcrumb-item { color: var(--text-secondary); font-size: 14px; font-weight: 500; cursor: pointer; padding: 6px 12px; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; gap: 6px; }
+        .breadcrumb-item:hover { background: #F1F3F5; color: var(--primary-color); }
+        .breadcrumb-item.active { color: var(--primary-color); font-weight: 600; background: rgba(139, 58, 58, 0.08); pointer-events: none; }
+        .breadcrumb-separator { color: #CED4DA; font-size: 12px; }
+
+        /* --- GRID DE CARDS (Arquivos e Pastas) --- */
+        .document-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+
+        .doc-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 20px; text-align: center; transition: all 0.3s ease; cursor: pointer; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 180px; }
+        .doc-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); border-color: var(--primary-color); }
+        
+        .doc-icon { font-size: 48px; margin-bottom: 15px; line-height: 1; }
+        .doc-name { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .doc-meta { font-size: 12px; color: var(--text-secondary); }
+
+        /* Card Específico para Pasta */
+        .doc-card.folder { background: linear-gradient(to bottom, #FFFFFF, #F8F9FA); border-color: #DEE2E6; }
+        .doc-card.folder .doc-icon { font-size: 54px; color: #FFC107; text-shadow: 0 2px 4px rgba(255, 193, 7, 0.2); }
+        
+        /* Ações do Card (Hover) */
+        .doc-actions { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; opacity: 0; transition: opacity 0.2s; }
+        .doc-card:hover .doc-actions { opacity: 1; }
+        .btn-action { background: white; border: 1px solid var(--border-color); border-radius: 6px; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-action:hover { background: #F1F3F5; color: var(--primary-color); border-color: var(--primary-color); }
+        .btn-action.delete:hover { color: var(--danger-color); border-color: var(--danger-color); }
+
+        /* --- CARD DE UPLOAD --- */
+        .upload-card { border: 2px dashed #CED4DA; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-secondary); transition: all 0.3s; }
+        .upload-card:hover, .upload-card.dragover { background: rgba(139, 58, 58, 0.05); border-color: var(--primary-color); color: var(--primary-color); }
+        .upload-card .doc-icon { font-size: 36px; margin-bottom: 10px; opacity: 0.7; }
+        .upload-card .doc-name { color: inherit; }
+
+        /* --- ESTADOS (Loading, Empty, Error) --- */
+        .state-container { grid-column: 1 / -1; text-align: center; padding: 60px 20px; background: var(--card-bg); border-radius: var(--radius-md); border: 1px dashed var(--border-color); }
+        .state-icon { font-size: 48px; margin-bottom: 15px; opacity: 0.5; }
+        .state-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 5px; }
+        .state-desc { font-size: 14px; color: var(--text-secondary); }
+        
+        .spinner { width: 40px; height: 40px; border: 3px solid rgba(139, 58, 58, 0.2); border-top-color: var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- MODAL DE PREVIEW --- */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal.active { display: flex; }
+        .modal-content { background: var(--card-bg); width: 90%; max-width: 900px; height: 90vh; border-radius: var(--radius-lg); display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: modalFadeIn 0.3s ease; }
+        @keyframes modalFadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .modal-header { padding: 20px 25px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: #F8F9FA; }
+        .modal-title { font-size: 16px; font-weight: 600; margin: 0; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
+        .modal-close { background: none; border: none; font-size: 24px; color: var(--text-secondary); cursor: pointer; transition: color 0.2s; line-height: 1; }
+        .modal-close:hover { color: var(--danger-color); }
+        
+        .modal-body { flex: 1; padding: 0; background: #E9ECEF; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .modal-body iframe, .modal-body img { width: 100%; height: 100%; object-fit: contain; border: none; }
+        .modal-body pre { width: 100%; height: 100%; margin: 0; padding: 20px; overflow: auto; background: white; font-family: monospace; font-size: 13px; }
+        
+        .modal-footer { padding: 15px 25px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; background: white; }
+        .btn { padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
+        .btn-primary { background: var(--primary-color); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: #E9ECEF; color: var(--text-primary); }
+        .btn-secondary:hover { background: #DEE2E6; }
+
+        /* --- ALERTS (Toast) --- */
+        .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: white; border-left: 4px solid var(--primary-color); padding: 15px 20px; border-radius: 8px; box-shadow: var(--shadow-md); display: flex; align-items: center; gap: 12px; min-width: 300px; transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+        .toast.show { transform: translateX(0); }
+        .toast.success { border-left-color: var(--success-color); }
+        .toast.error { border-left-color: var(--danger-color); }
+        .toast-icon { font-size: 20px; }
+        .toast-message { font-size: 14px; font-weight: 500; color: var(--text-primary); }
+
+        @media (max-width: 768px) {
+            .document-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+            .doc-card { min-height: 150px; padding: 15px; }
+            .doc-icon { font-size: 36px; }
+            .doc-actions { opacity: 1; top: 5px; right: 5px; } /* Sempre visível no mobile */
+            .modal-content { width: 100%; height: 100%; border-radius: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-container">
+            <div class="header-brand">
+                <div class="header-logo">
+                    <img src="https://scontdf.com.br/wp-content/uploads/elementor/thumbs/LogoScont-peic298y16fua1mv1zkur66kgxw0v6rzhu846yyg3k.png" alt="Logo SCONT">
+                </div>
+                <div class="header-title">
+                    <h1>Central de Documentos</h1>
+                    <p>Acesse e gerencie arquivos do servidor</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="documentos.html" class="btn-back-header">← Voltar à Central</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        
+        <!-- BREADCRUMB -->
+        <div class="breadcrumb-container" id="breadcrumb">
+            <!-- Preenchido via JS -->
+        </div>
+
+        <!-- GRID DE DOCUMENTOS -->
+        <div class="document-grid" id="gridContainer">
+            <!-- Preenchido via JS -->
+        </div>
+
+        <!-- INPUT FILE OCULTO -->
+        <input type="file" id="fileInput" style="display: none;" onchange="app.handleFileUpload(event)">
+
+    </main>
+
+    <!-- MODAL DE PREVIEW -->
+    <div id="previewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="previewTitle">📄 Nome do Arquivo.pdf</h3>
+                <button class="modal-close" onclick="app.closePreview()">✕</button>
+            </div>
+            <div class="modal-body" id="previewContent">
+                <!-- Conteúdo injetado aqui (iframe, img, etc) -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="app.closePreview()">Fechar</button>
+                <button class="btn btn-primary" onclick="app.downloadCurrentFile()">📥 Fazer Download</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTAINER DE TOASTS (Alertas) -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ===== CONFIGURAÇÃO SUPABASE =====
+        // Credenciais carregadas de ../supabase-config.js
+        const SUPABASE_CONFIG = {
+            URL: SUPABASE_URL,
+            KEY: SUPABASE_KEY,
+            BUCKET: 'documentos'
+        };
+
+        // ===== APLICAÇÃO PRINCIPAL =====
+        const app = {
+            state: {
+                supabaseClient: null,
+                currentPath: '',
+                items: [], // Itens da pasta atual
+                currentPreviewFile: null,
+                isLoading: false
+            },
+
+            init() {
+                this.state.supabaseClient = supabase.createClient(SUPABASE_CONFIG.URL, SUPABASE_CONFIG.KEY);
+                this.setupDragAndDrop();
+                this.loadFolder(''); // Carrega a raiz
+            },
+
+            // --- NAVEGAÇÃO E LEITURA ---
+
+            async loadFolder(path) {
+                this.state.isLoading = true;
+                this.state.currentPath = path;
+                this.renderLoading();
+                this.renderBreadcrumb();
+
+                try {
+                    // A API do Supabase Storage list() busca arquivos. 
+                    // Se passarmos um prefixo (path), ele busca dentro daquela "pasta".
+                    const { data, error } = await this.state.supabaseClient
+                        .storage
+                        .from(SUPABASE_CONFIG.BUCKET)
+                        .list(path, {
+                            limit: 1000,
+                            offset: 0,
+                            sortBy: { column: 'name', order: 'asc' }
+                        });
+
+                    if (error) throw error;
+
+                    this.processItems(data, path);
+
+                } catch (error) {
+                    console.error("Erro ao carregar pasta:", error);
+                    this.renderError("Não foi possível carregar os documentos. Verifique sua conexão ou as permissões do servidor.");
+                } finally {
+                    this.state.isLoading = false;
+                }
+            },
+
+            processItems(data, currentPath) {
+                this.state.items = [];
+                
+                if (!data || data.length === 0) {
+                    this.renderGrid(); // Vai renderizar o Empty State
+                    return;
+                }
+
+                // O Supabase retorna arquivos e "pastas" (prefixos).
+                // Um item sem 'id' ou com id nulo geralmente é considerado uma subpasta na resposta do list()
+                
+                data.forEach(item => {
+                    // Ignora o arquivo oculto .emptyFolderPlaceholder se existir
+                    if (item.name === '.emptyFolderPlaceholder') return;
+
+                    const isFolder = !item.id; // Heurística do Supabase para pastas
+                    
+                    this.state.items.push({
+                        name: item.name,
+                        isFolder: isFolder,
+                        path: currentPath ? `${currentPath}/${item.name}` : item.name,
+                        size: item.metadata ? item.metadata.size : 0,
+                        updatedAt: item.created_at || item.updated_at
+                    });
+                });
+
+                // Ordenar: Pastas primeiro, depois arquivos alfabeticamente
+                this.state.items.sort((a, b) => {
+                    if (a.isFolder && !b.isFolder) return -1;
+                    if (!a.isFolder && b.isFolder) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+
+                this.renderGrid();
+            },
+
+            navigateTo(path) {
+                this.loadFolder(path);
+            },
+
+            // --- RENDERIZAÇÃO (UI) ---
+
+            renderBreadcrumb() {
+                const container = document.getElementById('breadcrumb');
+                container.innerHTML = '';
+
+                // Item Raiz
+                const rootItem = document.createElement('span');
+                rootItem.className = `breadcrumb-item ${this.state.currentPath === '' ? 'active' : ''}`;
+                rootItem.innerHTML = '🏠 Início';
+                rootItem.onclick = () => this.navigateTo('');
+                container.appendChild(rootItem);
+
+                if (this.state.currentPath === '') return;
+
+                const parts = this.state.currentPath.split('/').filter(p => p);
+                let accumulatedPath = '';
+
+                parts.forEach((part, index) => {
+                    // Separador
+                    const separator = document.createElement('span');
+                    separator.className = 'breadcrumb-separator';
+                    separator.innerHTML = '❯';
+                    container.appendChild(separator);
+
+                    accumulatedPath += (index === 0 ? '' : '/') + part;
+                    const isLast = index === parts.length - 1;
+
+                    const item = document.createElement('span');
+                    item.className = `breadcrumb-item ${isLast ? 'active' : ''}`;
+                    item.innerHTML = `📁 ${part}`;
+                    
+                    if (!isLast) {
+                        const pathToGo = accumulatedPath; // Closure para manter o valor
+                        item.onclick = () => this.navigateTo(pathToGo);
+                    }
+                    
+                    container.appendChild(item);
+                });
+            },
+
+            renderGrid() {
+                const container = document.getElementById('gridContainer');
+                container.innerHTML = '';
+
+                if (this.state.items.length === 0) {
+                    container.innerHTML = `
+                        <div class="state-container">
+                            <div class="state-icon">📭</div>
+                            <h3 class="state-title">Esta pasta está vazia</h3>
+                            <p class="state-desc">Nenhum documento encontrado neste local.</p>
+                        </div>
+                    `;
+                } else {
+                    this.state.items.forEach(item => {
+                        const card = document.createElement('div');
+                        card.className = `doc-card ${item.isFolder ? 'folder' : 'file'}`;
+                        
+                        const icon = item.isFolder ? '📁' : this.getFileIcon(item.name);
+                        const metaText = item.isFolder ? 'Pasta' : this.formatFileSize(item.size);
+
+                        card.innerHTML = `
+                            <div class="doc-icon">${icon}</div>
+                            <div class="doc-name" title="${item.name}">${item.name}</div>
+                            <div class="doc-meta">${metaText}</div>
+                            
+                            ${!item.isFolder ? `
+                            <div class="doc-actions">
+                                <button class="btn-action" title="Baixar" onclick="event.stopPropagation(); app.downloadFile('${item.path}', '${item.name}')">📥</button>
+                                <button class="btn-action delete" title="Excluir" onclick="event.stopPropagation(); app.deleteFile('${item.path}', '${item.name}')">🗑️</button>
+                            </div>
+                            ` : ''}
+                        `;
+
+                        // Ação de clique principal do card
+                        card.onclick = () => {
+                            if (item.isFolder) {
+                                this.navigateTo(item.path);
+                            } else {
+                                this.openPreview(item.path, item.name);
+                            }
+                        };
+
+                        container.appendChild(card);
+                    });
+                }
+
+                // Adicionar Card de Upload no final
+                const uploadCard = document.createElement('div');
+                uploadCard.className = 'doc-card upload-card';
+                uploadCard.id = 'uploadCardDropzone';
+                uploadCard.innerHTML = `
+                    <div class="doc-icon">📤</div>
+                    <div class="doc-name">Enviar Arquivo</div>
+                    <div class="doc-meta">Clique ou arraste aqui</div>
+                `;
+                uploadCard.onclick = () => document.getElementById('fileInput').click();
+                container.appendChild(uploadCard);
+                
+                // Re-atrelar eventos de drag and drop ao novo card
+                this.setupDragAndDrop();
+            },
+
+            renderLoading() {
+                const container = document.getElementById('gridContainer');
+                container.innerHTML = `
+                    <div class="state-container">
+                        <div class="spinner"></div>
+                        <h3 class="state-title">Carregando documentos...</h3>
+                    </div>
+                `;
+            },
+
+            renderError(message) {
+                const container = document.getElementById('gridContainer');
+                container.innerHTML = `
+                    <div class="state-container">
+                        <div class="state-icon" style="color: var(--danger-color);">⚠️</div>
+                        <h3 class="state-title">Ocorreu um erro</h3>
+                        <p class="state-desc">${message}</p>
+                        <button class="btn btn-primary" style="margin: 20px auto 0;" onclick="app.loadFolder(app.state.currentPath)">Tentar Novamente</button>
+                    </div>
+                `;
+            },
+
+            // --- AÇÕES DE ARQUIVO ---
+
+            async openPreview(filePath, fileName) {
+                this.state.currentPreviewFile = { path: filePath, name: fileName };
+                
+                const modal = document.getElementById('previewModal');
+                const title = document.getElementById('previewTitle');
+                const content = document.getElementById('previewContent');
+                
+                title.innerHTML = `${this.getFileIcon(fileName)} ${fileName}`;
+                content.innerHTML = '<div class="spinner" style="margin: auto;"></div>';
+                modal.classList.add('active');
+
+                try {
+                    // Obter URL assinada temporária (válida por 60 segundos)
+                    const { data, error } = await this.state.supabaseClient
+                        .storage
+                        .from(SUPABASE_CONFIG.BUCKET)
+                        .createSignedUrl(filePath, 60);
+
+                    if (error) throw error;
+
+                    const url = data.signedUrl;
+                    const ext = fileName.split('.').pop().toLowerCase();
+
+                    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
+                        content.innerHTML = `<img src="${url}" alt="${fileName}">`;
+                    } else if (ext === 'pdf') {
+                        content.innerHTML = `<iframe src="${url}#toolbar=0"></iframe>`;
+                    } else if (['txt', 'csv', 'json', 'xml', 'html', 'css', 'js'].includes(ext)) {
+                        // Para texto, fazemos um fetch e mostramos em um <pre>
+                        const response = await fetch(url);
+                        const text = await response.text();
+                        content.innerHTML = `<pre>${this.escapeHtml(text)}</pre>`;
+                    } else {
+                        content.innerHTML = `
+                            <div style="text-align: center; padding: 40px;">
+                                <div style="font-size: 64px; margin-bottom: 20px;">📦</div>
+                                <h3>Visualização não disponível</h3>
+                                <p style="color: var(--text-secondary); margin-bottom: 20px;">Este tipo de arquivo não pode ser visualizado no navegador.</p>
+                                <button class="btn btn-primary" style="margin: 0 auto;" onclick="app.downloadCurrentFile()">Fazer Download</button>
+                            </div>
+                        `;
+                    }
+
+                } catch (error) {
+                    console.error("Erro no preview:", error);
+                    content.innerHTML = `
+                        <div style="text-align: center; color: var(--danger-color); padding: 40px;">
+                            <h3>Erro ao carregar visualização</h3>
+                            <p>O arquivo pode estar corrompido ou inacessível.</p>
+                        </div>
+                    `;
+                }
+            },
+
+            closePreview() {
+                document.getElementById('previewModal').classList.remove('active');
+                document.getElementById('previewContent').innerHTML = '';
+                this.state.currentPreviewFile = null;
+            },
+
+            async downloadFile(filePath, fileName) {
+                this.showToast('Iniciando download...', 'info');
+                try {
+                    const { data, error } = await this.state.supabaseClient
+                        .storage
+                        .from(SUPABASE_CONFIG.BUCKET)
+                        .download(filePath);
+
+                    if (error) throw error;
+
+                    // Criar link temporário para forçar o download
+                    const url = URL.createObjectURL(data);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    this.showToast('Download concluído!', 'success');
+
+                } catch (error) {
+                    console.error("Erro no download:", error);
+                    this.showToast('Erro ao baixar o arquivo.', 'error');
+                }
+            },
+
+            downloadCurrentFile() {
+                if (this.state.currentPreviewFile) {
+                    this.downloadFile(this.state.currentPreviewFile.path, this.state.currentPreviewFile.name);
+                }
+            },
+
+            async deleteFile(filePath, fileName) {
+                if (!confirm(`Tem certeza que deseja excluir permanentemente o arquivo "${fileName}"?`)) return;
+
+                this.showToast('Excluindo arquivo...', 'info');
+                try {
+                    const { error } = await this.state.supabaseClient
+                        .storage
+                        .from(SUPABASE_CONFIG.BUCKET)
+                        .remove([filePath]);
+
+                    if (error) throw error;
+
+                    this.showToast('Arquivo excluído com sucesso.', 'success');
+                    this.loadFolder(this.state.currentPath); // Recarrega a pasta
+
+                } catch (error) {
+                    console.error("Erro ao excluir:", error);
+                    this.showToast('Erro ao excluir o arquivo.', 'error');
+                }
+            },
+
+            // --- UPLOAD ---
+
+            setupDragAndDrop() {
+                // O evento é atrelado ao body para capturar em qualquer lugar, 
+                // mas o visual muda no card de upload
+                const body = document.body;
+                
+                body.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    const card = document.getElementById('uploadCardDropzone');
+                    if(card) card.classList.add('dragover');
+                });
+
+                body.addEventListener('dragleave', (e) => {
+                    e.preventDefault();
+                    const card = document.getElementById('uploadCardDropzone');
+                    if(card) card.classList.remove('dragover');
+                });
+
+                body.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const card = document.getElementById('uploadCardDropzone');
+                    if(card) card.classList.remove('dragover');
+                    
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                        this.processUpload(e.dataTransfer.files[0]);
+                    }
+                });
+            },
+
+            handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    this.processUpload(file);
+                }
+                event.target.value = ''; // Reseta o input
+            },
+
+            async processUpload(file) {
+                // Validação de tamanho (50MB)
+                if (file.size > 50 * 1024 * 1024) {
+                    this.showToast('O arquivo excede o limite de 50MB.', 'error');
+                    return;
+                }
+
+                const filePath = this.state.currentPath ? `${this.state.currentPath}/${file.name}` : file.name;
+                this.showToast(`Enviando ${file.name}...`, 'info');
+
+                try {
+                    const { error } = await this.state.supabaseClient
+                        .storage
+                        .from(SUPABASE_CONFIG.BUCKET)
+                        .upload(filePath, file, {
+                            cacheControl: '3600',
+                            upsert: true // Sobrescreve se existir
+                        });
+
+                    if (error) throw error;
+
+                    this.showToast('Upload concluído com sucesso!', 'success');
+                    this.loadFolder(this.state.currentPath); // Recarrega a pasta
+
+                } catch (error) {
+                    console.error("Erro no upload:", error);
+                    this.showToast('Erro ao enviar arquivo.', 'error');
+                }
+            },
+
+            // --- UTILITÁRIOS ---
+
+            getFileIcon(fileName) {
+                const ext = fileName.split('.').pop().toLowerCase();
+                const icons = {
+                    pdf: '📄',
+                    doc: '📝', docx: '📝',
+                    xls: '📊', xlsx: '📊', csv: '📊',
+                    jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', svg: '🖼️',
+                    txt: '📃',
+                    zip: '🗜️', rar: '🗜️'
+                };
+                return icons[ext] || '📄';
+            },
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 B';
+                const k = 1024;
+                const sizes = ['B', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+            },
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            },
+
+            showToast(message, type = 'info') {
+                const container = document.getElementById('toastContainer');
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                
+                let icon = 'ℹ️';
+                if (type === 'success') icon = '✅';
+                if (type === 'error') icon = '❌';
+
+                toast.innerHTML = `
+                    <div class="toast-icon">${icon}</div>
+                    <div class="toast-message">${message}</div>
+                `;
+
+                container.appendChild(toast);
+                
+                // Animação de entrada
+                setTimeout(() => toast.classList.add('show'), 10);
+
+                // Remover após 3 segundos
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    setTimeout(() => toast.remove(), 300); // Aguarda a transição CSS
+                }, 3000);
+            }
+        };
+
+        // Iniciar quando o DOM estiver pronto
+        document.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+    </script>
+
+    <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
+    <script src="../portal-auth-guard.js"></script>
+    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+</body>
+</html>

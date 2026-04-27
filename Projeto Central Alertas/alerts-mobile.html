@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Alertas | SCONT</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --surface: #ffffff;
+      --surface-2: #f8f9fb;
+      --line: #d8dde6;
+      --text: #1f2937;
+      --muted: #64748b;
+      --brand: #6f1d2f;
+      --brand-strong: #561521;
+      --success: #1f8a5b;
+      --success-soft: #e7f7ef;
+      --warning: #c97a00;
+      --warning-soft: #fff3da;
+      --danger: #b42318;
+      --danger-soft: #fde7e5;
+      --info: #1f5fbf;
+      --info-soft: #eaf1ff;
+      --shadow-soft: 0 10px 24px rgba(15, 23, 42, .05);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* HEADER MOBILE */
+    .mobile-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: linear-gradient(180deg, #161b24 0%, #1a2230 100%);
+      color: #fff;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .1);
+    }
+
+    .mobile-header h1 {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+
+    .mobile-header p {
+      margin: 4px 0 0;
+      font-size: .75rem;
+      color: rgba(255, 255, 255, .64);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn-icon-mobile {
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: rgba(255, 255, 255, .1);
+      color: #fff;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      transition: all .2s;
+      padding: 0;
+    }
+
+    .btn-icon-mobile:active {
+      background: rgba(255, 255, 255, .2);
+      transform: scale(0.95);
+    }
+
+    .btn-icon-mobile svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      transition: transform .3s ease;
+    }
+
+    .btn-icon-mobile.loading svg {
+      animation: spinRefresh .8s linear infinite;
+    }
+
+    @keyframes spinRefresh {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* CONTAINER MOBILE */
+    .mobile-container {
+      width: 100%;
+      min-height: 100vh;
+      padding: 12px;
+      padding-bottom: 60px;
+    }
+
+    /* FILTRO MOBILE */
+    .mobile-filter {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .filter-chip {
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 500;
+      white-space: nowrap;
+      transition: all .2s;
+      flex-shrink: 0;
+    }
+
+    .filter-chip.active {
+      background: var(--brand);
+      color: #fff;
+      border-color: var(--brand);
+    }
+
+    /* ALERT CARD MOBILE */
+    .alert-card-mobile {
+      background: var(--surface);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow-soft);
+      border-left: 4px solid;
+      transition: all .2s;
+      cursor: pointer;
+    }
+
+    .alert-card-mobile.success { border-left-color: var(--success); }
+    .alert-card-mobile.warning { border-left-color: var(--warning); }
+    .alert-card-mobile.danger { border-left-color: var(--danger); }
+    .alert-card-mobile.info { border-left-color: var(--info); }
+    .alert-card-mobile.normal { border-left-color: var(--info); }
+
+    .alert-header-mobile {
+      padding: 14px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .alert-header-mobile:active {
+      background: var(--surface-2);
+    }
+
+    .alert-icon-mobile {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+    }
+
+    .alert-card-mobile.success .alert-icon-mobile { background: var(--success-soft); color: var(--success); }
+    .alert-card-mobile.warning .alert-icon-mobile { background: var(--warning-soft); color: var(--warning); }
+    .alert-card-mobile.danger .alert-icon-mobile { background: var(--danger-soft); color: var(--danger); }
+    .alert-card-mobile.info .alert-icon-mobile { background: var(--info-soft); color: var(--info); }
+    .alert-card-mobile.normal .alert-icon-mobile { background: var(--info-soft); color: var(--info); }
+
+    .alert-content-mobile {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .alert-content-mobile h3 {
+      margin: 0 0 4px;
+      font-size: .95rem;
+      font-weight: 600;
+      line-height: 1.3;
+      word-break: break-word;
+    }
+
+    .alert-content-mobile p {
+      margin: 0;
+      font-size: .85rem;
+      color: var(--muted);
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .alert-toggle {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 1.2rem;
+      flex-shrink: 0;
+      transition: transform .2s;
+    }
+
+    .alert-card-mobile.expanded .alert-toggle {
+      transform: rotate(180deg);
+    }
+
+    /* ALERT DETAILS MOBILE */
+    .alert-details-mobile {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height .3s ease;
+      border-top: 1px solid var(--line);
+    }
+
+    .alert-card-mobile.expanded .alert-details-mobile {
+      max-height: 1000px;
+    }
+
+    .alert-details-content {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+      font-size: .9rem;
+    }
+
+    .detail-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 8px;
+    }
+
+    .detail-label {
+      font-weight: 600;
+      color: var(--text);
+      word-break: break-word;
+    }
+
+    .detail-value {
+      color: var(--muted);
+      word-break: break-word;
+    }
+
+    .detail-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: .8rem;
+      font-weight: 500;
+      width: fit-content;
+    }
+
+    .detail-badge.success { background: var(--success-soft); color: var(--success); }
+    .detail-badge.warning { background: var(--warning-soft); color: var(--warning); }
+    .detail-badge.danger { background: var(--danger-soft); color: var(--danger); }
+    .detail-badge.info { background: var(--info-soft); color: var(--info); }
+    .detail-badge.normal { background: var(--info-soft); color: var(--info); }
+
+    /* ABAS DE DETALHES */
+    .detail-tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--line);
+      margin: 12px 0;
+      padding: 0 14px;
+    }
+
+    .detail-tab {
+      padding: 10px 12px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 600;
+      border-bottom: 2px solid transparent;
+      transition: all .2s;
+    }
+
+    .detail-tab.active {
+      color: var(--brand);
+      border-bottom-color: var(--brand);
+    }
+
+    .tab-content {
+      display: none;
+      padding: 14px;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* TABELA DE PROCESSOS */
+    .processo-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem;
+    }
+
+    .processo-table th {
+      background: var(--surface-2);
+      padding: 8px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .processo-table td {
+      padding: 8px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+
+    .processo-table tbody tr:hover {
+      background: var(--surface-2);
+    }
+
+    /* EMPTY STATE */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+    }
+
+    .empty-state-icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+    }
+
+    .empty-state h4 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    .empty-state p {
+      margin: 0;
+      font-size: .9rem;
+    }
+
+    /* LOADING STATE */
+    .loading {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--line);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* TOAST NOTIFICATION */
+    .toast {
+      position: fixed;
+      bottom: 80px;
+      left: 12px;
+      right: 12px;
+      padding: 12px 14px;
+      background: var(--brand);
+      color: #fff;
+      border-radius: 8px;
+      font-size: .9rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
+      animation: slideUp .3s ease;
+      z-index: 1000;
+    }
+
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(100px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    /* FOOTER MOBILE */
+    .mobile-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+      padding: 12px;
+      display: flex;
+      gap: 8px;
+      z-index: 50;
+    }
+
+    .btn-footer {
+      flex: 1;
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      color: var(--text);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: .9rem;
+      font-weight: 500;
+      transition: all .2s;
+    }
+
+    .btn-footer:active {
+      background: var(--line);
+      transform: scale(0.95);
+    }
+
+    .btn-footer.primary {
+      background: var(--brand);
+      color: #fff;
+      border-color: var(--brand);
+    }
+
+    .btn-footer.primary:active {
+      background: var(--brand-strong);
+    }
+
+    @media (max-width: 480px) {
+      .mobile-container {
+        padding: 12px;
+        padding-bottom: 80px;
+      }
+
+      .detail-row {
+        grid-template-columns: 100px 1fr;
+      }
+    }
+
+    @media (min-width: 768px) {
+      body {
+        max-width: 600px;
+        margin: 0 auto;
+        border-left: 1px solid var(--line);
+        border-right: 1px solid var(--line);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- HEADER -->
+  <div class="mobile-header">
+    <div>
+      <h1>🔔 Alertas Visuais</h1>
+      <p>Documentos vencidos e próximos do vencimento</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-icon-mobile" id="refreshBtn" title="Atualizar alertas" aria-label="Atualizar alertas">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTAINER -->
+  <div class="mobile-container">
+    <!-- FILTRO -->
+    <div class="mobile-filter" id="filterContainer">
+      <button class="filter-chip active" data-filter="all">Todos</button>
+      <button class="filter-chip" data-filter="danger">Críticos</button>
+      <button class="filter-chip" data-filter="warning">Atenção</button>
+    </div>
+
+    <!-- ALERTAS -->
+    <div id="alertsContainer">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p>Carregando alertas...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="mobile-footer">
+    <button class="btn-footer" id="goBackBtn">← Voltar</button>
+    <button class="btn-footer primary" id="openMainBtn">Abrir ERP</button>
+  </div>
+
+  <script>
+    // CONFIGURAÇÃO SUPABASE
+    const SUPABASE_URL = 'https://graxaoomeffhsazuzkvg.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyYXhhb29tZWZmaHNhenV6a3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MTUxMDUsImV4cCI6MjA5MDI5MTEwNX0.ZpbVoNVS4momTyf7NME4mcYuI4oCQUvNFSDbORCHktI';
+
+    let supabaseClient = null;
+    let allAlerts = [];
+    let currentFilter = 'all';
+    let selectedDocumentId = null;
+
+    // INICIALIZAÇÃO
+    async function init() {
+      console.log('📱 Inicializando página mobile de alertas...');
+      
+      const { createClient } = window.supabase;
+      supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      try {
+        loadConfig();
+        await loadAlerts();
+        setupEventListeners();
+        setupRealtimeListeners();
+        console.log('✓ Página mobile inicializada');
+      } catch (error) {
+        console.error('❌ Erro ao inicializar:', error);
+        showToast('Erro ao carregar alertas', 'error');
+      }
+    }
+
+    // CARREGAR CONFIGURAÇÃO
+    function loadConfig() {
+      const config = JSON.parse(localStorage.getItem('alertConfig') || '{}');
+      window.appConfig = {
+        alertDays: config.days || 30,
+        alertEmail: config.email || '',
+        alertEnabled: config.enabled !== undefined ? config.enabled : true
+      };
+      console.log(`⚙️ Config carregada: ${window.appConfig.alertDays} dias`);
+    }
+
+    // SETUP REALTIME LISTENERS
+    function setupRealtimeListeners() {
+      const licencasChannel = supabaseClient
+        .channel('public:licencas')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'licencas' }, () => {
+          console.log('📡 Licenças atualizadas');
+          loadAlerts();
+        })
+        .subscribe();
+
+      const alvarasChannel = supabaseClient
+        .channel('public:alvaras')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'alvaras' }, () => {
+          console.log('📡 Alvarás atualizados');
+          loadAlerts();
+        })
+        .subscribe();
+
+      const processosChannel = supabaseClient
+        .channel('public:processos')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'processos' }, () => {
+          console.log('📡 Processos atualizados');
+          if (selectedDocumentId) {
+            loadProcessosForDocument(selectedDocumentId);
+          }
+        })
+        .subscribe();
+    }
+
+    // CARREGAR ALERTAS
+   async function loadAlerts() {
+  try {
+    console.log('🔔 Carregando alertas...');
+    
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+
+    const allDocs = [...(licencas || []), ...(alvaras || [])];
+    const today = new Date();
+    const diasAlertas = window.appConfig?.alertDays || 30;
+    const dataLimiteAlerta = new Date(today.getTime() + diasAlertas * 24 * 60 * 60 * 1000);
+
+    // Processar TODOS os documentos
+    allAlerts = allDocs
+      .map(d => {
+        const vencimento = new Date(d.data_validade);
+        const diasRestantes = Math.ceil((vencimento - today) / (1000 * 60 * 60 * 24));
+        
+        let tipo = 'normal';
+        let icone = '⏰';
+        let titulo = '';
+        
+        if (diasRestantes < 0) {
+          tipo = 'danger';
+          icone = '🔴';
+          const diasVencido = Math.abs(diasRestantes);
+          titulo = `${d.tipo} - VENCIDO há ${diasVencido} dia(s)`;
+        } else if (diasRestantes === 0) {
+          tipo = 'danger';
+          icone = '🔴';
+          titulo = `${d.tipo} - VENCE HOJE`;
+        } else if (diasRestantes <= 7) {
+          tipo = 'danger';
+          icone = '🔴';
+          titulo = `${d.tipo} - Vence em ${diasRestantes} dia(s)`;
+        } else if (diasRestantes <= diasAlertas) {
+          tipo = 'warning';
+          icone = '🟡';
+          titulo = `${d.tipo} - Vence em ${diasRestantes} dias`;
+        } else {
+          tipo = 'normal';
+          icone = '⏰';
+          titulo = `${d.tipo} - Vence em ${diasRestantes} dias`;
+        }
+
+        return {
+          ...d,
+          diasRestantes,
+          tipo,
+          icone,
+          titulo,
+          vencimento,
+          tipo_tabela: d.tipo_tabela || (d.tipo.includes('Licença') ? 'licencas' : 'alvaras')
+        };
+      })
+      .sort((a, b) => a.vencimento - b.vencimento);
+
+    console.log(`📊 ${allAlerts.length} documento(s) carregado(s) (TODOS, sem filtro de data)`);
+    renderAlerts();
+  } catch (error) {
+    console.error('❌ Erro ao carregar alertas:', error);
+    showToast('Erro ao carregar alertas', 'error');
+  }
+}
+
+
+
+
+    // RENDERIZAR ALERTAS
+ function renderAlerts() {
+  const container = document.getElementById('alertsContainer');
+  
+  let filtered = [];
+  
+  if (currentFilter === 'all') {
+    // TODOS: Mostrar TODOS os documentos (sem limite de data)
+    filtered = allAlerts;
+  } else if (currentFilter === 'danger') {
+    // CRÍTICOS: Vencidos + próximos 7 dias
+    filtered = allAlerts.filter(a => a.tipo === 'danger');
+  } else if (currentFilter === 'warning') {
+    // ATENÇÃO: Próximos X dias (conforme configuração)
+    filtered = allAlerts.filter(a => a.tipo === 'warning' || a.tipo === 'danger');
+  }
+
+  if (filtered.length === 0) {
+    let mensagem = '';
+    if (currentFilter === 'all') {
+      mensagem = 'Nenhum documento cadastrado no sistema.';
+    } else if (currentFilter === 'danger') {
+      mensagem = 'Nenhum documento crítico no momento.';
+    } else if (currentFilter === 'warning') {
+      mensagem = `Nenhum documento vencendo nos próximos ${window.appConfig?.alertDays || 30} dias.`;
+    }
+    
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">✓</div>
+        <h4>Nenhum resultado</h4>
+        <p>${mensagem}</p>
+      </div>
+    `;
+    return;
+  }
+
+  console.log(`📊 Exibindo ${filtered.length} documento(s) para filtro "${currentFilter}"`);
+
+  container.innerHTML = filtered.map((alert, index) => {
+    const statusText = alert.diasRestantes < 0 
+      ? `Vencido há ${Math.abs(alert.diasRestantes)} dia(s)`
+      : alert.diasRestantes === 0
+      ? 'Vence hoje'
+      : `Vence em ${alert.diasRestantes} dia(s)`;
+
+    return `
+      <div class="alert-card-mobile ${alert.tipo}" data-index="${index}" data-id="${alert.id}">
+        <div class="alert-header-mobile">
+          <div class="alert-icon-mobile">${alert.icone}</div>
+          <div class="alert-content-mobile">
+            <h3>${alert.titulo}</h3>
+            <p>${alert.estabelecimento} • ${formatDate(alert.data_validade)}</p>
+          </div>
+          <div class="alert-toggle">▼</div>
+        </div>
+        <div class="alert-details-mobile">
+          <div class="detail-tabs">
+            <button class="detail-tab active" data-tab="documento">Documento</button>
+            <button class="detail-tab" data-tab="processos">Processos</button>
+            <button class="detail-tab" data-tab="andamento">Andamento</button>
+          </div>
+
+          <!-- ABA: DOCUMENTO -->
+          <div class="tab-content active" data-tab="documento">
+            <div class="alert-details-content">
+              <div class="detail-row">
+                <span class="detail-label">Tipo:</span>
+                <span class="detail-value">${alert.tipo}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Número:</span>
+                <span class="detail-value">${alert.numero}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Emissão:</span>
+                <span class="detail-value">${formatDate(alert.data_emissao)}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Validade:</span>
+                <span class="detail-value">${formatDate(alert.data_validade)}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Órgão:</span>
+                <span class="detail-value">${alert.orgao_emissor || '-'}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Responsável:</span>
+                <span class="detail-value">${alert.responsavel || '-'}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Status:</span>
+                <span class="detail-badge ${alert.tipo}">${statusText}</span>
+              </div>
+              ${alert.observacoes ? `
+              <div class="detail-row">
+                <span class="detail-label">Obs:</span>
+                <span class="detail-value">${alert.observacoes}</span>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- ABA: PROCESSOS -->
+          <div class="tab-content" data-tab="processos">
+            <div id="processos-${alert.id}" class="processos-container">
+              <div class="loading" style="padding: 20px;">
+                <div class="spinner" style="width: 30px; height: 30px;"></div>
+                <p>Carregando processos...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- ABA: ANDAMENTO -->
+          <div class="tab-content" data-tab="andamento">
+            <div id="andamento-${alert.id}" class="andamento-container">
+              <div class="loading" style="padding: 20px;">
+                <div class="spinner" style="width: 30px; height: 30px;"></div>
+                <p>Carregando histórico...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Adicionar listeners aos cards
+  document.querySelectorAll('.alert-card-mobile').forEach(card => {
+    const docId = card.getAttribute('data-id');
+    
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.detail-tab')) return;
+      
+      card.classList.toggle('expanded');
+      
+      if (card.classList.contains('expanded')) {
+        selectedDocumentId = docId;
+        loadProcessosForDocument(docId);
+        loadAndamentoForDocument(docId);
+      }
+    });
+
+    // Listeners para abas
+    card.querySelectorAll('.detail-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const tabName = tab.getAttribute('data-tab');
+        
+        card.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+        card.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        
+        tab.classList.add('active');
+        card.querySelector(`.tab-content[data-tab="${tabName}"]`).classList.add('active');
+      });
+    });
+  });
+}
+    // CARREGAR PROCESSOS PARA DOCUMENTO
+    async function loadProcessosForDocument(docId) {
+      try {
+        const { data, error } = await supabaseClient
+          .from('processos')
+          .select('*')
+          .eq('documento_id', docId)
+          .order('data_abertura', { ascending: false });
+
+        if (error) throw error;
+
+        const container = document.getElementById(`processos-${docId}`);
+        if (!container) return;
+
+        if (!data || data.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state" style="padding: 20px;">
+              <div class="empty-state-icon">📋</div>
+              <h4>Nenhum processo</h4>
+              <p>Não há processos associados a este documento.</p>
+            </div>
+          `;
+          return;
+        }
+
+        let html = '<div class="alert-details-content">';
+        
+        data.forEach(processo => {
+          const statusBadge = {
+            'aberto': 'info',
+            'em_analise': 'warning',
+            'aprovado': 'success',
+            'rejeitado': 'danger',
+            'concluido': 'success'
+          }[processo.status] || 'info';
+
+          const statusTexto = {
+            'aberto': 'Aberto',
+            'em_analise': 'Em Análise',
+            'aprovado': 'Aprovado',
+            'rejeitado': 'Rejeitado',
+            'concluido': 'Concluído'
+          }[processo.status];
+
+          html += `
+            <div style="border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+              <div class="detail-row">
+                <span class="detail-label">Número:</span>
+                <span class="detail-value"><strong>${processo.numero_processo}</strong></span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Status:</span>
+                <span class="detail-badge ${statusBadge}">${statusTexto}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Abertura:</span>
+                <span class="detail-value">${formatDate(processo.data_abertura)}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Previsão:</span>
+                <span class="detail-value">${formatDate(processo.data_prevista_conclusao) || '-'}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Responsável:</span>
+                <span class="detail-value">${processo.responsavel || '-'}</span>
+              </div>
+              ${processo.descricao ? `
+              <div class="detail-row">
+                <span class="detail-label">Descrição:</span>
+                <span class="detail-value">${processo.descricao}</span>
+              </div>
+              ` : ''}
+            </div>
+          `;
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+      } catch (error) {
+        console.error('Erro ao carregar processos:', error);
+        const container = document.getElementById(`processos-${docId}`);
+        if (container) {
+          container.innerHTML = `
+            <div class="empty-state" style="padding: 20px;">
+              <div class="empty-state-icon">⚠️</div>
+              <h4>Erro ao carregar</h4>
+              <p>Não foi possível carregar os processos.</p>
+            </div>
+          `;
+        }
+      }
+    }
+
+    // CARREGAR ANDAMENTO PARA DOCUMENTO
+    async function loadAndamentoForDocument(docId) {
+  try {
+    console.log('📋 Carregando andamento para documento:', docId);
+    
+    // Passo 1: Buscar todos os processos associados ao documento
+    const { data: processos, error: erroProcessos } = await supabaseClient
+      .from('processos')
+      .select('id, numero_processo, status')
+      .eq('documento_id', docId);
+
+    if (erroProcessos) throw erroProcessos;
+
+    const container = document.getElementById(`andamento-${docId}`);
+    if (!container) return;
+
+    if (!processos || processos.length === 0) {
+      console.log('ℹ️ Nenhum processo encontrado para este documento');
+      container.innerHTML = `
+        <div class="empty-state" style="padding: 20px;">
+          <div class="empty-state-icon">📋</div>
+          <h4>Nenhum histórico</h4>
+          <p>Não há processos associados a este documento.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Passo 2: Buscar histórico de andamento para todos os processos
+    const processoIds = processos.map(p => p.id);
+    
+    const { data: andamentos, error: erroAndamentos } = await supabaseClient
+      .from('andamento_processos')
+      .select('*')
+      .in('processo_id', processoIds)
+      .order('data_mudanca', { ascending: false });
+
+    if (erroAndamentos) throw erroAndamentos;
+
+    if (!andamentos || andamentos.length === 0) {
+      console.log('ℹ️ Nenhum histórico de andamento encontrado');
+      container.innerHTML = `
+        <div class="empty-state" style="padding: 20px;">
+          <div class="empty-state-icon">📋</div>
+          <h4>Nenhum histórico</h4>
+          <p>Não há mudanças de status registradas para os processos deste documento.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Passo 3: Renderizar tabela de andamento
+    let html = `
+      <div style="padding: 14px;">
+        <p style="margin: 0 0 12px; font-size: .9rem; color: var(--muted);">
+          <strong>${processos.length}</strong> processo(s) encontrado(s) com <strong>${andamentos.length}</strong> mudança(s) de status
+        </p>
+        <table class="processo-table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Processo</th>
+              <th>De</th>
+              <th>Para</th>
+              <th>Responsável</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    andamentos.forEach(and => {
+      // Encontrar o processo correspondente
+      const processo = processos.find(p => p.id === and.processo_id);
+      const processoNum = processo ? processo.numero_processo : 'N/A';
+
+      html += `
+        <tr>
+          <td style="font-size: .8rem;">${formatDate(and.data_mudanca)}</td>
+          <td style="font-size: .8rem;"><strong>${processoNum}</strong></td>
+          <td><span class="detail-badge info" style="font-size: .75rem;">${and.status_anterior || 'Início'}</span></td>
+          <td><span class="detail-badge success" style="font-size: .75rem;">${and.status_novo}</span></td>
+          <td style="font-size: .8rem;">${and.responsavel || '-'}</td>
+        </tr>
+      `;
+    });
+
+    html += `
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    container.innerHTML = html;
+    console.log('✓ Andamento carregado com sucesso');
+  } catch (error) {
+    console.error('❌ Erro ao carregar andamento:', error);
+    const container = document.getElementById(`andamento-${docId}`);
+    if (container) {
+      container.innerHTML = `
+        <div class="empty-state" style="padding: 20px;">
+          <div class="empty-state-icon">⚠️</div>
+          <h4>Erro ao carregar</h4>
+          <p>Não foi possível carregar o histórico de andamento.</p>
+          <p style="font-size: .8rem; color: var(--danger);">${error.message}</p>
+        </div>
+      `;
+    }
+  }
+}
+
+    // SETUP EVENT LISTENERS
+    function setupEventListeners() {
+      console.log('🔧 Configurando event listeners...');
+      
+      const filterChips = document.querySelectorAll('.filter-chip');
+      if (filterChips.length > 0) {
+        filterChips.forEach(chip => {
+          chip.addEventListener('click', (e) => {
+            document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+            e.target.classList.add('active');
+            currentFilter = e.target.getAttribute('data-filter');
+            renderAlerts();
+          });
+        });
+        console.log('✓ Filtros configurados');
+      }
+
+      const refreshBtn = document.getElementById('refreshBtn');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+          const btn = document.getElementById('refreshBtn');
+          btn.classList.add('loading');
+          btn.disabled = true;
+          
+          try {
+            await loadAlerts();
+            showToast('✓ Alertas atualizados com sucesso', 'success');
+          } catch (error) {
+            console.error('Erro ao atualizar:', error);
+            showToast('❌ Erro ao atualizar alertas', 'error');
+          } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+          }
+        });
+        console.log('✓ Botão refresh configurado');
+      }
+
+      const goBackBtn = document.getElementById('goBackBtn');
+      if (goBackBtn) {
+        goBackBtn.addEventListener('click', () => {
+          window.history.back();
+        });
+      }
+
+      const openMainBtn = document.getElementById('openMainBtn');
+      if (openMainBtn) {
+        openMainBtn.addEventListener('click', () => {
+          window.location.href = 'control.html';
+        });
+      }
+
+      console.log('✓ Event listeners configurados com sucesso');
+    }
+
+    // FUNÇÕES AUXILIARES
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('pt-BR');
+    }
+
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+
+    // INICIAR
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>

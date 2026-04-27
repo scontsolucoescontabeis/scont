@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1e3a5f" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Central de Alertas — SCONT</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="../supabase-config.js"></script>
+  <script src="../licencas-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../portal-auth-guard.js"></script>
+</head>
+<body>
+
+  <!-- Auth overlay -->
+  <div id="authOverlay">
+    <div class="spinner"></div>
+    <p style="font-size:14px;color:#64748b;font-weight:600;">Verificando acesso...</p>
+  </div>
+
+  <!-- App -->
+  <div id="app" style="display:none;">
+
+    <!-- Header -->
+    <header class="header">
+      <span class="header-logo">🔔</span>
+      <div class="header-title">Central de Alertas</div>
+      <div class="header-actions">
+        <button class="btn-icon" id="btnRefresh" title="Atualizar" onclick="refreshAlerts()">🔄</button>
+        <button class="btn-icon" id="btnTheme"   title="Tema"      onclick="toggleTheme()">🌙</button>
+        <button class="btn-icon" title="Portal"  onclick="window.location.href='../portal.html'">🏠</button>
+      </div>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-card total  active" onclick="setFilter('todos')"       title="Ver todos">
+        <div class="stat-value" id="statTotal">—</div>
+        <div class="stat-label">Total</div>
+      </div>
+      <div class="stat-card critico" onclick="setFilter('critico')" title="Ver críticos">
+        <div class="stat-value" id="statCritico">—</div>
+        <div class="stat-label">Crítico</div>
+      </div>
+      <div class="stat-card urgente" onclick="setFilter('urgente')" title="Ver urgentes">
+        <div class="stat-value" id="statUrgente">—</div>
+        <div class="stat-label">Urgente</div>
+      </div>
+      <div class="stat-card atencao" onclick="setFilter('atencao')" title="Ver atenção">
+        <div class="stat-value" id="statAtencao">—</div>
+        <div class="stat-label">Atenção</div>
+      </div>
+      <div class="stat-card info" onclick="setFilter('info')" title="Ver informativos">
+        <div class="stat-value" id="statInfo">—</div>
+        <div class="stat-label">Info</div>
+      </div>
+    </div>
+
+    <!-- Filter tabs -->
+    <div class="filter-bar" id="filterBar">
+      <button class="filter-tab active" data-filter="todos"         onclick="setFilter('todos')">
+        📋 Todos <span class="tab-count" id="tabTodos">0</span>
+      </button>
+      <button class="filter-tab" data-filter="certificados"         onclick="setFilter('certificados')">
+        🔐 Certificados <span class="tab-count" id="tabCertificados">0</span>
+      </button>
+      <button class="filter-tab" data-filter="formularios"          onclick="setFilter('formularios')">
+        📄 Formulários <span class="tab-count" id="tabFormularios">0</span>
+      </button>
+      <button class="filter-tab" data-filter="admissoes"            onclick="setFilter('admissoes')">
+        👤 Admissões <span class="tab-count" id="tabAdmissoes">0</span>
+      </button>
+      <button class="filter-tab" data-filter="licencas" onclick="setFilter('licencas')">
+        🏛️ Licenças <span class="tab-count" id="tabLicencas">0</span>
+      </button>
+      <button class="filter-tab" data-filter="portal" id="tabPortalBtn" style="display:none;" onclick="setFilter('portal')">
+        🏠 Portal <span class="tab-count" id="tabPortal">0</span>
+      </button>
+    </div>
+
+    <!-- Skeleton (loading) -->
+    <div class="skeleton-list" id="skeleton">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+
+    <!-- Alert cards -->
+    <div class="alerts-container" id="alertsContainer" style="display:none;">
+      <div class="alerts-grid" id="alertsGrid"></div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">✅</div>
+      <div class="empty-title">Nenhum alerta</div>
+      <div class="empty-sub">Tudo em ordem neste filtro.</div>
+    </div>
+
+  </div><!-- /#app -->
+
+  <div id="toastContainer"></div>
+
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const auth = await window.PortalAuthGuard.init(1);
+      if (!auth) return;
+      document.getElementById('authOverlay').remove();
+      document.getElementById('app').style.display = 'flex';
+      document.getElementById('app').style.flexDirection = 'column';
+      initApp(auth);
+    });
+  </script>
+</body>
+</html>

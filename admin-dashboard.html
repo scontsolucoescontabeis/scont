@@ -29,6 +29,8 @@
         .sidebar-menu button:hover { background:rgba(255,255,255,.2); transform:translateX(3px); }
         .sidebar-menu button.active { background:rgba(255,255,255,.3); border-left:4px solid white; padding-left:10px; }
         .sidebar-footer { position:absolute; bottom:18px; left:18px; right:18px; padding-top:16px; border-top:1px solid rgba(255,255,255,.2); }
+        .portal-btn { width:100%; padding:9px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.25); color:white; border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:600; transition:var(--transition); display:flex; align-items:center; justify-content:center; gap:7px; margin-bottom:8px; }
+        .portal-btn:hover { background:rgba(255,255,255,.2); }
         .logout-btn { width:100%; padding:9px; background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3); color:white; border-radius:var(--radius); cursor:pointer; font-size:13px; font-weight:600; transition:var(--transition); display:flex; align-items:center; justify-content:center; gap:7px; }
         .logout-btn:hover { background:rgba(255,255,255,.28); }
         .admin-info { text-align:center; margin-bottom:18px; font-size:12px; opacity:.85; }
@@ -136,6 +138,7 @@
         <li><button class="menu-btn" data-tab="acessos">🔐 Acessos</button></li>
     </ul>
     <div class="sidebar-footer">
+        <button class="portal-btn" onclick="window.location.href='portal.html'">🏠 Ir ao Portal</button>
         <button class="logout-btn" id="logoutBtn">🚪 Sair</button>
     </div>
   </aside>
@@ -281,7 +284,7 @@
         <div class="form-group"><label>Nome *</label><input id="fNome" type="text" required placeholder="Ex: Microsoft 365"></div>
         <div class="form-group"><label>Descrição</label><textarea id="fDescricao" placeholder="Descrição da ferramenta" rows="2"></textarea></div>
         <div class="form-group"><label>Ícone (emoji)</label><input id="fIcone" type="text" placeholder="📊" maxlength="4"></div>
-        <div class="form-group"><label>URL</label><input id="fUrl" type="url" placeholder="https://..."></div>
+        <div class="form-group"><label>URL</label><input id="fUrl" type="text" placeholder="./Projeto RH/index.html ou https://..."></div>
         <div class="form-group"><label>Ordem (número)</label><input id="fOrdem" type="number" placeholder="1" min="0"></div>
         <div class="form-group" style="display:flex;align-items:center;gap:8px;">
             <input type="checkbox" id="fAtiva" checked style="width:16px;height:16px;">

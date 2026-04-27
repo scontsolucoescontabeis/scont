@@ -72,6 +72,7 @@ const APP_STATE = {
   currentUser: null,
   currentSession: null,
   certificates: [],
+  _allCertificates: [],
   historyLog: [],
   currentPage: 1,
   pageSize: 10,

@@ -84,26 +84,29 @@ function validateCNPJ(cnpj) {
 }
 
 // ============================================
-// MENSAGENS
+// SISTEMA DE TOASTS
 // ============================================
 
-function showError(elementId, message) {
-  const el = q(`#${elementId}`);
-  if (el) {
-    el.textContent = message;
-    el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 5000);
+function showToast(message, type = 'success', duration = 4000) {
+  let container = q('#toastContainer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toastContainer';
+    document.body.appendChild(container);
   }
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('visible'));
+  setTimeout(() => {
+    toast.classList.remove('visible');
+    setTimeout(() => toast.remove(), 400);
+  }, duration);
 }
 
-function showSuccess(elementId, message) {
-  const el = q(`#${elementId}`);
-  if (el) {
-    el.textContent = message;
-    el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 5000);
-  }
-}
+function showError(elementId, message) { showToast(message, 'error'); }
+function showSuccess(elementId, message) { showToast(message, 'success'); }
 
 // ============================================
 // CRIPTOGRAFIA

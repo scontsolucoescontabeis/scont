@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central de Documentos - SCONT</title>
+    <script src="../supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #8B3A3A;
+            --primary-hover: #6B2A2A;
+            --primary-light: rgba(139,58,58,0.08);
+            --secondary: #2C3E50;
+            --success: #27AE60;
+            --bg: #F4F7F6;
+            --card: #FFFFFF;
+            --text: #2C3E50;
+            --text-light: #7F8C8D;
+            --border: #E0E6ED;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
+            --radius: 14px;
+            --radius-sm: 8px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+
+        /* ─── HEADER ─── */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+            color: white;
+            padding: 0;
+            box-shadow: var(--shadow-md);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 18px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        .header-brand { display: flex; align-items: center; gap: 16px; }
+        .header-brand img { height: 38px; filter: brightness(0) invert(1); }
+        .header-brand h1 { font-size: 20px; font-weight: 700; }
+        .header-brand p { font-size: 12px; opacity: 0.85; margin-top: 1px; }
+        .header-actions { display: flex; align-items: center; gap: 10px; }
+        .btn-header {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-header:hover { background: rgba(255,255,255,0.25); }
+
+        /* ─── MAIN ─── */
+        .container { max-width: 1200px; margin: 36px auto; padding: 0 28px 60px; }
+
+        /* ─── PAGE TITLE ─── */
+        .page-title {
+            margin-bottom: 32px;
+        }
+        .page-title h2 { font-size: 24px; font-weight: 700; color: var(--text); }
+        .page-title p { font-size: 14px; color: var(--text-light); margin-top: 4px; }
+
+        /* ─── SEÇÃO ─── */
+        .section { margin-bottom: 40px; }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+        .section-header h3 { font-size: 16px; font-weight: 700; color: var(--text); }
+        .section-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 20px;
+            background: var(--primary-light);
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ─── GRID DE CARDS ─── */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
+        }
+
+        .doc-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            transition: all 0.25s ease;
+            box-shadow: var(--shadow-sm);
+            position: relative;
+            overflow: hidden;
+        }
+        .doc-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: var(--card-accent, var(--primary));
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .doc-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--card-accent, var(--primary));
+        }
+        .doc-card:hover::before { opacity: 1; }
+
+        .card-icon { font-size: 40px; line-height: 1; }
+        .card-body { flex: 1; }
+        .card-title { font-size: 15px; font-weight: 700; margin-bottom: 5px; }
+        .card-desc { font-size: 13px; color: var(--text-light); line-height: 1.5; }
+        .card-arrow {
+            font-size: 18px;
+            color: var(--card-accent, var(--primary));
+            align-self: flex-end;
+            opacity: 0;
+            transform: translateX(-4px);
+            transition: all 0.2s;
+        }
+        .doc-card:hover .card-arrow { opacity: 1; transform: translateX(0); }
+
+        /* Variantes de cor por tipo */
+        .card-registro   { --card-accent: #2980B9; }
+        .card-alteracao  { --card-accent: #8E44AD; }
+        .card-empregado  { --card-accent: #27AE60; }
+        .card-arquivos   { --card-accent: #E67E22; }
+        .card-gestao     { --card-accent: #8B3A3A; }
+
+        /* Card especial de destaque (Leitor) */
+        .doc-card.destaque {
+            background: linear-gradient(135deg, #fff8f4, #fff);
+            border-color: #E67E22;
+        }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-width: 640px) {
+            .container { padding: 0 16px 40px; }
+            .header-inner { padding: 14px 16px; }
+            .header-brand img { height: 30px; }
+            .header-brand h1 { font-size: 17px; }
+            .cards-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-inner">
+            <div class="header-brand">
+                <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+                <div>
+                    <h1>Central de Documentos</h1>
+                    <p>Formulários, registros e arquivos do servidor</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <a href="index.html" class="btn-header">📋 Gerenciador</a>
+                <a href="../portal.html" class="btn-header">🏠 Portal</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <div class="page-title">
+            <h2>O que você deseja acessar?</h2>
+            <p>Selecione um formulário para preencher ou gerencie os arquivos do servidor.</p>
+        </div>
+
+        <!-- SEÇÃO: FORMULÁRIOS DE ENTRADA -->
+        <section class="section">
+            <div class="section-header">
+                <span style="font-size:20px;">📝</span>
+                <h3>Formulários de Entrada</h3>
+                <span class="section-badge">Preenchimento</span>
+            </div>
+            <div class="cards-grid">
+
+                <a href="formulario_registro.HTML" class="doc-card card-registro">
+                    <div class="card-icon">🏢</div>
+                    <div class="card-body">
+                        <div class="card-title">Registro de Empresa</div>
+                        <div class="card-desc">Abertura de nova empresa. Preencha os dados cadastrais, sócios, atividades e regime tributário.</div>
+                    </div>
+                    <div class="card-arrow">→</div>
+                </a>
+
+                <a href="formulario_alteracao.html" class="doc-card card-alteracao">
+                    <div class="card-icon">📝</div>
+                    <div class="card-body">
+                        <div class="card-title">Alteração de Empresa</div>
+                        <div class="card-desc">Alteração de dados cadastrais, endereço, atividade, sócios ou regime de uma empresa existente.</div>
+                    </div>
+                    <div class="card-arrow">→</div>
+                </a>
+
+                <a href="formulario_empregado.html" class="doc-card card-empregado">
+                    <div class="card-icon">👤</div>
+                    <div class="card-body">
+                        <div class="card-title">Admissão de Empregado</div>
+                        <div class="card-desc">Ficha de admissão de novo empregado. Dados pessoais, cargo, salário e informações contratuais.</div>
+                    </div>
+                    <div class="card-arrow">→</div>
+                </a>
+
+            </div>
+        </section>
+
+        <!-- SEÇÃO: GESTÃO E ARQUIVOS -->
+        <section class="section">
+            <div class="section-header">
+                <span style="font-size:20px;">📁</span>
+                <h3>Gestão e Arquivos</h3>
+                <span class="section-badge">Administração</span>
+            </div>
+            <div class="cards-grid">
+
+                <a href="index.html" class="doc-card card-gestao">
+                    <div class="card-icon">📋</div>
+                    <div class="card-body">
+                        <div class="card-title">Gerenciador de Formulários</div>
+                        <div class="card-desc">Visualize, edite, valide e acompanhe todos os formulários enviados. Busca, filtros e histórico.</div>
+                    </div>
+                    <div class="card-arrow">→</div>
+                </a>
+
+                <a href="leitor.html" class="doc-card card-arquivos destaque">
+                    <div class="card-icon">🗂️</div>
+                    <div class="card-body">
+                        <div class="card-title">Arquivos do Servidor</div>
+                        <div class="card-desc">Navegue, visualize, faça upload e download de arquivos armazenados no servidor de documentos.</div>
+                    </div>
+                    <div class="card-arrow">→</div>
+                </a>
+
+            </div>
+        </section>
+
+    </main>
+
+    <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
+    <script src="../portal-auth-guard.js"></script>
+    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+</body>
+</html>

@@ -60,6 +60,12 @@
           <span>Configurações</span>
         </button>
       </nav>
+      <div class="sidebar-portal">
+        <button onclick="handleBackToPortal()" class="btn-portal">
+          <span>🏠</span>
+          <span>Voltar ao Portal</span>
+        </button>
+      </div>
       <div class="sidebar-footer">
         Controle rigoroso, histórico completo e alertas visuais para certificados digitais.
       </div>
@@ -238,28 +244,75 @@
             <div class="section-head">
               <div>
                 <h2>Relatórios avançados</h2>
-                <div class="meta">Análise completa de certificados com múltiplos filtros</div>
+                <div class="meta">Análise completa com filtros por empresa, tipo, situação e período</div>
               </div>
+              <button class="btn btn-primary" onclick="exportCSV()">⬇ Exportar CSV</button>
             </div>
             <div class="section-body">
-              <p style="color: var(--text-muted);">Conteúdo de relatórios será carregado aqui...</p>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
+                <div class="field">
+                  <label>Empresa</label>
+                  <input id="relEmpresa" type="text" placeholder="Filtrar..." />
+                </div>
+                <div class="field">
+                  <label>Tipo</label>
+                  <select id="relTipo">
+                    <option value="">Todos</option>
+                    <option value="A1">A1</option>
+                    <option value="A3">A3</option>
+                    <option value="e-CNPJ">e-CNPJ</option>
+                    <option value="e-CPF">e-CPF</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Situação</label>
+                  <select id="relSituacao">
+                    <option value="">Todas</option>
+                    <option value="Ativo">Ativo</option>
+                    <option value="Agendado">Agendado</option>
+                    <option value="Renovado">Renovado</option>
+                    <option value="Aguardando Contato">Aguardando Contato</option>
+                    <option value="Vencido">Vencido</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Venc. a partir de</label>
+                  <input id="relDataDe" type="date" />
+                </div>
+                <div class="field">
+                  <label>Venc. até</label>
+                  <input id="relDataAte" type="date" />
+                </div>
+                <div style="display:flex;gap:8px;align-items:flex-end;">
+                  <button class="btn btn-primary" onclick="filterRelatorio()" style="flex:1;">Filtrar</button>
+                  <button class="btn btn-secondary" onclick="clearRelatorio()" style="flex:1;">Limpar</button>
+                </div>
+              </div>
+              <div id="relSummary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>CPF/CNPJ</th>
+                      <th>Tipo</th>
+                      <th>Emissão</th>
+                      <th>Vencimento</th>
+                      <th>Situação</th>
+                      <th>Dias Rest.</th>
+                      <th>Responsável</th>
+                    </tr>
+                  </thead>
+                  <tbody id="relTable"></tbody>
+                </table>
+              </div>
             </div>
           </section>
         </section>
 
         <!-- AGENDA -->
         <section class="page" id="page-agenda">
-          <section class="section">
-            <div class="section-head">
-              <div>
-                <h2>Agenda de renovações</h2>
-                <div class="meta">Compromissos e contatos programados para renovação</div>
-              </div>
-            </div>
-            <div class="section-body">
-              <p style="color: var(--text-muted);">Conteúdo de agenda será carregado aqui...</p>
-            </div>
-          </section>
+          <div id="agendaPageContent"></div>
         </section>
 
         <!-- HISTÓRICO -->
@@ -272,7 +325,12 @@
               </div>
             </div>
             <div class="section-body">
-              <div class="timeline" id="historyTimeline"></div>
+              <div class="field" style="margin-bottom:20px;">
+                <input id="histSearchInput" type="text" placeholder="Buscar por empresa, responsável ou ação...">
+              </div>
+              <div class="timeline" id="historyTimeline">
+                <div style="color:var(--text-muted);text-align:center;padding:40px;">Carregando histórico...</div>
+              </div>
             </div>
           </section>
         </section>
@@ -282,13 +340,11 @@
           <section class="section">
             <div class="section-head">
               <div>
-                <h2>Segurança e criptografia local</h2>
-                <div class="meta">Proteção de senhas e dados sensíveis em front-end</div>
+                <h2>Senhas dos certificados</h2>
+                <div class="meta">Consulta local de senhas cadastradas — mantenha esses dados protegidos</div>
               </div>
             </div>
-            <div class="section-body">
-              <p style="color: var(--text-muted);">Conteúdo de segurança será carregado aqui...</p>
-            </div>
+            <div class="section-body" id="segurancaContent"></div>
           </section>
         </section>
 
@@ -297,13 +353,11 @@
           <section class="section">
             <div class="section-head">
               <div>
-                <h2>Configurações da interface</h2>
-                <div class="meta">Preferências visuais e parâmetros operacionais</div>
+                <h2>Configurações</h2>
+                <div class="meta">Preferências visuais, limiares de alerta e navegação</div>
               </div>
             </div>
-            <div class="section-body">
-              <p style="color: var(--text-muted);">Conteúdo de configurações será carregado aqui...</p>
-            </div>
+            <div class="section-body" id="configContent"></div>
           </section>
         </section>
       </section>
@@ -324,18 +378,18 @@
       </div>
       <div class="modal-body">
         <form id="certForm">
-          <input id="certId" type="hidden">
+          <input id="certId" name="certId" type="hidden">
           <div class="field">
             <label>Empresa *</label>
-            <input id="empresa" type="text" required>
+            <input id="empresa" name="empresa" type="text" required>
           </div>
           <div class="field">
             <label>CPF/CNPJ</label>
-            <input id="cpfcnpj" type="text">
+            <input id="cpfcnpj" name="cpfcnpj" type="text">
           </div>
           <div class="field">
             <label>Tipo *</label>
-            <select id="tipo" required>
+            <select id="tipo" name="tipo" required>
               <option value="">Selecione</option>
               <option value="A1">A1</option>
               <option value="A3">A3</option>
@@ -345,23 +399,23 @@
           </div>
           <div class="field">
             <label>Autoridade certificadora</label>
-            <input id="autoridade" type="text">
+            <input id="autoridade" name="autoridade" type="text">
           </div>
           <div class="field">
             <label>Data de emissão</label>
-            <input id="emissao" type="date">
+            <input id="emissao" name="emissao" type="date">
           </div>
           <div class="field">
             <label>Data de vencimento *</label>
-            <input id="vencimento" type="date" required>
+            <input id="vencimento" name="vencimento" type="date" required>
           </div>
           <div class="field">
-            <label>Senha *</label>
-            <input id="senha" type="password" required>
+            <label>Senha</label>
+            <input id="senha" name="senha" type="password">
           </div>
           <div class="field">
             <label>Situação *</label>
-            <select id="situacao" required>
+            <select id="situacao" name="situacao" required>
               <option value="Ativo">Ativo</option>
               <option value="Agendado">Agendado</option>
               <option value="Renovado">Renovado</option>
@@ -371,27 +425,27 @@
           </div>
           <div class="field">
             <label>Data de agendamento</label>
-            <input id="agendamento" type="date">
+            <input id="agendamento" name="agendamento" type="date">
           </div>
           <div class="field">
             <label>Responsável interno</label>
-            <input id="responsavel" type="text">
+            <input id="responsavel" name="responsavel" type="text">
           </div>
           <div class="field">
             <label>E-mail</label>
-            <input id="email" type="email">
+            <input id="email" name="email" type="email">
           </div>
           <div class="field">
             <label>Telefone</label>
-            <input id="telefone" type="tel">
+            <input id="telefone" name="telefone" type="tel">
           </div>
           <div class="field">
             <label>Informações adicionais</label>
-            <textarea id="info"></textarea>
+            <textarea id="info" name="info"></textarea>
           </div>
           <div class="field">
             <label>Observação de risco</label>
-            <textarea id="risco"></textarea>
+            <textarea id="risco" name="risco"></textarea>
           </div>
           <div style="display: flex; gap: 8px; margin-top: 24px;">
             <button type="button" class="btn btn-secondary" id="cancelCertForm" style="flex: 1;">Cancelar</button>

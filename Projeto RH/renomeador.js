@@ -99,11 +99,11 @@ function adicionarArquivos(files) {
 // --- MOTOR DE REGEX E ANÁLISE ---
 
 function criarRegexDoPadrao(padraoDe) {
-    let regexStr = padraoDe.replace(/[.*+?^$()|[\]\]/g, '\$&');
-    regexStr = regexStr.replace(/{CODIGO_EMPRESA}/g, '(?<codigo>\d+)');
+    let regexStr = padraoDe.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
+    regexStr = regexStr.replace(/{CODIGO_EMPRESA}/g, '(?<codigo>\\d+)');
     regexStr = regexStr.replace(/{NOME_ARQUIVO}/g, '(?<nome>.+?)');
-    regexStr = regexStr.replace(/{MM}/g, '(?<mes>\d{2})');
-    regexStr = regexStr.replace(/{AAAA}/g, '(?<ano>\d{4})');
+    regexStr = regexStr.replace(/{MM}/g, '(?<mes>\\d{2})');
+    regexStr = regexStr.replace(/{AAAA}/g, '(?<ano>\\d{4})');
     regexStr = regexStr.replace(/{IGNORAR}/g, '.*?');
     return new RegExp('^' + regexStr + '$', 'i');
 }
@@ -188,10 +188,10 @@ function analisarArquivos() {
                 caminhoRelativoDinamico = caminhoRelativoDinamico.replace(/{AAAA}/g, anoComp);
                 
                 // Normaliza barras para o ZIP (sempre usar / internamente no ZIP)
-                caminhoRelativoDinamico = caminhoRelativoDinamico.replace(/\/g, '/').replace(/^\/+|\/+$/g, '');
+                caminhoRelativoDinamico = caminhoRelativoDinamico.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
 
                 // 3. Caminhos Absolutos apenas para exibição visual na tabela
-                const separador = '\';
+                const separador = '\\';
                 const raizExpressLimpa = caminhoExpressRaw.replace(/[\/]+$/, '');
                 
                 exibicaoExpress = `${raizExpressLimpa}${separador}${novoNomeFinal}`;
@@ -226,71 +226,81 @@ function analisarArquivos() {
     });
 
     document.getElementById('avisoErros').style.display = temErros ? 'block' : 'none';
-    document.getElementById('btnGerarZip').style.display = temSucesso ? 'inline-flex' : 'none';
+    document.getElementById('btnSalvar').style.display = temSucesso ? 'inline-flex' : 'none';
 }
 
-// --- GERAÇÃO DO ARQUIVO ZIP DUPLO ---
+// --- GRAVAÇÃO DIRETA NOS DESTINOS (File System Access API) ---
 
-async function gerarZip() {
+async function salvarNosDestinos() {
     const arquivosParaProcessar = arquivosAnalisados.filter(a => a.podeProcessar);
     if (arquivosParaProcessar.length === 0) return;
 
-    const btn = document.getElementById('btnGerarZip');
-    btn.innerHTML = '⏳ Compactando arquivos...';
+    if (!window.showDirectoryPicker) {
+        mostrarMensagem('Navegador Incompatível', 'Esta função requer Google Chrome ou Microsoft Edge (versão 86 ou superior).\n\nPor favor, abra esta ferramenta nesses navegadores.');
+        return;
+    }
+
+    const btn = document.getElementById('btnSalvar');
     btn.disabled = true;
 
     try {
-        const zip = new JSZip();
-
-        // Cria as duas pastas principais dentro do ZIP
-        const pastaExpress = zip.folder("1_COPIAR_PARA_EXPRESS");
-        const pastaDinamico = zip.folder("2_COPIAR_PARA_DINAMICO");
-
-        // Adiciona um arquivo de instruções para o usuário
-        const caminhoExpressRaw = document.getElementById('caminhoExpress').value.trim();
-        const instrucoes = `INSTRUÇÕES DE USO:
-        
-1. Abra a pasta "1_COPIAR_PARA_EXPRESS" e copie todos os arquivos lá dentro.
-2. Cole esses arquivos no seu caminho EXPRESS: ${caminhoExpressRaw}
-
-3. Abra a pasta "2_COPIAR_PARA_DINAMICO" e copie as pastas que estão lá dentro.
-4. Cole essas pastas na raiz do seu diretório dinâmico.`;
-        
-        zip.file("LEIA-ME_INSTRUCOES.txt", instrucoes);
-
-        // Adiciona os arquivos nas respectivas pastas
-        for (const arq of arquivosParaProcessar) {
-            // Cópia 1: Solto na pasta EXPRESS
-            pastaExpress.file(arq.novoNome, arq.arquivoOriginal);
-            
-            // Cópia 2: Dentro da estrutura de pastas na pasta DINAMICO
-            const caminhoCompletoDinamico = `${arq.caminhoRelativoDinamico}/${arq.novoNome}`;
-            pastaDinamico.file(caminhoCompletoDinamico, arq.arquivoOriginal);
+        btn.innerHTML = '📁 Selecione a pasta EXPRESS...';
+        let pastaExpress;
+        try {
+            pastaExpress = await window.showDirectoryPicker({ mode: 'readwrite' });
+        } catch (e) {
+            if (e.name === 'AbortError') return;
+            throw e;
         }
 
-        // Gera o arquivo ZIP
-        const content = await zip.generateAsync({ type: "blob" });
-        
-        // Cria o link de download
-        const url = URL.createObjectURL(content);
-        const a = document.createElement('a');
-        a.href = url;
-        
-        const comp = document.getElementById('renCompetencia').value.replace('/', '-');
-        a.download = `Arquivos_Renomeados_${comp}.zip`;
-        
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        btn.innerHTML = '📁 Selecione a pasta DINÂMICO...';
+        let pastaDinamico;
+        try {
+            pastaDinamico = await window.showDirectoryPicker({ mode: 'readwrite' });
+        } catch (e) {
+            if (e.name === 'AbortError') return;
+            throw e;
+        }
 
-        mostrarMensagem('Sucesso', 'Arquivo ZIP gerado com sucesso!\n\nAbra o arquivo baixado e leia o arquivo "LEIA-ME_INSTRUCOES.txt" para saber onde colar cada pasta.');
+        btn.innerHTML = '⏳ Salvando arquivos...';
+        let salvos = 0;
+        const erros = [];
+
+        for (const arq of arquivosParaProcessar) {
+            try {
+                // Cópia 1: EXPRESS — arquivo solto na raiz da pasta selecionada
+                const fhExpress = await pastaExpress.getFileHandle(arq.novoNome, { create: true });
+                const writerExpress = await fhExpress.createWritable();
+                await writerExpress.write(arq.arquivoOriginal);
+                await writerExpress.close();
+
+                // Cópia 2: DINÂMICO — dentro da hierarquia de subpastas
+                const partes = arq.caminhoRelativoDinamico.split('/').filter(Boolean);
+                let dirAtual = pastaDinamico;
+                for (const parte of partes) {
+                    dirAtual = await dirAtual.getDirectoryHandle(parte, { create: true });
+                }
+                const fhDinamico = await dirAtual.getFileHandle(arq.novoNome, { create: true });
+                const writerDinamico = await fhDinamico.createWritable();
+                await writerDinamico.write(arq.arquivoOriginal);
+                await writerDinamico.close();
+
+                salvos++;
+            } catch (e) {
+                erros.push(`${arq.nomeOriginal}: ${e.message}`);
+            }
+        }
+
+        const titulo = erros.length === 0 ? 'Concluído' : 'Concluído com avisos';
+        let mensagem = `${salvos} arquivo(s) salvo(s) com sucesso.`;
+        if (erros.length > 0) mensagem += `\n\nErros:\n${erros.join('\n')}`;
+        mostrarMensagem(titulo, mensagem);
 
     } catch (erro) {
-        console.error("Erro ao gerar ZIP:", erro);
-        mostrarMensagem('Erro', 'Ocorreu um erro ao compactar os arquivos.');
+        console.error("Erro ao salvar arquivos:", erro);
+        mostrarMensagem('Erro', 'Ocorreu um erro ao salvar os arquivos: ' + erro.message);
     } finally {
-        btn.innerHTML = '📦 Gerar e Baixar Arquivo .ZIP';
+        btn.innerHTML = '💾 Salvar nos Destinos';
         btn.disabled = false;
     }
 }

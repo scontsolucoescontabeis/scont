@@ -1367,7 +1367,7 @@ async function viewDocuments(formId) {
             try {
                 const { data, error } = await supabaseClient.storage.from('documentos').list(caminho, { limit: 1000 });
                 if (!error && data) {
-                    const documentos = data.filter(item => !item.id.includes('/')).map(item => ({
+                    const documentos = data.filter(item => item.id && !item.id.includes('/')).map(item => ({
                         name: item.name, path: caminho + item.name, size: item.metadata?.size || 0, created_at: item.created_at
                     }));
                     todosDocumentos = [...todosDocumentos, ...documentos];
@@ -1510,17 +1510,17 @@ function filterHistory() {
 // ==========================================
 // 7. UTILITÁRIOS
 // ==========================================
-async function syncSupabase() {
+async function syncSupabase(btn) {
     try {
-        const btn = event.target;
         btn.disabled = true;
         btn.textContent = '⏳ Sincronizando...';
         await loadForms();
-        btn.disabled = false;
-        btn.textContent = '🔄 Sincronizar';
         showSuccess('Sincronização concluída!');
     } catch (error) {
         showError('Erro ao sincronizar');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Sincronizar';
     }
 }
 

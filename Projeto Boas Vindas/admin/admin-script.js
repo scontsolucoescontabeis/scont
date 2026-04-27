@@ -1,288 +1,134 @@
-// ===== CONFIGURAÇÃO =====
-const API_URL = 'http://localhost:5000/api';
+'use strict';
 
-// ===== VARIÁVEIS GLOBAIS =====
-let apresentacaoAtual = null;
-let cnaePrincipalSelecionado = null;
+// ===== SUPABASE =====
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ===== ESTADO =====
+let cnaePrincipalSelecionado   = null;
 let cnaesSecundariosSelecionados = [];
-let todosCNAEs = [];
-let modalCNAETipo = 'principal';
-let cnaesListaCompleta = [];
+let cnaesListaCompleta          = [];
+let modalCNAETipo               = 'principal';
 
 // ===== INICIALIZAÇÃO =====
-document.addEventListener('DOMContentLoaded', function() {
-    // Navegação entre seções
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', function(e) {
-            e.preventDefault();
-            const section = this.getAttribute('data-section');
-            mudarSecao(section);
-        });
-    });
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.nav-item').forEach(item =>
+        item.addEventListener('click', () => mudarSecao(item.getAttribute('data-section')))
+    );
 
-    // Formulário de criação
-    const formCriar = document.getElementById('formCriarApresentacao');
-    if (formCriar) {
-        formCriar.addEventListener('submit', function(e) {
-            e.preventDefault();
-            criarApresentacao();
-        });
-    }
+    document.getElementById('formCriarApresentacao')
+        ?.addEventListener('submit', e => { e.preventDefault(); criarApresentacao(); });
 
-    // Carregar histórico
     carregarHistorico();
-
-    // Carregar configurações
-    carregarConfiguracoes();
-
-    // Formulário de configurações
-    const formConfig = document.getElementById('formConfiguracoes');
-    if (formConfig) {
-        formConfig.addEventListener('submit', function(e) {
-            e.preventDefault();
-            salvarConfiguracoes();
-        });
-    }
 });
 
-// ===== NAVEGAÇÃO ENTRE SEÇÕES =====
+// ===== NAVEGAÇÃO =====
 function mudarSecao(secao) {
-    // Remover ativo de todos
     document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-
-    // Adicionar ativo à seção selecionada
-    const sectionElement = document.getElementById(secao);
-    if (sectionElement) {
-        sectionElement.classList.add('active');
-    }
-    
-    const navElement = document.querySelector(`[data-section="${secao}"]`);
-    if (navElement) {
-        navElement.classList.add('active');
-    }
+    document.getElementById(secao)?.classList.add('active');
+    document.querySelector(`[data-section="${secao}"]`)?.classList.add('active');
+    if (secao === 'historico') carregarHistorico();
 }
 
 // ===== CRIAR APRESENTAÇÃO =====
 async function criarApresentacao() {
-    const form = document.getElementById('formCriarApresentacao');
-    const btnSubmit = form.querySelector('button[type="submit"]');
-    
-    // ===== VALIDAÇÃO: CNAE PRINCIPAL É OBRIGATÓRIO =====
     if (!cnaePrincipalSelecionado) {
-        alert('❌ Selecione um CNAE Principal obrigatoriamente');
+        showToast('Selecione um CNAE Principal obrigatoriamente', 'error');
         return;
     }
-    
-    // ===== PROTEÇÃO CONTRA MÚLTIPLOS CLIQUES =====
-    if (btnSubmit.disabled) {
-        return;
-    }
-    
-    // Desabilitar botão
-    btnSubmit.disabled = true;
-    const textoBotaoOriginal = btnSubmit.innerHTML;
-    btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
-    
-    const formData = new FormData(form);
 
-    console.log('Dados do formulário:');
-    for (let [key, value] of formData.entries()) {
-        console.log(`${key}: ${value}`);
-    }
+    const btn = document.querySelector('#formCriarApresentacao button[type="submit"]');
+    const textoOriginal = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
 
-    const dados = {
-        razaoSocial: formData.get('razaoSocial'),
-        cnpj: formData.get('cnpj'),
-        inscricao: formData.get('inscricao'),
-        regime: formData.get('regime'),
-        porte: formData.get('porte'),
-        ramo: formData.get('ramo'),
-        nomeContato: formData.get('nomeContato'),
-        emailCliente: formData.get('emailCliente'),
-        telefone: formData.get('telefone'),
-        cargo: formData.get('cargo'),
-        mensagem: formData.get('mensagem'),
-        cnaePrincipal: cnaePrincipalSelecionado.codigo,
-        cnaesSecundarios: cnaesSecundariosSelecionados.map(c => c.codigo),
-        enviarEmail: form.enviarEmail?.checked || false,
-        enviarWhatsApp: form.enviarWhatsApp?.checked || false
+    const fd = new FormData(document.getElementById('formCriarApresentacao'));
+
+    const payload = {
+        razao_social:      fd.get('razaoSocial'),
+        cnpj:              fd.get('cnpj'),
+        inscricao:         fd.get('inscricao') || null,
+        regime:            fd.get('regime')    || null,
+        porte:             fd.get('porte')     || null,
+        ramo:              fd.get('ramo')      || null,
+        cnae_principal:    `${cnaePrincipalSelecionado.codigo} — ${cnaePrincipalSelecionado.atividade}`,
+        cnaes_secundarios: cnaesSecundariosSelecionados.length
+            ? cnaesSecundariosSelecionados.map(c => `${c.codigo} — ${c.atividade}`).join('\n')
+            : null,
+        nome_contato:  fd.get('nomeContato'),
+        email_cliente: fd.get('emailCliente'),
+        telefone:      fd.get('telefone') || null,
+        cargo:         fd.get('cargo')    || null,
+        mensagem:      fd.get('mensagem') || null,
     };
 
-    console.log('Dados a enviar:', dados);
-
     try {
-        const response = await fetch(`${API_URL}/criar-apresentacao`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(dados)
-        });
+        const { data, error } = await db
+            .from('apresentacoes')
+            .insert([payload])
+            .select('id, razao_social, nome_contato')
+            .single();
 
-        const resultado = await response.json();
+        if (error) throw error;
 
-        console.log('Resposta da API:', resultado);
+        exibirResultado(data);
+        showToast('Apresentação criada com sucesso!', 'success');
+        carregarHistorico();
 
-        if (resultado.sucesso) {
-            apresentacaoAtual = resultado;
-            exibirResultado(resultado);
-
-            // Mostrar status de notificações
-            if (resultado.notificacoes) {
-                exibirStatusNotificacoes(resultado.notificacoes);
-            }
-            
-            // ===== SUCESSO: Reabilitar botão após 3 segundos =====
-            setTimeout(() => {
-                btnSubmit.disabled = false;
-                btnSubmit.innerHTML = textoBotaoOriginal;
-            }, 3000);
-
-            // Recarregar histórico
-            carregarHistorico();
-        } else {
-            alert('❌ Erro: ' + resultado.mensagem);
-            
-            // ===== ERRO: Reabilitar botão imediatamente =====
-            btnSubmit.disabled = false;
-            btnSubmit.innerHTML = textoBotaoOriginal;
-        }
-    } catch (error) {
-        console.error('Erro:', error);
-        alert('❌ Erro ao criar apresentação: ' + error.message);
-        
-        // ===== ERRO: Reabilitar botão imediatamente =====
-        btnSubmit.disabled = false;
-        btnSubmit.innerHTML = textoBotaoOriginal;
+    } catch (err) {
+        console.error(err);
+        showToast('Erro ao salvar: ' + (err.message || JSON.stringify(err)), 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = textoOriginal;
     }
 }
 
 // ===== EXIBIR RESULTADO =====
 function exibirResultado(data) {
-    const resultado = document.getElementById('resultado');
-    if (!resultado) return;
-    
-    document.getElementById('resultadoCliente').textContent = data.nome_contato || 'N/A';
-    document.getElementById('resultadoEmpresa').textContent = data.razao_social || 'N/A';
-    document.getElementById('resultadoData').textContent = new Date().toLocaleDateString('pt-BR');
-    
-    const linkUnico = document.getElementById('linkUnico');
-    if (linkUnico) {
-        linkUnico.value = `${API_URL.replace('/api', '')}/index.html?id=${data.id}`;
-    }
-    
-    const btnVisualizar = document.getElementById('btnVisualizarApresentacao');
-    if (btnVisualizar) {
-        btnVisualizar.href = `${API_URL.replace('/api', '')}/index.html?id=${data.id}`;
-    }
+    document.getElementById('resultadoCliente').textContent = data.nome_contato;
+    document.getElementById('resultadoEmpresa').textContent = data.razao_social;
+    document.getElementById('resultadoData').textContent    = new Date().toLocaleDateString('pt-BR');
 
+    const link = gerarLink(data.id);
+    document.getElementById('linkUnico').value = link;
+    const btnVer = document.getElementById('btnVisualizarApresentacao');
+    if (btnVer) btnVer.href = link;
+
+    const resultado = document.getElementById('resultado');
     resultado.style.display = 'block';
     resultado.scrollIntoView({ behavior: 'smooth' });
 }
 
-// ===== EXIBIR STATUS DE NOTIFICAÇÕES =====
-function exibirStatusNotificacoes(notificacoes) {
-    let statusHTML = '<div class="notificacoes-status">';
-    
-    if (notificacoes.email) {
-        const status = notificacoes.email.sucesso ? '✓' : '✗';
-        const classe = notificacoes.email.sucesso ? 'sucesso' : 'erro';
-        statusHTML += `<p class="${classe}"><i class="fas fa-envelope"></i> Email: ${status} ${notificacoes.email.mensagem}</p>`;
-    }
-    
-    if (notificacoes.whatsapp) {
-        const status = notificacoes.whatsapp.sucesso ? '✓' : '✗';
-        const classe = notificacoes.whatsapp.sucesso ? 'sucesso' : 'erro';
-        statusHTML += `<p class="${classe}"><i class="fas fa-whatsapp"></i> WhatsApp: ${status} ${notificacoes.whatsapp.mensagem}</p>`;
-    }
-    
-    statusHTML += '</div>';
-    
-    const statusDiv = document.getElementById('statusNotificacoes');
-    if (statusDiv) {
-        statusDiv.innerHTML = statusHTML;
-    }
+function gerarLink(id) {
+    const base = window.location.href.replace(/admin\/admin\.html.*$/, '');
+    return `${base}index.html?id=${id}`;
 }
 
 // ===== COPIAR LINK =====
 function copiarLink() {
-    const link = document.getElementById('linkUnico');
-    if (!link) return;
-    
-    link.select();
-    document.execCommand('copy');
-    alert('✓ Link copiado para a área de transferência!');
-}
-
-// ===== ENVIAR EMAIL MANUAL =====
-function enviarEmailManual() {
-    if (!apresentacaoAtual) return;
-
-    const emailConfirmacao = document.getElementById('emailConfirmacao');
-    if (emailConfirmacao) {
-        emailConfirmacao.textContent = apresentacaoAtual.email_cliente;
-    }
-    
-    const modal = document.getElementById('modalConfirmacao');
-    if (modal) {
-        modal.style.display = 'flex';
-    }
-}
-
-// ===== CONFIRMAR ENVIO =====
-async function confirmarEnvio() {
-    if (!apresentacaoAtual) return;
-
-    try {
-        const response = await fetch(`${API_URL}/reenviar-notificacoes/${apresentacaoAtual.id}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email: true,
-                whatsapp: false
-            })
+    const val = document.getElementById('linkUnico')?.value;
+    if (!val) return;
+    navigator.clipboard.writeText(val)
+        .then(() => showToast('Link copiado!', 'success'))
+        .catch(() => {
+            document.getElementById('linkUnico').select();
+            document.execCommand('copy');
+            showToast('Link copiado!', 'success');
         });
-
-        const resultado = await response.json();
-
-        if (resultado.sucesso) {
-            alert('✓ Email reenviado com sucesso!');
-            fecharModal();
-        } else {
-            alert('❌ Erro: ' + resultado.mensagem);
-        }
-    } catch (error) {
-        console.error('Erro:', error);
-        alert('❌ Erro ao reenviar email');
-    }
 }
 
-// ===== FECHAR MODAL =====
-function fecharModal() {
-    const modal = document.getElementById('modalConfirmacao');
-    if (modal) {
-        modal.style.display = 'none';
-    }
+function copiarLinkHistorico(link) {
+    navigator.clipboard.writeText(link)
+        .then(() => showToast('Link copiado!', 'success'))
+        .catch(() => showToast('Não foi possível copiar', 'error'));
 }
 
 // ===== NOVA APRESENTAÇÃO =====
 function novaApresentacao() {
-    const form = document.getElementById('formCriarApresentacao');
-    if (form) {
-        form.reset();
-    }
-    
-    const resultado = document.getElementById('resultado');
-    if (resultado) {
-        resultado.style.display = 'none';
-    }
-    
-    apresentacaoAtual = null;
-    
-    // Limpar CNAEs
+    document.getElementById('formCriarApresentacao').reset();
+    document.getElementById('resultado').style.display = 'none';
     removerCnaePrincipal();
     cnaesSecundariosSelecionados = [];
     atualizarListaCnaesSecundarios();
@@ -290,332 +136,196 @@ function novaApresentacao() {
 
 // ===== CARREGAR HISTÓRICO =====
 async function carregarHistorico() {
+    const tbody = document.getElementById('tabelaHistorico');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Carregando...</td></tr>';
+
     try {
-        const response = await fetch(`${API_URL}/historico?limite=50`);
-        const data = await response.json();
+        const { data, error } = await db
+            .from('apresentacoes')
+            .select('id, razao_social, nome_contato, email_cliente, criado_em, acessos')
+            .eq('ativo', true)
+            .order('criado_em', { ascending: false })
+            .limit(50);
 
-        const tbody = document.getElementById('tabelaHistorico');
-        if (!tbody) return;
-        
-        tbody.innerHTML = '';
+        if (error) throw error;
 
-        if (data.sucesso && data.apresentacoes && data.apresentacoes.length > 0) {
-            data.apresentacoes.forEach(item => {
-                const row = document.createElement('tr');
-                const dataFormatada = new Date(item.data_criacao).toLocaleDateString('pt-BR');
-                row.innerHTML = `
-                    <td>${item.razao_social}</td>
-                    <td>${item.nome_contato}</td>
-                    <td>${item.email_cliente}</td>
-                    <td>${dataFormatada}</td>
-                    <td>${item.acessos || 0}</td>
-                    <td>
-                        <a href="/index.html?id=${item.id}" target="_blank" class="btn btn-info btn-sm">
-                            <i class="fas fa-eye"></i> Ver
-                        </a>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        } else {
+        if (!data?.length) {
             tbody.innerHTML = '<tr><td colspan="6" class="text-center">Nenhuma apresentação criada ainda</td></tr>';
+            return;
         }
-    } catch (error) {
-        console.error('Erro ao carregar histórico:', error);
+
+        tbody.innerHTML = data.map(item => {
+            const dt   = new Date(item.criado_em).toLocaleDateString('pt-BR');
+            const link = gerarLink(item.id);
+            return `<tr>
+                <td>${item.razao_social}</td>
+                <td>${item.nome_contato}</td>
+                <td>${item.email_cliente}</td>
+                <td>${dt}</td>
+                <td>${item.acessos || 0}</td>
+                <td style="display:flex;gap:6px;">
+                    <a href="${link}" target="_blank" class="btn btn-info btn-sm" title="Visualizar">
+                        <i class="fas fa-eye"></i>
+                    </a>
+                    <button onclick="copiarLinkHistorico('${link}')" class="btn btn-secondary btn-sm" title="Copiar link">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+
+    } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Erro ao carregar histórico</td></tr>';
+        showToast('Erro ao carregar histórico', 'error');
     }
 }
 
-// ===== CARREGAR CONFIGURAÇÕES =====
-async function carregarConfiguracoes() {
-    try {
-        const response = await fetch(`${API_URL}/obter-configuracoes`);
-        const data = await response.json();
-
-        if (data.sucesso && data.configuracoes) {
-            const emailRemetente = document.getElementById('emailRemetente');
-            const nomeRemetente = document.getElementById('nomeRemetente');
-            const assuntoEmail = document.getElementById('assuntoEmail');
-            
-            if (emailRemetente) emailRemetente.value = data.configuracoes.email_remetente || '';
-            if (nomeRemetente) nomeRemetente.value = data.configuracoes.nome_remetente || '';
-            if (assuntoEmail) assuntoEmail.value = data.configuracoes.assunto_email || '';
-        }
-    } catch (error) {
-        console.error('Erro ao carregar configurações:', error);
+// ===== TOAST =====
+function showToast(msg, type = 'success') {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.style.cssText = 'position:fixed;bottom:24px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;';
+        document.body.appendChild(container);
     }
+    const color = type === 'error' ? '#E74C3C' : '#27AE60';
+    const t = document.createElement('div');
+    t.style.cssText = `background:#fff;border-left:4px solid ${color};color:${color};padding:12px 18px;border-radius:8px;font-size:14px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.12);opacity:0;transform:translateX(40px);transition:opacity .3s,transform .3s;max-width:320px;pointer-events:auto;`;
+    t.textContent = msg;
+    container.appendChild(t);
+    requestAnimationFrame(() => { t.style.opacity = '1'; t.style.transform = 'translateX(0)'; });
+    setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 400); }, 4000);
 }
 
-// ===== SALVAR CONFIGURAÇÕES =====
-async function salvarConfiguracoes() {
-    const form = document.getElementById('formConfiguracoes');
-    if (!form) return;
-    
-    const formData = new FormData(form);
-
-    try {
-        const response = await fetch(`${API_URL}/salvar-configuracoes`, {
-            method: 'POST',
-            body: formData
-        });
-
-        const data = await response.json();
-
-        if (data.sucesso) {
-            alert('✓ Configurações salvas com sucesso!');
-        } else {
-            alert('❌ Erro: ' + data.mensagem);
-        }
-    } catch (error) {
-        console.error('Erro:', error);
-        alert('❌ Erro ao salvar configurações');
-    }
-}
-
-// ===== ABRIR MODAL CNAE =====
+// ===== MODAL CNAE =====
 function abrirModalCNAE(tipo) {
     modalCNAETipo = tipo;
-    
-    // Carregar CNAEs se não estiverem carregados
-    if (window.CNAES_LISTA && window.CNAES_LISTA.length > 0) {
-        cnaesListaCompleta = window.CNAES_LISTA;
-        exibirTabelaCNAE(cnaesListaCompleta);
-    } else {
-        console.error('CNAEs não carregados');
-        alert('❌ Erro ao carregar CNAEs');
-        return;
-    }
-    
-    // Abrir modal
-    const modal = document.getElementById('modalCNAE');
-    if (modal) {
-        modal.classList.add('active');
-    }
-    
+    if (!window.CNAES_LISTA?.length) { showToast('CNAEs não carregados', 'error'); return; }
+    cnaesListaCompleta = window.CNAES_LISTA;
+    exibirTabelaCNAE(cnaesListaCompleta);
+
+    document.getElementById('modalCNAE')?.classList.add('active');
     const filtro = document.getElementById('filtroCNAE');
-    if (filtro) {
-        filtro.value = '';
-        filtro.focus();
-    }
-    
-    // Atualizar título
-    const titulo = tipo === 'principal' ? 'Selecionar CNAE Principal' : 'Adicionar CNAE Secundário';
-    const headerTitle = document.querySelector('.modal-cnae-header h2');
-    if (headerTitle) {
-        headerTitle.textContent = titulo;
-    }
+    if (filtro) { filtro.value = ''; filtro.focus(); }
+
+    const h = document.querySelector('.modal-cnae-header h2');
+    if (h) h.textContent = tipo === 'principal' ? 'Selecionar CNAE Principal' : 'Adicionar CNAE Secundário';
 }
 
-// ===== FECHAR MODAL CNAE =====
 function fecharModalCNAE() {
-    const modal = document.getElementById('modalCNAE');
-    if (modal) {
-        modal.classList.remove('active');
-    }
-    
-    const filtro = document.getElementById('filtroCNAE');
-    if (filtro) {
-        filtro.value = '';
-    }
+    document.getElementById('modalCNAE')?.classList.remove('active');
+    const f = document.getElementById('filtroCNAE');
+    if (f) f.value = '';
 }
 
-// ===== FILTRAR TABELA CNAE =====
 function filtrarTabelaCNAE() {
-    const filtro = document.getElementById('filtroCNAE');
-    if (!filtro) return;
-    
-    const termo = filtro.value.toLowerCase();
-    
-    let cnaesFiltratos;
-    
-    if (!termo || termo.length === 0) {
-        cnaesFiltratos = cnaesListaCompleta;
-    } else {
-        cnaesFiltratos = cnaesListaCompleta.filter(cnae =>
-            cnae.codigo.toLowerCase().includes(termo) ||
-            cnae.atividade.toLowerCase().includes(termo)
-        );
-    }
-    
-    exibirTabelaCNAE(cnaesFiltratos);
+    const termo = document.getElementById('filtroCNAE')?.value.toLowerCase() || '';
+    exibirTabelaCNAE(
+        termo
+            ? cnaesListaCompleta.filter(c =>
+                c.codigo.toLowerCase().includes(termo) ||
+                c.atividade.toLowerCase().includes(termo))
+            : cnaesListaCompleta
+    );
 }
 
-// ===== EXIBIR TABELA CNAE =====
 function exibirTabelaCNAE(cnaes) {
     const tbody = document.getElementById('tabelaCNAECorpo');
-    const totalElement = document.getElementById('totalCNAEs');
-    
-    if (!tbody || !totalElement) return;
-    
-    totalElement.textContent = cnaes.length;
-    
-    if (cnaes.length === 0) {
+    const total = document.getElementById('totalCNAEs');
+    if (!tbody) return;
+    if (total) total.textContent = cnaes.length;
+    if (!cnaes.length) {
         tbody.innerHTML = '<tr><td colspan="3" class="text-center">Nenhum CNAE encontrado</td></tr>';
         return;
     }
-    
-    tbody.innerHTML = cnaes.map(cnae => `
+    tbody.innerHTML = cnaes.slice(0, 300).map(c => `
         <tr>
-            <td><strong>${cnae.codigo}</strong></td>
-            <td>${cnae.atividade}</td>
-            <td>
-                <button 
-                    type="button" 
-                    class="btn btn-info btn-sm"
-                    onclick="selecionarCNAE('${cnae.codigo}', '${cnae.atividade.replace(/'/g, "\'")}')"
-                >
-                    Selecionar
-                </button>
-            </td>
-        </tr>
-    `).join('');
+            <td><strong>${c.codigo}</strong></td>
+            <td>${c.atividade}</td>
+            <td><button type="button" class="btn btn-info btn-sm"
+                onclick="selecionarCNAE('${c.codigo}','${c.atividade.replace(/'/g, "\\'")}')">
+                Selecionar
+            </button></td>
+        </tr>`).join('');
 }
 
-// ===== SELECIONAR CNAE =====
 function selecionarCNAE(codigo, atividade) {
-    if (modalCNAETipo === 'principal') {
-        selecionarCnaePrincipal(codigo, atividade);
-    } else if (modalCNAETipo === 'secundario') {
-        adicionarCnaeSecundario(codigo, atividade);
-    }
-    
+    modalCNAETipo === 'principal'
+        ? selecionarCnaePrincipal(codigo, atividade)
+        : adicionarCnaeSecundario(codigo, atividade);
     fecharModalCNAE();
 }
 
-// ===== SELECIONAR CNAE PRINCIPAL =====
 function selecionarCnaePrincipal(codigo, atividade) {
     cnaePrincipalSelecionado = { codigo, atividade };
-    
-    // Atualizar display
-    const inputPrincipal = document.getElementById('cnaePrincipal');
-    if (inputPrincipal) {
-        inputPrincipal.value = `${codigo} - ${atividade}`;
-    }
-    
-    const codigoElement = document.getElementById('cnaePrincipalCodigo');
-    if (codigoElement) {
-        codigoElement.textContent = codigo;
-    }
-    
-    const atividadeElement = document.getElementById('cnaePrincipalAtividade');
-    if (atividadeElement) {
-        atividadeElement.textContent = atividade;
-    }
-    
-    const infoDisplay = document.getElementById('cnaePrincipalInfo');
-    if (infoDisplay) {
-        infoDisplay.style.display = 'block';
-    }
-    
-    // Mostrar grupo de secundários
-    const grupoSecundarios = document.getElementById('grupoSecundarios');
-    if (grupoSecundarios) {
-        grupoSecundarios.style.display = 'block';
-    }
-    
-    console.log('✓ CNAE Principal selecionado:', codigo);
+    const input = document.getElementById('cnaePrincipal');
+    if (input) input.value = `${codigo} - ${atividade}`;
+    const elCod = document.getElementById('cnaePrincipalCodigo');
+    if (elCod) elCod.textContent = codigo;
+    const elAtv = document.getElementById('cnaePrincipalAtividade');
+    if (elAtv) elAtv.textContent = atividade;
+    const info = document.getElementById('cnaePrincipalInfo');
+    if (info) info.style.display = 'block';
+    const grupo = document.getElementById('grupoSecundarios');
+    if (grupo) grupo.style.display = 'block';
 }
 
-// ===== REMOVER CNAE PRINCIPAL =====
 function removerCnaePrincipal() {
     cnaePrincipalSelecionado = null;
-    
-    const inputPrincipal = document.getElementById('cnaePrincipal');
-    if (inputPrincipal) {
-        inputPrincipal.value = '';
+    const input = document.getElementById('cnaePrincipal');
+    if (input) input.value = '';
+    const info = document.getElementById('cnaePrincipalInfo');
+    if (info) info.style.display = 'none';
+    if (!cnaesSecundariosSelecionados.length) {
+        const g = document.getElementById('grupoSecundarios');
+        if (g) g.style.display = 'none';
     }
-    
-    const infoDisplay = document.getElementById('cnaePrincipalInfo');
-    if (infoDisplay) {
-        infoDisplay.style.display = 'none';
-    }
-    
-    // NÃO ocultar grupo de secundários se houver secundários selecionados
-    const grupoSecundarios = document.getElementById('grupoSecundarios');
-    if (grupoSecundarios) {
-        // Só ocultar se não houver secundários
-        if (cnaesSecundariosSelecionados.length === 0) {
-            grupoSecundarios.style.display = 'none';
-        }
-        // Se houver secundários, MANTER visível
-    }
-    
-    // NÃO limpar secundários - mantém os dados
-    // cnaesSecundariosSelecionados = [];
-    // atualizarListaCnaesSecundarios();
-    
-    console.log('✓ CNAE Principal removido (secundários mantidos)');
 }
 
-// ===== ABRIR MODAL PARA ADICIONAR CNAE SECUNDÁRIO =====
-function abrirModalAdicionarSecundario() {
-    // Abrir modal com tipo 'secundario'
-    abrirModalCNAE('secundario');
-}
+function abrirModalAdicionarSecundario() { abrirModalCNAE('secundario'); }
 
-// ===== ADICIONAR CNAE SECUNDÁRIO =====
 function adicionarCnaeSecundario(codigo, atividade) {
-    // NÃO validar se CNAE Principal foi selecionado
-    // Permite adicionar secundários mesmo sem principal
-    
-    // Validar se já existe
     if (cnaesSecundariosSelecionados.find(c => c.codigo === codigo)) {
-        alert('⚠️ Este CNAE secundário já foi adicionado');
+        showToast('Este CNAE secundário já foi adicionado', 'error');
         return;
     }
-    
-    // Adicionar
     cnaesSecundariosSelecionados.push({ codigo, atividade });
     atualizarListaCnaesSecundarios();
-    
-    // Mostrar grupo de secundários mesmo sem principal
-    const grupoSecundarios = document.getElementById('grupoSecundarios');
-    if (grupoSecundarios) {
-        grupoSecundarios.style.display = 'block';
-    }
-    
-    console.log('✓ CNAE Secundário adicionado:', codigo);
+    const g = document.getElementById('grupoSecundarios');
+    if (g) g.style.display = 'block';
 }
 
-// ===== ATUALIZAR LISTA CNAES SECUNDÁRIOS =====
 function atualizarListaCnaesSecundarios() {
     const lista = document.getElementById('listaCnaesSecundarios');
     if (!lista) return;
-    
-    if (cnaesSecundariosSelecionados.length === 0) {
+    if (!cnaesSecundariosSelecionados.length) {
         lista.innerHTML = '<p class="text-muted">Nenhum CNAE secundário adicionado</p>';
         return;
     }
-    
-    lista.innerHTML = cnaesSecundariosSelecionados.map((cnae, index) => `
+    lista.innerHTML = cnaesSecundariosSelecionados.map((c, i) => `
         <div class="cnae-secundario-item">
             <div class="cnae-secundario-info">
-                <strong>${cnae.codigo}</strong>
-                <span>${cnae.atividade}</span>
+                <strong>${c.codigo}</strong>
+                <span>${c.atividade}</span>
             </div>
             <div class="cnae-secundario-acoes">
-                <button 
-                    type="button" 
-                    class="btn-remover-secundario"
-                    onclick="removerCnaeSecundario(${index})"
-                >
+                <button type="button" class="btn-remover-secundario" onclick="removerCnaeSecundario(${i})">
                     <i class="fas fa-trash"></i> Remover
                 </button>
             </div>
-        </div>
-    `).join('');
+        </div>`).join('');
 }
 
-// ===== REMOVER CNAE SECUNDÁRIO =====
 function removerCnaeSecundario(index) {
     cnaesSecundariosSelecionados.splice(index, 1);
     atualizarListaCnaesSecundarios();
-    console.log('✓ CNAE Secundário removido');
 }
 
-// ===== FECHAR MODAL AO CLICAR FORA =====
-document.addEventListener('click', function(e) {
+// Fechar modal ao clicar fora
+document.addEventListener('click', e => {
     const modal = document.getElementById('modalCNAE');
-    if (modal && e.target === modal) {
-        fecharModalCNAE();
-    }
+    if (modal && e.target === modal) fecharModalCNAE();
 });

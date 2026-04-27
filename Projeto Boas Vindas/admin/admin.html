@@ -4,20 +4,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - Scont Soluções Contábeis</title>
+    <script src="../../supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../../portal-auth-guard.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="admin-styles.css">
 </head>
 <body>
+    <!-- AUTH OVERLAY -->
+    <div id="authOverlay" style="position:fixed;inset:0;background:#F0F2F5;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+        <div style="font-size:40px;">🔐</div>
+        <p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p>
+    </div>
+
     <!-- HEADER -->
     <header class="admin-header">
         <div class="header-container">
             <div class="logo">
-                <i class="fas fa-briefcase"></i>
-                <span>Scont Admin</span>
+                <i class="fas fa-handshake"></i>
+                <span>Boas Vindas — Admin</span>
             </div>
-            <div class="admin-user">
-                <i class="fas fa-user-circle"></i>
-                <span>Administrador</span>
+            <div style="display:flex;align-items:center;gap:14px;">
+                <span id="adminEmail" style="font-size:13px;opacity:0.8;"></span>
+                <a href="../../portal.html" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);padding:7px 16px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
+                    🏠 Portal
+                </a>
             </div>
         </div>
     </header>
@@ -34,10 +45,6 @@
                 <div class="nav-item" data-section="historico">
                     <i class="fas fa-history"></i>
                     <span>Histórico</span>
-                </div>
-                <div class="nav-item" data-section="configuracoes">
-                    <i class="fas fa-cog"></i>
-                    <span>Configurações</span>
                 </div>
             </nav>
         </aside>
@@ -301,39 +308,6 @@
                 </div>
             </section>
 
-            <!-- SEÇÃO 3: CONFIGURAÇÕES -->
-            <section id="configuracoes" class="admin-section">
-                <div class="section-header">
-                    <h1><i class="fas fa-cog"></i> Configurações</h1>
-                    <p>Configure as informações de envio de emails</p>
-                </div>
-
-                <form id="formConfiguracoes" class="admin-form">
-                    <fieldset class="form-fieldset">
-                        <legend><i class="fas fa-envelope"></i> Configurações de Email</legend>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="emailRemetente">Email Remetente</label>
-                                <input type="email" id="emailRemetente" name="emailRemetente">
-                            </div>
-                            <div class="form-group">
-                                <label for="nomeRemetente">Nome do Remetente</label>
-                                <input type="text" id="nomeRemetente" name="nomeRemetente">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="assuntoEmail">Assunto do Email</label>
-                            <input type="text" id="assuntoEmail" name="assuntoEmail">
-                        </div>
-                    </fieldset>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Salvar Configurações
-                        </button>
-                    </div>
-                </form>
-            </section>
         </main>
     </div>
 
@@ -386,6 +360,18 @@
     </div>
 
     <!-- Scripts -->
+    <script>
+    (async () => {
+        const auth = await window.PortalAuthGuard.init(2);
+        if (!auth) return;
+        if (!auth.isAdmin) { window.location.replace('../../portal.html'); return; }
+        document.getElementById('authOverlay').remove();
+        const el = document.getElementById('adminEmail');
+        if (el && auth.email) el.textContent = auth.email;
+    })();
+    </script>
+    <!-- Dados CNAE (define window.CNAE_DATA) -->
+    <script src="../../Projeto Gerenciador Formularios/cnaes.js"></script>
     <script src="cnae.js"></script>
     <script src="admin-script.js"></script>
 </body>

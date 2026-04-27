@@ -1,0 +1,3634 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SCONT | Licenças e Relatórios</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#f3f4f6;
+      --bg-soft:#eceef2;
+      --surface:#ffffff;
+      --surface-2:#f8f9fb;
+      --line:#d8dde6;
+      --line-soft:#e8ebf0;
+      --text:#1f2937;
+      --muted:#64748b;
+      --brand:#6f1d2f;
+      --brand-2:#8f3a4b;
+      --brand-soft:#f7eaed;
+      --brand-strong:#561521;
+      --success:#1f8a5b;
+      --success-soft:#e7f7ef;
+      --warning:#c97a00;
+      --warning-soft:#fff3da;
+      --danger:#b42318;
+      --danger-soft:#fde7e5;
+      --info:#1f5fbf;
+      --info-soft:#eaf1ff;
+      --shadow:0 18px 40px rgba(15, 23, 42, .08);
+      --shadow-soft:0 10px 24px rgba(15, 23, 42, .05);
+      --radius:22px;
+      --radius-sm:14px;
+      --sidebar:286px;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{
+      min-height:100vh;
+      font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(111,29,47,.06), transparent 26%),
+        radial-gradient(circle at bottom left, rgba(111,29,47,.04), transparent 24%),
+        var(--bg);
+    }
+    button,input,select,textarea{font:inherit}
+    .app{
+      display:grid;
+      grid-template-columns: var(--sidebar) 1fr;
+      min-height:100vh;
+    }
+    .sidebar{
+      position:sticky;
+      top:0;
+      height:100vh;
+      padding:24px 18px;
+      background: linear-gradient(180deg, #161b24 0%, #1a2230 50%, #171b25 100%);
+      color:#fff;
+      border-right:1px solid rgba(255,255,255,.1);
+      overflow-y:auto;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      margin-bottom:28px;
+    }
+    .brand-mark{
+      width:44px;
+      height:44px;
+      border-radius:12px;
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-weight:700;
+      font-size:1.1rem;
+      margin:0 auto;
+    }
+    .brand h1{
+      margin:0;
+      font-size:1rem;
+      line-height:1.2;
+      letter-spacing:.2px;
+    }
+    .brand p{
+      margin:4px 0 0;
+      font-size:.82rem;
+      color:rgba(255,255,255,.67);
+    }
+    .nav{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .nav button{
+      border:1px solid transparent;
+      background:transparent;
+      color:#e8ecf4;
+      padding:14px 14px;
+      border-radius:16px;
+      text-align:left;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      transition:.2s ease;
+      font-size:.95rem;
+    }
+    .nav button span{
+      color:rgba(255,255,255,.68);
+      font-size:.8rem;
+    }
+    .nav button:hover,
+    .nav button.active{
+      background: rgba(255,255,255,.08);
+      border-color: rgba(255,255,255,.08);
+      transform: translateX(2px);
+    }
+    .sidebar-card{
+      margin-top:28px;
+      padding:16px;
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.1);
+      border-radius:16px;
+      color:#fff;
+    }
+    .sidebar-card h3{
+      margin:0 0 8px;
+      font-size:.95rem;
+    }
+    .sidebar-card p{
+      margin:0;
+      font-size:.8rem;
+      color:rgba(255,255,255,.64);
+      line-height:1.5;
+    }
+    .main{
+      padding:28px 32px;
+      overflow-y:auto;
+    }
+    .topbar{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:22px;
+    }
+    .title-block{
+      display:grid;
+      gap:18px;
+      margin-bottom:22px;
+    }
+    .title-block h2{
+      margin:0;
+      font-size:1.7rem;
+      letter-spacing:-.03em;
+    }
+    .title-block p{
+      margin:7px 0 0;
+      color:var(--muted);
+      font-size:.96rem;
+      max-width:800px;
+      line-height:1.55;
+    }
+    .top-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .btn{
+      border:none;
+      border-radius:14px;
+      padding:12px 16px;
+      cursor:pointer;
+      font-weight:700;
+      transition:.2s ease;
+      font-size:.92rem;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+    .btn:hover{transform:translateY(-1px)}
+    .btn-primary{
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color:#fff;
+      box-shadow: 0 12px 24px rgba(111,29,47,.18);
+    }
+    .btn-secondary{
+      background:#fff;
+      border:1px solid var(--line);
+      color:var(--text);
+    }
+    .btn-soft{
+      background:var(--surface-2);
+      border:1px solid var(--line);
+      color:var(--text);
+    }
+    .grid-kpis{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0,1fr));
+      gap:16px;
+      margin-bottom:28px;
+    }
+    .card{
+      background:#fff;
+      border-radius:var(--radius);
+      border:1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+    }
+    .kpi{
+      padding:20px;
+    }
+    .kpi small{
+      display:block;
+      color:var(--muted);
+      font-size:.85rem;
+      margin-bottom:8px;
+    }
+    .kpi strong{
+      display:block;
+      font-size:2rem;
+      color:var(--brand);
+      margin-bottom:8px;
+    }
+    .kpi .trend{
+      font-size:.85rem;
+      color:var(--success);
+    }
+    .content-grid{
+      display:grid;
+      grid-template-columns: 1.3fr .9fr;
+      gap:18px;
+      align-items:start;
+    }
+    .panel{
+      padding:20px;
+    }
+    .panel-header{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:16px;
+    }
+    .panel-header h3{
+      margin:0;
+      font-size:1.03rem;
+      letter-spacing:-.02em;
+    }
+    .panel-header p{
+      margin:4px 0 0;
+      color:var(--muted);
+      font-size:.88rem;
+      line-height:1.5;
+    }
+    .filters,.section-tabs{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .chip,.tab{
+      padding:10px 12px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:#fff;
+      color:var(--muted);
+      cursor:pointer;
+      font-size:.86rem;
+      font-weight:700;
+      transition:.2s ease;
+    }
+    .chip.active,.tab.active{
+      background:var(--brand);
+      color:#fff;
+      border-color:var(--brand);
+    }
+    .table-wrap{
+      overflow-x:auto;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+    }
+    thead{
+      background:var(--surface-2);
+      border-bottom:2px solid var(--line);
+    }
+    th{
+      padding:14px;
+      text-align:left;
+      font-weight:600;
+      color:var(--text);
+      font-size:.9rem;
+    }
+    td{
+      padding:14px;
+      border-bottom:1px solid var(--line-soft);
+      font-size:.92rem;
+      vertical-align:top;
+    }
+    tbody tr:hover{background:#fcfcfd}
+    .status{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 11px;
+      border-radius:999px;
+      font-weight:800;
+      font-size:.79rem;
+      white-space:nowrap;
+    }
+    .dot{
+      width:8px;height:8px;border-radius:50%;
+      background:currentColor;
+    }
+    .status.active{background:var(--success-soft);color:var(--success)}
+    .status.pending{background:var(--warning-soft);color:var(--warning)}
+    .status.expired{background:var(--danger-soft);color:var(--danger)}
+    .status.review{background:var(--info-soft);color:var(--info)}
+    .row-alert{
+      background: linear-gradient(90deg, rgba(201,122,0,.10), transparent);
+    }
+    .row-expired{
+      background: linear-gradient(90deg, rgba(180,35,24,.12), transparent);
+    }
+    .actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      font-size: .9rem;
+      font-weight: 500;
+      transition: all .2s ease;
+      white-space: nowrap;
+      min-height: 36px;
+    }
+    .btn-icon:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    }
+    .btn-icon.primary {
+      background: var(--brand);
+      color: #fff;
+      border-color: var(--brand);
+    }
+    .btn-icon.primary:hover {
+      background: var(--brand-strong);
+      border-color: var(--brand-strong);
+      box-shadow: 0 4px 12px rgba(111,29,47,.2);
+    }
+    .btn-icon.success {
+      background: var(--success-soft);
+      color: var(--success);
+      border-color: var(--success);
+    }
+    .btn-icon.success:hover {
+      background: var(--success);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(31,138,91,.2);
+    }
+    .btn-icon.warning {
+      background: var(--warning-soft);
+      color: var(--warning);
+      border-color: var(--warning);
+    }
+    .btn-icon.warning:hover {
+      background: var(--warning);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(201,122,0,.2);
+    }
+    .btn-icon.danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+    .btn-icon.danger:hover {
+      background: var(--danger);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(180,35,24,.2);
+    }
+    .btn-icon.info {
+      background: var(--info-soft);
+      color: var(--info);
+      border-color: var(--info);
+    }
+    .btn-icon.info:hover {
+      background: var(--info);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(31,95,191,.2);
+    }
+    .btn-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke-width: 2;
+      stroke: currentColor;
+      fill: none;
+    }
+    .side-stack{
+      display:grid;
+      gap:18px;
+    }
+    .mini-list{
+      display:grid;
+      gap:12px;
+    }
+    .mini-item{
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:#fff;
+      padding:16px;
+    }
+    .mini-item h4{
+      margin:0 0 8px;
+      font-size:.95rem;
+    }
+    .mini-item p{
+      margin:0;
+      color:var(--muted);
+      font-size:.85rem;
+      line-height:1.5;
+    }
+    .meta{
+      display:flex;
+      gap:8px;
+      margin-top:12px;
+      flex-wrap:wrap;
+    }
+    .badge{
+      display:inline-block;
+      padding:4px 10px;
+      border-radius:6px;
+      font-size:.75rem;
+      font-weight:700;
+    }
+    .badge.warn{background:var(--warning-soft);color:var(--warning)}
+    .badge.brand{background:var(--brand-soft);color:var(--brand)}
+    .badge.success{background:var(--success-soft);color:var(--success)}
+    .badge.danger{background:var(--danger-soft);color:var(--danger)}
+    .alert-card {
+      display: flex;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      border-left: 4px solid;
+      background: #fff;
+      align-items: flex-start;
+    }
+    .alert-card.success {
+      border-left-color: var(--success);
+      background: var(--success-soft);
+    }
+    .alert-card.warning {
+      border-left-color: var(--warning);
+      background: var(--warning-soft);
+    }
+    .alert-card.danger {
+      border-left-color: var(--danger);
+      background: var(--danger-soft);
+    }
+    .alert-card.info {
+      border-left-color: var(--info);
+      background: var(--info-soft);
+    }
+    .alert-icon {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-weight: bold;
+      font-size: .9rem;
+    }
+    .alert-card.success .alert-icon {
+      background: var(--success);
+      color: #fff;
+    }
+    .alert-card.warning .alert-icon {
+      background: var(--warning);
+      color: #fff;
+    }
+    .alert-card.danger .alert-icon {
+      background: var(--danger);
+      color: #fff;
+    }
+    .alert-card.info .alert-icon {
+      background: var(--info);
+      color: #fff;
+    }
+    .alert-content {
+      flex: 1;
+    }
+    .alert-content h4 {
+      margin: 0 0 4px;
+      font-size: .95rem;
+      font-weight: 600;
+    }
+    .alert-content p {
+      margin: 0;
+      font-size: .85rem;
+      line-height: 1.4;
+    }
+    .alert-card.success .alert-content h4 {
+      color: var(--success);
+    }
+    .alert-card.warning .alert-content h4 {
+      color: var(--warning);
+    }
+    .alert-card.danger .alert-content h4 {
+      color: var(--danger);
+    }
+    .alert-card.info .alert-content h4 {
+      color: var(--info);
+    }
+    .alert-card.success .alert-content p,
+    .alert-card.warning .alert-content p,
+    .alert-card.danger .alert-content p,
+    .alert-card.info .alert-content p {
+      color: var(--text);
+    }
+    .report-grid{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap:16px;
+    }
+    .report-card{
+      padding:18px;
+      border-radius:18px;
+      border:1px solid var(--line);
+      background:#fff;
+      box-shadow: var(--shadow-soft);
+    }
+    .report-card h4{
+      margin:0 0 8px;
+      font-size:.98rem;
+    }
+    .report-card p{
+      margin:0;
+      color:var(--muted);
+      font-size:.88rem;
+      line-height:1.55;
+    }
+    .report-value{
+      margin-top:14px;
+      font-size:1.7rem;
+      font-weight:900;
+      letter-spacing:-.04em;
+    }
+    .config-box{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap:12px;
+      margin-top:12px;
+    }
+    .toggle-box{
+      padding:14px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:#fff;
+    }
+    .toggle-box label{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:800;
+      cursor:pointer;
+      color:var(--text);
+    }
+    .toggle-box small{
+      display:block;
+      margin-top:8px;
+      color:var(--muted);
+      line-height:1.5;
+    }
+    .toggle-box input{
+      width:18px;
+      height:18px;
+      accent-color: var(--brand);
+    }
+    .toolbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    .toolbar input{
+      min-width:240px;
+    }
+    .note{
+      background:var(--brand-soft);
+      border:1px solid #e7cbd1;
+      color:#6f1d2f;
+      padding:14px 16px;
+      border-radius:16px;
+      margin-top:14px;
+      font-size:.88rem;
+      line-height:1.5;
+    }
+    .section-view{display:block}
+    .hidden{display:none !important}
+    .field{
+      display:grid;
+      gap:8px;
+    }
+    .field label{
+      font-weight:600;
+      font-size:.9rem;
+    }
+    .field input,
+    .field select,
+    .field textarea{
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      font-size:.9rem;
+    }
+    .field textarea{
+      min-height:92px;
+      resize:vertical;
+    }
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus{
+      border-color:var(--brand);
+      box-shadow:0 0 0 4px rgba(111,29,47,.08);
+    }
+    .form-grid{
+      display:grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap:14px;
+    }
+    .full{grid-column:1 / -1}
+    .modal{
+      display:none;
+      position:fixed;
+      top:0;
+      left:0;
+      right:0;
+      bottom:0;
+      background:rgba(0,0,0,.5);
+      z-index:1000;
+      align-items:center;
+      justify-content:center;
+    }
+    .modal.active{
+      display:flex;
+    }
+    .modal-content{
+      background:#fff;
+      border-radius:var(--radius);
+      padding:28px;
+      max-width:600px;
+      width:90%;
+      max-height:90vh;
+      overflow-y:auto;
+      box-shadow: var(--shadow);
+    }
+    .modal-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:20px;
+    }
+    .modal-header h2{
+      margin:0;
+      font-size:1.3rem;
+    }
+    .modal-close{
+      background:none;
+      border:none;
+      font-size:1.5rem;
+      cursor:pointer;
+      color:var(--muted);
+    }
+    .vencimento-filter {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 16px;
+      background: var(--surface-2);
+      border-radius: 12px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .vencimento-filter label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      color: var(--text);
+    }
+    .vencimento-filter input {
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: .9rem;
+      width: 80px;
+    }
+    .vencimento-filter button {
+      padding: 10px 16px;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all .2s;
+    }
+    .vencimento-filter button:hover {
+      background: var(--brand-strong);
+      transform: translateY(-2px);
+    }
+    .vencimento-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .vencimento-table thead {
+      background: var(--surface-2);
+      border-bottom: 2px solid var(--line);
+    }
+    .vencimento-table th {
+      padding: 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text);
+      font-size: .9rem;
+    }
+    .vencimento-table td {
+      padding: 14px;
+      border-bottom: 1px solid var(--line-soft);
+      font-size: .9rem;
+    }
+    .vencimento-table tbody tr:hover {
+      background: var(--surface-2);
+    }
+    .vencimento-dias {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 50px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: .85rem;
+    }
+    .vencimento-dias.critico {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+    .vencimento-dias.atencao {
+      background: var(--warning-soft);
+      color: var(--warning);
+    }
+    .vencimento-dias.ok {
+      background: var(--success-soft);
+      color: var(--success);
+    }
+    @media (max-width: 1180px){
+      .app{grid-template-columns:1fr}
+      .sidebar{position:relative;height:auto}
+      .grid-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .content-grid,.report-grid,.config-box{grid-template-columns:1fr}
+    }
+    @media (max-width: 720px){
+      .main{padding:16px}
+      .topbar{flex-direction:column}
+      .grid-kpis{grid-template-columns:1fr}
+      .form-grid{grid-template-columns:1fr}
+      .toolbar input{min-width:100%}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">SC</div>
+      <div>
+        <h1>SCONT</h1>
+        <p> Soluções Contábeis</p>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="active" onclick="showSection('dashboard')">Dashboard</button>
+      <button onclick="showSection('documentos')">Licenças </button>
+      <button onclick="showSection('processos')">Processos</button>
+      <button onclick="showSection('clientes')">Clientes</button>
+      <button onclick="showSection('relatorios')">Relatórios Gerenciais</button>
+      <button onclick="showSection('config')">Configurações</button>
+    </nav>
+    <div class="sidebar-card">
+      <h3>Integração com Supabase</h3>
+      <p>O front-end está preparado para leitura, gravação, atualização e exclusão em base real, mantendo rastreabilidade e padrão corporativo.</p>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="title-block">
+        <h2>Controlador de Licenças</h2>
+        
+      </div>
+      <div class="top-actions">
+        <button class="btn btn-secondary" id="syncBtn">Sincronizar</button>
+        <button class="btn btn-primary" id="newRecordBtn">Novo registro</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="section-view">
+      <section class="grid-kpis">
+        <div class="card kpi">
+          <small>Licenças ativas</small>
+          <strong id="kpiAtivos">0</strong>
+          <div class="trend">Base operacional saudável</div>
+        </div>
+        <div class="card kpi">
+          <small>Próximos do vencimento</small>
+          <strong id="kpiVencendo">0</strong>
+          <div class="trend">Ação recomendada</div>
+        </div>
+        <div class="card kpi">
+          <small>Documentos vencidos</small>
+          <strong id="kpiVencidos">0</strong>
+          <div class="trend">Atenção crítica</div>
+        </div>
+        <div class="card kpi">
+          <small>Clientes cadastrados</small>
+          <strong id="kpiClientes">0</strong>
+          <div class="trend">Gestão centralizada</div>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <section class="card panel">
+          <div class="panel-header">
+            <div>
+              <h3>Documentos Críticos</h3>
+              <p>Licenças que requerem ação imediata.</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Empresa / Estabelecimento</th>
+                  <th>Tipo</th>
+                  <th>Número</th>
+                  <th>Validade</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="dashboardTable">
+                <tr><td colspan="6" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="side-stack">
+          <section class="card panel">
+            <div class="panel-header">
+              <div>
+                <h3>Alertas visuais</h3>
+                <p>Documentos vencidos e próximos do vencimento com destaque imediato.</p>
+              </div>
+            </div>
+            <div class="mini-list" id="alertsList">
+              <div style="text-align:center;color:var(--muted);padding:20px;">Carregando alertas...</div>
+            </div>
+          </section>
+        </aside>
+      </section>
+    </div>
+
+    <!-- DOCUMENTOS (Licenças UNIFICADOS) -->
+    <div id="documentos" class="section-view hidden">
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Gerenciamento de Documentos</h3>
+            <p>Licenças - Controle centralizado de certificações.</p>
+          </div>
+          <div class="top-actions">
+            <button class="btn btn-secondary" id="refreshDocumentos">Atualizar dados</button>
+            <button class="btn btn-primary" id="newDocumento">Novo documento</button>
+          </div>
+        </div>
+
+        <!-- ABAS DE TIPO -->
+        <div class="section-tabs" style="margin-bottom: 16px;">
+          <button class="tab active" onclick="filterDocumentosPorTipo('todos')">Todos</button>
+          <button class="tab" onclick="filterDocumentosPorTipo('licenca')">Licenças</button>
+          <button class="tab" onclick="filterDocumentosPorTipo('alvara')">Alvarás</button>
+        </div>
+
+        <!-- FILTROS E BUSCA -->
+        <div class="toolbar">
+          <input id="searchDocumentos" type="text" placeholder="Buscar por empresa, número, responsável...">
+          <button class="btn btn-soft" onclick="filterStatus('documento','active')">Ativas</button>
+          <button class="btn btn-soft" onclick="filterStatus('documento','pending')">Pendentes</button>
+          <button class="btn btn-soft" onclick="filterStatus('documento','expired')">Vencidas</button>
+        </div>
+
+        <!-- TABELA -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Estabelecimento</th>
+                <th>Tipo</th>
+                <th>Número</th>
+                <th>Emissão</th>
+                <th>Validade</th>
+                <th>Órgão</th>
+                <th>Status</th>
+                <th>Responsável</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="documentosTable">
+              <tr><td colspan="9" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- PROCESSOS -->
+    <div id="processos" class="section-view hidden">
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Gerenciamento de Processos</h3>
+            <p>Acompanhamento do andamento de renovações de Licenças.</p>
+          </div>
+          <div class="top-actions">
+            <button class="btn btn-secondary" id="refreshProcessos">Atualizar dados</button>
+            <button class="btn btn-primary" id="newProcesso">Novo processo</button>
+          </div>
+        </div>
+
+        <!-- FILTROS -->
+        <div class="toolbar">
+          <input id="searchProcessos" type="text" placeholder="Buscar por número, documento, responsável...">
+          <button class="btn btn-soft" onclick="filterProcessosPorStatus('aberto')">Abertos</button>
+          <button class="btn btn-soft" onclick="filterProcessosPorStatus('em_analise')">Em Análise</button>
+          <button class="btn btn-soft" onclick="filterProcessosPorStatus('aprovado')">Aprovados</button>
+          <button class="btn btn-soft" onclick="filterProcessosPorStatus('concluido')">Concluídos</button>
+        </div>
+
+        <!-- TABELA -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Número Processo</th>
+                <th>Documento</th>
+                <th>Tipo</th>
+                <th>Status</th>
+                <th>Data Abertura</th>
+                <th>Previsão Conclusão</th>
+                <th>Responsável</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="processosTable">
+              <tr><td colspan="8" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- DETALHES DO PROCESSO (MODAL) -->
+      <section class="card panel" style="margin-top: 20px;">
+        <div class="panel-header">
+          <div>
+            <h3>Histórico de Andamento</h3>
+            <p>Rastreamento completo das mudanças de status.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Status Anterior</th>
+                <th>Status Novo</th>
+                <th>Responsável</th>
+                <th>Observação</th>
+              </tr>
+            </thead>
+            <tbody id="andamentoTable">
+              <tr><td colspan="5" style="text-align:center;color:var(--muted);">Carregando histórico...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- CLIENTES -->
+    <div id="clientes" class="section-view hidden">
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Cadastro de clientes e estabelecimentos</h3>
+            <p>Lista consolidada com informações de contato, unidades vinculadas e situação documental.</p>
+          </div>
+          <div class="top-actions">
+            <button class="btn btn-secondary" id="refreshClientes">Atualizar dados</button>
+            <button class="btn btn-primary" id="newCliente">Novo cliente</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Estabelecimentos</th>
+                <th>Contato</th>
+                <th>Email</th>
+                <th>Status geral</th>
+                <th>Última atualização</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="clientesTable">
+              <tr><td colspan="7" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- RELATÓRIOS GERENCIAIS -->
+    <div id="relatorios" class="section-view hidden">
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Relatórios Gerenciais</h3>
+            <p>Análise consolidada de documentos, processos e conformidade regulatória.</p>
+          </div>
+          <div class="top-actions">
+            <button class="btn btn-secondary" id="refreshReports">Atualizar relatórios</button>
+            <button class="btn btn-soft" id="exportPdf">📥 Exportar PDF</button>
+            <button class="btn btn-soft" id="exportCsv">📥 Exportar CSV</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RELATÓRIO DE SAÚDE DOCUMENTAL -->
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Saúde Documental</h3>
+            <p>Distribuição de documentos por status de validade.</p>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Quantidade</th>
+                  <th>Percentual</th>
+                </tr>
+              </thead>
+              <tbody id="tableSaude">
+                <tr><td colspan="3" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="min-height:300px;">
+            <canvas id="chartSaude"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- RELATÓRIO DE VENCIMENTOS PRÓXIMOS -->
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Relatório de Vencimentos Próximos</h3>
+            <p>Documentos que vencem nos próximos X dias (configurável).</p>
+          </div>
+        </div>
+        
+        <div class="vencimento-filter">
+          <label>
+            Próximos
+            <input type="number" id="diasVencimento" value="30" min="1" max="365">
+            dias
+          </label>
+          <button onclick="loadReportVencimentosConfiguravel()">Aplicar filtro</button>
+        </div>
+        
+        <div class="table-wrap">
+          <table class="vencimento-table">
+            <thead>
+              <tr>
+                <th>Estabelecimento</th>
+                <th>Tipo de Documento</th>
+                <th>Número</th>
+                <th>Data de Vencimento</th>
+                <th>Dias Restantes</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tableVencimentosConfiguravel">
+              <tr><td colspan="7" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- RELATÓRIO DE DISTRIBUIÇÃO POR TIPO -->
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Distribuição por Tipo de Documento</h3>
+            <p>Análise de portfolio de certificações.</p>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Total</th>
+                  <th>Ativas</th>
+                  <th>Vencidas</th>
+                </tr>
+              </thead>
+              <tbody id="tableTipo">
+                <tr><td colspan="4" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="min-height:300px;">
+            <canvas id="chartTipo"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- RELATÓRIO DE CLIENTES COM DOCUMENTOS VENCIDOS -->
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Clientes com Documentos Vencidos</h3>
+            <p>Identificação de clientes que requerem ação imediata.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Documentos Vencidos</th>
+                <th>Prioridade</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tableClientesVencidos">
+              <tr><td colspan="4" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- RELATÓRIO TEMPORAL -->
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Análise Temporal</h3>
+            <p>Tendências de renovações nos últimos 90 dias.</p>
+          </div>
+        </div>
+        <div style="min-height:300px;">
+          <canvas id="chartTemporal"></canvas>
+        </div>
+      </section>
+
+      <!-- RELATÓRIO DE CONFORMIDADE -->
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Conformidade por Órgão Emissor</h3>
+            <p>Taxa de conformidade de documentos por órgão regulador.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Órgão Emissor</th>
+                <th>Total</th>
+                <th>Conformes</th>
+                <th>Taxa Conformidade</th>
+              </tr>
+            </thead>
+            <tbody id="tableConformidade">
+              <tr><td colspan="4" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- RELATÓRIO DE PROCESSOS -->
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Relatório de Processos</h3>
+            <p>Distribuição de processos por status.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+           <thead>
+  <tr>
+    <th>Número Processo</th>
+    <th>Estabelecimento</th>
+    <th>Tipo</th>
+    <th>Status</th>
+    <th>Data Abertura</th>
+    <th>Previsão Conclusão</th>
+    <th>Responsável</th>
+    <th>Ações</th>
+  </tr>
+</thead>
+            <tbody id="tableProcessos">
+              <tr><td colspan="3" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- CONFIGURAÇÕES -->
+    <div id="config" class="section-view hidden">
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Configurações do Sistema</h3>
+            <p>Personalize alertas, notificações e preferências de operação.</p>
+          </div>
+        </div>
+
+        <div style="margin-bottom:28px;">
+          <h4 style="margin:0 0 16px;font-size:1rem;">Alertas de Vencimento</h4>
+          <div class="toggle-box">
+            <label>
+              <input type="checkbox" id="alertEnabled">
+              Ativar alertas de vencimento
+            </label>
+            <small>Receba notificações quando documentos estiverem próximos do vencimento.</small>
+          </div>
+        </div>
+
+        <div style="margin-bottom:28px;">
+          <h4 style="margin:0 0 16px;font-size:1rem;">Dias para Alerta de Vencimento Próximo</h4>
+          <div class="config-box">
+            <div class="toggle-box">
+              <label>
+                Dias:
+                <input type="number" id="alertDays" value="30" min="1" max="365" style="width:60px;">
+              </label>
+              <small>Defina quantos dias antes do vencimento deseja ser alertado.</small>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:28px;">
+          <h4 style="margin:0 0 16px;font-size:1rem;">Email para Notificações</h4>
+          <div class="field">
+            <input type="email" id="alertEmail" placeholder="seu.email@empresa.com">
+            <small style="color:var(--muted);font-size:.85rem;">Deixe em branco para desabilitar notificações por email.</small>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="saveConfigBtn">Salvar configurações</button>
+        <div class="note">
+          ℹ️ As configurações são salvas localmente no seu navegador. Os alertas visuais no dashboard respeitarão o número de dias configurado.
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div id="recordModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="modalTitle">Novo Registro</h2>
+      <button class="modal-close" id="closeModalBtn">&times;</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+
+    // ============================================
+    // CONFIGURAÇÃO SUPABASE - DOIS CLIENTES
+    // ============================================
+
+    // Projeto A - Licenças
+    const SUPABASE_URL = 'https://graxaoomeffhsazuzkvg.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyYXhhb29tZWZmaHNhenV6a3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MTUxMDUsImV4cCI6MjA5MDI5MTEwNX0.ZpbVoNVS4momTyf7NME4mcYuI4oCQUvNFSDbORCHktI';
+
+    // Projeto B - Empresas
+    const SUPABASE_URL_2 = 'https://udnikmolgryzczalcbbz.supabase.co';
+    const SUPABASE_KEY_2 = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVkbmlrbW9sZ3J5emN6YWxjYmJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNDQzNTUsImV4cCI6MjA5MDcyMDM1NX0.9vCwDkmxhrLAc-UxKpUxiVHF0BBh8OIdGZPKpTWu-lI';
+
+    // Clientes Supabase
+    let supabaseClient = null;
+    let supabaseClientB = null;
+    let currentFilter = { type: 'all', status: 'all' };
+    let charts = {};
+    let realtimeSubscriptions = [];
+    let documentosFiltroTipo = 'todos';
+
+    // ============================================
+    // INICIALIZAR SUPABASE
+    // ============================================
+
+    async function initSupabase() {
+      console.log('🔌 Conectando ao Supabase...');
+      const { createClient } = window.supabase;
+      if (!createClient) {
+        console.error('❌ Biblioteca Supabase não carregada');
+        showAlert('Erro: Biblioteca Supabase não disponível', 'error');
+        return;
+      }
+
+      try {
+        // Cliente A - Licenças
+        supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+        const { data: testA, error: errorA } = await supabaseClient
+          .from('licencas')
+          .select('count', { count: 'exact' });
+
+        if (errorA) throw new Error(`Projeto A: ${errorA.message}`);
+        console.log('✓ Projeto A (Licenças) conectado');
+
+        // Cliente B - Empresas
+        supabaseClientB = createClient(SUPABASE_URL_2, SUPABASE_KEY_2);
+        const { data: testB, error: errorB } = await supabaseClientB
+          .from('empresas')
+          .select('count', { count: 'exact' });
+
+        if (errorB) throw new Error(`Projeto B: ${errorB.message}`);
+        console.log('✓ Projeto B (Empresas) conectado');
+
+        // Carregar dados iniciais
+        await loadDashboard();
+        console.log('✓ Dashboard carregado');
+
+        // Configurar listeners realtime
+        setupRealtimeListeners();
+        console.log('✓ Listeners realtime configurados');
+
+        showAlert('✓ Conectado aos dois Supabase com sucesso!', 'success');
+
+      } catch (error) {
+        console.error('❌ Erro ao conectar Supabase:', error.message);
+        console.error('Detalhes:', error);
+        showAlert(`❌ Erro ao conectar: ${error.message}`, 'error');
+      }
+    }
+
+    // ============================================
+    // DASHBOARD
+    // ============================================
+async function loadDashboard() {
+  try {
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: clientes } = await supabaseClient.from('clientes').select('*');
+    
+    const today = new Date();
+    const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    const allDocs = [...(licencas || []), ...(alvaras || [])];
+    const ativos = allDocs.filter(d => new Date(d.data_validade) > today).length;
+    const vencidos = allDocs.filter(d => new Date(d.data_validade) < today).length;
+    const vencendo = allDocs.filter(d => {
+      const vencimento = new Date(d.data_validade);
+      return vencimento > today && vencimento <= in30Days;
+    }).length;
+    
+    document.getElementById('kpiAtivos').textContent = ativos;
+    document.getElementById('kpiVencendo').textContent = vencendo;
+    document.getElementById('kpiVencidos').textContent = vencidos;
+    document.getElementById('kpiClientes').textContent = clientes?.length || 0;
+    
+    await loadDashboardTable();
+    await loadAlerts();
+  } catch (error) {
+    console.error('Erro ao carregar dashboard:', error);
+  }
+}
+
+async function loadDashboardTable() {
+  try {
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    
+    const allDocs = [...(licencas || []), ...(alvaras || [])];
+    const today = new Date();
+    const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    let filtered = allDocs.filter(d => {
+      const vencimento = new Date(d.data_validade);
+      return vencimento <= in30Days;
+    });
+    
+    const tbody = document.getElementById('dashboardTable');
+    tbody.innerHTML = '';
+    
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);">Nenhum documento crítico</td></tr>';
+      return;
+    }
+    
+    filtered.forEach(doc => {
+      const vencimento = new Date(doc.data_validade);
+      const status = vencimento < today ? 'expired' : 'pending';
+      const statusText = vencimento < today ? 'Vencido' : 'Próximo do vencimento';
+      
+      const row = document.createElement('tr');
+      row.className = status === 'expired' ? 'row-expired' : 'row-warning';
+      row.innerHTML = `
+        <td>${doc.estabelecimento}</td>
+        <td>${doc.tipo}</td>
+        <td>${doc.numero}</td>
+        <td>${formatDate(doc.data_validade)}</td>
+        <td><span class="status ${status}"><span class="dot"></span>${statusText}</span></td>
+        <td>
+          <div class="btn-group">
+            <button class="btn-icon info" data-action="view" data-id="${doc.id}" data-table="${doc.tipo_tabela || (doc.tipo.includes('Licença') ? 'licencas' : 'alvaras')}">
+              <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Ver
+            </button>
+            <button class="btn-icon primary" data-action="edit" data-id="${doc.id}" data-table="${doc.tipo_tabela || (doc.tipo.includes('Licença') ? 'licencas' : 'alvaras')}">
+              <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Editar
+            </button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(row);
+    });
+    
+    attachActionListeners();
+  } catch (error) {
+    console.error('Erro ao carregar tabela dashboard:', error);
+  }
+}
+
+  async function loadAlerts() {
+  try {
+    console.log('🔔 Carregando alertas visuais...');
+    
+    // Obter configuração de dias
+    const diasAlertas = window.appConfig?.alertDays || 30;
+    console.log(`📅 Usando ${diasAlertas} dias como limite de alerta`);
+    
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    
+    const allDocs = [...(licencas || []), ...(alvaras || [])];
+    const today = new Date();
+    const dataLimiteAlerta = new Date(today.getTime() + diasAlertas * 24 * 60 * 60 * 1000);
+    
+    // Filtrar documentos vencidos OU próximos do vencimento (até X dias)
+    const alerts = allDocs
+      .filter(d => {
+        const vencimento = new Date(d.data_validade);
+        return vencimento <= dataLimiteAlerta;
+      })
+      .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade))
+      .slice(0, 10);
+    
+    const alertsList = document.getElementById('alertsList');
+    alertsList.innerHTML = '';
+    
+    if (alerts.length === 0) {
+      alertsList.innerHTML = `
+        <div class="alert-card info">
+          <div class="alert-icon">✓</div>
+          <div class="alert-content">
+            <h4>Nenhum alerta ativo</h4>
+            <p>Todos os documentos estão em dia. Próximo alerta em ${diasAlertas} dias.</p>
+          </div>
+        </div>
+      `;
+      console.log('✓ Nenhum alerta ativo');
+      return;
+    }
+    
+    console.log(`📊 ${alerts.length} alerta(s) encontrado(s)`);
+    
+    alerts.forEach((alert) => {
+      const vencimento = new Date(alert.data_validade);
+      const diasRestantes = Math.ceil((vencimento - today) / (1000 * 60 * 60 * 24));
+      
+      let tipoAlerta = 'info';
+      let icone = '⏰';
+      let titulo = '';
+      let descricao = '';
+      
+      if (diasRestantes < 0) {
+        tipoAlerta = 'danger';
+        icone = '🔴';
+        const diasVencido = Math.abs(diasRestantes);
+        titulo = `${alert.tipo} - VENCIDO há ${diasVencido} dia(s)`;
+        descricao = `Vencimento: ${formatDate(alert.data_validade)} • AÇÃO IMEDIATA NECESSÁRIA`;
+      } else if (diasRestantes === 0) {
+        tipoAlerta = 'danger';
+        icone = '🔴';
+        titulo = `${alert.tipo} - VENCE HOJE`;
+        descricao = `Vencimento: ${formatDate(alert.data_validade)} • AÇÃO URGENTE`;
+      } else if (diasRestantes <= 7) {
+        tipoAlerta = 'danger';
+        icone = '🔴';
+        titulo = `${alert.tipo} - Vence em ${diasRestantes} dia(s)`;
+        descricao = `Vencimento: ${formatDate(alert.data_validade)} • CRÍTICO`;
+      } else if (diasRestantes <= 14) {
+        tipoAlerta = 'warning';
+        icone = '🟡';
+        titulo = `${alert.tipo} - Vence em ${diasRestantes} dias`;
+        descricao = `Vencimento: ${formatDate(alert.data_validade)} • Atenção recomendada`;
+      } else {
+        tipoAlerta = 'info';
+        icone = '⏰';
+        titulo = `${alert.tipo} - Vence em ${diasRestantes} dias`;
+        descricao = `Vencimento: ${formatDate(alert.data_validade)} • Monitoramento`;
+      }
+      
+      const div = document.createElement('div');
+      div.className = `alert-card ${tipoAlerta}`;
+      div.innerHTML = `
+        <div class="alert-icon">${icone}</div>
+        <div class="alert-content">
+          <h4>${titulo}</h4>
+          <p><strong>${alert.estabelecimento}</strong> • ${descricao}</p>
+        </div>
+      `;
+      alertsList.appendChild(div);
+    });
+    
+    console.log(`✓ ${alerts.length} alerta(s) exibido(s)`);
+    
+  } catch (error) {
+    console.error('❌ Erro ao carregar alertas:', error);
+  }
+}
+    // ============================================
+    // DOCUMENTOS
+    // ============================================
+
+    async function fetchDocumentos() {
+      try {
+        const { data: licencas } = await supabaseClient.from('licencas').select('*').order('data_validade', { ascending: true });
+        const { data: alvaras } = await supabaseClient.from('alvaras').select('*').order('data_validade', { ascending: true });
+        const allDocs = [
+          ...(licencas || []).map(d => ({ ...d, tipo_tabela: 'licencas' })),
+          ...(alvaras || []).map(d => ({ ...d, tipo_tabela: 'alvaras' }))
+        ];
+
+        const tbody = document.getElementById('documentosTable');
+        tbody.innerHTML = '';
+
+        if (allDocs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);">Nenhum documento cadastrado</td></tr>';
+          return;
+        }
+
+        allDocs.forEach(doc => {
+          const today = new Date();
+          const vencimento = new Date(doc.data_validade);
+          let status = 'active';
+          let statusText = 'Ativa';
+
+          if (vencimento < today) {
+            status = 'expired';
+            statusText = 'Vencida';
+          } else if (vencimento < new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)) {
+            status = 'pending';
+            statusText = 'Próximo vencimento';
+          }
+
+          const row = document.createElement('tr');
+          row.setAttribute('data-status', status);
+          row.innerHTML = `
+            <td>${doc.estabelecimento}</td>
+            <td>${doc.tipo}</td>
+            <td>${doc.numero}</td>
+            <td>${formatDate(doc.data_emissao)}</td>
+            <td>${formatDate(doc.data_validade)}</td>
+            <td>${doc.orgao_emissor}</td>
+            <td><span class="status ${status}"><span class="dot"></span>${statusText}</span></td>
+            <td>${doc.responsavel}</td>
+            <td class="actions">
+              <div class="btn-group">
+                <button class="btn-icon info" data-action="view" data-id="${doc.id}" data-table="${doc.tipo_tabela}">
+                  <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+                <button class="btn-icon primary" data-action="edit" data-id="${doc.id}" data-table="${doc.tipo_tabela}">
+                  <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="btn-icon danger" data-action="delete" data-id="${doc.id}" data-table="${doc.tipo_tabela}">
+                  <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        attachActionListeners();
+      } catch (error) {
+        console.error('Erro ao carregar documentos:', error);
+        showAlert('Erro ao carregar documentos', 'error');
+      }
+    }
+
+    // ============================================
+    // PROCESSOS
+    // ============================================
+
+    async function fetchProcessos() {
+      try {
+        const { data, error } = await supabaseClient.from('processos').select('*').order('data_abertura', { ascending: false });
+        if (error) throw error;
+
+        const tbody = document.getElementById('processosTable');
+        tbody.innerHTML = '';
+
+        if (!data || data.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);">Nenhum processo cadastrado</td></tr>';
+          return;
+        }
+
+        data.forEach(processo => {
+          const statusBadge = {
+            'aberto': 'info',
+            'em_analise': 'warning',
+            'aprovado': 'success',
+            'rejeitado': 'danger',
+            'concluido': 'success'
+          }[processo.status] || 'info';
+
+          const statusTexto = {
+            'aberto': 'Aberto',
+            'em_analise': 'Em Análise',
+            'aprovado': 'Aprovado',
+            'rejeitado': 'Rejeitado',
+            'concluido': 'Concluído'
+          }[processo.status];
+
+          const row = document.createElement('tr');
+          row.setAttribute('data-status', processo.status);
+          row.innerHTML = `
+            <td>${processo.numero_processo}</td>
+            <td>${processo.tipo_documento}</td>
+            <td>${processo.tipo_documento}</td>
+            <td><span class="status ${statusBadge}"><span class="dot"></span>${statusTexto}</span></td>
+            <td>${formatDate(processo.data_abertura)}</td>
+            <td>${formatDate(processo.data_prevista_conclusao)}</td>
+            <td>${processo.responsavel}</td>
+            <td class="actions">
+              <div class="btn-group">
+                <button class="btn-icon info" data-action="view-processo" data-id="${processo.id}">
+                  <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+                <button class="btn-icon primary" data-action="edit-processo" data-id="${processo.id}">
+                  <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="btn-icon danger" data-action="delete-processo" data-id="${processo.id}">
+                  <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        attachActionListeners();
+      } catch (error) {
+        console.error('Erro ao carregar processos:', error);
+        showAlert('Erro ao carregar processos', 'error');
+      }
+    }
+
+    // ============================================
+    // CLIENTES (EMPRESAS DO PROJETO B)
+    // ============================================
+
+    async function fetchClientes() {
+      try {
+        console.log('📥 Buscando empresas do Projeto B...');
+
+        const { data: empresas, error } = await supabaseClientB
+          .from('empresas')
+          .select('*')
+          .order('id', { ascending: true });
+
+        if (error) {
+          console.error('❌ Erro ao buscar empresas:', error);
+          throw error;
+        }
+
+        console.log('✓ Empresas recuperadas:', empresas);
+
+        const tbody = document.getElementById('clientesTable');
+        tbody.innerHTML = '';
+
+        if (!empresas || !empresas.length) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--muted);">Nenhuma empresa cadastrada</td></tr>';
+          return;
+        }
+
+        // Renderizar com campos dinâmicos
+        empresas.forEach(empresa => {
+          const row = document.createElement('tr');
+
+          // Detectar quais campos existem
+          const nome = empresa.nome || empresa.razao_social || empresa.empresa || empresa.company || 'N/A';
+          const cnpj = empresa.cnpj || empresa.cpf || empresa.document || '-';
+          const contato = empresa.contato || empresa.contact || empresa.responsavel || '-';
+          const email = empresa.email || empresa.mail || '-';
+          const telefone = empresa.telefone || empresa.phone || empresa.celular || '-';
+
+          row.innerHTML = `
+            <td>${nome}</td>
+            <td>${cnpj}</td>
+            <td>${contato}</td>
+            <td>${email}</td>
+            <td>${telefone}</td>
+            <td><span class="status active"><span class="dot"></span>Ativo</span></td>
+            <td class="actions">
+              <div class="btn-group">
+                <button class="btn-icon info" data-action="view" data-id="${empresa.id}" data-table="empresas">
+                  <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+                <button class="btn-icon primary" data-action="edit" data-id="${empresa.id}" data-table="empresas">
+                  <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="btn-icon danger" data-action="delete" data-id="${empresa.id}" data-table="empresas">
+                  <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        attachActionListeners();
+        console.log('✓ Tabela de empresas renderizada com sucesso');
+
+      } catch (error) {
+        console.error('❌ Erro ao buscar empresas:', error);
+        showAlert(`Erro ao carregar empresas: ${error.message}`, 'error');
+
+        const tbody = document.getElementById('clientesTable');
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="text-align: center; color: var(--danger); padding: 20px;">
+              <strong>❌ Erro ao carregar dados</strong><br>
+              <small>${error.message}</small>
+            </td>
+          </tr>
+        `;
+      }
+    }
+
+    // ============================================
+    // RELATÓRIOS
+    // ============================================
+
+ async function loadReports() {
+  try {
+    await Promise.all([
+      loadReportSaude(),
+      loadReportVencimentos(),
+      loadReportTipo(),
+      loadReportClientesVencidos(),
+      loadReportTemporal(),
+      loadReportConformidade(),
+      loadReportVencimentosConfiguravel(),
+      loadReportProcessos()
+    ]);
+  } catch (error) {
+    console.error('Erro ao carregar relatórios:', error);
+    showAlert('Erro ao carregar relatórios', 'error');
+  }
+}
+
+async function loadReportSaude() {
+  try {
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    
+    const allDocs = [...(licencas || []), ...(alvaras || [])];
+    const today = new Date();
+    
+    const ativas = allDocs.filter(d => new Date(d.data_validade) > today).length;
+    const vencidas = allDocs.filter(d => new Date(d.data_validade) < today).length;
+    const proximas = allDocs.filter(d => {
+      const vencimento = new Date(d.data_validade);
+      return vencimento > today && vencimento <= new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    }).length;
+    
+    const total = allDocs.length;
+    
+    const tbody = document.getElementById('tableSaude');
+    tbody.innerHTML = `
+      <tr>
+        <td>Ativas</td>
+        <td>${ativas}</td>
+        <td>${total > 0 ? ((ativas / total) * 100).toFixed(1) : 0}%</td>
+      </tr>
+      <tr>
+        <td>Próximas do vencimento</td>
+        <td>${proximas}</td>
+        <td>${total > 0 ? ((proximas / total) * 100).toFixed(1) : 0}%</td>
+      </tr>
+      <tr>
+        <td>Vencidas</td>
+        <td>${vencidas}</td>
+        <td>${total > 0 ? ((vencidas / total) * 100).toFixed(1) : 0}%</td>
+      </tr>
+    `;
+    
+    const ctx = document.getElementById('chartSaude');
+    if (!ctx) return;
+    
+    if (charts.saude) charts.saude.destroy();
+    
+    charts.saude = new Chart(ctx.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Ativas', 'Próximas do vencimento', 'Vencidas'],
+        datasets: [{
+          data: [ativas, proximas, vencidas],
+          backgroundColor: ['#1f8a5b', '#c97a00', '#b42318'],
+          borderColor: '#fff',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao carregar relatório de saúde:', error);
+  }
+}
+
+async function loadReportVencimentos() {
+  try {
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    
+    const allDocs = [...(licencas || []), ...(alvaras || [])];
+    const today = new Date();
+    const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    const vencimentos = allDocs
+      .filter(d => {
+        const vencimento = new Date(d.data_validade);
+        return vencimento > today && vencimento <= in30Days;
+      })
+      .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
+    
+    const tbody = document.getElementById('tableVencimentos');
+    tbody.innerHTML = '';
+    
+    if (vencimentos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Nenhum vencimento próximo</td></tr>';
+      return;
+    }
+    
+    vencimentos.forEach(doc => {
+      const vencimento = new Date(doc.data_validade);
+      const diasRestantes = Math.ceil((vencimento - today) / (1000 * 60 * 60 * 24));
+      
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${doc.tipo}</td>
+        <td>${doc.estabelecimento}</td>
+        <td>${formatDate(doc.data_validade)}</td>
+        <td><strong>${diasRestantes}</strong> dias</td>
+      `;
+      tbody.appendChild(row);
+    });
+  } catch (error) {
+    console.error('Erro ao carregar relatório de vencimentos:', error);
+  }
+}
+
+async function loadReportTipo() {
+  try {
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    
+    const today = new Date();
+    const tipos = {};
+    
+    [...(licencas || [])].forEach(doc => {
+      if (!tipos[doc.tipo]) {
+        tipos[doc.tipo] = { total: 0, ativas: 0, vencidas: 0 };
+      }
+      tipos[doc.tipo].total++;
+      if (new Date(doc.data_validade) > today) {
+        tipos[doc.tipo].ativas++;
+      } else {
+        tipos[doc.tipo].vencidas++;
+      }
+    });
+    
+    [...(alvaras || [])].forEach(doc => {
+      if (!tipos[doc.tipo]) {
+        tipos[doc.tipo] = { total: 0, ativas: 0, vencidas: 0 };
+      }
+      tipos[doc.tipo].total++;
+      if (new Date(doc.data_validade) > today) {
+        tipos[doc.tipo].ativas++;
+      } else {
+        tipos[doc.tipo].vencidas++;
+      }
+    });
+    
+    const tbody = document.getElementById('tableTipo');
+    tbody.innerHTML = '';
+    
+    Object.entries(tipos).forEach(([tipo, dados]) => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${tipo}</td>
+        <td>${dados.total}</td>
+        <td>${dados.ativas}</td>
+        <td>${dados.vencidas}</td>
+      `;
+      tbody.appendChild(row);
+    });
+    
+    const ctx = document.getElementById('chartTipo');
+    if (!ctx) return;
+    
+    if (charts.tipo) charts.tipo.destroy();
+    
+    const labels = Object.keys(tipos);
+    const data = Object.values(tipos).map(t => t.total);
+    
+    charts.tipo = new Chart(ctx.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Quantidade de documentos',
+          data: data,
+          backgroundColor: '#6f1d2f',
+          borderColor: '#6f1d2f',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          x: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao carregar relatório de tipos:', error);
+  }
+}
+
+async function loadReportClientesVencidos() {
+  try {
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    
+    const today = new Date();
+    const allDocs = [...(licencas || []), ...(alvaras || [])];
+    
+    const clientesVencidos = {};
+    
+    allDocs.forEach(doc => {
+      if (new Date(doc.data_validade) < today) {
+        if (!clientesVencidos[doc.estabelecimento]) {
+          clientesVencidos[doc.estabelecimento] = [];
+        }
+        clientesVencidos[doc.estabelecimento].push(doc);
+      }
+    });
+    
+    const tbody = document.getElementById('tableClientesVencidos');
+    tbody.innerHTML = '';
+    
+    if (Object.keys(clientesVencidos).length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Nenhum cliente com documentos vencidos</td></tr>';
+      return;
+    }
+    
+    Object.entries(clientesVencidos).forEach(([cliente, docs]) => {
+      const row = document.createElement('tr');
+      const prioridade = docs.length > 2 ? 'Crítica' : 'Alta';
+      row.innerHTML = `
+        <td>${cliente}</td>
+        <td>${docs.length} documento(s)</td>
+        <td><span class="badge danger">${prioridade}</span></td>
+        <td><button class="btn btn-soft" onclick="alert('Abrir detalhes de ${cliente}')">Detalhes</button></td>
+      `;
+      tbody.appendChild(row);
+    });
+  } catch (error) {
+    console.error('Erro ao carregar relatório de clientes vencidos:', error);
+  }
+}
+
+async function loadReportTemporal() {
+  try {
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    
+    const allDocs = [...(licencas || []), ...(alvaras || [])];
+    const today = new Date();
+    const last90Days = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000);
+    
+    const semanas = {};
+    
+    allDocs.forEach(doc => {
+      const emissao = new Date(doc.data_emissao);
+      if (emissao >= last90Days && emissao <= today) {
+        const semana = Math.floor((today - emissao) / (7 * 24 * 60 * 60 * 1000));
+        const label = `Semana ${semana}`;
+        semanas[label] = (semanas[label] || 0) + 1;
+      }
+    });
+    
+    const ctx = document.getElementById('chartTemporal');
+    if (!ctx) return;
+    
+    if (charts.temporal) charts.temporal.destroy();
+    
+    const labels = Object.keys(semanas).reverse();
+    const data = Object.values(semanas).reverse();
+    
+    charts.temporal = new Chart(ctx.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Renovações por semana',
+          data: data,
+          borderColor: '#6f1d2f',
+          backgroundColor: 'rgba(111,29,47,.1)',
+          tension: 0.4,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Erro ao carregar relatório temporal:', error);
+  }
+}
+
+async function loadReportConformidade() {
+  try {
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    
+    const today = new Date();
+    const allDocs = [...(licencas || []), ...(alvaras || [])];
+    
+    const orgaos = {};
+    
+    allDocs.forEach(doc => {
+      const orgao = doc.orgao_emissor || 'Não especificado';
+      if (!orgaos[orgao]) {
+        orgaos[orgao] = { total: 0, conformes: 0 };
+      }
+      orgaos[orgao].total++;
+      if (new Date(doc.data_validade) > today) {
+        orgaos[orgao].conformes++;
+      }
+    });
+    
+    const tbody = document.getElementById('tableConformidade');
+    tbody.innerHTML = '';
+    
+    Object.entries(orgaos).forEach(([orgao, dados]) => {
+      const taxa = dados.total > 0 ? ((dados.conformes / dados.total) * 100).toFixed(1) : 0;
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${orgao}</td>
+        <td>${dados.total}</td>
+        <td>${dados.conformes}</td>
+        <td><strong>${taxa}%</strong></td>
+      `;
+      tbody.appendChild(row);
+    });
+  } catch (error) {
+    console.error('Erro ao carregar relatório de conformidade:', error);
+  }
+}
+
+async function loadReportVencimentosConfiguravel() {
+  try {
+    const diasConfiguravelRelatorio = parseInt(document.getElementById('diasVencimento').value) || 30;
+    
+    const { data: licencas } = await supabaseClient.from('licencas').select('*');
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    
+    const allDocs = [...(licencas || []), ...(alvaras || [])];
+    const today = new Date();
+    const dataLimiteRelatorio = new Date(today.getTime() + diasConfiguravelRelatorio * 24 * 60 * 60 * 1000);
+    
+    const vencimentos = allDocs
+      .filter(d => {
+        const vencimento = new Date(d.data_validade);
+        return vencimento > today && vencimento <= dataLimiteRelatorio;
+      })
+      .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
+    
+    const tbody = document.getElementById('tableVencimentosConfiguravel');
+    tbody.innerHTML = '';
+    
+    if (vencimentos.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px;">Nenhum documento vence nos próximos ${diasConfiguravelRelatorio} dias</td></tr>`;
+      return;
+    }
+    
+    vencimentos.forEach(doc => {
+      const vencimento = new Date(doc.data_validade);
+      const diasRestantes = Math.ceil((vencimento - today) / (1000 * 60 * 60 * 24));
+      
+      let classDias = 'ok';
+      if (diasRestantes <= 7) classDias = 'critico';
+      else if (diasRestantes <= 14) classDias = 'atencao';
+      
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><strong>${doc.estabelecimento}</strong></td>
+        <td>${doc.tipo}</td>
+        <td>${doc.numero}</td>
+        <td>${formatDate(doc.data_validade)}</td>
+        <td><span class="vencimento-dias ${classDias}">${diasRestantes} dias</span></td>
+        <td>
+          ${diasRestantes <= 7 ? '<span class="badge danger">Crítico</span>' : 
+            diasRestantes <= 14 ? '<span class="badge warn">Atenção</span>' : 
+            '<span class="badge success">Ok</span>'}
+        </td>
+        <td>
+          <div class="btn-group">
+            <button class="btn-icon info" data-action="view" data-id="${doc.id}" data-table="${doc.tipo_tabela || (doc.tipo.includes('Licença') ? 'licencas' : 'alvaras')}">
+              <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Ver
+            </button>
+            <button class="btn-icon primary" data-action="edit" data-id="${doc.id}" data-table="${doc.tipo_tabela || (doc.tipo.includes('Licença') ? 'licencas' : 'alvaras')}">
+              <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Editar
+            </button>
+            <button class="btn-icon danger" data-action="delete" data-id="${doc.id}" data-table="${doc.tipo_tabela || (doc.tipo.includes('Licença') ? 'licencas' : 'alvaras')}">
+              <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+              Excluir
+            </button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(row);
+    });
+    
+    attachActionListeners();
+    showAlert(`${vencimentos.length} documento(s) vence(m) nos próximos ${diasConfiguravelRelatorio} dias`, 'info');
+  } catch (error) {
+    console.error('Erro ao carregar relatório de vencimentos:', error);
+    showAlert('Erro ao carregar relatório', 'error');
+  }
+}
+
+async function loadReportProcessos() {
+  try {
+    const { data } = await supabaseClient.from('processos').select('*');
+    
+    if (!data || data.length === 0) return;
+    
+    const statusCounts = {
+      aberto: 0,
+      em_analise: 0,
+      aprovado: 0,
+      rejeitado: 0,
+      concluido: 0
+    };
+    
+    data.forEach(p => {
+      if (statusCounts[p.status] !== undefined) {
+        statusCounts[p.status]++;
+      }
+    });
+    
+    const tbody = document.getElementById('tableProcessos');
+    if (!tbody) return;
+    
+    tbody.innerHTML = `
+      <tr>
+        <td>Abertos</td>
+        <td>${statusCounts.aberto}</td>
+        <td>${((statusCounts.aberto / data.length) * 100).toFixed(1)}%</td>
+      </tr>
+      <tr>
+        <td>Em Análise</td>
+        <td>${statusCounts.em_analise}</td>
+        <td>${((statusCounts.em_analise / data.length) * 100).toFixed(1)}%</td>
+      </tr>
+      <tr>
+        <td>Aprovados</td>
+        <td>${statusCounts.aprovado}</td>
+        <td>${((statusCounts.aprovado / data.length) * 100).toFixed(1)}%</td>
+      </tr>
+      <tr>
+        <td>Concluídos</td>
+        <td>${statusCounts.concluido}</td>
+        <td>${((statusCounts.concluido / data.length) * 100).toFixed(1)}%</td>
+      </tr>
+    `;
+  } catch (error) {
+    console.error('Erro ao carregar relatório de processos:', error);
+  }
+}
+
+function refreshReports() {
+  showAlert('Atualizando relatórios...', 'info');
+  loadReports();
+}
+
+function exportReports(format) {
+  if (format === 'pdf') {
+    showAlert('Exportação em PDF será implementada com biblioteca jsPDF', 'info');
+  } else if (format === 'csv') {
+    showAlert('Exportação em CSV será implementada', 'info');
+  }
+}
+
+    // ============================================
+    // CONFIGURAÇÕES
+    // ============================================
+
+    // ============================================
+    // CONFIGURAÇÕES
+    // ============================================
+
+    function saveConfig() {
+      const alertDays = document.getElementById('alertDays').value;
+      const alertEmail = document.getElementById('alertEmail').value;
+      const alertEnabled = document.getElementById('alertEnabled').checked;
+
+      if (!alertDays || alertDays < 1 || alertDays > 365) {
+        showAlert('❌ Dias deve estar entre 1 e 365', 'error');
+        return;
+      }
+
+      localStorage.setItem('alertConfig', JSON.stringify({
+        days: parseInt(alertDays),
+        email: alertEmail,
+        enabled: alertEnabled
+      }));
+
+      window.appConfig = {
+        alertDays: parseInt(alertDays),
+        alertEmail: alertEmail,
+        alertEnabled: alertEnabled
+      };
+
+      console.log(`✓ Configurações salvas: ${alertDays} dias para alerta`);
+      showAlert(`✓ Configurações salvas! Alertas configurados para ${alertDays} dias`, 'success');
+    }
+
+    function loadConfig() {
+      console.log('⚙️ Carregando configurações...');
+      const config = JSON.parse(localStorage.getItem('alertConfig') || '{}');
+      const alertDaysDefault = 30;
+      const alertEmailDefault = '';
+      const alertEnabledDefault = true;
+
+      const alertDays = config.days || alertDaysDefault;
+      const alertEmail = config.email || alertEmailDefault;
+      const alertEnabled = config.enabled !== undefined ? config.enabled : alertEnabledDefault;
+
+      const alertDaysInput = document.getElementById('alertDays');
+      const alertEmailInput = document.getElementById('alertEmail');
+      const alertEnabledInput = document.getElementById('alertEnabled');
+
+      if (alertDaysInput) alertDaysInput.value = alertDays;
+      if (alertEmailInput) alertEmailInput.value = alertEmail;
+      if (alertEnabledInput) alertEnabledInput.checked = alertEnabled;
+
+      console.log(`✓ Configurações carregadas: ${alertDays} dias para alerta`);
+
+      window.appConfig = {
+        alertDays: alertDays,
+        alertEmail: alertEmail,
+        alertEnabled: alertEnabled
+      };
+
+      return window.appConfig;
+    }
+
+    // ============================================
+    // REALTIME - SINCRONIZAÇÃO AUTOMÁTICA
+    // ============================================
+
+    function setupRealtimeListeners() {
+      // Listener para Licenças
+      const licencasChannel = supabaseClient
+        .channel('public:licencas')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'licencas' }, payload => {
+          console.log('📡 Licenças atualizadas:', payload);
+          if (document.getElementById('documentosTable').closest('.section-view').classList.contains('active')) {
+            fetchDocumentos();
+          }
+          loadDashboard();
+        })
+        .subscribe();
+      realtimeSubscriptions.push(licencasChannel);
+
+      // Listener para Alvarás
+      const alvarasChannel = supabaseClient
+        .channel('public:alvaras')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'alvaras' }, payload => {
+          console.log('📡 Alvarás atualizados:', payload);
+          if (document.getElementById('documentosTable').closest('.section-view').classList.contains('active')) {
+            fetchDocumentos();
+          }
+          loadDashboard();
+        })
+        .subscribe();
+      realtimeSubscriptions.push(alvarasChannel);
+
+      // Listener para Clientes
+      const clientesChannel = supabaseClient
+        .channel('public:clientes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' }, payload => {
+          console.log('📡 Clientes atualizados:', payload);
+          if (document.getElementById('clientesTable').closest('.section-view').classList.contains('active')) {
+            fetchClientes();
+          }
+          loadDashboard();
+        })
+        .subscribe();
+      realtimeSubscriptions.push(clientesChannel);
+
+      // Listener para Processos
+      const processosChannel = supabaseClient
+        .channel('public:processos')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'processos' }, payload => {
+          console.log('📡 Processos atualizados:', payload);
+          if (document.getElementById('processosTable').closest('.section-view').classList.contains('active')) {
+            fetchProcessos();
+          }
+        })
+        .subscribe();
+      realtimeSubscriptions.push(processosChannel);
+
+      // Listener para Empresas (Projeto B)
+      const empresasChannel = supabaseClientB
+        .channel('public:empresas')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'empresas' }, payload => {
+          console.log('📡 Empresas atualizadas:', payload);
+          if (document.getElementById('clientesTable').closest('.section-view').classList.contains('active')) {
+            fetchClientes();
+          }
+          loadDashboard();
+        })
+        .subscribe();
+      realtimeSubscriptions.push(empresasChannel);
+    }
+
+    // ============================================
+    // FUNÇÕES DE NAVEGAÇÃO
+    // ============================================
+
+    function showSection(sectionId) {
+      console.log('🔄 Navegando para:', sectionId);
+
+      // Ocultar TODAS as seções
+      const allSections = document.querySelectorAll('.section-view');
+      allSections.forEach(section => {
+        section.classList.remove('active');
+        section.classList.add('hidden');
+      });
+
+      // Remover active de TODOS os botões
+      const allButtons = document.querySelectorAll('.nav button');
+      allButtons.forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      // Mostrar seção selecionada
+      const targetSection = document.getElementById(sectionId);
+      if (targetSection) {
+        targetSection.classList.remove('hidden');
+        targetSection.classList.add('active');
+        console.log('✓ Seção exibida:', sectionId);
+      } else {
+        console.error('✗ Seção não encontrada:', sectionId);
+        return;
+      }
+
+      // Marcar botão como ativo
+      allButtons.forEach(btn => {
+        const onclick = btn.getAttribute('onclick');
+        if (onclick && onclick.includes(`'${sectionId}'`)) {
+          btn.classList.add('active');
+          console.log('✓ Botão marcado como ativo');
+        }
+      });
+
+      // Carregar dados
+      setTimeout(() => {
+        if (sectionId === 'documentos') {
+          console.log('📄 Carregando Documentos...');
+          fetchDocumentos();
+        } else if (sectionId === 'processos') {
+          console.log('📋 Carregando Processos...');
+          loadAllAndamentos();
+          fetchProcessos();
+        } else if (sectionId === 'clientes') {
+          console.log('👥 Carregando Clientes...');
+          fetchClientes();
+        } else if (sectionId === 'relatorios') {
+          console.log('📈 Carregando Relatórios...');
+          loadReports();
+        } else if (sectionId === 'config') {
+          console.log('⚙️ Carregando Configurações...');
+          loadConfig();
+        }
+      }, 100);
+    }
+
+    // ============================================
+    // FUNÇÕES AUXILIARES
+    // ============================================
+
+    function closeModal() {
+      const modal = document.getElementById('recordModal');
+      modal.classList.remove('active');
+      document.getElementById('modalBody').innerHTML = '';
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('pt-BR');
+    }
+
+    function showAlert(message, type = 'info') {
+      const alert = document.createElement('div');
+      alert.className = `alert ${type}`;
+      alert.textContent = message;
+      const main = document.querySelector('main');
+      main.insertBefore(alert, main.firstChild);
+      setTimeout(() => {
+        alert.remove();
+      }, 4000);
+    }
+
+    function safeGetElement(selector) {
+      const element = document.getElementById(selector);
+      if (!element) {
+        console.warn(`⚠️ Elemento com ID não encontrado: ${selector}`);
+      }
+      return element;
+    }
+
+    function filterRows(type, searchTerm) {
+      const tableId = type === 'documento' ? 'documentosTable' : type === 'processo' ? 'processosTable' : 'clientesTable';
+      const table = document.getElementById(tableId);
+      if (!table) return;
+
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(searchTerm) ? '' : 'none';
+      });
+    }
+
+    function filterStatus(type, status) {
+      const tableId = type === 'documento' ? 'documentosTable' : 'clientesTable';
+      const table = document.getElementById(tableId);
+      if (!table) return;
+
+      const rows = table.querySelectorAll('tbody tr');
+      rows.forEach(row => {
+        if (status === 'all') {
+          row.style.display = '';
+        } else {
+          const rowStatus = row.getAttribute('data-status');
+          row.style.display = rowStatus === status ? '' : 'none';
+        }
+      });
+    }
+
+    function filterProcessosPorStatus(status) {
+      const rows = document.querySelectorAll('#processosTable tr');
+      rows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status');
+        row.style.display = rowStatus === status ? '' : 'none';
+      });
+    }
+
+    async function syncFromSupabase() {
+      showAlert('Sincronizando dados com Supabase...', 'info');
+      try {
+        await loadDashboard();
+        showAlert('Sincronização concluída com sucesso!', 'success');
+      } catch (error) {
+        console.error('Erro ao sincronizar:', error);
+        showAlert('Erro ao sincronizar dados', 'error');
+      }
+    }
+
+    // ============================================
+    // CRUD - DOCUMENTOS
+    // ============================================
+
+    async function openNewDocumento() {
+      const modal = document.getElementById('recordModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalBody = document.getElementById('modalBody');
+
+      modalTitle.textContent = 'Nova Licença';
+      modalBody.innerHTML = `
+        <form onsubmit="saveDocumento(event)">
+          <div class="form-grid">
+            <div class="field full">
+              <label>Estabelecimento *</label>
+              <input type="text" id="estabelecimento" required>
+            </div>
+            <div class="field">
+              <label>Tipo de Operação *</label>
+              <select id="tipoOperacao" required onchange="toggleCamposDocumento()">
+                <option value="">Selecione...</option>
+                <option value="emissao">Emissão</option>
+                <option value="renovacao">Renovação</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Tipo de Licença *</label>
+              <input type="text" id="tipo" placeholder="Ex: Licença Sanitária" required>
+            </div>
+            <div class="field" id="campoNumero">
+              <label>Número *</label>
+              <input type="text" id="numero" required>
+            </div>
+            <div class="field" id="campoDataEmissao">
+              <label>Data de Emissão *</label>
+              <input type="date" id="dataEmissao" required>
+            </div>
+            <div class="field" id="campoDataValidade">
+              <label>Data de Validade *</label>
+              <input type="date" id="dataValidade" required>
+            </div>
+            <div class="field">
+              <label>Órgão Emissor</label>
+              <input type="text" id="orgaoEmissor" placeholder="Ex: Prefeitura Municipal">
+            </div>
+            <div class="field">
+              <label>Responsável</label>
+              <input type="text" id="responsavel" placeholder="Nome do responsável">
+            </div>
+            <div class="field full">
+              <label>Observações</label>
+              <textarea id="observacoes" placeholder="Observações adicionais..."></textarea>
+            </div>
+            <div class="field full">
+              <button type="submit" class="btn btn-primary">✓ Salvar Licença</button>
+            </div>
+          </div>
+        </form>
+      `;
+
+      modal.classList.add('active');
+    }
+
+    function toggleCamposDocumento() {
+      const tipoOperacao = document.getElementById('tipoOperacao').value;
+      const campoNumero = document.getElementById('campoNumero');
+      const campoDataEmissao = document.getElementById('campoDataEmissao');
+      const campoDataValidade = document.getElementById('campoDataValidade');
+
+      if (tipoOperacao === 'emissao') {
+        campoNumero.style.display = 'none';
+        campoDataEmissao.style.display = 'none';
+        campoDataValidade.style.display = 'none';
+        document.getElementById('numero').removeAttribute('required');
+        document.getElementById('dataEmissao').removeAttribute('required');
+        document.getElementById('dataValidade').removeAttribute('required');
+        console.log('📝 Modo Emissão: campos número, data emissão e validade ocultos');
+      } else if (tipoOperacao === 'renovacao') {
+        campoNumero.style.display = 'block';
+        campoDataEmissao.style.display = 'block';
+        campoDataValidade.style.display = 'block';
+        document.getElementById('numero').setAttribute('required', 'required');
+        document.getElementById('dataEmissao').setAttribute('required', 'required');
+        document.getElementById('dataValidade').setAttribute('required', 'required');
+        console.log('🔄 Modo Renovação: todos os campos visíveis');
+      }
+    }
+
+    async function saveDocumento(event) {
+      event.preventDefault();
+
+      const tipoOperacao = document.getElementById('tipoOperacao').value;
+      const data = {
+        estabelecimento: document.getElementById('estabelecimento').value,
+        tipo: document.getElementById('tipo').value,
+        numero: tipoOperacao === 'emissao' ? 'PENDENTE' : document.getElementById('numero').value,
+        data_emissao: tipoOperacao === 'emissao' ? new Date().toISOString().split('T')[0] : document.getElementById('dataEmissao').value,
+        data_validade: tipoOperacao === 'emissao' ? null : document.getElementById('dataValidade').value,
+        orgao_emissor: document.getElementById('orgaoEmissor').value || 'Não informado',
+        responsavel: document.getElementById('responsavel').value || 'Não informado',
+        observacoes: document.getElementById('observacoes').value,
+        tipo_operacao: tipoOperacao
+      };
+
+      try {
+        console.log('💾 Salvando licença:', data);
+        const { error } = await supabaseClient.from('licencas').insert([data]);
+        if (error) throw error;
+
+        console.log('✓ Licença salva com sucesso');
+        showAlert('✓ Licença salva com sucesso!', 'success');
+        closeModal();
+        fetchDocumentos();
+        loadDashboard();
+      } catch (error) {
+        console.error('❌ Erro ao salvar licença:', error);
+        showAlert('❌ Erro ao salvar licença: ' + error.message, 'error');
+      }
+    }
+
+    // ============================================
+    // CRUD - PROCESSOS
+    // ============================================
+
+    async function openNewProcesso() {
+      const modal = document.getElementById('recordModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalBody = document.getElementById('modalBody');
+
+      modalTitle.textContent = 'Novo Processo';
+      modalBody.innerHTML = `
+        <div style="text-align: center; padding: 20px;">
+          <div class="spinner" style="width: 40px; height: 40px; border: 3px solid var(--line); border-top-color: var(--brand); border-radius: 50%; animation: spin .6s linear infinite; margin: 0 auto 12px;"></div>
+          <p>Carregando dados...</p>
+        </div>
+      `;
+
+      try {
+        const { data: licencas } = await supabaseClient
+          .from('licencas')
+          .select('id, numero, tipo, estabelecimento')
+          .order('estabelecimento', { ascending: true });
+
+        const { data: alvaras } = await supabaseClient
+          .from('alvaras')
+          .select('id, numero, tipo, estabelecimento')
+          .order('estabelecimento', { ascending: true });
+
+        const { data: clientes } = await supabaseClient
+          .from('clientes')
+          .select('nome')
+          .order('nome');
+
+        const allDocs = [
+          ...(licencas || []).map(d => ({
+            id: d.id,
+            numero: d.numero,
+            tipo: d.tipo,
+            estabelecimento: d.estabelecimento,
+            tipo_tabela: 'licencas'
+          })),
+          ...(alvaras || []).map(d => ({
+            id: d.id,
+            numero: d.numero,
+            tipo: d.tipo,
+            estabelecimento: d.estabelecimento,
+            tipo_tabela: 'alvaras'
+          }))
+        ];
+
+        if (allDocs.length === 0) {
+          modalBody.innerHTML = `
+            <div style="text-align: center; padding: 20px; color: var(--muted);">
+              <p>❌ Nenhum documento cadastrado no sistema.</p>
+              <p>Crie uma licença ou alvará antes de criar um processo.</p>
+            </div>
+          `;
+          modal.classList.add('active');
+          return;
+        }
+
+        const optionsDocHtml = allDocs.map(doc =>
+          `<option value="${doc.id}|${doc.tipo_tabela}|${doc.tipo}|${doc.estabelecimento}">
+            ${doc.estabelecimento} - ${doc.tipo} (${doc.numero})
+          </option>`
+        ).join('');
+
+        const optionsEstabHtml = (clientes || []).map(cliente =>
+          `<option value="${cliente.nome}">${cliente.nome}</option>`
+        ).join('');
+
+        modalBody.innerHTML = `
+          <form onsubmit="saveProcesso(event)">
+            <div class="form-grid">
+              <div class="field full">
+                <label>📄 Documento Associado *</label>
+                <select id="documentoVinculado" required style="border: 2px solid var(--brand);" onchange="atualizarTipoDocumento()">
+                  <option value="">-- Selecione um documento --</option>
+                  ${optionsDocHtml}
+                </select>
+                <small style="color: var(--muted); margin-top: 4px; display: block;">
+                  Total de ${allDocs.length} documento(s) disponível(is)
+                </small>
+              </div>
+              <div class="field full">
+                <label>🏢 Estabelecimento *</label>
+                <select id="estabelecimentoProcesso" required style="border: 2px solid var(--brand);">
+                  <option value="">-- Selecione um estabelecimento --</option>
+                  ${optionsEstabHtml}
+                </select>
+              </div>
+              <div class="field full">
+                <label>Tipo de Documento</label>
+                <input type="text" id="tipoDocumento" readonly style="background: var(--surface-2);">
+              </div>
+              <div class="field">
+                <label>Número do Processo *</label>
+                <input type="text" id="numeroProcesso" placeholder="Ex: PROC-2024-001" required>
+              </div>
+              <div class="field">
+                <label>Status *</label>
+                <select id="statusProcesso" required>
+                  <option value="aberto">Aberto</option>
+                  <option value="em_analise">Em Análise</option>
+                  <option value="aprovado">Aprovado</option>
+                  <option value="rejeitado">Rejeitado</option>
+                  <option value="concluido">Concluído</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Data de Abertura *</label>
+                <input type="date" id="dataAbertura" required>
+              </div>
+              <div class="field">
+                <label>Previsão de Conclusão</label>
+                <input type="date" id="dataPrevista">
+              </div>
+              <div class="field">
+                <label>Responsável *</label>
+                <input type="text" id="responsavelProcesso" placeholder="Nome do responsável" required>
+              </div>
+              <div class="field full">
+                <label>Descrição</label>
+                <textarea id="descricaoProcesso" placeholder="Descreva o processo..."></textarea>
+              </div>
+              <div class="field full">
+                <label>Observações</label>
+                <textarea id="observacoesProcesso" placeholder="Observações adicionais..."></textarea>
+              </div>
+              <div class="field full">
+                <button type="submit" class="btn btn-primary">✓ Salvar Processo</button>
+              </div>
+            </div>
+          </form>
+        `;
+
+        modal.classList.add('active');
+        console.log('✓ Formulário de novo processo carregado com sucesso');
+      } catch (error) {
+        console.error('❌ Erro ao carregar dados:', error);
+        modalBody.innerHTML = `
+          <div style="text-align: center; padding: 20px; color: var(--danger);">
+            <p>❌ Erro ao carregar dados</p>
+            <p style="font-size: .9rem;">${error.message}</p>
+          </div>
+        `;
+        modal.classList.add('active');
+      }
+    }
+
+    function atualizarTipoDocumento() {
+      const documentoVinculado = document.getElementById('documentoVinculado').value;
+      const tipoDocumentoInput = document.getElementById('tipoDocumento');
+      const estabelecimentoInput = document.getElementById('estabelecimentoProcesso');
+
+      if (!documentoVinculado) {
+        tipoDocumentoInput.value = '';
+        estabelecimentoInput.value = '';
+        return;
+      }
+
+      const [documentoId, tipoTabela, tipoDocumento, estabelecimento] = documentoVinculado.split('|');
+      tipoDocumentoInput.value = tipoDocumento;
+      estabelecimentoInput.value = estabelecimento;
+      console.log('✓ Tipo de documento e estabelecimento atualizados automaticamente');
+    }
+
+    async function saveProcesso(event) {
+      event.preventDefault();
+
+      console.log('💾 Iniciando salvamento de processo...');
+
+      const documentoVinculado = document.getElementById('documentoVinculado').value;
+      if (!documentoVinculado) {
+        showAlert('❌ Selecione um documento para vincular ao processo', 'error');
+        console.warn('Validação falhou: documento não selecionado');
+        return;
+      }
+
+      const [documentoId, tipoTabela] = documentoVinculado.split('|');
+      console.log('📋 Documento selecionado:', { documentoId, tipoTabela });
+
+      const numeroProcesso = document.getElementById('numeroProcesso').value.trim();
+      const dataAbertura = document.getElementById('dataAbertura').value;
+      const responsavel = document.getElementById('responsavelProcesso').value.trim();
+
+      if (!numeroProcesso) {
+        showAlert('❌ Preencha o número do processo', 'error');
+        return;
+      }
+
+      if (!dataAbertura) {
+        showAlert('❌ Preencha a data de abertura', 'error');
+        return;
+      }
+
+      if (!responsavel) {
+        showAlert('❌ Preencha o responsável', 'error');
+        return;
+      }
+
+      const data = {
+        documento_id: documentoId,
+        tipo_documento: document.getElementById('tipoDocumento').value,
+        numero_processo: numeroProcesso,
+        status: document.getElementById('statusProcesso').value,
+        data_abertura: dataAbertura,
+        data_prevista_conclusao: document.getElementById('dataPrevista').value || null,
+        responsavel: responsavel,
+        descricao: document.getElementById('descricaoProcesso').value.trim() || null,
+        observacoes: document.getElementById('observacoesProcesso').value.trim() || null
+      };
+
+      console.log('📊 Dados a salvar:', data);
+
+      try {
+        const { data: processoSalvo, error: erroSalvar } = await supabaseClient
+          .from('processos')
+          .insert([data])
+          .select();
+
+        if (erroSalvar) {
+          console.error('❌ Erro Supabase ao salvar:', erroSalvar);
+          throw erroSalvar;
+        }
+
+        console.log('✓ Processo salvo com sucesso:', processoSalvo);
+
+        if (processoSalvo && processoSalvo.length > 0) {
+          const processoId = processoSalvo[0].id;
+          const andamento = {
+            processo_id: processoId,
+            status_anterior: null,
+            status_novo: data.status,
+            responsavel: data.responsavel,
+            observacao: 'Processo criado'
+          };
+          const { error: erroAndamento } = await supabaseClient
+            .from('andamento_processos')
+            .insert([andamento]);
+
+          if (erroAndamento) {
+            console.error('⚠️ Aviso ao registrar andamento:', erroAndamento);
+          }
+        }
+
+        showAlert('✓ Processo salvo com sucesso!', 'success');
+        closeModal();
+        fetchProcessos();
+        loadDashboard();
+      } catch (error) {
+        console.error('❌ Erro ao salvar processo:', error);
+        showAlert('❌ Erro ao salvar processo: ' + error.message, 'error');
+      }
+    }
+
+    async function loadAllAndamentos() {
+      try {
+        console.log('📋 Carregando TODOS os andamentos...');
+
+        const { data: andamentos, error } = await supabaseClient
+          .from('andamento_processos')
+          .select(`
+            id,
+            processo_id,
+            status_anterior,
+            status_novo,
+            data_mudanca,
+            responsavel,
+            observacao,
+            processos(numero_processo)
+          `)
+          .order('data_mudanca', { ascending: false });
+
+        if (error) throw error;
+
+        const tbody = document.getElementById('andamentoTable');
+        tbody.innerHTML = '';
+
+        if (!andamentos || andamentos.length === 0) {
+          console.log('ℹ️ Nenhum andamento encontrado');
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);">Nenhum andamento registrado</td></tr>';
+          return;
+        }
+
+        andamentos.forEach(andamento => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${formatDate(andamento.data_mudanca)}</td>
+            <td>${andamento.status_anterior || '-'}</td>
+            <td>${andamento.status_novo}</td>
+            <td>${andamento.responsavel}</td>
+            <td>${andamento.observacao || '-'}</td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        console.log('✓ Andamentos carregados com sucesso');
+      } catch (error) {
+        console.error('Erro ao carregar andamentos:', error);
+        document.getElementById('andamentoTable').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--danger);">Erro ao carregar andamento</td></tr>';
+      }
+    }
+
+    async function loadAndamentoForProcesso(processoId) {
+      try {
+        console.log('📋 Carregando andamento para processo:', processoId);
+
+        const { data: andamentos, error } = await supabaseClient
+          .from('andamento_processos')
+          .select(`
+            id,
+            processo_id,
+            status_anterior,
+            status_novo,
+            data_mudanca,
+            responsavel,
+            observacao,
+            processos(numero_processo)
+          `)
+          .eq('processo_id', processoId)
+          .order('data_mudanca', { ascending: false });
+
+        if (error) throw error;
+
+        const tbody = document.getElementById('andamentoTable');
+        tbody.innerHTML = '';
+
+        if (!andamentos || andamentos.length === 0) {
+          console.log('ℹ️ Nenhum andamento encontrado para este processo');
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);">Nenhum andamento para este processo</td></tr>';
+          return;
+        }
+
+        andamentos.forEach(andamento => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${formatDate(andamento.data_mudanca)}</td>
+            <td>${andamento.status_anterior || '-'}</td>
+            <td>${andamento.status_novo}</td>
+            <td>${andamento.responsavel}</td>
+            <td>${andamento.observacao || '-'}</td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        console.log('✓ Andamento carregado com sucesso');
+      } catch (error) {
+        console.error('Erro ao carregar andamento:', error);
+        document.getElementById('andamentoTable').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--danger);">Erro ao carregar andamento</td></tr>';
+      }
+    }
+
+    function filterProcessosPorStatus(status) {
+      const rows = document.querySelectorAll('#processosTable tr');
+      rows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status');
+        row.style.display = rowStatus === status ? '' : 'none';
+      });
+    }
+
+    // ============================================
+    // CRUD - CLIENTES
+    // ============================================
+
+    async function openNewRecord(type) {
+      const modal = document.getElementById('recordModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalBody = document.getElementById('modalBody');
+
+      modalTitle.textContent = `Novo ${type === 'cliente' ? 'Cliente' : 'Registro'}`;
+
+      if (type === 'cliente') {
+        modalBody.innerHTML = `
+          <form onsubmit="saveCliente(event)">
+            <div class="form-grid">
+              <div class="field full">
+                <label>Nome do cliente</label>
+                <input type="text" id="nome" required>
+              </div>
+              <div class="field">
+                <label>Contato</label>
+                <input type="text" id="contato" required>
+              </div>
+              <div class="field">
+                <label>Email</label>
+                <input type="email" id="email" required>
+              </div>
+              <div class="field full">
+                <label>Estabelecimentos</label>
+                <textarea id="estabelecimentos" placeholder="Liste os estabelecimentos vinculados"></textarea>
+              </div>
+              <div class="field full">
+                <button type="submit" class="btn btn-primary">Salvar cliente</button>
+              </div>
+            </div>
+          </form>
+        `;
+      }
+
+      modal.classList.add('active');
+    }
+
+    async function saveCliente(event) {
+      event.preventDefault();
+
+      const data = {
+        nome: document.getElementById('nome').value,
+        contato: document.getElementById('contato').value,
+        email: document.getElementById('email').value,
+        estabelecimentos: document.getElementById('estabelecimentos').value
+      };
+
+      try {
+        const { error } = await supabaseClient.from('clientes').insert([data]);
+        if (error) throw error;
+
+        showAlert('Cliente salvo com sucesso!', 'success');
+        closeModal();
+        fetchClientes();
+        loadDashboard();
+      } catch (error) {
+        console.error('Erro ao salvar cliente:', error);
+        showAlert('Erro ao salvar cliente', 'error');
+      }
+    }
+
+    // ============================================
+    // CRUD - VISUALIZAR/EDITAR/DELETAR
+    // ============================================
+
+    async function viewRecord(id, table) {
+      try {
+        const { data, error } = await supabaseClient.from(table).select('*').eq('id', id).single();
+        if (error) throw error;
+
+        const modal = document.getElementById('recordModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+
+        modalTitle.textContent = `Visualizar ${table === 'licencas' ? 'Licença' : table === 'alvaras' ? 'Alvará' : table === 'empresas' ? 'Empresa' : 'Cliente'}`;
+
+        let html = '<div style="padding:10px;">';
+
+        if (table === 'licencas' || table === 'alvaras') {
+          html += `
+            <p><strong>Estabelecimento:</strong> ${data.estabelecimento}</p>
+            <p><strong>Tipo:</strong> ${data.tipo}</p>
+            <p><strong>Número:</strong> ${data.numero}</p>
+            <p><strong>Data de emissão:</strong> ${formatDate(data.data_emissao)}</p>
+            <p><strong>Data de validade:</strong> ${formatDate(data.data_validade)}</p>
+            <p><strong>Órgão emissor:</strong> ${data.orgao_emissor}</p>
+            <p><strong>Responsável:</strong> ${data.responsavel}</p>
+            <p><strong>Observações:</strong> ${data.observacoes || '-'}</p>
+          `;
+        } else if (table === 'clientes') {
+          html += `
+            <p><strong>Nome:</strong> ${data.nome}</p>
+            <p><strong>Contato:</strong> ${data.contato || '-'}</p>
+            <p><strong>Email:</strong> ${data.email || '-'}</p>
+            <p><strong>Estabelecimentos:</strong> ${data.estabelecimentos || '-'}</p>
+          `;
+        } else if (table === 'empresas') {
+          const nome = data.nome || data.razao_social || 'N/A';
+          const cnpj = data.cnpj || data.cpf || '-';
+          const contato = data.contato || data.contact || '-';
+          const email = data.email || data.mail || '-';
+          const telefone = data.telefone || data.phone || '-';
+
+          html += `
+            <p><strong>Nome:</strong> ${nome}</p>
+            <p><strong>CNPJ/CPF:</strong> ${cnpj}</p>
+            <p><strong>Contato:</strong> ${contato}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Telefone:</strong> ${telefone}</p>
+          `;
+        }
+
+        html += '</div>';
+        modalBody.innerHTML = html;
+        modal.classList.add('active');
+      } catch (error) {
+        console.error('Erro ao visualizar registro:', error);
+        showAlert('Erro ao visualizar registro', 'error');
+      }
+    }
+
+    async function editRecord(id, table) {
+      try {
+        const { data, error } = await supabaseClient.from(table).select('*').eq('id', id).single();
+        if (error) throw error;
+
+        const modal = document.getElementById('recordModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+
+        modalTitle.textContent = `Editar ${table === 'licencas' ? 'Licença' : table === 'alvaras' ? 'Alvará' : 'Cliente'}`;
+
+        if (table === 'licencas' || table === 'alvaras') {
+          modalBody.innerHTML = `
+            <form onsubmit="updateRecord(event, '${id}', '${table}')">
+              <div class="form-grid">
+                <div class="field full">
+                  <label>Estabelecimento</label>
+                  <input type="text" id="estabelecimento" value="${data.estabelecimento}" required>
+                </div>
+                <div class="field">
+                  <label>Tipo</label>
+                  <input type="text" id="tipo" value="${data.tipo}" required>
+                </div>
+                <div class="field">
+                  <label>Número</label>
+                  <input type="text" id="numero" value="${data.numero}" required>
+                </div>
+                <div class="field">
+                  <label>Data de Emissão</label>
+                  <input type="date" id="dataEmissao" value="${data.data_emissao}" required>
+                </div>
+                <div class="field">
+                  <label>Data de Validade</label>
+                  <input type="date" id="dataValidade" value="${data.data_validade}" required>
+                </div>
+                <div class="field">
+                  <label>Órgão Emissor</label>
+                  <input type="text" id="orgaoEmissor" value="${data.orgao_emissor || ''}" required>
+                </div>
+                <div class="field">
+                  <label>Responsável</label>
+                  <input type="text" id="responsavel" value="${data.responsavel || ''}" required>
+                </div>
+                <div class="field full">
+                  <label>Observações</label>
+                  <textarea id="observacoes">${data.observacoes || ''}</textarea>
+                </div>
+                <div class="field full">
+                  <button type="submit" class="btn btn-primary">Atualizar</button>
+                </div>
+              </div>
+            </form>
+          `;
+        } else if (table === 'clientes') {
+          modalBody.innerHTML = `
+            <form onsubmit="updateRecord(event, '${id}', '${table}')">
+              <div class="form-grid">
+                <div class="field full">
+                  <label>Nome</label>
+                  <input type="text" id="nome" value="${data.nome}" required>
+                </div>
+                <div class="field">
+                  <label>Contato</label>
+                  <input type="text" id="contato" value="${data.contato || ''}" required>
+                </div>
+                <div class="field">
+                  <label>Email</label>
+                  <input type="email" id="email" value="${data.email || ''}" required>
+                </div>
+                <div class="field full">
+                  <label>Estabelecimentos</label>
+                  <textarea id="estabelecimentos">${data.estabelecimentos || ''}</textarea>
+                </div>
+                <div class="field full">
+                  <button type="submit" class="btn btn-primary">Atualizar</button>
+                </div>
+              </div>
+            </form>
+          `;
+        }
+
+        modal.classList.add('active');
+      } catch (error) {
+        console.error('Erro ao carregar registro:', error);
+        showAlert('Erro ao carregar registro', 'error');
+      }
+    }
+
+    async function updateRecord(event, id, table) {
+      event.preventDefault();
+
+      let data = {};
+
+      if (table === 'licencas' || table === 'alvaras') {
+        data = {
+          estabelecimento: document.getElementById('estabelecimento').value,
+          tipo: document.getElementById('tipo').value,
+          numero: document.getElementById('numero').value,
+          data_emissao: document.getElementById('dataEmissao').value,
+          data_validade: document.getElementById('dataValidade').value,
+          orgao_emissor: document.getElementById('orgaoEmissor').value,
+          responsavel: document.getElementById('responsavel').value,
+          observacoes: document.getElementById('observacoes').value
+        };
+      } else if (table === 'clientes') {
+        data = {
+          nome: document.getElementById('nome').value,
+          contato: document.getElementById('contato').value,
+          email: document.getElementById('email').value,
+          estabelecimentos: document.getElementById('estabelecimentos').value
+        };
+      }
+
+      try {
+        const { error } = await supabaseClient.from(table).update(data).eq('id', id);
+        if (error) throw error;
+
+        showAlert('Registro atualizado com sucesso!', 'success');
+        closeModal();
+
+        if (table === 'licencas' || table === 'alvaras') fetchDocumentos();
+        if (table === 'clientes') fetchClientes();
+        loadDashboard();
+      } catch (error) {
+        console.error('Erro ao atualizar registro:', error);
+        showAlert('Erro ao atualizar registro', 'error');
+      }
+    }
+
+    async function deleteRecord(id, table) {
+      if (!confirm('Tem certeza que deseja excluir este registro?')) return;
+
+      try {
+        const { error } = await supabaseClient.from(table).delete().eq('id', id);
+        if (error) throw error;
+
+        showAlert('Registro excluído com sucesso!', 'success');
+
+        if (table === 'licencas' || table === 'alvaras') fetchDocumentos();
+        if (table === 'clientes') fetchClientes();
+        loadDashboard();
+      } catch (error) {
+        console.error('Erro ao excluir registro:', error);
+        showAlert('Erro ao excluir registro', 'error');
+      }
+    }
+
+    async function deleteProcesso(id) {
+      if (!confirm('Tem certeza que deseja excluir este processo?')) return;
+
+      try {
+        const { error } = await supabaseClient.from('processos').delete().eq('id', id);
+        if (error) throw error;
+
+        showAlert('Processo excluído com sucesso!', 'success');
+        fetchProcessos();
+      } catch (error) {
+        console.error('Erro ao excluir processo:', error);
+        showAlert('Erro ao excluir processo', 'error');
+      }
+    }
+
+    async function viewProcesso(id) {
+      try {
+        const { data, error } = await supabaseClient.from('processos').select('*').eq('id', id).single();
+        if (error) throw error;
+
+        await loadAndamentoForProcesso(id);
+
+        const modal = document.getElementById('recordModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+
+        modalTitle.textContent = `Processo ${data.numero_processo}`;
+        modalBody.innerHTML = `
+          <div style="padding:10px;">
+            <p><strong>Número:</strong> ${data.numero_processo}</p>
+            <p><strong>Tipo de Documento:</strong> ${data.tipo_documento}</p>
+            <p><strong>Status:</strong> ${data.status}</p>
+            <p><strong>Data de Abertura:</strong> ${formatDate(data.data_abertura)}</p>
+            <p><strong>Previsão de Conclusão:</strong> ${formatDate(data.data_prevista_conclusao)}</p>
+            <p><strong>Responsável:</strong> ${data.responsavel}</p>
+            <p><strong>Descrição:</strong> ${data.descricao || '-'}</p>
+            <p><strong>Observações:</strong> ${data.observacoes || '-'}</p>
+          </div>
+        `;
+
+        modal.classList.add('active');
+      } catch (error) {
+        console.error('Erro ao visualizar processo:', error);
+        showAlert('Erro ao visualizar processo', 'error');
+      }
+    }
+
+    async function editProcesso(id) {
+      try {
+        const { data, error } = await supabaseClient.from('processos').select('*').eq('id', id).single();
+        if (error) throw error;
+
+        const modal = document.getElementById('recordModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+
+        modalTitle.textContent = 'Editar Processo';
+        modalBody.innerHTML = `
+          <form onsubmit="updateProcesso(event, '${id}')">
+            <div class="form-grid">
+              <div class="field full">
+                <label>Número do Processo</label>
+                <input type="text" id="numeroProcesso" value="${data.numero_processo}" required>
+              </div>
+              <div class="field">
+                <label>Status</label>
+                <select id="statusProcesso" required>
+                  <option value="aberto" ${data.status === 'aberto' ? 'selected' : ''}>Aberto</option>
+                  <option value="em_analise" ${data.status === 'em_analise' ? 'selected' : ''}>Em Análise</option>
+                  <option value="aprovado" ${data.status === 'aprovado' ? 'selected' : ''}>Aprovado</option>
+                  <option value="rejeitado" ${data.status === 'rejeitado' ? 'selected' : ''}>Rejeitado</option>
+                  <option value="concluido" ${data.status === 'concluido' ? 'selected' : ''}>Concluído</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Data de Abertura</label>
+                <input type="date" id="dataAbertura" value="${data.data_abertura}" required>
+              </div>
+              <div class="field">
+                <label>Previsão de Conclusão</label>
+                <input type="date" id="dataPrevista" value="${data.data_prevista_conclusao || ''}">
+              </div>
+              <div class="field">
+                <label>Responsável</label>
+                <input type="text" id="responsavelProcesso" value="${data.responsavel}" required>
+              </div>
+              <div class="field full">
+                <label>Descrição</label>
+                <textarea id="descricaoProcesso">${data.descricao || ''}</textarea>
+              </div>
+              <div class="field full">
+                <label>Observações</label>
+                <textarea id="observacoesProcesso">${data.observacoes || ''}</textarea>
+              </div>
+              <div class="field full">
+                <button type="submit" class="btn btn-primary">Atualizar processo</button>
+              </div>
+            </div>
+          </form>
+        `;
+
+        modal.classList.add('active');
+      } catch (error) {
+        console.error('Erro ao carregar processo:', error);
+        showAlert('Erro ao carregar processo', 'error');
+      }
+    }
+
+    async function updateProcesso(event, id) {
+      event.preventDefault();
+
+      const statusAnterior = (await supabaseClient.from('processos').select('status').eq('id', id).single()).data.status;
+      const statusNovo = document.getElementById('statusProcesso').value;
+
+      const data = {
+        numero_processo: document.getElementById('numeroProcesso').value,
+        status: statusNovo,
+        data_abertura: document.getElementById('dataAbertura').value,
+        data_prevista_conclusao: document.getElementById('dataPrevista').value,
+        responsavel: document.getElementById('responsavelProcesso').value,
+        descricao: document.getElementById('descricaoProcesso').value,
+        observacoes: document.getElementById('observacoesProcesso').value
+      };
+
+      try {
+        const { error } = await supabaseClient.from('processos').update(data).eq('id', id);
+        if (error) throw error;
+
+        if (statusAnterior !== statusNovo) {
+          await supabaseClient.from('andamento_processos').insert([{
+            processo_id: id,
+            status_anterior: statusAnterior,
+            status_novo: statusNovo,
+            responsavel: data.responsavel,
+            observacao: data.observacoes
+          }]);
+        }
+
+        showAlert('Processo atualizado com sucesso!', 'success');
+        closeModal();
+        fetchProcessos();
+      } catch (error) {
+        console.error('Erro ao atualizar processo:', error);
+        showAlert('Erro ao atualizar processo', 'error');
+      }
+    }
+
+    // ============================================
+    // EVENT DELEGATION - AÇÕES DOS BOTÕES
+    // ============================================
+
+    function attachActionListeners() {
+      document.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const action = btn.getAttribute('data-action');
+          const id = btn.getAttribute('data-id');
+          const table = btn.getAttribute('data-table');
+
+          if (action === 'view') {
+            viewRecord(id, table);
+          } else if (action === 'edit') {
+            editRecord(id, table);
+          } else if (action === 'delete') {
+            deleteRecord(id, table);
+          } else if (action === 'view-processo') {
+            viewProcesso(id);
+          } else if (action === 'edit-processo') {
+            editProcesso(id);
+          } else if (action === 'delete-processo') {
+            deleteProcesso(id);
+          }
+        });
+      });
+    }
+
+    // ============================================
+    // EVENT LISTENERS
+    // ============================================
+
+    function setupEventListeners() {
+      console.log('🔧 Configurando event listeners...');
+
+      // Navegação
+      const navButtons = document.querySelectorAll('.nav button');
+      if (navButtons.length > 0) {
+        navButtons.forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const onclick = btn.getAttribute('onclick');
+            if (onclick) {
+              const match = onclick.match(/showSection\('([^']+)'\)/);
+              if (match) {
+                showSection(match[1]);
+              }
+            }
+          });
+        });
+        console.log('✓ Navegação configurada');
+      }
+
+      // Botões de ação principais
+      const syncBtn = safeGetElement('syncBtn');
+      if (syncBtn) syncBtn.addEventListener('click', syncFromSupabase);
+
+      const newRecordBtn = safeGetElement('newRecordBtn');
+      if (newRecordBtn) newRecordBtn.addEventListener('click', () => openNewRecord('cliente'));
+
+      // Documentos
+      const refreshDocumentos = safeGetElement('refreshDocumentos');
+      if (refreshDocumentos) refreshDocumentos.addEventListener('click', fetchDocumentos);
+
+      const newDocumento = safeGetElement('newDocumento');
+      if (newDocumento) newDocumento.addEventListener('click', openNewDocumento);
+
+      const searchDocumentos = safeGetElement('searchDocumentos');
+      if (searchDocumentos) searchDocumentos.addEventListener('input', (e) => filterRows('documento', e.target.value));
+
+      // Processos
+      const refreshProcessos = safeGetElement('refreshProcessos');
+      if (refreshProcessos) refreshProcessos.addEventListener('click', fetchProcessos);
+
+      const newProcesso = safeGetElement('newProcesso');
+      if (newProcesso) newProcesso.addEventListener('click', openNewProcesso);
+
+      const searchProcessos = safeGetElement('searchProcessos');
+      if (searchProcessos) searchProcessos.addEventListener('input', (e) => filterRows('processo', e.target.value));
+
+      // Clientes
+      const refreshClientes = safeGetElement('refreshClientes');
+      if (refreshClientes) refreshClientes.addEventListener('click', fetchClientes);
+
+      const newCliente = safeGetElement('newCliente');
+      if (newCliente) newCliente.addEventListener('click', () => openNewRecord('cliente'));
+
+      const searchClientes = safeGetElement('searchClientes');
+      if (searchClientes) searchClientes.addEventListener('input', (e) => filterRows('cliente', e.target.value));
+
+      // Relatórios
+      const refreshReports = safeGetElement('refreshReports');
+      if (refreshReports) refreshReports.addEventListener('click', loadReports);
+
+      const exportPdf = safeGetElement('exportPdf');
+      if (exportPdf) exportPdf.addEventListener('click', () => exportReports('pdf'));
+
+      const exportCsv = safeGetElement('exportCsv');
+      if (exportCsv) exportCsv.addEventListener('click', () => exportReports('csv'));
+
+      // Configurações
+      const saveConfigBtn = safeGetElement('saveConfigBtn');
+      if (saveConfigBtn) saveConfigBtn.addEventListener('click', saveConfig);
+
+      // Modal
+      const closeModalBtn = safeGetElement('closeModalBtn');
+      if (closeModalBtn) closeModalBtn.addEventListener('click', closeModal);
+
+      const recordModal = safeGetElement('recordModal');
+      if (recordModal) {
+        recordModal.addEventListener('click', (e) => {
+          if (e.target.id === 'recordModal') closeModal();
+        });
+      }
+
+      console.log('✓ Event listeners configurados com sucesso');
+    }
+
+    // ============================================
+    // INICIALIZAÇÃO PRINCIPAL
+    // ============================================
+
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('📄 DOM carregado, iniciando aplicação...');
+      try {
+        // Carregar configurações PRIMEIRO
+        window.appConfig = loadConfig();
+        console.log('✓ Configurações carregadas globalmente');
+
+        // Setup de listeners
+        setupEventListeners();
+
+        // Inicializar Supabase
+        initSupabase();
+      } catch (error) {
+        console.error('❌ Erro durante inicialização:', error);
+        showAlert('Erro ao inicializar aplicação', 'error');
+      }
+    });
+
+    // Fallback para navegadores antigos
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        console.log('✓ Fallback DOMContentLoaded acionado');
+      });
+    } else {
+      console.log('✓ DOM já estava carregado');
+    }
+
+    console.log('🚀 Script carregado e pronto');
+  </script>
+</body>
+</html>
