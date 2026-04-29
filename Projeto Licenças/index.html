@@ -7,7 +7,6 @@
   <script src="../supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../portal-auth-guard.js"></script>
-  <script src="../licencas-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root{
@@ -1341,11 +1340,11 @@
     // CONFIGURAÇÃO SUPABASE - DOIS CLIENTES
     // ============================================
 
-    // Credenciais carregadas de licencas-config.js (LIC_URL_A, LIC_KEY_A, LIC_URL_B, LIC_KEY_B)
+    // Mesmo Supabase do portal — credenciais de supabase-config.js (SUPABASE_URL, SUPABASE_KEY)
+    // A sessão JWT do portal-auth-guard é automaticamente herdada (localStorage).
 
-    // Clientes Supabase
+    // Cliente Supabase
     let supabaseClient = null;
-    let supabaseClientB = null;
     let currentFilter = { type: 'all', status: 'all' };
     let charts = {};
     let realtimeSubscriptions = [];
@@ -1365,23 +1364,13 @@
       }
 
       try {
-        // Cliente A - Licenças
-        supabaseClient = createClient(LIC_URL_A, LIC_KEY_A);
-        const { data: testA, error: errorA } = await supabaseClient
+        supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+        const { error: errorConn } = await supabaseClient
           .from('licencas')
           .select('count', { count: 'exact' });
 
-        if (errorA) throw new Error(`Projeto A: ${errorA.message}`);
-        console.log('✓ Projeto A (Licenças) conectado');
-
-        // Cliente B - Empresas
-        supabaseClientB = createClient(LIC_URL_B, LIC_KEY_B);
-        const { data: testB, error: errorB } = await supabaseClientB
-          .from('empresas')
-          .select('count', { count: 'exact' });
-
-        if (errorB) throw new Error(`Projeto B: ${errorB.message}`);
-        console.log('✓ Projeto B (Empresas) conectado');
+        if (errorConn) throw new Error(errorConn.message);
+        console.log('✓ Supabase conectado');
 
         // Carregar dados iniciais
         await loadDashboard();
@@ -1391,7 +1380,7 @@
         setupRealtimeListeners();
         console.log('✓ Listeners realtime configurados');
 
-        showAlert('✓ Conectado aos dois Supabase com sucesso!', 'success');
+        showAlert('✓ Conectado ao Supabase com sucesso!', 'success');
 
       } catch (error) {
         console.error('❌ Erro ao conectar Supabase:', error.message);
@@ -1407,7 +1396,7 @@ async function loadDashboard() {
   try {
     const { data: licencas } = await supabaseClient.from('licencas').select('*');
     const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
-    const { data: clientes } = await supabaseClient.from('clientes').select('*');
+    const { data: clientes } = await supabaseClient.from('empresas').select('*');
     
     const today = new Date();
     const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -1733,10 +1722,10 @@ async function loadDashboardTable() {
       try {
         console.log('📥 Buscando empresas do Projeto B...');
 
-        const { data: empresas, error } = await supabaseClientB
+        const { data: empresas, error } = await supabaseClient
           .from('empresas')
           .select('*')
-          .order('id', { ascending: true });
+          .order('nome', { ascending: true });
 
         if (error) {
           console.error('❌ Erro ao buscar empresas:', error);
@@ -2401,19 +2390,6 @@ function exportReports(format) {
         .subscribe();
       realtimeSubscriptions.push(alvarasChannel);
 
-      // Listener para Clientes
-      const clientesChannel = supabaseClient
-        .channel('public:clientes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'clientes' }, payload => {
-          console.log('📡 Clientes atualizados:', payload);
-          if (document.getElementById('clientesTable').closest('.section-view').classList.contains('active')) {
-            fetchClientes();
-          }
-          loadDashboard();
-        })
-        .subscribe();
-      realtimeSubscriptions.push(clientesChannel);
-
       // Listener para Processos
       const processosChannel = supabaseClient
         .channel('public:processos')
@@ -2426,8 +2402,8 @@ function exportReports(format) {
         .subscribe();
       realtimeSubscriptions.push(processosChannel);
 
-      // Listener para Empresas (Projeto B)
-      const empresasChannel = supabaseClientB
+      // Listener para Empresas
+      const empresasChannel = supabaseClient
         .channel('public:empresas')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'empresas' }, payload => {
           console.log('📡 Empresas atualizadas:', payload);
@@ -2744,7 +2720,7 @@ function exportReports(format) {
           .order('estabelecimento', { ascending: true });
 
         const { data: clientes } = await supabaseClient
-          .from('clientes')
+          .from('empresas')
           .select('nome')
           .order('nome');
 
@@ -3096,12 +3072,20 @@ function exportReports(format) {
                 <input type="text" id="nome" required>
               </div>
               <div class="field">
+                <label>CNPJ</label>
+                <input type="text" id="cnpj" placeholder="00.000.000/0000-00">
+              </div>
+              <div class="field">
                 <label>Contato</label>
                 <input type="text" id="contato" required>
               </div>
               <div class="field">
                 <label>Email</label>
                 <input type="email" id="email" required>
+              </div>
+              <div class="field">
+                <label>Telefone</label>
+                <input type="text" id="telefone" placeholder="(00) 00000-0000">
               </div>
               <div class="field full">
                 <label>Estabelecimentos</label>
@@ -3123,13 +3107,15 @@ function exportReports(format) {
 
       const data = {
         nome: document.getElementById('nome').value,
+        cnpj: document.getElementById('cnpj').value || null,
         contato: document.getElementById('contato').value,
         email: document.getElementById('email').value,
+        telefone: document.getElementById('telefone').value || null,
         estabelecimentos: document.getElementById('estabelecimentos').value
       };
 
       try {
-        const { error } = await supabaseClient.from('clientes').insert([data]);
+        const { error } = await supabaseClient.from('empresas').insert([data]);
         if (error) throw error;
 
         showAlert('Cliente salvo com sucesso!', 'success');
@@ -3170,26 +3156,14 @@ function exportReports(format) {
             <p><strong>Responsável:</strong> ${data.responsavel}</p>
             <p><strong>Observações:</strong> ${data.observacoes || '-'}</p>
           `;
-        } else if (table === 'clientes') {
+        } else if (table === 'empresas') {
           html += `
-            <p><strong>Nome:</strong> ${data.nome}</p>
+            <p><strong>Nome:</strong> ${data.nome || '-'}</p>
+            <p><strong>CNPJ:</strong> ${data.cnpj || '-'}</p>
             <p><strong>Contato:</strong> ${data.contato || '-'}</p>
             <p><strong>Email:</strong> ${data.email || '-'}</p>
+            <p><strong>Telefone:</strong> ${data.telefone || '-'}</p>
             <p><strong>Estabelecimentos:</strong> ${data.estabelecimentos || '-'}</p>
-          `;
-        } else if (table === 'empresas') {
-          const nome = data.nome || data.razao_social || 'N/A';
-          const cnpj = data.cnpj || data.cpf || '-';
-          const contato = data.contato || data.contact || '-';
-          const email = data.email || data.mail || '-';
-          const telefone = data.telefone || data.phone || '-';
-
-          html += `
-            <p><strong>Nome:</strong> ${nome}</p>
-            <p><strong>CNPJ/CPF:</strong> ${cnpj}</p>
-            <p><strong>Contato:</strong> ${contato}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Telefone:</strong> ${telefone}</p>
           `;
         }
 
@@ -3211,7 +3185,7 @@ function exportReports(format) {
         const modalTitle = document.getElementById('modalTitle');
         const modalBody = document.getElementById('modalBody');
 
-        modalTitle.textContent = `Editar ${table === 'licencas' ? 'Licença' : table === 'alvaras' ? 'Alvará' : 'Cliente'}`;
+        modalTitle.textContent = `Editar ${table === 'licencas' ? 'Licença' : table === 'alvaras' ? 'Alvará' : 'Empresa'}`;
 
         if (table === 'licencas' || table === 'alvaras') {
           modalBody.innerHTML = `
@@ -3255,13 +3229,17 @@ function exportReports(format) {
               </div>
             </form>
           `;
-        } else if (table === 'clientes') {
+        } else if (table === 'empresas') {
           modalBody.innerHTML = `
             <form onsubmit="updateRecord(event, '${id}', '${table}')">
               <div class="form-grid">
                 <div class="field full">
                   <label>Nome</label>
-                  <input type="text" id="nome" value="${data.nome}" required>
+                  <input type="text" id="nome" value="${data.nome || ''}" required>
+                </div>
+                <div class="field">
+                  <label>CNPJ</label>
+                  <input type="text" id="cnpj" value="${data.cnpj || ''}">
                 </div>
                 <div class="field">
                   <label>Contato</label>
@@ -3270,6 +3248,10 @@ function exportReports(format) {
                 <div class="field">
                   <label>Email</label>
                   <input type="email" id="email" value="${data.email || ''}" required>
+                </div>
+                <div class="field">
+                  <label>Telefone</label>
+                  <input type="text" id="telefone" value="${data.telefone || ''}">
                 </div>
                 <div class="field full">
                   <label>Estabelecimentos</label>
@@ -3306,11 +3288,13 @@ function exportReports(format) {
           responsavel: document.getElementById('responsavel').value,
           observacoes: document.getElementById('observacoes').value
         };
-      } else if (table === 'clientes') {
+      } else if (table === 'empresas') {
         data = {
           nome: document.getElementById('nome').value,
+          cnpj: document.getElementById('cnpj').value || null,
           contato: document.getElementById('contato').value,
           email: document.getElementById('email').value,
+          telefone: document.getElementById('telefone').value || null,
           estabelecimentos: document.getElementById('estabelecimentos').value
         };
       }
@@ -3323,7 +3307,7 @@ function exportReports(format) {
         closeModal();
 
         if (table === 'licencas' || table === 'alvaras') fetchDocumentos();
-        if (table === 'clientes') fetchClientes();
+        if (table === 'empresas') fetchClientes();
         loadDashboard();
       } catch (error) {
         console.error('Erro ao atualizar registro:', error);
@@ -3341,7 +3325,7 @@ function exportReports(format) {
         showAlert('Registro excluído com sucesso!', 'success');
 
         if (table === 'licencas' || table === 'alvaras') fetchDocumentos();
-        if (table === 'clientes') fetchClientes();
+        if (table === 'empresas') fetchClientes();
         loadDashboard();
       } catch (error) {
         console.error('Erro ao excluir registro:', error);

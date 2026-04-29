@@ -77,18 +77,17 @@ async function loadAlerts() {
   }
 }
 
-/* ---- Licenças alerts (Supabase externo) ---- */
+/* ---- Licenças alerts (mesmo Supabase do portal) ---- */
 async function loadLicencasAlerts() {
-  if (typeof LIC_URL_A === 'undefined' || typeof LIC_KEY_A === 'undefined') return [];
+  if (!STATE.supabase) return [];
 
   try {
-    const licClient = window.supabase.createClient(LIC_URL_A, LIC_KEY_A);
-    const today     = new Date();
-    const in30Days  = new Date(today.getTime() + 30 * 86400000);
+    const today    = new Date();
+    const in30Days = new Date(today.getTime() + 30 * 86400000);
 
     const [{ data: licencas }, { data: alvaras }] = await Promise.all([
-      licClient.from('licencas').select('id,estabelecimento,tipo,numero,orgao_emissor,data_validade,responsavel'),
-      licClient.from('alvaras').select('id,estabelecimento,tipo,numero,orgao_emissor,data_validade,responsavel'),
+      STATE.supabase.from('licencas').select('id,estabelecimento,tipo,numero,orgao_emissor,data_validade,responsavel'),
+      STATE.supabase.from('alvaras').select('id,estabelecimento,tipo,numero,orgao_emissor,data_validade,responsavel'),
     ]);
 
     const allDocs = [
