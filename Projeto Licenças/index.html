@@ -2719,11 +2719,6 @@ function exportReports(format) {
           .select('id, numero, tipo, estabelecimento')
           .order('estabelecimento', { ascending: true });
 
-        const { data: clientes } = await supabaseClient
-          .from('empresas')
-          .select('nome')
-          .order('nome');
-
         const allDocs = [
           ...(licencas || []).map(d => ({
             id: d.id,
@@ -2758,10 +2753,6 @@ function exportReports(format) {
           </option>`
         ).join('');
 
-        const optionsEstabHtml = (clientes || []).map(cliente =>
-          `<option value="${cliente.nome}">${cliente.nome}</option>`
-        ).join('');
-
         modalBody.innerHTML = `
           <form onsubmit="saveProcesso(event)">
             <div class="form-grid">
@@ -2774,13 +2765,6 @@ function exportReports(format) {
                 <small style="color: var(--muted); margin-top: 4px; display: block;">
                   Total de ${allDocs.length} documento(s) disponível(is)
                 </small>
-              </div>
-              <div class="field full">
-                <label>🏢 Estabelecimento *</label>
-                <select id="estabelecimentoProcesso" required style="border: 2px solid var(--brand);">
-                  <option value="">-- Selecione um estabelecimento --</option>
-                  ${optionsEstabHtml}
-                </select>
               </div>
               <div class="field full">
                 <label>Tipo de Documento</label>
@@ -2844,18 +2828,14 @@ function exportReports(format) {
     function atualizarTipoDocumento() {
       const documentoVinculado = document.getElementById('documentoVinculado').value;
       const tipoDocumentoInput = document.getElementById('tipoDocumento');
-      const estabelecimentoInput = document.getElementById('estabelecimentoProcesso');
 
       if (!documentoVinculado) {
         tipoDocumentoInput.value = '';
-        estabelecimentoInput.value = '';
         return;
       }
 
-      const [documentoId, tipoTabela, tipoDocumento, estabelecimento] = documentoVinculado.split('|');
+      const [documentoId, tipoTabela, tipoDocumento] = documentoVinculado.split('|');
       tipoDocumentoInput.value = tipoDocumento;
-      estabelecimentoInput.value = estabelecimento;
-      console.log('✓ Tipo de documento e estabelecimento atualizados automaticamente');
     }
 
     async function saveProcesso(event) {

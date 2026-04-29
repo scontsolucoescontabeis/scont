@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS public.rh_saves (
 
     -- Auditoria
     responsavel_alteracao       TEXT,
-    status                      TEXT DEFAULT 'rascunho' CHECK (status IN ('rascunho', 'finalizado', 'exportado')),
+    status                      TEXT DEFAULT 'rascunho',
     criado_por                  TEXT,
     atualizado_por              TEXT,
     nome_usuario                TEXT,
@@ -86,6 +86,9 @@ CREATE TABLE IF NOT EXISTS public.rh_saves (
     CONSTRAINT rh_saves_empresa_trabalhador_competencia_unique
         UNIQUE (empresa_codigo, nome_trabalhador, competencia)
 );
+
+-- Remove constraint de status se existir de execução anterior
+ALTER TABLE public.rh_saves DROP CONSTRAINT IF EXISTS rh_saves_status_check;
 
 CREATE INDEX IF NOT EXISTS idx_rh_saves_empresa     ON public.rh_saves (empresa_codigo);
 CREATE INDEX IF NOT EXISTS idx_rh_saves_competencia ON public.rh_saves (competencia);
@@ -122,10 +125,16 @@ CREATE TABLE IF NOT EXISTS public.rh_mapeamento_nomes (
 --    Políticas permissivas para usuários autenticados.
 --    O controle de acesso real é feito pelo Portal SCONT
 --    (usuário precisa estar logado e ter a ferramenta liberada).
+--
+--    Padrão: DROP IF EXISTS antes de CREATE para permitir
+--    re-execução segura do schema sem erros de duplicidade.
 -- ============================================================
 
 -- 7.1 rh_empresas
 ALTER TABLE public.rh_empresas ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "rh_empresas: leitura autenticado" ON public.rh_empresas;
+DROP POLICY IF EXISTS "rh_empresas: escrita autenticado"  ON public.rh_empresas;
 
 CREATE POLICY "rh_empresas: leitura autenticado"
     ON public.rh_empresas FOR SELECT
@@ -142,6 +151,9 @@ CREATE POLICY "rh_empresas: escrita autenticado"
 -- 7.2 rh_empregados
 ALTER TABLE public.rh_empregados ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "rh_empregados: leitura autenticado" ON public.rh_empregados;
+DROP POLICY IF EXISTS "rh_empregados: escrita autenticado"  ON public.rh_empregados;
+
 CREATE POLICY "rh_empregados: leitura autenticado"
     ON public.rh_empregados FOR SELECT
     TO authenticated
@@ -156,6 +168,9 @@ CREATE POLICY "rh_empregados: escrita autenticado"
 
 -- 7.3 rh_rubricas
 ALTER TABLE public.rh_rubricas ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "rh_rubricas: leitura autenticado" ON public.rh_rubricas;
+DROP POLICY IF EXISTS "rh_rubricas: escrita autenticado"  ON public.rh_rubricas;
 
 CREATE POLICY "rh_rubricas: leitura autenticado"
     ON public.rh_rubricas FOR SELECT
@@ -172,6 +187,9 @@ CREATE POLICY "rh_rubricas: escrita autenticado"
 -- 7.4 rh_saves
 ALTER TABLE public.rh_saves ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "rh_saves: leitura autenticado" ON public.rh_saves;
+DROP POLICY IF EXISTS "rh_saves: escrita autenticado"  ON public.rh_saves;
+
 CREATE POLICY "rh_saves: leitura autenticado"
     ON public.rh_saves FOR SELECT
     TO authenticated
@@ -187,6 +205,9 @@ CREATE POLICY "rh_saves: escrita autenticado"
 -- 7.5 rh_regras_renomeacao
 ALTER TABLE public.rh_regras_renomeacao ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "rh_regras: leitura autenticado" ON public.rh_regras_renomeacao;
+DROP POLICY IF EXISTS "rh_regras: escrita autenticado"  ON public.rh_regras_renomeacao;
+
 CREATE POLICY "rh_regras: leitura autenticado"
     ON public.rh_regras_renomeacao FOR SELECT
     TO authenticated
@@ -201,6 +222,9 @@ CREATE POLICY "rh_regras: escrita autenticado"
 
 -- 7.6 rh_mapeamento_nomes
 ALTER TABLE public.rh_mapeamento_nomes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "rh_mapeamento: leitura autenticado" ON public.rh_mapeamento_nomes;
+DROP POLICY IF EXISTS "rh_mapeamento: escrita autenticado"  ON public.rh_mapeamento_nomes;
 
 CREATE POLICY "rh_mapeamento: leitura autenticado"
     ON public.rh_mapeamento_nomes FOR SELECT

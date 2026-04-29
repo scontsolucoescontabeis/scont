@@ -915,7 +915,7 @@ async function processarFolhaComSalvamento(nomeResponsavel) {
                 dsr_dias: JSON.stringify(dsrDiasArray), // ✅ Sempre um ARRAY
                 flags_folga: JSON.stringify(flagsFolgaObj), // ✅ Sempre um OBJETO
                 responsavel_alteracao: nomeResponsavel,
-                status: 'processado',
+                status: 'finalizado',
                 criado_por: nomeResponsavel,
                 atualizado_por: nomeResponsavel,
                 nome_usuario: nomeResponsavel
