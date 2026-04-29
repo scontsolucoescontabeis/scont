@@ -212,7 +212,8 @@
             if (!auth) return;
             document.getElementById('portalAuthOverlay').remove();
             initSupabase();
-            loadForms();
+            await loadForms();
+            setupRealtimeSubscriptions();
         });
     </script>
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>

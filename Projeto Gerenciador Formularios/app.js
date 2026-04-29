@@ -1222,7 +1222,7 @@ async function saveChanges() {
             if (document.getElementById('editIptu')) updateData.iptu = document.getElementById('editIptu').value;
             if (document.getElementById('editEmailComercial')) updateData.email_comercial = document.getElementById('editEmailComercial').value;
             if (document.getElementById('editTelefoneComercial')) updateData.telefone_comercial = document.getElementById('editTelefoneComercial').value;
-            if (document.getElementById('editAtividadePrincipal')) updateData.atividade_principal = document.getElementById('editAtividadePrincipal').value;
+            if (document.getElementById('editAtividadePrincipal')) updateData.cnae_principal = document.getElementById('editAtividadePrincipal').value;
         } 
         else if (tipo === 'alteracao') {
             if (document.getElementById('editNomeEmpresa')) updateData.nome_empresa = document.getElementById('editNomeEmpresa').value;
@@ -1508,7 +1508,48 @@ function filterHistory() {
 }
 
 // ==========================================
-// 7. UTILITÁRIOS
+// 7. REALTIME — atualização automática
+// ==========================================
+let _realtimeChannel = null;
+
+function setupRealtimeSubscriptions() {
+    if (!supabaseClient) return;
+
+    // Debounce: evita recargas em rafaga quando múltiplos eventos chegam juntos
+    let debounceTimer = null;
+    function debouncedReload(eventName, table) {
+        console.log(`🔔 Realtime: ${eventName} em "${table}" — agendando atualização...`);
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            console.log('🔄 Realtime: recarregando formulários...');
+            loadForms();
+        }, 600);
+    }
+
+    // Remove canal anterior se já existia (ex: reconexão)
+    if (_realtimeChannel) {
+        supabaseClient.removeChannel(_realtimeChannel);
+    }
+
+    _realtimeChannel = supabaseClient
+        .channel('gerenciador-formularios')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'formularios' },
+            (payload) => debouncedReload(payload.eventType, 'formularios'))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'empregados' },
+            (payload) => debouncedReload(payload.eventType, 'empregados'))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'socios' },
+            (payload) => debouncedReload(payload.eventType, 'socios'))
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Realtime: inscrito nas tabelas formularios, empregados, socios');
+            } else if (status === 'CHANNEL_ERROR') {
+                console.warn('⚠️ Realtime: erro no canal — verifique se Realtime está habilitado no Supabase para essas tabelas');
+            }
+        });
+}
+
+// ==========================================
+// 8. UTILITÁRIOS
 // ==========================================
 async function syncSupabase(btn) {
     try {

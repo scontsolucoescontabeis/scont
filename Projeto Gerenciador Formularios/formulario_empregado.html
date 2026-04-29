@@ -241,13 +241,7 @@
             margin-bottom: 10px;
             color: var(--gray-700);
         }
-        .document-item input[type="checkbox"] {
-            margin-right: 10px;
-            cursor: pointer;
-            width: 18px;
-            height: 18px;
-        }
-        .document-item input[type="file"] {
+.document-item input[type="file"] {
             display: block;
             margin-top: 10px;
             width: 100%;
@@ -718,19 +712,19 @@
                     <h3>Documentos de Identificação</h3>
                     
                     <div class="document-item">
-                        <label><input type="checkbox" name="docCarteiraTrabalho"> Carteira de Trabalho</label>
+                        <label>Carteira de Trabalho</label>
                         <input type="file" name="docCarteiraTrabalho" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docCarteiraTrabalho')">
                         <div class="document-preview" id="preview_docCarteiraTrabalho"></div>
                     </div>
 
                     <div class="document-item">
-                        <label><input type="checkbox" name="docIdentidadeCPF"> Identidade, CPF e Título de Eleitor</label>
+                        <label>Identidade, CPF e Título de Eleitor</label>
                         <input type="file" name="docIdentidadeCPF" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docIdentidadeCPF')">
                         <div class="document-preview" id="preview_docIdentidadeCPF"></div>
                     </div>
 
                     <div class="document-item">
-    <label><input type="checkbox" name="docPIS"> Cartão do PIS</label>
+    <label>Cartão do PIS</label>
     <div style="margin-top: 10px; padding: 10px; background-color: #f0f0f0; border-radius: 4px;">
         <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--gray-700); font-size: 13px;">Número do PIS (opcional)</label>
         <input type="text" id="numeroPIS" name="numeroPIS" placeholder="Digite o número do PIS (ex: 123.45.678.90)" style="width: 100%; padding: 8px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 14px;">
@@ -743,7 +737,7 @@
                  
 
                     <div class="document-item">
-                        <label><input type="checkbox" name="docReservista"> Certificado de Reservista (Homens)</label>
+                        <label>Certificado de Reservista (Homens)</label>
                         <input type="file" name="docReservista" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docReservista')">
                         <div class="document-preview" id="preview_docReservista"></div>
                     </div>
@@ -762,13 +756,13 @@
                     <h3>Documentos Familiares</h3>
                     
                     <div class="document-item">
-                        <label><input type="checkbox" name="docCertidaoFilhos"> Certidão de Nascimento dos Filhos</label>
+                        <label>Certidão de Nascimento dos Filhos</label>
                         <input type="file" name="docCertidaoFilhos" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docCertidaoFilhos')">
                         <div class="document-preview" id="preview_docCertidaoFilhos"></div>
                     </div>
 
                     <div class="document-item">
-                        <label><input type="checkbox" name="docComprovanteResidencia"> Comprovante de Residência</label>
+                        <label>Comprovante de Residência</label>
                         <input type="file" name="docComprovanteResidencia" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docComprovanteResidencia')">
                         <div class="document-preview" id="preview_docComprovanteResidencia"></div>
                     </div>
@@ -786,7 +780,7 @@
                     <h3>Documentos Médicos</h3>
                     
                     <div class="document-item">
-                        <label><input type="checkbox" name="docExameMedico"> Exame Médico Admissional (ASO)</label>
+                        <label>Exame Médico Admissional (ASO)</label>
                         <input type="file" name="docExameMedico" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docExameMedico')">
                         <div class="document-preview" id="preview_docExameMedico"></div>
                     </div>
@@ -1357,14 +1351,19 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
             return;
         }
 
-        if (!window.validateForm()) {
-            return;
-        }
-
+        const originalText = submitBtn.innerHTML;
         isSubmitting = true;
         submitBtn.disabled = true;
-        const originalText = submitBtn.innerHTML;
+        submitBtn.style.pointerEvents = 'none';
         submitBtn.innerHTML = '<span class="spinner"></span>Enviando...';
+
+        if (!window.validateForm()) {
+            isSubmitting = false;
+            submitBtn.disabled = false;
+            submitBtn.style.pointerEvents = '';
+            submitBtn.innerHTML = originalText;
+            return;
+        }
 
         try {
             console.log('📝 Coletando dados do formulário...');
@@ -1441,6 +1440,7 @@ const { data: empregadoData, error: empregadoError } = await supabase
     .from('empregados')
     .insert([{
         nome_completo: formData.nomeCompleto,
+        nome_empresa: formData.nomeEmpresa,
         cpf: formData.cpf,
         email: formData.email,
         telefone: formData.telefone,
@@ -1601,6 +1601,7 @@ const { data: empregadoData, error: empregadoError } = await supabase
         } finally {
             isSubmitting = false;
             submitBtn.disabled = false;
+            submitBtn.style.pointerEvents = '';
             submitBtn.innerHTML = originalText;
         }
     };

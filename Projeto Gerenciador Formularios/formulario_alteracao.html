@@ -626,8 +626,20 @@
                 <!-- SEÇÃO 4: DADOS DOS SÓCIOS -->
                 <section class="form-section">
                     <h2 class="section-title">DADOS DOS SÓCIOS</h2>
-                    <div id="sociosContainer"></div>
-                    <button type="button" id="addSocioBtn" class="btn btn-add-socio">+ ADICIONAR SÓCIO</button>
+
+                    <!-- Pergunta sobre alteração no quadro societário -->
+                    <div class="form-group">
+                        <label>Haverá alteração no quadro societário? *</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="alterarQuadroSocietario" value="nao" checked onchange="toggleQuadroSocietario()"> Não</label>
+                            <label><input type="radio" name="alterarQuadroSocietario" value="sim" onchange="toggleQuadroSocietario()"> Sim</label>
+                        </div>
+                    </div>
+
+                    <div id="quadroSocietarioSection" style="display:none;">
+                        <div id="sociosContainer"></div>
+                        <button type="button" id="addSocioBtn" class="btn btn-add-socio">+ ADICIONAR SÓCIO</button>
+                    </div>
                 </section>
 
                 <!-- SEÇÃO 6: CLÁUSULA DE RESPONSABILIDADE -->
@@ -647,7 +659,7 @@
                     <div class="legal-text">
                         <p><strong>Em conformidade com a Lei nº 13.709/2018 – Lei de Proteção de Dados Pessoais</strong></p>
                         <p><strong>I - DADOS PESSOAIS:</strong> Os dados pessoais a serem utilizados para fins de alteração de empresa: Nome, nacionalidade, estado civil, naturalidade, filiação, profissão, números do registro geral junto a SSP ou CNH ou Carteira do órgão de classe e CPF, endereço residencial, telefone e e-mail.</p>
-                        <p><strong>II - FINALIDADE DO TRATAMENTO:</strong> A finalidade do tratamento de dados ora consentido visa à elaboração do contrato social alterado da pessoa jurídica e sócios, com o fim de realizar o competente Registro na JUCIS/DF, além da obtenção do CNPJ atualizado, registro junto à Secretaria de Estado de Fazenda do DF para obtenção da Inscrição Estadual, registro no DF Legal (quando necessário) e Licença de Funcionamento-RLE com suas respectivas vistorias para sua obtenção, junto aos órgãos e entidades governamentais.</p>
+                        <p><strong>II - FINALIDADE DO TRATAMENTO:</strong> A finalidade do tratamento de dados ora consentido visa à elaboração do contrato social alterado da pessoa jurídica e sócios, com o fim de realizar o competente Registro, além da obtenção do CNPJ atualizado, registro junto à Secretaria de Estado de Fazenda para obtenção da Inscrição Estadual, registro no DF Legal (se aplicável) e Licença de Funcionamento-RLE com suas respectivas vistorias para sua obtenção, junto aos órgãos e entidades governamentais.</p>
                         <p><strong>III – DA PRIVACIDADE E SIGILO:</strong> A SCONT SOLUÇÕES CONTÁBEIS LTDA. se compromete perante o Titular de Dados Pessoais a tratar os dados recebidos, observando a boa-fé e os princípios da Lei nº 13.709/2018, adotando no tratamento os cuidados e medidas de segurança aptas a proteger os dados pessoais de acessos não autorizados e de situações acidentais ou ilícitas de destruição, perda, alteração, comunicação ou difusão.</p>
                         <p><strong>IV - DEMAIS DISPOSIÇÕES:</strong></p>
                         <p><strong>a)</strong> O Titular de Dados poderá requerer da SCONT acesso a seus dados; pedir correção em caso de inexatidão; pedir atualização; requerer eliminação de dados desnecessários; solicitar portabilidade de seus dados para outro prestador de serviços; eliminação de dados pessoais ao término do tratamento; revogação do consentimento.</p>
@@ -660,7 +672,7 @@
 
                 <!-- BOTÕES DE AÇÃO -->
                 <section class="form-section button-section">
-                    <button type="submit" class="btn btn-primary">SALVAR E ENVIAR</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">SALVAR E ENVIAR</button>
                     <button type="reset" class="btn btn-secondary">LIMPAR FORMULÁRIO</button>
                 </section>
             </form>
@@ -697,7 +709,7 @@ const closeModalBtn = document.getElementById('closeModal');
 const shareWhatsapp = document.getElementById('shareWhatsapp');
 const sociosContainer = document.getElementById('sociosContainer');
 const addSocioBtn = document.getElementById('addSocioBtn');
-const submitBtn = document.querySelector('.btn-primary'); // CORREÇÃO: Referência ao botão
+const submitBtn = document.getElementById('submitBtn');
         // ===== DADOS DO FORMULÁRIO =====
         let formData = {};
         let sociosCount = 0;
@@ -841,10 +853,21 @@ let isSubmitting = false; // CORREÇÃO: FLAG PARA PREVENIR DUPLICAÇÃO
             }
         }
 
+        // ===== TOGGLE QUADRO SOCIETÁRIO =====
+        function toggleQuadroSocietario() {
+            const val = document.querySelector('input[name="alterarQuadroSocietario"]:checked')?.value;
+            const section = document.getElementById('quadroSocietarioSection');
+            if (val === 'sim') {
+                section.style.display = 'block';
+                if (sociosCount === 0) { sociosCount = 1; addSocioCard(1); }
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
         // ===== ADICIONAR PRIMEIRO SÓCIO =====
         function addInitialSocio() {
-            sociosCount = 1;
-            addSocioCard(1);
+            // A seção inicia oculta; o primeiro card só é criado quando o usuário selecionar "Sim"
         }
 
         // ===== ADICIONAR SÓCIO =====
@@ -860,13 +883,25 @@ let isSubmitting = false; // CORREÇÃO: FLAG PARA PREVENIR DUPLICAÇÃO
             socioCard.className = 'socio-card';
             socioCard.id = 'socio' + index + 'Card';
             socioCard.innerHTML = `
-                <div class="socio-card-title">
-                    SÓCIO #${index}
+                <div class="socio-card-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <span>SÓCIO #${index}</span>
+                    <select id="socio${index}Acao" name="socio${index}Acao" required style="font-size:.85rem;padding:4px 8px;border-radius:6px;border:1px solid var(--gray-300);">
+                        <option value="">-- Ação *</option>
+                        <option value="inclusao">Inclusão</option>
+                        <option value="edicao">Edição</option>
+                        <option value="exclusao">Exclusão</option>
+                    </select>
                     ${index > 1 ? '<button type="button" class="btn-remove-socio" onclick="removeSocio(' + index + ')">Remover Sócio</button>' : ''}
                 </div>
-                <div class="form-group">
-                    <label for="socio${index}Nome">Nome Completo *</label>
-                    <input type="text" id="socio${index}Nome" name="socio${index}Nome" placeholder="Digite o nome completo" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="socio${index}Nome">Nome Completo *</label>
+                        <input type="text" id="socio${index}Nome" name="socio${index}Nome" placeholder="Digite o nome completo" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="socio${index}CPF">CPF *</label>
+                        <input type="text" id="socio${index}CPF" name="socio${index}CPF" placeholder="000.000.000-00" maxlength="14" required>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Administrador? *</label>
@@ -879,7 +914,7 @@ let isSubmitting = false; // CORREÇÃO: FLAG PARA PREVENIR DUPLICAÇÃO
                     <label><input type="checkbox" name="socio${index}CNPJ"> Responsável pelo CNPJ</label>
                 </div>
                 <div class="form-group">
-                    <label for="socio${index}EstadoCivil">Estado Civil (se casado, informar regime de partilhas) *</label>
+                    <label for="socio${index}EstadoCivil">Estado Civil *</label>
                     <select id="socio${index}EstadoCivil" name="socio${index}EstadoCivil" required onchange="toggleRegimePartilha(${index})">
                         <option value="">Selecione...</option>
                         <option value="solteiro">Solteiro(a)</option>
@@ -893,21 +928,25 @@ let isSubmitting = false; // CORREÇÃO: FLAG PARA PREVENIR DUPLICAÇÃO
                     <label for="socio${index}RegimePartilha">Regime de Partilhas de Bens</label>
                     <input type="text" id="socio${index}RegimePartilha" name="socio${index}RegimePartilha" placeholder="Ex: Comunhão Universal de Bens">
                 </div>
-                <div class="form-group">
-                    <label for="socio${index}Naturalidade">Naturalidade *</label>
-                    <input type="text" id="socio${index}Naturalidade" name="socio${index}Naturalidade" placeholder="Cidade/Estado" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="socio${index}Naturalidade">Naturalidade *</label>
+                        <input type="text" id="socio${index}Naturalidade" name="socio${index}Naturalidade" placeholder="Cidade/Estado" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="socio${index}Profissao">Profissão *</label>
+                        <input type="text" id="socio${index}Profissao" name="socio${index}Profissao" placeholder="Digite a profissão" required>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="socio${index}Profissao">Profissão *</label>
-                    <input type="text" id="socio${index}Profissao" name="socio${index}Profissao" placeholder="Digite a profissão" required>
-                </div>
-                <div class="form-group">
-                    <label for="socio${index}EnderecoResidencial">Endereço Residencial *</label>
-                    <input type="text" id="socio${index}EnderecoResidencial" name="socio${index}EnderecoResidencial" placeholder="Rua, número, complemento" required>
-                </div>
-                <div class="form-group">
-                    <label for="socio${index}CEP">CEP *</label>
-                    <input type="text" id="socio${index}CEP" name="socio${index}CEP" placeholder="00000-000" maxlength="9" required>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="socio${index}EnderecoResidencial">Endereço Residencial *</label>
+                        <input type="text" id="socio${index}EnderecoResidencial" name="socio${index}EnderecoResidencial" placeholder="Rua, número, complemento" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="socio${index}CEP">CEP *</label>
+                        <input type="text" id="socio${index}CEP" name="socio${index}CEP" placeholder="00000-000" maxlength="9" required>
+                    </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -924,7 +963,7 @@ let isSubmitting = false; // CORREÇÃO: FLAG PARA PREVENIR DUPLICAÇÃO
                     <input type="number" id="socio${index}Participacao" name="socio${index}Participacao" placeholder="0" step="0.01" min="0" max="100" required>
                 </div>
                 <div class="form-group">
-                    <label for="socio${index}Documento">Upload de Documento de Identificação (RG, CPF ou CNH) *</label>
+                    <label for="socio${index}Documento">Upload de Documento de Identificação *</label>
                     <input type="file" id="socio${index}Documento" name="socio${index}Documento" accept=".pdf,.jpg,.jpeg,.png" required onchange="handleFileUpload(event, ${index})">
                     <small>Formatos aceitos: PDF, JPG, PNG (máx. 5MB)</small>
                     <div id="socio${index}DocumentoPreview"></div>
@@ -1018,20 +1057,23 @@ let isSubmitting = false; // CORREÇÃO: FLAG PARA PREVENIR DUPLICAÇÃO
                     return false;
                 }
             }
-            const socio1Nome = form.elements['socio1Nome'];
-            if (!socio1Nome || !socio1Nome.value) {
-                alert('Por favor, preencha os dados do primeiro sócio.');
-                if (socio1Nome) socio1Nome.focus();
-                return false;
-            }
-            for (let i = 1; i <= sociosCount; i++) {
-                const nomeField = form.elements['socio' + i + 'Nome'];
-                if (nomeField && nomeField.value) {
-                    const docInput = document.getElementById('socio' + i + 'Documento');
-                    if (!docInput || !docInput.files || docInput.files.length === 0) {
-                        alert('Por favor, faça upload do documento de identificação do Sócio #' + i);
-                        if (docInput) docInput.focus();
-                        return false;
+            const alterarQS = document.querySelector('input[name="alterarQuadroSocietario"]:checked')?.value;
+            if (alterarQS === 'sim') {
+                const socio1Nome = form.elements['socio1Nome'];
+                if (!socio1Nome || !socio1Nome.value) {
+                    alert('Por favor, preencha os dados do primeiro sócio.');
+                    if (socio1Nome) socio1Nome.focus();
+                    return false;
+                }
+                for (let i = 1; i <= sociosCount; i++) {
+                    const nomeField = form.elements['socio' + i + 'Nome'];
+                    if (nomeField && nomeField.value) {
+                        const docInput = document.getElementById('socio' + i + 'Documento');
+                        if (!docInput || !docInput.files || docInput.files.length === 0) {
+                            alert('Por favor, faça upload do documento de identificação do Sócio #' + i);
+                            if (docInput) docInput.focus();
+                            return false;
+                        }
                     }
                 }
             }
@@ -1049,6 +1091,8 @@ let isSubmitting = false; // CORREÇÃO: FLAG PARA PREVENIR DUPLICAÇÃO
 }
 
 function validateSocios() {
+    const alterarQS = document.querySelector('input[name="alterarQuadroSocietario"]:checked')?.value;
+    if (alterarQS !== 'sim') return true;
     const sociosCount = getSociosCount();
     for (let i = 1; i <= sociosCount; i++) {
         const nome = form.elements['socio' + i + 'Nome']?.value.trim();
@@ -1077,26 +1121,39 @@ function validateSocios() {
      // ===== SUBMISSÃO DO FORMULÁRIO =====
 async function handleFormSubmit(e) {
     e.preventDefault();
-    if (isSubmitting) {
-        console.warn('⚠️ Submissão em andamento...');
-        return;
-    }
+    if (isSubmitting) return;
 
-    if (!validateForm()) return;
-    if (!validateSocios()) return;  // Nova validação
-
-    const submitBtn = document.querySelector('.btn-primary');
+    // Bloquear imediatamente — antes de qualquer validação ou operação assíncrona
     const originalText = submitBtn.innerHTML;
     isSubmitting = true;
     submitBtn.disabled = true;
+    submitBtn.style.pointerEvents = 'none';
     submitBtn.innerHTML = '⏳ Processando...';
 
+    if (!validateForm()) {
+        isSubmitting = false;
+        submitBtn.disabled = false;
+        submitBtn.style.pointerEvents = '';
+        submitBtn.innerHTML = originalText;
+        return;
+    }
+    if (!validateSocios()) {
+        isSubmitting = false;
+        submitBtn.disabled = false;
+        submitBtn.style.pointerEvents = '';
+        submitBtn.innerHTML = originalText;
+        return;
+    }
+
     try {
-        // 1. PDF (manter igual)
+        // 1. Coletar dados do formulário
+        collectFormData();
+
+        // 2. PDF
         console.log('📄 Gerando PDF...');
         const pdfBlob = await gerarPDFFormulario();
 
-        // 2. Uploads (adaptado para gerarNomeDocumentoSocio)
+        // 3. Uploads
         console.log('📤 Upload PDF...');
         const nomeFormulario = gerarNomeFormulario(formData.nomeEmpresa);
         await uploadArquivo(pdfBlob, 'formulario', nomeFormulario);
@@ -1144,6 +1201,7 @@ async function handleFormSubmit(e) {
                 alterar_atividades: formData.alterarAtividades === 'sim',
                 atividade_principal_nova: formData.atividadePrincipalNova || null,
                 atividades_secundarias_nova: formData.atividadesSecundariasNova || null,
+                alterar_quadro_societario: document.querySelector('input[name="alterarQuadroSocietario"]:checked')?.value === 'sim',
                 data_preenchimento: formData.dataPreenchimento,
                 hora_preenchimento: formData.horaPreenchimento,
                 status: 'recebido'
@@ -1164,10 +1222,9 @@ async function handleFormSubmit(e) {
                 sociosData.push({
                     formulario_id: submissionId,
                     numero_socio: i,
+                    acao_socio: form.elements['socio' + i + 'Acao']?.value || null,
                     nome: form.elements['socio' + i + 'Nome'].value.trim(),
-                    cpf: form.elements['socio' + i + 'CPF'].value.trim(),
-                    rg: form.elements['socio' + i + 'RG']?.value?.trim() || null,
-                    cnh: form.elements['socio' + i + 'CNH']?.value?.trim() || null,
+                    cpf: form.elements['socio' + i + 'CPF']?.value?.trim() || null,
                     endereco_residencial: form.elements['socio' + i + 'EnderecoResidencial']?.value?.trim() || null,
                     cep: form.elements['socio' + i + 'CEP']?.value?.trim() || null,
                     email: form.elements['socio' + i + 'Email']?.value?.trim() || null,
@@ -1200,6 +1257,7 @@ async function handleFormSubmit(e) {
     } finally {
         isSubmitting = false;
         submitBtn.disabled = false;
+        submitBtn.style.pointerEvents = '';
         submitBtn.innerHTML = originalText;
     }
 }

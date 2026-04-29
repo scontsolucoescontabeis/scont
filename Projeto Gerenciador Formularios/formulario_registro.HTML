@@ -343,6 +343,7 @@
                     <div class="radio-group">
                         <label><input type="radio" name="porteEmpresa" value="microempresa" required> Microempresa (até R$ 360 mil/ano)</label>
                         <label><input type="radio" name="porteEmpresa" value="pequeno_porte"> Pequeno Porte (até R$ 4.800.000/ano)</label>
+                        <label><input type="radio" name="porteEmpresa" value="outros"> Outros</label>
                     </div>
                 </div>
                 <div class="form-group">
@@ -420,9 +421,7 @@
                 <div class="legal-text">
                     <p>A elaboração dos instrumentos contratuais pela SCONT Soluções Contábeis – sejam atos constitutivos ou alterações contratuais – segue estritamente os modelos padronizados e as diretrizes estabelecidas pela Junta Comercial e demais órgãos de registro.</p>
                     <p><strong>I – RESPONSABILIDADE DO CLIENTE:</strong> O cliente é responsável pela veracidade, exatidão e legalidade de todas as informações fornecidas neste formulário.</p>
-                    <p><strong>II – FINALIDADE DO TRATAMENTO:</strong> A finalidade do tratamento de dados ora consentido visa à elaboração do contrato social da pessoa jurídica e sócios, com o fim de realizar o competente Registro na JUCIS/DF, além da obtenção do CNPJ, registro junto à Secretaria de Estado de Fazenda do DF para obtenção da Inscrição Estadual, registro no DF Legal (quando necessário) e Licença de Funcionamento-RLE com suas respectivas vistorias para sua obtenção, junto aos órgãos e entidades governamentais.</p>
-                    <p><strong>III – DA PRIVACIDADE E SIGILO:</strong> A SCONT SOLUÇÕES CONTÁBEIS LTDA. se compromete perante o Titular de Dados Pessoais a tratar os dados recebidos, observando a boa-fé e os princípios da Lei nº 13.709/2018, adotando no tratamento os cuidados e medidas de segurança aptas a proteger os dados pessoais de acessos não autorizados e de situações acidentais ou ilícitas de destruição, perda, alteração, comunicação ou difusão.</p>
-                    <p><strong>IV - DEMAIS DISPOSIÇÕES:</strong></p>
+                    <p><strong>II - DEMAIS DISPOSIÇÕES:</strong></p>
                     <p><strong>a)</strong> O cliente reconhece que a SCONT não fornece análise jurídica e recomenda a consulta com um advogado para análise dos documentos contratuais.</p>
                 </div>
             </section>
@@ -432,11 +431,11 @@
                 <h2 class="section-title">TERMO DE CONSENTIMENTO - LGPD</h2>
                 <div class="legal-text">
                     <p><strong>I – DADOS PESSOAIS COLETADOS:</strong> Nome completo, CPF, RG, CNH, endereço residencial, CEP, e-mail, telefone celular, estado civil, regime de partilha, naturalidade e profissão.</p>
-                    <p><strong>II – FINALIDADE DO TRATAMENTO:</strong> A finalidade do tratamento de dados ora consentido visa à elaboração do contrato social da pessoa jurídica e sócios, com o fim de realizar o competente Registro na JUCIS/DF, além da obtenção do CNPJ, registro junto à Secretaria de Estado de Fazenda do DF para obtenção da Inscrição Estadual, registro no DF Legal (quando necessário) e Licença de Funcionamento-RLE com suas respectivas vistorias para sua obtenção, junto aos órgãos e entidades governamentais.</p>
+                    <p><strong>II – FINALIDADE DO TRATAMENTO:</strong> A finalidade do tratamento de dados ora consentido visa à elaboração do contrato social da pessoa jurídica e sócios, com o fim de realizar o competente Registro, além da obtenção do CNPJ, registro junto à Secretaria de Estado de Fazenda para obtenção da Inscrição Estadual, registro no DF Legal (se aplicável) e Licença de Funcionamento-RLE com suas respectivas vistorias para sua obtenção, junto aos órgãos e entidades governamentais.</p>
                     <p><strong>III – DA PRIVACIDADE E SIGILO:</strong> A SCONT SOLUÇÕES CONTÁBEIS LTDA. se compromete perante o Titular de Dados Pessoais a tratar os dados recebidos, observando a boa-fé e os princípios da Lei nº 13.709/2018, adotando no tratamento os cuidados e medidas de segurança aptas a proteger os dados pessoais de acessos não autorizados e de situações acidentais ou ilícitas de destruição, perda, alteração, comunicação ou difusão.</p>
                 </div>
                 <div class="form-group">
-                    <label><input type="checkbox" id="consentimentoLGPD" name="consentimentoLGPD" required> Declaro que li e concordo com o Termo de Consentimento LGPD *</label>
+                    <label><input type="checkbox" id="consentimentoLGPD" name="consentimentoLGPD" required> Declaro que li e concordo com o Termos*</label>
                 </div>
             </section>
 
@@ -544,16 +543,6 @@
                 <div class="form-group">
                     <label for="socio${index}CPF">CPF *</label>
                     <input type="text" id="socio${index}CPF" name="socio${index}CPF" placeholder="000.000.000-00" required>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="socio${index}RG">RG</label>
-                    <input type="text" id="socio${index}RG" name="socio${index}RG" placeholder="0000000">
-                </div>
-                <div class="form-group">
-                    <label for="socio${index}CNH">CNH</label>
-                    <input type="text" id="socio${index}CNH" name="socio${index}CNH" placeholder="00000000000">
                 </div>
             </div>
             <div class="form-row">
@@ -803,18 +792,29 @@
     // ===== SUBMISSÃO DO FORMULÁRIO =====
     async function handleFormSubmit(e) {
         e.preventDefault();
-        if (isSubmitting) {
-            console.warn('⚠️ Submissão em andamento...');
-            return;
-        }
+        if (isSubmitting) return;
 
-        if (!validateForm()) return;
-        if (!validateSocios()) return;
-
+        // Bloquear imediatamente — antes de qualquer validação ou operação assíncrona
         const originalText = submitBtn.innerHTML;
         isSubmitting = true;
         submitBtn.disabled = true;
+        submitBtn.style.pointerEvents = 'none';
         submitBtn.innerHTML = '⏳ Processando...';
+
+        if (!validateForm()) {
+            isSubmitting = false;
+            submitBtn.disabled = false;
+            submitBtn.style.pointerEvents = '';
+            submitBtn.innerHTML = originalText;
+            return;
+        }
+        if (!validateSocios()) {
+            isSubmitting = false;
+            submitBtn.disabled = false;
+            submitBtn.style.pointerEvents = '';
+            submitBtn.innerHTML = originalText;
+            return;
+        }
 
         try {
             // 1. Coletar dados
@@ -859,7 +859,7 @@
                     email_comercial: formData.emailComercial || null,
                     telefone_comercial: formData.telefoneComercial || null,
                     forma_atuacao: formData.formaAtuacao || null,
-                    atividade_principal: formData.atividadePrincipal || null,
+                    cnae_principal: formData.atividadePrincipal || null,
                     atividades_secundarias: formData.atividadesSecundarias || null,
                     data_preenchimento: formData.dataPreenchimento,
                     hora_preenchimento: formData.horaPreenchimento,
@@ -902,6 +902,7 @@ try {
             formulario_id: submissionId,
             numero_socio: i,
             nome: form.elements['socio' + i + 'Nome'].value.trim(),
+            cpf: form.elements['socio' + i + 'CPF']?.value?.trim() || null,
             administrador: form.elements['socio' + i + 'Admin']?.value === 'sim',
             responsavel_cnpj: !!form.elements['socio' + i + 'CNPJ']?.checked,
             estado_civil: form.elements['socio' + i + 'EstadoCivil']?.value || null,
@@ -947,6 +948,7 @@ try {
         } finally {
             isSubmitting = false;
             submitBtn.disabled = false;
+            submitBtn.style.pointerEvents = '';
             submitBtn.innerHTML = originalText;
         }
     }
