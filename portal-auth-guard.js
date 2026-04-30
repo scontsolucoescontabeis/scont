@@ -21,8 +21,10 @@ window.PortalAuthGuard = (function () {
         return '../'.repeat(depth) + 'login.html';
     }
 
-    function redirecionar(depth) {
-        window.location.replace(getLoginUrl(depth));
+    function redirecionar(depth, returnTo) {
+        let url = getLoginUrl(depth);
+        if (returnTo) url += '?returnTo=' + encodeURIComponent(returnTo);
+        window.location.replace(url);
     }
 
     /** Extrai os últimos 2 segmentos do pathname atual: "PastaFerramenta/arquivo.html" */
@@ -38,22 +40,27 @@ window.PortalAuthGuard = (function () {
      * @param {number} depthToRoot  Níveis de pasta até a raiz do portal (padrão: 1)
      * @returns {object|null}       Objeto userAuth do sessionStorage, ou null se não autorizado
      */
-    async function init(depthToRoot) {
+    /**
+     * @param {number} depthToRoot
+     * @param {{ returnAfterLogin?: boolean }} [opts]
+     */
+    async function init(depthToRoot, opts) {
         depthToRoot = depthToRoot ?? 1;
+        const returnTo = opts?.returnAfterLogin ? window.location.href : null;
 
         // 1. sessionStorage
         const saved = sessionStorage.getItem('userAuth');
-        if (!saved) { redirecionar(depthToRoot); return null; }
+        if (!saved) { redirecionar(depthToRoot, returnTo); return null; }
 
         let auth;
-        try { auth = JSON.parse(saved); } catch { redirecionar(depthToRoot); return null; }
+        try { auth = JSON.parse(saved); } catch { redirecionar(depthToRoot, returnTo); return null; }
 
         // 2. Sessão Supabase Auth
         const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const { data: { session } } = await sb.auth.getSession();
         if (!session) {
             sessionStorage.removeItem('userAuth');
-            redirecionar(depthToRoot);
+            redirecionar(depthToRoot, returnTo);
             return null;
         }
 
@@ -65,7 +72,7 @@ window.PortalAuthGuard = (function () {
             .from('usuario_ferramentas')
             .select('ferramentas ( url_base )');
 
-        if (error) { redirecionar(depthToRoot); return null; }
+        if (error) { redirecionar(depthToRoot, returnTo); return null; }
 
         const urlsAutorizadas = (data || [])
             .map(r => r.ferramentas?.url_base)
@@ -81,7 +88,7 @@ window.PortalAuthGuard = (function () {
 
         // Acesso permitido se: URL exata autorizada OU qualquer ferramenta da mesma pasta está autorizada
         const autorizado = urlsAutorizadas.some(u => u === atual || u.startsWith(pastaAtual + '/'));
-        if (!autorizado) { redirecionar(depthToRoot); return null; }
+        if (!autorizado) { redirecionar(depthToRoot, returnTo); return null; }
 
         return auth;
     }

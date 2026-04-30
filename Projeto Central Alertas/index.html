@@ -109,7 +109,7 @@
   <script src="app.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', async () => {
-      const auth = await window.PortalAuthGuard.init(1);
+      const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
       if (!auth) return;
       document.getElementById('authOverlay').remove();
       const app = document.getElementById('app');

@@ -118,6 +118,30 @@
 <script>
 // ─── CONFIG (compartilhada com todos os arquivos) ───────────
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const _returnTo = new URLSearchParams(location.search).get('returnTo');
+
+function _toolPath(url) {
+    try {
+        const path = decodeURIComponent(new URL(url).pathname).replace(/\\/g, '/');
+        const segs = path.split('/').filter(Boolean);
+        if (segs.length < 2) return (segs[0] || '').toLowerCase();
+        return (segs[segs.length - 2] + '/' + segs[segs.length - 1]).toLowerCase();
+    } catch { return ''; }
+}
+
+async function _resolveDestino(isAdmin, userId) {
+    if (!_returnTo) return 'portal.html';
+    if (isAdmin) return _returnTo;
+    const toolPath = _toolPath(_returnTo);
+    const toolFolder = toolPath.split('/')[0];
+    const { data } = await sb.from('usuario_ferramentas').select('ferramentas ( url_base )');
+    const autorizadas = (data || [])
+        .map(r => r.ferramentas?.url_base).filter(Boolean)
+        .map(u => decodeURIComponent(u).replace(/^\.\//, '').replace(/\\/g, '/').toLowerCase());
+    return autorizadas.some(u => u === toolPath || u.startsWith(toolFolder + '/'))
+        ? _returnTo
+        : 'portal.html';
+}
 
 function sanitize(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
 function showAlert(el, msg, type) { el.textContent = msg; el.className = `alert alert-${type} show`; setTimeout(() => el.classList.remove('show'), 6000); }
@@ -171,7 +195,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
                 userData:   { nome: usuario.nome }
             }));
             showAlert(alertEl, '✅ Acesso admin liberado! Redirecionando...', 'success');
-            setTimeout(() => { window.location.href = 'portal.html'; }, 1200);
+            const destinoAdmin = await _resolveDestino(true);
+            setTimeout(() => { window.location.href = destinoAdmin; }, 1200);
             return;
         }
 
@@ -207,7 +232,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         }));
 
         showAlert(alertEl, '✅ Login realizado! Redirecionando...', 'success');
-        setTimeout(() => { window.location.href = 'portal.html'; }, 1200);
+        const destino = await _resolveDestino(false);
+        setTimeout(() => { window.location.href = destino; }, 1200);
 
     } catch (err) {
         showAlert(alertEl, '❌ ' + sanitize(err.message), 'error');
@@ -280,8 +306,12 @@ document.getElementById('cadastroForm').addEventListener('submit', async (e) => 
 document.addEventListener('DOMContentLoaded', async () => {
     const { data: { session } } = await sb.auth.getSession();
     const saved = sessionStorage.getItem('userAuth');
-    if (session && saved)  { window.location.href = 'portal.html'; return; }
-    if (!session && saved)   sessionStorage.removeItem('userAuth');
+    if (session && saved) {
+        const auth = JSON.parse(saved);
+        window.location.href = await _resolveDestino(!!auth.isAdmin);
+        return;
+    }
+    if (!session && saved) sessionStorage.removeItem('userAuth');
 });
 </script>
 </body>
