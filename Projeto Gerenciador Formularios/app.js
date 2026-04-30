@@ -161,6 +161,9 @@ function createFormCard(form) {
                 <button class="btn btn-primary btn-small" onclick="event.stopPropagation(); editFormCard('${form.id}')">
                     ✏️ Editar
                 </button>
+                <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); deleteForm('${form.id}', '${(nome).replace(/'/g, '\\\'')}')" title="Excluir formulário">
+                    🗑️
+                </button>
             </div>
         </div>
     `;
@@ -202,6 +205,8 @@ function filterForms() {
     if (!window.allForms) return;
 
     const filtered = window.allForms.filter(form => {
+        if (form.status === 'excluido') return false;
+
         const nome = (form.nome_empresa || form.nome_completo || form.nomeEmpresa || form.nomeCompleto || '').toLowerCase();
         const email = (form.email_comercial || form.email || form.emailComercial || '').toLowerCase();
         const telefone = (form.telefone_comercial || form.celular || form.telefoneComercial || '').toLowerCase();
@@ -1286,8 +1291,8 @@ async function saveChanges() {
             await supabaseClient.from('historico_edicoes').insert([{
                 tabela: tableName,
                 registro_id: formId,
-                campo: 'status/dados',
-                valor_anterior: form.status || 'N/A',
+                campo: 'EVENTO_EDICAO',
+                valor_anterior: form.status || 'recebido',
                 valor_novo: newStatus,
                 editado_por: responsavel,
                 editado_em: new Date().toISOString()
@@ -1296,19 +1301,17 @@ async function saveChanges() {
 
         // 4. GERAR E ENVIAR PDF ATUALIZADO
         try {
-            // Muda o texto do botão para dar feedback visual
             const btnSalvar = document.querySelector('#editModal .btn-primary');
             const textoOriginal = btnSalvar.innerText;
             btnSalvar.innerText = 'Gerando PDF...';
             btnSalvar.disabled = true;
 
             await gerarEEnviarPDFAlterado(form, updateData, sociosAtualizados, responsavel);
-            
+
             btnSalvar.innerText = textoOriginal;
             btnSalvar.disabled = false;
         } catch (pdfError) {
             console.error('Erro ao gerar/enviar PDF:', pdfError);
-            // Não interrompe o fluxo se o PDF falhar, pois os dados já foram salvos
         }
 
         showSuccess('Formulário atualizado e PDF gerado com sucesso!');
@@ -1325,6 +1328,43 @@ async function saveChanges() {
 function closeEditModal() {
     const modal = document.getElementById('editModal');
     if (modal) modal.style.display = 'none';
+}
+
+async function deleteForm(formId, formName) {
+    if (!confirm(`Excluir "${formName}"?\n\nO formulário será marcado como excluído e o evento ficará registrado no histórico por 48 h na Central de Alertas.`)) return;
+
+    const form = window.allForms.find(f => f.id === formId);
+    if (!form) return showError('Formulário não encontrado');
+
+    const tableName = form.tipo_formulario === 'empregado' ? 'empregados' : 'formularios';
+    let responsavel;
+    try { responsavel = JSON.parse(localStorage.getItem('lastUser')) || 'Sistema'; }
+    catch { responsavel = 'Sistema'; }
+
+    try {
+        const { error } = await supabaseClient
+            .from(tableName)
+            .update({ status: 'excluido', updated_at: new Date().toISOString() })
+            .eq('id', formId);
+
+        if (error) throw error;
+
+        await supabaseClient.from('historico_edicoes').insert([{
+            tabela: tableName,
+            registro_id: formId,
+            campo: 'EVENTO_EXCLUSAO',
+            valor_anterior: form.status || 'recebido',
+            valor_novo: 'excluido',
+            editado_por: responsavel,
+            editado_em: new Date().toISOString()
+        }]);
+
+        showSuccess('Formulário excluído e evento registrado.');
+        closeModal();
+        loadForms();
+    } catch (err) {
+        showError('Erro ao excluir: ' + err.message);
+    }
 }
 
 // ==========================================

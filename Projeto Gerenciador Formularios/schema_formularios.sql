@@ -12,7 +12,7 @@
 CREATE TABLE IF NOT EXISTS public.formularios (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tipo_formulario             TEXT NOT NULL CHECK (tipo_formulario IN ('registro', 'alteracao')),
-    status                      TEXT NOT NULL DEFAULT 'recebido' CHECK (status IN ('recebido', 'validado', 'rejeitado')),
+    status                      TEXT NOT NULL DEFAULT 'recebido' CHECK (status IN ('recebido', 'validado', 'rejeitado', 'excluido')),
 
     -- Identificação (ambos os tipos)
     nome_empresa                TEXT,           -- razão social ou nome proposto
@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS public.empregados (
     -- Auditoria
     data_preenchimento          TEXT,
     hora_preenchimento          TEXT,
-    status                      TEXT NOT NULL DEFAULT 'recebido' CHECK (status IN ('recebido', 'validado', 'rejeitado')),
+    status                      TEXT NOT NULL DEFAULT 'recebido' CHECK (status IN ('recebido', 'validado', 'rejeitado', 'excluido')),
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

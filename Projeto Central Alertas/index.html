@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#1e3a5f" />
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>Central de Alertas — SCONT</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="../supabase-config.js"></script>
@@ -16,88 +17,89 @@
 <body>
 
   <!-- Auth overlay -->
-  <div id="authOverlay">
-    <div class="spinner"></div>
-    <p style="font-size:14px;color:#64748b;font-weight:600;">Verificando acesso...</p>
+  <div id="authOverlay" class="auth-overlay">
+    <div class="auth-spinner"></div>
+    <p class="auth-msg">Verificando acesso…</p>
   </div>
 
   <!-- App -->
-  <div id="app" style="display:none;">
+  <div id="app" style="display:none">
 
-    <!-- Header -->
-    <header class="header">
-      <span class="header-logo">🔔</span>
-      <div class="header-title">Central de Alertas</div>
+    <!-- ── Header ── -->
+    <header class="app-header">
+      <span class="header-brand">🔔</span>
+      <h1 class="header-title">Central de Alertas</h1>
       <div class="header-actions">
-        <button class="btn-icon" id="btnRefresh" title="Atualizar" onclick="refreshAlerts()">🔄</button>
-        <button class="btn-icon" id="btnTheme"   title="Tema"      onclick="toggleTheme()">🌙</button>
-        <button class="btn-icon" title="Portal"  onclick="window.location.href='../portal.html'">🏠</button>
+        <button class="btn-icon" id="btnTheme"   onclick="toggleTheme()"                           title="Alternar tema">🌙</button>
+        <button class="btn-icon" id="btnRefresh" onclick="refreshAlerts()"                          title="Atualizar">🔄</button>
+        <button class="btn-icon"                 onclick="navigate('../portal.html')"               title="Portal">🏠</button>
       </div>
     </header>
 
-    <!-- Stats -->
-    <div class="stats-bar" id="statsBar">
-      <div class="stat-card total  active" onclick="setFilter('todos')"       title="Ver todos">
-        <div class="stat-value" id="statTotal">—</div>
-        <div class="stat-label">Total</div>
-      </div>
-      <div class="stat-card critico" onclick="setFilter('critico')" title="Ver críticos">
-        <div class="stat-value" id="statCritico">—</div>
-        <div class="stat-label">Crítico</div>
-      </div>
-      <div class="stat-card urgente" onclick="setFilter('urgente')" title="Ver urgentes">
-        <div class="stat-value" id="statUrgente">—</div>
-        <div class="stat-label">Urgente</div>
-      </div>
-      <div class="stat-card atencao" onclick="setFilter('atencao')" title="Ver atenção">
-        <div class="stat-value" id="statAtencao">—</div>
-        <div class="stat-label">Atenção</div>
-      </div>
-      <div class="stat-card info" onclick="setFilter('info')" title="Ver informativos">
-        <div class="stat-value" id="statInfo">—</div>
-        <div class="stat-label">Info</div>
-      </div>
+    <!-- ── Stats chips ── -->
+    <div class="stats-bar">
+      <button class="stat-chip active" data-sev="total"   onclick="setFilter('todos')">
+        <span class="chip-count" id="statTotal">—</span>
+        <span class="chip-label">Total</span>
+      </button>
+      <button class="stat-chip" data-sev="critico" onclick="setFilter('critico')">
+        <span class="chip-count" id="statCritico">—</span>
+        <span class="chip-label">Crítico</span>
+      </button>
+      <button class="stat-chip" data-sev="urgente" onclick="setFilter('urgente')">
+        <span class="chip-count" id="statUrgente">—</span>
+        <span class="chip-label">Urgente</span>
+      </button>
+      <button class="stat-chip" data-sev="atencao" onclick="setFilter('atencao')">
+        <span class="chip-count" id="statAtencao">—</span>
+        <span class="chip-label">Atenção</span>
+      </button>
+      <button class="stat-chip" data-sev="info" onclick="setFilter('info')">
+        <span class="chip-count" id="statInfo">—</span>
+        <span class="chip-label">Info</span>
+      </button>
     </div>
 
-    <!-- Filter tabs -->
-    <div class="filter-bar" id="filterBar">
-      <button class="filter-tab active" data-filter="todos"         onclick="setFilter('todos')">
-        📋 Todos <span class="tab-count" id="tabTodos">0</span>
+    <!-- ── Category tabs ── -->
+    <nav class="cat-tabs" role="tablist">
+      <button class="cat-tab active" data-filter="todos"        role="tab" onclick="setFilter('todos')">
+        Todos <span class="tab-count" id="tabTodos">0</span>
       </button>
-      <button class="filter-tab" data-filter="certificados"         onclick="setFilter('certificados')">
-        🔐 Certificados <span class="tab-count" id="tabCertificados">0</span>
+      <button class="cat-tab" data-filter="certificados"        role="tab" onclick="setFilter('certificados')">
+        🔐 Certif. <span class="tab-count" id="tabCertificados">0</span>
       </button>
-      <button class="filter-tab" data-filter="formularios"          onclick="setFilter('formularios')">
-        📄 Formulários <span class="tab-count" id="tabFormularios">0</span>
+      <button class="cat-tab" data-filter="formularios"         role="tab" onclick="setFilter('formularios')">
+        📄 Formul. <span class="tab-count" id="tabFormularios">0</span>
       </button>
-      <button class="filter-tab" data-filter="admissoes"            onclick="setFilter('admissoes')">
-        👤 Admissões <span class="tab-count" id="tabAdmissoes">0</span>
+      <button class="cat-tab" data-filter="admissoes"           role="tab" onclick="setFilter('admissoes')">
+        👤 Admis. <span class="tab-count" id="tabAdmissoes">0</span>
       </button>
-      <button class="filter-tab" data-filter="licencas" onclick="setFilter('licencas')">
+      <button class="cat-tab" data-filter="licencas"            role="tab" onclick="setFilter('licencas')">
         🏛️ Licenças <span class="tab-count" id="tabLicencas">0</span>
       </button>
-      <button class="filter-tab" data-filter="portal" id="tabPortalBtn" style="display:none;" onclick="setFilter('portal')">
+      <button class="cat-tab" data-filter="portal" id="tabPortalBtn" role="tab" style="display:none" onclick="setFilter('portal')">
         🏠 Portal <span class="tab-count" id="tabPortal">0</span>
       </button>
-    </div>
+    </nav>
 
-    <!-- Skeleton (loading) -->
-    <div class="skeleton-list" id="skeleton">
+    <!-- ── Skeleton ── -->
+    <div id="skeleton" class="skeleton-list">
       <div class="skeleton-card"></div>
       <div class="skeleton-card"></div>
       <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
     </div>
 
-    <!-- Alert cards -->
-    <div class="alerts-container" id="alertsContainer" style="display:none;">
-      <div class="alerts-grid" id="alertsGrid"></div>
-    </div>
+    <!-- ── Alerts list ── -->
+    <main id="alertsContainer" class="alerts-list" style="display:none">
+      <div id="alertsGrid"></div>
+    </main>
 
-    <!-- Empty state -->
-    <div class="empty-state" id="emptyState">
+    <!-- ── Empty state ── -->
+    <div id="emptyState" class="empty-state">
       <div class="empty-icon">✅</div>
-      <div class="empty-title">Nenhum alerta</div>
-      <div class="empty-sub">Tudo em ordem neste filtro.</div>
+      <h3 class="empty-title">Tudo em ordem</h3>
+      <p class="empty-sub">Nenhum alerta neste filtro.</p>
     </div>
 
   </div><!-- /#app -->
@@ -110,8 +112,9 @@
       const auth = await window.PortalAuthGuard.init(1);
       if (!auth) return;
       document.getElementById('authOverlay').remove();
-      document.getElementById('app').style.display = 'flex';
-      document.getElementById('app').style.flexDirection = 'column';
+      const app = document.getElementById('app');
+      app.style.display = 'flex';
+      app.style.flexDirection = 'column';
       initApp(auth);
     });
   </script>
