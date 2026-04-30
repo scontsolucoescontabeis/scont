@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciamento de Formulários - SCONT</title>
+    <link rel="icon" type="image/x-icon" href="../assets/icons/gerenciador-formularios/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/gerenciador-formularios/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/gerenciador-formularios/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/icons/gerenciador-formularios/apple-touch-icon.png" />
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -16,19 +20,19 @@
                 </div>
             </div>
             <nav class="sidebar-nav">
-                <a href="#" class="nav-item active" onclick="filterByType('', this)">
+                <a href="#" id="navTodos" class="nav-item active" onclick="filterByType('', this)">
                     <span class="icon">📋</span>
                     <span>Todos os Formulários</span>
                 </a>
-                <a href="#" class="nav-item" onclick="filterByType('registro', this)">
+                <a href="#" id="navRegistro" class="nav-item" onclick="filterByType('registro', this)">
                     <span class="icon">🏢</span>
                     <span>Registro de Empresa</span>
                 </a>
-                <a href="#" class="nav-item" onclick="filterByType('alteracao', this)">
+                <a href="#" id="navAlteracao" class="nav-item" onclick="filterByType('alteracao', this)">
                     <span class="icon">📝</span>
                     <span>Alteração de Empresa</span>
                 </a>
-                <a href="#" class="nav-item" onclick="filterByType('empregado', this)">
+                <a href="#" id="navEmpregado" class="nav-item" onclick="filterByType('empregado', this)">
                     <span class="icon">👤</span>
                     <span>Registro de Empregado</span>
                 </a>
@@ -210,6 +214,36 @@
         document.addEventListener('DOMContentLoaded', async function() {
             const auth = await window.PortalAuthGuard.init(1);
             if (!auth) return;
+
+            // Carregar sub-permissões do Gerenciador
+            window.gfPermissions = [];
+            if (!auth.isAdmin && auth.userId) {
+                const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                const { data: ufRows } = await _sb
+                    .from('usuario_ferramentas')
+                    .select('permissoes, ferramentas(url_base)')
+                    .eq('usuario_id', auth.userId);
+                const entry = (ufRows || []).find(r => {
+                    const u = (r.ferramentas?.url_base || '').toLowerCase().replace(/\\/g, '/').replace(/^\.\//, '');
+                    return u.includes('gerenciador');
+                });
+                window.gfPermissions = entry?.permissoes || [];
+            }
+
+            // Aplicar visibilidade da sidebar conforme permissões
+            const _p = window.gfPermissions;
+            const hasFormularios = _p.length === 0 || _p.includes('formularios');
+            const hasEmpregados  = _p.length === 0 || _p.includes('empregados');
+
+            if (!hasFormularios) {
+                document.getElementById('navTodos').style.display    = 'none';
+                document.getElementById('navRegistro').style.display = 'none';
+                document.getElementById('navAlteracao').style.display = 'none';
+            }
+            if (!hasEmpregados) {
+                document.getElementById('navEmpregado').style.display = 'none';
+            }
+
             document.getElementById('portalAuthOverlay').remove();
             initSupabase();
             await loadForms();

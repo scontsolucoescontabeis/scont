@@ -67,35 +67,43 @@ async function loadForms() {
 
         let allForms = [];
 
-        // Buscar da tabela: formularios
-        try {
-            const { data: forms, error } = await supabaseClient
-                .from('formularios')
-                .select('*')
-                .order('created_at', { ascending: false });
+        const _gfP = window.gfPermissions || [];
+        const _hasForm = _gfP.length === 0 || _gfP.includes('formularios');
+        const _hasEmp  = _gfP.length === 0 || _gfP.includes('empregados');
 
-            if (!error && forms) allForms = [...allForms, ...forms];
-        } catch (e) { console.warn('⚠️ Tabela "formularios" vazia ou erro'); }
+        // Buscar da tabela: formularios
+        if (_hasForm) {
+            try {
+                const { data: forms, error } = await supabaseClient
+                    .from('formularios')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (!error && forms) allForms = [...allForms, ...forms];
+            } catch (e) { console.warn('⚠️ Tabela "formularios" vazia ou erro'); }
+        }
 
         // Buscar da tabela: empregados
-        try {
-            const { data: empregados, error } = await supabaseClient
-                .from('empregados')
-                .select('*')
-                .order('created_at', { ascending: false });
+        if (_hasEmp) {
+            try {
+                const { data: empregados, error } = await supabaseClient
+                    .from('empregados')
+                    .select('*')
+                    .order('created_at', { ascending: false });
 
-            if (!error && empregados) {
-                const empregadosFormatados = empregados.map(emp => ({
-                    ...emp,
-                    tipo_formulario: 'empregado',
-                    nome_empresa: emp.nomeEmpresa || emp.nome_empresa || 'N/A',
-                    nome_completo: emp.nome_completo || emp.nomeCompleto || 'N/A',
-                    email_comercial: emp.email || emp.email_comercial,
-                    telefone_comercial: emp.celular || emp.telefone_comercial
-                }));
-                allForms = [...allForms, ...empregadosFormatados];
-            }
-        } catch (e) { console.warn('⚠️ Tabela "empregados" vazia ou erro'); }
+                if (!error && empregados) {
+                    const empregadosFormatados = empregados.map(emp => ({
+                        ...emp,
+                        tipo_formulario: 'empregado',
+                        nome_empresa: emp.nomeEmpresa || emp.nome_empresa || 'N/A',
+                        nome_completo: emp.nome_completo || emp.nomeCompleto || 'N/A',
+                        email_comercial: emp.email || emp.email_comercial,
+                        telefone_comercial: emp.celular || emp.telefone_comercial
+                    }));
+                    allForms = [...allForms, ...empregadosFormatados];
+                }
+            } catch (e) { console.warn('⚠️ Tabela "empregados" vazia ou erro'); }
+        }
 
         // Remover duplicatas e ordenar por data mais recente
         const uniqueForms = Array.from(new Map(allForms.map(f => [f.id, f])).values());
@@ -173,6 +181,13 @@ function createFormCard(form) {
 // 2. FILTROS (SIDEBAR E BUSCA)
 // ==========================================
 function filterByType(type, element) {
+    // Verificar sub-permissão antes de aplicar filtro
+    const _p = window.gfPermissions || [];
+    const _hasForm = _p.length === 0 || _p.includes('formularios');
+    const _hasEmp  = _p.length === 0 || _p.includes('empregados');
+    if ((type === 'registro' || type === 'alteracao') && !_hasForm) return;
+    if (type === 'empregado' && !_hasEmp) return;
+
     // Previne o recarregamento da página ao clicar no link
     if (window.event) window.event.preventDefault();
 

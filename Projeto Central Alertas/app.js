@@ -13,6 +13,7 @@ const STATE = {
   currentFilter: 'todos',
   theme:         localStorage.getItem('ca_theme') || 'light',
   pollTimer:     null,
+  userCats:      null, // null = sem restrição (admin); array = categorias permitidas
 };
 
 /* ── Severity ── */
@@ -40,9 +41,10 @@ const CAT_LABEL = {
 };
 
 /* ── Init ── */
-function initApp(auth) {
+function initApp(auth, userCats) {
   STATE.auth     = auth;
   STATE.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  STATE.userCats = userCats ?? null;
 
   applyTheme(STATE.theme);
 
@@ -50,6 +52,16 @@ function initApp(auth) {
   if (isAdmin) {
     const btn = document.getElementById('tabPortalBtn');
     if (btn) btn.style.display = '';
+  }
+
+  // Ocultar abas de categorias não autorizadas
+  if (STATE.userCats !== null) {
+    ['certificados', 'formularios', 'admissoes', 'licencas'].forEach(cat => {
+      if (!STATE.userCats.includes(cat)) {
+        const tab = document.querySelector(`.cat-tab[data-filter="${cat}"]`);
+        if (tab) tab.style.display = 'none';
+      }
+    });
   }
 
   loadAlerts();
@@ -91,33 +103,41 @@ function setFilter(filter) {
 
 function applyFilter() {
   const f = STATE.currentFilter;
+
+  // Aplicar filtro de categorias autorizadas
+  const allowed = STATE.userCats !== null
+    ? STATE.allAlerts.filter(a => STATE.userCats.includes(a.categoria))
+    : STATE.allAlerts;
+
   if (f === 'todos' || f in SEV) {
     STATE.filtered = f === 'todos'
-      ? [...STATE.allAlerts]
-      : STATE.allAlerts.filter(a => a.severidade === f);
+      ? [...allowed]
+      : allowed.filter(a => a.severidade === f);
   } else {
-    STATE.filtered = STATE.allAlerts.filter(a => a.categoria === f);
+    STATE.filtered = allowed.filter(a => a.categoria === f);
   }
-  renderStats();
+  renderStats(allowed);
   renderAlerts();
-  updateTabCounts();
+  updateTabCounts(allowed);
 }
 
 /* ── Stats ── */
-function renderStats() {
+function renderStats(alerts) {
+  alerts = alerts || STATE.allAlerts;
   const counts = { critico: 0, urgente: 0, atencao: 0, info: 0 };
-  STATE.allAlerts.forEach(a => { if (counts[a.severidade] !== undefined) counts[a.severidade]++; });
+  alerts.forEach(a => { if (counts[a.severidade] !== undefined) counts[a.severidade]++; });
 
-  document.getElementById('statTotal').textContent   = STATE.allAlerts.length;
+  document.getElementById('statTotal').textContent   = alerts.length;
   document.getElementById('statCritico').textContent = counts.critico;
   document.getElementById('statUrgente').textContent = counts.urgente;
   document.getElementById('statAtencao').textContent = counts.atencao;
   document.getElementById('statInfo').textContent    = counts.info;
 }
 
-function updateTabCounts() {
-  const n = cat => STATE.allAlerts.filter(a => a.categoria === cat).length;
-  document.getElementById('tabTodos').textContent        = STATE.allAlerts.length;
+function updateTabCounts(alerts) {
+  alerts = alerts || STATE.allAlerts;
+  const n = cat => alerts.filter(a => a.categoria === cat).length;
+  document.getElementById('tabTodos').textContent        = alerts.length;
   document.getElementById('tabFormularios').textContent  = n('formularios');
   document.getElementById('tabAdmissoes').textContent    = n('admissoes');
   document.getElementById('tabCertificados').textContent = n('certificados');
@@ -170,10 +190,22 @@ function renderAlerts() {
 
 /* ── Card builder ── */
 function buildCard(a) {
+  const det = a.detalhes || {};
+
+  // Formulários (não-evento) e admissões: card idêntico ao Gerenciador de Formulários
+  if ((a.categoria === 'formularios' && !det.evento) || a.categoria === 'admissoes') {
+    return buildFormCard(a);
+  }
+
+  // Licenças: card estilo alerts-mobile
+  if (a.categoria === 'licencas') return buildLicencaCard(a);
+
+  // Certificados: card estilo certificado_mobile
+  if (a.categoria === 'certificados') return buildCertificadoCard(a);
+
   const sev  = SEV[a.severidade] || SEV.info;
   const icon = CAT_ICON[a.categoria] || '📌';
   const time = formatTime(a.data_ref);
-  const det  = a.detalhes || {};
 
   return `
     <div class="alert-card ${sev.cardClass}" onclick="toggleCard(this)">
@@ -197,6 +229,223 @@ function buildCard(a) {
             : ''}
         </div>
       </div>
+    </div>`;
+}
+
+/* ── Form card (estilo Gerenciador de Formulários) ── */
+function buildFormCard(a) {
+  const sev = SEV[a.severidade] || SEV.info;
+  const det = a.detalhes || {};
+
+  const tipoFormulario = a.categoria === 'admissoes'
+    ? 'empregado'
+    : (det.tipo_formulario || 'registro');
+
+  const tipoLabels = {
+    registro:  'Registro de Empresa',
+    alteracao: 'Alteração de Empresa',
+    empregado: 'Registro de Empregado',
+  };
+  const tipoIcons = { registro: '🏢', alteracao: '📝', empregado: '👤' };
+
+  const tipoLabel = tipoLabels[tipoFormulario] || tipoFormulario;
+  const tipoIcon  = tipoIcons[tipoFormulario]  || '📄';
+
+  const nome     = det.nome_fantasia || det.nome_empresa || det.nome_completo
+                   || det.razao_social || a.titulo || 'Sem título';
+  const email    = det.email_comercial || det.email || '-';
+  const telefone = det.telefone_comercial || det.celular || det.telefone || '-';
+  const status   = det.status || 'recebido';
+  const dataFmt  = a.data_ref
+    ? new Date(a.data_ref).toLocaleDateString('pt-BR')
+    : formatTime(a.data_ref);
+
+  return `
+    <div class="fac ${sev.cardClass}">
+      <div class="fac-header">
+        <div class="fac-title-row">
+          <div class="fac-title">${escHtml(nome)}</div>
+          <div class="fac-badge-group">
+            <span class="fac-status fac-status-${escHtml(status)}">${escHtml(status.charAt(0).toUpperCase() + status.slice(1))}</span>
+            <span class="alert-badge ${sev.badgeClass}">${sev.label}</span>
+          </div>
+        </div>
+        <div>
+          <span class="fac-type">${tipoIcon} ${escHtml(tipoLabel)}</span>
+        </div>
+      </div>
+
+      <div class="fac-info">
+        <div class="fac-info-row">
+          <span class="fac-info-label">📧 E-mail:</span>
+          <span class="fac-info-value">${escHtml(email)}</span>
+        </div>
+        <div class="fac-info-row">
+          <span class="fac-info-label">📱 Telefone:</span>
+          <span class="fac-info-value">${escHtml(telefone)}</span>
+        </div>
+        <div class="fac-info-row">
+          <span class="fac-info-label">📅 Data:</span>
+          <span class="fac-info-value">${escHtml(dataFmt)}</span>
+        </div>
+      </div>
+
+      <div class="fac-actions">
+        ${a.link
+          ? `<button class="fac-btn fac-btn-secondary" onclick="navigate('${escHtml(a.link)}')">📁 Documentos</button>
+             <button class="fac-btn fac-btn-secondary" onclick="navigate('${escHtml(a.link)}')">👁️ Ver</button>
+             <button class="fac-btn fac-btn-primary"   onclick="navigate('${escHtml(a.link)}')">✏️ Editar</button>`
+          : ''}
+      </div>
+    </div>`;
+}
+
+/* ── Licença card (estilo alerts-mobile) ── */
+function buildLicencaCard(a) {
+  const sev = SEV[a.severidade] || SEV.info;
+  const det = a.detalhes || {};
+  const docId   = det.id ? String(det.id) : ('lc' + Math.random().toString(36).slice(2, 8));
+  const docTipo = det.tipo_documento || 'licencas';
+  const tipoLabel = docTipo === 'alvaras' ? 'Alvará' : 'Licença';
+  const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('pt-BR') : '-';
+
+  const icons  = { critico: '🔴', urgente: '🟠', atencao: '🟡', info: '🔵' };
+  const icon   = icons[a.severidade] || '📌';
+  const bdMap  = { critico: 'danger', urgente: 'danger', atencao: 'warning', info: 'info' };
+  const bdCls  = bdMap[a.severidade] || 'info';
+
+  const docPanelId  = `alm-doc-${docId}`;
+  const procPanelId = `alm-prc-${docId}`;
+  const procCtnId   = `alm-pc-${docId}`;
+
+  return `
+    <div class="alert-card ${sev.cardClass}" onclick="toggleCard(this)">
+      <div class="alm-header">
+        <div class="alm-icon">${icon}</div>
+        <div class="alm-body">
+          <h3>${escHtml(a.titulo)}</h3>
+          <p>${escHtml(det.responsavel || det.numero || '')}${det.data_validade ? ' • ' + fmtDate(det.data_validade) : ''}</p>
+        </div>
+        <div class="alm-chevron">▾</div>
+      </div>
+      <div class="card-detail">
+        <div class="alm-tab-bar">
+          <button class="alm-tab active"
+                  data-panel-id="${docPanelId}"
+                  onclick="event.stopPropagation(); almTab(this)">Documento</button>
+          <button class="alm-tab"
+                  data-panel-id="${procPanelId}"
+                  data-doc-id="${escHtml(docId)}"
+                  data-doc-tipo="${escHtml(docTipo)}"
+                  data-ctn-id="${procCtnId}"
+                  onclick="event.stopPropagation(); almTab(this)">Processos</button>
+        </div>
+        <div class="alm-panel active" id="${docPanelId}">
+          <div class="alm-rows">
+            ${almRow('Tipo', tipoLabel)}
+            ${almRow('Número', det.numero)}
+            ${almRow('Emissão', fmtDate(det.data_emissao))}
+            ${almRow('Validade', fmtDate(det.data_validade))}
+            ${almRow('Órgão', det.orgao_emissor)}
+            ${almRow('Responsável', det.responsavel)}
+            <div class="alm-row">
+              <span class="alm-lbl">Status:</span>
+              <span class="alm-sbadge alm-sbadge-${bdCls}">${escHtml(a.descricao || a.titulo)}</span>
+            </div>
+          </div>
+        </div>
+        <div class="alm-panel" id="${procPanelId}">
+          <div id="${procCtnId}" class="loading-inline">Carregando processos…</div>
+        </div>
+        ${a.link ? `<div style="padding:0 14px 14px"><button class="btn-acao" onclick="event.stopPropagation(); navigate('${escHtml(a.link)}')">Abrir ferramenta →</button></div>` : ''}
+      </div>
+    </div>`;
+}
+
+function almRow(label, value) {
+  if (!value) return '';
+  return `
+    <div class="alm-row">
+      <span class="alm-lbl">${escHtml(label)}:</span>
+      <span class="alm-val">${escHtml(String(value))}</span>
+    </div>`;
+}
+
+function almTab(btnEl) {
+  const card = btnEl.closest('.alert-card');
+  card.querySelectorAll('.alm-tab').forEach(t => t.classList.remove('active'));
+  card.querySelectorAll('.alm-panel').forEach(p => p.classList.remove('active'));
+  btnEl.classList.add('active');
+  const panel = document.getElementById(btnEl.dataset.panelId);
+  if (panel) panel.classList.add('active');
+
+  const docId  = btnEl.dataset.docId;
+  const ctnId  = btnEl.dataset.ctnId;
+  const tipo   = btnEl.dataset.docTipo;
+  if (docId && ctnId) {
+    const ctn = document.getElementById(ctnId);
+    if (ctn && ctn.classList.contains('loading-inline')) {
+      loadProcessos(docId, tipo, ctnId);
+    }
+  }
+}
+
+/* ── Certificado card (estilo certificado_mobile) ── */
+function buildCertificadoCard(a) {
+  const sev = SEV[a.severidade] || SEV.info;
+  const det = a.detalhes || {};
+  const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('pt-BR') : '-';
+
+  const dias = det.data_vencimento
+    ? Math.ceil((new Date(det.data_vencimento) - new Date()) / 86400000)
+    : null;
+  const diasTxt = dias === null ? '-'
+    : dias < 0  ? '⚠️ VENCIDO'
+    : dias + ' dias';
+  const diasCls = dias !== null && dias < 0  ? 'mc-val-critico'
+    : dias !== null && dias <= 7 ? 'mc-val-urgente'
+    : '';
+
+  const bdIcons = { critico: '⚠️', urgente: '🔴', atencao: '🟡', info: 'ℹ️' };
+  const bdIcon  = bdIcons[a.severidade] || '📌';
+
+  return `
+    <div class="mc-card ${sev.cardClass}">
+      <div class="mc-card-header">
+        <div class="mc-card-title">${escHtml(a.titulo)}</div>
+        <div class="mc-card-badge mc-badge-${escHtml(a.severidade)}">${bdIcon} ${sev.label}</div>
+      </div>
+      <div class="mc-card-info">
+        <div class="mc-info-item">
+          <div class="mc-info-lbl">Tipo</div>
+          <div class="mc-info-val">${escHtml(det.tipo_id || '-')}</div>
+        </div>
+        <div class="mc-info-item">
+          <div class="mc-info-lbl">Vencimento</div>
+          <div class="mc-info-val">${fmtDate(det.data_vencimento)}</div>
+        </div>
+        <div class="mc-info-item">
+          <div class="mc-info-lbl">Dias Restantes</div>
+          <div class="mc-info-val ${diasCls}">${diasTxt}</div>
+        </div>
+        <div class="mc-info-item">
+          <div class="mc-info-lbl">Situação</div>
+          <div class="mc-info-val">${escHtml(det.situacao || '-')}</div>
+        </div>
+        <div class="mc-info-item">
+          <div class="mc-info-lbl">CPF / CNPJ</div>
+          <div class="mc-info-val">${escHtml(det.cpf_cnpj || '-')}</div>
+        </div>
+        <div class="mc-info-item">
+          <div class="mc-info-lbl">Responsável</div>
+          <div class="mc-info-val">${escHtml(det.responsavel_nome || '-')}</div>
+        </div>
+      </div>
+      ${a.link ? `
+      <div class="mc-card-footer">
+        <button class="mc-btn mc-btn-secondary" onclick="navigate('${escHtml(a.link)}')">👁️ Ver Detalhes</button>
+        <button class="mc-btn mc-btn-primary"   onclick="navigate('${escHtml(a.link)}')">🔐 Abrir Certificados</button>
+      </div>` : ''}
     </div>`;
 }
 
@@ -550,3 +799,4 @@ window.setFilter     = setFilter;
 window.toggleTheme   = toggleTheme;
 window.navigate      = navigate;
 window.toggleCard    = toggleCard;
+window.almTab        = almTab;

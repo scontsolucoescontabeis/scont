@@ -208,7 +208,7 @@
             </div>
             <div class="cards-grid">
 
-                <a href="formulario_registro.HTML" class="doc-card card-registro">
+                <a id="cardRegistro" href="formulario_registro.HTML" class="doc-card card-registro">
                     <div class="card-icon">🏢</div>
                     <div class="card-body">
                         <div class="card-title">Registro de Empresa</div>
@@ -217,7 +217,7 @@
                     <div class="card-arrow">→</div>
                 </a>
 
-                <a href="formulario_alteracao.html" class="doc-card card-alteracao">
+                <a id="cardAlteracao" href="formulario_alteracao.html" class="doc-card card-alteracao">
                     <div class="card-icon">📝</div>
                     <div class="card-body">
                         <div class="card-title">Alteração de Empresa</div>
@@ -226,7 +226,7 @@
                     <div class="card-arrow">→</div>
                 </a>
 
-                <a href="formulario_empregado.html" class="doc-card card-empregado">
+                <a id="cardEmpregado" href="formulario_empregado.html" class="doc-card card-empregado">
                     <div class="card-icon">👤</div>
                     <div class="card-body">
                         <div class="card-title">Admissão de Empregado</div>
@@ -272,6 +272,39 @@
 
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
     <script src="../portal-auth-guard.js"></script>
-    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+    <script>
+    (async () => {
+        const a = await window.PortalAuthGuard.init(1);
+        if (!a) return;
+
+        // Verificar sub-permissões do Gerenciador
+        let gfP = [];
+        if (!a.isAdmin && a.userId) {
+            const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            const { data } = await _sb
+                .from('usuario_ferramentas')
+                .select('permissoes, ferramentas(url_base)')
+                .eq('usuario_id', a.userId);
+            const entry = (data || []).find(r => {
+                const u = (r.ferramentas?.url_base || '').toLowerCase().replace(/\\/g, '/').replace(/^\.\//, '');
+                return u.includes('gerenciador');
+            });
+            gfP = entry?.permissoes || [];
+        }
+
+        const hasFormularios = gfP.length === 0 || gfP.includes('formularios');
+        const hasEmpregados  = gfP.length === 0 || gfP.includes('empregados');
+
+        if (!hasFormularios) {
+            document.getElementById('cardRegistro').style.display  = 'none';
+            document.getElementById('cardAlteracao').style.display = 'none';
+        }
+        if (!hasEmpregados) {
+            document.getElementById('cardEmpregado').style.display = 'none';
+        }
+
+        document.getElementById('portalAuthOverlay').remove();
+    })();
+    </script>
 </body>
 </html>

@@ -104,6 +104,10 @@
         .checkbox-group { display:flex; flex-direction:column; gap:9px; margin-top:8px; }
         .checkbox-item { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; }
         .checkbox-item input { width:16px; height:16px; cursor:pointer; }
+        .sub-perm-group { display:none; flex-direction:column; gap:6px; padding:6px 0 2px 28px; border-left:2px solid var(--border); margin-left:7px; }
+        .sub-perm-group.visible { display:flex; }
+        .checkbox-item.sub-perm { font-size:12px; color:var(--muted); }
+        .checkbox-item.sub-perm input { width:14px; height:14px; }
         .modal-actions { display:flex; gap:9px; margin-top:18px; justify-content:flex-end; }
         .btn-modal { padding:9px 18px; border:none; border-radius:6px; cursor:pointer; font-weight:600; font-size:13px; transition:var(--transition); }
         .btn-modal-primary { background:var(--primary); color:white; }
@@ -352,7 +356,7 @@ async function loadFerramentas() {
     const tbody = document.getElementById('tblFerramentas');
     const { data, error } = await sb
         .from('ferramentas')
-        .select('id, nome, descricao, icone, url_base, ativa, ordem')
+        .select('id, nome, descricao, icone, url_base, ativa, ordem, sub_permissoes')
         .order('ordem', { ascending: true });
     if (error) {
         console.error('loadFerramentas:', error);
@@ -533,6 +537,66 @@ function updateStats() {
             solicitacoes.filter(x => x.status === s).length);
 }
 
+// ─── HELPER: CHECKBOXES DE FERRAMENTAS COM SUB-PERMISSÕES ──
+function buildFerCheckboxes(containerId, idsAtuais, permAtuais, cbClass, cbSubClass) {
+    const cont = document.getElementById(containerId);
+    cont.innerHTML = '';
+    const ativas = ferramentas.filter(f => f.ativa);
+    if (!ativas.length) {
+        cont.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:8px 0;">Nenhuma ferramenta ativa disponível.</p>';
+        return;
+    }
+    ativas.forEach(f => {
+        const wrapper = document.createElement('div');
+        const lbl = document.createElement('label');
+        lbl.className = 'checkbox-item';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.value = f.id; cb.className = cbClass;
+        cb.checked = idsAtuais.has(f.id);
+        const sp = document.createElement('span');
+        sp.textContent = `${f.icone || '🔧'} ${f.nome}`;
+        lbl.append(cb, sp);
+        wrapper.appendChild(lbl);
+
+        const subs = Array.isArray(f.sub_permissoes) ? f.sub_permissoes : [];
+        if (subs.length) {
+            const subGroup = document.createElement('div');
+            subGroup.className = 'sub-perm-group' + (cb.checked ? ' visible' : '');
+            subGroup.dataset.ferId = f.id;
+
+            const userPerms = permAtuais[f.id] || [];
+            const allChecked = userPerms.length === 0; // vazio = acesso total
+
+            subs.forEach(s => {
+                const sLbl = document.createElement('label');
+                sLbl.className = 'checkbox-item sub-perm';
+                const sCb = document.createElement('input');
+                sCb.type = 'checkbox'; sCb.value = s.key;
+                sCb.className = cbSubClass; sCb.dataset.ferId = f.id;
+                sCb.checked = allChecked || userPerms.includes(s.key);
+                const sSp = document.createElement('span');
+                sSp.textContent = s.label;
+                sLbl.append(sCb, sSp);
+                subGroup.appendChild(sLbl);
+            });
+
+            cb.addEventListener('change', () => {
+                subGroup.classList.toggle('visible', cb.checked);
+                if (cb.checked) subGroup.querySelectorAll('input').forEach(c => c.checked = true);
+            });
+
+            wrapper.appendChild(subGroup);
+        }
+        cont.appendChild(wrapper);
+    });
+}
+
+function collectPermissoes(fId, cbSubClass) {
+    const subCbs = [...document.querySelectorAll(`.${cbSubClass}[data-fer-id="${fId}"]`)];
+    if (!subCbs.length) return [];
+    return subCbs.filter(c => c.checked).map(c => c.value);
+}
+
 // ─── MODAL: APROVAR ────────────────────────────────────────
 function abrirModalAprovar(sol) {
     currentSolId = sol.id;
@@ -540,25 +604,7 @@ function abrirModalAprovar(sol) {
     document.getElementById('apEmail').value   = sol.email;
     document.getElementById('apEmpresa').value = sol.empresa || '';
     document.getElementById('apCargo').value   = sol.cargo || '';
-
-    const cont = document.getElementById('apFerramentas');
-    cont.innerHTML = '';
-    const ativas = ferramentas.filter(f => f.ativa);
-    if (!ativas.length) {
-        cont.innerHTML = '<p style="color:var(--muted);font-size:13px;padding:8px 0;">Nenhuma ferramenta ativa disponível. Cadastre ferramentas na aba Ferramentas antes de aprovar.</p>';
-    } else {
-        ativas.forEach(f => {
-            const lbl = document.createElement('label');
-            lbl.className = 'checkbox-item';
-            const cb = document.createElement('input');
-            cb.type = 'checkbox'; cb.value = f.id; cb.className = 'cb-aprovar';
-            const sp = document.createElement('span');
-            sp.textContent = `${f.icone || '🔧'} ${f.nome}`;
-            lbl.append(cb, sp);
-            cont.appendChild(lbl);
-        });
-    }
-
+    buildFerCheckboxes('apFerramentas', new Set(), {}, 'cb-aprovar', 'cb-sub-aprovar');
     openModal('modalAprovar');
 }
 
@@ -585,7 +631,8 @@ document.getElementById('formAprovar').addEventListener('submit', async (e) => {
         const inserts = selecionadas.map(fId => ({
             usuario_id:    currentSolId,
             ferramenta_id: fId,
-            data_acesso:   new Date().toISOString()
+            data_acesso:   new Date().toISOString(),
+            permissoes:    collectPermissoes(fId, 'cb-sub-aprovar')
         }));
         const { error: insErr } = await sb.from('usuario_ferramentas').insert(inserts);
         if (insErr) throw insErr;
@@ -640,28 +687,17 @@ async function abrirModalEditar(user) {
     document.getElementById('edNome').value  = user.nome;
     document.getElementById('edEmail').value = user.email;
 
-    // Buscar acessos atuais do usuário
+    // Buscar acessos atuais do usuário (incluindo sub-permissões)
     const { data: atuais } = await sb
         .from('usuario_ferramentas')
-        .select('ferramenta_id')
+        .select('ferramenta_id, permissoes')
         .eq('usuario_id', user.id);
-    const idsAtuais = new Set((atuais || []).map(a => a.ferramenta_id));
 
-    // Listar todas as ferramentas com checkbox marcado se já tem acesso
-    const cont = document.getElementById('edFerramentas');
-    cont.innerHTML = '';
-    ferramentas.filter(f => f.ativa).forEach(f => {
-        const lbl = document.createElement('label');
-        lbl.className = 'checkbox-item';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox'; cb.value = f.id; cb.className = 'cb-editar';
-        cb.checked = idsAtuais.has(f.id);
-        const sp = document.createElement('span');
-        sp.textContent = `${f.icone || '🔧'} ${f.nome}`;
-        lbl.append(cb, sp);
-        cont.appendChild(lbl);
-    });
+    const idsAtuais  = new Set((atuais || []).map(a => a.ferramenta_id));
+    const permAtuais = {};
+    (atuais || []).forEach(a => { permAtuais[a.ferramenta_id] = a.permissoes || []; });
 
+    buildFerCheckboxes('edFerramentas', idsAtuais, permAtuais, 'cb-editar', 'cb-sub-editar');
     openModal('modalEditar');
 }
 
@@ -679,7 +715,8 @@ document.getElementById('formEditar').addEventListener('submit', async (e) => {
             const inserts = selecionadas.map(fId => ({
                 usuario_id:    currentSolId,
                 ferramenta_id: fId,
-                data_acesso:   new Date().toISOString()
+                data_acesso:   new Date().toISOString(),
+                permissoes:    collectPermissoes(fId, 'cb-sub-editar')
             }));
             const { error: insErr } = await sb.from('usuario_ferramentas').insert(inserts);
             if (insErr) throw insErr;

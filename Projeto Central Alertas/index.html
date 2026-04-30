@@ -9,6 +9,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>Central de Alertas — SCONT</title>
+  <link rel="icon" type="image/x-icon" href="../assets/icons/central-alertas/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/central-alertas/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/central-alertas/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="../assets/icons/central-alertas/apple-touch-icon.png" />
   <link rel="stylesheet" href="styles.css" />
   <script src="../supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -111,11 +115,42 @@
     document.addEventListener('DOMContentLoaded', async () => {
       const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
       if (!auth) return;
+
+      // Determinar quais categorias o usuário pode ver
+      let userCats = null; // null = admin (sem restrição)
+      if (!auth.isAdmin) {
+        const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const { data: ufRows } = await _sb
+          .from('usuario_ferramentas')
+          .select('permissoes, ferramentas(url_base, nome)')
+          .eq('usuario_id', auth.userId);
+
+        userCats = [];
+        (ufRows || []).forEach(uf => {
+          const url  = (uf.ferramentas?.url_base || '').toLowerCase().replace(/\\/g, '/').replace(/^\.\//, '');
+          const nome = (uf.ferramentas?.nome || '').toLowerCase();
+
+          if (url.includes('certificado') || nome.includes('certificado'))
+            userCats.push('certificados');
+
+          if (url.includes('licenca') || url.includes('alvara') || nome.includes('licença') || nome.includes('alvará'))
+            userCats.push('licencas');
+
+          if (url.includes('gerenciador') || url.includes('formulario')) {
+            const perms    = uf.permissoes || [];
+            const hasForm  = perms.length === 0 || perms.includes('formularios');
+            const hasEmp   = perms.length === 0 || perms.includes('empregados');
+            if (hasForm) userCats.push('formularios');
+            if (hasEmp)  userCats.push('admissoes');
+          }
+        });
+      }
+
       document.getElementById('authOverlay').remove();
       const app = document.getElementById('app');
       app.style.display = 'flex';
       app.style.flexDirection = 'column';
-      initApp(auth);
+      initApp(auth, userCats);
     });
   </script>
 </body>
