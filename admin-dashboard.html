@@ -237,6 +237,10 @@
             <label>Ferramentas de Acesso</label>
             <div class="checkbox-group" id="apFerramentas"></div>
         </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:6px;">
+            <input type="checkbox" id="apIsAdmin" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+            <label for="apIsAdmin" style="font-weight:600;font-size:13px;color:#92400E;cursor:pointer;margin:0;">👑 Conceder perfil de administrador</label>
+        </div>
         <div class="modal-actions">
             <button type="button" class="btn-modal btn-modal-secondary" data-close="modalAprovar">Cancelar</button>
             <button type="submit" class="btn-modal btn-modal-primary">✅ Aprovar e Liberar Acesso</button>
@@ -271,6 +275,10 @@
         <div class="form-group">
             <label>Ferramentas Autorizadas</label>
             <div class="checkbox-group" id="edFerramentas"></div>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:6px;">
+            <input type="checkbox" id="edIsAdmin" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
+            <label for="edIsAdmin" style="font-weight:600;font-size:13px;color:#92400E;cursor:pointer;margin:0;">👑 Perfil de administrador</label>
         </div>
         <div class="modal-actions">
             <button type="button" class="btn-modal btn-modal-secondary" data-close="modalEditar">Cancelar</button>
@@ -605,6 +613,7 @@ function abrirModalAprovar(sol) {
     document.getElementById('apEmpresa').value = sol.empresa || '';
     document.getElementById('apCargo').value   = sol.cargo || '';
     buildFerCheckboxes('apFerramentas', new Set(), {}, 'cb-aprovar', 'cb-sub-aprovar');
+    document.getElementById('apIsAdmin').checked = false;
     openModal('modalAprovar');
 }
 
@@ -626,7 +635,14 @@ document.getElementById('formAprovar').addEventListener('submit', async (e) => {
         if (!updated || updated.length === 0)
             throw new Error('Nenhuma linha atualizada. Verifique se o usuário tem is_admin = TRUE na tabela "usuarios".');
 
-        // 2. Inserir acessos — um registro por ferramenta
+        // 2. Se admin escolheu conceder perfil de administrador, atualizar usuarios
+        if (document.getElementById('apIsAdmin').checked) {
+            const emailUsuario = document.getElementById('apEmail').value;
+            const { error: admErr } = await sb.from('usuarios').update({ is_admin: true }).eq('email', emailUsuario);
+            if (admErr) throw admErr;
+        }
+
+        // 3. Inserir acessos — um registro por ferramenta
         //    usuario_id = solicitacoes_acesso.id  (mesmo id que o portal usa para buscar)
         const inserts = selecionadas.map(fId => ({
             usuario_id:    currentSolId,
@@ -698,6 +714,10 @@ async function abrirModalEditar(user) {
     (atuais || []).forEach(a => { permAtuais[a.ferramenta_id] = a.permissoes || []; });
 
     buildFerCheckboxes('edFerramentas', idsAtuais, permAtuais, 'cb-editar', 'cb-sub-editar');
+
+    const { data: usuarioData } = await sb.from('usuarios').select('is_admin').eq('email', user.email).maybeSingle();
+    document.getElementById('edIsAdmin').checked = usuarioData?.is_admin || false;
+
     openModal('modalEditar');
 }
 
@@ -721,6 +741,12 @@ document.getElementById('formEditar').addEventListener('submit', async (e) => {
             const { error: insErr } = await sb.from('usuario_ferramentas').insert(inserts);
             if (insErr) throw insErr;
         }
+
+        // Atualizar perfil de administrador
+        const { error: admErr } = await sb.from('usuarios')
+            .update({ is_admin: document.getElementById('edIsAdmin').checked })
+            .eq('email', document.getElementById('edEmail').value);
+        if (admErr) throw admErr;
 
         closeModal('modalEditar');
         alert('✅ Acessos atualizados!');

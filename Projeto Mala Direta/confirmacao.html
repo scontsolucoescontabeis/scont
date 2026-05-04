@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirmação — SCONT</title>
+  <script src="../supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --primary: #8B3A3A;
+      --secondary: #2C3E50;
+      --success: #27AE60;
+      --danger: #E74C3C;
+      --bg: #F0F2F5;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      max-width: 680px;
+      width: 100%;
+      overflow: hidden;
+    }
+    .card-header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: white;
+      padding: 32px 28px;
+      text-align: center;
+    }
+    .card-header .logo { font-size: 14px; opacity: 0.8; margin-bottom: 4px; letter-spacing: 1px; text-transform: uppercase; }
+    .card-header h1 { font-size: 22px; font-weight: 700; }
+    .card-body { padding: 32px 28px; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 40px; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #eee;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Message box */
+    .msg-box {
+      background: #FAFBFC;
+      border: 1px solid #E0E6ED;
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
+      font-size: 15px;
+      line-height: 1.8;
+      color: #2C3E50;
+      white-space: pre-wrap;
+    }
+
+    /* Action buttons */
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      border: none; border-radius: 8px; padding: 14px 20px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .btn:active { transform: none; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-confirm { background: var(--success); color: white; }
+    .btn-refuse  { background: var(--danger);  color: white; }
+    .btn-read    { background: var(--primary);  color: white; grid-column: 1 / -1; }
+
+    /* Feedback states */
+    .feedback {
+      text-align: center;
+      padding: 24px 20px;
+    }
+    .feedback-icon { font-size: 56px; margin-bottom: 16px; }
+    .feedback h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .feedback p  { font-size: 14px; color: #5A6C7D; line-height: 1.6; }
+    .feedback.success .feedback-icon::after { content: ''; }
+    .already-done { background: #EFF6FF; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #1D4ED8; }
+
+    .card-footer {
+      background: #F8F9FA;
+      padding: 16px 28px;
+      text-align: center;
+      font-size: 12px;
+      color: #8B95A5;
+      border-top: 1px solid #E0E6ED;
+    }
+
+    @media (max-width: 480px) {
+      .card-body { padding: 20px; }
+      .actions { grid-template-columns: 1fr; }
+      .btn-read { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="card-header">
+      <div class="logo">SCONT · Mala Direta</div>
+      <h1 id="header-title">Mensagem Personalizada</h1>
+    </div>
+
+    <div class="card-body" id="conteudo">
+      <div class="loading">
+        <div class="spinner"></div>
+        <p style="color:#8B95A5;font-size:14px">Carregando mensagem…</p>
+      </div>
+    </div>
+
+    <div class="card-footer">
+      SCONT — Sistema de Controle &nbsp;·&nbsp; Esta mensagem foi enviada para você diretamente.
+    </div>
+  </div>
+
+  <script>
+  const TOKEN = new URLSearchParams(window.location.search).get('token');
+  let envio = null, campanha = null;
+
+  async function init() {
+    if (!TOKEN) { renderErro('Link inválido. Token não encontrado.'); return; }
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Buscar envio pelo token
+    const { data: env, error: envErr } = await sb
+      .from('mala_direta_envios')
+      .select('*')
+      .eq('token', TOKEN)
+      .single();
+
+    if (envErr || !env) { renderErro('Link inválido ou expirado. Verifique o link e tente novamente.'); return; }
+    envio = env;
+
+    // Buscar campanha para obter tipo_confirmacao
+    const { data: camp } = await sb
+      .from('mala_direta_campanhas')
+      .select('nome, tipo_confirmacao')
+      .eq('id', env.campanha_id)
+      .single();
+    campanha = camp;
+
+    if (camp?.nome) {
+      document.getElementById('header-title').textContent = camp.nome;
+    }
+
+    // Se já foi confirmado
+    if (env.status_confirmacao !== 'pendente') {
+      renderJaRespondido(env.status_confirmacao);
+      return;
+    }
+
+    // Se não foi enviado ainda (segurança)
+    if (env.status_envio !== 'enviado') {
+      renderErro('Este link ainda não está disponível.');
+      return;
+    }
+
+    const tipo = camp?.tipo_confirmacao || 'leitura';
+    renderFormulario(env.mensagem_final, tipo);
+  }
+
+  function renderFormulario(mensagem, tipo) {
+    let botoes = '';
+    if (tipo === 'leitura') {
+      botoes = `<button class="btn btn-read" onclick="confirmar('lido')">✓ Confirmar Leitura</button>`;
+    } else if (tipo === 'interesse') {
+      botoes = `
+        <button class="btn btn-confirm" onclick="confirmar('confirmado')">✓ Tenho Interesse</button>
+        <button class="btn btn-refuse"  onclick="confirmar('recusado')">✗ Sem Interesse</button>
+      `;
+    }
+    // tipo 'nenhuma': não deve chegar aqui (sem link de confirmação), mas renderiza só leitura
+
+    document.getElementById('conteudo').innerHTML = `
+      <div class="msg-box">${escHTML(mensagem)}</div>
+      ${botoes ? `
+        <p style="font-size:13px;color:#8B95A5;margin-bottom:14px;text-align:center">
+          ${tipo === 'leitura' ? 'Confirme que recebeu e leu esta mensagem.' : 'Indique seu interesse na proposta acima.'}
+        </p>
+        <div class="actions">${botoes}</div>
+      ` : ''}
+    `;
+  }
+
+  async function confirmar(status) {
+    document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const { error } = await sb
+      .from('mala_direta_envios')
+      .update({
+        status_confirmacao: status,
+        data_confirmacao: new Date().toISOString(),
+      })
+      .eq('token', TOKEN);
+
+    if (error) {
+      document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+      alert('Erro ao registrar. Tente novamente.');
+      return;
+    }
+
+    renderSucesso(status);
+  }
+
+  function renderSucesso(status) {
+    const msgs = {
+      lido:       { icon: '✅', titulo: 'Leitura confirmada!',    sub: 'Obrigado por confirmar o recebimento desta mensagem.' },
+      confirmado: { icon: '🎯', titulo: 'Interesse confirmado!',  sub: 'Ótimo! Entraremos em contato em breve.' },
+      recusado:   { icon: '📬', titulo: 'Resposta registrada.',   sub: 'Agradecemos o retorno. Sua resposta foi registrada.' },
+    };
+    const m = msgs[status] || msgs.lido;
+    document.getElementById('conteudo').innerHTML = `
+      <div class="feedback">
+        <div class="feedback-icon">${m.icon}</div>
+        <h2>${m.titulo}</h2>
+        <p>${m.sub}</p>
+        <p style="margin-top:16px;font-size:13px;color:#8B95A5">Você já pode fechar esta página.</p>
+      </div>
+    `;
+  }
+
+  function renderJaRespondido(status) {
+    const labels = { lido:'lida', confirmado:'confirmada (interesse)', recusado:'registrada (sem interesse)' };
+    document.getElementById('conteudo').innerHTML = `
+      <div class="already-done">
+        Esta mensagem já foi respondida anteriormente.
+      </div>
+      <div class="feedback">
+        <div class="feedback-icon">📋</div>
+        <h2>Já respondido</h2>
+        <p>Sua resposta "<strong>${labels[status] || status}</strong>" foi registrada anteriormente.</p>
+        <p style="margin-top:16px;font-size:13px;color:#8B95A5">Você pode fechar esta página.</p>
+      </div>
+    `;
+  }
+
+  function renderErro(msg) {
+    document.getElementById('conteudo').innerHTML = `
+      <div class="feedback">
+        <div class="feedback-icon">❌</div>
+        <h2>Link inválido</h2>
+        <p>${escHTML(msg)}</p>
+      </div>
+    `;
+  }
+
+  function escHTML(s) {
+    const d = document.createElement('div'); d.textContent = String(s || ''); return d.innerHTML;
+  }
+
+  init();
+  </script>
+</body>
+</html>

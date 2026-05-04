@@ -283,6 +283,51 @@ ON CONFLICT DO NOTHING;
 
 
 -- ============================================================
+-- 7b. COLUNAS ADICIONAIS (sub-permissões)
+--     Adicionadas após implantação inicial; idempotentes.
+-- ============================================================
+
+-- sub_permissoes: define quais sub-permissões a ferramenta suporta
+-- Ex.: {"formularios": "Formulários", "empregados": "Empregados"}
+ALTER TABLE public.ferramentas
+    ADD COLUMN IF NOT EXISTS sub_permissoes JSONB DEFAULT NULL;
+
+-- permissoes: sub-permissões concedidas ao usuário nesta ferramenta
+-- Array vazio {} = acesso total (compatibilidade retroativa)
+ALTER TABLE public.usuario_ferramentas
+    ADD COLUMN IF NOT EXISTS permissoes TEXT[] NOT NULL DEFAULT '{}';
+
+
+-- ============================================================
+-- 7c. FUNÇÃO AUXILIAR: has_gerenciador_permission(perm)
+--     Verifica se o usuário autenticado possui uma sub-permissão
+--     específica no Gerenciador de Formulários.
+--     SECURITY DEFINER: executa como dono, sem RLS sobre as tabelas
+--     de aplicação — necessário para uso nas policies de storage.
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.has_gerenciador_permission(perm TEXT)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER AS $$
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.usuario_ferramentas uf
+        JOIN public.ferramentas f ON f.id = uf.ferramenta_id
+        WHERE uf.usuario_id IN (
+            SELECT id FROM public.solicitacoes_acesso WHERE email = auth.email()
+        )
+        AND (
+            lower(f.url_base) LIKE '%gerenciador%'
+            OR lower(f.url_base) LIKE '%formulario%'
+        )
+        AND (
+            uf.permissoes IS NULL
+            OR uf.permissoes = '{}'
+            OR perm = ANY(uf.permissoes)
+        )
+    );
+$$;
+
+
+-- ============================================================
 -- 8. REALTIME
 --    Habilitar Realtime nas tabelas que o portal.html observa.
 --    O portal usa subscribeFerramentas() para atualizar o grid
@@ -305,6 +350,104 @@ BEGIN
         ALTER PUBLICATION supabase_realtime ADD TABLE public.ferramentas;
     END IF;
 END $$;
+
+
+-- ============================================================
+-- 9. STORAGE RLS — bucket: documentos
+--    Adequação LGPD: acesso restrito por pasta e sub-permissão.
+--
+--    ATENÇÃO (antes de executar):
+--      • Confirme que o bucket "documentos" está configurado como
+--        PRIVADO no painel Supabase → Storage → Policies.
+--      • As políticas abaixo substituem qualquer policy existente
+--        de mesmo nome no bucket documentos.
+--
+--    Estrutura de pastas e permissões:
+--      alteracao/        → sub-permissão "formularios"
+--      registro/         → sub-permissão "formularios"
+--      novos-empregados/ → sub-permissão "empregados"
+--      (raiz e outras pastas) → somente admin
+-- ============================================================
+
+-- Leitura: listar, visualizar, baixar e gerar signed URLs
+DROP POLICY IF EXISTS "documentos: leitura autorizada" ON storage.objects;
+CREATE POLICY "documentos: leitura autorizada"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (
+    bucket_id = 'documentos'
+    AND (
+        public.is_admin()
+        OR (
+            (storage.foldername(name))[1] IN ('alteracao', 'registro')
+            AND public.has_gerenciador_permission('formularios')
+        )
+        OR (
+            (storage.foldername(name))[1] = 'novos-empregados'
+            AND public.has_gerenciador_permission('empregados')
+        )
+    )
+);
+
+-- Upload
+DROP POLICY IF EXISTS "documentos: upload autorizado" ON storage.objects;
+CREATE POLICY "documentos: upload autorizado"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (
+    bucket_id = 'documentos'
+    AND (
+        public.is_admin()
+        OR (
+            (storage.foldername(name))[1] IN ('alteracao', 'registro')
+            AND public.has_gerenciador_permission('formularios')
+        )
+        OR (
+            (storage.foldername(name))[1] = 'novos-empregados'
+            AND public.has_gerenciador_permission('empregados')
+        )
+    )
+);
+
+-- Atualização / sobrescrita (upsert)
+DROP POLICY IF EXISTS "documentos: atualização autorizada" ON storage.objects;
+CREATE POLICY "documentos: atualização autorizada"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (
+    bucket_id = 'documentos'
+    AND (
+        public.is_admin()
+        OR (
+            (storage.foldername(name))[1] IN ('alteracao', 'registro')
+            AND public.has_gerenciador_permission('formularios')
+        )
+        OR (
+            (storage.foldername(name))[1] = 'novos-empregados'
+            AND public.has_gerenciador_permission('empregados')
+        )
+    )
+);
+
+-- Exclusão
+DROP POLICY IF EXISTS "documentos: exclusão autorizada" ON storage.objects;
+CREATE POLICY "documentos: exclusão autorizada"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (
+    bucket_id = 'documentos'
+    AND (
+        public.is_admin()
+        OR (
+            (storage.foldername(name))[1] IN ('alteracao', 'registro')
+            AND public.has_gerenciador_permission('formularios')
+        )
+        OR (
+            (storage.foldername(name))[1] = 'novos-empregados'
+            AND public.has_gerenciador_permission('empregados')
+        )
+    )
+);
 
 
 -- ============================================================

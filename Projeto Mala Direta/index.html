@@ -1,0 +1,2210 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mala Direta — SCONT</title>
+  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+  <link rel="stylesheet" href="styles.css">
+  <script src="../supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../portal-auth-guard.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- Auth -->
+  <div id="authOverlay" class="auth-overlay">
+    <div class="auth-spinner"></div>
+    <p class="auth-msg">Verificando acesso…</p>
+  </div>
+
+  <div id="app" style="display:none">
+
+    <!-- ── HAMBURGER (mobile) ── -->
+    <button class="hamburger" id="hamburger">☰</button>
+    <div class="overlay" id="overlay"></div>
+
+    <!-- ══════════════════════════════════════════════════
+         SIDEBAR
+    ══════════════════════════════════════════════════ -->
+    <aside class="sidebar" id="sidebar">
+
+      <div class="sidebar-header">
+        <span class="sidebar-logo">✉️</span>
+        <h2>Mala Direta</h2>
+        <p>SCONT · Mensagens</p>
+      </div>
+
+      <nav class="sidebar-nav">
+        <ul>
+          <li>
+            <button class="nav-link active" id="nav-dashboard" onclick="showSection('dashboard')">
+              <span class="nav-icon">📊</span> Dashboard
+            </button>
+          </li>
+          <li>
+            <button class="nav-link" id="nav-campanhas" onclick="showSection('campanhas')">
+              <span class="nav-icon">📣</span> Campanhas
+            </button>
+          </li>
+          <li>
+            <button class="nav-link" id="nav-contatos" onclick="showSection('contatos')">
+              <span class="nav-icon">👥</span> Contatos
+            </button>
+          </li>
+          <li>
+            <button class="nav-link" id="nav-grupos" onclick="showSection('grupos')">
+              <span class="nav-icon">🏷️</span> Grupos
+            </button>
+          </li>
+          <li>
+            <button class="nav-link" id="nav-configuracoes" onclick="showSection('configuracoes')">
+              <span class="nav-icon">⚙️</span> Configurações
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <strong id="sidebarNome">—</strong>
+          <span id="sidebarEmail">—</span>
+        </div>
+        <button class="btn-portal" onclick="location.href='../portal.html'">🏠 Voltar ao Portal</button>
+      </div>
+    </aside>
+
+    <!-- ══════════════════════════════════════════════════
+         MAIN
+    ══════════════════════════════════════════════════ -->
+    <div class="main-content">
+
+      <!-- ═══ DASHBOARD ═══ -->
+      <section id="sec-dashboard" class="section active">
+        <div class="page-header">
+          <div>
+            <h1>Dashboard</h1>
+            <div class="page-header-sub">Visão geral das campanhas e confirmações</div>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-primary" onclick="showSection('campanhas')">+ Nova Campanha</button>
+          </div>
+        </div>
+
+        <!-- Card de progresso de envio em lote (visível quando job ativo) -->
+        <div id="dash-batch-card" style="display:none;margin-bottom:20px"></div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Campanhas Ativas</div>
+            <div class="stat-value" id="stat-ativas">—</div>
+          </div>
+          <div class="stat-card info">
+            <div class="stat-label">Aguardando Envio</div>
+            <div class="stat-value" id="stat-pendentes">—</div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-label">Confirmações</div>
+            <div class="stat-value" id="stat-confirmacoes">—</div>
+          </div>
+          <div class="stat-card warning">
+            <div class="stat-label">Taxa de Resposta</div>
+            <div class="stat-value" id="stat-taxa">—</div>
+            <div class="stat-sub">dos enviados</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            📣 Campanhas Recentes
+            <button class="btn btn-secondary btn-sm" onclick="showSection('campanhas')">Ver todas</button>
+          </div>
+          <div class="card-body">
+            <div id="dash-campanhas">
+              <div class="empty"><span class="empty-icon">📣</span><p>Nenhuma campanha ainda</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ CAMPANHAS ═══ -->
+      <section id="sec-campanhas" class="section">
+        <div class="page-header">
+          <div>
+            <h1>Campanhas</h1>
+            <div class="page-header-sub">Crie e gerencie campanhas de mala direta</div>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-primary" onclick="openModalCampanha()">+ Nova Campanha</button>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <input type="text" id="filtro-campanhas" placeholder="Buscar campanha…" oninput="renderCampanhas()">
+        </div>
+
+        <div id="campanhas-list"></div>
+      </section>
+
+      <!-- ═══ DETALHE CAMPANHA ═══ -->
+      <section id="sec-detalhe" class="section">
+        <button class="back-link" onclick="voltarCampanhas()">← Voltar às campanhas</button>
+
+        <div class="page-header" style="margin-bottom:20px">
+          <div style="flex:1;min-width:0">
+            <h1 id="det-nome" style="font-size:20px"></h1>
+            <div id="det-meta" class="page-header-sub" style="margin-top:6px"></div>
+          </div>
+          <div class="page-header-actions" style="flex-wrap:wrap;gap:8px">
+            <button class="btn btn-secondary btn-sm" onclick="openModalCampanha(campanhaAtualId)">Editar</button>
+            <button class="btn btn-primary btn-sm" onclick="openModalDestinatarios()">+ Destinatários</button>
+            <button class="btn btn-secondary btn-sm" onclick="abrirEmailLote()">📧 Enviar por Email</button>
+            <button class="btn btn-success btn-sm" onclick="marcarTodosEnviados()">✓ Todos enviados</button>
+            <button class="btn btn-danger btn-sm" onclick="deletarCampanhaAtual()">Excluir</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-title">Template da Mensagem</div>
+          <div class="card-body">
+            <div id="det-template" style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:16px;font-size:13px;color:var(--text-light);white-space:pre-wrap;line-height:1.7"></div>
+          </div>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom:20px">
+          <div class="stat-card" style="padding:16px 20px">
+            <div class="stat-label">Total</div>
+            <div class="stat-value" id="det-total" style="font-size:26px">0</div>
+          </div>
+          <div class="stat-card info" style="padding:16px 20px">
+            <div class="stat-label">Enviados</div>
+            <div class="stat-value" id="det-enviados" style="font-size:26px">0</div>
+          </div>
+          <div class="stat-card success" style="padding:16px 20px">
+            <div class="stat-label">Confirmados</div>
+            <div class="stat-value" id="det-confirmados" style="font-size:26px">0</div>
+          </div>
+          <div class="stat-card warning" style="padding:16px 20px">
+            <div class="stat-label">Sem resposta</div>
+            <div class="stat-value" id="det-sem-resp" style="font-size:26px">0</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            Destinatários
+            <input type="text" id="filtro-envios" placeholder="Filtrar…"
+              style="border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:13px;font-weight:400;color:var(--text)"
+              oninput="renderEnvios()">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome / Empresa</th>
+                  <th>Canal</th>
+                  <th>Envio</th>
+                  <th>Confirmação</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="envios-tbody">
+                <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ CONTATOS ═══ -->
+      <section id="sec-contatos" class="section">
+        <div class="page-header">
+          <div>
+            <h1>Contatos</h1>
+            <div class="page-header-sub">Catálogo reutilizável de destinatários</div>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-secondary" onclick="abrirImportarContatos()">📥 Importar Excel</button>
+            <button class="btn btn-primary" onclick="openModalContato()">+ Novo Contato</button>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <input type="text" id="filtro-contatos" placeholder="Buscar por nome, empresa…" oninput="renderContatos()">
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Empresa</th>
+                  <th>Cargo</th>
+                  <th>Email</th>
+                  <th>WhatsApp</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="contatos-tbody">
+                <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ GRUPOS ═══ -->
+      <section id="sec-grupos" class="section">
+        <div class="page-header">
+          <div>
+            <h1>Grupos</h1>
+            <div class="page-header-sub">Organize contatos em grupos para envios mais ágeis</div>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-primary" onclick="openModalGrupo()">+ Novo Grupo</button>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <input type="text" id="filtro-grupos" placeholder="Buscar grupo…" oninput="renderGrupos()">
+        </div>
+
+        <div id="grupos-list"></div>
+      </section>
+
+      <!-- ═══ DETALHE GRUPO ═══ -->
+      <section id="sec-grupo-detalhe" class="section">
+        <button class="back-link" onclick="voltarGrupos()">← Voltar aos grupos</button>
+
+        <div class="page-header" style="margin-bottom:20px">
+          <div>
+            <h1 id="gdet-nome"></h1>
+            <div id="gdet-meta" class="page-header-sub"></div>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-secondary btn-sm" onclick="openModalGrupo(grupoAtualId)">Editar</button>
+            <button class="btn btn-primary btn-sm" onclick="openModalAddGrupoContatos()">+ Adicionar Contatos</button>
+            <button class="btn btn-danger btn-sm" onclick="deletarGrupoAtual()">Excluir Grupo</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" id="gdet-card-title">Contatos do Grupo</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Empresa</th>
+                  <th>Email</th>
+                  <th>WhatsApp</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="grupo-contatos-tbody">
+                <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ CONFIGURAÇÕES ═══ -->
+      <section id="sec-configuracoes" class="section">
+        <div class="page-header">
+          <div>
+            <h1>Configurações</h1>
+            <div class="page-header-sub">Parâmetros de envio em lote via Outlook</div>
+          </div>
+        </div>
+
+        <div class="card" style="max-width:560px">
+          <div class="card-title">📧 Envio em Lote</div>
+          <div class="card-body">
+            <div class="form-group">
+              <label>Máximo de emails por lote</label>
+              <input type="number" id="cfg-lote-max" class="form-control" min="1" max="500" placeholder="50">
+              <div class="form-hint">Limite do seu plano Outlook (padrão: 50). O sistema dividirá automaticamente os destinatários em lotes deste tamanho.</div>
+            </div>
+            <div class="form-group">
+              <label>Intervalo entre lotes (minutos)</label>
+              <input type="number" id="cfg-lote-intervalo" class="form-control" min="1" max="1440" placeholder="75">
+              <div class="form-hint">Tempo de espera entre o fim de um lote e o início do próximo. Mantenha a aba aberta durante o envio.</div>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label>Intervalo entre emails dentro do lote (segundos)</label>
+              <input type="number" id="cfg-lote-delay" class="form-control" min="0" max="60" placeholder="2">
+              <div class="form-hint">Tempo entre a abertura de cada email no Outlook. Use 0 para abrir todos de uma vez.</div>
+            </div>
+          </div>
+          <div style="padding:0 20px 20px">
+            <button class="btn btn-primary" onclick="salvarConfiguracoes()">Salvar Configurações</button>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /.main-content -->
+  </div><!-- /#app -->
+
+
+  <!-- ══════════════════════════════════════════════════
+       MODAIS
+  ══════════════════════════════════════════════════ -->
+
+  <!-- Modal: Campanha -->
+  <div id="modal-campanha" class="modal-overlay">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3 id="modal-camp-titulo">Nova Campanha</h3>
+        <button class="modal-close" onclick="closeModal('modal-campanha')">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="camp-id">
+        <div class="form-group">
+          <label>Nome da Campanha *</label>
+          <input type="text" id="camp-nome" class="form-control" placeholder="Ex: Proposta Renovação Q2 2026"
+            oninput="autoFillAssunto()">
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <input type="text" id="camp-descricao" class="form-control" placeholder="Opcional">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tipo de Confirmação *</label>
+            <select id="camp-tipo" class="form-control">
+              <option value="leitura">Confirmar Leitura</option>
+              <option value="interesse">Confirmar Interesse</option>
+              <option value="nenhuma">Sem Confirmação</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="camp-status" class="form-control">
+              <option value="rascunho">Rascunho</option>
+              <option value="ativa">Ativa</option>
+              <option value="encerrada">Encerrada</option>
+            </select>
+          </div>
+        </div>
+        <!-- Excel de destinatários com variáveis customizadas -->
+        <div class="form-group">
+          <label>Planilha de Destinatários e Variáveis (Excel) — opcional</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="file" id="camp-excel-file" accept=".xlsx,.xls" class="form-control" style="flex:1"
+              onchange="previewExcelCampanha(this.files[0])">
+            <button type="button" class="btn btn-secondary btn-sm" style="flex-shrink:0;white-space:nowrap"
+              onclick="_limparExcelCampanha()">✕ Limpar</button>
+          </div>
+          <div class="form-hint">As colunas da planilha viram variáveis disponíveis no template e no assunto.</div>
+          <div id="camp-excel-preview" style="margin-top:10px"></div>
+        </div>
+
+        <!-- Chips de variáveis (aparece após upload do Excel) -->
+        <div id="camp-vars-section" style="display:none;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">
+            Variáveis disponíveis — clique para inserir
+          </div>
+          <div id="camp-vars-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+        </div>
+
+        <div class="form-group">
+          <label>Assunto do Email</label>
+          <input type="text" id="camp-assunto" class="form-control"
+            placeholder="Padrão: nome da campanha"
+            oninput="this.dataset.customizado='1'">
+          <div class="form-hint">Preenchido automaticamente com o nome da campanha. Suporta variáveis.</div>
+        </div>
+        <div class="form-group">
+          <label>Template da Mensagem *</label>
+          <textarea id="camp-template" class="form-control" rows="7"
+            placeholder="Olá {{Nome Responsavel}},
+
+Segue o detalhamento do contrato de {{Empresa}}:
+• Valor dos honorários: {{Valor Honorario}}
+• Vigência: a partir de {{Inicio Vigencia}}
+
+Atenciosamente,
+Equipe SCONT"></textarea>
+          <div class="form-hint" id="camp-template-hint">Variáveis padrão: {{nome}} {{empresa}} {{cargo}} {{email}} {{telefone}}</div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modal-campanha')">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarCampanha()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Contato -->
+  <div id="modal-contato" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 id="modal-cont-titulo">Novo Contato</h3>
+        <button class="modal-close" onclick="closeModal('modal-contato')">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="cont-id">
+        <div class="form-group">
+          <label>Nome Completo *</label>
+          <input type="text" id="cont-nome" class="form-control" placeholder="Nome do destinatário">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="cont-email" class="form-control" placeholder="email@exemplo.com">
+          </div>
+          <div class="form-group">
+            <label>WhatsApp</label>
+            <input type="tel" id="cont-telefone" class="form-control" placeholder="(61) 99999-9999">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Empresa</label>
+            <input type="text" id="cont-empresa" class="form-control" placeholder="Nome da empresa">
+          </div>
+          <div class="form-group">
+            <label>Cargo</label>
+            <input type="text" id="cont-cargo" class="form-control" placeholder="Cargo ou função">
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modal-contato')">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarContato()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Adicionar Destinatários -->
+  <div id="modal-destinatarios" class="modal-overlay">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3>Adicionar Destinatários</h3>
+        <button class="modal-close" onclick="closeModal('modal-destinatarios')">×</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Seleção por Grupo -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title" style="font-size:14px;padding:14px 18px">Selecionar por Grupo
+            <span style="font-size:11px;font-weight:400;color:var(--muted)">Clique num grupo para marcar todos os seus contatos</span>
+          </div>
+          <div id="modal-grupos-lista" style="padding:14px;display:flex;flex-wrap:wrap;gap:8px">
+            <span style="color:var(--muted);font-size:13px">Carregando grupos…</span>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title" style="font-size:14px;padding:14px 18px">Selecionar da lista de Contatos</div>
+          <div style="padding:14px">
+            <input type="text" id="filtro-sel" class="form-control" style="margin-bottom:10px"
+              placeholder="Filtrar contatos…" oninput="renderContatosParaSelecao()">
+            <div id="lista-contatos-sel" class="contact-list-select"></div>
+          </div>
+        </div>
+
+        <!-- Excel import para destinatários -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title" style="font-size:14px;padding:14px 18px">
+            📥 Importar do Excel
+            <button class="btn btn-secondary btn-sm" style="font-size:11px" onclick="baixarModeloExcel('envios')">⬇ Baixar Modelo</button>
+          </div>
+          <div style="padding:0 14px 14px">
+            <div class="form-hint" style="margin-bottom:10px">
+              Colunas: <strong>nome</strong> (obrigatório), <code>email</code>, <code>telefone</code>, <code>empresa</code>, <code>cargo</code>
+            </div>
+            <input type="file" id="excel-envios-file" accept=".xlsx,.xls" class="form-control"
+              onchange="previewExcelEnvios(this.files[0])">
+            <div id="excel-envios-preview" style="margin-top:12px"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="font-size:14px;padding:14px 18px">Ou adicionar destinatário avulso</div>
+          <div class="card-body" style="padding:16px">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nome *</label>
+                <input type="text" id="av-nome" class="form-control" placeholder="Nome completo">
+              </div>
+              <div class="form-group">
+                <label>Canal</label>
+                <select id="av-canal" class="form-control">
+                  <option value="ambos">Email + WhatsApp</option>
+                  <option value="email">Somente Email</option>
+                  <option value="whatsapp">Somente WhatsApp</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="av-email" class="form-control" placeholder="email@exemplo.com">
+              </div>
+              <div class="form-group">
+                <label>WhatsApp</label>
+                <input type="tel" id="av-telefone" class="form-control" placeholder="(61) 99999-9999">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Empresa</label>
+                <input type="text" id="av-empresa" class="form-control">
+              </div>
+              <div class="form-group">
+                <label>Cargo</label>
+                <input type="text" id="av-cargo" class="form-control">
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modal-destinatarios')">Cancelar</button>
+        <button class="btn btn-primary" onclick="adicionarDestinatarios()">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Ver Envio / Mensagem -->
+  <div id="modal-envio" class="modal-overlay">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3 id="modal-env-nome">Mensagem Personalizada</h3>
+        <button class="modal-close" onclick="closeModal('modal-envio')">×</button>
+      </div>
+      <div class="modal-body">
+
+        <div style="background:var(--bg-light);border:1px solid var(--border-light);border-left:4px solid var(--primary);border-radius:8px;padding:16px;margin-bottom:18px;white-space:pre-wrap;font-size:14px;line-height:1.8;color:var(--text)" id="modal-env-msg"></div>
+
+        <div id="modal-env-link-wrap" style="margin-bottom:18px">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Link de Confirmação</div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="modal-env-link" readonly class="form-control"
+              style="font-size:12px;color:var(--text-light)">
+            <button class="btn btn-secondary btn-sm" onclick="copiarLink()">Copiar</button>
+          </div>
+        </div>
+
+        <div id="modal-env-actions" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Configurar e Enviar por Email -->
+  <div id="modal-email" class="modal-overlay">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3>📧 Enviar por Email — Outlook</h3>
+        <button class="modal-close" onclick="closeModal('modal-email')">×</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Configurações -->
+        <div style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:var(--radius-sm);padding:16px;margin-bottom:18px">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:12px">Configurações do Email</div>
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0">
+              <label>Assunto *</label>
+              <input type="text" id="email-assunto" class="form-control"
+                placeholder="Assunto do email (suporta {{nome}}, {{empresa}}…)">
+              <div class="form-hint">Variáveis serão substituídas para cada destinatário.</div>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label>Campo de email do destinatário</label>
+              <select id="email-campo" class="form-control">
+                <option value="email">Campo "email" do contato</option>
+              </select>
+              <div class="form-hint">Endereço obtido deste campo para cada envio.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conteúdo dinâmico: individual ou lote -->
+        <div id="modal-email-corpo"></div>
+
+      </div>
+      <div class="modal-foot" id="modal-email-rodape">
+        <button class="btn btn-secondary" onclick="closeModal('modal-email')">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Grupo -->
+  <div id="modal-grupo" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 id="modal-grupo-titulo">Novo Grupo</h3>
+        <button class="modal-close" onclick="closeModal('modal-grupo')">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="grupo-id">
+        <div class="form-group">
+          <label>Nome do Grupo *</label>
+          <input type="text" id="grupo-nome" class="form-control" placeholder="Ex: Clientes VIP, Fornecedores, Parceiros…">
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <input type="text" id="grupo-descricao" class="form-control" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modal-grupo')">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarGrupo()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Adicionar Contatos ao Grupo -->
+  <div id="modal-add-gc" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3>Adicionar Contatos ao Grupo</h3>
+        <button class="modal-close" onclick="closeModal('modal-add-gc')">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="filtro-add-gc" class="form-control" style="margin-bottom:12px"
+          placeholder="Filtrar contatos…" oninput="renderContatosParaGrupo()">
+        <div id="lista-add-gc" class="contact-list-select"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modal-add-gc')">Cancelar</button>
+        <button class="btn btn-primary" onclick="adicionarContatosAoGrupo()">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Importar Contatos do Excel -->
+  <div id="modal-importar-contatos" class="modal-overlay">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3>📥 Importar Contatos do Excel</h3>
+        <button class="modal-close" onclick="closeModal('modal-importar-contatos')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:14px;margin-bottom:16px">
+          <div style="font-size:13px;color:var(--text-light);margin-bottom:10px">
+            Importe uma planilha Excel com os dados dos contatos. Colunas aceitas:
+            <strong>nome</strong> (obrigatório), <code>email</code>, <code>telefone</code>, <code>empresa</code>, <code>cargo</code>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
+            <input type="file" id="excel-contatos-file" accept=".xlsx,.xls" class="form-control"
+              style="flex:1;min-width:200px" onchange="previewExcelContatos(this.files[0])">
+            <button class="btn btn-secondary btn-sm" style="flex-shrink:0;white-space:nowrap"
+              onclick="baixarModeloExcel('contatos')">⬇ Baixar Modelo</button>
+          </div>
+        </div>
+        <div id="excel-contatos-preview"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modal-importar-contatos')">Cancelar</button>
+        <button class="btn btn-primary" id="btn-importar-contatos" onclick="confirmarImportContatos()" disabled>Importar Contatos</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- ══════════════════════════════════════════════════
+       JAVASCRIPT
+  ══════════════════════════════════════════════════ -->
+  <script>
+  // ── ESTADO ───────────────────────────────────────────────────
+  let sb, userId;
+  let campanhas = [], contatos = [], envios = [];
+  let campanhaAtualId = null, campanhaAtual = null;
+  let grupos = [], grupoContatosAtual = [];
+  let grupoAtualId = null, grupoAtual = null;
+  let gcMap = {};
+  let emailBatchJob = null;
+  let excelEnviosRows = [], excelContatosRows = [];
+  let excelCampanhaRows = [], excelCampanhaColunas = [];
+
+  // ── BOOT ─────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', async () => {
+    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+    if (!auth) return;
+
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Buscar ID do usuário direto da sessão Supabase ativa (o sessionStorage pode ter estrutura variada)
+    const { data: { session } } = await sb.auth.getSession();
+    userId = session?.user?.id ?? null;
+
+    // Preencher sidebar com dados do usuário
+    const nome  = auth?.userData?.nome ?? auth?.nome ?? session?.user?.email ?? auth?.email ?? '—';
+    const email = session?.user?.email ?? auth?.email ?? auth?.userData?.email ?? '—';
+    document.getElementById('sidebarNome').textContent  = nome;
+    document.getElementById('sidebarEmail').textContent = email;
+
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+
+    // Hamburger
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('overlay');
+    document.getElementById('hamburger').addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('show');
+    });
+    overlay.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('show');
+    });
+
+    await Promise.all([loadCampanhas(), loadContatos(), loadGrupos()]);
+    renderDashboard();
+  });
+
+  // ── NAVEGAÇÃO ─────────────────────────────────────────────────
+  const NAV_MAP = {
+    dashboard:     'sec-dashboard',
+    campanhas:     'sec-campanhas',
+    contatos:      'sec-contatos',
+    grupos:        'sec-grupos',
+    configuracoes: 'sec-configuracoes',
+  };
+
+  function showSection(name) {
+    Object.values(NAV_MAP).forEach(id => document.getElementById(id).classList.remove('active'));
+    document.getElementById('sec-detalhe').classList.remove('active');
+    document.getElementById('sec-grupo-detalhe').classList.remove('active');
+
+    document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
+    document.getElementById('nav-' + name)?.classList.add('active');
+
+    const secId = NAV_MAP[name];
+    if (secId) document.getElementById(secId).classList.add('active');
+
+    if (name === 'campanhas')     renderCampanhas();
+    if (name === 'contatos')      renderContatos();
+    if (name === 'grupos')        renderGrupos();
+    if (name === 'dashboard')     renderDashboard();
+    if (name === 'configuracoes') carregarConfiguracoes();
+
+    // fecha sidebar no mobile
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('show');
+  }
+
+  // ── TOAST ─────────────────────────────────────────────────────
+  let _tt;
+  function toast(msg, type = '') {
+    clearTimeout(_tt);
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.className = 'show ' + type;
+    _tt = setTimeout(() => el.className = '', 3200);
+  }
+
+  // ── MODAIS ────────────────────────────────────────────────────
+  function openModal(id) { document.getElementById(id).classList.add('open'); }
+  function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+  // ── CARREGAR DADOS ────────────────────────────────────────────
+  async function loadCampanhas() {
+    const { data } = await sb.from('mala_direta_campanhas')
+      .select('*').order('created_at', { ascending: false });
+    campanhas = data || [];
+  }
+
+  async function loadContatos() {
+    const { data } = await sb.from('mala_direta_contatos')
+      .select('*').eq('ativo', true).order('nome');
+    contatos = data || [];
+  }
+
+  async function loadGrupos() {
+    const { data } = await sb.from('mala_direta_grupos').select('*').order('nome');
+    grupos = data || [];
+  }
+
+  async function loadEnvios(campanhaId) {
+    const { data } = await sb.from('mala_direta_envios')
+      .select('*').eq('campanha_id', campanhaId).order('nome');
+    envios = data || [];
+    renderEnvios();
+    atualizarDetalheStats();
+  }
+
+  // ── DASHBOARD ─────────────────────────────────────────────────
+  async function renderDashboard() {
+    const { data: todos } = await sb.from('mala_direta_envios')
+      .select('status_envio,status_confirmacao');
+    const all = todos || [];
+
+    const ativas      = campanhas.filter(c => c.status === 'ativa').length;
+    const pendentes   = all.filter(e => e.status_envio === 'pendente').length;
+    const confirmados = all.filter(e => ['lido','confirmado'].includes(e.status_confirmacao)).length;
+    const enviados    = all.filter(e => e.status_envio === 'enviado').length;
+    const taxa        = enviados > 0 ? Math.round(confirmados / enviados * 100) : 0;
+
+    document.getElementById('stat-ativas').textContent      = ativas;
+    document.getElementById('stat-pendentes').textContent   = pendentes;
+    document.getElementById('stat-confirmacoes').textContent= confirmados;
+    document.getElementById('stat-taxa').textContent        = taxa + '%';
+
+    const cont = document.getElementById('dash-campanhas');
+    if (!campanhas.length) {
+      cont.innerHTML = '<div class="empty"><span class="empty-icon">📣</span><p>Nenhuma campanha ainda</p></div>';
+      return;
+    }
+    updateDashboardBatchCard();
+
+    cont.innerHTML = campanhas.slice(0, 6).map(c => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light)">
+        <div>
+          <div style="font-weight:600;font-size:14px;color:var(--primary)">${esc(c.nome)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">${labelTipoConf(c.tipo_confirmacao)} · ${formatDate(c.created_at)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="badge badge-${c.status}">${labelStatus(c.status)}</span>
+          <button class="btn btn-secondary btn-sm" onclick="abrirDetalhe('${c.id}')">Ver →</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ── CAMPANHAS ─────────────────────────────────────────────────
+  function renderCampanhas() {
+    const filtro = (document.getElementById('filtro-campanhas')?.value || '').toLowerCase();
+    const lista  = filtro
+      ? campanhas.filter(c => c.nome.toLowerCase().includes(filtro) || (c.descricao||'').toLowerCase().includes(filtro))
+      : campanhas;
+    const cont = document.getElementById('campanhas-list');
+
+    if (!lista.length) {
+      cont.innerHTML = '<div class="empty"><span class="empty-icon">📣</span><p>Nenhuma campanha encontrada</p></div>';
+      return;
+    }
+    cont.innerHTML = `<div class="md-grid">${lista.map(c => `
+      <div class="md-card" onclick="abrirDetalhe('${c.id}')">
+        <div class="md-card-top">
+          <div class="md-card-icon">📣</div>
+          <div class="md-card-info">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+              <div class="md-card-name">${esc(c.nome)}</div>
+              <span class="badge badge-${c.status}" style="flex-shrink:0">${labelStatus(c.status)}</span>
+            </div>
+            ${c.descricao ? `<div class="md-card-desc">${esc(c.descricao)}</div>` : ''}
+          </div>
+        </div>
+        <div class="md-card-stats">
+          <div class="md-stat">
+            <span class="n" style="font-size:10px;line-height:1.4">${labelTipoConf(c.tipo_confirmacao)}</span>
+            <span class="l">Confirmação</span>
+          </div>
+          <div class="md-stat">
+            <span class="n" style="font-size:12px">${formatDate(c.created_at)}</span>
+            <span class="l">Criada em</span>
+          </div>
+        </div>
+        <div class="md-card-footer" onclick="event.stopPropagation()">
+          <button class="btn btn-secondary btn-sm" onclick="openModalCampanha('${c.id}')">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmarDeletar('${c.id}')">Excluir</button>
+        </div>
+      </div>
+    `).join('')}</div>`;
+  }
+
+  async function abrirDetalhe(id) {
+    campanhaAtualId = id;
+    campanhaAtual = campanhas.find(c => c.id === id);
+    if (!campanhaAtual) return;
+
+    Object.values(NAV_MAP).forEach(sid => document.getElementById(sid).classList.remove('active'));
+    document.getElementById('sec-detalhe').classList.add('active');
+    document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
+    document.getElementById('nav-campanhas').classList.add('active');
+
+    document.getElementById('det-nome').textContent = campanhaAtual.nome;
+    document.getElementById('det-meta').innerHTML =
+      `<span class="badge badge-${campanhaAtual.status}">${labelStatus(campanhaAtual.status)}</span>
+       &nbsp; ${labelTipoConf(campanhaAtual.tipo_confirmacao)}&nbsp;·&nbsp;Criada em ${formatDate(campanhaAtual.created_at)}`;
+    document.getElementById('det-template').textContent = campanhaAtual.template;
+
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('show');
+
+    await loadEnvios(id);
+  }
+
+  function voltarCampanhas() {
+    campanhaAtualId = null; campanhaAtual = null; envios = [];
+    showSection('campanhas');
+  }
+
+  function atualizarDetalheStats() {
+    document.getElementById('det-total').textContent      = envios.length;
+    document.getElementById('det-enviados').textContent   = envios.filter(e => e.status_envio === 'enviado').length;
+    document.getElementById('det-confirmados').textContent= envios.filter(e => ['lido','confirmado'].includes(e.status_confirmacao)).length;
+    document.getElementById('det-sem-resp').textContent   = envios.filter(e => e.status_envio === 'enviado' && e.status_confirmacao === 'pendente').length;
+  }
+
+  function renderEnvios() {
+    const filtro = (document.getElementById('filtro-envios')?.value || '').toLowerCase();
+    const lista  = filtro
+      ? envios.filter(e => e.nome.toLowerCase().includes(filtro) || (e.empresa||'').toLowerCase().includes(filtro))
+      : envios;
+    const tbody = document.getElementById('envios-tbody');
+
+    if (!lista.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--muted)">
+        Nenhum destinatário. Clique em "+ Destinatários" para adicionar.
+      </td></tr>`;
+      return;
+    }
+    tbody.innerHTML = lista.map(e => `
+      <tr>
+        <td>
+          <div style="font-weight:600;color:var(--primary)">${esc(e.nome)}</div>
+          <div style="font-size:11px;color:var(--muted)">${esc(e.empresa||'')}${e.cargo?' · '+esc(e.cargo):''}</div>
+        </td>
+        <td>${labelCanal(e.canal)}</td>
+        <td>
+          ${e.status_envio === 'enviado'
+            ? '<span class="badge badge-sent">Enviado</span>'
+            : `<button class="btn btn-secondary btn-sm" onclick="marcarEnviado('${e.id}')">Marcar enviado</button>`}
+        </td>
+        <td><span class="badge badge-${badgeConf(e.status_confirmacao)}">${labelConf(e.status_confirmacao)}</span></td>
+        <td>
+          <div class="envio-actions">
+            <button class="btn btn-primary btn-sm" onclick="verEnvio('${e.id}')">Ver msg</button>
+            ${e.email && e.canal !== 'whatsapp' ? `<button class="btn btn-secondary btn-sm" onclick="abrirEmailIndividual('${e.id}')">📧</button>` : ''}
+            ${e.telefone && e.canal !== 'email' ? `<button class="btn btn-success btn-sm" onclick="abrirWhatsApp('${e.id}')">💬</button>` : ''}
+            <button class="btn btn-danger btn-sm" onclick="deletarEnvio('${e.id}')">✕</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // ── MODAL CAMPANHA ────────────────────────────────────────────
+  function openModalCampanha(id) {
+    const c = id ? campanhas.find(x => x.id === id) : null;
+    document.getElementById('camp-id').value      = id || '';
+    document.getElementById('modal-camp-titulo').textContent = c ? 'Editar Campanha' : 'Nova Campanha';
+    document.getElementById('camp-nome').value     = c?.nome || '';
+    document.getElementById('camp-descricao').value= c?.descricao || '';
+    document.getElementById('camp-tipo').value     = c?.tipo_confirmacao || 'leitura';
+    document.getElementById('camp-status').value   = c?.status || 'rascunho';
+    document.getElementById('camp-template').value  = c?.template || '';
+
+    const assuntoEl = document.getElementById('camp-assunto');
+    assuntoEl.value              = c?.assunto_email || c?.nome || '';
+    assuntoEl.dataset.customizado = c?.assunto_email ? '1' : '';
+
+    // Reset Excel state
+    _limparExcelCampanha();
+    openModal('modal-campanha');
+  }
+
+  async function salvarCampanha() {
+    const id       = document.getElementById('camp-id').value;
+    const nome     = document.getElementById('camp-nome').value.trim();
+    const template = document.getElementById('camp-template').value.trim();
+    if (!nome || !template) { toast('Nome e template são obrigatórios', 'error'); return; }
+
+    const payload = {
+      nome,
+      descricao:        document.getElementById('camp-descricao').value.trim() || null,
+      tipo_confirmacao: document.getElementById('camp-tipo').value,
+      status:           document.getElementById('camp-status').value,
+      template,
+      assunto_email:    document.getElementById('camp-assunto').value.trim() || nome,
+    };
+
+    let savedId = id, error;
+    if (id) {
+      ({ error } = await sb.from('mala_direta_campanhas').update(payload).eq('id', id));
+    } else {
+      payload.criado_por = userId;
+      const { data: ins, error: err } = await sb.from('mala_direta_campanhas').insert(payload).select().single();
+      error   = err;
+      savedId = ins?.id;
+    }
+    if (error) { toast('Erro: ' + error.message, 'error'); return; }
+
+    const hasExcel = excelCampanhaRows.length > 0;
+    if (hasExcel) {
+      try {
+        await _criarEnviosDoExcel(savedId, { ...payload, id: savedId });
+        toast(`${id ? 'Campanha atualizada' : 'Campanha criada'} com ${excelCampanhaRows.length} destinatário(s)!`, 'success');
+      } catch(e) {
+        toast('Campanha salva, mas erro ao importar Excel: ' + e.message, 'error');
+      }
+      _limparExcelCampanha();
+    } else {
+      toast(id ? 'Campanha atualizada!' : 'Campanha criada!', 'success');
+    }
+
+    closeModal('modal-campanha');
+    await loadCampanhas();
+
+    if (hasExcel && savedId) {
+      campanhaAtual = campanhas.find(c => c.id === savedId);
+      if (campanhaAtual) await abrirDetalhe(savedId);
+    } else {
+      if (campanhaAtualId === id) {
+        campanhaAtual = campanhas.find(c => c.id === id);
+        document.getElementById('det-nome').textContent = campanhaAtual.nome;
+        document.getElementById('det-template').textContent = campanhaAtual.template;
+      }
+      renderCampanhas();
+    }
+  }
+
+  async function confirmarDeletar(id) {
+    if (!confirm('Excluir esta campanha e todos os envios relacionados?')) return;
+    const { error } = await sb.from('mala_direta_campanhas').delete().eq('id', id);
+    if (error) { toast('Erro ao excluir', 'error'); return; }
+    toast('Campanha excluída', 'success');
+    await loadCampanhas();
+    renderCampanhas();
+  }
+
+  async function deletarCampanhaAtual() {
+    if (!campanhaAtualId) return;
+    if (!confirm('Excluir esta campanha e todos os envios relacionados?')) return;
+    const { error } = await sb.from('mala_direta_campanhas').delete().eq('id', campanhaAtualId);
+    if (error) { toast('Erro ao excluir', 'error'); return; }
+    toast('Campanha excluída', 'success');
+    await loadCampanhas();
+    voltarCampanhas();
+  }
+
+  // ── MODAL CONTATO ─────────────────────────────────────────────
+  function openModalContato(id) {
+    const c = id ? contatos.find(x => x.id === id) : null;
+    document.getElementById('cont-id').value       = id || '';
+    document.getElementById('modal-cont-titulo').textContent = c ? 'Editar Contato' : 'Novo Contato';
+    document.getElementById('cont-nome').value     = c?.nome || '';
+    document.getElementById('cont-email').value    = c?.email || '';
+    document.getElementById('cont-telefone').value = c?.telefone || '';
+    document.getElementById('cont-empresa').value  = c?.empresa || '';
+    document.getElementById('cont-cargo').value    = c?.cargo || '';
+    openModal('modal-contato');
+  }
+
+  async function salvarContato() {
+    const id   = document.getElementById('cont-id').value;
+    const nome = document.getElementById('cont-nome').value.trim();
+    if (!nome) { toast('Nome é obrigatório', 'error'); return; }
+
+    const payload = {
+      nome,
+      email:    document.getElementById('cont-email').value.trim() || null,
+      telefone: document.getElementById('cont-telefone').value.trim() || null,
+      empresa:  document.getElementById('cont-empresa').value.trim() || null,
+      cargo:    document.getElementById('cont-cargo').value.trim() || null,
+    };
+
+    let error;
+    if (id) {
+      ({ error } = await sb.from('mala_direta_contatos').update(payload).eq('id', id));
+    } else {
+      ({ error } = await sb.from('mala_direta_contatos').insert(payload));
+    }
+    if (error) { toast('Erro: ' + error.message, 'error'); return; }
+    toast(id ? 'Contato atualizado!' : 'Contato criado!', 'success');
+    closeModal('modal-contato');
+    await loadContatos();
+    renderContatos();
+  }
+
+  async function deletarContato(id) {
+    if (!confirm('Remover este contato?')) return;
+    const { error } = await sb.from('mala_direta_contatos').update({ ativo: false }).eq('id', id);
+    if (error) { toast('Erro', 'error'); return; }
+    toast('Contato removido', 'success');
+    await loadContatos();
+    renderContatos();
+  }
+
+  function renderContatos() {
+    const filtro = (document.getElementById('filtro-contatos')?.value || '').toLowerCase();
+    const lista  = filtro
+      ? contatos.filter(c => c.nome.toLowerCase().includes(filtro) || (c.empresa||'').toLowerCase().includes(filtro))
+      : contatos;
+    const tbody = document.getElementById('contatos-tbody');
+
+    if (!lista.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:36px;color:var(--muted)">Nenhum contato cadastrado</td></tr>';
+      return;
+    }
+    tbody.innerHTML = lista.map(c => `
+      <tr>
+        <td><strong style="color:var(--primary)">${esc(c.nome)}</strong></td>
+        <td>${esc(c.empresa||'—')}</td>
+        <td>${esc(c.cargo||'—')}</td>
+        <td>${c.email ? `<a href="mailto:${esc(c.email)}" style="color:var(--primary)">${esc(c.email)}</a>` : '—'}</td>
+        <td>${c.telefone ? esc(c.telefone) : '—'}</td>
+        <td>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="openModalContato('${c.id}')">Editar</button>
+            <button class="btn btn-danger btn-sm" onclick="deletarContato('${c.id}')">✕</button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // ── DESTINATÁRIOS ─────────────────────────────────────────────
+  async function openModalDestinatarios() {
+    if (!campanhaAtualId) return;
+    ['av-nome','av-email','av-telefone','av-empresa','av-cargo'].forEach(i => document.getElementById(i).value = '');
+    document.getElementById('av-canal').value = 'ambos';
+    document.getElementById('filtro-sel').value = '';
+    // reset Excel state
+    excelEnviosRows = [];
+    document.getElementById('excel-envios-file').value = '';
+    document.getElementById('excel-envios-preview').innerHTML = '';
+    renderContatosParaSelecao();
+    await renderGruposNoModal();
+    openModal('modal-destinatarios');
+  }
+
+  // Carrega mapa grupoId → [contatoId] e renderiza botões no modal
+  async function renderGruposNoModal() {
+    const { data } = await sb.from('mala_direta_grupo_contatos').select('grupo_id,contato_id');
+    gcMap = {};
+    (data || []).forEach(r => {
+      if (!gcMap[r.grupo_id]) gcMap[r.grupo_id] = [];
+      gcMap[r.grupo_id].push(r.contato_id);
+    });
+
+    const cont = document.getElementById('modal-grupos-lista');
+    if (!grupos.length) {
+      cont.innerHTML = '<span style="color:var(--muted);font-size:13px">Nenhum grupo cadastrado. Crie grupos na seção "Grupos".</span>';
+      return;
+    }
+    cont.innerHTML = grupos.map(g => {
+      const total = (gcMap[g.id] || []).length;
+      return `<button class="btn btn-secondary btn-sm" id="btn-mg-${g.id}"
+        onclick="toggleGrupoNoModal('${g.id}')"
+        style="border-radius:20px;gap:6px">
+        🏷️ ${esc(g.nome)} <span style="opacity:0.6;font-weight:400">${total}</span>
+      </button>`;
+    }).join('');
+  }
+
+  function toggleGrupoNoModal(grupoId) {
+    const btn = document.getElementById('btn-mg-' + grupoId);
+    const ativo = btn.classList.contains('btn-primary');
+    btn.classList.toggle('btn-primary', !ativo);
+    btn.classList.toggle('btn-secondary', ativo);
+
+    const ids = gcMap[grupoId] || [];
+    ids.forEach(cid => {
+      const cb = document.querySelector(`input[name="sel-contato"][value="${cid}"]`);
+      if (cb) cb.checked = !ativo;
+    });
+  }
+
+  function renderContatosParaSelecao() {
+    const filtro = (document.getElementById('filtro-sel')?.value || '').toLowerCase();
+    const jaAdicionados = envios.map(e => e.contato_id).filter(Boolean);
+    const lista = contatos.filter(c =>
+      !jaAdicionados.includes(c.id) &&
+      (!filtro || c.nome.toLowerCase().includes(filtro) || (c.empresa||'').toLowerCase().includes(filtro))
+    );
+    const cont = document.getElementById('lista-contatos-sel');
+    if (!lista.length) {
+      cont.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">Nenhum contato disponível para adicionar</div>';
+      return;
+    }
+    cont.innerHTML = lista.map(c => `
+      <label class="contact-item">
+        <input type="checkbox" name="sel-contato" value="${c.id}">
+        <div class="contact-info">
+          <div class="contact-name">${esc(c.nome)}</div>
+          <div class="contact-detail">${c.empresa ? esc(c.empresa) + ' · ' : ''}${c.email||''}${c.telefone ? ' · ' + c.telefone : ''}</div>
+        </div>
+      </label>
+    `).join('');
+  }
+
+  async function adicionarDestinatarios() {
+    const template = campanhaAtual?.template || '';
+    const inserts  = [];
+
+    document.querySelectorAll('input[name="sel-contato"]:checked').forEach(inp => {
+      const c = contatos.find(x => x.id === inp.value);
+      if (!c) return;
+      inserts.push({
+        campanha_id: campanhaAtualId, contato_id: c.id,
+        nome: c.nome, email: c.email || null, telefone: c.telefone || null,
+        empresa: c.empresa || null, cargo: c.cargo || null,
+        mensagem_final: applyTemplate(template, c),
+        token: crypto.randomUUID().replace(/-/g,''),
+        canal: c.email && c.telefone ? 'ambos' : c.telefone ? 'whatsapp' : 'email',
+      });
+    });
+
+    const avNome = document.getElementById('av-nome').value.trim();
+    if (avNome) {
+      const av = {
+        nome: avNome,
+        email:    document.getElementById('av-email').value.trim() || null,
+        telefone: document.getElementById('av-telefone').value.trim() || null,
+        empresa:  document.getElementById('av-empresa').value.trim() || null,
+        cargo:    document.getElementById('av-cargo').value.trim() || null,
+      };
+      inserts.push({
+        campanha_id: campanhaAtualId, contato_id: null, ...av,
+        mensagem_final: applyTemplate(template, av),
+        token: crypto.randomUUID().replace(/-/g,''),
+        canal: document.getElementById('av-canal').value,
+      });
+    }
+
+    // Excel rows
+    excelEnviosRows.forEach(r => {
+      inserts.push({
+        campanha_id: campanhaAtualId, contato_id: null,
+        nome: r.nome, email: r.email || null, telefone: r.telefone || null,
+        empresa: r.empresa || null, cargo: r.cargo || null,
+        mensagem_final: applyTemplate(template, r),
+        token: crypto.randomUUID().replace(/-/g,''),
+        canal: r.email && r.telefone ? 'ambos' : r.telefone ? 'whatsapp' : 'email',
+      });
+    });
+
+    if (!inserts.length) { toast('Selecione ao menos um destinatário', 'error'); return; }
+
+    const { error } = await sb.from('mala_direta_envios').insert(inserts);
+    if (error) { toast('Erro: ' + error.message, 'error'); return; }
+
+    toast(`${inserts.length} destinatário(s) adicionado(s)!`, 'success');
+    closeModal('modal-destinatarios');
+    await loadEnvios(campanhaAtualId);
+  }
+
+  // ── TEMPLATE ─────────────────────────────────────────────────
+  function applyTemplate(t, row) {
+    return String(t).replace(/\{\{([^}]+)\}\}/gi, (_, key) => {
+      const k = key.trim();
+      if (row[k] !== undefined) return String(row[k] ?? '');
+      const found = Object.keys(row).find(rk => rk.toLowerCase() === k.toLowerCase());
+      return found ? String(row[found] ?? '') : '';
+    });
+  }
+
+  // ── VER ENVIO ─────────────────────────────────────────────────
+  function getConfirmUrl(token) {
+    const base = window.location.href.split('?')[0];
+    const dir  = base.substring(0, base.lastIndexOf('/') + 1);
+    return dir + 'confirmacao.html?token=' + token;
+  }
+
+  function verEnvio(id) {
+    const e = envios.find(x => x.id === id);
+    if (!e) return;
+
+    document.getElementById('modal-env-nome').textContent = e.nome;
+    document.getElementById('modal-env-msg').textContent  = e.mensagem_final;
+
+    const semConfirm = campanhaAtual?.tipo_confirmacao === 'nenhuma';
+    document.getElementById('modal-env-link-wrap').style.display = semConfirm ? 'none' : 'block';
+    if (!semConfirm) document.getElementById('modal-env-link').value = getConfirmUrl(e.token);
+
+    const actions = [];
+    if (!semConfirm) actions.push(`<button class="btn btn-secondary" onclick="copiarLink()">🔗 Copiar link de confirmação</button>`);
+    if (e.email && e.canal !== 'whatsapp')  actions.push(`<button class="btn btn-secondary" onclick="enviarEmail('${id}')">📧 Abrir no email</button>`);
+    if (e.telefone && e.canal !== 'email')  actions.push(`<button class="btn btn-success"   onclick="enviarWhatsApp('${id}')">💬 Abrir no WhatsApp</button>`);
+    actions.push(`<button class="btn btn-primary" onclick="marcarEnviado('${id}');closeModal('modal-envio')" ${e.status_envio==='enviado'?'disabled':''}>✓ Marcar enviado</button>`);
+    document.getElementById('modal-env-actions').innerHTML = actions.join('');
+
+    openModal('modal-envio');
+  }
+
+  function abrirEmail(id)    { verEnvio(id); }
+  function abrirWhatsApp(id) { verEnvio(id); }
+
+  // ── EMAIL VIA OUTLOOK ─────────────────────────────────────────
+  function abrirEmailIndividual(id) {
+    const e = envios.find(x => x.id === id);
+    if (!e) return;
+
+    document.getElementById('email-assunto').value =
+      applyTemplate(campanhaAtual?.assunto_email || campanhaAtual?.nome || '', e);
+
+    document.getElementById('modal-email-corpo').innerHTML = `
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Destinatário</div>
+      <div style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:14px;margin-bottom:16px">
+        <div style="font-weight:600;font-size:14px;color:var(--text)">${esc(e.nome)}</div>
+        <div style="font-size:12px;color:var(--muted)">${esc(e.email || '(sem email)')}</div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Mensagem</div>
+      <div style="background:var(--bg-light);border:1px solid var(--border-light);border-left:4px solid var(--primary);border-radius:8px;padding:14px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text);max-height:220px;overflow-y:auto">${esc(e.mensagem_final)}</div>
+    `;
+
+    document.getElementById('modal-email-rodape').innerHTML = `
+      <button class="btn btn-secondary" onclick="closeModal('modal-email')">Fechar</button>
+      <button class="btn btn-primary" onclick="_dispararEmailItem('${id}')">📧 Abrir no Outlook</button>
+    `;
+
+    openModal('modal-email');
+  }
+
+  function abrirEmailLote() {
+    const comEmail = envios.filter(e => e.email && e.canal !== 'whatsapp');
+    if (!comEmail.length) { toast('Nenhum destinatário com email nesta campanha', 'error'); return; }
+
+    if (emailBatchJob && ['rodando','aguardando'].includes(emailBatchJob.status)) {
+      toast('Envio em lote já em andamento. Acompanhe no Dashboard.', 'error'); return;
+    }
+
+    document.getElementById('email-assunto').value =
+      campanhaAtual?.assunto_email || campanhaAtual?.nome || '';
+
+    const settings  = getSettings();
+    const numLotes  = Math.ceil(comEmail.length / settings.loteMax);
+    const totalMin  = (numLotes - 1) * settings.loteIntervalo;
+    const tempoStr  = totalMin >= 60
+      ? `${Math.floor(totalMin/60)}h${totalMin%60 > 0 ? ` ${totalMin%60}min` : ''}`
+      : totalMin > 0 ? `${totalMin} min` : 'imediato';
+
+    document.getElementById('modal-email-corpo').innerHTML = `
+      <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:14px 16px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:700;color:#1E40AF;text-transform:uppercase;letter-spacing:0.5px">Configurações do Lote</span>
+          <button class="btn btn-secondary btn-sm" style="font-size:11px" onclick="closeModal('modal-email');showSection('configuracoes')">⚙️ Alterar</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center">
+          <div><div style="font-size:22px;font-weight:700;color:#1E40AF">${comEmail.length}</div><div style="font-size:10px;color:#6B7280;text-transform:uppercase">Emails</div></div>
+          <div><div style="font-size:22px;font-weight:700;color:#1E40AF">${numLotes}</div><div style="font-size:10px;color:#6B7280;text-transform:uppercase">Lotes (máx ${settings.loteMax})</div></div>
+          <div><div style="font-size:22px;font-weight:700;color:#1E40AF">${tempoStr}</div><div style="font-size:10px;color:#6B7280;text-transform:uppercase">Tempo estimado</div></div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">
+        Envio individual
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto">
+        ${comEmail.map(e => `
+          <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:10px 14px;gap:12px">
+            <div style="min-width:0">
+              <div style="font-weight:600;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.nome)}</div>
+              <div style="font-size:11px;color:var(--muted)">${esc(e.email)}</div>
+            </div>
+            <button class="btn btn-primary btn-sm" style="flex-shrink:0" onclick="_dispararEmailItem('${e.id}')">📧 Abrir</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    document.getElementById('modal-email-rodape').innerHTML = `
+      <button class="btn btn-secondary" onclick="closeModal('modal-email')">Fechar</button>
+      <button class="btn btn-primary" onclick="iniciarEnvioEmLote()">⚡ Iniciar Envio em Lote</button>
+    `;
+
+    openModal('modal-email');
+  }
+
+  function _dispararEmailItem(id) {
+    const e = envios.find(x => x.id === id);
+    if (!e) return;
+    const campo = document.getElementById('email-campo').value || 'email';
+    const dest  = e[campo] || e.email;
+    if (!dest) { toast('Este destinatário não tem email', 'error'); return; }
+
+    const assuntoTpl = document.getElementById('email-assunto').value || campanhaAtual?.nome || '';
+    const assunto    = applyTemplate(assuntoTpl, e);
+    const corpo      = e.mensagem_final + (campanhaAtual?.tipo_confirmacao !== 'nenhuma'
+      ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
+
+    window.open(`mailto:${encodeURIComponent(dest)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
+  }
+
+  function copiarLink() {
+    navigator.clipboard.writeText(document.getElementById('modal-env-link').value)
+      .then(() => toast('Link copiado!', 'success'));
+  }
+
+  function enviarEmail(id) {
+    const e = envios.find(x => x.id === id);
+    if (!e?.email) return;
+    const assunto = campanhaAtual?.nome || 'Mensagem SCONT';
+    const corpo   = e.mensagem_final + (campanhaAtual?.tipo_confirmacao !== 'nenhuma'
+      ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
+    window.open(`mailto:${encodeURIComponent(e.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
+  }
+
+  function enviarWhatsApp(id) {
+    const e = envios.find(x => x.id === id);
+    if (!e?.telefone) return;
+    const tel    = e.telefone.replace(/\D/g,'');
+    const prefixo = tel.startsWith('55') ? tel : '55' + tel;
+    const msg    = e.mensagem_final + (campanhaAtual?.tipo_confirmacao !== 'nenhuma'
+      ? '\n\nConfirme em: ' + getConfirmUrl(e.token) : '');
+    window.open(`https://wa.me/${prefixo}?text=${encodeURIComponent(msg)}`);
+  }
+
+  // ── MARCAR ENVIADO ────────────────────────────────────────────
+  async function marcarEnviado(id) {
+    const { error } = await sb.from('mala_direta_envios')
+      .update({ status_envio: 'enviado', data_envio: new Date().toISOString() })
+      .eq('id', id);
+    if (error) { toast('Erro', 'error'); return; }
+    toast('Marcado como enviado', 'success');
+    await loadEnvios(campanhaAtualId);
+  }
+
+  async function marcarTodosEnviados() {
+    const pendentes = envios.filter(e => e.status_envio === 'pendente').map(e => e.id);
+    if (!pendentes.length) { toast('Todos já estão marcados como enviados'); return; }
+    if (!confirm(`Marcar ${pendentes.length} envio(s) como enviados?`)) return;
+    const { error } = await sb.from('mala_direta_envios')
+      .update({ status_envio: 'enviado', data_envio: new Date().toISOString() })
+      .in('id', pendentes);
+    if (error) { toast('Erro', 'error'); return; }
+    toast(`${pendentes.length} marcados como enviados`, 'success');
+    await loadEnvios(campanhaAtualId);
+  }
+
+  async function deletarEnvio(id) {
+    if (!confirm('Remover este destinatário da campanha?')) return;
+    const { error } = await sb.from('mala_direta_envios').delete().eq('id', id);
+    if (error) { toast('Erro', 'error'); return; }
+    toast('Destinatário removido', 'success');
+    await loadEnvios(campanhaAtualId);
+  }
+
+  // ── GRUPOS ────────────────────────────────────────────────────
+  function renderGrupos() {
+    const filtro = (document.getElementById('filtro-grupos')?.value || '').toLowerCase();
+    const lista  = filtro ? grupos.filter(g => g.nome.toLowerCase().includes(filtro) || (g.descricao||'').toLowerCase().includes(filtro)) : grupos;
+    const cont   = document.getElementById('grupos-list');
+
+    if (!lista.length) {
+      cont.innerHTML = '<div class="empty"><span class="empty-icon">🏷️</span><p>Nenhum grupo cadastrado</p></div>';
+      return;
+    }
+    cont.innerHTML = `<div class="md-grid">${lista.map(g => `
+      <div class="md-card" onclick="abrirGrupoDetalhe('${g.id}')">
+        <div class="md-card-top">
+          <div class="md-card-icon">🏷️</div>
+          <div class="md-card-info">
+            <div class="md-card-name">${esc(g.nome)}</div>
+            ${g.descricao ? `<div class="md-card-desc">${esc(g.descricao)}</div>` : ''}
+          </div>
+        </div>
+        <div class="md-card-stats">
+          <div class="md-stat">
+            <span class="n" style="font-size:12px">${formatDate(g.created_at)}</span>
+            <span class="l">Criado em</span>
+          </div>
+        </div>
+        <div class="md-card-footer" onclick="event.stopPropagation()">
+          <button class="btn btn-secondary btn-sm" onclick="openModalGrupo('${g.id}')">Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmarDeletarGrupo('${g.id}')">Excluir</button>
+        </div>
+      </div>
+    `).join('')}</div>`;
+  }
+
+  async function abrirGrupoDetalhe(id) {
+    grupoAtualId = id;
+    grupoAtual = grupos.find(g => g.id === id);
+    if (!grupoAtual) return;
+
+    Object.values(NAV_MAP).forEach(sid => document.getElementById(sid).classList.remove('active'));
+    document.getElementById('sec-detalhe').classList.remove('active');
+    document.getElementById('sec-grupo-detalhe').classList.add('active');
+    document.querySelectorAll('.nav-link').forEach(b => b.classList.remove('active'));
+    document.getElementById('nav-grupos').classList.add('active');
+
+    document.getElementById('gdet-nome').textContent = grupoAtual.nome;
+    document.getElementById('gdet-meta').textContent = grupoAtual.descricao || '';
+
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('show');
+
+    await loadGrupoContatosAtual();
+  }
+
+  async function loadGrupoContatosAtual() {
+    const { data } = await sb
+      .from('mala_direta_grupo_contatos')
+      .select('contato_id, mala_direta_contatos(id,nome,empresa,cargo,email,telefone)')
+      .eq('grupo_id', grupoAtualId);
+    grupoContatosAtual = (data || []).map(r => r.mala_direta_contatos).filter(Boolean);
+    renderGrupoContatos();
+  }
+
+  function renderGrupoContatos() {
+    const total = grupoContatosAtual.length;
+    document.getElementById('gdet-card-title').textContent = `Contatos do Grupo (${total})`;
+    const tbody = document.getElementById('grupo-contatos-tbody');
+    if (!grupoContatosAtual.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Nenhum contato neste grupo. Clique em "+ Adicionar Contatos".</td></tr>';
+      return;
+    }
+    tbody.innerHTML = grupoContatosAtual.map(c => `
+      <tr>
+        <td><strong style="color:var(--primary)">${esc(c.nome)}</strong></td>
+        <td>${esc(c.empresa||'—')}</td>
+        <td>${c.email ? `<a href="mailto:${esc(c.email)}" style="color:var(--primary)">${esc(c.email)}</a>` : '—'}</td>
+        <td>${c.telefone || '—'}</td>
+        <td>
+          <button class="btn btn-danger btn-sm" onclick="removerContatoDoGrupo('${c.id}')">Remover</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function voltarGrupos() {
+    grupoAtualId = null; grupoAtual = null; grupoContatosAtual = [];
+    showSection('grupos');
+  }
+
+  // Modal criar/editar grupo
+  function openModalGrupo(id) {
+    const g = id ? grupos.find(x => x.id === id) : null;
+    document.getElementById('grupo-id').value         = id || '';
+    document.getElementById('modal-grupo-titulo').textContent = g ? 'Editar Grupo' : 'Novo Grupo';
+    document.getElementById('grupo-nome').value       = g?.nome || '';
+    document.getElementById('grupo-descricao').value  = g?.descricao || '';
+    openModal('modal-grupo');
+  }
+
+  async function salvarGrupo() {
+    const id   = document.getElementById('grupo-id').value;
+    const nome = document.getElementById('grupo-nome').value.trim();
+    if (!nome) { toast('Nome é obrigatório', 'error'); return; }
+
+    const payload = {
+      nome,
+      descricao: document.getElementById('grupo-descricao').value.trim() || null,
+    };
+
+    let error;
+    if (id) {
+      ({ error } = await sb.from('mala_direta_grupos').update(payload).eq('id', id));
+    } else {
+      ({ error } = await sb.from('mala_direta_grupos').insert(payload));
+    }
+    if (error) { toast('Erro: ' + error.message, 'error'); return; }
+
+    toast(id ? 'Grupo atualizado!' : 'Grupo criado!', 'success');
+    closeModal('modal-grupo');
+    await loadGrupos();
+    if (grupoAtualId === id) {
+      grupoAtual = grupos.find(g => g.id === id);
+      document.getElementById('gdet-nome').textContent = grupoAtual.nome;
+      document.getElementById('gdet-meta').textContent = grupoAtual.descricao || '';
+    }
+    renderGrupos();
+  }
+
+  async function confirmarDeletarGrupo(id) {
+    if (!confirm('Excluir este grupo? Os contatos não serão apagados.')) return;
+    const { error } = await sb.from('mala_direta_grupos').delete().eq('id', id);
+    if (error) { toast('Erro ao excluir', 'error'); return; }
+    toast('Grupo excluído', 'success');
+    await loadGrupos();
+    renderGrupos();
+  }
+
+  async function deletarGrupoAtual() {
+    if (!grupoAtualId) return;
+    if (!confirm('Excluir este grupo? Os contatos não serão apagados.')) return;
+    const { error } = await sb.from('mala_direta_grupos').delete().eq('id', grupoAtualId);
+    if (error) { toast('Erro ao excluir', 'error'); return; }
+    toast('Grupo excluído', 'success');
+    await loadGrupos();
+    voltarGrupos();
+  }
+
+  // Modal adicionar contatos ao grupo
+  function openModalAddGrupoContatos() {
+    if (!grupoAtualId) return;
+    document.getElementById('filtro-add-gc').value = '';
+    renderContatosParaGrupo();
+    openModal('modal-add-gc');
+  }
+
+  function renderContatosParaGrupo() {
+    const filtro = (document.getElementById('filtro-add-gc')?.value || '').toLowerCase();
+    const jaNoGrupo = grupoContatosAtual.map(c => c.id);
+    const lista = contatos.filter(c =>
+      !jaNoGrupo.includes(c.id) &&
+      (!filtro || c.nome.toLowerCase().includes(filtro) || (c.empresa||'').toLowerCase().includes(filtro))
+    );
+    const cont = document.getElementById('lista-add-gc');
+    if (!lista.length) {
+      cont.innerHTML = '<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px">Nenhum contato disponível para adicionar</div>';
+      return;
+    }
+    cont.innerHTML = lista.map(c => `
+      <label class="contact-item">
+        <input type="checkbox" name="sel-gc" value="${c.id}">
+        <div class="contact-info">
+          <div class="contact-name">${esc(c.nome)}</div>
+          <div class="contact-detail">${c.empresa ? esc(c.empresa) + ' · ' : ''}${c.email||''}${c.telefone ? ' · ' + c.telefone : ''}</div>
+        </div>
+      </label>
+    `).join('');
+  }
+
+  async function adicionarContatosAoGrupo() {
+    const selecionados = [...document.querySelectorAll('input[name="sel-gc"]:checked')].map(i => i.value);
+    if (!selecionados.length) { toast('Selecione ao menos um contato', 'error'); return; }
+
+    const inserts = selecionados.map(cid => ({ grupo_id: grupoAtualId, contato_id: cid }));
+    const { error } = await sb.from('mala_direta_grupo_contatos').insert(inserts);
+    if (error) { toast('Erro: ' + error.message, 'error'); return; }
+
+    toast(`${selecionados.length} contato(s) adicionado(s) ao grupo!`, 'success');
+    closeModal('modal-add-gc');
+    await loadGrupoContatosAtual();
+  }
+
+  async function removerContatoDoGrupo(contatoId) {
+    if (!confirm('Remover este contato do grupo?')) return;
+    const { error } = await sb.from('mala_direta_grupo_contatos')
+      .delete().eq('grupo_id', grupoAtualId).eq('contato_id', contatoId);
+    if (error) { toast('Erro', 'error'); return; }
+    toast('Contato removido do grupo', 'success');
+    await loadGrupoContatosAtual();
+  }
+
+  // ── EXCEL CAMPANHA (variáveis customizadas) ──────────────────
+  function autoFillAssunto() {
+    const assuntoEl = document.getElementById('camp-assunto');
+    if (!assuntoEl.dataset.customizado) {
+      assuntoEl.value = document.getElementById('camp-nome').value;
+    }
+  }
+
+  function _limparExcelCampanha() {
+    excelCampanhaRows    = [];
+    excelCampanhaColunas = [];
+    const fi = document.getElementById('camp-excel-file');
+    if (fi) fi.value = '';
+    const prev = document.getElementById('camp-excel-preview');
+    if (prev) prev.innerHTML = '';
+    const sec = document.getElementById('camp-vars-section');
+    if (sec) sec.style.display = 'none';
+    const hint = document.getElementById('camp-template-hint');
+    if (hint) hint.textContent = 'Variáveis padrão: {{nome}} {{empresa}} {{cargo}} {{email}} {{telefone}}';
+  }
+
+  async function previewExcelCampanha(file) {
+    if (!file) return;
+    const prev = document.getElementById('camp-excel-preview');
+    prev.innerHTML = '<div style="color:var(--muted);font-size:13px">Lendo planilha…</div>';
+    excelCampanhaRows    = [];
+    excelCampanhaColunas = [];
+
+    try {
+      const ab   = await file.arrayBuffer();
+      const wb   = XLSX.read(ab);
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      if (!rows.length) {
+        prev.innerHTML = '<div style="color:var(--danger);font-size:13px">Planilha vazia ou sem dados.</div>';
+        return;
+      }
+
+      excelCampanhaColunas = Object.keys(rows[0]);
+      excelCampanhaRows    = rows;
+
+      // Render variable chips
+      const varsSection = document.getElementById('camp-vars-section');
+      const chipsEl     = document.getElementById('camp-vars-chips');
+      chipsEl.innerHTML = excelCampanhaColunas.map(col => `
+        <button type="button"
+          style="border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s"
+          onmouseover="this.style.background='var(--primary)';this.style.color='white'"
+          onmouseout="this.style.background='transparent';this.style.color='var(--primary)'"
+          onclick="inserirVarTemplate('${col.replace(/'/g,"\\'")}')">{{${esc(col)}}}</button>
+      `).join('');
+      varsSection.style.display = 'block';
+
+      // Update template hint
+      const hint = document.getElementById('camp-template-hint');
+      if (hint) hint.textContent = 'Variáveis da planilha: ' + excelCampanhaColunas.map(c => `{{${c}}}`).join('  ');
+
+      // Preview table
+      const colDet = _detectarColunasChave(excelCampanhaColunas);
+      const alerts = [];
+      if (!colDet.colEmail)   alerts.push('nenhuma coluna de email detectada');
+      if (!colDet.colFone)    alerts.push('nenhuma coluna de telefone detectada');
+      if (!colDet.colNome)    alerts.push('nenhuma coluna de nome detectada — será usada a 1ª coluna');
+      const alertHtml = alerts.length
+        ? `<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#92400E">⚠️ ${alerts.join(' · ')}</div>`
+        : '';
+
+      const previewRows = rows.slice(0, 4);
+      const cols = excelCampanhaColunas;
+      prev.innerHTML = `
+        ${alertHtml}
+        <div style="font-size:12px;color:var(--success);font-weight:600;margin-bottom:8px">✅ ${rows.length} destinatário(s) · ${cols.length} coluna(s)</div>
+        <div style="overflow-x:auto;border:1px solid var(--border-light);border-radius:6px">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:var(--bg-light)">
+                ${cols.map(c => `<th style="padding:6px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">${esc(c)}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${previewRows.map(r => `<tr style="border-top:1px solid var(--border-light)">${cols.map(c =>
+                `<td style="padding:6px 10px;color:var(--text);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis">${esc(String(r[c] ?? ''))}</td>`
+              ).join('')}</tr>`).join('')}
+              ${rows.length > 4 ? `<tr><td colspan="${cols.length}" style="padding:6px 10px;color:var(--muted);font-style:italic;text-align:center">… e mais ${rows.length - 4} linha(s)</td></tr>` : ''}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } catch(e) {
+      prev.innerHTML = `<div style="color:var(--danger);font-size:13px">Erro ao ler arquivo: ${esc(e.message)}</div>`;
+    }
+  }
+
+  function inserirVarTemplate(colName) {
+    const ta  = document.getElementById('camp-template');
+    const pos = ta.selectionStart ?? ta.value.length;
+    const tag = `{{${colName}}}`;
+    ta.value  = ta.value.slice(0, pos) + tag + ta.value.slice(pos);
+    ta.selectionStart = ta.selectionEnd = pos + tag.length;
+    ta.focus();
+  }
+
+  function _detectarColunasChave(colunas) {
+    const lw = colunas.map(c => c.toLowerCase());
+    const find = tests => { const i = lw.findIndex(c => tests.some(t => c.includes(t))); return i >= 0 ? colunas[i] : null; };
+    return {
+      colNome:    find(['nome','responsavel','name','destinatario','cliente']),
+      colEmail:   find(['email','e-mail','mail','correio']),
+      colFone:    find(['telefone','celular','whatsapp','fone','phone']),
+      colEmpresa: find(['empresa','company','razao','organizacao','cliente']),
+      colCargo:   find(['cargo','funcao','role','posicao']),
+    };
+  }
+
+  async function _criarEnviosDoExcel(campanhaId, campanha) {
+    if (!excelCampanhaRows.length) return;
+    const { colNome, colEmail, colFone, colEmpresa, colCargo } = _detectarColunasChave(excelCampanhaColunas);
+
+    const inserts = excelCampanhaRows.map(row => {
+      const nome     = String(colNome    ? (row[colNome]    ?? '') : Object.values(row)[0] ?? '').trim() || 'Destinatário';
+      const email    = colEmail   ? String(row[colEmail]   ?? '').trim() : null;
+      const telefone = colFone    ? String(row[colFone]    ?? '').trim() : null;
+      const empresa  = colEmpresa ? String(row[colEmpresa] ?? '').trim() : null;
+      const cargo    = colCargo   ? String(row[colCargo]   ?? '').trim() : null;
+      return {
+        campanha_id:    campanhaId,
+        contato_id:     null,
+        nome,
+        email:          email    || null,
+        telefone:       telefone || null,
+        empresa:        empresa  || null,
+        cargo:          cargo    || null,
+        mensagem_final: applyTemplate(campanha.template, row),
+        token:          crypto.randomUUID().replace(/-/g,''),
+        canal:          email && telefone ? 'ambos' : telefone ? 'whatsapp' : 'email',
+      };
+    });
+
+    for (let i = 0; i < inserts.length; i += 500) {
+      const { error } = await sb.from('mala_direta_envios').insert(inserts.slice(i, i + 500));
+      if (error) throw error;
+    }
+  }
+
+  // ── EXCEL IMPORT ──────────────────────────────────────────────
+  function _normalizarColuna(key) {
+    return key.toLowerCase().trim()
+      .replace(/[à-åè-ëì-ïò-öù-üç]/g, m => ({à:'a',á:'a',â:'a',ã:'a',ä:'a',å:'a',è:'e',é:'e',ê:'e',ë:'e',ì:'i',í:'i',î:'i',ï:'i',ò:'o',ó:'o',ô:'o',õ:'o',ö:'o',ù:'u',ú:'u',û:'u',ü:'u',ç:'c'}[m]||m));
+  }
+
+  function _mapearLinha(row) {
+    const out = {};
+    for (const [key, val] of Object.entries(row)) {
+      const k = _normalizarColuna(key);
+      const v = String(val ?? '').trim();
+      if (['nome','name'].some(x => k === x || k.startsWith(x)))           out.nome     = out.nome     || v;
+      else if (['email','e-mail','mail'].some(x => k === x || k.includes(x))) out.email    = out.email    || v;
+      else if (['telefone','fone','celular','whatsapp','cel','phone'].some(x => k === x || k.includes(x))) out.telefone = out.telefone || v;
+      else if (['empresa','company','razao','cnpj','organizacao'].some(x => k.includes(x))) out.empresa  = out.empresa  || v;
+      else if (['cargo','funcao','role','posicao'].some(x => k.includes(x))) out.cargo    = out.cargo    || v;
+    }
+    return out;
+  }
+
+  async function _parseExcelFile(file) {
+    const ab   = await file.arrayBuffer();
+    const wb   = XLSX.read(ab);
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    return rows.map(_mapearLinha).filter(r => r.nome && r.nome.length > 0);
+  }
+
+  function baixarModeloExcel(tipo) {
+    const headers = ['nome', 'email', 'telefone', 'empresa', 'cargo'];
+    const exemplo = tipo === 'contatos'
+      ? [['Maria Souza', 'maria@exemplo.com', '(11) 98888-2222', 'Tech Ltda', 'Diretora'],
+         ['João Silva',  'joao@empresa.com',  '(61) 99999-1111', 'Empresa ABC', 'Gerente']]
+      : [['Ana Lima',    'ana@cliente.com',   '(21) 97777-3333', 'Construtora XYZ', 'Sócia'],
+         ['Carlos Reis', 'carlos@demo.com',   '(31) 96666-4444', 'Indústria Beta', 'Diretor']];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...exemplo]);
+    ws['!cols'] = headers.map(() => ({ wch: 26 }));
+    XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+    XLSX.writeFile(wb, `modelo-mala-direta-${tipo}.xlsx`);
+  }
+
+  function _renderPreviewExcel(rows) {
+    const total     = rows.length;
+    const semEmail  = rows.filter(r => !r.email).length;
+    const semFone   = rows.filter(r => !r.telefone).length;
+    const alertas   = [];
+    if (semEmail) alertas.push(`${semEmail} linha(s) sem email`);
+    if (semFone)  alertas.push(`${semFone} linha(s) sem telefone`);
+    const alertHtml = alertas.length
+      ? `<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:6px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#92400E">⚠️ ${alertas.join(' · ')}</div>`
+      : '';
+    const preview = rows.slice(0, 6);
+    const extra   = total > 6 ? `<tr><td colspan="5" style="padding:8px 10px;color:var(--muted);font-style:italic;text-align:center">… e mais ${total - 6} linha(s)</td></tr>` : '';
+    return `
+      ${alertHtml}
+      <div style="font-size:12px;color:var(--success);font-weight:600;margin-bottom:8px">✅ ${total} linha(s) encontradas</div>
+      <div style="overflow-x:auto;border:1px solid var(--border-light);border-radius:6px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="background:var(--bg-light)">
+              ${['Nome','Email','Telefone','Empresa','Cargo'].map(h =>
+                `<th style="padding:7px 10px;text-align:left;color:var(--muted);font-weight:600;white-space:nowrap">${h}</th>`
+              ).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${preview.map(r => `
+              <tr style="border-top:1px solid var(--border-light)">
+                <td style="padding:7px 10px;font-weight:600;color:var(--text)">${esc(r.nome)}</td>
+                <td style="padding:7px 10px;color:var(--muted)">${esc(r.email||'—')}</td>
+                <td style="padding:7px 10px;color:var(--muted)">${esc(r.telefone||'—')}</td>
+                <td style="padding:7px 10px;color:var(--muted)">${esc(r.empresa||'—')}</td>
+                <td style="padding:7px 10px;color:var(--muted)">${esc(r.cargo||'—')}</td>
+              </tr>`).join('')}
+            ${extra}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  async function previewExcelEnvios(file) {
+    if (!file) return;
+    const prev = document.getElementById('excel-envios-preview');
+    prev.innerHTML = '<div style="color:var(--muted);font-size:13px">Lendo planilha…</div>';
+    excelEnviosRows = [];
+    try {
+      const rows = await _parseExcelFile(file);
+      if (!rows.length) {
+        prev.innerHTML = '<div style="color:var(--danger);font-size:13px">Nenhuma linha válida. Verifique se a coluna <strong>nome</strong> existe.</div>';
+        return;
+      }
+      excelEnviosRows = rows;
+      prev.innerHTML  = _renderPreviewExcel(rows);
+    } catch(e) {
+      prev.innerHTML  = `<div style="color:var(--danger);font-size:13px">Erro ao ler o arquivo: ${esc(e.message)}</div>`;
+    }
+  }
+
+  function abrirImportarContatos() {
+    excelContatosRows = [];
+    document.getElementById('excel-contatos-file').value = '';
+    document.getElementById('excel-contatos-preview').innerHTML = '';
+    document.getElementById('btn-importar-contatos').disabled = true;
+    openModal('modal-importar-contatos');
+  }
+
+  async function previewExcelContatos(file) {
+    if (!file) return;
+    const prev = document.getElementById('excel-contatos-preview');
+    const btn  = document.getElementById('btn-importar-contatos');
+    prev.innerHTML  = '<div style="color:var(--muted);font-size:13px">Lendo planilha…</div>';
+    btn.disabled    = true;
+    excelContatosRows = [];
+    try {
+      const rows = await _parseExcelFile(file);
+      if (!rows.length) {
+        prev.innerHTML = '<div style="color:var(--danger);font-size:13px">Nenhuma linha válida. Verifique se a coluna <strong>nome</strong> existe.</div>';
+        return;
+      }
+      excelContatosRows = rows;
+      prev.innerHTML   = _renderPreviewExcel(rows);
+      btn.disabled     = false;
+    } catch(e) {
+      prev.innerHTML = `<div style="color:var(--danger);font-size:13px">Erro ao ler o arquivo: ${esc(e.message)}</div>`;
+    }
+  }
+
+  async function confirmarImportContatos() {
+    if (!excelContatosRows.length) return;
+    const btn = document.getElementById('btn-importar-contatos');
+    btn.disabled    = true;
+    btn.textContent = 'Importando…';
+
+    const inserts = excelContatosRows.map(r => ({
+      nome:     r.nome,
+      email:    r.email    || null,
+      telefone: r.telefone || null,
+      empresa:  r.empresa  || null,
+      cargo:    r.cargo    || null,
+      ativo:    true,
+    }));
+
+    const { error } = await sb.from('mala_direta_contatos').insert(inserts);
+    if (error) {
+      toast('Erro ao importar: ' + error.message, 'error');
+      btn.disabled    = false;
+      btn.textContent = 'Importar Contatos';
+      return;
+    }
+
+    toast(`✅ ${inserts.length} contato(s) importado(s) com sucesso!`, 'success');
+    excelContatosRows = [];
+    closeModal('modal-importar-contatos');
+    await loadContatos();
+    renderContatos();
+  }
+
+  // ── CONFIGURAÇÕES ─────────────────────────────────────────────
+  function getSettings() {
+    return {
+      loteMax:       parseInt(localStorage.getItem('md_lote_max')       || '50'),
+      loteIntervalo: parseInt(localStorage.getItem('md_lote_intervalo') || '75'),
+      loteDelay:     parseInt(localStorage.getItem('md_lote_delay')     || '2'),
+    };
+  }
+
+  function carregarConfiguracoes() {
+    const s = getSettings();
+    document.getElementById('cfg-lote-max').value       = s.loteMax;
+    document.getElementById('cfg-lote-intervalo').value = s.loteIntervalo;
+    document.getElementById('cfg-lote-delay').value     = s.loteDelay;
+  }
+
+  function salvarConfiguracoes() {
+    const max = parseInt(document.getElementById('cfg-lote-max').value);
+    const inv = parseInt(document.getElementById('cfg-lote-intervalo').value);
+    const del = parseInt(document.getElementById('cfg-lote-delay').value);
+    if (!max || max < 1)  { toast('Máximo por lote inválido', 'error'); return; }
+    if (!inv || inv < 1)  { toast('Intervalo inválido', 'error'); return; }
+    if (isNaN(del) || del < 0) { toast('Delay inválido', 'error'); return; }
+    localStorage.setItem('md_lote_max',       max);
+    localStorage.setItem('md_lote_intervalo', inv);
+    localStorage.setItem('md_lote_delay',     del);
+    toast('Configurações salvas!', 'success');
+  }
+
+  // ── ENVIO EM LOTE ─────────────────────────────────────────────
+  function iniciarEnvioEmLote() {
+    const comEmail = envios.filter(e => e.email && e.canal !== 'whatsapp');
+    if (!comEmail.length) { toast('Nenhum destinatário com email', 'error'); return; }
+
+    const settings = getSettings();
+    const numLotes = Math.ceil(comEmail.length / settings.loteMax);
+    const assuntoTpl = document.getElementById('email-assunto').value || campanhaAtual?.nome || '';
+
+    if (!confirm(
+      `Iniciar envio em lote?\n\n` +
+      `• ${comEmail.length} emails em ${numLotes} lote(s)\n` +
+      `• Máx. ${settings.loteMax} por lote · Intervalo: ${settings.loteIntervalo} min\n\n` +
+      `Mantenha esta aba aberta durante todo o processo.`
+    )) return;
+
+    const lotes = [];
+    for (let i = 0; i < comEmail.length; i += settings.loteMax)
+      lotes.push(comEmail.slice(i, i + settings.loteMax));
+
+    emailBatchJob = {
+      campanhaNome:     campanhaAtual?.nome || '',
+      campanhaTipoConf: campanhaAtual?.tipo_confirmacao,
+      assuntoTpl,
+      lotes,
+      loteAtual:    0,
+      totalEnvios:  comEmail.length,
+      enviadosCount: 0,
+      status:       'rodando',
+      iniciado:     new Date(),
+      proximoLoteEm: null,
+      timerId:      null,
+      contadorId:   null,
+    };
+
+    window.onbeforeunload = ev => {
+      if (emailBatchJob && ['rodando','aguardando'].includes(emailBatchJob.status)) {
+        ev.preventDefault();
+        return 'Envio em lote em andamento. Tem certeza que quer sair?';
+      }
+    };
+
+    closeModal('modal-email');
+    showSection('dashboard');
+    _enviarLote();
+  }
+
+  async function _enviarLote() {
+    if (!emailBatchJob || emailBatchJob.status === 'cancelado') return;
+
+    const lote     = emailBatchJob.lotes[emailBatchJob.loteAtual];
+    const settings = getSettings();
+
+    emailBatchJob.status = 'rodando';
+    updateDashboardBatchCard();
+
+    for (let i = 0; i < lote.length; i++) {
+      if (!emailBatchJob || emailBatchJob.status === 'cancelado') return;
+      if (i > 0 && settings.loteDelay > 0)
+        await new Promise(r => setTimeout(r, settings.loteDelay * 1000));
+      if (!emailBatchJob || emailBatchJob.status === 'cancelado') return;
+
+      const e       = lote[i];
+      const assunto = applyTemplate(emailBatchJob.assuntoTpl, e);
+      const corpo   = e.mensagem_final + (emailBatchJob.campanhaTipoConf !== 'nenhuma'
+        ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
+      _openMailto(e.email, assunto, corpo);
+      emailBatchJob.enviadosCount++;
+      updateDashboardBatchCard();
+    }
+
+    if (!emailBatchJob || emailBatchJob.status === 'cancelado') return;
+
+    emailBatchJob.loteAtual++;
+
+    if (emailBatchJob.loteAtual >= emailBatchJob.lotes.length) {
+      emailBatchJob.status = 'concluido';
+      window.onbeforeunload = null;
+      updateDashboardBatchCard();
+      toast(`✅ Envio concluído! ${emailBatchJob.totalEnvios} emails disparados para "${emailBatchJob.campanhaNome}".`, 'success');
+      return;
+    }
+
+    const intervaloMs = settings.loteIntervalo * 60 * 1000;
+    emailBatchJob.proximoLoteEm = new Date(Date.now() + intervaloMs);
+    emailBatchJob.status = 'aguardando';
+
+    if (emailBatchJob.contadorId) clearInterval(emailBatchJob.contadorId);
+    emailBatchJob.contadorId = setInterval(() => updateDashboardBatchCard(), 1000);
+
+    emailBatchJob.timerId = setTimeout(async () => {
+      if (emailBatchJob?.contadorId) { clearInterval(emailBatchJob.contadorId); emailBatchJob.contadorId = null; }
+      await _enviarLote();
+    }, intervaloMs);
+
+    updateDashboardBatchCard();
+  }
+
+  function _openMailto(dest, assunto, corpo) {
+    const a = document.createElement('a');
+    a.href = `mailto:${encodeURIComponent(dest)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  function cancelarEnvioLote() {
+    if (!emailBatchJob) return;
+    if (!confirm(`Cancelar o envio em lote?\n\nJá foram disparados ${emailBatchJob.enviadosCount} de ${emailBatchJob.totalEnvios} emails.`)) return;
+    if (emailBatchJob.timerId)    clearTimeout(emailBatchJob.timerId);
+    if (emailBatchJob.contadorId) clearInterval(emailBatchJob.contadorId);
+    emailBatchJob.status     = 'cancelado';
+    emailBatchJob.timerId    = null;
+    emailBatchJob.contadorId = null;
+    window.onbeforeunload    = null;
+    updateDashboardBatchCard();
+    toast('Envio em lote cancelado.', 'error');
+  }
+
+  function limparJobEnvio() {
+    if (emailBatchJob?.timerId)    clearTimeout(emailBatchJob.timerId);
+    if (emailBatchJob?.contadorId) clearInterval(emailBatchJob.contadorId);
+    emailBatchJob = null;
+    const el = document.getElementById('dash-batch-card');
+    if (el) el.style.display = 'none';
+  }
+
+  function updateDashboardBatchCard() {
+    const el = document.getElementById('dash-batch-card');
+    if (!el) return;
+    if (!emailBatchJob) { el.style.display = 'none'; return; }
+
+    el.style.display = 'block';
+    el.className = 'card';
+
+    const { campanhaNome, totalEnvios, enviadosCount, loteAtual, lotes, status, proximoLoteEm, iniciado } = emailBatchJob;
+    const pct = totalEnvios > 0 ? Math.round(enviadosCount / totalEnvios * 100) : 0;
+
+    let statusHtml = '', countdownHtml = '', btnHtml = '';
+
+    if (status === 'rodando') {
+      statusHtml = `<span style="color:var(--primary);font-weight:600">⚡ Enviando lote ${loteAtual + 1} de ${lotes.length}…</span>`;
+      btnHtml    = `<button class="btn btn-danger btn-sm" onclick="cancelarEnvioLote()">Cancelar</button>`;
+    } else if (status === 'aguardando') {
+      const restSeg = Math.max(0, Math.floor((proximoLoteEm - Date.now()) / 1000));
+      const hh = String(Math.floor(restSeg / 3600)).padStart(2,'0');
+      const mm = String(Math.floor((restSeg % 3600) / 60)).padStart(2,'0');
+      const ss = String(restSeg % 60).padStart(2,'0');
+      statusHtml    = `<span style="color:var(--success);font-weight:600">✅ Lote ${loteAtual} de ${lotes.length} concluído</span>`;
+      countdownHtml = `
+        <div style="text-align:center;padding:14px;border:1px dashed var(--border);border-radius:8px;margin:12px 0;background:var(--bg-light)">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Próximo lote em</div>
+          <div style="font-size:32px;font-weight:700;color:var(--primary);font-variant-numeric:tabular-nums;letter-spacing:2px">${hh}:${mm}:${ss}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">Lote ${loteAtual + 1} de ${lotes.length} · ${lotes[loteAtual]?.length || 0} emails</div>
+        </div>`;
+      btnHtml = `<button class="btn btn-danger btn-sm" onclick="cancelarEnvioLote()">Cancelar</button>`;
+    } else if (status === 'concluido') {
+      statusHtml = `<span style="color:var(--success);font-weight:600">✅ Todos os emails foram disparados com sucesso!</span>`;
+      btnHtml    = `<button class="btn btn-secondary btn-sm" onclick="limparJobEnvio()">Limpar</button>`;
+    } else if (status === 'cancelado') {
+      statusHtml = `<span style="color:var(--danger);font-weight:600">⛔ Envio cancelado — ${enviadosCount} de ${totalEnvios} emails disparados</span>`;
+      btnHtml    = `<button class="btn btn-secondary btn-sm" onclick="limparJobEnvio()">Limpar</button>`;
+    }
+
+    const lotesInfo = lotes.map((l, i) => {
+      const icon = i < loteAtual ? '✅' : (i === loteAtual && status === 'rodando' ? '⚡' : '○');
+      return `${icon} Lote ${i+1}: ${l.length} emails`;
+    }).join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+
+    el.innerHTML = `
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📧 Envio em Lote — <em style="font-weight:400">${esc(campanhaNome)}</em></span>
+        ${btnHtml}
+      </div>
+      <div class="card-body">
+        <div style="margin-bottom:12px">${statusHtml}</div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-light);margin-bottom:6px">
+          <span>${enviadosCount} de ${totalEnvios} emails disparados</span>
+          <strong>${pct}%</strong>
+        </div>
+        <div style="background:var(--border-light);border-radius:8px;height:12px;overflow:hidden;margin-bottom:10px">
+          <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--primary),var(--primary-light));border-radius:8px;transition:width 0.4s ease"></div>
+        </div>
+        ${countdownHtml}
+        <div style="font-size:11px;color:var(--muted);margin-top:8px">${lotesInfo}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Iniciado às ${formatDateTime(iniciado)}</div>
+      </div>
+    `;
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────────
+  function esc(s) { const d = document.createElement('div'); d.textContent = String(s||''); return d.innerHTML; }
+  function formatDate(iso) { return iso ? new Date(iso).toLocaleDateString('pt-BR') : ''; }
+  function formatDateTime(d) { if (!d) return ''; const dt = d instanceof Date ? d : new Date(d); return dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+  function labelStatus(s)  { return { rascunho:'Rascunho', ativa:'Ativa', encerrada:'Encerrada' }[s] || s; }
+  function labelTipoConf(t){ return { leitura:'Confirmar leitura', interesse:'Confirmar interesse', nenhuma:'Sem confirmação' }[t] || t; }
+  function labelCanal(c)   { return { email:'📧 Email', whatsapp:'💬 WhatsApp', ambos:'📧💬 Ambos' }[c] || c; }
+  function labelConf(s)    { return { pendente:'Pendente', lido:'Lido', confirmado:'Confirmado', recusado:'Recusado' }[s] || s; }
+  function badgeConf(s)    { return { pendente:'pending', lido:'read', confirmado:'confirmed', recusado:'refused' }[s] || 'pending'; }
+  </script>
+</body>
+</html>
