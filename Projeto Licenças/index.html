@@ -12,6 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../portal-auth-guard.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     :root{
       --bg:#F0F2F5;
@@ -655,6 +656,32 @@
       border-color:var(--brand);
       box-shadow:0 0 0 4px rgba(111,29,47,.08);
     }
+    .autocomplete-wrap{position:relative}
+    .autocomplete-list{
+      position:absolute;
+      top:100%;
+      left:0;
+      right:0;
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:var(--radius-sm);
+      box-shadow:var(--shadow-soft);
+      max-height:220px;
+      overflow-y:auto;
+      z-index:200;
+      display:none;
+    }
+    .autocomplete-list.open{display:block}
+    .autocomplete-item{
+      padding:10px 14px;
+      cursor:pointer;
+      font-size:.93rem;
+      transition:.15s;
+    }
+    .autocomplete-item:hover,.autocomplete-item.highlighted{
+      background:var(--brand-soft);
+      color:var(--brand);
+    }
     .form-grid{
       display:grid;
       grid-template-columns: repeat(2, minmax(0,1fr));
@@ -819,7 +846,7 @@
     </div>
     <nav class="nav">
       <button class="active" onclick="showSection('dashboard')">📊 Dashboard</button>
-      <button onclick="showSection('documentos')">📄 Licenças e Alvarás</button>
+      <button onclick="showSection('documentos')">📄 Licenças</button>
       <button onclick="showSection('processos')">📋 Processos</button>
       <button onclick="showSection('clientes')">👥 Clientes</button>
       <button onclick="showSection('relatorios')">📈 Relatórios</button>
@@ -921,6 +948,9 @@
           </div>
           <div class="top-actions">
             <button class="btn btn-secondary" id="refreshDocumentos">Atualizar dados</button>
+            <button class="btn btn-soft" id="importLicencasBtn">📥 Importar Excel</button>
+            <input type="file" id="importLicencasFile" accept=".xlsx,.xls" style="display:none">
+            <button class="btn btn-soft" id="modeloLicencasBtn" title="Baixar modelo de planilha">📄 Modelo</button>
             <button class="btn btn-primary" id="newDocumento">Novo documento</button>
           </div>
         </div>
@@ -929,7 +959,6 @@
         <div class="section-tabs" style="margin-bottom: 16px;">
           <button class="tab active" onclick="filterDocumentosPorTipo('todos')">Todos</button>
           <button class="tab" onclick="filterDocumentosPorTipo('licenca')">Licenças</button>
-          <button class="tab" onclick="filterDocumentosPorTipo('alvara')">Alvarás</button>
         </div>
 
         <!-- FILTROS E BUSCA -->
@@ -946,7 +975,8 @@
             <thead>
               <tr>
                 <th>Estabelecimento</th>
-                <th>Tipo</th>
+                <th>Operação</th>
+                <th>Tipo de Licença</th>
                 <th>Número</th>
                 <th>Emissão</th>
                 <th>Validade</th>
@@ -957,7 +987,7 @@
               </tr>
             </thead>
             <tbody id="documentosTable">
-              <tr><td colspan="9" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
+              <tr><td colspan="10" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1046,6 +1076,9 @@
           </div>
           <div class="top-actions">
             <button class="btn btn-secondary" id="refreshClientes">Atualizar dados</button>
+            <button class="btn btn-soft" id="importClientesBtn">📥 Importar Excel</button>
+            <input type="file" id="importClientesFile" accept=".xlsx,.xls" style="display:none">
+            <button class="btn btn-soft" id="modeloClientesBtn" title="Baixar modelo de planilha">📄 Modelo</button>
             <button class="btn btn-primary" id="newCliente">Novo cliente</button>
           </div>
         </div>
@@ -1597,35 +1630,45 @@ async function loadDashboardTable() {
         tbody.innerHTML = '';
 
         if (allDocs.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted);">Nenhum documento cadastrado</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);">Nenhum documento cadastrado</td></tr>';
           return;
         }
 
         allDocs.forEach(doc => {
-          const today = new Date();
-          const vencimento = new Date(doc.data_validade);
-          let status = 'active';
-          let statusText = 'Ativa';
+          const isEmissao = doc.tipo_operacao === 'emissao';
+          const operacaoLabel = isEmissao ? 'Emissão' : 'Renovação';
+          const operacaoBadge = isEmissao ? 'info' : 'success';
 
-          if (vencimento < today) {
-            status = 'expired';
-            statusText = 'Vencida';
-          } else if (vencimento < new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)) {
+          let status, statusText;
+          if (isEmissao) {
             status = 'pending';
-            statusText = 'Próximo vencimento';
+            statusText = 'Em emissão';
+          } else {
+            const today = new Date();
+            const vencimento = new Date(doc.data_validade);
+            status = 'active';
+            statusText = 'Ativa';
+            if (vencimento < today) {
+              status = 'expired';
+              statusText = 'Vencida';
+            } else if (vencimento < new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)) {
+              status = 'pending';
+              statusText = 'Próximo vencimento';
+            }
           }
 
           const row = document.createElement('tr');
           row.setAttribute('data-status', status);
           row.innerHTML = `
             <td>${doc.estabelecimento}</td>
+            <td><span class="status ${operacaoBadge}" style="font-size:.78rem"><span class="dot"></span>${operacaoLabel}</span></td>
             <td>${doc.tipo}</td>
-            <td>${doc.numero}</td>
-            <td>${formatDate(doc.data_emissao)}</td>
-            <td>${formatDate(doc.data_validade)}</td>
-            <td>${doc.orgao_emissor}</td>
+            <td>${isEmissao ? '—' : (doc.numero || '—')}</td>
+            <td>${isEmissao ? '—' : formatDate(doc.data_emissao)}</td>
+            <td>${isEmissao ? '—' : formatDate(doc.data_validade)}</td>
+            <td>${doc.orgao_emissor || '—'}</td>
             <td><span class="status ${status}"><span class="dot"></span>${statusText}</span></td>
-            <td>${doc.responsavel}</td>
+            <td>${doc.responsavel || '—'}</td>
             <td class="actions">
               <div class="btn-group">
                 <button class="btn-icon info" data-action="view" data-id="${doc.id}" data-table="${doc.tipo_tabela}">
@@ -2574,9 +2617,25 @@ function exportReports(format) {
       const modalBody = document.getElementById('modalBody');
 
       modalTitle.textContent = 'Nova Licença';
+
+      // Carrega clientes para o autocomplete
+      let clientes = [];
+      try {
+        const { data } = await supabaseClient.from('empresas').select('id, nome').eq('ativo', true).order('nome');
+        clientes = data || [];
+      } catch (_) {}
+
       modalBody.innerHTML = `
         <form onsubmit="saveDocumento(event)">
           <div class="form-grid">
+            <div class="field full">
+              <label>Cliente</label>
+              <div class="autocomplete-wrap">
+                <input type="text" id="clienteNome" placeholder="Buscar cliente (opcional)..." autocomplete="off">
+                <input type="hidden" id="clienteId">
+                <ul class="autocomplete-list" id="clienteDropdown"></ul>
+              </div>
+            </div>
             <div class="field full">
               <label>Estabelecimento *</label>
               <input type="text" id="estabelecimento" required>
@@ -2625,6 +2684,46 @@ function exportReports(format) {
       `;
 
       modal.classList.add('active');
+
+      // Inicializa autocomplete de clientes
+      initClienteAutocomplete(clientes);
+    }
+
+    function initClienteAutocomplete(clientes) {
+      const input = document.getElementById('clienteNome');
+      const hiddenId = document.getElementById('clienteId');
+      const dropdown = document.getElementById('clienteDropdown');
+      if (!input) return;
+
+      function renderList(filtrados) {
+        dropdown.innerHTML = '';
+        if (!filtrados.length) { dropdown.classList.remove('open'); return; }
+        filtrados.slice(0, 8).forEach(c => {
+          const li = document.createElement('li');
+          li.className = 'autocomplete-item';
+          li.textContent = c.nome;
+          li.addEventListener('mousedown', e => {
+            e.preventDefault();
+            input.value = c.nome;
+            hiddenId.value = c.id;
+            dropdown.classList.remove('open');
+          });
+          dropdown.appendChild(li);
+        });
+        dropdown.classList.add('open');
+      }
+
+      input.addEventListener('input', () => {
+        hiddenId.value = '';
+        const q = input.value.toLowerCase();
+        if (!q) { dropdown.classList.remove('open'); return; }
+        renderList(clientes.filter(c => c.nome.toLowerCase().includes(q)));
+      });
+
+      input.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('open'), 150));
+      input.addEventListener('focus', () => {
+        if (input.value) input.dispatchEvent(new Event('input'));
+      });
     }
 
     function toggleCamposDocumento() {
@@ -2667,11 +2766,13 @@ function exportReports(format) {
         }
       }
 
+      const clienteIdVal = document.getElementById('clienteId')?.value || null;
       const data = {
+        empresa_id: clienteIdVal || null,
         estabelecimento: document.getElementById('estabelecimento').value,
         tipo: document.getElementById('tipo').value,
         numero: tipoOperacao === 'emissao' ? 'PENDENTE' : document.getElementById('numero').value,
-        data_emissao: tipoOperacao === 'emissao' ? new Date().toISOString().split('T')[0] : document.getElementById('dataEmissao').value,
+        data_emissao: tipoOperacao === 'emissao' ? null : document.getElementById('dataEmissao').value,
         data_validade: tipoOperacao === 'emissao' ? null : document.getElementById('dataValidade').value,
         orgao_emissor: document.getElementById('orgaoEmissor').value || 'Não informado',
         responsavel: document.getElementById('responsavel').value || 'Não informado',
@@ -3130,7 +3231,15 @@ function exportReports(format) {
         let html = '<div style="padding:10px;">';
 
         if (table === 'licencas' || table === 'alvaras') {
+          let nomeCliente = '-';
+          if (data.empresa_id) {
+            try {
+              const { data: emp } = await supabaseClient.from('empresas').select('nome').eq('id', data.empresa_id).single();
+              if (emp?.nome) nomeCliente = emp.nome;
+            } catch (_) {}
+          }
           html += `
+            <p><strong>Cliente:</strong> ${nomeCliente}</p>
             <p><strong>Estabelecimento:</strong> ${data.estabelecimento}</p>
             <p><strong>Tipo:</strong> ${data.tipo}</p>
             <p><strong>Número:</strong> ${data.numero}</p>
@@ -3517,6 +3626,32 @@ function exportReports(format) {
         console.log('✓ Navegação configurada');
       }
 
+      // Importação Excel — Licenças
+      const importLicencasBtn = safeGetElement('importLicencasBtn');
+      const importLicencasFile = safeGetElement('importLicencasFile');
+      if (importLicencasBtn && importLicencasFile) {
+        importLicencasBtn.addEventListener('click', () => importLicencasFile.click());
+        importLicencasFile.addEventListener('change', e => {
+          if (e.target.files[0]) importarExcelLicencas(e.target.files[0]);
+          e.target.value = '';
+        });
+      }
+      const modeloLicencasBtn = safeGetElement('modeloLicencasBtn');
+      if (modeloLicencasBtn) modeloLicencasBtn.addEventListener('click', baixarModeloLicencas);
+
+      // Importação Excel — Clientes
+      const importClientesBtn = safeGetElement('importClientesBtn');
+      const importClientesFile = safeGetElement('importClientesFile');
+      if (importClientesBtn && importClientesFile) {
+        importClientesBtn.addEventListener('click', () => importClientesFile.click());
+        importClientesFile.addEventListener('change', e => {
+          if (e.target.files[0]) importarExcelClientes(e.target.files[0]);
+          e.target.value = '';
+        });
+      }
+      const modeloClientesBtn = safeGetElement('modeloClientesBtn');
+      if (modeloClientesBtn) modeloClientesBtn.addEventListener('click', baixarModeloClientes);
+
       // Botões de ação principais
       const syncBtn = safeGetElement('syncBtn');
       if (syncBtn) syncBtn.addEventListener('click', syncFromSupabase);
@@ -3585,6 +3720,189 @@ function exportReports(format) {
     // ============================================
     // INICIALIZAÇÃO PRINCIPAL
     // ============================================
+
+    // ============================================
+    // IMPORTAÇÃO EXCEL
+    // ============================================
+
+    function baixarModeloLicencas() {
+      const ws = XLSX.utils.aoa_to_sheet([
+        ['tipo_operacao','estabelecimento','tipo','numero','data_emissao','data_validade','orgao_emissor','responsavel','observacoes','cliente'],
+        ['renovacao','Unidade Centro','Licença Sanitária','LS-001','01/01/2024','01/01/2025','Vigilância Sanitária','João Silva','Renovação anual','Nome do Cliente'],
+        ['emissao','Unidade Norte','Licença Ambiental','','','','IBAMA','Maria Souza','Em processo de emissão','']
+      ]);
+      ws['!cols'] = [12,20,22,14,14,14,22,18,28,20].map(w => ({ wch: w }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Licenças');
+      XLSX.writeFile(wb, 'modelo_importacao_licencas.xlsx');
+    }
+
+    function baixarModeloClientes() {
+      const ws = XLSX.utils.aoa_to_sheet([
+        ['nome','cnpj','contato','email','telefone','estabelecimentos'],
+        ['Empresa Exemplo Ltda','12.345.678/0001-90','Ana Lima','ana@empresa.com','(11) 99999-0000','Unidade Centro; Unidade Norte'],
+        ['Comércio Silva ME','98.765.432/0001-10','Pedro Silva','pedro@comercio.com','(21) 98888-0000','Loja Principal']
+      ]);
+      ws['!cols'] = [26,22,18,26,18,30].map(w => ({ wch: w }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+      XLSX.writeFile(wb, 'modelo_importacao_clientes.xlsx');
+    }
+
+    function parseDateExcel(val) {
+      if (!val) return null;
+      if (typeof val === 'number') {
+        // número serial do Excel
+        const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+        return d.toISOString().split('T')[0];
+      }
+      const s = String(val).trim();
+      // DD/MM/AAAA
+      const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+      // YYYY-MM-DD já ok
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      return null;
+    }
+
+    function showImportPreview(rows, columns, onConfirm) {
+      const modal = document.getElementById('recordModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const modalBody = document.getElementById('modalBody');
+
+      modalTitle.textContent = `Prévia — ${rows.length} registro(s) encontrado(s)`;
+
+      const preview = rows.slice(0, 10);
+      const ths = columns.map(c => `<th>${c}</th>`).join('');
+      const trs = preview.map(r =>
+        `<tr>${columns.map(c => `<td style="font-size:.82rem;padding:6px 10px;border-bottom:1px solid var(--line)">${r[c] ?? '-'}</td>`).join('')}</tr>`
+      ).join('');
+
+      modalBody.innerHTML = `
+        <p style="color:var(--muted);font-size:.88rem;margin-bottom:12px">
+          Exibindo até 10 de ${rows.length} linha(s). Confirme para importar todos os registros válidos.
+        </p>
+        <div style="overflow-x:auto;margin-bottom:16px">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="background:var(--bg)">${ths}</tr></thead>
+            <tbody>${trs}</tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" id="confirmImportBtn">✓ Confirmar importação</button>
+          <button class="btn btn-soft" onclick="closeModal()">Cancelar</button>
+        </div>
+      `;
+
+      modal.classList.add('active');
+      document.getElementById('confirmImportBtn').addEventListener('click', async () => {
+        document.getElementById('confirmImportBtn').disabled = true;
+        document.getElementById('confirmImportBtn').textContent = 'Importando...';
+        await onConfirm();
+      });
+    }
+
+    async function importarExcelLicencas(file) {
+      if (!window.XLSX) { showAlert('❌ Biblioteca de leitura Excel não carregada', 'error'); return; }
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        if (!rows.length) { showAlert('❌ Planilha vazia ou sem dados', 'error'); return; }
+
+        // Lookup de clientes para mapear nome → id
+        let clienteMap = {};
+        try {
+          const { data: emps } = await supabaseClient.from('empresas').select('id, nome').eq('ativo', true);
+          (emps || []).forEach(e => { clienteMap[e.nome.toLowerCase()] = e.id; });
+        } catch (_) {}
+
+        const cols = ['tipo_operacao','estabelecimento','tipo','numero','data_emissao','data_validade','orgao_emissor','responsavel','observacoes','cliente'];
+        showImportPreview(rows, cols.filter(c => rows[0].hasOwnProperty(c)), async () => {
+          let ok = 0, fail = 0;
+          for (const r of rows) {
+            const estab = String(r['estabelecimento'] || '').trim();
+            const tipo = String(r['tipo'] || '').trim();
+            if (!estab || !tipo) { fail++; continue; }
+
+            const tipoOp = String(r['tipo_operacao'] || '').trim().toLowerCase();
+            const isEmissao = tipoOp === 'emissao';
+
+            const nomeCliente = String(r['cliente'] || '').trim().toLowerCase();
+            const empresa_id = nomeCliente ? (clienteMap[nomeCliente] || null) : null;
+
+            const row = {
+              empresa_id,
+              estabelecimento: estab,
+              tipo,
+              tipo_operacao: isEmissao ? 'emissao' : (tipoOp === 'renovacao' ? 'renovacao' : null),
+              numero: isEmissao ? 'PENDENTE' : (String(r['numero'] || '').trim() || null),
+              data_emissao: isEmissao ? null : (parseDateExcel(r['data_emissao']) || null),
+              data_validade: isEmissao ? null : (parseDateExcel(r['data_validade']) || null),
+              orgao_emissor: String(r['orgao_emissor'] || '').trim() || null,
+              responsavel: String(r['responsavel'] || '').trim() || null,
+              observacoes: String(r['observacoes'] || '').trim() || null,
+            };
+
+            try {
+              const { error } = await supabaseClient.from('licencas').insert([row]);
+              if (error) throw error;
+              ok++;
+            } catch (_) { fail++; }
+          }
+          closeModal();
+          showAlert(`✓ ${ok} licença(s) importada(s). ${fail ? fail + ' falharam — verifique o console.' : ''}`, ok ? 'success' : 'error');
+          fetchDocumentos();
+          loadDashboard();
+        });
+      } catch (err) {
+        console.error('Erro ao ler Excel de licenças:', err);
+        showAlert('❌ Erro ao ler o arquivo Excel', 'error');
+      }
+    }
+
+    async function importarExcelClientes(file) {
+      if (!window.XLSX) { showAlert('❌ Biblioteca de leitura Excel não carregada', 'error'); return; }
+      try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+        if (!rows.length) { showAlert('❌ Planilha vazia ou sem dados', 'error'); return; }
+
+        const cols = ['nome','cnpj','contato','email','telefone','estabelecimentos'];
+        showImportPreview(rows, cols.filter(c => rows[0].hasOwnProperty(c)), async () => {
+          let ok = 0, fail = 0;
+          for (const r of rows) {
+            const nome = String(r['nome'] || '').trim();
+            if (!nome) { fail++; continue; }
+            const row = {
+              nome,
+              cnpj: String(r['cnpj'] || '').trim() || null,
+              contato: String(r['contato'] || '').trim() || null,
+              email: String(r['email'] || '').trim() || null,
+              telefone: String(r['telefone'] || '').trim() || null,
+              estabelecimentos: String(r['estabelecimentos'] || '').trim() || null,
+            };
+            try {
+              const { error } = await supabaseClient.from('empresas').insert([row]);
+              if (error) throw error;
+              ok++;
+            } catch (_) { fail++; }
+          }
+          closeModal();
+          showAlert(`✓ ${ok} cliente(s) importado(s). ${fail ? fail + ' falharam — verifique o console.' : ''}`, ok ? 'success' : 'error');
+          fetchClientes();
+          loadDashboard();
+        });
+      } catch (err) {
+        console.error('Erro ao ler Excel de clientes:', err);
+        showAlert('❌ Erro ao ler o arquivo Excel', 'error');
+      }
+    }
 
     document.addEventListener('DOMContentLoaded', async () => {
       console.log('📄 DOM carregado, verificando autenticação...');

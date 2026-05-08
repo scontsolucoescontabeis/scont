@@ -14,6 +14,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../portal-auth-guard.js"></script>
   
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <!-- Estilos -->
   <link rel="stylesheet" href="css/styles.css" />
 </head>
@@ -177,13 +179,22 @@
                 <h2>Certificados digitais</h2>
                 <div class="meta">Gestão completa de certificados A1, A3, e-CNPJ, e-CPF</div>
               </div>
-              <button class="btn btn-primary" id="btnNewCert">+ Novo certificado</button>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <button class="btn btn-secondary" id="btnImportCert">📥 Importar Excel</button>
+                <input type="file" id="importCertFile" accept=".xlsx,.xls" style="display:none">
+                <button class="btn btn-secondary" id="btnModeloCert" title="Baixar modelo de planilha">📄 Modelo</button>
+                <button class="btn btn-primary" id="btnNewCert">+ Novo certificado</button>
+              </div>
             </div>
             <div class="section-body">
-              <div class="toolbar" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+              <div class="toolbar" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
                 <div class="field">
                   <label>Empresa</label>
                   <input id="filterEmpresa" type="text" placeholder="Nome da empresa" />
+                </div>
+                <div class="field">
+                  <label>Cliente</label>
+                  <input id="filterCliente" type="text" placeholder="Nome do cliente" />
                 </div>
                 <div class="field">
                   <label>Tipo</label>
@@ -204,6 +215,16 @@
                     <option value="Renovado">Renovado</option>
                     <option value="Aguardando Contato">Aguardando Contato</option>
                     <option value="Vencido">Vencido</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Situação financeira</label>
+                  <select id="filterSitFinanceira">
+                    <option value="">Todas</option>
+                    <option value="Pago">Pago</option>
+                    <option value="Pendente">Pendente</option>
+                    <option value="Inadimplente">Inadimplente</option>
+                    <option value="Isento">Isento</option>
                   </select>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: flex-end;">
@@ -253,10 +274,14 @@
               <button class="btn btn-primary" onclick="exportCSV()">⬇ Exportar CSV</button>
             </div>
             <div class="section-body">
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
                 <div class="field">
                   <label>Empresa</label>
                   <input id="relEmpresa" type="text" placeholder="Filtrar..." />
+                </div>
+                <div class="field">
+                  <label>Cliente</label>
+                  <input id="relCliente" type="text" placeholder="Filtrar..." />
                 </div>
                 <div class="field">
                   <label>Tipo</label>
@@ -280,6 +305,27 @@
                   </select>
                 </div>
                 <div class="field">
+                  <label>Sit. financeira</label>
+                  <select id="relSitFinanceira">
+                    <option value="">Todas</option>
+                    <option value="Pago">Pago</option>
+                    <option value="Pendente">Pendente</option>
+                    <option value="Inadimplente">Inadimplente</option>
+                    <option value="Isento">Isento</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Forma de pagamento</label>
+                  <select id="relFormaPag">
+                    <option value="">Todas</option>
+                    <option value="PIX">PIX</option>
+                    <option value="Cartão">Cartão</option>
+                    <option value="Boleto">Boleto</option>
+                    <option value="Transferência">Transferência</option>
+                    <option value="Dinheiro">Dinheiro</option>
+                  </select>
+                </div>
+                <div class="field">
                   <label>Venc. a partir de</label>
                   <input id="relDataDe" type="date" />
                 </div>
@@ -298,11 +344,14 @@
                   <thead>
                     <tr>
                       <th>Empresa</th>
+                      <th>Cliente</th>
                       <th>CPF/CNPJ</th>
                       <th>Tipo</th>
                       <th>Emissão</th>
                       <th>Vencimento</th>
                       <th>Situação</th>
+                      <th>Sit. Financeira</th>
+                      <th>Forma Pag.</th>
                       <th>Dias Rest.</th>
                       <th>Responsável</th>
                     </tr>
@@ -442,6 +491,31 @@
           <div class="field">
             <label>Telefone</label>
             <input id="telefone" name="telefone" type="tel">
+          </div>
+          <div class="field">
+            <label>Cliente</label>
+            <input id="cliente" name="cliente" type="text" placeholder="Nome do cliente responsável">
+          </div>
+          <div class="field">
+            <label>Situação financeira</label>
+            <select id="situacao_financeira" name="situacao_financeira">
+              <option value="">Não informada</option>
+              <option value="Pago">Pago</option>
+              <option value="Pendente">Pendente</option>
+              <option value="Inadimplente">Inadimplente</option>
+              <option value="Isento">Isento</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Forma de pagamento</label>
+            <select id="forma_pagamento" name="forma_pagamento">
+              <option value="">Não informada</option>
+              <option value="PIX">PIX</option>
+              <option value="Cartão">Cartão</option>
+              <option value="Boleto">Boleto</option>
+              <option value="Transferência">Transferência</option>
+              <option value="Dinheiro">Dinheiro</option>
+            </select>
           </div>
           <div class="field">
             <label>Informações adicionais</label>

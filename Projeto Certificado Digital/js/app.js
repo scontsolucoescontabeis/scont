@@ -2,12 +2,13 @@
 // INICIALIZAÇÃO DA APLICAÇÃO
 // ============================================
 
-function initializeApp() {
+async function initializeApp() {
   setupAuthListeners();
   setupAppListeners();
+  applyTheme(APP_STATE.isDarkMode);
+  await loadConfiguracoes();
   setPage('dashboard');
   fetchCertificates();
-  applyTheme(APP_STATE.isDarkMode);
   setupRealtime();
 }
 
@@ -60,10 +61,12 @@ function applyTheme(isDark) {
 
 function renderDashboard() {
   const certs = APP_STATE._allCertificates;
-  const total    = certs.length;
-  const active   = certs.filter(c => c.situacao === 'Ativo').length;
-  const expired  = certs.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d < 0; }).length;
-  const upcoming = certs.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d >= 0 && d <= 30; }).length;
+  const total      = certs.length;
+  const active     = certs.filter(c => c.situacao === 'Ativo').length;
+  const expired    = certs.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d < 0; }).length;
+  const upcoming   = certs.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d >= 0 && d <= 30; }).length;
+  const pendentes  = certs.filter(c => c.situacao_financeira === 'Pendente').length;
+  const inadimpl   = certs.filter(c => c.situacao_financeira === 'Inadimplente').length;
 
   const alertCount = certs.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d <= 15; }).length;
   const notifBtn = q('#notifBtn');
@@ -90,6 +93,17 @@ function renderDashboard() {
       <div class="card-value">${upcoming}</div>
       <div class="card-meta">Próximos 30 dias</div>
     </div>
+    <div class="card warning">
+      <div class="card-label">Pagamentos Pendentes</div>
+      <div class="card-value">${pendentes}</div>
+      <div class="card-meta">Aguardando recebimento</div>
+    </div>
+    ${inadimpl > 0 ? `
+    <div class="card critical">
+      <div class="card-label">Inadimplentes</div>
+      <div class="card-value">${inadimpl}</div>
+      <div class="card-meta">Requer cobrança</div>
+    </div>` : ''}
   `;
 
   const alerts = certs
@@ -147,10 +161,10 @@ function renderCertTable() {
     return `
       <tr ${rowBg}>
         <td><strong>${c.empresa_id}</strong></td>
-        <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id}</span></td>
+        <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id || '—'}</span></td>
         <td>${fmt(c.data_vencimento)}</td>
         <td>${fmt(c.data_emissao)}</td>
-        <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
+        <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao || '—'}</span></td>
         <td>${c.responsavel_nome || '—'}</td>
         <td style="white-space:nowrap;">
           <button class="btn btn-ghost" onclick="openDetails('${c.id}')"    style="padding:5px 10px;font-size:12px;margin-right:3px;">👁 Ver</button>
@@ -198,37 +212,46 @@ function renderRelatorio(certs = APP_STATE._allCertificates) {
     return `
       <tr>
         <td><strong>${c.empresa_id}</strong></td>
+        <td>${c.cliente || '—'}</td>
         <td>${c.cpf_cnpj || '—'}</td>
-        <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id}</span></td>
+        <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id || '—'}</span></td>
         <td>${fmt(c.data_emissao)}</td>
         <td>${fmt(c.data_vencimento)}</td>
-        <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
+        <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao || '—'}</span></td>
+        <td>${c.situacao_financeira || '—'}</td>
+        <td>${c.forma_pagamento || '—'}</td>
         <td>${dStr}</td>
         <td>${c.responsavel_nome || '—'}</td>
       </tr>`;
-  }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);">Nenhum resultado</td></tr>';
+  }).join('') : '<tr><td colspan="11" style="text-align:center;color:var(--text-muted);">Nenhum resultado</td></tr>';
 }
 
 function filterRelatorio() {
-  const empresa  = q('#relEmpresa')?.value.toLowerCase()  || '';
-  const tipo     = q('#relTipo')?.value    || '';
-  const situacao = q('#relSituacao')?.value || '';
-  const dataDe   = q('#relDataDe')?.value  || '';
-  const dataAte  = q('#relDataAte')?.value  || '';
+  const empresa   = q('#relEmpresa')?.value.toLowerCase().trim()  || '';
+  const cliente   = q('#relCliente')?.value.toLowerCase().trim()  || '';
+  const tipo      = q('#relTipo')?.value.toLowerCase().trim()     || '';
+  const situacao  = q('#relSituacao')?.value.toLowerCase().trim() || '';
+  const sitFin    = q('#relSitFinanceira')?.value.toLowerCase().trim() || '';
+  const formaPag  = q('#relFormaPag')?.value.toLowerCase().trim() || '';
+  const dataDe    = q('#relDataDe')?.value    || '';
+  const dataAte   = q('#relDataAte')?.value   || '';
 
   const filtered = APP_STATE._allCertificates.filter(c => {
-    if (empresa  && !c.empresa_id.toLowerCase().includes(empresa)) return false;
-    if (tipo     && c.tipo_id !== tipo)     return false;
-    if (situacao && c.situacao !== situacao) return false;
-    if (dataDe   && c.data_vencimento < dataDe) return false;
-    if (dataAte  && c.data_vencimento > dataAte) return false;
+    if (empresa  && !(c.empresa_id || '').toLowerCase().includes(empresa)) return false;
+    if (cliente  && !(c.cliente    || '').toLowerCase().includes(cliente)) return false;
+    if (tipo     && (c.tipo_id     || '').toLowerCase() !== tipo)          return false;
+    if (situacao && (c.situacao    || '').toLowerCase() !== situacao)      return false;
+    if (sitFin   && (c.situacao_financeira || '').toLowerCase() !== sitFin)   return false;
+    if (formaPag && (c.forma_pagamento     || '').toLowerCase() !== formaPag) return false;
+    if (dataDe   && c.data_vencimento && c.data_vencimento < dataDe) return false;
+    if (dataAte  && c.data_vencimento && c.data_vencimento > dataAte) return false;
     return true;
   });
   renderRelatorio(filtered);
 }
 
 function clearRelatorio() {
-  ['#relEmpresa','#relTipo','#relSituacao','#relDataDe','#relDataAte'].forEach(sel => {
+  ['#relEmpresa','#relCliente','#relTipo','#relSituacao','#relSitFinanceira','#relFormaPag','#relDataDe','#relDataAte'].forEach(sel => {
     const el = q(sel); if (el) el.value = '';
   });
   renderRelatorio();
@@ -250,12 +273,13 @@ function exportCSV() {
     return true;
   });
 
-  const header = ['Empresa','CPF/CNPJ','Tipo','Emissão','Vencimento','Situação','Dias Restantes','Responsável','Email','Telefone'];
+  const header = ['Empresa','Cliente','CPF/CNPJ','Tipo','Emissão','Vencimento','Situação','Sit. Financeira','Forma Pagamento','Dias Restantes','Responsável','Email','Telefone'];
   const rows = certs.map(c => {
     const d = daysLeft(c.data_vencimento);
     return [
-      c.empresa_id, c.cpf_cnpj || '', c.tipo_id,
+      c.empresa_id, c.cliente || '', c.cpf_cnpj || '', c.tipo_id,
       fmt(c.data_emissao), fmt(c.data_vencimento), c.situacao,
+      c.situacao_financeira || '', c.forma_pagamento || '',
       d === null ? '' : d,
       c.responsavel_nome || '', c.responsavel_email || '', c.responsavel_telefone || ''
     ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
@@ -530,9 +554,33 @@ function setTheme(isDark) {
   renderConfigPage();
 }
 
-function setPageSize(size) {
+async function setPageSize(size) {
   APP_STATE.pageSize = parseInt(size);
   APP_STATE.currentPage = 1;
+  renderCertTable();
+  try {
+    await supabaseClient
+      .from(TABLE_NAMES.CONFIG)
+      .upsert({ chave: 'pageSize', valor: String(size), atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
+  } catch (e) {
+    console.error('Erro ao salvar pageSize no Supabase:', e);
+  }
+}
+
+async function loadConfiguracoes() {
+  try {
+    const { data } = await supabaseClient
+      .from(TABLE_NAMES.CONFIG)
+      .select('chave, valor');
+    if (!data) return;
+    data.forEach(row => {
+      if (row.chave === 'pageSize') {
+        APP_STATE.pageSize = parseInt(row.valor) || 10;
+      }
+    });
+  } catch (e) {
+    console.error('Erro ao carregar configurações:', e);
+  }
 }
 
 function salvarConfig() {
@@ -569,8 +617,11 @@ function openCertModal(id = null) {
       q('#responsavel').value  = cert.responsavel_nome || '';
       q('#email').value        = cert.responsavel_email || '';
       q('#telefone').value     = cert.responsavel_telefone || '';
-      q('#info').value         = cert.informacoes_adicionais || '';
-      q('#risco').value        = cert.observacao_risco || '';
+      q('#cliente').value              = cert.cliente             || '';
+      q('#situacao_financeira').value  = cert.situacao_financeira || '';
+      q('#forma_pagamento').value      = cert.forma_pagamento     || '';
+      q('#info').value                 = cert.informacoes_adicionais || '';
+      q('#risco').value                = cert.observacao_risco       || '';
     }
   } else {
     q('#certModalTitle').textContent = 'Novo certificado';
@@ -606,9 +657,12 @@ function openDetails(id) {
         <div style="font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:4px;">⏳ SITUAÇÃO TEMPORAL</div>
         <div style="font-size:20px;font-weight:800;color:${dColor};">${dText}</div>
       </div>
-      ${dRow('📊 Situação',   `<span class="badge ${badgeClass(cert.situacao)}">${cert.situacao}</span>`)}
-      ${dRow('📅 Agendamento', cert.data_renovacao_agendada ? fmt(cert.data_renovacao_agendada) : '—')}
-      ${dRow('👤 Responsável', cert.responsavel_nome || '—')}
+      ${dRow('📊 Situação',        `<span class="badge ${badgeClass(cert.situacao)}">${cert.situacao}</span>`)}
+      ${dRow('💰 Sit. Financeira', cert.situacao_financeira || '—')}
+      ${dRow('💳 Forma Pagamento', cert.forma_pagamento     || '—')}
+      ${dRow('👤 Cliente',         cert.cliente             || '—')}
+      ${dRow('📅 Agendamento',     cert.data_renovacao_agendada ? fmt(cert.data_renovacao_agendada) : '—')}
+      ${dRow('👤 Responsável',     cert.responsavel_nome    || '—')}
       ${dRow('📧 E-mail',      cert.responsavel_email || '—')}
       ${dRow('📞 Telefone',    cert.responsavel_telefone || '—')}
       ${cert.informacoes_adicionais ? `<div style="grid-column:1/-1;">${dRow('📝 Informações', cert.informacoes_adicionais)}</div>` : ''}
@@ -675,8 +729,11 @@ async function saveCertificate(formData) {
       responsavel_nome:         formData.get('responsavel') || null,
       responsavel_email:        formData.get('email')       || null,
       responsavel_telefone:     formData.get('telefone')    || null,
-      informacoes_adicionais:   formData.get('info')        || null,
-      observacao_risco:         formData.get('risco')       || null,
+      informacoes_adicionais:   formData.get('info')               || null,
+      observacao_risco:         formData.get('risco')              || null,
+      cliente:                  formData.get('cliente')            || null,
+      situacao_financeira:      formData.get('situacao_financeira')|| null,
+      forma_pagamento:          formData.get('forma_pagamento')    || null,
       atualizado_por:           APP_STATE.currentUser?.usuario_id
     };
 
@@ -722,6 +779,214 @@ function updateConnectionStatus(connected) {
 }
 
 // ============================================
+// SELEÇÃO E EXCLUSÃO EM LOTE
+// ============================================
+
+function updateSelectionBar() {
+  const checkboxes = document.querySelectorAll('.cert-checkbox');
+  const selected   = document.querySelectorAll('.cert-checkbox:checked');
+  const btn        = q('#btnDeleteSelected');
+  const counter    = q('#selectedCount');
+  if (btn)     btn.style.display = selected.length > 0 ? 'inline-flex' : 'none';
+  if (counter) counter.textContent = selected.length;
+}
+
+function selectAllCerts() {
+  document.querySelectorAll('.cert-checkbox').forEach(cb => cb.checked = true);
+  updateSelectionBar();
+}
+
+function deselectAllCerts() {
+  document.querySelectorAll('.cert-checkbox').forEach(cb => cb.checked = false);
+  updateSelectionBar();
+}
+
+async function deleteSelectedCerts() {
+  const selected = [...document.querySelectorAll('.cert-checkbox:checked')];
+  if (!selected.length) return;
+
+  if (!confirm(`Excluir ${selected.length} certificado(s) selecionado(s)? Esta ação não pode ser desfeita.`)) return;
+
+  const ids = selected.map(cb => cb.dataset.id);
+  let ok = 0, fail = 0;
+  const now = new Date().toISOString();
+  const userId = APP_STATE.currentUser?.usuario_id || null;
+
+  for (const id of ids) {
+    try {
+      const { error } = await supabaseClient
+        .from(TABLE_NAMES.CERTIFICADOS)
+        .update({ deleted_at: now, deleted_by: userId })
+        .eq('id', id);
+      if (error) {
+        console.error(`Falha ao excluir id ${id}:`, error.message, error);
+        showToast('Erro: ' + error.message, 'error', 6000);
+        fail++;
+      } else {
+        ok++;
+      }
+    } catch (e) {
+      console.error('Exceção ao excluir:', id, e);
+      fail++;
+    }
+  }
+
+  if (ok > 0) {
+    showToast(`${ok} excluído(s)${fail ? ` • ${fail} falharam` : ''}`, 'success', 5000);
+  }
+  updateSelectionBar();
+  await fetchCertificates();
+}
+
+// ============================================
+// IMPORTAÇÃO EXCEL — CERTIFICADOS
+// ============================================
+
+const SITUACAO_MAP = {
+  'ativo': 'Ativo',
+  'agendado': 'Agendado',
+  'renovado': 'Renovado',
+  'aguardando contato': 'Aguardando Contato',
+  'realizar contato': 'Aguardando Contato',
+  'vencido': 'Vencido',
+};
+
+function normalizeSituacao(val) {
+  if (!val) return null;
+  const key = String(val).trim().toLowerCase();
+  return SITUACAO_MAP[key] || String(val).trim() || null;
+}
+
+function parseDateCert(val) {
+  if (!val) return null;
+  if (typeof val === 'number') {
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    return d.toISOString().split('T')[0];
+  }
+  const s = String(val).trim();
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return null;
+}
+
+function showCertImportPreview(rows, onConfirm) {
+  const cols = ['empresa','senha','data_vencimento','informacoes','situacao','data_agendamento','cliente','situacao_financeira','forma_pagamento'];
+  const visibleCols = cols.filter(c => rows[0]?.hasOwnProperty(c));
+  const preview = rows.slice(0, 10);
+
+  const ths = visibleCols.map(c => `<th style="padding:6px 10px;background:var(--bg-soft);font-size:12px;">${c}</th>`).join('');
+  const trs = preview.map(r =>
+    `<tr>${visibleCols.map(c => `<td style="padding:6px 10px;border-bottom:1px solid var(--border);font-size:12px;">${r[c] ?? '—'}</td>`).join('')}</tr>`
+  ).join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'importPreviewModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:28px;max-width:90vw;max-height:85vh;overflow:auto;min-width:420px;">
+      <h3 style="margin:0 0 8px;font-size:1.1rem;">Prévia da importação</h3>
+      <p style="margin:0 0 16px;color:#666;font-size:.88rem;">${rows.length} registro(s) encontrado(s). Exibindo até 10.</p>
+      <div style="overflow-x:auto;margin-bottom:20px;">
+        <table style="border-collapse:collapse;width:100%;">
+          <thead><tr>${ths}</tr></thead>
+          <tbody>${trs}</tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button id="confirmCertImport" class="btn btn-primary">✓ Confirmar importação</button>
+        <button onclick="document.getElementById('importPreviewModal').remove()" class="btn btn-secondary">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  document.getElementById('confirmCertImport').addEventListener('click', async () => {
+    document.getElementById('confirmCertImport').disabled = true;
+    document.getElementById('confirmCertImport').textContent = 'Importando...';
+    await onConfirm();
+    modal.remove();
+  });
+}
+
+async function importarExcelCertificados(file) {
+  if (!window.XLSX) { showToast('Biblioteca Excel não carregada', 'error'); return; }
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+    if (!rows.length) { showToast('Planilha vazia ou sem dados', 'error'); return; }
+
+    showCertImportPreview(rows, async () => {
+      // Carrega empresas existentes para deduplicação
+      let existentes = new Set();
+      try {
+        const { data: existing } = await supabaseClient
+          .from(TABLE_NAMES.CERTIFICADOS)
+          .select('empresa_id')
+          .is('deleted_at', null);
+        (existing || []).forEach(c => existentes.add(c.empresa_id.trim().toLowerCase()));
+      } catch (_) {}
+
+      let ok = 0, fail = 0, skipped = 0;
+      for (const r of rows) {
+        const empresa = String(r['empresa'] || '').trim();
+        if (!empresa) { fail++; continue; }
+
+        if (existentes.has(empresa.toLowerCase())) { skipped++; continue; }
+
+        const cert = {
+          empresa_id:              empresa,
+          tipo_id:                 String(r['tipo'] || '').trim() || null,
+          senha_hash:              String(r['senha'] ?? '').trim() || null,
+          data_vencimento:         parseDateCert(r['data_vencimento']) || null,
+          informacoes_adicionais:  String(r['informacoes'] || '').trim() || null,
+          situacao:                normalizeSituacao(r['situacao']),
+          data_renovacao_agendada: parseDateCert(r['data_agendamento']) || null,
+          cliente:                 String(r['cliente'] || '').trim() || null,
+          situacao_financeira:     String(r['situacao_financeira'] || '').trim() || null,
+          forma_pagamento:         String(r['forma_pagamento'] || '').trim() || null,
+          criado_por:              APP_STATE.currentUser?.usuario_id || null,
+        };
+
+        try {
+          const { error } = await supabaseClient.from(TABLE_NAMES.CERTIFICADOS).insert([cert]);
+          if (error) throw error;
+          ok++;
+          existentes.add(empresa.toLowerCase()); // evita duplicatas dentro da própria planilha
+        } catch (e) {
+          console.error('Falha na linha:', r, e);
+          fail++;
+        }
+      }
+      const msg = [
+        ok      ? `${ok} importado(s)`       : '',
+        skipped ? `${skipped} duplicado(s) ignorado(s)` : '',
+        fail    ? `${fail} falharam`          : '',
+      ].filter(Boolean).join(' • ');
+      showToast(msg, ok || skipped ? 'success' : 'error', 6000);
+      await fetchCertificates();
+    });
+  } catch (err) {
+    console.error('Erro ao ler Excel:', err);
+    showToast('Erro ao ler o arquivo Excel', 'error');
+  }
+}
+
+function baixarModeloCertificados() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['empresa','tipo','senha','data_vencimento','informacoes','situacao','data_agendamento','cliente','situacao_financeira','forma_pagamento'],
+    ['Empresa Exemplo Ltda','A1','Senha@2024','31/12/2025','Certificado A1 emitido pela Serasa','Ativo','15/11/2025','João da Silva','Pago','Cartão'],
+    ['Comércio Silva ME','e-CNPJ','Pass#456','30/06/2025','e-CNPJ renovado','Agendado','01/06/2025','Maria Oliveira','Pendente','PIX']
+  ]);
+  ws['!cols'] = [24,10,14,16,28,18,16,20,18,18].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Certificados');
+  XLSX.writeFile(wb, 'modelo_importacao_certificados.xlsx');
+}
+
+// ============================================
 // EVENT LISTENERS
 // ============================================
 
@@ -742,6 +1007,13 @@ function setupAppListeners() {
   q('#securityItem')?.addEventListener('click', () => { q('#userDropdown')?.classList.remove('active'); setPage('seguranca'); });
 
   q('#btnNewCert')?.addEventListener('click', () => openCertModal());
+
+  q('#btnImportCert')?.addEventListener('click', () => q('#importCertFile')?.click());
+  q('#importCertFile')?.addEventListener('change', e => {
+    if (e.target.files[0]) importarExcelCertificados(e.target.files[0]);
+    e.target.value = '';
+  });
+  q('#btnModeloCert')?.addEventListener('click', baixarModeloCertificados);
   q('#closeCertModal')?.addEventListener('click', closeCertModal);
   q('#cancelCertForm')?.addEventListener('click', closeCertModal);
   q('#certForm')?.addEventListener('submit', e => {
@@ -750,22 +1022,28 @@ function setupAppListeners() {
   });
 
   q('#btnFilterCert')?.addEventListener('click', () => {
-    const empresa  = q('#filterEmpresa').value.toLowerCase();
-    const tipo     = q('#filterTipo').value;
-    const situacao = q('#filterSituacao').value;
+    const empresa      = q('#filterEmpresa').value.toLowerCase();
+    const cliente      = q('#filterCliente').value.toLowerCase();
+    const tipo         = q('#filterTipo').value;
+    const situacao     = q('#filterSituacao').value;
+    const sitFin       = q('#filterSitFinanceira').value;
     APP_STATE.certificates = APP_STATE._allCertificates.filter(c =>
       (!empresa  || c.empresa_id.toLowerCase().includes(empresa)) &&
+      (!cliente  || (c.cliente || '').toLowerCase().includes(cliente)) &&
       (!tipo     || c.tipo_id === tipo) &&
-      (!situacao || c.situacao === situacao)
+      (!situacao || c.situacao === situacao) &&
+      (!sitFin   || c.situacao_financeira === sitFin)
     );
     APP_STATE.currentPage = 1;
     renderCertTable();
   });
 
   q('#btnClearFilter')?.addEventListener('click', () => {
-    q('#filterEmpresa').value = '';
-    q('#filterTipo').value    = '';
-    q('#filterSituacao').value = '';
+    q('#filterEmpresa').value       = '';
+    q('#filterCliente').value       = '';
+    q('#filterTipo').value          = '';
+    q('#filterSituacao').value      = '';
+    q('#filterSitFinanceira').value = '';
     APP_STATE.certificates = [...APP_STATE._allCertificates];
     APP_STATE.currentPage  = 1;
     renderCertTable();
@@ -799,13 +1077,18 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Expor funções globais (chamadas via onclick no HTML)
-window.openDetails    = openDetails;
-window.openCertModal  = openCertModal;
-window.removeCert     = removeCert;
-window.exportCSV      = exportCSV;
-window.filterRelatorio = filterRelatorio;
-window.clearRelatorio  = clearRelatorio;
-window.toggleSenha    = toggleSenha;
-window.setTheme       = setTheme;
-window.setPageSize    = setPageSize;
-window.salvarConfig   = salvarConfig;
+window.openDetails              = openDetails;
+window.openCertModal            = openCertModal;
+window.removeCert               = removeCert;
+window.exportCSV                = exportCSV;
+window.filterRelatorio          = filterRelatorio;
+window.clearRelatorio           = clearRelatorio;
+window.toggleSenha              = toggleSenha;
+window.setTheme                 = setTheme;
+window.setPageSize              = setPageSize;
+window.salvarConfig             = salvarConfig;
+window.importarExcelCertificados = importarExcelCertificados;
+window.baixarModeloCertificados  = baixarModeloCertificados;
+window.selectAllCerts            = selectAllCerts;
+window.deselectAllCerts          = deselectAllCerts;
+window.deleteSelectedCerts       = deleteSelectedCerts;
