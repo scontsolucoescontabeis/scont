@@ -8,8 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --primary:#8B3A3A; --primary-hover:#6B2A2A; --secondary:#2C3E50;
-            --success:#27AE60; --warning:#F39C12; --danger:#E74C3C; --info:#3498DB;
+            --primary:#4e1820; --primary-hover:#3a1018; --secondary:#2C3E50;
+            --success:#33aa23; --warning:#F39C12; --danger:#E74C3C; --info:#3498DB;
             --bg:#F4F7F6; --card:#FFFFFF; --text:#2C3E50; --muted:#7F8C8D; --border:#E0E6ED;
             --shadow-md:0 4px 12px rgba(0,0,0,.08); --shadow-lg:0 8px 24px rgba(0,0,0,.12);
             --radius:12px; --transition:all .3s cubic-bezier(.25,.8,.25,1);
@@ -99,7 +99,7 @@
         .form-group { margin-bottom:13px; }
         .form-group label { display:block; margin-bottom:5px; font-weight:600; font-size:13px; color:var(--text); }
         .form-group input, .form-group select, .form-group textarea { width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit; transition:var(--transition); }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(139,58,58,.1); }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(78,24,32,.1); }
         .form-group textarea { resize:vertical; min-height:75px; }
         .checkbox-group { display:flex; flex-direction:column; gap:9px; margin-top:8px; }
         .checkbox-item { display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; }
@@ -115,6 +115,71 @@
         .btn-modal-secondary { background:var(--border); color:var(--text); }
 
         .empty-cell { text-align:center; padding:36px; color:var(--muted); font-size:14px; }
+
+        /* CONFIGURAÇÕES */
+        .cfg-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+        @media (max-width:640px) { .cfg-grid { grid-template-columns:1fr; } }
+        .cfg-full { grid-column:1/-1; }
+        .cfg-hint { font-size:12px; color:var(--muted); margin-top:4px; display:block; }
+        .cfg-actions { display:flex; gap:10px; margin-top:16px; align-items:center; flex-wrap:wrap; }
+        .cfg-status { font-size:13px; font-weight:600; padding:6px 12px; border-radius:6px; display:none; }
+        .cfg-status.ok  { background:#DCFCE7; color:#166534; display:inline-block; }
+        .cfg-status.err { background:#FEE2E2; color:#991B1B; display:inline-block; }
+        .cfg-section-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+        .cfg-section-desc { font-size:13px; color:var(--muted); margin-bottom:18px; }
+        .cfg-section-desc a { color:var(--primary); }
+        .btn-secondary-sm { padding:7px 14px; border:1px solid var(--border); border-radius:6px; background:var(--card); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; transition:var(--transition); display:inline-flex; align-items:center; gap:6px; }
+        .btn-secondary-sm:hover { background:var(--bg); }
+        .provedor-opt { display:flex; cursor:pointer; }
+        .provedor-opt input[type=radio] { display:none; }
+        .provedor-label { display:flex; align-items:center; gap:10px; padding:12px 18px; border:2px solid var(--border); border-radius:10px; transition:var(--transition); background:var(--card); }
+        .provedor-opt input:checked + .provedor-label { border-color:var(--primary); background:rgba(78,24,32,.05); }
+        .provedor-label:hover { border-color:var(--primary); }
+        .provedor-icon { font-size:22px; }
+        .provedor-label strong { display:block; font-size:14px; color:var(--text); }
+        .provedor-label small { display:block; font-size:11px; color:var(--muted); margin-top:2px; }
+
+        /* DISPAROS */
+        .disp-toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+        .disp-search { flex:1; min-width:180px; padding:8px 12px; border:1px solid var(--border); border-radius:6px; font-size:13px; }
+        .disp-search:focus { outline:none; border-color:var(--primary); }
+        .disp-count { font-size:13px; color:var(--muted); white-space:nowrap; }
+        .disp-count strong { color:var(--primary); }
+        .canal-grid { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+        .canal-opt { display:flex; cursor:pointer; }
+        .canal-opt input[type=checkbox] { display:none; }
+        .canal-label { display:flex; align-items:center; gap:8px; padding:10px 16px; border:2px solid var(--border); border-radius:10px; transition:var(--transition); background:var(--card); font-size:13px; font-weight:600; }
+        .canal-opt input:checked + .canal-label { border-color:var(--primary); background:rgba(78,24,32,.06); color:var(--primary); }
+        .canal-label:hover { border-color:var(--primary); }
+        .tpl-vars { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+        .tpl-var { background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:2px 8px; font-size:11px; font-family:monospace; cursor:pointer; color:var(--text); transition:var(--transition); }
+        .tpl-var:hover { background:var(--primary); color:white; border-color:var(--primary); }
+        .tpl-area { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit; resize:vertical; min-height:100px; }
+        .tpl-area:focus { outline:none; border-color:var(--primary); }
+        .disp-btn-send { padding:11px 24px; background:var(--primary); color:white; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; transition:var(--transition); display:inline-flex; align-items:center; gap:8px; }
+        .disp-btn-send:hover { background:var(--primary-hover); }
+        .disp-btn-send:disabled { opacity:.5; cursor:not-allowed; }
+        .prog-bar-wrap { background:var(--bg); border-radius:6px; overflow:hidden; height:10px; margin:10px 0; }
+        .prog-bar { height:10px; background:linear-gradient(90deg,var(--primary),var(--primary-hover)); width:0; transition:width .3s ease; border-radius:6px; }
+        .result-list { max-height:260px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+        .result-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:6px; font-size:13px; }
+        .result-item.ok  { background:#DCFCE7; color:#166534; }
+        .result-item.err { background:#FEE2E2; color:#991B1B; }
+        .result-item.skip { background:#FEF3C7; color:#92400E; }
+        .wa-fila-card { background:var(--bg); border-radius:10px; padding:20px; margin-bottom:14px; }
+        .wa-fila-msg { background:white; border:1px solid var(--border); border-radius:8px; padding:14px; font-size:13px; white-space:pre-wrap; line-height:1.7; max-height:180px; overflow-y:auto; margin:10px 0; }
+        .wa-prog { font-size:13px; color:var(--muted); margin-bottom:14px; }
+        .wa-prog strong { color:var(--primary); }
+        .wa-actions { display:flex; gap:10px; flex-wrap:wrap; }
+        .btn-wa-open { padding:10px 20px; background:#25D366; color:white; border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+        .btn-wa-open:hover { background:#1ebe5d; }
+        .btn-wa-skip { padding:10px 16px; background:var(--border); color:var(--text); border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+        .btn-wa-skip:hover { background:#d0d5dd; }
+        .wa-status-list { max-height:200px; overflow-y:auto; margin-top:14px; display:flex; flex-direction:column; gap:4px; }
+        .wa-status-item { display:flex; align-items:center; gap:8px; font-size:12px; padding:4px 8px; border-radius:4px; }
+        .wa-status-item.sent { color:#166534; }
+        .wa-status-item.skip { color:#92400E; }
+        .wa-status-item.pending { color:var(--muted); }
 
         @media (max-width:768px) {
             .sidebar { width:100%; height:auto; position:relative; padding:18px; }
@@ -140,6 +205,7 @@
         <li><button class="menu-btn" data-tab="usuarios">👥 Usuários</button></li>
         <li><button class="menu-btn" data-tab="ferramentas">🔧 Ferramentas</button></li>
         <li><button class="menu-btn" data-tab="acessos">🔐 Acessos</button></li>
+        <li><button class="menu-btn" data-tab="configuracoes">⚙️ Configurações</button></li>
     </ul>
     <div class="sidebar-footer">
         <button class="portal-btn" onclick="window.location.href='portal.html'">🏠 Ir ao Portal</button>
@@ -221,6 +287,120 @@
             </div>
         </div>
     </div>
+
+    <!-- CONFIGURAÇÕES -->
+    <div id="configuracoes" class="tab-content">
+
+      <!-- CARD EMAIL -->
+      <div class="card">
+        <p class="cfg-section-title">📧 Configurações de E-mail</p>
+
+        <!-- SELETOR DE PROVEDOR -->
+        <div style="display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap;">
+          <label class="provedor-opt" id="optResend">
+            <input type="radio" name="emailProvedor" value="resend" id="radioResend">
+            <span class="provedor-label">
+              <span class="provedor-icon">🚀</span>
+              <span>
+                <strong>Resend</strong>
+                <small>3.000 e-mails/mês grátis</small>
+              </span>
+            </span>
+          </label>
+          <label class="provedor-opt" id="optSmtp">
+            <input type="radio" name="emailProvedor" value="smtp" id="radioSmtp">
+            <span class="provedor-label">
+              <span class="provedor-icon">📨</span>
+              <span>
+                <strong>SMTP</strong>
+                <small>Outlook, Gmail, etc.</small>
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <!-- CAMPOS COMUNS -->
+        <div class="cfg-grid">
+          <div class="form-group">
+            <label>E-mail Remetente</label>
+            <input type="email" id="cfgEmailRemetente" placeholder="contato@scontdf.com.br">
+          </div>
+          <div class="form-group">
+            <label>Nome Remetente</label>
+            <input type="text" id="cfgNomeRemetente" placeholder="Scont Soluções Contábeis">
+          </div>
+        </div>
+
+        <!-- CAMPOS RESEND -->
+        <div id="painelResend">
+          <div class="form-group">
+            <label>Resend — API Key</label>
+            <input type="password" id="cfgResendApiKey" placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+            <span class="cfg-hint"><a href="https://resend.com" target="_blank">resend.com</a> → API Keys → Create API Key. Teste com remetente <code>onboarding@resend.dev</code> antes de verificar seu domínio.</span>
+          </div>
+        </div>
+
+        <!-- CAMPOS SMTP -->
+        <div id="painelSmtp" style="display:none;">
+          <div class="cfg-grid">
+            <div class="form-group">
+              <label>Servidor SMTP (host)</label>
+              <input type="text" id="cfgSmtpHost" placeholder="smtp-mail.outlook.com">
+              <span class="cfg-hint">Outlook: <code>smtp-mail.outlook.com</code> · Gmail: <code>smtp.gmail.com</code></span>
+            </div>
+            <div class="form-group">
+              <label>Porta</label>
+              <input type="number" id="cfgSmtpPorta" placeholder="587" min="1" max="65535">
+            </div>
+            <div class="form-group">
+              <label>Segurança</label>
+              <select id="cfgSmtpSeguranca">
+                <option value="STARTTLS">STARTTLS — porta 587 (recomendado)</option>
+                <option value="SSL">SSL/TLS — porta 465</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Usuário (e-mail da conta)</label>
+              <input type="email" id="cfgSmtpUsuario" placeholder="seunome@outlook.com" autocomplete="off">
+            </div>
+            <div class="form-group cfg-full">
+              <label>Senha / App Password</label>
+              <input type="password" id="cfgSmtpSenha" placeholder="••••••••••••" autocomplete="off">
+              <span class="cfg-hint">Para Outlook/Microsoft 365 com MFA ativo, use uma <strong>App Password</strong> gerada em Conta Microsoft → Segurança. Para Gmail, ative "Acesso a apps menos seguros" ou use App Password.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="cfg-actions">
+          <button class="btn-primary-sm" id="btnSalvarEmail">💾 Salvar E-mail</button>
+          <button class="btn-secondary-sm" id="btnTestarEmail">📤 Enviar e-mail de teste</button>
+          <span class="cfg-status" id="cfgEmailStatus"></span>
+        </div>
+      </div>
+
+      <!-- CARD WHATSAPP -->
+      <div class="card">
+        <p class="cfg-section-title">💬 Configurações de WhatsApp</p>
+        <p class="cfg-section-desc">
+          Número do WhatsApp Business da SCONT. Utilizado como referência em links de contato
+          e em mensagens enviadas aos clientes via WhatsApp Web.
+        </p>
+        <div class="cfg-grid">
+          <div class="form-group">
+            <label>Número WhatsApp SCONT</label>
+            <input type="text" id="cfgWhatsappNumero" placeholder="5561999999999" maxlength="15" autocomplete="off">
+            <span class="cfg-hint">Com DDI, sem + ou espaços. Ex: 5561999999999 (55 = Brasil, 61 = DDD + número)</span>
+          </div>
+        </div>
+        <div class="cfg-actions">
+          <button class="btn-primary-sm" id="btnSalvarWhatsApp">💾 Salvar WhatsApp</button>
+          <button class="btn-secondary-sm" id="btnTestarWhatsApp">📲 Testar link WhatsApp</button>
+          <span class="cfg-status" id="cfgWaStatus"></span>
+        </div>
+      </div>
+
+    </div><!-- /configuracoes -->
+
   </main>
 </div>
 
@@ -241,6 +421,17 @@
             <input type="checkbox" id="apIsAdmin" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
             <label for="apIsAdmin" style="font-weight:600;font-size:13px;color:#92400E;cursor:pointer;margin:0;">👑 Conceder perfil de administrador</label>
         </div>
+        <div class="form-group" style="padding:12px;background:#F0FDF4;border:1px solid #86EFAC;border-radius:6px;">
+            <label style="font-weight:600;font-size:13px;color:#166534;margin-bottom:8px;display:block;">📣 Notificar usuário sobre aprovação</label>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
+                    <input type="checkbox" id="apNotifEmail" style="width:15px;height:15px;cursor:pointer;"> 📧 E-mail
+                </label>
+                <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
+                    <input type="checkbox" id="apNotifWhatsApp" style="width:15px;height:15px;cursor:pointer;"> 💬 WhatsApp
+                </label>
+            </div>
+        </div>
         <div class="modal-actions">
             <button type="button" class="btn-modal btn-modal-secondary" data-close="modalAprovar">Cancelar</button>
             <button type="submit" class="btn-modal btn-modal-primary">✅ Aprovar e Liberar Acesso</button>
@@ -257,6 +448,17 @@
         <div class="form-group"><label>Solicitante</label><input id="rjNome" type="text" readonly></div>
         <div class="form-group"><label>E-mail</label><input id="rjEmail" type="email" readonly></div>
         <div class="form-group"><label>Motivo da Rejeição *</label><textarea id="rjMotivo" required placeholder="Explique o motivo..."></textarea></div>
+        <div class="form-group" style="padding:12px;background:#FFF1F2;border:1px solid #FECACA;border-radius:6px;">
+            <label style="font-weight:600;font-size:13px;color:#991B1B;margin-bottom:8px;display:block;">📣 Notificar usuário sobre rejeição</label>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
+                    <input type="checkbox" id="rjNotifEmail" style="width:15px;height:15px;cursor:pointer;"> 📧 E-mail
+                </label>
+                <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
+                    <input type="checkbox" id="rjNotifWhatsApp" style="width:15px;height:15px;cursor:pointer;"> 💬 WhatsApp
+                </label>
+            </div>
+        </div>
         <div class="modal-actions">
             <button type="button" class="btn-modal btn-modal-secondary" data-close="modalRejeitar">Cancelar</button>
             <button type="submit" class="btn-modal btn-modal-primary">❌ Rejeitar</button>
@@ -279,6 +481,17 @@
         <div class="form-group" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:6px;">
             <input type="checkbox" id="edIsAdmin" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">
             <label for="edIsAdmin" style="font-weight:600;font-size:13px;color:#92400E;cursor:pointer;margin:0;">👑 Perfil de administrador</label>
+        </div>
+        <div class="form-group" style="padding:12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;">
+            <label style="font-weight:600;font-size:13px;color:#1E40AF;margin-bottom:8px;display:block;">📣 Notificar usuário sobre alteração de acesso</label>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
+                    <input type="checkbox" id="edNotifEmail" style="width:15px;height:15px;cursor:pointer;"> 📧 E-mail
+                </label>
+                <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;">
+                    <input type="checkbox" id="edNotifWhatsApp" style="width:15px;height:15px;cursor:pointer;"> 💬 WhatsApp
+                </label>
+            </div>
         </div>
         <div class="modal-actions">
             <button type="button" class="btn-modal btn-modal-secondary" data-close="modalEditar">Cancelar</button>
@@ -327,10 +540,11 @@ document.querySelectorAll('.modal').forEach(m =>
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
 
 // ─── ESTADO ────────────────────────────────────────────────
-let solicitacoes = [];
-let ferramentas  = [];
-let currentSolId = null;   // solicitacoes_acesso.id atual no modal
-let editingFId   = null;   // ferramenta.id em edição (null = nova)
+let solicitacoes       = [];
+let ferramentas        = [];
+let currentSolId       = null;   // solicitacoes_acesso.id atual no modal
+let currentSolTelefone = null;   // telefone do solicitante atual
+let editingFId         = null;   // ferramenta.id em edição (null = nova)
 
 // ─── AUTH ──────────────────────────────────────────────────
 async function checkAuth() {
@@ -348,7 +562,7 @@ async function loadSolicitacoes() {
     const tbody = document.getElementById('tblSolicitacoes_acesso');
     const { data, error } = await sb
         .from('solicitacoes_acesso')
-        .select('id, nome, email, empresa, cargo, status, data_solicitacao, data_avaliacao')
+        .select('id, nome, email, empresa, cargo, telefone, status, data_solicitacao, data_avaliacao')
         .order('data_solicitacao', { ascending: false });
     if (error) {
         console.error('loadSolicitacoes:', error);
@@ -379,7 +593,7 @@ async function loadUsuarios() {
     const tbody = document.getElementById('tblUsuarios');
     const { data, error } = await sb
         .from('solicitacoes_acesso')
-        .select('id, nome, email, empresa, cargo, data_avaliacao')
+        .select('id, nome, email, empresa, cargo, telefone, data_avaliacao')
         .eq('status', 'aprovado')
         .order('data_avaliacao', { ascending: false });
     if (error) {
@@ -607,13 +821,16 @@ function collectPermissoes(fId, cbSubClass) {
 
 // ─── MODAL: APROVAR ────────────────────────────────────────
 function abrirModalAprovar(sol) {
-    currentSolId = sol.id;
+    currentSolId       = sol.id;
+    currentSolTelefone = sol.telefone || null;
     document.getElementById('apNome').value    = sol.nome;
     document.getElementById('apEmail').value   = sol.email;
     document.getElementById('apEmpresa').value = sol.empresa || '';
     document.getElementById('apCargo').value   = sol.cargo || '';
     buildFerCheckboxes('apFerramentas', new Set(), {}, 'cb-aprovar', 'cb-sub-aprovar');
-    document.getElementById('apIsAdmin').checked = false;
+    document.getElementById('apIsAdmin').checked    = false;
+    document.getElementById('apNotifEmail').checked = true;
+    document.getElementById('apNotifWhatsApp').checked = !!(sol.telefone);
     openModal('modalAprovar');
 }
 
@@ -654,7 +871,65 @@ document.getElementById('formAprovar').addEventListener('submit', async (e) => {
         if (insErr) throw insErr;
 
         closeModal('modalAprovar');
-        alert('✅ Solicitação aprovada e acessos liberados!');
+
+        // 4. Notificações
+        const nome  = document.getElementById('apNome').value;
+        const email = document.getElementById('apEmail').value;
+        const ferrsAprovadas = ferramentas.filter(f => selecionadas.includes(f.id));
+        let notifLinhas = [];
+        let waUrl = null;
+
+        if (document.getElementById('apNotifEmail').checked) {
+            try {
+                const { data: { session } } = await sb.auth.getSession();
+                if (!session) throw new Error('Sessão expirada.');
+                const resp = await fetch(`${SUPABASE_URL}/functions/v1/enviar-email`, {
+                    method:  'POST',
+                    headers: {
+                        'Content-Type':  'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey':        SUPABASE_KEY,
+                    },
+                    body: JSON.stringify({
+                        destinatario:     email,
+                        nomeDestinatario: nome,
+                        assunto:          '✅ Seu acesso ao Portal SCONT foi aprovado!',
+                        params: {
+                            tipo:        'aprovacao',
+                            ferramentas: ferrsAprovadas.map(f => ({
+                                nome:      f.nome,
+                                icone:     f.icone || '🔧',
+                                descricao: f.descricao || '',
+                                url:       f.url_base  || '',
+                            })),
+                            portal_url: window.location.origin + '/portal.html',
+                        },
+                    }),
+                });
+                const json = await resp.json();
+                notifLinhas.push(json.ok
+                    ? '📧 E-mail enviado com sucesso.'
+                    : '📧 E-mail — falha: ' + (json.error || 'erro desconhecido'));
+            } catch(e) {
+                notifLinhas.push('📧 E-mail — erro: ' + e.message);
+            }
+        }
+
+        if (document.getElementById('apNotifWhatsApp').checked && currentSolTelefone) {
+            const listaFerrs = ferrsAprovadas.map(f => `• ${f.icone || '🔧'} ${f.nome}`).join('\n');
+            const msgWa = `Olá, ${nome}! 🎉\n\nSeu acesso ao *Portal SCONT* foi *aprovado*!\n\n*Ferramentas liberadas:*\n${listaFerrs}\n\nAcesse o portal em:\n${window.location.origin}/portal.html`;
+            const n = currentSolTelefone.replace(/\D/g, '');
+            const comDDI = n.startsWith('55') ? n : '55' + n;
+            waUrl = `https://wa.me/${comDDI}?text=${encodeURIComponent(msgWa)}`;
+            notifLinhas.push('💬 WhatsApp: clique OK para abrir.');
+        }
+
+        const resumo = notifLinhas.length
+            ? '\n\nNotificações:\n' + notifLinhas.join('\n')
+            : '';
+        alert('✅ Solicitação aprovada e acessos liberados!' + resumo);
+        if (waUrl) window.open(waUrl, '_blank');
+
         loadSolicitacoes();
         loadAcessos();
 
@@ -665,10 +940,13 @@ document.getElementById('formAprovar').addEventListener('submit', async (e) => {
 
 // ─── MODAL: REJEITAR ───────────────────────────────────────
 function abrirModalRejeitar(sol) {
-    currentSolId = sol.id;
-    document.getElementById('rjNome').value  = sol.nome;
-    document.getElementById('rjEmail').value = sol.email;
+    currentSolId       = sol.id;
+    currentSolTelefone = sol.telefone || null;
+    document.getElementById('rjNome').value   = sol.nome;
+    document.getElementById('rjEmail').value  = sol.email;
     document.getElementById('rjMotivo').value = '';
+    document.getElementById('rjNotifEmail').checked    = true;
+    document.getElementById('rjNotifWhatsApp').checked = !!(sol.telefone);
     openModal('modalRejeitar');
 }
 
@@ -689,7 +967,54 @@ document.getElementById('formRejeitar').addEventListener('submit', async (e) => 
             throw new Error('Nenhuma linha atualizada. Verifique se o usuário tem is_admin = TRUE na tabela "usuarios".');
 
         closeModal('modalRejeitar');
-        alert('Solicitação rejeitada.');
+
+        // Notificações
+        const nome  = document.getElementById('rjNome').value;
+        const email = document.getElementById('rjEmail').value;
+        let notifLinhas = [];
+        let waUrl = null;
+
+        if (document.getElementById('rjNotifEmail').checked) {
+            try {
+                const { data: { session } } = await sb.auth.getSession();
+                if (!session) throw new Error('Sessão expirada.');
+                const resp = await fetch(`${SUPABASE_URL}/functions/v1/enviar-email`, {
+                    method:  'POST',
+                    headers: {
+                        'Content-Type':  'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey':        SUPABASE_KEY,
+                    },
+                    body: JSON.stringify({
+                        destinatario:     email,
+                        nomeDestinatario: nome,
+                        assunto:          'Atualização sobre sua solicitação — Portal SCONT',
+                        params: { tipo: 'rejeicao', motivo },
+                    }),
+                });
+                const json = await resp.json();
+                notifLinhas.push(json.ok
+                    ? '📧 E-mail enviado com sucesso.'
+                    : '📧 E-mail — falha: ' + (json.error || 'erro desconhecido'));
+            } catch(e) {
+                notifLinhas.push('📧 E-mail — erro: ' + e.message);
+            }
+        }
+
+        if (document.getElementById('rjNotifWhatsApp').checked && currentSolTelefone) {
+            const msgWa = `Olá, ${nome}.\n\nAgradecemos seu interesse no *Portal SCONT*.\n\nInfelizmente, sua solicitação de acesso não foi aprovada no momento.\n\n*Motivo:* ${motivo}\n\nEm caso de dúvidas, entre em contato com nossa equipe.`;
+            const n = currentSolTelefone.replace(/\D/g, '');
+            const comDDI = n.startsWith('55') ? n : '55' + n;
+            waUrl = `https://wa.me/${comDDI}?text=${encodeURIComponent(msgWa)}`;
+            notifLinhas.push('💬 WhatsApp: clique OK para abrir.');
+        }
+
+        const resumo = notifLinhas.length
+            ? '\n\nNotificações:\n' + notifLinhas.join('\n')
+            : '';
+        alert('Solicitação rejeitada.' + resumo);
+        if (waUrl) window.open(waUrl, '_blank');
+
         loadSolicitacoes();
 
     } catch (err) {
@@ -717,6 +1042,10 @@ async function abrirModalEditar(user) {
 
     const { data: usuarioData } = await sb.from('usuarios').select('is_admin').eq('email', user.email).maybeSingle();
     document.getElementById('edIsAdmin').checked = usuarioData?.is_admin || false;
+
+    currentSolTelefone = user.telefone || null;
+    document.getElementById('edNotifEmail').checked    = true;
+    document.getElementById('edNotifWhatsApp').checked = !!(user.telefone);
 
     openModal('modalEditar');
 }
@@ -749,7 +1078,67 @@ document.getElementById('formEditar').addEventListener('submit', async (e) => {
         if (admErr) throw admErr;
 
         closeModal('modalEditar');
-        alert('✅ Acessos atualizados!');
+
+        // Notificações
+        const nome  = document.getElementById('edNome').value;
+        const email = document.getElementById('edEmail').value;
+        const ferrsAtuais = ferramentas.filter(f => selecionadas.includes(f.id));
+        let notifLinhas = [];
+        let waUrl = null;
+
+        if (document.getElementById('edNotifEmail').checked) {
+            try {
+                const { data: { session } } = await sb.auth.getSession();
+                if (!session) throw new Error('Sessão expirada.');
+                const resp = await fetch(`${SUPABASE_URL}/functions/v1/enviar-email`, {
+                    method:  'POST',
+                    headers: {
+                        'Content-Type':  'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey':        SUPABASE_KEY,
+                    },
+                    body: JSON.stringify({
+                        destinatario:     email,
+                        nomeDestinatario: nome,
+                        assunto:          '🔄 Seus acessos no Portal SCONT foram atualizados',
+                        params: {
+                            tipo:        'aprovacao',
+                            ferramentas: ferrsAtuais.map(f => ({
+                                nome:      f.nome,
+                                icone:     f.icone || '🔧',
+                                descricao: f.descricao || '',
+                                url:       f.url_base  || '',
+                            })),
+                            portal_url: window.location.origin + '/portal.html',
+                        },
+                    }),
+                });
+                const json = await resp.json();
+                notifLinhas.push(json.ok
+                    ? '📧 E-mail enviado com sucesso.'
+                    : '📧 E-mail — falha: ' + (json.error || 'erro desconhecido'));
+            } catch(e) {
+                notifLinhas.push('📧 E-mail — erro: ' + e.message);
+            }
+        }
+
+        if (document.getElementById('edNotifWhatsApp').checked && currentSolTelefone) {
+            const listaFerrs = ferrsAtuais.length
+                ? ferrsAtuais.map(f => `• ${f.icone || '🔧'} ${f.nome}`).join('\n')
+                : '(nenhuma ferramenta ativa no momento)';
+            const msgWa = `Olá, ${nome}!\n\nSeus acessos no *Portal SCONT* foram atualizados.\n\n*Ferramentas autorizadas:*\n${listaFerrs}\n\nAcesse o portal em:\n${window.location.origin}/portal.html`;
+            const n = currentSolTelefone.replace(/\D/g, '');
+            const comDDI = n.startsWith('55') ? n : '55' + n;
+            waUrl = `https://wa.me/${comDDI}?text=${encodeURIComponent(msgWa)}`;
+            notifLinhas.push('💬 WhatsApp: clique OK para abrir.');
+        }
+
+        const resumo = notifLinhas.length
+            ? '\n\nNotificações:\n' + notifLinhas.join('\n')
+            : '';
+        alert('✅ Acessos atualizados!' + resumo);
+        if (waUrl) window.open(waUrl, '_blank');
+
         loadAcessos();
         loadUsuarios();
 
@@ -820,6 +1209,168 @@ async function deletarFerramenta(id, nome) {
     loadAcessos();
 }
 
+// ─── CONFIGURAÇÕES ─────────────────────────────────────────
+const _CFG_MAP = {
+    email_remetente: 'cfgEmailRemetente',
+    nome_remetente:  'cfgNomeRemetente',
+    resend_api_key:  'cfgResendApiKey',
+    smtp_host:       'cfgSmtpHost',
+    smtp_porta:      'cfgSmtpPorta',
+    smtp_seguranca:  'cfgSmtpSeguranca',
+    smtp_usuario:    'cfgSmtpUsuario',
+    smtp_senha:      'cfgSmtpSenha',
+    whatsapp_numero: 'cfgWhatsappNumero',
+};
+
+function _aplicarProvedor(provedor) {
+    const isSmtp = provedor === 'smtp';
+    document.getElementById('radioResend').checked = !isSmtp;
+    document.getElementById('radioSmtp').checked   =  isSmtp;
+    document.getElementById('painelResend').style.display = isSmtp ? 'none' : 'block';
+    document.getElementById('painelSmtp').style.display   = isSmtp ? 'block' : 'none';
+}
+
+async function loadConfiguracoes() {
+    const { data, error } = await sb.from('configuracoes_scont').select('chave, valor');
+    if (error) {
+        alert('Erro ao carregar configurações: ' + error.message +
+              '\n\nVerifique se a tabela configuracoes_scont foi criada via _sql/configuracoes_scont.sql');
+        return;
+    }
+    const map = {};
+    (data || []).forEach(r => { map[r.chave] = r.valor || ''; });
+
+    Object.entries(_CFG_MAP).forEach(([chave, elId]) => {
+        const el = document.getElementById(elId);
+        if (el) el.value = map[chave] || '';
+    });
+
+    _aplicarProvedor(map.email_provedor || 'resend');
+}
+
+// Toggle de provedor
+document.querySelectorAll('input[name="emailProvedor"]').forEach(radio =>
+    radio.addEventListener('change', () => _aplicarProvedor(radio.value))
+);
+
+async function _salvarChaves(chaves, statusElId, msg) {
+    const auth = JSON.parse(sessionStorage.getItem('adminAuth') || '{}');
+    const statusEl = document.getElementById(statusElId);
+
+    const upserts = chaves.map(chave => ({
+        chave,
+        valor:         document.getElementById(_CFG_MAP[chave])?.value.trim() || '',
+        atualizado_em: new Date().toISOString(),
+        atualizado_por: auth.email || '—',
+    }));
+
+    const { error } = await sb.from('configuracoes_scont')
+        .upsert(upserts, { onConflict: 'chave' });
+
+    statusEl.className = 'cfg-status ' + (error ? 'err' : 'ok');
+    statusEl.textContent = error ? '✕ Erro: ' + error.message : '✓ ' + (msg || 'Salvo com sucesso');
+    setTimeout(() => { statusEl.className = 'cfg-status'; }, 4000);
+}
+
+document.getElementById('btnSalvarEmail').addEventListener('click', async () => {
+    const provedor = document.querySelector('input[name="emailProvedor"]:checked')?.value || 'resend';
+    const auth = JSON.parse(sessionStorage.getItem('adminAuth') || '{}');
+    const statusEl = document.getElementById('cfgEmailStatus');
+
+    // Salvar provedor selecionado + todos os campos de e-mail
+    const chaves = ['email_remetente','nome_remetente','resend_api_key',
+                    'smtp_host','smtp_porta','smtp_seguranca','smtp_usuario','smtp_senha'];
+
+    const upserts = [
+        { chave: 'email_provedor', valor: provedor, atualizado_em: new Date().toISOString(), atualizado_por: auth.email || '—' },
+        ...chaves.map(chave => ({
+            chave,
+            valor:          document.getElementById(_CFG_MAP[chave])?.value.trim() || '',
+            atualizado_em:  new Date().toISOString(),
+            atualizado_por: auth.email || '—',
+        })),
+    ];
+
+    const { error } = await sb.from('configuracoes_scont').upsert(upserts, { onConflict: 'chave' });
+    statusEl.className = 'cfg-status ' + (error ? 'err' : 'ok');
+    statusEl.textContent = error ? '✕ Erro: ' + error.message : '✓ Configurações de e-mail salvas!';
+    setTimeout(() => { statusEl.className = 'cfg-status'; }, 4000);
+});
+
+document.getElementById('btnSalvarWhatsApp').addEventListener('click', () =>
+    _salvarChaves(['whatsapp_numero'], 'cfgWaStatus', 'Número WhatsApp salvo!')
+);
+
+document.getElementById('btnTestarEmail').addEventListener('click', async () => {
+    const to        = document.getElementById('cfgEmailRemetente').value.trim();
+    const apiKey    = document.getElementById('cfgResendApiKey').value.trim();
+    const statusEl  = document.getElementById('cfgEmailStatus');
+
+    if (!to || !apiKey) {
+        statusEl.className = 'cfg-status err';
+        statusEl.textContent = '✕ Salve o e-mail remetente e a API Key antes de testar.';
+        setTimeout(() => { statusEl.className = 'cfg-status'; }, 5000);
+        return;
+    }
+
+    const provedor = document.querySelector('input[name="emailProvedor"]:checked')?.value || 'resend';
+    statusEl.className = 'cfg-status ok';
+    statusEl.textContent = `⏳ Enviando teste via ${provedor === 'smtp' ? 'SMTP' : 'Resend'}...`;
+
+    try {
+        // Salvar config antes de testar (garante que o servidor use os valores atuais)
+        await _salvarChaves(['email_remetente','nome_remetente','resend_api_key'], 'cfgEmailStatus', '');
+
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) throw new Error('Sessão expirada. Faça login novamente.');
+
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/enviar-email`, {
+            method:  'POST',
+            headers: {
+                'Content-Type':  'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+                'apikey':        SUPABASE_KEY,
+            },
+            body: JSON.stringify({
+                destinatario:     to,
+                nomeDestinatario: 'Administrador SCONT',
+                assunto:          '✅ Teste de E-mail — SCONT Admin',
+                params: {
+                    mensagem:          'Este é um e-mail de teste enviado pelo Painel Administrativo da SCONT.',
+                    link_apresentacao: window.location.origin,
+                    empresa:           'SCONT Soluções Contábeis',
+                },
+            }),
+        });
+
+        const json = await resp.json();
+        if (!json.ok) throw new Error(json.error);
+
+        statusEl.className = 'cfg-status ok';
+        statusEl.textContent = `✓ E-mail de teste enviado para ${to} via ${provedor === 'smtp' ? 'SMTP' : 'Resend'}`;
+    } catch (err) {
+        statusEl.className = 'cfg-status err';
+        statusEl.textContent = '✕ Falha: ' + (err.message || String(err));
+    }
+    setTimeout(() => { statusEl.className = 'cfg-status'; }, 6000);
+});
+
+document.getElementById('btnTestarWhatsApp').addEventListener('click', () => {
+    const num = document.getElementById('cfgWhatsappNumero').value.trim().replace(/\D/g, '');
+    const statusEl = document.getElementById('cfgWaStatus');
+    if (!num) {
+        statusEl.className = 'cfg-status err';
+        statusEl.textContent = '✕ Informe o número WhatsApp antes de testar.';
+        setTimeout(() => { statusEl.className = 'cfg-status'; }, 4000);
+        return;
+    }
+    const url = `https://wa.me/${num}?text=${encodeURIComponent('✅ Teste de link WhatsApp — SCONT Admin')}`;
+    window.open(url, '_blank');
+    statusEl.className = 'cfg-status ok';
+    statusEl.textContent = '✓ Link aberto: wa.me/' + num;
+    setTimeout(() => { statusEl.className = 'cfg-status'; }, 5000);
+});
+
 // ─── LOGOUT ────────────────────────────────────────────────
 document.getElementById('logoutBtn').addEventListener('click', async () => {
     if (!confirm('Deseja sair?')) return;
@@ -835,9 +1386,10 @@ document.querySelectorAll('.menu-btn').forEach(btn => btn.addEventListener('clic
     btn.classList.add('active');
     const tab = btn.dataset.tab;
     document.getElementById(tab).classList.add('active');
-    if (tab === 'usuarios')    loadUsuarios();
-    if (tab === 'ferramentas') loadFerramentas();
-    if (tab === 'acessos')     loadAcessos();
+    if (tab === 'usuarios')       loadUsuarios();
+    if (tab === 'ferramentas')    loadFerramentas();
+    if (tab === 'acessos')        loadAcessos();
+    if (tab === 'configuracoes')  loadConfiguracoes();
 }));
 
 document.querySelectorAll('.tab-btn[data-filter]').forEach(btn => btn.addEventListener('click', () => {

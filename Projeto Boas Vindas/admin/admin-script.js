@@ -9,6 +9,7 @@ let cnaePrincipalSelecionado   = null;
 let cnaesSecundariosSelecionados = [];
 let cnaesListaCompleta          = [];
 let modalCNAETipo               = 'principal';
+let _ultimaApresentacao        = null; // guarda dados para reenvio
 
 // ===== INICIALIZAÇÃO =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -72,9 +73,10 @@ async function criarApresentacao() {
 
         if (error) throw error;
 
-        exibirResultado(data);
+        exibirResultado(data, payload);
         showToast('Apresentação criada com sucesso!', 'success');
         carregarHistorico();
+        await _enviarNotificacoes(data, payload);
 
     } catch (err) {
         console.error(err);
@@ -86,7 +88,7 @@ async function criarApresentacao() {
 }
 
 // ===== EXIBIR RESULTADO =====
-function exibirResultado(data) {
+function exibirResultado(data, payload) {
     document.getElementById('resultadoCliente').textContent = data.nome_contato;
     document.getElementById('resultadoEmpresa').textContent = data.razao_social;
     document.getElementById('resultadoData').textContent    = new Date().toLocaleDateString('pt-BR');
@@ -96,9 +98,87 @@ function exibirResultado(data) {
     const btnVer = document.getElementById('btnVisualizarApresentacao');
     if (btnVer) btnVer.href = link;
 
+    // Guardar para reenvio
+    _ultimaApresentacao = { ...data, ...(payload || {}), link };
+
+    const statusEl = document.getElementById('statusNotificacoes');
+    if (statusEl) statusEl.innerHTML = '';
+
     const resultado = document.getElementById('resultado');
     resultado.style.display = 'block';
     resultado.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ===== NOTIFICAÇÕES =====
+async function _enviarNotificacoes(data, payload) {
+    const envEmail = document.getElementById('enviarEmail')?.checked;
+    const envWa    = document.getElementById('enviarWhatsApp')?.checked;
+    const statusEl = document.getElementById('statusNotificacoes');
+
+    if (!envEmail && !envWa) return;
+
+    const link = gerarLink(data.id);
+    const msgs = [];
+
+    if (envEmail) {
+        try {
+            await Notificacoes.enviarEmail({
+                destinatario:     payload.email_cliente,
+                nomeDestinatario: payload.nome_contato,
+                assunto:          `Bem-vindo(a) à Scont, ${data.razao_social}!`,
+                params: {
+                    mensagem:          payload.mensagem || 'Preparamos uma apresentação personalizada para sua empresa. Acesse o link abaixo!',
+                    link_apresentacao: link,
+                    empresa:           data.razao_social,
+                },
+            });
+            msgs.push(`<span style="color:#166534">✓ E-mail enviado para ${payload.email_cliente}</span>`);
+        } catch (err) {
+            msgs.push(`<span style="color:#991B1B">✕ E-mail falhou: ${err.message}</span>`);
+        }
+    }
+
+    if (envWa && payload.telefone) {
+        try {
+            const msg = `Olá, ${payload.nome_contato}! 👋\n\n` +
+                `A *Scont Soluções Contábeis* preparou uma apresentação personalizada para a *${data.razao_social}*.\n\n` +
+                `Acesse agora: ${link}`;
+            Notificacoes.abrirWhatsAppCliente({ numero: payload.telefone, mensagem: msg });
+            msgs.push(`<span style="color:#166534">✓ WhatsApp aberto para ${payload.telefone}</span>`);
+        } catch (err) {
+            msgs.push(`<span style="color:#991B1B">✕ WhatsApp falhou: ${err.message}</span>`);
+        }
+    } else if (envWa && !payload.telefone) {
+        msgs.push(`<span style="color:#92400E">⚠️ WhatsApp não enviado: telefone não informado</span>`);
+    }
+
+    if (statusEl && msgs.length) {
+        statusEl.innerHTML = `<div style="margin-top:12px;padding:10px 14px;background:#f8f9fa;border-radius:8px;font-size:13px;display:flex;flex-direction:column;gap:4px;">${msgs.join('')}</div>`;
+    }
+}
+
+// ===== REENVIAR EMAIL =====
+async function enviarEmailManual() {
+    if (!_ultimaApresentacao) {
+        showToast('Nenhuma apresentação ativa para reenvio', 'error');
+        return;
+    }
+    const a = _ultimaApresentacao;
+    try {
+        await Notificacoes.enviarEmail({
+            destinatario:     a.email_cliente,
+            nomeDestinatario: a.nome_contato,
+            assunto:          `Bem-vindo(a) à Scont, ${a.razao_social}!`,
+            params: {
+                mensagem:          a.mensagem || 'Preparamos uma apresentação personalizada para sua empresa. Acesse o link abaixo!',
+                link_apresentacao: a.link,
+                empresa:           a.razao_social,
+            },
+        });
+        showToast('E-mail reenviado com sucesso!', 'success');
+    } catch (err) {
+        showToast('Falha no reenvio: ' + err.message, 'error');
+    }
 }
 
 function gerarLink(id) {
