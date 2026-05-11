@@ -25,6 +25,22 @@ function fmt(date, format = 'DD/MM/YYYY') {
   return format.replace('DD', day).replace('MM', month).replace('YYYY', year);
 }
 
+function toISODateTime(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d)) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fmtDateTime(date) {
+  if (!date) return '';
+  const d = new Date(date);
+  if (isNaN(d)) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function daysLeft(dateStr) {
   if (!dateStr) return null;
   const today = new Date();

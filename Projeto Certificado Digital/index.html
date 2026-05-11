@@ -476,9 +476,18 @@
               <option value="Vencido">Vencido</option>
             </select>
           </div>
+          <div class="field" style="grid-column:1/-1;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;">
+              <input id="ativo" name="ativo" type="checkbox" checked style="width:18px;height:18px;accent-color:var(--danger);cursor:pointer;">
+              <span id="ativoLabel" style="font-weight:600;">Cliente/certificado inativo — excluir dos relatórios de vencidos e a vencer</span>
+            </label>
+            <div id="ativoWarning" style="display:none;margin-top:6px;padding:8px 12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:6px;font-size:12px;color:var(--danger);">
+              ⚠️ Este certificado está marcado como <strong>inativo</strong> e não aparecerá nos relatórios operacionais.
+            </div>
+          </div>
           <div class="field">
             <label>Data de agendamento</label>
-            <input id="agendamento" name="agendamento" type="date">
+            <input id="agendamento" name="agendamento" type="datetime-local">
           </div>
           <div class="field">
             <label>Responsável interno</label>

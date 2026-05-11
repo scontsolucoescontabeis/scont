@@ -61,14 +61,15 @@ function applyTheme(isDark) {
 
 function renderDashboard() {
   const certs = APP_STATE._allCertificates;
+  const ativos = certs.filter(c => c.ativo !== false);
   const total      = certs.length;
-  const active     = certs.filter(c => c.situacao === 'Ativo').length;
-  const expired    = certs.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d < 0; }).length;
-  const upcoming   = certs.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d >= 0 && d <= 30; }).length;
-  const pendentes  = certs.filter(c => c.situacao_financeira === 'Pendente').length;
-  const inadimpl   = certs.filter(c => c.situacao_financeira === 'Inadimplente').length;
+  const active     = ativos.filter(c => c.situacao === 'Ativo').length;
+  const expired    = ativos.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d < 0; }).length;
+  const upcoming   = ativos.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d >= 0 && d <= 30; }).length;
+  const pendentes  = ativos.filter(c => c.situacao_financeira === 'Pendente').length;
+  const inadimpl   = ativos.filter(c => c.situacao_financeira === 'Inadimplente').length;
 
-  const alertCount = certs.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d <= 15; }).length;
+  const alertCount = ativos.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d <= 15; }).length;
   const notifBtn = q('#notifBtn');
   if (notifBtn) notifBtn.dataset.count = alertCount;
 
@@ -106,7 +107,7 @@ function renderDashboard() {
     </div>` : ''}
   `;
 
-  const alerts = certs
+  const alerts = ativos
     .filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d <= 30; })
     .sort((a, b) => daysLeft(a.data_vencimento) - daysLeft(b.data_vencimento))
     .slice(0, 5);
@@ -124,7 +125,7 @@ function renderDashboard() {
       </tr>`;
   }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Nenhum alerta crítico</td></tr>';
 
-  const agenda = certs
+  const agenda = ativos
     .filter(c => c.data_renovacao_agendada)
     .sort((a, b) => new Date(a.data_renovacao_agendada) - new Date(b.data_renovacao_agendada))
     .slice(0, 5);
@@ -132,7 +133,7 @@ function renderDashboard() {
   q('#agendaTable').innerHTML = agenda.length ? agenda.map(c => `
     <tr>
       <td><strong>${c.empresa_id}</strong></td>
-      <td>${fmt(c.data_renovacao_agendada)}</td>
+      <td>${fmtDateTime(c.data_renovacao_agendada)}</td>
       <td><span class="badge badge-info">${c.situacao}</span></td>
     </tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">Nenhum agendamento</td></tr>';
 
@@ -155,12 +156,16 @@ function renderCertTable() {
   const paged  = certs.slice(start, start + APP_STATE.pageSize);
 
   q('#certTable').innerHTML = paged.length ? paged.map(c => {
-    const d = daysLeft(c.data_vencimento);
-    const rowBg = d !== null && d < 0 ? 'style="background:rgba(239,68,68,0.04)"'
-                : d !== null && d <= 7 ? 'style="background:rgba(245,158,11,0.03)"' : '';
+    const inativo = c.ativo === false;
+    const d = inativo ? null : daysLeft(c.data_vencimento);
+    const rowStyle = inativo
+      ? 'style="opacity:0.55;background:rgba(0,0,0,0.03);"'
+      : d !== null && d < 0 ? 'style="background:rgba(239,68,68,0.04)"'
+      : d !== null && d <= 7 ? 'style="background:rgba(245,158,11,0.03)"' : '';
+    const inatBadge = inativo ? '<span class="badge" style="font-size:10px;background:var(--text-muted);color:#fff;margin-left:4px;">Inativo</span>' : '';
     return `
-      <tr ${rowBg}>
-        <td><strong>${c.empresa_id}</strong></td>
+      <tr ${rowStyle}>
+        <td><strong>${c.empresa_id}</strong>${inatBadge}</td>
         <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id || '—'}</span></td>
         <td>${fmt(c.data_vencimento)}</td>
         <td>${fmt(c.data_emissao)}</td>
@@ -186,7 +191,7 @@ function renderCertTable() {
 // RENDERIZAÇÃO — RELATÓRIOS
 // ============================================
 
-function renderRelatorio(certs = APP_STATE._allCertificates) {
+function renderRelatorio(certs = APP_STATE._allCertificates.filter(c => c.ativo !== false)) {
   const total    = certs.length;
   const vencidos = certs.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d < 0; }).length;
   const criticos = certs.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d >= 0 && d <= 7; }).length;
@@ -237,6 +242,7 @@ function filterRelatorio() {
   const dataAte   = q('#relDataAte')?.value   || '';
 
   const filtered = APP_STATE._allCertificates.filter(c => {
+    if (c.ativo === false) return false;
     if (empresa  && !(c.empresa_id || '').toLowerCase().includes(empresa)) return false;
     if (cliente  && !(c.cliente    || '').toLowerCase().includes(cliente)) return false;
     if (tipo     && (c.tipo_id     || '').toLowerCase() !== tipo)          return false;
@@ -304,7 +310,7 @@ function renderAgendaPage() {
   const el = q('#agendaPageContent');
   if (!el) return;
 
-  const certs = APP_STATE._allCertificates;
+  const certs = APP_STATE._allCertificates.filter(c => c.ativo !== false);
 
   const scheduled = certs
     .filter(c => c.data_renovacao_agendada)
@@ -322,7 +328,7 @@ function renderAgendaPage() {
     <tr>
       <td><strong>${c.empresa_id}</strong></td>
       <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id}</span></td>
-      <td>${fmt(c.data_renovacao_agendada)}</td>
+      <td>${fmtDateTime(c.data_renovacao_agendada)}</td>
       <td>${fmt(c.data_vencimento)}</td>
       <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
       <td>${c.responsavel_nome || '—'}</td>
@@ -557,13 +563,14 @@ function setTheme(isDark) {
 async function setPageSize(size) {
   APP_STATE.pageSize = parseInt(size);
   APP_STATE.currentPage = 1;
+  localStorage.setItem('cert_pageSize', String(size));
   renderCertTable();
   try {
     await supabaseClient
       .from(TABLE_NAMES.CONFIG)
       .upsert({ chave: 'pageSize', valor: String(size), atualizado_em: new Date().toISOString() }, { onConflict: 'chave' });
   } catch (e) {
-    console.error('Erro ao salvar pageSize no Supabase:', e);
+    // Tabela configuracoes_certificados opcional — localStorage garante persistência
   }
 }
 
@@ -613,7 +620,7 @@ function openCertModal(id = null) {
       q('#vencimento').value   = toISODate(cert.data_vencimento);
       q('#senha').value        = cert.senha_hash || '';
       q('#situacao').value     = cert.situacao;
-      q('#agendamento').value  = toISODate(cert.data_renovacao_agendada);
+      q('#agendamento').value  = toISODateTime(cert.data_renovacao_agendada);
       q('#responsavel').value  = cert.responsavel_nome || '';
       q('#email').value        = cert.responsavel_email || '';
       q('#telefone').value     = cert.responsavel_telefone || '';
@@ -622,11 +629,21 @@ function openCertModal(id = null) {
       q('#forma_pagamento').value      = cert.forma_pagamento     || '';
       q('#info').value                 = cert.informacoes_adicionais || '';
       q('#risco').value                = cert.observacao_risco       || '';
+      const ativoEl = q('#ativo');
+      if (ativoEl) {
+        ativoEl.checked = cert.ativo === false;
+        const warning = q('#ativoWarning');
+        if (warning) warning.style.display = ativoEl.checked ? 'block' : 'none';
+      }
     }
   } else {
     q('#certModalTitle').textContent = 'Novo certificado';
     form.reset();
     q('#certId').value = '';
+    const ativoEl = q('#ativo');
+    if (ativoEl) { ativoEl.checked = false; }
+    const warning = q('#ativoWarning');
+    if (warning) warning.style.display = 'none';
   }
   q('#certModal').classList.add('active');
 }
@@ -661,7 +678,7 @@ function openDetails(id) {
       ${dRow('💰 Sit. Financeira', cert.situacao_financeira || '—')}
       ${dRow('💳 Forma Pagamento', cert.forma_pagamento     || '—')}
       ${dRow('👤 Cliente',         cert.cliente             || '—')}
-      ${dRow('📅 Agendamento',     cert.data_renovacao_agendada ? fmt(cert.data_renovacao_agendada) : '—')}
+      ${dRow('📅 Agendamento',     cert.data_renovacao_agendada ? fmtDateTime(cert.data_renovacao_agendada) : '—')}
       ${dRow('👤 Responsável',     cert.responsavel_nome    || '—')}
       ${dRow('📧 E-mail',      cert.responsavel_email || '—')}
       ${dRow('📞 Telefone',    cert.responsavel_telefone || '—')}
@@ -734,6 +751,7 @@ async function saveCertificate(formData) {
       cliente:                  formData.get('cliente')            || null,
       situacao_financeira:      formData.get('situacao_financeira')|| null,
       forma_pagamento:          formData.get('forma_pagamento')    || null,
+      ativo:                    !(q('#ativo')?.checked),
       atualizado_por:           APP_STATE.currentUser?.usuario_id
     };
 
@@ -1016,6 +1034,10 @@ function setupAppListeners() {
   q('#btnModeloCert')?.addEventListener('click', baixarModeloCertificados);
   q('#closeCertModal')?.addEventListener('click', closeCertModal);
   q('#cancelCertForm')?.addEventListener('click', closeCertModal);
+  q('#ativo')?.addEventListener('change', function () {
+    const warning = q('#ativoWarning');
+    if (warning) warning.style.display = this.checked ? 'block' : 'none';
+  });
   q('#certForm')?.addEventListener('submit', e => {
     e.preventDefault();
     saveCertificate(new FormData(q('#certForm')));

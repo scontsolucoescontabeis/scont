@@ -75,7 +75,7 @@ const APP_STATE = {
   _allCertificates: [],
   historyLog: [],
   currentPage: 1,
-  pageSize: 10,
+  pageSize: parseInt(localStorage.getItem('cert_pageSize')) || 10,
   sortKey: 'data_vencimento',
   sortDir: 'asc',
   isConnected: false,
