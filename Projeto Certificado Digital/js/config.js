@@ -79,7 +79,8 @@ const APP_STATE = {
   sortKey: 'data_vencimento',
   sortDir: 'asc',
   isConnected: false,
-  isDarkMode: localStorage.getItem('theme') === 'dark'
+  isDarkMode: localStorage.getItem('theme') === 'dark',
+  podeVerSenha: false
 };
 
 // ============================================

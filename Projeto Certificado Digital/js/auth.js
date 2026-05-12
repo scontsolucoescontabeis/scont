@@ -11,6 +11,8 @@ async function checkAuth() {
     APP_STATE.currentUser = {
       nome_usuario: auth.userData?.nome || auth.email,
       usuario_email: auth.email,
+      usuario_id: auth.userId || null,
+      isAdmin: auth.isAdmin === true,
       ativo: true
     };
 

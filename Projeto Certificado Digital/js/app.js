@@ -7,6 +7,7 @@ async function initializeApp() {
   setupAppListeners();
   applyTheme(APP_STATE.isDarkMode);
   await loadConfiguracoes();
+  await checkPermissaoVerSenha();
   setPage('dashboard');
   fetchCertificates();
   setupRealtime();
@@ -453,11 +454,21 @@ function renderSegurancaPage() {
   const el = q('#segurancaContent');
   if (!el) return;
 
+  if (!APP_STATE.podeVerSenha) {
+    el.innerHTML = `
+      <div style="padding:48px 32px;text-align:center;color:var(--text-muted);">
+        <div style="font-size:52px;margin-bottom:14px;">🔒</div>
+        <div style="font-size:16px;font-weight:600;margin-bottom:8px;color:var(--text-primary);">Acesso restrito</div>
+        <div style="font-size:13px;line-height:1.6;">Você não tem permissão para visualizar senhas de certificados.<br>Solicite ao administrador a concessão da permissão <strong>Ver Senhas</strong>.</div>
+      </div>`;
+    return;
+  }
+
   const certs = APP_STATE._allCertificates.filter(c => c.senha_hash);
 
   el.innerHTML = `
     <div style="margin-bottom:16px;padding:14px 18px;background:var(--warning-light);border-radius:var(--radius-md);border:1px solid rgba(245,158,11,0.3);font-size:13px;color:var(--text-secondary);">
-      ⚠️ As senhas são exibidas apenas para consulta local. Mantenha esses dados seguros e nunca compartilhe.
+      ⚠️ As senhas são decifradas sob demanda via servidor. Mantenha esses dados seguros e nunca compartilhe.
     </div>
     <div class="table-wrap">
       <table>
@@ -474,7 +485,7 @@ function renderSegurancaPage() {
               <td>
                 <div style="display:flex;align-items:center;gap:8px;">
                   <span id="senha-${i}" style="font-family:monospace;font-size:13px;letter-spacing:2px;">••••••••</span>
-                  <button class="btn btn-ghost" onclick="toggleSenha(${i},'${encodeURIComponent(c.senha_hash)}')" data-visible="false" style="padding:4px 10px;font-size:11px;">👁 Ver</button>
+                  <button id="btnSenha-${i}" class="btn btn-ghost" onclick="revelarSenha('${c.id}',${i})" data-visible="false" style="padding:4px 10px;font-size:11px;">👁 Ver</button>
                 </div>
               </td>
             </tr>`).join('')
@@ -484,19 +495,52 @@ function renderSegurancaPage() {
     </div>`;
 }
 
-function toggleSenha(index, encodedSenha) {
+async function revelarSenha(certId, index) {
   const el  = q(`#senha-${index}`);
-  const btn = el?.nextElementSibling;
+  const btn = q(`#btnSenha-${index}`);
   if (!el || !btn) return;
-  const visible = btn.dataset.visible === 'true';
-  if (visible) {
+
+  if (btn.dataset.visible === 'true') {
     el.textContent = '••••••••';
     btn.textContent = '👁 Ver';
     btn.dataset.visible = 'false';
-  } else {
-    el.textContent = decodeURIComponent(encodedSenha);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  try {
+    const { data, error } = await supabaseClient.rpc('fn_decifrar_senha_certificado', { p_id: certId });
+    if (error) throw error;
+    el.textContent = data || '(vazia)';
     btn.textContent = '🙈 Ocultar';
     btn.dataset.visible = 'true';
+  } catch {
+    el.textContent = '⛔ Erro';
+    btn.textContent = '👁 Ver';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function checkPermissaoVerSenha() {
+  if (APP_STATE.currentUser?.isAdmin) {
+    APP_STATE.podeVerSenha = true;
+    return;
+  }
+  const userId = APP_STATE.currentUser?.usuario_id;
+  if (!userId) { APP_STATE.podeVerSenha = false; return; }
+  try {
+    const { data } = await supabaseClient
+      .from('usuario_ferramentas')
+      .select('permissoes, ferramentas(url_base)')
+      .eq('usuario_id', userId);
+    const row = (data || []).find(r => r.ferramentas?.url_base?.toLowerCase().includes('certificado'));
+    if (!row) { APP_STATE.podeVerSenha = false; return; }
+    const p = row.permissoes || [];
+    APP_STATE.podeVerSenha = p.length === 0 || p.includes('ver_senhas');
+  } catch {
+    APP_STATE.podeVerSenha = false;
   }
 }
 
@@ -1105,7 +1149,7 @@ window.removeCert               = removeCert;
 window.exportCSV                = exportCSV;
 window.filterRelatorio          = filterRelatorio;
 window.clearRelatorio           = clearRelatorio;
-window.toggleSenha              = toggleSenha;
+window.revelarSenha             = revelarSenha;
 window.setTheme                 = setTheme;
 window.setPageSize              = setPageSize;
 window.salvarConfig             = salvarConfig;
