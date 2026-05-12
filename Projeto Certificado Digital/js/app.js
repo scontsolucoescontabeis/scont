@@ -538,7 +538,7 @@ async function checkPermissaoVerSenha() {
     const row = (data || []).find(r => r.ferramentas?.url_base?.toLowerCase().includes('certificado'));
     if (!row) { APP_STATE.podeVerSenha = false; return; }
     const p = row.permissoes || [];
-    APP_STATE.podeVerSenha = p.length === 0 || p.includes('ver_senhas');
+    APP_STATE.podeVerSenha = p.includes('ver_senhas');
   } catch {
     APP_STATE.podeVerSenha = false;
   }

@@ -74,10 +74,7 @@ BEGIN
                 WHERE email = auth.email()
             )
             AND lower(f.url_base) LIKE '%certificado%'
-            AND (
-                uf.permissoes = '{}'::text[]        -- acesso total = sem restrição
-                OR 'ver_senhas' = ANY(uf.permissoes)
-            )
+            AND 'ver_senhas' = ANY(uf.permissoes)
         ) THEN
             RAISE EXCEPTION 'Acesso negado: permissão ver_senhas não concedida';
         END IF;
