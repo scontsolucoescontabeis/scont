@@ -52,7 +52,7 @@ CREATE FUNCTION public.fn_decifrar_senha_certificado(p_id UUID)
 RETURNS TEXT
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, vault, pgsodium AS $$
+SET search_path = public, extensions, vault, pgsodium AS $$
 DECLARE
     v_senha_hash TEXT;
     v_chave      TEXT;
