@@ -83,6 +83,7 @@
         <div class="admin-tabs">
             <button type="button" class="admin-tab-btn active" onclick="abrirAba('empresas')">🏢 Empresas</button>
             <button type="button" class="admin-tab-btn" onclick="abrirAba('empregados')">👥 Empregados</button>
+            <button type="button" class="admin-tab-btn" onclick="abrirAba('socios')">🤝 Sócios</button>
             <button type="button" class="admin-tab-btn" onclick="abrirAba('rubricas')">🏷️ Rubricas</button>
             <button type="button" class="admin-tab-btn" onclick="abrirAba('regrasRenomeacao')">🔄 Renomear Arquivos</button>
             <button type="button" class="admin-tab-btn" onclick="abrirAba('importar')">📥 Importar Dados</button>
@@ -93,20 +94,6 @@
             <div class="admin-section">
                 <h2>Gerenciar Empresas</h2>
                 <div id="statusEmpresas" class="status-message"></div>
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #2C3E50; margin-bottom: 15px;">Adicionar Nova Empresa</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="codigoEmpresa">Código da Empresa *</label>
-                            <input type="text" id="codigoEmpresa" placeholder="Ex: 386" maxlength="50">
-                        </div>
-                        <div class="form-group">
-                            <label for="nomeEmpresa">Nome da Empresa *</label>
-                            <input type="text" id="nomeEmpresa" placeholder="Ex: HL Engenharia" maxlength="255">
-                        </div>
-                    </div>
-                    <button type="button" class="btn-save" onclick="adicionarEmpresa()">➕ Adicionar Empresa</button>
-                </div>
                 <h3 style="color: #2C3E50; margin-bottom: 10px;">Empresas Cadastradas</h3>
                 <div style="background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
                     <div class="form-group" style="margin-bottom:0;flex:2;min-width:180px;">
@@ -141,9 +128,8 @@
                             <th>Endereço</th>
                             <th>CEP</th>
                             <th>Cidade</th>
-                            <th>Ações</th>
                         </tr></thead>
-                        <tbody id="empresasTableBody"><tr><td colspan="13" style="text-align: center; color: #95A5A6;">Carregando...</td></tr></tbody>
+                        <tbody id="empresasTableBody"><tr><td colspan="12" style="text-align: center; color: #95A5A6;">Carregando...</td></tr></tbody>
                     </table>
                     <div class="paginacao" id="paginacaoEmpresas"></div>
                 </div>
@@ -252,6 +238,62 @@
                         <button type="button" class="btn-save" onclick="adicionarEmpregado()">➕ Adicionar Empregado</button>
                     </div>
                 </details>
+            </div>
+        </div>
+
+        <!-- ABA SÓCIOS -->
+        <div id="socios" class="admin-tab-content">
+            <div class="admin-section">
+                <h2>Gerenciar Sócios</h2>
+                <div id="statusSocios" class="status-message"></div>
+
+                <!-- Filtros -->
+                <h3 style="color:#2C3E50;margin-bottom:10px">Sócios Cadastrados</h3>
+                <div style="background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+                    <div class="form-group" style="margin-bottom:0;flex:2;min-width:180px">
+                        <label>Buscar por nome, CPF ou empresa</label>
+                        <input type="text" id="filtroSociosTexto" placeholder="Nome do sócio, CPF ou código da empresa…" oninput="filtrarSocios()">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;flex:1;min-width:150px">
+                        <label>Empresa</label>
+                        <select id="filtroSociosEmpresa" onchange="filtrarSocios()">
+                            <option value="">Todas</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;flex:1;min-width:130px">
+                        <label>Situação da Empresa</label>
+                        <select id="filtroSociosSituacaoEmp" onchange="filtrarSocios()">
+                            <option value="">Todas</option>
+                            <option value="Ativo">Ativa</option>
+                            <option value="Inativo">Inativa</option>
+                        </select>
+                    </div>
+                    <div style="flex:0 0 auto;padding-bottom:1px">
+                        <button type="button" onclick="document.getElementById('filtroSociosTexto').value='';document.getElementById('filtroSociosEmpresa').value='';document.getElementById('filtroSociosSituacaoEmp').value='';filtrarSocios();" style="padding:9px 16px;border:1px solid #C0C0C0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-weight:600">✕ Limpar</button>
+                    </div>
+                    <span id="infoSocios" style="font-size:12px;color:#7F8C8D;align-self:center;white-space:nowrap"></span>
+                </div>
+
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead><tr>
+                            <th>Empresa</th>
+                            <th>CNPJ</th>
+                            <th>Situação Empresa</th>
+                            <th>Nome do Sócio</th>
+                            <th>CPF</th>
+                            <th>Participação</th>
+                            <th>Cargo</th>
+                            <th>Ingresso</th>
+                            <th>Saída</th>
+                            <th>E-mail Sócio</th>
+                        </tr></thead>
+                        <tbody id="sociosTableBody">
+                            <tr><td colspan="10" style="text-align:center;color:#95A5A6">Carregando…</td></tr>
+                        </tbody>
+                    </table>
+                    <div class="paginacao" id="paginacaoSocios"></div>
+                </div>
             </div>
         </div>
 
@@ -471,11 +513,11 @@
                             <span class="import-card-icon">🤝</span>
                             <div>
                                 <div class="import-card-title">Sócios</div>
-                                <div class="import-card-subtitle">6 campos</div>
+                                <div class="import-card-subtitle">10 campos</div>
                             </div>
                             <button class="btn-modelo" onclick="baixarModeloSocios()">⬇️ Modelo</button>
                         </div>
-                        <div class="import-fields">Cód. Empresa · Nome do Sócio · CPF · Participação (%) · Cargo · Data de Entrada</div>
+                        <div class="import-fields">Código da Empresa · Capital Social · Email Empresa · Data Atualização Quadro Societário · CPF do Sócio · Nome do Sócio · Participação · Ingresso · Saída · Email Sócio</div>
                         <div id="statusImportarSocios" class="status-message"></div>
                         <div class="upload-area-sm" onclick="document.getElementById('fileSocios').click()"
                              ondragover="event.preventDefault();this.style.borderColor='#8B3A3A'"

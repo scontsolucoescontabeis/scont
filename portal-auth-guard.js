@@ -55,7 +55,20 @@ window.PortalAuthGuard = (function () {
         let auth;
         try { auth = JSON.parse(saved); } catch { redirecionar(depthToRoot, returnTo); return null; }
 
-        // 2. Sessão Supabase Auth
+        // 2. Admin tem acesso irrestrito — verificação antecipada antes do round-trip Supabase
+        if (auth.isAdmin) {
+            // Valida que a sessão Supabase ainda existe; se não, força novo login
+            const sbAdm = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            const { data: admData } = await sbAdm.auth.getSession();
+            if (!admData?.session) {
+                sessionStorage.removeItem('userAuth');
+                redirecionar(depthToRoot, returnTo);
+                return null;
+            }
+            return auth;
+        }
+
+        // 3. Sessão Supabase Auth (usuário comum)
         const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         const { data: { session } } = await sb.auth.getSession();
         if (!session) {
@@ -63,10 +76,6 @@ window.PortalAuthGuard = (function () {
             redirecionar(depthToRoot, returnTo);
             return null;
         }
-
-        // 3. Autorização para esta ferramenta
-        // Admin tem acesso irrestrito
-        if (auth.isAdmin) return auth;
 
         const { data, error } = await sb
             .from('usuario_ferramentas')

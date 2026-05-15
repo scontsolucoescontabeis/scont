@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gerador de Modelos — SCONT</title>
+  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="print.css">
+  <script src="../supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../portal-auth-guard.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+  <!-- Auth -->
+  <div id="authOverlay" class="auth-overlay">
+    <div class="auth-spinner"></div>
+    <p class="auth-msg">Verificando acesso…</p>
+  </div>
+
+  <div id="app" style="display:none">
+
+    <button class="hamburger" id="hamburger">☰</button>
+    <div class="overlay" id="overlay"></div>
+
+    <!-- ══ SIDEBAR ══ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-logo">📄</span>
+        <h2>Gerador de Modelos</h2>
+        <p>SCONT · Documentos</p>
+      </div>
+      <nav class="sidebar-nav">
+        <ul>
+          <li><button class="nav-link active" id="nav-dashboard" onclick="showSection('dashboard')"><span class="nav-icon">📊</span> Dashboard</button></li>
+          <li><button class="nav-link" id="nav-modelos" onclick="showSection('modelos')"><span class="nav-icon">📄</span> Modelos</button></li>
+          <li><button class="nav-link" id="nav-gerar" onclick="showSection('gerar')"><span class="nav-icon">⚡</span> Gerar</button></li>
+          <li><button class="nav-link" id="nav-historico" onclick="showSection('historico')"><span class="nav-icon">🕓</span> Histórico</button></li>
+        </ul>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <strong id="sidebarNome">—</strong>
+          <span id="sidebarEmail">—</span>
+        </div>
+        <button class="btn-portal" onclick="location.href='../portal.html'">🏠 Voltar ao Portal</button>
+      </div>
+    </aside>
+
+    <!-- ══ MAIN ══ -->
+    <div class="main-content">
+
+      <!-- ═══ DASHBOARD ═══ -->
+      <section id="sec-dashboard" class="section active">
+        <div class="page-header">
+          <div>
+            <h1>Dashboard</h1>
+            <div class="page-header-sub">Visão geral dos modelos e gerações</div>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-primary" onclick="showSection('modelos')">+ Novo Modelo</button>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-label">Modelos Cadastrados</div><div class="stat-value" id="stat-modelos">—</div></div>
+          <div class="stat-card info"><div class="stat-label">Gerações Hoje</div><div class="stat-value" id="stat-hoje">—</div></div>
+          <div class="stat-card success"><div class="stat-label">Total de Gerações</div><div class="stat-value" id="stat-total">—</div></div>
+          <div class="stat-card warning"><div class="stat-label">Registros Gerados</div><div class="stat-value" id="stat-registros">—</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📄 Modelos Recentes <button class="btn btn-secondary btn-sm" onclick="showSection('modelos')">Ver todos</button></div>
+          <div class="card-body"><div id="dash-modelos"><div class="empty"><span class="empty-icon">📄</span><p>Nenhum modelo ainda</p></div></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🕓 Últimas Gerações <button class="btn btn-secondary btn-sm" onclick="showSection('historico')">Ver histórico</button></div>
+          <div class="card-body"><div id="dash-historico"><div class="empty"><span class="empty-icon">🕓</span><p>Nenhuma geração ainda</p></div></div></div>
+        </div>
+      </section>
+
+      <!-- ═══ MODELOS ═══ -->
+      <section id="sec-modelos" class="section">
+        <div class="page-header">
+          <div>
+            <h1>Modelos</h1>
+            <div class="page-header-sub">Crie e gerencie templates de documentos</div>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-primary" onclick="openModalModelo()">+ Novo Modelo</button>
+          </div>
+        </div>
+        <div class="search-bar">
+          <input type="text" id="filtro-modelos" placeholder="Buscar modelo…" oninput="renderModelos()">
+        </div>
+        <div id="modelos-grid" class="gm-grid"></div>
+      </section>
+
+      <!-- ═══ GERAR (wizard) ═══ -->
+      <section id="sec-gerar" class="section">
+        <div class="page-header">
+          <div>
+            <h1>Gerar Documento</h1>
+            <div class="page-header-sub">Siga os passos para selecionar dados e exportar</div>
+          </div>
+        </div>
+
+        <!-- Steps indicator — renderizado dinamicamente -->
+        <div class="wizard-steps" id="wizard-steps-bar"></div>
+
+        <!-- ── Panel: Modelo ── -->
+        <div class="wizard-panel" id="wpanel-modelo">
+          <div class="card">
+            <div class="card-title">Selecione o Modelo de Documento</div>
+            <div class="card-body">
+              <div class="search-bar" style="margin-bottom:12px">
+                <input type="text" id="filtro-modelos-wizard" placeholder="Buscar modelo…" oninput="renderModelosWizard()">
+              </div>
+              <div id="modelos-wizard-list"></div>
+            </div>
+          </div>
+          <div class="wizard-nav">
+            <div></div>
+            <button class="btn btn-primary" onclick="wizardAvançar()">Próximo →</button>
+          </div>
+        </div>
+
+        <!-- ── Panel: Empresas ── -->
+        <div class="wizard-panel" id="wpanel-empresas">
+          <div class="card">
+            <div class="card-title">Selecione as Empresas</div>
+            <div class="card-body">
+              <p style="font-size:13px;color:var(--text-light);margin-bottom:14px">Selecione uma ou mais empresas. Os registros das etapas seguintes serão filtrados por estas empresas.</p>
+              <div class="search-bar" style="margin-bottom:12px">
+                <input type="text" id="filtro-empresas" placeholder="Filtrar empresas…" oninput="renderEmpresasWizard()">
+              </div>
+              <div class="empresa-list" id="empresas-wizard-list">
+                <div class="empresa-item"><span style="color:var(--muted);font-size:13px">Carregando…</span></div>
+              </div>
+              <div style="margin-top:10px;font-size:12px;color:var(--muted)" id="empresas-selected-count">Nenhuma empresa selecionada</div>
+            </div>
+          </div>
+          <div class="wizard-nav">
+            <button class="btn btn-secondary" onclick="wizardVoltar()">← Anterior</button>
+            <button class="btn btn-primary" onclick="wizardAvançar()">Próximo →</button>
+          </div>
+        </div>
+
+        <!-- ── Panel: Empregados ── -->
+        <div class="wizard-panel" id="wpanel-empregados">
+          <div class="card">
+            <div class="card-title">
+              Selecione os Empregados
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary btn-sm" onclick="selecionarTodosEmpregados(true)">Todos</button>
+                <button class="btn btn-secondary btn-sm" onclick="selecionarTodosEmpregados(false)">Nenhum</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="search-bar" style="margin-bottom:12px">
+                <input type="text" id="filtro-empregados-wizard" placeholder="Filtrar por nome ou código…" oninput="renderEmpregadosWizard()">
+              </div>
+              <div class="empresa-list" id="empregados-wizard-list">
+                <div class="empresa-item"><span style="color:var(--muted);font-size:13px">Carregando…</span></div>
+              </div>
+              <div style="margin-top:10px;font-size:12px;color:var(--muted)" id="empregados-selected-count">Nenhum empregado selecionado</div>
+            </div>
+          </div>
+          <div class="wizard-nav">
+            <button class="btn btn-secondary" onclick="wizardVoltar()">← Anterior</button>
+            <button class="btn btn-primary" onclick="wizardAvançar()">Próximo →</button>
+          </div>
+        </div>
+
+        <!-- ── Panel: Sócios ── -->
+        <div class="wizard-panel" id="wpanel-socios">
+          <div class="card">
+            <div class="card-title">
+              Selecione os Sócios
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary btn-sm" onclick="selecionarTodosSocios(true)">Todos</button>
+                <button class="btn btn-secondary btn-sm" onclick="selecionarTodosSocios(false)">Nenhum</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="search-bar" style="margin-bottom:12px">
+                <input type="text" id="filtro-socios-wizard" placeholder="Filtrar por nome…" oninput="renderSociosWizard()">
+              </div>
+              <div class="empresa-list" id="socios-wizard-list">
+                <div class="empresa-item"><span style="color:var(--muted);font-size:13px">Carregando…</span></div>
+              </div>
+              <div style="margin-top:10px;font-size:12px;color:var(--muted)" id="socios-selected-count">Nenhum sócio selecionado</div>
+            </div>
+          </div>
+          <div class="wizard-nav">
+            <button class="btn btn-secondary" onclick="wizardVoltar()">← Anterior</button>
+            <button class="btn btn-primary" onclick="wizardAvançar()">Próximo →</button>
+          </div>
+        </div>
+
+        <!-- ── Panel: Rubricas ── -->
+        <div class="wizard-panel" id="wpanel-rubricas">
+          <div class="card">
+            <div class="card-title">
+              Selecione as Rubricas
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary btn-sm" onclick="selecionarTodasRubricas(true)">Todas</button>
+                <button class="btn btn-secondary btn-sm" onclick="selecionarTodasRubricas(false)">Nenhuma</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="search-bar" style="margin-bottom:12px">
+                <input type="text" id="filtro-rubricas-wizard" placeholder="Filtrar por evento ou código…" oninput="renderRubricasWizard()">
+              </div>
+              <div class="empresa-list" id="rubricas-wizard-list">
+                <div class="empresa-item"><span style="color:var(--muted);font-size:13px">Carregando…</span></div>
+              </div>
+              <div style="margin-top:10px;font-size:12px;color:var(--muted)" id="rubricas-selected-count">Nenhuma rubrica selecionada</div>
+            </div>
+          </div>
+          <div class="wizard-nav">
+            <button class="btn btn-secondary" onclick="wizardVoltar()">← Anterior</button>
+            <button class="btn btn-primary" onclick="wizardAvançar()">Próximo →</button>
+          </div>
+        </div>
+
+        <!-- ── Panel: Exportar ── -->
+        <div class="wizard-panel" id="wpanel-exportar">
+
+          <!-- Preview -->
+          <div class="card">
+            <div class="card-title">
+              Pré-visualização
+              <div style="display:flex;align-items:center;gap:8px">
+                <button class="btn btn-secondary btn-sm" onclick="previewPrev()">‹ Anterior</button>
+                <span class="preview-counter" id="preview-counter">1 / 1</span>
+                <button class="btn btn-secondary btn-sm" onclick="previewNext()">Próximo ›</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="preview-area" id="preview-area"></div>
+            </div>
+          </div>
+
+          <!-- Cabeçalho -->
+          <div class="card">
+            <div class="card-title">Opções de Cabeçalho</div>
+            <div class="card-body">
+              <div class="cabecalho-options">
+                <label class="cab-option selected" id="cab-opt-completo">
+                  <input type="radio" name="cabecalho" value="completo" checked onchange="selectCabecalho('completo')">
+                  <div class="cab-option-title">Cabeçalho Completo</div>
+                  <div class="cab-option-desc">Logo + "SCONT Soluções Contábeis" + título do modelo</div>
+                  <div class="cab-preview-box">
+                    <div class="cab-preview-bar">
+                      <span class="logo-placeholder">SCONT</span>
+                      <div class="cab-sep" style="width:1px;height:28px;background:rgba(255,255,255,0.3);flex-shrink:0"></div>
+                      <div class="cab-text">
+                        <strong>Título do Modelo</strong>
+                        <span>SCONT Soluções Contábeis — Gestão de RH</span>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+                <label class="cab-option" id="cab-opt-neutro">
+                  <input type="radio" name="cabecalho" value="neutro" onchange="selectCabecalho('neutro')">
+                  <div class="cab-option-title">Cabeçalho Neutro</div>
+                  <div class="cab-option-desc">Nome da empresa cliente + título do modelo (sem referência SCONT)</div>
+                  <div class="cab-preview-box">
+                    <div class="cab-preview-bar">
+                      <div class="cab-text">
+                        <strong id="cab-neutro-empresa-name">Nome da Empresa</strong>
+                        <span id="cab-neutro-titulo">Título do Modelo</span>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resumo + Exportar -->
+          <div class="card">
+            <div class="card-title">Resumo e Exportação</div>
+            <div class="card-body">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:20px">
+                <div><div class="stat-label">Modelo</div><div style="font-size:14px;font-weight:600;color:var(--text)" id="res-modelo">—</div></div>
+                <div><div class="stat-label">Tipo</div><div style="font-size:14px;font-weight:600;color:var(--text)" id="res-tipo">—</div></div>
+                <div><div class="stat-label">Empresas</div><div style="font-size:14px;font-weight:600;color:var(--text)" id="res-empresas">—</div></div>
+                <div><div class="stat-label">Registros</div><div style="font-size:14px;font-weight:600;color:var(--text)" id="res-registros">—</div></div>
+              </div>
+              <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <button class="btn btn-primary" onclick="exportarPDF()">🖨️ Imprimir / Salvar PDF</button>
+                <button class="btn btn-success" onclick="exportarExcel()">📊 Exportar Excel</button>
+              </div>
+              <div class="form-hint" style="margin-top:12px">Para salvar como PDF, na janela de impressão escolha "Salvar como PDF" como destino.</div>
+            </div>
+          </div>
+
+          <div class="wizard-nav">
+            <button class="btn btn-secondary" onclick="wizardVoltar()">← Anterior</button>
+            <button class="btn btn-secondary" onclick="resetWizard()">🔄 Nova Geração</button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ═══ HISTÓRICO ═══ -->
+      <section id="sec-historico" class="section">
+        <div class="page-header">
+          <div>
+            <h1>Histórico</h1>
+            <div class="page-header-sub">Registro de documentos gerados</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Modelo</th>
+                  <th>Empresas</th>
+                  <th>Registros</th>
+                  <th>Cabeçalho</th>
+                  <th>Gerado por</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody id="historico-tbody">
+                <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Carregando…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /main-content -->
+  </div><!-- /app -->
+
+  <!-- ══ MODAL: Criar/Editar Modelo ══ -->
+  <div class="modal-overlay" id="modal-modelo">
+    <div class="modal-box extra-wide">
+      <div class="modal-head">
+        <h3 id="modal-modelo-title">Novo Modelo</h3>
+        <button class="modal-close" onclick="closeModalModelo()">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="modelo-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nome do Modelo *</label>
+            <input type="text" id="modelo-nome" class="form-control" placeholder="Ex: Contrato de Trabalho">
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select id="modelo-tipo" class="form-control">
+              <option value="por_registro">Por Registro (um doc por empregado)</option>
+              <option value="consolidado">Consolidado (todos em um doc)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Descrição</label>
+            <input type="text" id="modelo-descricao" class="form-control" placeholder="Descrição opcional">
+          </div>
+          <div class="form-group">
+            <label>Cabeçalho Padrão</label>
+            <select id="modelo-cabecalho" class="form-control">
+              <option value="completo">Completo (logo + SCONT)</option>
+              <option value="neutro">Neutro (empresa cliente)</option>
+              <option value="nenhum">Sem cabeçalho</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Fontes de Dados</label>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" value="empresas" class="fonte-cb" checked style="accent-color:var(--primary)"> Empresas
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" value="empregados" class="fonte-cb" checked style="accent-color:var(--primary)"> Empregados
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" value="socios" class="fonte-cb" style="accent-color:var(--primary)"> Sócios
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" value="rubricas" class="fonte-cb" style="accent-color:var(--primary)"> Rubricas
+            </label>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>Template do Documento</label>
+          <div class="form-hint" style="margin-bottom:8px">Clique em uma variável para inserir no cursor. Use {{variavel}} para personalizar o texto.</div>
+          <div class="editor-layout">
+            <div class="editor-wrapper">
+              <!-- Toolbar -->
+              <div class="editor-toolbar">
+                <button type="button" class="tb-btn" onclick="document.execCommand('bold')" title="Negrito"><b>N</b></button>
+                <button type="button" class="tb-btn" onclick="document.execCommand('italic')" title="Itálico"><i>I</i></button>
+                <button type="button" class="tb-btn" onclick="document.execCommand('underline')" title="Sublinhado"><u>S</u></button>
+                <div class="tb-sep"></div>
+                <button type="button" class="tb-btn" onclick="document.execCommand('justifyLeft')" title="Alinhar esquerda">⬤≡</button>
+                <button type="button" class="tb-btn" onclick="document.execCommand('justifyCenter')" title="Centralizar">≡</button>
+                <button type="button" class="tb-btn" onclick="document.execCommand('justifyRight')" title="Alinhar direita">≡⬤</button>
+                <button type="button" class="tb-btn" onclick="document.execCommand('justifyFull')" title="Justificar">&#x2261;</button>
+                <div class="tb-sep"></div>
+                <select class="tb-select" title="Tamanho da fonte" onchange="aplicarTamanhoFonte(this.value);this.value=''">
+                  <option value="">Tamanho</option>
+                  <option value="10px">Pequeno (10)</option>
+                  <option value="13px">Normal (13)</option>
+                  <option value="16px">Médio (16)</option>
+                  <option value="20px">Grande (20)</option>
+                  <option value="26px">Extra grande (26)</option>
+                </select>
+                <select class="tb-select" title="Fonte" onchange="aplicarFonte(this.value);this.value=''">
+                  <option value="">Fonte</option>
+                  <option value="'Segoe UI', Arial, sans-serif">Segoe UI (padrão)</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="'Times New Roman', serif">Times New Roman</option>
+                  <option value="'Courier New', monospace">Courier New</option>
+                  <option value="Georgia, serif">Georgia</option>
+                </select>
+                <div class="tb-sep"></div>
+                <button type="button" class="tb-btn" onclick="document.execCommand('removeFormat')" title="Limpar formatação">✕ Fmt</button>
+              </div>
+              <!-- Área editável -->
+              <div id="modelo-template" class="editor-content" contenteditable="true"
+                data-placeholder="Digite aqui o conteúdo do modelo… Ex: Contrato firmado entre {{empresa.nome_empresa}} e {{empregado.nome_empregado}}."></div>
+            </div>
+            <div class="vars-panel" id="vars-panel">
+              <div class="vars-panel-title">Variáveis Disponíveis</div>
+              <div id="vars-panel-content"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModalModelo()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarModelo()">Salvar Modelo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PRINT ROOT (gerado dinamicamente) ══ -->
+  <div id="print-root"></div>
+
+  <div id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

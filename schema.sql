@@ -277,7 +277,19 @@ INSERT INTO public.ferramentas (nome, descricao, icone, url_base, ativa, ordem) 
 
     ('Simulador de Folha de Pagamento',
      'Simulação e comparação de cenários de folha de pagamento por regime tributário',
-     '🧮', './Projeto Simulador Folha/index.html', TRUE, 110)
+     '🧮', './Projeto Simulador Folha/index.html', TRUE, 110),
+
+    ('Mala Direta',
+     'Criação e envio de campanhas de e-mail personalizadas com variáveis de dados',
+     '📨', './Projeto Mala Direta/index.html', TRUE, 120),
+
+    ('Central de Alertas',
+     'Monitoramento e gestão de alertas e notificações do sistema',
+     '🔔', './Projeto Central Alertas/index.html', TRUE, 130),
+
+    ('Gerador de Modelos',
+     'Geração de contratos, recibos e documentos textuais com variáveis de dados',
+     '📄', './Projeto Gerador Modelos/index.html', TRUE, 140)
 
 ON CONFLICT DO NOTHING;
 

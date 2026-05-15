@@ -9,6 +9,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 document.addEventListener('DOMContentLoaded', () => {
     carregarEmpresas();
     carregarEmpregados();
+    carregarSocios();
     carregarRubricas();
     carregarRegras();
     carregarMapeamentos();
@@ -124,7 +125,6 @@ function renderizarTabelaEmpresas() {
             <td title="${e.endereco||''}">${fmt(e.endereco)}</td>
             <td title="${e.cep||''}">${fmt(e.cep)}</td>
             <td title="${e.cidade||''}">${fmt(e.cidade)}</td>
-            <td><button type="button" class="btn-delete" onclick="deletarEmpresa('${e.codigo_empresa}')">🗑</button></td>
         </tr>`;
     });
 
@@ -647,6 +647,195 @@ async function deletarEmpregado(id) {
         mostrarStatus('statusEmpregados', '✅ Empregado deletado com sucesso!', 'success');
         carregarEmpregados();
     } catch (erro) { mostrarStatus('statusEmpregados', 'Erro ao deletar empregado: ' + erro.message, 'error'); }
+}
+
+// --- SÓCIOS ---
+
+let _todosSocios = [];
+let _sociosFiltrados = [];
+const _porPaginaSocios = 50;
+let _pagSocios = 1;
+
+async function carregarSocios() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_socios')
+            .select('*')
+            .order('nome_socio', { ascending: true });
+        if (error) throw error;
+        _todosSocios = data || [];
+
+        // Popula selects de empresa nos filtros e formulário
+        const empresas = [...new Set(_todosSocios.map(s => s.codigo_empresa))].sort();
+        const filtroSelect = document.getElementById('filtroSociosEmpresa');
+        const formSelect   = document.getElementById('socioEmpresa');
+        if (filtroSelect) {
+            filtroSelect.innerHTML = '<option value="">Todas</option>' +
+                empresas.map(cod => {
+                    const emp = _todasEmpresas.find(e => e.codigo_empresa === cod);
+                    const label = emp ? `${emp.nome_empresa} (${cod})` : cod;
+                    return `<option value="${cod}">${label}</option>`;
+                }).join('');
+        }
+        if (formSelect) {
+            const emps = _todasEmpresas.length ? _todasEmpresas : (await supabaseClient.from('rh_empresas').select('codigo_empresa,nome_empresa').order('nome_empresa')).data || [];
+            formSelect.innerHTML = '<option value="">Selecione a empresa…</option>' +
+                emps.map(e => `<option value="${e.codigo_empresa}">${e.nome_empresa} (${e.codigo_empresa})</option>`).join('');
+        }
+
+        filtrarSocios();
+    } catch (err) {
+        mostrarStatus('statusSocios', 'Erro ao carregar sócios: ' + err.message, 'error');
+    }
+}
+
+function filtrarSocios() {
+    const texto    = (document.getElementById('filtroSociosTexto')?.value || '').toLowerCase();
+    const empresa  = document.getElementById('filtroSociosEmpresa')?.value || '';
+    const situacao = document.getElementById('filtroSociosSituacaoEmp')?.value || '';
+    _sociosFiltrados = _todosSocios.filter(s => {
+        const matchTexto = !texto || s.nome_socio?.toLowerCase().includes(texto) || s.codigo_empresa?.toLowerCase().includes(texto) || s.cpf?.includes(texto);
+        const matchEmp   = !empresa || s.codigo_empresa === empresa;
+        if (!matchTexto || !matchEmp) return false;
+        if (situacao) {
+            const emp = _todasEmpresas.find(e => e.codigo_empresa === s.codigo_empresa);
+            const sit = emp?.status_situacao || '';
+            if (situacao === 'Ativo'   && !sit.toLowerCase().includes('ativ'))   return false;
+            if (situacao === 'Inativo' && !sit.toLowerCase().includes('inativ')) return false;
+        }
+        return true;
+    });
+    _pagSocios = 1;
+    renderSocios();
+}
+
+function renderSocios() {
+    const tbody = document.getElementById('sociosTableBody');
+    const info  = document.getElementById('infoSocios');
+    const total = _sociosFiltrados.length;
+    const inicio = (_pagSocios - 1) * _porPaginaSocios;
+    const pagina = _sociosFiltrados.slice(inicio, inicio + _porPaginaSocios);
+
+    if (info) info.textContent = `${total} sócio(s)`;
+
+    if (!pagina.length) {
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#95A5A6;padding:24px">Nenhum sócio encontrado</td></tr>';
+        document.getElementById('paginacaoSocios').innerHTML = '';
+        return;
+    }
+
+    const fmtData = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    const esc = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    tbody.innerHTML = pagina.map(s => {
+        const emp = _todasEmpresas.find(e => e.codigo_empresa === s.codigo_empresa);
+        const nomeEmp = emp ? esc(emp.nome_empresa) : '—';
+        const cnpj    = emp?.cnpj ? esc(emp.cnpj) : '—';
+        const sit     = emp?.status_situacao || '—';
+        const sitCor  = sit.toLowerCase().includes('ativ') && !sit.toLowerCase().includes('inativ') ? '#27AE60' : '#E74C3C';
+        return `
+        <tr>
+            <td><strong>${esc(s.codigo_empresa)}</strong><br><span style="font-size:11px;color:#555">${nomeEmp}</span></td>
+            <td style="font-size:12px">${cnpj}</td>
+            <td><span style="color:${sitCor};font-weight:600;font-size:12px">${esc(sit)}</span></td>
+            <td><strong>${esc(s.nome_socio)}</strong></td>
+            <td style="font-size:12px">${esc(s.cpf) || '—'}</td>
+            <td>${s.participacao != null ? s.participacao + '%' : '—'}</td>
+            <td>${esc(s.cargo) || '—'}</td>
+            <td style="font-size:12px">${fmtData(s.data_entrada)}</td>
+            <td style="font-size:12px">${fmtData(s.data_saida)}</td>
+            <td style="font-size:12px">${esc(s.email_socio) || '—'}</td>
+        </tr>`;
+    }).join('');
+
+    renderPaginacaoSocios(total);
+}
+
+function renderPaginacaoSocios(total) {
+    const pag = document.getElementById('paginacaoSocios');
+    const totalPags = Math.ceil(total / _porPaginaSocios);
+    if (totalPags <= 1) { pag.innerHTML = ''; return; }
+    pag.innerHTML = `
+        <button onclick="_pagSocios=Math.max(1,_pagSocios-1);renderSocios()" ${_pagSocios===1?'disabled':''}>‹ Anterior</button>
+        <span class="pag-info">Página ${_pagSocios} de ${totalPags}</span>
+        <button onclick="_pagSocios=Math.min(${totalPags},_pagSocios+1);renderSocios()" ${_pagSocios===totalPags?'disabled':''}>Próxima ›</button>
+    `;
+}
+
+async function salvarSocio() {
+    const id      = document.getElementById('socioEditId').value;
+    const empresa = document.getElementById('socioEmpresa').value.trim();
+    const nome    = document.getElementById('socioNome').value.trim();
+    if (!empresa || !nome) { mostrarStatus('statusSocios', 'Empresa e nome são obrigatórios.', 'error'); return; }
+
+    const payload = {
+        codigo_empresa: empresa,
+        nome_socio:     nome,
+        cpf:            document.getElementById('socioCpf').value.trim() || null,
+        participacao:   parseFloat(document.getElementById('socioParticipacao').value) || null,
+        cargo:          document.getElementById('socioCargo').value.trim() || null,
+        email_socio:    document.getElementById('socioEmailSocio').value.trim() || null,
+        data_entrada:   document.getElementById('socioDataEntrada').value || null,
+        data_saida:     document.getElementById('socioDataSaida').value || null,
+    };
+
+    try {
+        let error;
+        if (id) {
+            ({ error } = await supabaseClient.from('rh_socios').update(payload).eq('id', id));
+        } else {
+            ({ error } = await supabaseClient.from('rh_socios').insert(payload));
+        }
+        if (error) throw error;
+        mostrarStatus('statusSocios', id ? '✅ Sócio atualizado!' : '✅ Sócio adicionado!', 'success');
+        cancelarEdicaoSocio();
+        await carregarSocios();
+    } catch (err) {
+        mostrarStatus('statusSocios', 'Erro: ' + err.message, 'error');
+    }
+}
+
+function editarSocio(id) {
+    const s = _todosSocios.find(x => x.id === id);
+    if (!s) return;
+    document.getElementById('socioEditId').value       = s.id;
+    document.getElementById('socioEmpresa').value      = s.codigo_empresa;
+    document.getElementById('socioNome').value         = s.nome_socio;
+    document.getElementById('socioCpf').value          = s.cpf || '';
+    document.getElementById('socioParticipacao').value = s.participacao ?? '';
+    document.getElementById('socioCargo').value        = s.cargo || '';
+    document.getElementById('socioEmailSocio').value   = s.email_socio || '';
+    document.getElementById('socioDataEntrada').value  = s.data_entrada || '';
+    document.getElementById('socioDataSaida').value    = s.data_saida || '';
+    document.getElementById('socioFormTitulo').textContent = 'Editar Sócio';
+    document.getElementById('sociosBtnCancelar').style.display = '';
+    document.getElementById('socios').scrollIntoView({ behavior: 'smooth' });
+}
+
+function cancelarEdicaoSocio() {
+    document.getElementById('socioEditId').value       = '';
+    document.getElementById('socioEmpresa').value      = '';
+    document.getElementById('socioNome').value         = '';
+    document.getElementById('socioCpf').value          = '';
+    document.getElementById('socioParticipacao').value = '';
+    document.getElementById('socioCargo').value        = '';
+    document.getElementById('socioEmailSocio').value   = '';
+    document.getElementById('socioDataEntrada').value  = '';
+    document.getElementById('socioDataSaida').value    = '';
+    document.getElementById('socioFormTitulo').textContent = 'Adicionar Sócio';
+    document.getElementById('sociosBtnCancelar').style.display = 'none';
+}
+
+async function deletarSocio(id) {
+    if (!confirm('Excluir este sócio?')) return;
+    try {
+        const { error } = await supabaseClient.from('rh_socios').delete().eq('id', id);
+        if (error) throw error;
+        mostrarStatus('statusSocios', '✅ Sócio excluído.', 'success');
+        await carregarSocios();
+    } catch (err) {
+        mostrarStatus('statusSocios', 'Erro: ' + err.message, 'error');
+    }
 }
 
 // --- RUBRICAS ---
@@ -1202,9 +1391,18 @@ async function importarRubricasIndividual(file) {
 function baixarModeloSocios() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([[
-        'Cód. Empresa', 'Nome do Sócio', 'CPF', 'Participação (%)', 'Cargo', 'Data de Entrada'
+        'CODIGO DA EMPRESA',
+        'CAPITAL SOCIAL',
+        'EMAIL EMPRESA',
+        'DATA ATUALIZAÇÃO QUADRO SOCIETÁRIO',
+        'CPF DO SOCIO',
+        'NOME DO SOCIO',
+        'PARTICIPAÇÃO',
+        'INGRESSO',
+        'SAIDA',
+        'EMAIL SOCIO'
     ]]);
-    ws['!cols'] = [14, 35, 14, 14, 20, 14].map(w => ({ wch: w }));
+    ws['!cols'] = [18, 16, 28, 36, 16, 35, 14, 14, 14, 28].map(w => ({ wch: w }));
     XLSX.utils.book_append_sheet(wb, ws, 'Socios');
     XLSX.writeFile(wb, 'modelo_socios.xlsx');
 }
@@ -1220,40 +1418,58 @@ async function importarSocios(file) {
         setStatusImport(ENT, 'Lendo arquivo...', 'info');
         setProgresso(ENT, 10);
 
-        const rows = (await lerPlanilha(file, ['codigo_empresa','nome_socio','cpf','participacao','cargo','data_entrada']))
+        const cols = [
+            'codigo_empresa', 'capital_social', 'email_empresa',
+            'data_atualizacao_quadro', 'cpf', 'nome_socio',
+            'participacao', 'data_entrada', 'data_saida', 'email_socio'
+        ];
+        const fmtDate = v => {
+            if (!v) return null;
+            if (v instanceof Date) return v.toISOString().split('T')[0];
+            const s = String(v).trim();
+            return s || null;
+        };
+        const rows = (await lerPlanilha(file, cols))
             .filter(r => r.codigo_empresa && r.nome_socio)
             .map(r => ({
-                codigo_empresa: String(r.codigo_empresa).trim(),
-                nome_socio:     String(r.nome_socio).trim(),
-                cpf:            r.cpf ? String(r.cpf).trim() : null,
-                participacao:   r.participacao !== '' ? parseFloat(String(r.participacao).replace(',', '.')) || null : null,
-                cargo:          r.cargo ? String(r.cargo).trim() : null,
-                data_entrada:   r.data_entrada instanceof Date
-                                    ? r.data_entrada.toISOString().split('T')[0]
-                                    : (r.data_entrada ? String(r.data_entrada).trim() : null),
+                codigo_empresa:          String(r.codigo_empresa).trim(),
+                capital_social:          r.capital_social !== '' && r.capital_social != null ? parseFloat(String(r.capital_social).replace(/[^\d,.-]/g,'').replace(',','.')) || null : null,
+                email_empresa:           r.email_empresa ? String(r.email_empresa).trim() : null,
+                data_atualizacao_quadro: fmtDate(r.data_atualizacao_quadro),
+                cpf:                     r.cpf ? String(r.cpf).trim() : null,
+                nome_socio:              String(r.nome_socio).trim(),
+                participacao:            r.participacao !== '' && r.participacao != null ? parseFloat(String(r.participacao).replace(',', '.')) || null : null,
+                data_entrada:            fmtDate(r.data_entrada),
+                data_saida:              fmtDate(r.data_saida),
+                email_socio:             r.email_socio ? String(r.email_socio).trim() : null,
             }));
 
         if (!rows.length) throw new Error('Nenhuma linha válida encontrada. Verifique se o arquivo segue o modelo.');
 
-        const modo = await confirmarModoImportacao('Sócios', rows.length);
+        // Deduplica por (codigo_empresa + nome_socio) — última ocorrência prevalece
+        const deduped = [...new Map(rows.map(r => [`${r.codigo_empresa}|${r.nome_socio}`, r])).values()];
+        const duplicatas = rows.length - deduped.length;
+
+        const modo = await confirmarModoImportacao('Sócios', deduped.length);
         if (!modo) { setStatusImport(ENT, '', ''); setProgresso(ENT, null); return; }
 
         setProgresso(ENT, 50);
-        setStatusImport(ENT, `Salvando ${rows.length} sócio(s)...`, 'info');
+        setStatusImport(ENT, `Salvando ${deduped.length} sócio(s)...`, 'info');
 
         if (modo === 'substituir') {
-            const codigos = [...new Set(rows.map(r => r.codigo_empresa))];
+            const codigos = [...new Set(deduped.map(r => r.codigo_empresa))];
             const { error: delErr } = await supabaseClient.from('rh_socios').delete().in('codigo_empresa', codigos);
             if (delErr) throw delErr;
-            const { error } = await supabaseClient.from('rh_socios').insert(rows);
+            const { error } = await supabaseClient.from('rh_socios').insert(deduped);
             if (error) throw error;
         } else {
-            const { error } = await supabaseClient.from('rh_socios').upsert(rows, { onConflict: 'codigo_empresa,nome_socio' });
+            const { error } = await supabaseClient.from('rh_socios').upsert(deduped, { onConflict: 'codigo_empresa,nome_socio' });
             if (error) throw error;
         }
 
         setProgresso(ENT, null);
-        setStatusImport(ENT, `✅ ${rows.length} sócio(s) importado(s) com sucesso!`, 'success');
+        const aviso = duplicatas > 0 ? ` (${duplicatas} duplicata(s) ignorada(s))` : '';
+        setStatusImport(ENT, `✅ ${deduped.length} sócio(s) importado(s) com sucesso!${aviso}`, 'success');
     } catch (err) {
         setProgresso(ENT, null);
         setStatusImport(ENT, '❌ ' + err.message, 'error');

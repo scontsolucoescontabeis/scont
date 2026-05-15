@@ -172,6 +172,27 @@
           </div>
         </div>
 
+        <!-- ── PREVIEW DE MENSAGENS ── -->
+        <div class="card" id="preview-md-card" style="margin-bottom:20px;display:none">
+          <div class="card-title">
+            👁 Preview das Mensagens
+            <div style="display:flex;align-items:center;gap:10px">
+              <button class="btn btn-secondary btn-sm" onclick="previewMDNav(-1)">‹ Anterior</button>
+              <span id="preview-md-counter" style="font-size:12px;color:var(--muted);white-space:nowrap">1 / 1</span>
+              <button class="btn btn-secondary btn-sm" onclick="previewMDNav(1)">Próximo ›</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px" id="preview-md-nome"></div>
+            <div id="preview-md-area"
+              style="background:var(--bg-light);border:1px solid var(--border-light);border-left:4px solid var(--primary);border-radius:8px;padding:16px;font-size:13px;line-height:1.8;white-space:pre-wrap;min-height:80px"></div>
+            <div style="margin-top:8px;font-size:11px;color:var(--muted)">
+              <span style="background:#FFF3CD;color:#856404;padding:1px 6px;border-radius:3px;font-family:monospace;font-size:11px">{{variável}}</span>
+              em amarelo = variável não preenchida para este destinatário.
+            </div>
+          </div>
+        </div>
+
         <div class="stats-grid" style="margin-bottom:20px">
           <div class="stat-card" style="padding:16px 20px">
             <div class="stat-label">Total</div>
@@ -829,6 +850,8 @@ Equipe SCONT"></textarea>
     envios = data || [];
     renderEnvios();
     atualizarDetalheStats();
+    _previewMDIdx = 0;
+    renderPreviewMD();
   }
 
   // ── DASHBOARD ─────────────────────────────────────────────────
@@ -1292,6 +1315,55 @@ Equipe SCONT"></textarea>
       const found = Object.keys(row).find(rk => rk.toLowerCase() === k.toLowerCase());
       return found ? String(row[found] ?? '') : '';
     });
+  }
+
+  // ── PREVIEW DE MENSAGENS ─────────────────────────────────────
+  let _previewMDIdx = 0;
+
+  function applyTemplateHighlight(t, row) {
+    return String(t).replace(/\{\{([^}]+)\}\}/gi, (match, key) => {
+      const k = key.trim();
+      const found = Object.keys(row).find(rk => rk.toLowerCase() === k.toLowerCase());
+      const val = found ? String(row[found] ?? '') : '';
+      if (!found || val === '') {
+        return `<span style="background:#FFF3CD;color:#856404;padding:1px 4px;border-radius:3px;font-family:monospace;font-size:12px">${match}</span>`;
+      }
+      return escHtml(val);
+    });
+  }
+
+  function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderPreviewMD() {
+    const card = document.getElementById('preview-md-card');
+    if (!envios.length || !campanhaAtual?.template) { card.style.display = 'none'; return; }
+
+    card.style.display = '';
+    _previewMDIdx = Math.max(0, Math.min(_previewMDIdx, envios.length - 1));
+    const e = envios[_previewMDIdx];
+
+    const rowData = {
+      nome: e.nome, email: e.email, telefone: e.telefone,
+      empresa: e.empresa, cargo: e.cargo,
+      Nome: e.nome, Email: e.email, Telefone: e.telefone,
+      Empresa: e.empresa, Cargo: e.cargo,
+    };
+    if (e.variaveis_extras && typeof e.variaveis_extras === 'object') {
+      Object.assign(rowData, e.variaveis_extras);
+    }
+
+    const html = applyTemplateHighlight(campanhaAtual.template, rowData);
+
+    document.getElementById('preview-md-nome').textContent = `Destinatário: ${e.nome}${e.empresa ? ' · ' + e.empresa : ''}`;
+    document.getElementById('preview-md-area').innerHTML = html;
+    document.getElementById('preview-md-counter').textContent = `${_previewMDIdx + 1} / ${envios.length}`;
+  }
+
+  function previewMDNav(dir) {
+    _previewMDIdx = Math.max(0, Math.min(envios.length - 1, _previewMDIdx + dir));
+    renderPreviewMD();
   }
 
   // ── VER ENVIO ─────────────────────────────────────────────────
