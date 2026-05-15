@@ -6,17 +6,17 @@
     <title>Administração - SCONT</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        .admin-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        .admin-header { background: linear-gradient(135deg, #8B3A3A 0%, #6B2A2A 100%); color: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; text-align: center; }
-        .admin-header h1 { margin: 0; font-size: 28px; }
-        .admin-tabs { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 2px solid #E0E0E0; flex-wrap: wrap; }
-        .admin-tab-btn { padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; cursor: pointer; font-weight: 600; color: #7F8C8D; transition: all 0.3s ease; }
+        .admin-container { max-width: 98vw; margin: 0 auto; padding: 16px 24px; }
+        .admin-header { background: linear-gradient(135deg, #8B3A3A 0%, #6B2A2A 100%); color: white; padding: 22px 30px; border-radius: 12px; margin-bottom: 20px; text-align: center; }
+        .admin-header h1 { margin: 0; font-size: 26px; }
+        .admin-tabs { display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 2px solid #E0E0E0; flex-wrap: wrap; }
+        .admin-tab-btn { padding: 10px 18px; background: none; border: none; border-bottom: 3px solid transparent; cursor: pointer; font-weight: 600; color: #7F8C8D; transition: all 0.3s ease; }
         .admin-tab-btn:hover { color: #8B3A3A; }
         .admin-tab-btn.active { color: #8B3A3A; border-bottom-color: #8B3A3A; }
-        .admin-tab-content { display: none; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+        .admin-tab-content { display: none; background: white; border-radius: 12px; padding: 24px 28px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
         .admin-tab-content.active { display: block; }
-        .admin-section { margin-bottom: 30px; }
-        .admin-section h2 { color: #8B3A3A; margin-bottom: 20px; font-size: 20px; border-bottom: 2px solid #F5F5F5; padding-bottom: 10px; }
+        .admin-section { margin-bottom: 24px; }
+        .admin-section h2 { color: #8B3A3A; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #F5F5F5; padding-bottom: 8px; }
         .upload-area { border: 2px dashed #8B3A3A; border-radius: 8px; padding: 30px; text-align: center; background: #F5F5F5; cursor: pointer; transition: all 0.3s ease; }
         .upload-area:hover { background: #EEE; border-color: #6B2A2A; }
         .upload-area.dragover { background: #E8E8E8; border-color: #6B2A2A; }
@@ -43,7 +43,23 @@
         .status-message.success { background: #D4EDDA; color: #155724; border: 1px solid #C3E6CB; display: block; }
         .status-message.error { background: #F8D7DA; color: #721C24; border: 1px solid #F5C6CB; display: block; }
         .status-message.info { background: #D1ECF1; color: #0C5460; border: 1px solid #BEE5EB; display: block; }
-        @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } .admin-tabs { flex-direction: column; } .admin-tab-btn { border-bottom: none; border-left: 3px solid transparent; padding-left: 15px; } .admin-tab-btn.active { border-left-color: #8B3A3A; border-bottom-color: transparent; } }
+        .paginacao { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 14px; font-size: 13px; }
+        .paginacao button { padding: 5px 14px; border: 1px solid #D0D0D0; border-radius: 6px; background: white; cursor: pointer; font-weight: 600; color: #2C3E50; }
+        .paginacao button:hover:not(:disabled) { background: #8B3A3A; color: white; border-color: #8B3A3A; }
+        .paginacao button:disabled { opacity: 0.35; cursor: default; }
+        .paginacao .pag-info { color: #7F8C8D; }
+        .import-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .import-card { border: 1px solid #E0E0E0; border-radius: 10px; padding: 20px; background: #FAFAFA; display: flex; flex-direction: column; gap: 12px; }
+        .import-card-header { display: flex; align-items: center; gap: 12px; }
+        .import-card-icon { font-size: 28px; }
+        .import-card-title { font-weight: 700; font-size: 15px; color: #2C3E50; }
+        .import-card-subtitle { font-size: 11px; color: #95A5A6; }
+        .import-card-header .btn-modelo { margin-left: auto; background: #8B3A3A; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; }
+        .import-card-header .btn-modelo:hover { background: #6B2A2A; }
+        .import-fields { font-size: 11px; color: #7F8C8D; background: #F0F0F0; padding: 8px 10px; border-radius: 6px; line-height: 1.6; }
+        .upload-area-sm { border: 2px dashed #C0C0C0; border-radius: 8px; padding: 16px; text-align: center; font-size: 12px; color: #7F8C8D; cursor: pointer; transition: all 0.2s; }
+        .upload-area-sm:hover { border-color: #8B3A3A; color: #8B3A3A; background: #FFF5F5; }
+        @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } .admin-tabs { flex-direction: column; } .admin-tab-btn { border-bottom: none; border-left: 3px solid transparent; padding-left: 15px; } .admin-tab-btn.active { border-left-color: #8B3A3A; border-bottom-color: transparent; } .import-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
@@ -91,12 +107,45 @@
                     </div>
                     <button type="button" class="btn-save" onclick="adicionarEmpresa()">➕ Adicionar Empresa</button>
                 </div>
-                <h3 style="color: #2C3E50; margin-bottom: 15px;">Empresas Cadastradas</h3>
+                <h3 style="color: #2C3E50; margin-bottom: 10px;">Empresas Cadastradas</h3>
+                <div style="background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+                    <div class="form-group" style="margin-bottom:0;flex:2;min-width:180px;">
+                        <label>Buscar por Código ou Nome</label>
+                        <input type="text" id="filtroEmpresasTexto" placeholder="Digite o código ou nome da empresa..." oninput="filtrarEmpresas()">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;flex:1;min-width:150px;">
+                        <label>Status</label>
+                        <select id="filtroEmpresasStatus" onchange="filtrarEmpresas()">
+                            <option value="">Todos</option>
+                            <option value="Ativo">Ativo</option>
+                            <option value="Inativo">Inativo</option>
+                        </select>
+                    </div>
+                    <div style="flex:0 0 auto;padding-bottom:1px;">
+                        <button type="button" onclick="document.getElementById('filtroEmpresasTexto').value='';document.getElementById('filtroEmpresasStatus').value='';filtrarEmpresas();" style="padding:9px 16px;border:1px solid #C0C0C0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-weight:600;">✕ Limpar</button>
+                    </div>
+                    <span id="infoEmpresas" style="font-size:12px;color:#7F8C8D;align-self:center;white-space:nowrap;"></span>
+                </div>
                 <div class="table-container">
                     <table class="admin-table">
-                        <thead><tr><th>Código</th><th>Nome</th><th>Data de Criação</th><th>Ações</th></tr></thead>
-                        <tbody id="empresasTableBody"><tr><td colspan="4" style="text-align: center; color: #95A5A6;">Carregando...</td></tr></tbody>
+                        <thead><tr>
+                            <th>Cód.</th>
+                            <th>Empresa</th>
+                            <th>CNPJ</th>
+                            <th>Regime</th>
+                            <th>Insc. Estadual</th>
+                            <th>Insc. Municipal</th>
+                            <th>Município</th>
+                            <th>Status</th>
+                            <th>Dt. Cadastro</th>
+                            <th>Endereço</th>
+                            <th>CEP</th>
+                            <th>Cidade</th>
+                            <th>Ações</th>
+                        </tr></thead>
+                        <tbody id="empresasTableBody"><tr><td colspan="13" style="text-align: center; color: #95A5A6;">Carregando...</td></tr></tbody>
                     </table>
+                    <div class="paginacao" id="paginacaoEmpresas"></div>
                 </div>
             </div>
         </div>
@@ -106,31 +155,103 @@
             <div class="admin-section">
                 <h2>Gerenciar Empregados</h2>
                 <div id="statusEmpregados" class="status-message"></div>
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #2C3E50; margin-bottom: 15px;">Adicionar Novo Empregado</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="empresaSelect">Empresa *</label>
-                            <select id="empresaSelect"><option value="">Selecione uma empresa...</option></select>
+
+                <!-- Filtros -->
+                <div style="background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:16px;margin-bottom:14px;">
+                    <div style="display:flex;gap:15px;align-items:flex-start;flex-wrap:wrap;">
+                        <!-- Filtro empresa (multi) -->
+                        <div style="flex:1;min-width:220px;">
+                            <label style="display:block;font-weight:600;color:#2C3E50;font-size:13px;margin-bottom:5px;">Filtrar por Empresa</label>
+                            <div style="display:flex;gap:6px;margin-bottom:6px;">
+                                <button type="button" onclick="selecionarTodasEmpresas(true)" style="padding:3px 8px;border:1px solid #C0C0C0;border-radius:4px;background:white;cursor:pointer;font-size:11px;font-weight:600;">Todas</button>
+                                <button type="button" onclick="selecionarTodasEmpresas(false)" style="padding:3px 8px;border:1px solid #C0C0C0;border-radius:4px;background:white;cursor:pointer;font-size:11px;font-weight:600;">Nenhuma</button>
+                                <span id="qtdEmpresasFiltro" style="font-size:11px;color:#7F8C8D;align-self:center;"></span>
+                            </div>
+                            <input type="text" id="buscaEmpresaFiltro" placeholder="Buscar empresa..." oninput="filtrarListaEmpresasCheckbox()" style="width:100%;padding:6px 8px;border:1px solid #DEE2E6;border-radius:6px 6px 0 0;font-size:12px;box-sizing:border-box;border-bottom:none;">
+                            <div id="filtroEmpresaEmp" style="max-height:140px;overflow-y:auto;border:1px solid #DEE2E6;border-radius:0 0 6px 6px;background:white;padding:6px 8px;display:flex;flex-direction:column;gap:3px;"></div>
                         </div>
-                        <div class="form-group">
-                            <label for="codigoEmpregado">Código do Empregado *</label>
-                            <input type="text" id="codigoEmpregado" placeholder="Ex: 12" maxlength="50">
+                        <!-- Busca por nome + situação -->
+                        <div style="flex:2;min-width:200px;display:flex;flex-direction:column;gap:8px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Buscar por Nome / Código</label>
+                                <input type="text" id="filtroNomeEmp" placeholder="Nome ou código do empregado..." oninput="filtrarEmpregados()">
+                            </div>
+                            <div style="margin-bottom:0;">
+                                <label style="display:block;font-weight:600;color:#2C3E50;font-size:13px;margin-bottom:5px;">Situação</label>
+                                <div style="display:flex;gap:6px;margin-bottom:5px;">
+                                    <button type="button" onclick="selecionarTodasSituacoes(true)" style="padding:3px 8px;border:1px solid #C0C0C0;border-radius:4px;background:white;cursor:pointer;font-size:11px;font-weight:600;">Todas</button>
+                                    <button type="button" onclick="selecionarTodasSituacoes(false)" style="padding:3px 8px;border:1px solid #C0C0C0;border-radius:4px;background:white;cursor:pointer;font-size:11px;font-weight:600;">Nenhuma</button>
+                                </div>
+                                <div id="filtroSituacaoEmp" style="border:1px solid #DEE2E6;border-radius:6px;background:white;padding:6px 8px;display:flex;flex-direction:column;gap:4px;">
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" value="Trabalhando" checked onchange="toggleSituacaoFiltro()"> Trabalhando</label>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" value="Demitido" checked onchange="toggleSituacaoFiltro()"> Demitido</label>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:normal;"><input type="checkbox" value="Doença período superior a 15 dias" checked onchange="toggleSituacaoFiltro()"> Doença período superior a 15 dias</label>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:normal;"><input type="checkbox" value="Aposent. por invalid. exceto acid. trab. e doença profissional" checked onchange="toggleSituacaoFiltro()"> Aposent. por invalid. exceto acid. trab. e doença profissional</label>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:normal;"><input type="checkbox" value="Aposent. por invalid. doença profissional" checked onchange="toggleSituacaoFiltro()"> Aposent. por invalid. doença profissional</label>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:normal;"><input type="checkbox" value="Novo afast. mesma doença" checked onchange="toggleSituacaoFiltro()"> Novo afast. mesma doença</label>
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Tipo de Empregado</label>
+                                <select id="filtroTipoEmp" onchange="filtrarEmpregados()">
+                                    <option value="">Todos</option>
+                                    <option value="Empregado">Empregado</option>
+                                    <option value="Contribuinte">Contribuinte</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="nomeEmpregado">Nome do Empregado *</label>
-                        <input type="text" id="nomeEmpregado" placeholder="Ex: Herbert" maxlength="255">
-                    </div>
-                    <button type="button" class="btn-save" onclick="adicionarEmpregado()">➕ Adicionar Empregado</button>
                 </div>
-                <h3 style="color: #2C3E50; margin-bottom: 15px;">Empregados Cadastrados</h3>
-                <div class="table-container">
-                    <table class="admin-table">
-                        <thead><tr><th>Empresa</th><th>Código</th><th>Nome</th><th>Data de Criação</th><th>Ações</th></tr></thead>
-                        <tbody id="empregadosTableBody"><tr><td colspan="5" style="text-align: center; color: #95A5A6;">Carregando...</td></tr></tbody>
+
+                <!-- Seletor de Campos -->
+                <details style="background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;margin-bottom:14px;padding:12px 16px;">
+                    <summary style="cursor:pointer;font-weight:600;color:#2C3E50;font-size:14px;user-select:none;">📋 Selecionar Campos do Relatório</summary>
+                    <div style="margin-top:12px;">
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+                            <button type="button" onclick="selecionarTodosCampos(true)" style="padding:5px 12px;border:1px solid #C0C0C0;border-radius:5px;background:white;cursor:pointer;font-size:12px;font-weight:600;">Marcar Todos</button>
+                            <button type="button" onclick="selecionarTodosCampos(false)" style="padding:5px 12px;border:1px solid #C0C0C0;border-radius:5px;background:white;cursor:pointer;font-size:12px;font-weight:600;">Desmarcar Todos</button>
+                            <div style="display:flex;gap:8px;margin-left:auto;">
+                                <button type="button" class="btn-save" onclick="exportarRelatorioEmpregados()" style="padding:6px 16px;font-size:12px;">📥 Exportar Excel</button>
+                                <button type="button" onclick="gerarRelatorioPDFEmpregados()" style="padding:6px 16px;font-size:12px;font-weight:600;background:linear-gradient(135deg,#C0392B,#96281B);color:white;border:none;border-radius:6px;cursor:pointer;">🖨️ Gerar PDF</button>
+                            </div>
+                        </div>
+                        <div id="camposSeletorEmp" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 16px;"></div>
+                    </div>
+                </details>
+
+                <!-- Tabela -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <span id="infoEmpregados" style="color:#6C757D;font-size:13px;"></span>
+                </div>
+                <div class="table-container" style="overflow-x:auto;">
+                    <table class="admin-table" id="empregadosTable">
+                        <thead id="empregadosThead"></thead>
+                        <tbody id="empregadosTableBody"><tr><td style="text-align:center;color:#95A5A6;padding:20px;">Carregando...</td></tr></tbody>
                     </table>
                 </div>
+                <div class="paginacao" id="paginacaoEmpregados"></div>
+
+                <!-- Adicionar Empregado -->
+                <details style="margin-top:22px;border:1px solid #DEE2E6;border-radius:8px;padding:12px 16px;">
+                    <summary style="cursor:pointer;font-weight:600;color:#2C3E50;font-size:14px;user-select:none;">➕ Adicionar Novo Empregado</summary>
+                    <div style="margin-top:14px;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="empresaSelect">Empresa *</label>
+                                <select id="empresaSelect"><option value="">Selecione uma empresa...</option></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="codigoEmpregado">Código do Empregado *</label>
+                                <input type="text" id="codigoEmpregado" placeholder="Ex: 12" maxlength="50">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="nomeEmpregado">Nome do Empregado *</label>
+                            <input type="text" id="nomeEmpregado" placeholder="Ex: Herbert" maxlength="255">
+                        </div>
+                        <button type="button" class="btn-save" onclick="adicionarEmpregado()">➕ Adicionar Empregado</button>
+                    </div>
+                </details>
             </div>
         </div>
 
@@ -252,33 +373,127 @@
         <!-- ABA IMPORTAR -->
         <div id="importar" class="admin-tab-content">
             <div class="admin-section">
-                <h2>Importar Dados da Planilha</h2>
-                <div id="statusImportar" class="status-message"></div>
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #2C3E50; margin-bottom: 15px;">Instruções</h3>
-                    <div style="background: #F5F5F5; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px; line-height: 1.6;">
-                        <p><strong>Sua planilha deve conter as seguintes abas:</strong></p>
-                        <ul style="margin: 10px 0; padding-left: 20px;">
-                            <li><strong>Aba "Empresas":</strong> Coluna A = Código da Empresa, Coluna B = Nome da Empresa</li>
-                            <li><strong>Aba "Empregados":</strong> Coluna A = Código da Empresa, Coluna B = Código do Empregado, Coluna C = Nome do Empregado</li>
-                            <li><strong>Aba "Rubricas":</strong> Coluna A = Código da Empresa, Coluna B = Código da Rubrica, Coluna C = Nome do Evento (ex: horasTrabalhadas, horasExtras50, horasExtras100, horasNoturnaConvertida, horasDevidas)</li>
-                        </ul>
-                        <p style="margin-top: 15px; color: #E74C3C;"><strong>⚠️ Aviso:</strong> A importação irá <strong>substituir</strong> todos os dados existentes (Empresas, Empregados e Rubricas)!</p>
-                    </div>
-                </div>
-                <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-                    <div class="upload-icon">📊</div>
-                    <div class="upload-text"><strong>Clique para selecionar ou arraste a planilha aqui</strong></div>
-                    <div class="upload-hint">Formatos aceitos: .xlsx, .xls, .csv</div>
-                </div>
-                <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileSelect(event)">
-                <div id="importProgress" style="display: none; margin-top: 20px;">
-                    <div style="background: #D1ECF1; padding: 15px; border-radius: 8px; color: #0C5460;">
-                        <strong>Processando importação...</strong>
-                        <div style="margin-top: 10px; background: white; border-radius: 4px; height: 20px; overflow: hidden;">
-                            <div id="progressBar" style="background: #17A2B8; height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                <h2>Importar Dados</h2>
+                <p style="color:#7F8C8D;font-size:13px;margin-bottom:24px;">Importação individualizada por tipo de cadastro. Baixe o modelo, preencha e importe. Registros existentes serão <strong>atualizados</strong> — nenhum dado é excluído.</p>
+
+                <div class="import-grid">
+
+                    <!-- EMPRESAS -->
+                    <div class="import-card">
+                        <div class="import-card-header">
+                            <span class="import-card-icon">🏢</span>
+                            <div>
+                                <div class="import-card-title">Empresas</div>
+                                <div class="import-card-subtitle">12 campos</div>
+                            </div>
+                            <button class="btn-modelo" onclick="baixarModeloEmpresas()">⬇️ Modelo</button>
+                        </div>
+                        <div class="import-fields">Cód. · Empresa · CNPJ · Regime Enquadramento · Insc. Estadual · Insc. Municipal · Município · Status/Situação · Data de Cadastro · Endereço · CEP · Cidade</div>
+                        <div id="statusImportarEmpresas" class="status-message"></div>
+                        <div class="upload-area-sm" onclick="document.getElementById('fileEmpresas').click()"
+                             ondragover="event.preventDefault();this.style.borderColor='#8B3A3A'"
+                             ondragleave="this.style.borderColor=''"
+                             ondrop="event.preventDefault();this.style.borderColor='';handleImportarEmpresas({target:{files:event.dataTransfer.files}})">
+                            📊 Clique ou arraste o arquivo (.xlsx / .csv)
+                        </div>
+                        <input type="file" id="fileEmpresas" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportarEmpresas(event)">
+                        <div id="progressEmpresas" style="display:none;">
+                            <div style="background:#D1ECF1;padding:10px;border-radius:6px;font-size:12px;color:#0C5460;">
+                                <strong>Importando empresas...</strong>
+                                <div style="margin-top:6px;background:white;border-radius:4px;height:8px;overflow:hidden;">
+                                    <div id="progressBarEmpresas" style="background:#17A2B8;height:100%;width:0%;transition:width 0.3s;"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- EMPREGADOS -->
+                    <div class="import-card">
+                        <div class="import-card-header">
+                            <span class="import-card-icon">👥</span>
+                            <div>
+                                <div class="import-card-title">Empregados</div>
+                                <div class="import-card-subtitle">3 campos</div>
+                            </div>
+                            <button class="btn-modelo" onclick="baixarModeloEmpregados()">⬇️ Modelo</button>
+                        </div>
+                        <div class="import-fields">Cód Emp · Cód Epr · Nome · Cód eSocial · Admissão · Fim Determinado · Fim Prorrogação · Salário · Categoria · Cód Cargo · Desc. Cargo · CBO · Cód Função · Desc. Função · Cód Ccusto · Desc. Ccusto · Cód Serviço · Desc. Serviço · Cód Dpto · Desc. Dpto · Cód Sind · Sindicato · CPF · PIS · RG · UF RG · Orgão RG · Data EX · Dt. Nasc · Cidade Nasc · UF Nasc · País Nasc · Endereço · Número · Complemento · Bairro · CEP · Cidade · UF End · Telefone · Celular · Email · RIC · Orgão RIC · Local RIC · Data Exp RIC · Validade RIC · Passaporte · UF Pass · Emissão Pass · Validade Pass · RNE · Orgão RNE · Expedição RNE · CNH · Cat. CNH · Expedição CNH · Vencimento CNH · Reservista · Título · Zona · Seção · CTPS · Série CTPS · UF CTPS · Expedição CTPS · Nome Mãe · Nome Pai · Sexo · Estado Civil · Raça/Cor · Jornada · Nome Banco · Tipo Conta · Agência · Conta · Nome Social · Grau Instrução · Situação · Dt. Demissão · Motivo Demissão · Tipo Empregado · Deficiências (8 campos) · Conselho (4 campos) · Dependentes 1–7 (4 campos cada)</div>
+                        <div id="statusImportarEmpregados" class="status-message"></div>
+                        <div class="upload-area-sm" onclick="document.getElementById('fileEmpregados').click()"
+                             ondragover="event.preventDefault();this.style.borderColor='#8B3A3A'"
+                             ondragleave="this.style.borderColor=''"
+                             ondrop="event.preventDefault();this.style.borderColor='';handleImportarEmpregados({target:{files:event.dataTransfer.files}})">
+                            📊 Clique ou arraste o arquivo (.xlsx / .csv)
+                        </div>
+                        <input type="file" id="fileEmpregados" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportarEmpregados(event)">
+                        <div id="progressEmpregados" style="display:none;">
+                            <div style="background:#D1ECF1;padding:10px;border-radius:6px;font-size:12px;color:#0C5460;">
+                                <strong>Importando empregados...</strong>
+                                <div style="margin-top:6px;background:white;border-radius:4px;height:8px;overflow:hidden;">
+                                    <div id="progressBarEmpregados" style="background:#17A2B8;height:100%;width:0%;transition:width 0.3s;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RUBRICAS -->
+                    <div class="import-card">
+                        <div class="import-card-header">
+                            <span class="import-card-icon">🏷️</span>
+                            <div>
+                                <div class="import-card-title">Rubricas</div>
+                                <div class="import-card-subtitle">3 campos</div>
+                            </div>
+                            <button class="btn-modelo" onclick="baixarModeloRubricas()">⬇️ Modelo</button>
+                        </div>
+                        <div class="import-fields">Cód. Empresa · Cód. Rubrica · Evento (horasTrabalhadas, horasExtras50, horasExtras100, horasNoturnaConvertida, horasDevidas)</div>
+                        <div id="statusImportarRubricas" class="status-message"></div>
+                        <div class="upload-area-sm" onclick="document.getElementById('fileRubricas').click()"
+                             ondragover="event.preventDefault();this.style.borderColor='#8B3A3A'"
+                             ondragleave="this.style.borderColor=''"
+                             ondrop="event.preventDefault();this.style.borderColor='';handleImportarRubricas({target:{files:event.dataTransfer.files}})">
+                            📊 Clique ou arraste o arquivo (.xlsx / .csv)
+                        </div>
+                        <input type="file" id="fileRubricas" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportarRubricas(event)">
+                        <div id="progressRubricas" style="display:none;">
+                            <div style="background:#D1ECF1;padding:10px;border-radius:6px;font-size:12px;color:#0C5460;">
+                                <strong>Importando rubricas...</strong>
+                                <div style="margin-top:6px;background:white;border-radius:4px;height:8px;overflow:hidden;">
+                                    <div id="progressBarRubricas" style="background:#17A2B8;height:100%;width:0%;transition:width 0.3s;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SÓCIOS -->
+                    <div class="import-card">
+                        <div class="import-card-header">
+                            <span class="import-card-icon">🤝</span>
+                            <div>
+                                <div class="import-card-title">Sócios</div>
+                                <div class="import-card-subtitle">6 campos</div>
+                            </div>
+                            <button class="btn-modelo" onclick="baixarModeloSocios()">⬇️ Modelo</button>
+                        </div>
+                        <div class="import-fields">Cód. Empresa · Nome do Sócio · CPF · Participação (%) · Cargo · Data de Entrada</div>
+                        <div id="statusImportarSocios" class="status-message"></div>
+                        <div class="upload-area-sm" onclick="document.getElementById('fileSocios').click()"
+                             ondragover="event.preventDefault();this.style.borderColor='#8B3A3A'"
+                             ondragleave="this.style.borderColor=''"
+                             ondrop="event.preventDefault();this.style.borderColor='';handleImportarSocios({target:{files:event.dataTransfer.files}})">
+                            📊 Clique ou arraste o arquivo (.xlsx / .csv)
+                        </div>
+                        <input type="file" id="fileSocios" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportarSocios(event)">
+                        <div id="progressSocios" style="display:none;">
+                            <div style="background:#D1ECF1;padding:10px;border-radius:6px;font-size:12px;color:#0C5460;">
+                                <strong>Importando sócios...</strong>
+                                <div style="margin-top:6px;background:white;border-radius:4px;height:8px;overflow:hidden;">
+                                    <div id="progressBarSocios" style="background:#17A2B8;height:100%;width:0%;transition:width 0.3s;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -302,6 +517,28 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="../portal-auth-guard.js"></script>
+    <!-- Modal: Modo de Importação -->
+    <div id="modalImportMode" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99998;align-items:center;justify-content:center;">
+        <div style="background:white;border-radius:14px;padding:32px 28px;max-width:460px;width:92%;box-shadow:0 24px 64px rgba(0,0,0,0.25);">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                <span style="font-size:28px;">📥</span>
+                <h3 id="modalImportTitle" style="color:#2C3E50;font-size:17px;margin:0;"></h3>
+            </div>
+            <p id="modalImportMsg" style="color:#555;font-size:13px;line-height:1.7;margin-bottom:24px;background:#FFF8F0;border-left:3px solid #E67E22;padding:10px 14px;border-radius:4px;"></p>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <button id="modalBtnSubstituir" style="padding:12px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;background:linear-gradient(135deg,#E74C3C,#C0392B);color:white;text-align:left;">
+                    🗑 Substituir — excluir os dados anteriores e importar os novos
+                </button>
+                <button id="modalBtnAcrescentar" style="padding:12px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;background:linear-gradient(135deg,#27AE60,#1E8449);color:white;text-align:left;">
+                    ➕ Acrescentar — manter os dados existentes e adicionar os novos
+                </button>
+                <button id="modalBtnCancelar" style="padding:10px 16px;border:1px solid #CCC;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;background:white;color:#555;">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="admin.js"></script>
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
     <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>

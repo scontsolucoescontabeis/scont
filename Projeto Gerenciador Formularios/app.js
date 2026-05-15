@@ -270,6 +270,7 @@ async function openFormDetails(formId) {
         modal.style.display = 'flex';
 
         let sociosDoBanco = [];
+        let dependentesDoBanco = [];
 
         // Buscar sócios na tabela 'socios' se for registro ou alteração
         if (form.tipo_formulario === 'registro' || form.tipo_formulario === 'alteracao') {
@@ -290,11 +291,27 @@ async function openFormDetails(formId) {
             }
         }
 
+        // Buscar dependentes na tabela 'dependentes' se for empregado
+        if (form.tipo_formulario === 'empregado' && supabaseClient) {
+            try {
+                const { data: deps, error } = await supabaseClient
+                    .from('dependentes')
+                    .select('*')
+                    .eq('empregado_id', formId)
+                    .order('id', { ascending: true });
+
+                if (!error && deps) {
+                    dependentesDoBanco = deps;
+                }
+            } catch (e) {
+                console.warn('⚠️ Erro ao buscar dependentes:', e);
+            }
+        }
+
         const nome = form.nome_empresa || form.nome_completo || form.nomeEmpresa || form.nomeCompleto;
         modalTitle.textContent = `Detalhes - ${sanitizeOutput(nome)}`;
-        
-        // Passamos os sócios encontrados como segundo parâmetro
-        modalBody.innerHTML = createDetailContent(form, sociosDoBanco);
+
+        modalBody.innerHTML = createDetailContent(form, sociosDoBanco, dependentesDoBanco);
         
         window.currentFormId = formId;
         window.currentForm = form;
@@ -341,7 +358,7 @@ async function loadFormDetails(formId) {
     }
 }
 
-function createDetailContent(form, sociosDoBanco = []) {
+function createDetailContent(form, sociosDoBanco = [], dependentesDoBanco = []) {
     const tipo = getTipoFormulario(form.tipo_formulario);
     const status = form.status || 'Recebido';
     const dataFormatada = new Date(form.created_at || form.data_preenchimento || Date.now()).toLocaleDateString('pt-BR');
@@ -500,20 +517,76 @@ function createDetailContent(form, sociosDoBanco = []) {
     // 3. REGISTRO DE EMPREGADO
     // ==========================================
     else if (form.tipo_formulario === 'empregado') {
+        const diasTrabalho = Array.isArray(form.dias_trabalho)
+            ? form.dias_trabalho.join(', ')
+            : (form.dias_trabalho || form.diasTrabalho || '-');
+
+        const dependentesHtml = dependentesDoBanco.length > 0
+            ? `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;">
+                <thead>
+                    <tr style="background:var(--gray-100);">
+                        <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border-color);">Nome</th>
+                        <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border-color);">CPF</th>
+                        <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border-color);">Nascimento</th>
+                        <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border-color);">Parentesco</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${dependentesDoBanco.map(d => `
+                    <tr>
+                        <td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);">${sanitizeOutput(d.nome || d.nome_completo || '-')}</td>
+                        <td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);">${sanitizeOutput(d.cpf || '-')}</td>
+                        <td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);">${sanitizeOutput(d.data_nascimento || '-')}</td>
+                        <td style="padding:6px 10px;border-bottom:1px solid var(--gray-100);text-transform:capitalize;">${sanitizeOutput(d.parentesco || d.grau_parentesco || '-')}</td>
+                    </tr>`).join('')}
+                </tbody>
+               </table>`
+            : '<span style="color:var(--gray-500);font-size:13px;">Nenhum dependente cadastrado.</span>';
+
         conteudoAdicional = `
             <div class="detail-section">
                 <div class="detail-section-title">👤 Informações Pessoais</div>
                 <div class="detail-row">
                     <div class="detail-field">
+                        <span class="detail-label">Nome Completo</span>
+                        <div class="detail-value">${sanitizeOutput(form.nome_completo || form.nomeCompleto || '-')}</div>
+                    </div>
+                    <div class="detail-field">
                         <span class="detail-label">CPF</span>
                         <div class="detail-value">${sanitizeOutput(form.cpf || '-')}</div>
                     </div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-field">
+                        <span class="detail-label">E-mail</span>
+                        <div class="detail-value">${sanitizeOutput(form.email || '-')}</div>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Celular</span>
+                        <div class="detail-value">${sanitizeOutput(form.celular || '-')}</div>
+                    </div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-field">
+                        <span class="detail-label">Telefone</span>
+                        <div class="detail-value">${sanitizeOutput(form.telefone || '-')}</div>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Número do PIS</span>
+                        <div class="detail-value">${sanitizeOutput(form.numero_pis || form.numeroPIS || '-')}</div>
+                    </div>
+                </div>
+                <div class="detail-row">
                     <div class="detail-field">
                         <span class="detail-label">Estado Civil</span>
                         <div class="detail-value" style="text-transform: capitalize;">${sanitizeOutput(form.estado_civil || form.estadoCivil || '-')}</div>
                     </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Data de Nascimento</span>
+                        <div class="detail-value">${sanitizeOutput(form.data_nascimento || form.dataNascimento || '-')}</div>
+                    </div>
                 </div>
-                
+
                 ${(form.estado_civil === 'casado' || form.estado_civil === 'uniao_estavel') ? `
                 <div class="detail-row">
                     <div class="detail-field">
@@ -528,28 +601,28 @@ function createDetailContent(form, sociosDoBanco = []) {
 
                 <div class="detail-row">
                     <div class="detail-field">
-                        <span class="detail-label">Data de Nascimento</span>
-                        <div class="detail-value">${sanitizeOutput(form.data_nascimento || form.dataNascimento || '-')}</div>
-                    </div>
-                    <div class="detail-field">
                         <span class="detail-label">Naturalidade</span>
                         <div class="detail-value">${sanitizeOutput(form.naturalidade || '-')}</div>
                     </div>
-                </div>
-                <div class="detail-row">
                     <div class="detail-field">
                         <span class="detail-label">Grau de Escolaridade</span>
                         <div class="detail-value">${sanitizeOutput(form.grau_escolaridade || form.grauEscolaridade || '-')}</div>
                     </div>
+                </div>
+                <div class="detail-row">
                     <div class="detail-field">
                         <span class="detail-label">Raça/Cor</span>
                         <div class="detail-value" style="text-transform: capitalize;">${sanitizeOutput(form.raca || '-')}</div>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">CEP</span>
+                        <div class="detail-value">${sanitizeOutput(form.cep || '-')}</div>
                     </div>
                 </div>
                 <div class="detail-row full">
                     <div class="detail-field">
                         <span class="detail-label">Endereço Residencial</span>
-                        <div class="detail-value">${sanitizeOutput(form.endereco || '-')} - CEP: ${sanitizeOutput(form.cep || '-')}</div>
+                        <div class="detail-value">${sanitizeOutput(form.endereco || '-')}</div>
                     </div>
                 </div>
             </div>
@@ -562,8 +635,14 @@ function createDetailContent(form, sociosDoBanco = []) {
                         <div class="detail-value">${form.tem_filhos ? 'Sim' : 'Não'}</div>
                     </div>
                     <div class="detail-field">
-                        <span class="detail-label">Quantidade de Filhos (&lt; 14 anos)</span>
-                        <div class="detail-value">${form.quantidade_filhos || 0}</div>
+                        <span class="detail-label">Dependentes cadastrados</span>
+                        <div class="detail-value">${dependentesDoBanco.length}</div>
+                    </div>
+                </div>
+                <div class="detail-row full">
+                    <div class="detail-field">
+                        <span class="detail-label">Lista de Dependentes</span>
+                        <div class="detail-value" style="padding:0;">${dependentesHtml}</div>
                     </div>
                 </div>
             </div>
@@ -611,10 +690,14 @@ function createDetailContent(form, sociosDoBanco = []) {
                     </div>
                     <div class="detail-field">
                         <span class="detail-label">Contrato de Experiência</span>
-                        <div class="detail-value">${sanitizeOutput(form.contrato_experiencia || form.contratoExperiencia || '-').replace('_', ' ')}</div>
+                        <div class="detail-value">${sanitizeOutput((form.contrato_experiencia || form.contratoExperiencia || '-')).replace(/_/g, ' ')}</div>
                     </div>
                 </div>
-                <div class="detail-row full">
+                <div class="detail-row">
+                    <div class="detail-field">
+                        <span class="detail-label">Dias de Trabalho</span>
+                        <div class="detail-value" style="text-transform:uppercase;">${sanitizeOutput(diasTrabalho)}</div>
+                    </div>
                     <div class="detail-field">
                         <span class="detail-label">Horário de Trabalho</span>
                         <div class="detail-value">${sanitizeOutput(form.horario_trabalho || form.horarioTrabalho || '-')}</div>
@@ -780,6 +863,7 @@ async function editFormCard(formId) {
         modal.style.display = 'flex';
 
         let sociosDoBanco = [];
+        let dependentesDoBanco = [];
 
         // Buscar sócios na tabela 'socios' se for registro ou alteração
         if (form.tipo_formulario === 'registro' || form.tipo_formulario === 'alteracao') {
@@ -800,11 +884,26 @@ async function editFormCard(formId) {
             }
         }
 
-        // Passa os sócios para a função que cria o formulário
-        modalBody.innerHTML = createEditForm(form, sociosDoBanco);
+        // Buscar dependentes para edição se for empregado
+        if (form.tipo_formulario === 'empregado' && supabaseClient) {
+            try {
+                const { data: deps, error } = await supabaseClient
+                    .from('dependentes')
+                    .select('*')
+                    .eq('empregado_id', formId)
+                    .order('id', { ascending: true });
+                if (!error && deps) dependentesDoBanco = deps;
+            } catch (e) {
+                console.warn('⚠️ Erro ao buscar dependentes para edição:', e);
+            }
+        }
+
+        // Passa os dados para a função que cria o formulário
+        modalBody.innerHTML = createEditForm(form, sociosDoBanco, dependentesDoBanco);
         window.currentFormId = formId;
         window.currentForm = form;
-        window.currentSocios = sociosDoBanco; // Salva os sócios na memória para usar no saveChanges
+        window.currentSocios = sociosDoBanco;
+        window.currentDependentes = dependentesDoBanco;
 
     } catch (error) {
         console.error('❌ Erro ao abrir edição:', error);
@@ -813,7 +912,7 @@ async function editFormCard(formId) {
     }
 }
 
-function createEditForm(form, sociosDoBanco = []) {
+function createEditForm(form, sociosDoBanco = [], dependentesDoBanco = []) {
     const tipo = form.tipo_formulario || 'formulario';
     
     let camposEdicao = `
@@ -939,9 +1038,31 @@ function createEditForm(form, sociosDoBanco = []) {
     } 
     // 3. EDIÇÃO: REGISTRO DE EMPREGADO
     else if (tipo === 'empregado') {
+        const _diasTrab = Array.isArray(form.dias_trabalho) ? form.dias_trabalho : (form.dias_trabalho ? String(form.dias_trabalho).split(',').map(d => d.trim()) : []);
+        const _diasOpts = ['seg','ter','qua','qui','sex','sab','dom'];
+        const _diasLabels = {seg:'Seg',ter:'Ter',qua:'Qua',qui:'Qui',sex:'Sex',sab:'Sáb',dom:'Dom'};
+        const diasCheckboxes = _diasOpts.map(d => `<label style="display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:13px;"><input type="checkbox" name="editDiasTrabalho" value="${d}" ${_diasTrab.includes(d) ? 'checked' : ''}> ${_diasLabels[d]}</label>`).join('');
+
+        const depTabela = dependentesDoBanco.length > 0
+            ? `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+                <thead><tr style="background:var(--gray-100);">
+                    <th style="padding:6px 10px;text-align:left;">Nome</th>
+                    <th style="padding:6px 10px;text-align:left;">CPF</th>
+                    <th style="padding:6px 10px;text-align:left;">Nascimento</th>
+                    <th style="padding:6px 10px;text-align:left;">Parentesco</th>
+                </tr></thead>
+                <tbody>${dependentesDoBanco.map(d => `<tr>
+                    <td style="padding:5px 10px;border-bottom:1px solid var(--gray-100);">${sanitizeOutput(d.nome||d.nome_completo||'-')}</td>
+                    <td style="padding:5px 10px;border-bottom:1px solid var(--gray-100);">${sanitizeOutput(d.cpf||'-')}</td>
+                    <td style="padding:5px 10px;border-bottom:1px solid var(--gray-100);">${sanitizeOutput(d.data_nascimento||'-')}</td>
+                    <td style="padding:5px 10px;border-bottom:1px solid var(--gray-100);text-transform:capitalize;">${sanitizeOutput(d.parentesco||d.grau_parentesco||'-')}</td>
+                </tr>`).join('')}</tbody>
+               </table>`
+            : '<span style="color:var(--gray-500);font-size:13px;">Nenhum dependente cadastrado.</span>';
+
         camposEdicao += `
             <div class="detail-section">
-                <div class="detail-section-title">Informações Pessoais</div>
+                <div class="detail-section-title">👤 Informações Pessoais</div>
                 <div class="detail-row">
                     <div class="detail-field"><label class="detail-label">Nome Completo</label><input type="text" id="editNomeCompleto" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.nome_completo || form.nomeCompleto || '')}"></div>
                     <div class="detail-field"><label class="detail-label">CPF</label><input type="text" id="editCpf" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.cpf || '')}"></div>
@@ -950,16 +1071,111 @@ function createEditForm(form, sociosDoBanco = []) {
                     <div class="detail-field"><label class="detail-label">E-mail</label><input type="email" id="editEmail" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.email || '')}"></div>
                     <div class="detail-field"><label class="detail-label">Celular</label><input type="tel" id="editCelular" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.celular || '')}"></div>
                 </div>
-            </div>
-            <div class="detail-section">
-                <div class="detail-section-title">Dados Contratuais</div>
                 <div class="detail-row">
-                    <div class="detail-field"><label class="detail-label">Cargo</label><input type="text" id="editCargo" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.cargo || '')}"></div>
+                    <div class="detail-field"><label class="detail-label">Telefone</label><input type="tel" id="editTelefone" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.telefone || '')}"></div>
+                    <div class="detail-field"><label class="detail-label">Número do PIS</label><input type="text" id="editNumeroPIS" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.numero_pis || form.numeroPIS || '')}"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-field">
+                        <label class="detail-label">Estado Civil</label>
+                        <select id="editEstadoCivil" class="filter-select" style="padding: var(--spacing-md);">
+                            <option value="solteiro" ${(form.estado_civil||form.estadoCivil) === 'solteiro' ? 'selected' : ''}>Solteiro(a)</option>
+                            <option value="casado" ${(form.estado_civil||form.estadoCivil) === 'casado' ? 'selected' : ''}>Casado(a)</option>
+                            <option value="divorciado" ${(form.estado_civil||form.estadoCivil) === 'divorciado' ? 'selected' : ''}>Divorciado(a)</option>
+                            <option value="viuvo" ${(form.estado_civil||form.estadoCivil) === 'viuvo' ? 'selected' : ''}>Viúvo(a)</option>
+                            <option value="uniao_estavel" ${(form.estado_civil||form.estadoCivil) === 'uniao_estavel' ? 'selected' : ''}>União Estável</option>
+                        </select>
+                    </div>
+                    <div class="detail-field"><label class="detail-label">Nome do Cônjuge</label><input type="text" id="editNomeConjuge" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.nome_conjuge || '')}"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-field"><label class="detail-label">Data de Nascimento</label><input type="date" id="editDataNascimento" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.data_nascimento || form.dataNascimento || '')}"></div>
+                    <div class="detail-field"><label class="detail-label">Naturalidade</label><input type="text" id="editNaturalidade" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.naturalidade || '')}"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-field">
+                        <label class="detail-label">Grau de Escolaridade</label>
+                        <select id="editGrauEscolaridade" class="filter-select" style="padding: var(--spacing-md);">
+                            <option value="">Selecione...</option>
+                            ${['1_grau_incompleto','1_grau_completo','2_grau_incompleto','2_grau_completo','3_grau_incompleto','3_grau_completo'].map(v => `<option value="${v}" ${(form.grau_escolaridade||form.grauEscolaridade) === v ? 'selected' : ''}>${v.replace(/_/g,' ')}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="detail-field">
+                        <label class="detail-label">Raça/Cor</label>
+                        <select id="editRaca" class="filter-select" style="padding: var(--spacing-md);">
+                            <option value="">Selecione...</option>
+                            ${['indigena','branca','negra','amarela','parda'].map(v => `<option value="${v}" ${form.raca === v ? 'selected' : ''}>${v.charAt(0).toUpperCase()+v.slice(1)}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="detail-row full">
+                    <div class="detail-field"><label class="detail-label">Endereço Residencial</label><input type="text" id="editEndereco" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.endereco || '')}"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-field"><label class="detail-label">CEP</label><input type="text" id="editCep" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.cep || '')}"></div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="detail-section-title">👨‍👩‍👧‍👦 Dependentes (${dependentesDoBanco.length})</div>
+                <div class="detail-row full">
+                    <div class="detail-field">
+                        <div class="detail-value" style="padding:0;">${depTabela}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="detail-section-title">💼 Dados Contratuais</div>
+                <div class="detail-row">
+                    <div class="detail-field"><label class="detail-label">Empresa Contratante</label><input type="text" id="editNomeEmpresa" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.nome_empresa || form.nomeEmpresa || '')}"></div>
+                    <div class="detail-field"><label class="detail-label">Data de Admissão</label><input type="date" id="editDataAdmissao" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.data_admissao || form.dataAdmissao || '')}"></div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-field"><label class="detail-label">Cargo/Função</label><input type="text" id="editCargo" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.cargo || '')}"></div>
                     <div class="detail-field"><label class="detail-label">Departamento</label><input type="text" id="editDepartamento" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.departamento || '')}"></div>
                 </div>
                 <div class="detail-row">
-                    <div class="detail-field"><label class="detail-label">Salário</label><input type="number" id="editSalario" class="search-input" style="padding: var(--spacing-md);" value="${form.salario_contratual || form.salarioContratual || 0}" step="0.01"></div>
+                    <div class="detail-field"><label class="detail-label">Salário Contratual (R$)</label><input type="number" id="editSalario" class="search-input" style="padding: var(--spacing-md);" value="${form.salario_contratual || form.salarioContratual || 0}" step="0.01"></div>
+                    <div class="detail-field">
+                        <label class="detail-label">Contrato de Experiência</label>
+                        <select id="editContratoExperiencia" class="filter-select" style="padding: var(--spacing-md);">
+                            <option value="">Selecione...</option>
+                            <option value="30_30" ${(form.contrato_experiencia||form.contratoExperiencia) === '30_30' ? 'selected' : ''}>30 dias + 30 dias</option>
+                            <option value="45_45" ${(form.contrato_experiencia||form.contratoExperiencia) === '45_45' ? 'selected' : ''}>45 dias + 45 dias</option>
+                            <option value="90" ${(form.contrato_experiencia||form.contratoExperiencia) === '90' ? 'selected' : ''}>90 dias</option>
+                            <option value="nao_tera" ${(form.contrato_experiencia||form.contratoExperiencia) === 'nao_tera' ? 'selected' : ''}>Não terá</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="detail-row">
                     <div class="detail-field"><label class="detail-label">Horário de Trabalho</label><input type="text" id="editHorarioTrabalho" class="search-input" style="padding: var(--spacing-md);" value="${sanitizeOutput(form.horario_trabalho || form.horarioTrabalho || '')}"></div>
+                </div>
+                <div class="detail-row full">
+                    <div class="detail-field">
+                        <label class="detail-label">Dias de Trabalho</label>
+                        <div style="padding:8px 0;">${diasCheckboxes}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="detail-section-title">🚌 Benefícios</div>
+                <div class="detail-row">
+                    <div class="detail-field">
+                        <label class="detail-label">Vale Transporte?</label>
+                        <select id="editValeTransporte" class="filter-select" style="padding: var(--spacing-md);">
+                            <option value="true" ${form.vale_transporte ? 'selected' : ''}>Sim</option>
+                            <option value="false" ${!form.vale_transporte ? 'selected' : ''}>Não</option>
+                        </select>
+                    </div>
+                    <div class="detail-field">
+                        <label class="detail-label">Desconto 6% VT?</label>
+                        <select id="editDescontoVT" class="filter-select" style="padding: var(--spacing-md);">
+                            <option value="true" ${form.desconto_vt ? 'selected' : ''}>Sim</option>
+                            <option value="false" ${!form.desconto_vt ? 'selected' : ''}>Não</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         `;
@@ -1255,14 +1471,32 @@ async function saveChanges() {
             if (document.getElementById('editAtividadePrincipalNova')) updateData.atividade_principal_nova = document.getElementById('editAtividadePrincipalNova').value;
         } 
         else if (tipo === 'empregado') {
-            if (document.getElementById('editNomeCompleto')) updateData.nome_completo = document.getElementById('editNomeCompleto').value;
-            if (document.getElementById('editCpf')) updateData.cpf = document.getElementById('editCpf').value;
-            if (document.getElementById('editEmail')) updateData.email = document.getElementById('editEmail').value;
-            if (document.getElementById('editCelular')) updateData.celular = document.getElementById('editCelular').value;
-            if (document.getElementById('editCargo')) updateData.cargo = document.getElementById('editCargo').value;
-            if (document.getElementById('editDepartamento')) updateData.departamento = document.getElementById('editDepartamento').value;
-            if (document.getElementById('editSalario')) updateData.salario_contratual = parseFloat(document.getElementById('editSalario').value) || 0;
-            if (document.getElementById('editHorarioTrabalho')) updateData.horario_trabalho = document.getElementById('editHorarioTrabalho').value;
+            const _ge = id => document.getElementById(id);
+            if (_ge('editNomeCompleto')) updateData.nome_completo = _ge('editNomeCompleto').value;
+            if (_ge('editCpf')) updateData.cpf = _ge('editCpf').value;
+            if (_ge('editEmail')) updateData.email = _ge('editEmail').value;
+            if (_ge('editCelular')) updateData.celular = _ge('editCelular').value;
+            if (_ge('editTelefone')) updateData.telefone = _ge('editTelefone').value;
+            if (_ge('editNumeroPIS')) updateData.numero_pis = _ge('editNumeroPIS').value;
+            if (_ge('editEstadoCivil')) updateData.estado_civil = _ge('editEstadoCivil').value;
+            if (_ge('editNomeConjuge')) updateData.nome_conjuge = _ge('editNomeConjuge').value;
+            if (_ge('editDataNascimento')) updateData.data_nascimento = _ge('editDataNascimento').value || null;
+            if (_ge('editNaturalidade')) updateData.naturalidade = _ge('editNaturalidade').value;
+            if (_ge('editGrauEscolaridade')) updateData.grau_escolaridade = _ge('editGrauEscolaridade').value;
+            if (_ge('editRaca')) updateData.raca = _ge('editRaca').value;
+            if (_ge('editEndereco')) updateData.endereco = _ge('editEndereco').value;
+            if (_ge('editCep')) updateData.cep = _ge('editCep').value;
+            if (_ge('editNomeEmpresa')) updateData.nome_empresa = _ge('editNomeEmpresa').value;
+            if (_ge('editDataAdmissao')) updateData.data_admissao = _ge('editDataAdmissao').value || null;
+            if (_ge('editCargo')) updateData.cargo = _ge('editCargo').value;
+            if (_ge('editDepartamento')) updateData.departamento = _ge('editDepartamento').value;
+            if (_ge('editSalario')) updateData.salario_contratual = parseFloat(_ge('editSalario').value) || 0;
+            if (_ge('editContratoExperiencia')) updateData.contrato_experiencia = _ge('editContratoExperiencia').value;
+            if (_ge('editHorarioTrabalho')) updateData.horario_trabalho = _ge('editHorarioTrabalho').value;
+            if (_ge('editValeTransporte')) updateData.vale_transporte = _ge('editValeTransporte').value === 'true';
+            if (_ge('editDescontoVT')) updateData.desconto_vt = _ge('editDescontoVT').value === 'true';
+            const diasMarcados = Array.from(document.querySelectorAll('input[name="editDiasTrabalho"]:checked')).map(el => el.value);
+            if (diasMarcados.length > 0) updateData.dias_trabalho = diasMarcados;
         }
 
         // 1. Atualiza o formulário principal

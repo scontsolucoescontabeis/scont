@@ -924,7 +924,9 @@ async function processarFolhaComSalvamento(nomeResponsavel) {
         
         console.log('Primeiro registro a salvar:', dadosParaSalvar[0]);
         
-        const { error } = await supabaseClient.from('rh_saves').insert(dadosParaSalvar);
+        const { error } = await supabaseClient.from('rh_saves').upsert(dadosParaSalvar, {
+            onConflict: 'empresa_codigo,nome_trabalhador,competencia'
+        });
         if (error) throw error;
         
         fecharModalMensagem();

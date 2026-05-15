@@ -729,8 +729,10 @@ let isSubmitting = false; // CORREÇÃO: FLAG PARA PREVENIR DUPLICAÇÃO
         // ===== INICIALIZAR SUPABASE =====
         function initSupabase() {
             if (typeof window.supabase !== 'undefined') {
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                console.log('✅ Supabase inicializado');
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    auth: { persistSession: false, autoRefreshToken: false }
+                });
+                console.log('✅ Supabase inicializado (modo anônimo)');
             } else {
                 console.warn('⚠️ Supabase não carregado');
             }
@@ -742,7 +744,9 @@ let isSubmitting = false; // CORREÇÃO: FLAG PARA PREVENIR DUPLICAÇÃO
                 console.error('❌ Supabase não carregado');
                 return null;
             }
-            return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            return window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                auth: { persistSession: false, autoRefreshToken: false }
+            });
         }
 
         // ===== EVENT LISTENERS =====

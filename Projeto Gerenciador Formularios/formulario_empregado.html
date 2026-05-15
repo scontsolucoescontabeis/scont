@@ -695,7 +695,7 @@
             <!-- SEÇÃO 5: DOCUMENTAÇÃO EXIGIDA -->
             <section class="form-section">
                 <h2 class="section-title">DOCUMENTAÇÃO EXIGIDA</h2>
-                <p style="margin-bottom: 20px; color: var(--gray-600); font-size: 13px;">Selecione os documentos que serão enviados e faça upload dos arquivos correspondentes. Formatos aceitos: PDF, JPG, PNG (máx. 5MB por arquivo).</p>
+                <p style="margin-bottom: 20px; color: var(--gray-600); font-size: 13px;">Selecione os documentos que serão enviados e faça upload dos arquivos correspondentes. Formatos aceitos: PDF, JPG, PNG (máx. 5MB por arquivo). <strong>É possível selecionar múltiplos arquivos por campo</strong> — ex.: frente e verso do documento, certidões de vários dependentes.</p>
 
                 <!-- CATEGORIA: DOCUMENTOS DE IDENTIFICAÇÃO -->
                 <div class="document-category">
@@ -713,13 +713,13 @@
                     
                     <div class="document-item">
                         <label>Carteira de Trabalho</label>
-                        <input type="file" name="docCarteiraTrabalho" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docCarteiraTrabalho')">
+                        <input type="file" name="docCarteiraTrabalho" accept=".pdf,.jpg,.jpeg,.png" multiple onchange="window.handleFileUpload(event, 'docCarteiraTrabalho')">
                         <div class="document-preview" id="preview_docCarteiraTrabalho"></div>
                     </div>
 
                     <div class="document-item">
                         <label>Identidade, CPF e Título de Eleitor</label>
-                        <input type="file" name="docIdentidadeCPF" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docIdentidadeCPF')">
+                        <input type="file" name="docIdentidadeCPF" accept=".pdf,.jpg,.jpeg,.png" multiple onchange="window.handleFileUpload(event, 'docIdentidadeCPF')">
                         <div class="document-preview" id="preview_docIdentidadeCPF"></div>
                     </div>
 
@@ -730,7 +730,7 @@
         <input type="text" id="numeroPIS" name="numeroPIS" placeholder="Digite o número do PIS (ex: 123.45.678.90)" style="width: 100%; padding: 8px; border: 1px solid var(--gray-300); border-radius: 4px; font-size: 14px;">
     </div>
     <label style="display: block; margin-top: 10px; margin-bottom: 8px; font-weight: 600; color: var(--gray-700); font-size: 13px;">Ou faça upload do cartão</label>
-    <input type="file" name="docPIS" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docPIS')">
+    <input type="file" name="docPIS" accept=".pdf,.jpg,.jpeg,.png" multiple onchange="window.handleFileUpload(event, 'docPIS')">
     <div class="document-preview" id="preview_docPIS"></div>
 </div>
 
@@ -738,7 +738,7 @@
 
                     <div class="document-item">
                         <label>Certificado de Reservista (Homens)</label>
-                        <input type="file" name="docReservista" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docReservista')">
+                        <input type="file" name="docReservista" accept=".pdf,.jpg,.jpeg,.png" multiple onchange="window.handleFileUpload(event, 'docReservista')">
                         <div class="document-preview" id="preview_docReservista"></div>
                     </div>
                 </div>
@@ -757,13 +757,13 @@
                     
                     <div class="document-item">
                         <label>Certidão de Nascimento dos Filhos</label>
-                        <input type="file" name="docCertidaoFilhos" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docCertidaoFilhos')">
+                        <input type="file" name="docCertidaoFilhos" accept=".pdf,.jpg,.jpeg,.png" multiple onchange="window.handleFileUpload(event, 'docCertidaoFilhos')">
                         <div class="document-preview" id="preview_docCertidaoFilhos"></div>
                     </div>
 
                     <div class="document-item">
                         <label>Comprovante de Residência</label>
-                        <input type="file" name="docComprovanteResidencia" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docComprovanteResidencia')">
+                        <input type="file" name="docComprovanteResidencia" accept=".pdf,.jpg,.jpeg,.png" multiple onchange="window.handleFileUpload(event, 'docComprovanteResidencia')">
                         <div class="document-preview" id="preview_docComprovanteResidencia"></div>
                     </div>
                 </div>
@@ -781,7 +781,7 @@
                     
                     <div class="document-item">
                         <label>Exame Médico Admissional (ASO)</label>
-                        <input type="file" name="docExameMedico" accept=".pdf,.jpg,.jpeg,.png" onchange="window.handleFileUpload(event, 'docExameMedico')">
+                        <input type="file" name="docExameMedico" accept=".pdf,.jpg,.jpeg,.png" multiple onchange="window.handleFileUpload(event, 'docExameMedico')">
                         <div class="document-preview" id="preview_docExameMedico"></div>
                     </div>
                 </div>
@@ -838,8 +838,10 @@
     let supabaseClient = null;
     function initSupabase() {
         if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-            console.log('✅ Supabase inicializado com sucesso');
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                auth: { persistSession: false, autoRefreshToken: false }
+            });
+            console.log('✅ Supabase inicializado (modo anônimo)');
             return supabaseClient;
         } else {
             console.error('❌ Biblioteca Supabase não carregada');
@@ -953,31 +955,50 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
         }
     };
 
-    // ===== HANDLE FILE UPLOAD =====
+    // ===== HANDLE FILE UPLOAD (múltiplos arquivos) =====
     window.handleFileUpload = function(event, fieldName) {
-        const file = event.target.files[0];
-        if (!file) return;
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
 
         const maxSize = 5 * 1024 * 1024;
-        if (file.size > maxSize) {
-            alert('Arquivo muito grande! Máximo permitido: 5MB');
-            event.target.value = '';
-            return;
-        }
-
         const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-        if (!allowedTypes.includes(file.type)) {
-            alert('Tipo de arquivo não permitido! Use PDF, JPG ou PNG');
-            event.target.value = '';
-            return;
-        }
+        const rejeitados = [];
 
-        uploadedDocuments[fieldName] = file;
+        const validos = files.filter(file => {
+            if (file.size > maxSize)                    { rejeitados.push(`${file.name}: excede 5MB`); return false; }
+            if (!allowedTypes.includes(file.type))      { rejeitados.push(`${file.name}: tipo não permitido`); return false; }
+            return true;
+        });
 
+        if (rejeitados.length) alert('Arquivo(s) ignorado(s):\n' + rejeitados.join('\n'));
+        if (!validos.length) { event.target.value = ''; return; }
+
+        // Acumula — permite adicionar mais arquivos em cliques subsequentes
+        if (!uploadedDocuments[fieldName]) uploadedDocuments[fieldName] = [];
+        uploadedDocuments[fieldName] = uploadedDocuments[fieldName].concat(validos);
+
+        _renderizarPreview(fieldName);
+        event.target.value = ''; // limpa input para permitir re-seleção do mesmo arquivo
+    };
+
+    function _renderizarPreview(fieldName) {
         const preview = document.getElementById('preview_' + fieldName);
-        if (preview) {
-            preview.innerHTML = `✅ ${file.name} (${(file.size / 1024).toFixed(2)} KB)`;
-        }
+        if (!preview) return;
+        const lista = uploadedDocuments[fieldName] || [];
+        if (!lista.length) { preview.innerHTML = ''; return; }
+        preview.innerHTML = lista.map((f, i) => `
+            <div style="display:flex;align-items:center;gap:8px;padding:4px 6px;background:#F0FFF4;border:1px solid #A8D5B5;border-radius:5px;margin-top:4px;font-size:12px;">
+                <span style="color:#27AE60;">✅</span>
+                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.name}">${f.name} <span style="color:#888;">(${(f.size/1024).toFixed(0)} KB)</span></span>
+                <button type="button" onclick="window.removerArquivo('${fieldName}', ${i})" style="border:none;background:none;color:#E74C3C;cursor:pointer;font-size:14px;padding:0 2px;" title="Remover">✕</button>
+            </div>`).join('');
+    }
+
+    window.removerArquivo = function(fieldName, index) {
+        if (!uploadedDocuments[fieldName]) return;
+        uploadedDocuments[fieldName].splice(index, 1);
+        if (!uploadedDocuments[fieldName].length) delete uploadedDocuments[fieldName];
+        _renderizarPreview(fieldName);
     };
 
     // ===== ADD DEPENDENT ROW =====
@@ -1410,26 +1431,27 @@ const formData = {
                 throw new Error('Supabase não inicializado. Verifique as credenciais.');
             }
 
-            // ===== VALIDAR CPF DUPLICADO =====
-            console.log('🔍 Verificando se CPF já existe no banco de dados...');
-            
+            // ===== VALIDAR CPF DUPLICADO NA MESMA EMPRESA =====
+            console.log('🔍 Verificando se CPF já está cadastrado nesta empresa...');
+
             const { data: cpfExistente, error: cpfError } = await supabase
                 .from('empregados')
-                .select('id, nome_completo')
+                .select('id, nome_completo, nome_empresa')
                 .eq('cpf', formData.cpf)
-                .single();
+                .eq('nome_empresa', formData.nomeEmpresa)
+                .maybeSingle();
 
             if (cpfExistente) {
-                console.warn('⚠️ CPF já registrado no sistema');
-                throw new Error(`Este CPF já está registrado no sistema para o empregado: ${cpfExistente.nome_completo}. Por favor, verifique os dados ou entre em contato com o administrador.`);
+                console.warn('⚠️ CPF já registrado nesta empresa');
+                throw new Error(`Este CPF já está cadastrado para a empresa "${cpfExistente.nome_empresa}" (empregado: ${cpfExistente.nome_completo}). Caso seja um novo vínculo em outra empresa, verifique o campo "Nome da Empresa".`);
             }
 
-            if (cpfError && cpfError.code !== 'PGRST116') {
+            if (cpfError) {
                 console.error('❌ Erro ao verificar CPF:', cpfError);
                 throw cpfError;
             }
 
-            console.log('✅ CPF validado - não existe duplicação');
+            console.log('✅ CPF validado - sem duplicação para esta empresa');
 
             console.log('💾 Salvando dados do empregado no banco de dados...');
 
@@ -1482,40 +1504,36 @@ const { data: empregadoData, error: empregadoError } = await supabase
 
             // ===== SALVAR DEPENDENTES =====
             let dependentes = [];
-            if (formData.temFilhos) {
-                console.log('📝 Salvando dependentes...');
-                const dependentRows = document.querySelectorAll('#dependentsTableBody tr');
-                
-                for (let row of dependentRows) {
-                    const nome = row.querySelector('.dependent-name').value;
-                    const cpf = row.querySelector('.dependent-cpf').value || null;
-                    const dataNasc = row.querySelector('.dependent-birth').value;
-                    const parentesco = row.querySelector('.dependent-relationship').value;
+            const dependentRows = document.querySelectorAll('#dependentsTableBody tr');
+            console.log(`📝 Linhas de dependentes encontradas: ${dependentRows.length}`);
 
-                    if (nome && dataNasc && parentesco) {
-                        const { error: depError } = await supabase
-                            .from('dependentes')
-                            .insert([{
-                                empregado_id: empregadoId,
-                                nome_completo: nome,
-                                cpf: cpf,
-                                data_nascimento: dataNasc,
-                                grau_parentesco: parentesco
-                            }]);
+            for (let row of dependentRows) {
+                const nome      = (row.querySelector('.dependent-name')?.value || '').trim();
+                const cpf       = (row.querySelector('.dependent-cpf')?.value || '').trim() || null;
+                const dataNasc  = (row.querySelector('.dependent-birth')?.value || '').trim();
+                const parentesco = (row.querySelector('.dependent-relationship')?.value || '').trim();
 
-                        if (depError) {
-                            console.error('❌ Erro ao salvar dependente:', depError);
-                        } else {
-                            console.log('✅ Dependente salvo:', nome);
-                            dependentes.push({
-                                nome_completo: nome,
-                                cpf: cpf,
-                                data_nascimento: dataNasc,
-                                grau_parentesco: parentesco
-                            });
-                        }
-                    }
+                console.log(`  → Dependente: nome="${nome}" dataNasc="${dataNasc}" parentesco="${parentesco}"`);
+
+                if (!nome) continue; // linha vazia — ignora
+
+                const { error: depError } = await supabase
+                    .from('dependentes')
+                    .insert([{
+                        empregado_id: empregadoId,
+                        nome:            nome,
+                        cpf:             cpf,
+                        data_nascimento: dataNasc || null,
+                        parentesco:      parentesco || null
+                    }]);
+
+                if (depError) {
+                    console.error('❌ Erro ao salvar dependente:', depError);
+                    throw new Error(`Erro ao salvar dependente "${nome}": ${depError.message}`);
                 }
+
+                console.log('✅ Dependente salvo:', nome);
+                dependentes.push({ nome, cpf, data_nascimento: dataNasc, parentesco });
             }
 
             // ===== GERAR PDF DO FORMULÁRIO =====
@@ -1548,13 +1566,16 @@ const { data: empregadoData, error: empregadoError } = await supabase
             };
 
             for (let [fieldName, categoria] of Object.entries(documentTypes)) {
-                if (uploadedDocuments[fieldName]) {
+                const arquivos = uploadedDocuments[fieldName];
+                if (!arquivos || !arquivos.length) continue;
+                for (let idx = 0; idx < arquivos.length; idx++) {
                     try {
                         const tempo = formatarDataHora();
-                        const nomeBase = sanitizarNomeArquivo(formData.nomeCompleto) + '_' + fieldName + '_' + tempo.dataHora;
-                        
+                        const sufixo = arquivos.length > 1 ? `_${idx + 1}` : '';
+                        const nomeBase = sanitizarNomeArquivo(formData.nomeCompleto) + '_' + fieldName + sufixo + '_' + tempo.dataHora;
+
                         const uploadResult = await uploadArquivo(
-                            uploadedDocuments[fieldName],
+                            arquivos[idx],
                             formData.nomeEmpresa,
                             formData.nomeCompleto,
                             categoria,
@@ -1581,7 +1602,7 @@ const { data: empregadoData, error: empregadoError } = await supabase
                             }
                         }
                     } catch (error) {
-                        console.error('❌ Erro ao fazer upload de ' + fieldName + ':', error.message);
+                        console.error('❌ Erro ao fazer upload de ' + fieldName + '[' + idx + ']:', error.message);
                     }
                 }
             }
@@ -1620,6 +1641,7 @@ const { data: empregadoData, error: empregadoError } = await supabase
     window.resetForm = function() {
         form.reset();
         uploadedDocuments = {};
+        document.querySelectorAll('.document-preview').forEach(el => el.innerHTML = '');
         dependentsTableBody.innerHTML = '';
         dependentsCount = 0;
         document.getElementById('dependentsTableWrapper').classList.remove('show');
