@@ -1,0 +1,279 @@
+╔═════════════════════════════════════════════════════════════════════════╗
+║                                                                         ║
+║           🎯 LEIA PRIMEIRO: COMECE AQUI 🎯                           ║
+║                                                                         ║
+║      Sistema Automático de Conversão PDF → Excel                       ║
+║                 Avisos de Vencimento                                    ║
+║                                                                         ║
+╚═════════════════════════════════════════════════════════════════════════╝
+
+📌 ORDEM DE LEITURA RECOMENDADA
+═════════════════════════════════════════════════════════════════════════
+
+1️⃣  ESTE ARQUIVO (00_COMECE_AQUI.txt)
+    └─ O que você recebeu e como começar
+       Tempo: 2 minutos
+
+2️⃣  ESTRUTURA.txt
+    └─ Visão geral de todos os arquivos
+       Fluxo de uso passo a passo
+       Recursos da saída
+       Tempo: 3 minutos
+
+3️⃣  INICIO_RAPIDO.md
+    └─ Instruções de instalação (5 min)
+       Primeiros comandos para rodar
+       Troubleshooting rápido
+       Tempo: 5 minutos
+
+4️⃣  README.md
+    └─ Documentação completa
+       Requisitos detalhados
+       Dicas de personalização
+       Tempo: 15 minutos
+
+5️⃣  EXEMPLOS.md
+    └─ 15+ casos de uso
+       Automação
+       Integração
+       Tempo: 10 minutos (conforme precisar)
+
+═════════════════════════════════════════════════════════════════════════
+
+✅ O QUE VOCÊ RECEBEU
+═════════════════════════════════════════════════════════════════════════
+
+📦 9 Arquivos Prontos para Usar:
+
+  Documentação (4 arquivos):
+  ✓ 00_COMECE_AQUI.txt      ← Você está aqui
+  ✓ ESTRUTURA.txt           ← Mapa visual
+  ✓ INICIO_RAPIDO.md        ← Tutorial rápido
+  ✓ README.md               ← Manual completo
+  ✓ EXEMPLOS.md             ← Exemplos práticos
+
+  Scripts (3 arquivos):
+  ✓ pdf_to_excel_vencimentos.py  ← Script principal
+  ✓ converter_vencimentos.sh     ← Para macOS/Linux
+  ✓ converter_vencimentos.bat    ← Para Windows
+
+  Configuração (2 arquivos):
+  ✓ setup.py                ← Instalador automático
+  ✓ requirements.txt        ← Dependências
+
+  Bônus:
+  ✓ Avisos_de_Vencimento.xlsx   ← Exemplo de saída
+
+═════════════════════════════════════════════════════════════════════════
+
+🚀 3 PASSOS PARA COMEÇAR (AGORA!)
+═════════════════════════════════════════════════════════════════════════
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ PASSO 1: Instalar (Uma Vez)                                         ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                     ┃
+┃ Abra terminal/PowerShell e execute:                                ┃
+┃                                                                     ┃
+┃ $ python setup.py                                                  ┃
+┃                                                                     ┃
+┃ Isso vai:                                                          ┃
+┃ ✓ Verificar Python 3.7+                                           ┃
+┃ ✓ Verificar pip                                                    ┃
+┃ ✓ Instalar dependências (openpyxl, pypdf)                        ┃
+┃ ✓ Validar arquivos necessários                                    ┃
+┃                                                                     ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ PASSO 2: Colocar seu PDF                                           ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                     ┃
+┃ Coloque seu arquivo PDF na mesma pasta dos scripts:               ┃
+┃                                                                     ┃
+┃ Seu_Arquivo_PDF.pdf  ← Aqui nesta pasta                           ┃
+┃                                                                     ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ PASSO 3: Converter                                                   ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃                                                                     ┃
+┃ Escolha conforme seu sistema:                                      ┃
+┃                                                                     ┃
+┃ 🪟 WINDOWS (PowerShell/CMD):                                        ┃
+┃    $ converter_vencimentos.bat seu_arquivo.pdf                     ┃
+┃                                                                     ┃
+┃ 🐧 macOS/LINUX (Terminal):                                          ┃
+┃    $ chmod +x converter_vencimentos.sh                             ┃
+┃    $ ./converter_vencimentos.sh seu_arquivo.pdf                    ┃
+┃                                                                     ┃
+┃ 🐍 QUALQUER SISTEMA (Python):                                       ┃
+┃    $ python pdf_to_excel_vencimentos.py seu_arquivo.pdf            ┃
+┃                                                                     ┃
+┃ ✅ Seu arquivo Excel está pronto!                                  ┃
+┃    seu_arquivo_vencimentos.xlsx                                    ┃
+┃                                                                     ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+═════════════════════════════════════════════════════════════════════════
+
+❓ PRECISO FAZER ALGO ESPECIAL?
+═════════════════════════════════════════════════════════════════════════
+
+❌ NÃO preciso:
+   • Instalar Excel
+   • Usar software especial
+   • Conectar à Internet
+   • Registrar-se em nada
+   • Pagar qualquer coisa
+
+✅ PRECISO:
+   • Python 3.7+ (instale de python.org se não tiver)
+   • pip (vem com Python)
+   • Seu arquivo PDF
+   • 5 minutos para ler esta intro
+
+═════════════════════════════════════════════════════════════════════════
+
+🎯 MINHA PRIMEIRA CONVERSÃO
+═════════════════════════════════════════════════════════════════════════
+
+Suponha que seu PDF se chama "vencimentos_maio.pdf":
+
+1. Coloque "vencimentos_maio.pdf" nesta pasta
+
+2. Abra terminal e execute:
+
+   Windows:
+   > converter_vencimentos.bat vencimentos_maio.pdf
+
+   macOS/Linux:
+   $ ./converter_vencimentos.sh vencimentos_maio.pdf
+
+3. Quando terminar, você terá:
+   ✅ vencimentos_maio_vencimentos.xlsx
+
+4. Abra em Excel/Calc/Sheets:
+   ✓ Dados formatados
+   ✓ Cores por tipo
+   ✓ Filtros ativos
+   ✓ Pronto para usar!
+
+═════════════════════════════════════════════════════════════════════════
+
+🐛 ALGO DEU ERRADO?
+═════════════════════════════════════════════════════════════════════════
+
+"Python não encontrado"
+→ Instale Python 3.7+ de https://www.python.org/downloads/
+
+"módulo não encontrado (openpyxl/pypdf)"
+→ Execute: pip install -r requirements.txt
+
+"arquivo PDF não encontrado"
+→ Coloque o PDF na mesma pasta ou use caminho completo
+
+"Permissão negada" (macOS/Linux)
+→ Execute: chmod +x converter_vencimentos.sh
+
+⚠️  MAIS PROBLEMAS?
+→ Veja detalhes completos em README.md (seção Troubleshooting)
+
+═════════════════════════════════════════════════════════════════════════
+
+📊 O QUE VOCÊ VÃO GANHAR
+═════════════════════════════════════════════════════════════════════════
+
+Seu Excel terá:
+
+✅ Todas as informações do PDF organizadas em colunas:
+   • Empresa
+   • CNPJ/CPF
+   • Empregado
+   • Tipo de aviso
+   • Data de vencimento
+
+✅ Formatação profissional:
+   • Cabeçalho azul com texto branco
+   • Bordas em todas as células
+   • Fonte clara e legível
+   • Altura otimizada
+
+✅ Cores por tipo de evento:
+   🟢 Aniversário
+   🟠 Certificado Digital
+   🔵 Contrato Experiência
+   🟡 Férias
+   🔴 Rescisão
+   🩵 Monitoramento Saúde
+   🟣 Retorno Afastamento
+
+✅ Funcionalidades especiais:
+   • Cabeçalho congelado (scroll sem perder cabeça)
+   • Filtros automáticos
+   • Dados prontos para filtrar/ordenar
+   • Compatível com Excel/Google Sheets/LibreOffice
+
+═════════════════════════════════════════════════════════════════════════
+
+🔄 PRÓXIMA ETAPA
+═════════════════════════════════════════════════════════════════════════
+
+Agora que você sabe o que vai fazer, escolha:
+
+  A) Quero começar AGORA:
+     → Vá para ESTRUTURA.txt (visão geral)
+     → Depois execute: python setup.py
+
+  B) Prefiro entender tudo primeiro:
+     → Leia INICIO_RAPIDO.md (10 min)
+     → Depois README.md se quiser detalhes
+
+  C) Quero ver exemplos de uso:
+     → Veja EXEMPLOS.md
+     → Depois adapte para seu caso
+
+═════════════════════════════════════════════════════════════════════════
+
+✨ RESUMO
+═════════════════════════════════════════════════════════════════════════
+
+Você tem um sistema completo e automático para converter PDFs de
+avisos de vencimento para Excel com formatação profissional.
+
+Scripts prontos para:
+  ✓ Windows
+  ✓ macOS
+  ✓ Linux
+
+Documentação completa:
+  ✓ Início rápido (5 min)
+  ✓ Manual completo
+  ✓ 15+ exemplos
+  ✓ Guia de troubleshooting
+
+Tudo aberto, editável, sem mistério!
+
+═════════════════════════════════════════════════════════════════════════
+
+🎉 VOCÊ ESTÁ PRONTO!
+═════════════════════════════════════════════════════════════════════════
+
+Próximo passo:
+1. Abra ESTRUTURA.txt (2 min)
+2. Execute: python setup.py
+3. Coloque seu PDF
+4. Converta!
+
+Dúvidas? Leia README.md ou EXEMPLOS.md
+
+Sucesso! 🚀
+
+═════════════════════════════════════════════════════════════════════════
+
+Conversor PDF para Excel v1.0
+Compatível: Python 3.7+ | Windows | macOS | Linux
+Maio 2026
+
+═════════════════════════════════════════════════════════════════════════

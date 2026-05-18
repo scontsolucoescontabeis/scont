@@ -10,6 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../portal-auth-guard.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
 <body>
 
@@ -61,6 +62,16 @@
           <li>
             <button class="nav-link" id="nav-configuracoes" onclick="showSection('configuracoes')">
               <span class="nav-icon">⚙️</span> Configurações
+            </button>
+          </li>
+          <li>
+            <button class="nav-link" id="nav-conversor" onclick="showSection('conversor')">
+              <span class="nav-icon">🔄</span> Conversor PDF
+            </button>
+          </li>
+          <li>
+            <button class="nav-link" id="nav-regras" onclick="showSection('regras')">
+              <span class="nav-icon">⏰</span> Envios Recorrentes
             </button>
           </li>
         </ul>
@@ -363,6 +374,240 @@
           <div style="padding:0 20px 20px">
             <button class="btn btn-primary" onclick="salvarConfiguracoes()">Salvar Configurações</button>
           </div>
+        </div>
+      </section>
+
+      <!-- ═══ ENVIOS RECORRENTES ═══ -->
+      <section id="sec-regras" class="section">
+        <div class="page-header">
+          <div>
+            <h1>Envios Recorrentes</h1>
+            <div class="page-header-sub">Regras que geram campanhas automaticamente a cada período</div>
+          </div>
+        </div>
+
+        <!-- Alerta de regras pendentes -->
+        <div id="regras-alert" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#92400E"></div>
+
+        <div id="regras-list">
+          <div class="empty"><span class="empty-icon">⏰</span><p>Nenhuma regra recorrente. Crie uma no Conversor PDF → Configurar Envio.</p></div>
+        </div>
+      </section>
+
+      <!-- ═══ CONVERSOR PDF ═══ -->
+      <section id="sec-conversor" class="section">
+        <div class="page-header">
+          <div>
+            <h1>Conversor PDF → Excel</h1>
+            <div class="page-header-sub">Importe o relatório de avisos de vencimento e gere dados para mala direta</div>
+          </div>
+        </div>
+
+        <!-- Drop zone -->
+        <div id="conv-dropzone"
+          style="border:2px dashed var(--border);border-radius:12px;padding:48px 32px;text-align:center;background:var(--bg);cursor:pointer;transition:border-color .2s,background .2s;margin-bottom:20px"
+          onclick="document.getElementById('conv-file-input').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--primary)';this.style.background='#fdf5f5'"
+          ondragleave="this.style.borderColor='var(--border)';this.style.background='var(--bg)'"
+          ondrop="event.preventDefault();this.style.borderColor='var(--border)';this.style.background='var(--bg)';processarPDFConversor(event.dataTransfer.files[0])">
+          <div style="font-size:40px;margin-bottom:12px">📄</div>
+          <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px">Arraste o PDF aqui ou clique para selecionar</div>
+          <div style="font-size:13px;color:var(--muted)">Relatório de Avisos de Vencimento · Arquivo .pdf</div>
+          <input type="file" id="conv-file-input" accept=".pdf" style="display:none"
+            onchange="processarPDFConversor(this.files[0])">
+        </div>
+
+        <!-- Status / loading -->
+        <div id="conv-status" style="display:none;margin-bottom:16px"></div>
+
+        <!-- Results -->
+        <div id="conv-results" style="display:none">
+
+          <!-- Barra de ações -->
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+            <div>
+              <span id="conv-count" style="font-weight:700;color:var(--text)"></span>
+              <span style="color:var(--muted);font-size:13px"> registros extraídos</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-secondary btn-sm" onclick="conv_limpar()">🔄 Novo PDF</button>
+              <button class="btn btn-secondary btn-sm" onclick="conv_baixarExcel()">⬇ Baixar Excel</button>
+              <button class="btn btn-primary btn-sm" onclick="openModal_conv_importar()">📣 Importar para Campanha</button>
+            </div>
+          </div>
+
+          <!-- Abas de visualização -->
+          <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:18px">
+            <button id="conv-tab-tabela" onclick="conv_toggleView('tabela')"
+              style="padding:8px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px">
+              📋 Tabela
+            </button>
+            <button id="conv-tab-agrupar" onclick="conv_toggleView('agrupar')"
+              style="padding:8px 20px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px">
+              📅 Agrupar e Agendar
+            </button>
+          </div>
+
+          <!-- VIEW: Tabela -->
+          <div id="conv-view-tabela">
+            <div class="search-bar" style="margin-bottom:14px">
+              <input type="text" id="conv-filtro" placeholder="Filtrar por empresa, empregado ou tipo…" oninput="conv_renderTabela()">
+            </div>
+            <div class="card">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Empresa</th>
+                      <th>CNPJ</th>
+                      <th>Empregado</th>
+                      <th>Tipo de Evento</th>
+                      <th>Vencimento</th>
+                    </tr>
+                  </thead>
+                  <tbody id="conv-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- VIEW: Configurar Envio -->
+          <div id="conv-view-agrupar" style="display:none">
+
+            <!-- STEP 1: Tipos -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-title" style="font-size:13px">1 · Tipos de Evento</div>
+              <div class="card-body">
+                <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Selecione um ou mais tipos para incluir na campanha</div>
+                <div id="conf-tipos-checks" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+              </div>
+            </div>
+
+            <!-- STEP 2: Empresas -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-title" style="font-size:13px">2 · Empresas</div>
+              <div class="card-body">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;font-weight:600">
+                    <input type="checkbox" id="conf-emp-todas" checked onchange="conf_toggleTodasEmpresas(this.checked)" style="width:14px;height:14px">
+                    Todas as empresas
+                  </label>
+                  <span id="conf-emp-count" style="font-size:11px;color:var(--muted)"></span>
+                </div>
+                <div id="conf-empresas-checks" style="display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow-y:auto"></div>
+              </div>
+            </div>
+
+            <!-- STEP 3: Frequência e Período -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-title" style="font-size:13px">3 · Frequência e Período</div>
+              <div class="card-body">
+                <div style="display:flex;gap:6px;margin-bottom:16px">
+                  <button id="conf-btn-unica"   class="btn btn-primary btn-sm"    onclick="conf_setFreq('unica')">Único</button>
+                  <button id="conf-btn-semanal"  class="btn btn-secondary btn-sm"  onclick="conf_setFreq('semanal')">Semanal</button>
+                  <button id="conf-btn-mensal"   class="btn btn-secondary btn-sm"  onclick="conf_setFreq('mensal')">Mensal</button>
+                </div>
+
+                <!-- Único -->
+                <div id="conf-freq-unica">
+                  <div class="form-group" style="margin-bottom:0">
+                    <label>Data de Envio</label>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                      <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px" onclick="conf_setDataRapida('hoje')">Hoje</button>
+                      <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px" onclick="conf_setDataRapida('domingo')">Próx. domingo</button>
+                      <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px" onclick="conf_setDataRapida('ultima-mes')">Último dia mês</button>
+                    </div>
+                    <input type="date" id="conf-data-unica" class="form-control" style="max-width:200px" onchange="conf_renderPreview()">
+                  </div>
+                </div>
+
+                <!-- Semanal -->
+                <div id="conf-freq-semanal" style="display:none">
+                  <div class="form-group" style="margin-bottom:0">
+                    <label>Dia da semana para envio</label>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                      <button type="button" id="conf-dsem-0" class="btn btn-primary btn-sm"   onclick="conf_setDiaSem(0)">Dom</button>
+                      <button type="button" id="conf-dsem-1" class="btn btn-secondary btn-sm" onclick="conf_setDiaSem(1)">Seg</button>
+                      <button type="button" id="conf-dsem-2" class="btn btn-secondary btn-sm" onclick="conf_setDiaSem(2)">Ter</button>
+                      <button type="button" id="conf-dsem-3" class="btn btn-secondary btn-sm" onclick="conf_setDiaSem(3)">Qua</button>
+                      <button type="button" id="conf-dsem-4" class="btn btn-secondary btn-sm" onclick="conf_setDiaSem(4)">Qui</button>
+                      <button type="button" id="conf-dsem-5" class="btn btn-secondary btn-sm" onclick="conf_setDiaSem(5)">Sex</button>
+                      <button type="button" id="conf-dsem-6" class="btn btn-secondary btn-sm" onclick="conf_setDiaSem(6)">Sáb</button>
+                    </div>
+                    <div id="conf-periodo-label" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+                  </div>
+                </div>
+
+                <!-- Mensal -->
+                <div id="conf-freq-mensal" style="display:none">
+                  <div class="form-group" style="margin-bottom:0">
+                    <label>Dia de envio no mês</label>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                      <button type="button" id="conf-dmes-ultimo" class="btn btn-primary btn-sm" onclick="conf_setDiaMes('ultimo')">Último dia</button>
+                      <button type="button" id="conf-dmes-1"  class="btn btn-secondary btn-sm" onclick="conf_setDiaMes(1)">Dia 1</button>
+                      <button type="button" id="conf-dmes-15" class="btn btn-secondary btn-sm" onclick="conf_setDiaMes(15)">Dia 15</button>
+                      <button type="button" id="conf-dmes-personalizado" class="btn btn-secondary btn-sm" onclick="conf_setDiaMes('custom')">Outro…</button>
+                    </div>
+                    <input type="number" id="conf-dmes-num" min="1" max="28" class="form-control"
+                      style="max-width:100px;display:none" placeholder="Dia (1-28)"
+                      onchange="conf_setDiaMes(parseInt(this.value))" oninput="conf_renderPreview()">
+                    <div id="conf-periodo-label-m" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- STEP 4: Agrupamento -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-title" style="font-size:13px">4 · Agrupamento</div>
+              <div class="card-body">
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer">
+                  <input type="checkbox" id="conf-agrupar-empresa" checked style="margin-top:2px;width:16px;height:16px" onchange="conf_renderPreview()">
+                  <div>
+                    <div style="font-weight:600;font-size:13px;color:var(--text)">Agrupar por empresa (recomendado)</div>
+                    <div style="font-size:12px;color:var(--muted);margin-top:2px">Uma mensagem por cliente com a lista de colaboradores. Use <code>{{lista_empregados}}</code> no template.</div>
+                    <div id="conf-agrupar-desc-individual" style="font-size:12px;color:var(--muted);margin-top:4px;display:none">Desmarcado: uma mensagem por colaborador. Use <code>{{empregado}}</code> <code>{{tipo_evento}}</code> <code>{{vencimento}}</code>.</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- STEP 5: Destinatário -->
+            <div class="card" style="margin-bottom:14px">
+              <div class="card-title" style="font-size:13px">5 · Destinatário</div>
+              <div class="card-body">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:var(--bg-light);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px">
+                    <input type="radio" name="conf-dest" value="empresa" checked onchange="conf_setDestinatario('empresa')">
+                    <span>🏢 Empresa (cliente)</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:var(--bg-light);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px">
+                    <input type="radio" name="conf-dest" value="scont" onchange="conf_setDestinatario('scont')">
+                    <span>🏠 Só SCONT (controle interno)</span>
+                  </label>
+                  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;background:var(--bg-light);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:12px">
+                    <input type="radio" name="conf-dest" value="ambos" onchange="conf_setDestinatario('ambos')">
+                    <span>📨 Empresa + SCONT</span>
+                  </label>
+                </div>
+                <div id="conf-dest-scont-hint" style="display:none;background:#EEF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:10px 14px;font-size:12px;color:#1E40AF">
+                  <div style="margin-bottom:6px;font-weight:600">E-mail SCONT para controle interno:</div>
+                  <input type="email" id="conf-scont-email" class="form-control" style="max-width:300px;font-size:12px" value="herbertscont@gmail.com">
+                  <div style="margin-top:6px;color:#374151;font-size:11px">Um resumo consolidado de todas as empresas será enviado para este endereço.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Preview dinâmico -->
+            <div id="conf-preview" style="margin-bottom:16px"></div>
+
+            <!-- Ações -->
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="conf_abrirModalCampanha(false)">📣 Criar Campanha Agora</button>
+              <button class="btn btn-secondary" onclick="conf_abrirModalCampanha(true)">🔄 Salvar como Regra Recorrente</button>
+            </div>
+          </div>
+
         </div>
       </section>
 
@@ -729,6 +974,86 @@ Equipe SCONT"></textarea>
     </div>
   </div>
 
+  <!-- Modal: Configurar e Criar Campanha (do Conversor) -->
+  <div id="modal-conf-campanha" class="modal-overlay">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3 id="modal-conf-titulo">📣 Criar Campanha</h3>
+        <button class="modal-close" onclick="closeModal('modal-conf-campanha')">×</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Resumo dos parâmetros selecionados -->
+        <div id="conf-modal-resumo" style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--text-light);line-height:1.8"></div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nome da Campanha *</label>
+            <input type="text" id="conf-camp-nome" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Assunto do Email</label>
+            <input type="text" id="conf-camp-assunto" class="form-control">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>📅 Data de Envio *</label>
+          <input type="date" id="conf-camp-data" class="form-control" style="max-width:200px">
+          <div class="form-hint">Visível no dashboard como lembrete de quando enviar.</div>
+        </div>
+
+        <!-- Recorrência (mostrado só se isRegra=true) -->
+        <div id="conf-modal-regra-info" style="display:none;background:#EEF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#1E40AF">
+          🔄 Esta regra será executada automaticamente toda vez que você abrir o sistema no dia configurado, gerando a campanha do período correspondente.
+        </div>
+
+        <div class="form-group">
+          <label>Template da Mensagem *</label>
+          <textarea id="conf-camp-template" class="form-control" rows="7"></textarea>
+          <div id="conf-modal-vars-hint" class="form-hint"></div>
+        </div>
+
+        <!-- Preview dos envios gerados -->
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">
+          Preview dos envios a criar
+        </div>
+        <div id="conf-modal-preview-envios" style="max-height:200px;overflow-y:auto;border:1px solid var(--border-light);border-radius:6px"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modal-conf-campanha')">Cancelar</button>
+        <button class="btn btn-primary" id="btn-conf-criar" onclick="conf_criarCampanha()">Criar Campanha</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Importar Conversor para Campanha -->
+  <div id="modal-conv-importar" class="modal-overlay">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3>📣 Importar para Campanha</h3>
+        <button class="modal-close" onclick="closeModal('modal-conv-importar')">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:14px;margin-bottom:18px;font-size:13px;color:var(--text-light);line-height:1.7">
+          Cada linha do PDF será adicionada como destinatário na campanha escolhida.<br>
+          As variáveis <code>{{empresa}}</code>, <code>{{empregado}}</code>, <code>{{tipo_evento}}</code> e <code>{{vencimento}}</code> estarão disponíveis no template.
+        </div>
+        <div class="form-group">
+          <label>Selecionar Campanha *</label>
+          <select id="conv-camp-select" class="form-control">
+            <option value="">— Escolha uma campanha —</option>
+          </select>
+        </div>
+        <div id="conv-import-preview" style="margin-top:12px"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modal-conv-importar')">Cancelar</button>
+        <button class="btn btn-primary" id="btn-conv-importar" onclick="conv_importarCampanha()" disabled>Importar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
 
   <!-- ══════════════════════════════════════════════════
@@ -778,8 +1103,9 @@ Equipe SCONT"></textarea>
       overlay.classList.remove('show');
     });
 
-    await Promise.all([loadCampanhas(), loadContatos(), loadGrupos()]);
+    await Promise.all([loadCampanhas(), loadContatos(), loadGrupos(), loadRegras()]);
     renderDashboard();
+    regras_verificarDue();
   });
 
   // ── NAVEGAÇÃO ─────────────────────────────────────────────────
@@ -789,6 +1115,8 @@ Equipe SCONT"></textarea>
     contatos:      'sec-contatos',
     grupos:        'sec-grupos',
     configuracoes: 'sec-configuracoes',
+    conversor:     'sec-conversor',
+    regras:        'sec-regras',
   };
 
   function showSection(name) {
@@ -807,6 +1135,8 @@ Equipe SCONT"></textarea>
     if (name === 'grupos')        renderGrupos();
     if (name === 'dashboard')     renderDashboard();
     if (name === 'configuracoes') carregarConfiguracoes();
+    if (name === 'conversor')     conv_init();
+    if (name === 'regras')        renderRegras();
 
     // fecha sidebar no mobile
     document.getElementById('sidebar').classList.remove('open');
@@ -882,7 +1212,10 @@ Equipe SCONT"></textarea>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border-light)">
         <div>
           <div style="font-weight:600;font-size:14px;color:var(--primary)">${esc(c.nome)}</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">${labelTipoConf(c.tipo_confirmacao)} · ${formatDate(c.created_at)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">
+            ${labelTipoConf(c.tipo_confirmacao)} · ${formatDate(c.created_at)}
+            ${c.data_agendamento ? `<span style="margin-left:8px;background:#EEF6FF;color:#1E40AF;padding:1px 7px;border-radius:4px;font-weight:600;font-size:11px">📅 ${formatDateBR(c.data_agendamento)}${_convDiasRestantes(c.data_agendamento)}</span>` : ''}
+          </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
           <span class="badge badge-${c.status}">${labelStatus(c.status)}</span>
@@ -890,6 +1223,48 @@ Equipe SCONT"></textarea>
         </div>
       </div>
     `).join('');
+
+    // Próximos agendamentos
+    const agendadas = campanhas
+      .filter(c => c.data_agendamento && new Date(c.data_agendamento) >= new Date(new Date().toDateString()))
+      .sort((a, b) => new Date(a.data_agendamento) - new Date(b.data_agendamento))
+      .slice(0, 5);
+
+    let dashAg = document.getElementById('dash-agendamentos-card');
+    if (!dashAg) {
+      dashAg = document.createElement('div');
+      dashAg.id = 'dash-agendamentos-card';
+      dashAg.className = 'card';
+      dashAg.style.marginTop = '20px';
+      document.getElementById('sec-dashboard').querySelector('.card').after(dashAg);
+    }
+    if (agendadas.length) {
+      dashAg.innerHTML = `
+        <div class="card-title">📅 Próximos Agendamentos
+          <button class="btn btn-secondary btn-sm" onclick="showSection('conversor')">+ Novo</button>
+        </div>
+        <div class="card-body">
+          ${agendadas.map(c => {
+            const dias = Math.round((new Date(c.data_agendamento) - new Date(new Date().toDateString())) / 86400000);
+            const badge = dias === 0 ? '<span style="background:#FEF3C7;color:#92400E;padding:1px 8px;border-radius:4px;font-size:11px;font-weight:700">HOJE</span>'
+                        : dias === 1 ? '<span style="background:#FEE2E2;color:#991B1B;padding:1px 8px;border-radius:4px;font-size:11px;font-weight:700">AMANHÃ</span>'
+                        : `<span style="background:#EEF6FF;color:#1E40AF;padding:1px 8px;border-radius:4px;font-size:11px;font-weight:700">em ${dias}d</span>`;
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-light)">
+              <div>
+                <div style="font-weight:600;font-size:13px;color:var(--text)">${esc(c.nome)}</div>
+                <div style="font-size:11px;color:var(--muted)">${formatDateBR(c.data_agendamento)}</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                ${badge}
+                <button class="btn btn-secondary btn-sm" onclick="abrirDetalhe('${c.id}')">Abrir →</button>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      dashAg.style.display = '';
+    } else {
+      dashAg.style.display = 'none';
+    }
   }
 
   // ── CAMPANHAS ─────────────────────────────────────────────────
@@ -922,8 +1297,9 @@ Equipe SCONT"></textarea>
             <span class="l">Confirmação</span>
           </div>
           <div class="md-stat">
-            <span class="n" style="font-size:12px">${formatDate(c.created_at)}</span>
-            <span class="l">Criada em</span>
+            ${c.data_agendamento
+              ? `<span class="n" style="font-size:11px;color:#1E40AF">📅 ${formatDateBR(c.data_agendamento)}</span><span class="l">Agendado</span>`
+              : `<span class="n" style="font-size:12px">${formatDate(c.created_at)}</span><span class="l">Criada em</span>`}
           </div>
         </div>
         <div class="md-card-footer" onclick="event.stopPropagation()">
@@ -947,7 +1323,8 @@ Equipe SCONT"></textarea>
     document.getElementById('det-nome').textContent = campanhaAtual.nome;
     document.getElementById('det-meta').innerHTML =
       `<span class="badge badge-${campanhaAtual.status}">${labelStatus(campanhaAtual.status)}</span>
-       &nbsp; ${labelTipoConf(campanhaAtual.tipo_confirmacao)}&nbsp;·&nbsp;Criada em ${formatDate(campanhaAtual.created_at)}`;
+       &nbsp; ${labelTipoConf(campanhaAtual.tipo_confirmacao)}&nbsp;·&nbsp;Criada em ${formatDate(campanhaAtual.created_at)}
+       ${campanhaAtual.data_agendamento ? `&nbsp;·&nbsp;<span style="background:#EEF6FF;color:#1E40AF;padding:1px 8px;border-radius:4px;font-weight:600;font-size:11px">📅 Envio em ${formatDateBR(campanhaAtual.data_agendamento)}${_convDiasRestantes(campanhaAtual.data_agendamento)}</span>` : ''}`;
     document.getElementById('det-template').textContent = campanhaAtual.template;
 
     document.getElementById('sidebar').classList.remove('open');
@@ -2048,6 +2425,1438 @@ Equipe SCONT"></textarea>
     renderContatos();
   }
 
+  // ── CONVERSOR PDF ─────────────────────────────────────────────
+  let _convRows  = []; // rows parsed from PDF: [empresa, cnpj, empregado, tipo, vencimento]
+  let _convGrupos = [];
+  let _convViewMode = 'tabela';
+
+  // Configurar Envio state
+  let _confFreq       = 'unica';
+  let _confDiaSem     = 0;
+  let _confDiaMes     = 'ultimo';
+  let _confDataUnica  = '';
+  let _confTiposSel   = [];
+  let _confTiposLista = [];
+  let _confEmpresasSel  = [];   // vazio = todas; preenchido = apenas as listadas
+  let _confEmpresasLista = [];  // lista indexada para binding
+  let _confDestinatario = 'empresa'; // 'empresa' | 'scont' | 'ambos'
+  let _confIsRegra    = false;
+
+  // Regras recorrentes
+  let _regras = [];
+
+  const CONV_TIPOS = [
+    'Aniversário colaboradores',
+    'Certificado digital',
+    'Contrato experiência 1º vencimento',
+    'Contrato experiência prorrogação',
+    'Vencimento de 2º Férias',
+    'Aviso Prévio de rescisão',
+    'Envio rescisão eSocial',
+    'Monitoramento de Saúde - Admissional',
+    'Monitoramento de Saúde - Mudança de função',
+    'Retorno de afastamento de Licença maternidade',
+    'Retorno de afastamento de Doença',
+    'Retorno de afastamento de Acidente de trabalho',
+  ];
+
+  // Sorted descending by length so longer matches win
+  const CONV_TIPOS_SORTED = [...CONV_TIPOS].sort((a, b) => b.length - a.length);
+
+  function conv_init() {
+    // PDF.js worker
+    if (window['pdfjs-dist/build/pdf']) {
+      window['pdfjs-dist/build/pdf'].GlobalWorkerOptions.workerSrc =
+        'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    }
+    if (_convRows.length) conv_renderTabela();
+  }
+
+  async function processarPDFConversor(file) {
+    if (!file || file.type !== 'application/pdf') {
+      toast('Selecione um arquivo PDF válido.', 'error');
+      return;
+    }
+    const status = document.getElementById('conv-status');
+    const results = document.getElementById('conv-results');
+    results.style.display = 'none';
+    status.style.display = 'block';
+    status.innerHTML = '<div style="color:var(--muted);font-size:14px">⏳ Extraindo texto do PDF…</div>';
+
+    try {
+      const text = await _conv_extrairTextoPDF(file);
+      status.innerHTML = '<div style="color:var(--muted);font-size:14px">🔍 Analisando dados…</div>';
+      const rows = _conv_parsearTexto(text);
+
+      if (!rows.length) {
+        status.innerHTML = `
+          <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:16px;font-size:13px;color:#92400E">
+            ⚠️ Nenhum registro encontrado no PDF. Verifique se é o relatório correto de Avisos de Vencimento.<br>
+            <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">Ver texto extraído</summary>
+            <pre style="margin-top:8px;font-size:11px;max-height:200px;overflow:auto;white-space:pre-wrap;background:#fff3e0;padding:8px;border-radius:4px">${esc(text.slice(0, 3000))}</pre>
+            </details>
+          </div>`;
+        return;
+      }
+
+      _convRows = rows;
+      status.style.display = 'none';
+      document.getElementById('conv-filtro').value = '';
+      conv_renderTabela();
+      results.style.display = 'block';
+      toast(`✅ ${rows.length} registros extraídos do PDF!`, 'success');
+    } catch(e) {
+      status.innerHTML = `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:16px;font-size:13px;color:#991B1B">❌ Erro ao processar PDF: ${esc(e.message)}</div>`;
+    }
+  }
+
+  async function _conv_extrairTextoPDF(file) {
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    if (!pdfjsLib) throw new Error('PDF.js não carregou. Verifique a conexão.');
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let allLines = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const content = await page.getTextContent();
+
+      // Group text items by rounded y-position to reconstruct rows
+      const rowMap = new Map();
+      for (const item of content.items) {
+        if (!item.str || !item.str.trim()) continue;
+        const y = Math.round(item.transform[5] / 3) * 3;
+        if (!rowMap.has(y)) rowMap.set(y, []);
+        rowMap.get(y).push({ x: item.transform[4], str: item.str });
+      }
+
+      const sorted = [...rowMap.entries()]
+        .sort((a, b) => b[0] - a[0]) // PDF y axis is bottom-up
+        .map(([, items]) =>
+          items.sort((a, b) => a.x - b.x).map(i => i.str).join(' ')
+        );
+      allLines.push(...sorted);
+    }
+    return allLines.join('\n');
+  }
+
+  // Labels de cabeçalho do PDF que não são nomes de empresa (com ou sem dois-pontos no final)
+  const CONV_LABELS_PDF = /^(CNPJ|CPF|Empresa|Nome|Empregado|Colaborador|Tipo|Data|Vencimento|Aviso|Relatório|Relatorio|Página|Pagina|Data de|Emissão|Emissao)\s*:?\s*$/i;
+
+  function _conv_empresaValida(linha) {
+    if (!linha || linha.length < 5) return false;
+    if (CONV_LABELS_PDF.test(linha.trim())) return false;
+    // Linha só com números/símbolos não é nome de empresa
+    if (/^[\d\s/.\-:,]+$/.test(linha)) return false;
+    return true;
+  }
+
+  function _conv_limparEmpresa(raw) {
+    if (!raw) return '';
+    let s = raw.trim();
+    // Remove prefixo "Empresa:" ou "Empresa :"
+    s = s.replace(/^Empresa\s*:\s*/i, '');
+    // Remove sufixo " CNPJ:" ou " CPF:" que pode sobrar no meio/fim da string
+    s = s.replace(/\s+CNPJ\s*:?\s*$/i, '').replace(/\s+CPF\s*:?\s*$/i, '');
+    // Remove prefixo numérico "21 - " ou "003 - "
+    s = s.replace(/^\d+\s*[-–]\s*/, '');
+    return s.trim();
+  }
+
+  // Regex que identifica uma linha de empresa com certeza (ex: "Empresa: 13 - NOME" ou "13 - NOME")
+  const CONV_EMPRESA_RE = /^(?:Empresa\s*:\s*)?\d+\s*[-–]\s*.{3,}/i;
+
+  function _conv_parsearTexto(text) {
+    const rows = [];
+    const CNPJ_RE = /(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/;
+
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 2);
+
+    let currentEmpresa   = null;
+    let currentCNPJ      = null;
+    let lastEmpresaLine  = null; // última linha identificada como nome de empresa
+    let prevLine         = null; // linha imediatamente anterior (fallback)
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // ── Linha com CNPJ → marca nova empresa ──────────────────
+      const cnpjMatch = line.match(CNPJ_RE);
+      if (cnpjMatch) {
+        currentCNPJ = cnpjMatch[1];
+
+        // 1ª prioridade: linha marcada explicitamente como empresa ("Empresa: N - NOME")
+        // 2ª prioridade: linha imediatamente anterior ao CNPJ
+        // 3ª prioridade: texto antes do CNPJ na mesma linha (após limpar label "CNPJ:")
+        const beforeCNPJ = line.slice(0, cnpjMatch.index).trim()
+          .replace(/^CNPJ\s*:?\s*/i, '').trim();
+
+        if (_conv_empresaValida(lastEmpresaLine)) {
+          currentEmpresa = lastEmpresaLine;
+        } else if (_conv_empresaValida(prevLine)) {
+          currentEmpresa = prevLine;
+        } else if (_conv_empresaValida(beforeCNPJ)) {
+          currentEmpresa = beforeCNPJ;
+        }
+
+        // Evento na mesma linha após o CNPJ?
+        const afterCNPJ = line.slice(cnpjMatch.index + cnpjMatch[0].length).trim();
+        if (afterCNPJ && currentEmpresa) {
+          const parsed = _conv_parsearLinhaDados(afterCNPJ, currentEmpresa, currentCNPJ);
+          if (parsed) rows.push(parsed);
+        }
+
+        lastEmpresaLine = null;
+        prevLine        = null;
+        continue;
+      }
+
+      // ── Tenta encontrar tipo de evento ───────────────────────
+      const tipoMatch = CONV_TIPOS_SORTED.find(t =>
+        line.toLowerCase().includes(t.toLowerCase())
+      );
+
+      if (!tipoMatch) {
+        // Linha sem tipo de evento — pode ser nome de empresa
+        prevLine = line;
+        // Se seguir o padrão "Empresa: N - NOME" ou "N - NOME", guarda com prioridade
+        if (CONV_EMPRESA_RE.test(line)) {
+          lastEmpresaLine = line;
+        }
+        continue;
+      }
+
+      if (!currentEmpresa) continue;
+
+      const parsed = _conv_parsearLinhaDados(line, currentEmpresa, currentCNPJ);
+      if (parsed) rows.push(parsed);
+    }
+
+    return rows;
+  }
+
+  function _conv_parsearLinhaDados(line, empresa, cnpj) {
+    const DATE_RE = /\b(\d{2}\/\d{2}(?:\/\d{4})?)\b/;
+    const tipoMatch = CONV_TIPOS_SORTED.find(t =>
+      line.toLowerCase().includes(t.toLowerCase())
+    );
+    if (!tipoMatch) return null;
+
+    const dateMatch = line.match(DATE_RE);
+    const vencimento = dateMatch ? dateMatch[1] : '';
+
+    // Employee name: remove event type and date from line
+    let empregado = line;
+    empregado = empregado.replace(new RegExp(tipoMatch.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i'), '');
+    if (dateMatch) empregado = empregado.replace(dateMatch[0], '');
+    empregado = empregado.replace(/\s+/g, ' ').trim().replace(/^[-·|:,]+|[-·|:,]+$/g, '').trim();
+    // Strip leading employee numeric code e.g. "001 NOME" → "NOME"
+    empregado = empregado.replace(/^\d+\s+/, '').trim();
+
+    // Fallback: usa o nome da empresa como empregado
+    if (!empregado || empregado.length < 2) {
+      empregado = _conv_limparEmpresa(empresa);
+    }
+
+    // Remove prefixo numérico da empresa: "3 - NOME" → "NOME"
+    const empresaLimpa = _conv_limparEmpresa(empresa);
+
+    return [empresaLimpa, cnpj || '', empregado, tipoMatch, vencimento];
+  }
+
+  function conv_renderTabela() {
+    const filtro = (document.getElementById('conv-filtro')?.value || '').toLowerCase();
+    const tbody = document.getElementById('conv-tbody');
+    const countEl = document.getElementById('conv-count');
+
+    const filtered = filtro
+      ? _convRows.filter(r => r.some(v => v.toLowerCase().includes(filtro)))
+      : _convRows;
+
+    countEl.textContent = filtered.length;
+
+    if (!filtered.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Nenhum resultado</td></tr>`;
+      return;
+    }
+
+    const TYPE_COLORS = {
+      'aniversário':    '#E2EFDA',
+      'certificado':    '#FCE4D6',
+      '1º vencimento':  '#DDEBF7',
+      'prorrogação':    '#EBF3FB',
+      'férias':         '#FFF2CC',
+      'rescisão':       '#FDECEA',
+      'esocial':        '#FDECEA',
+      'saúde':          '#EAF2FF',
+      'retorno':        '#F3E5F5',
+    };
+
+    function rowColor(tipo) {
+      const t = tipo.toLowerCase();
+      for (const [key, color] of Object.entries(TYPE_COLORS)) {
+        if (t.includes(key)) return color;
+      }
+      return '#ffffff';
+    }
+
+    tbody.innerHTML = filtered.map(([emp, cnpj, empregado, tipo, venc]) => `
+      <tr style="background:${rowColor(tipo)}">
+        <td style="padding:8px 12px;font-size:12px;font-weight:600;color:var(--text)">${esc(emp)}</td>
+        <td style="padding:8px 12px;font-size:12px;color:var(--muted);white-space:nowrap">${esc(cnpj)}</td>
+        <td style="padding:8px 12px;font-size:12px;color:var(--text)">${esc(empregado)}</td>
+        <td style="padding:8px 12px;font-size:12px;color:var(--text)">${esc(tipo)}</td>
+        <td style="padding:8px 12px;font-size:12px;color:var(--text);white-space:nowrap">${esc(venc)}</td>
+      </tr>`).join('');
+  }
+
+  function conv_limpar() {
+    _convRows = [];
+    _convGrupos = [];
+    _convViewMode = 'tabela';
+    document.getElementById('conv-results').style.display = 'none';
+    document.getElementById('conv-status').style.display = 'none';
+    document.getElementById('conv-file-input').value = '';
+  }
+
+  // ── TOGGLE DE VISÃO ───────────────────────────────────────────
+  function conv_toggleView(mode) {
+    _convViewMode = mode;
+    const tabela  = document.getElementById('conv-view-tabela');
+    const agrupar = document.getElementById('conv-view-agrupar');
+    const btnT    = document.getElementById('conv-tab-tabela');
+    const btnA    = document.getElementById('conv-tab-agrupar');
+    tabela.style.display  = mode === 'tabela'  ? '' : 'none';
+    agrupar.style.display = mode === 'agrupar' ? '' : 'none';
+    btnT.style.color        = mode === 'tabela'  ? 'var(--primary)' : 'var(--muted)';
+    btnT.style.borderBottomColor = mode === 'tabela'  ? 'var(--primary)' : 'transparent';
+    btnA.style.color        = mode === 'agrupar' ? 'var(--primary)' : 'var(--muted)';
+    btnA.style.borderBottomColor = mode === 'agrupar' ? 'var(--primary)' : 'transparent';
+    if (mode === 'agrupar') {
+      conf_renderTiposCheck();
+      conf_renderEmpresasCheck();
+      conf_renderPreview();
+    }
+  }
+
+  // ── AGRUPAMENTO ──────────────────────────────────────────────
+  function conv_computarGrupos() {
+    const map = new Map();
+    for (const row of _convRows) {
+      const [empresa, cnpj, empregado, tipo, venc] = row;
+      const key = `${cnpj || empresa}||${tipo}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          cnpj: cnpj || '',
+          empresa: empresa.replace(/^\d+\s*[-–]\s*/, '').trim(),
+          empresaRaw: empresa,
+          tipo,
+          rows: [],
+          dataEnvio: conv_sugerirData(tipo),
+          expanded: false,
+        });
+      }
+      map.get(key).rows.push(row);
+    }
+    _convGrupos = [...map.values()].sort((a, b) =>
+      a.empresa.localeCompare(b.empresa) || a.tipo.localeCompare(b.tipo)
+    );
+  }
+
+  function conv_sugerirData(tipo) {
+    const t = tipo.toLowerCase();
+    const now = new Date();
+    if (t.includes('aniversário')) {
+      // Último dia do mês corrente
+      return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    }
+    if (t.includes('contrato')) {
+      // Próxima segunda-feira
+      return conv_proximoDiaSemana(1);
+    }
+    if (t.includes('férias') || t.includes('ferias')) {
+      return conv_proximoDiaSemana(1);
+    }
+    // Padrão: próxima segunda
+    return conv_proximoDiaSemana(1);
+  }
+
+  function conv_proximoDiaSemana(dow) { // 0=dom, 1=seg, ..., 6=sab
+    const d = new Date();
+    const diff = (dow - d.getDay() + 7) % 7 || 7;
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().split('T')[0];
+  }
+
+  function conv_renderGrupos() {
+    const container = document.getElementById('conv-grupos-list');
+    if (!_convGrupos.length) {
+      container.innerHTML = '<div class="empty"><span class="empty-icon">📭</span><p>Nenhum grupo gerado</p></div>';
+      return;
+    }
+
+    const TYPE_COLORS = {
+      'aniversário':   '#E2EFDA', 'certificado': '#FCE4D6',
+      '1º vencimento': '#DDEBF7', 'prorrogação': '#EBF3FB',
+      'férias':        '#FFF2CC', 'rescisão':    '#FDECEA',
+      'esocial':       '#FDECEA', 'saúde':       '#EAF2FF',
+      'retorno':       '#F3E5F5',
+    };
+    const rowColor = tipo => {
+      const t = tipo.toLowerCase();
+      for (const [k, c] of Object.entries(TYPE_COLORS)) if (t.includes(k)) return c;
+      return '#ffffff';
+    };
+
+    container.innerHTML = _convGrupos.map((g, idx) => {
+      const bg = rowColor(g.tipo);
+      const recordsHtml = g.rows.map(([emp, cnpj, emp2, tipo, venc]) =>
+        `<div style="display:flex;gap:12px;padding:5px 12px;border-bottom:1px solid var(--border-light);font-size:12px;color:var(--text)">
+          <span style="flex:2;font-weight:500">${esc(emp2)}</span>
+          <span style="flex:1;color:var(--muted)">${esc(venc||'—')}</span>
+        </div>`
+      ).join('');
+
+      return `
+      <div class="card" style="margin-bottom:12px;border-left:4px solid ${bg === '#ffffff' ? 'var(--border)' : bg.replace('ff','dd')}">
+        <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-weight:700;color:var(--text);font-size:13px">${esc(g.empresa)}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(g.cnpj)}</div>
+            <div style="margin-top:6px">
+              <span style="background:${bg};color:var(--text);font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600">${esc(g.tipo)}</span>
+              <span style="margin-left:6px;font-size:12px;color:var(--muted)">${g.rows.length} registro(s)</span>
+            </div>
+          </div>
+
+          <!-- Data de envio -->
+          <div style="min-width:200px">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px">Data de Envio</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">
+              <button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:2px 7px"
+                onclick="conv_setDataGrupo(${idx},'ultimo-mes')">Últ. dia mês</button>
+              <button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:2px 7px"
+                onclick="conv_setDataGrupo(${idx},'domingo')">Dom.</button>
+              <button type="button" class="btn btn-secondary btn-sm" style="font-size:10px;padding:2px 7px"
+                onclick="conv_setDataGrupo(${idx},'segunda')">Seg.</button>
+            </div>
+            <input type="date" id="conv-grupo-data-${idx}"
+              value="${g.dataEnvio || ''}"
+              onchange="_convGrupos[${idx}].dataEnvio=this.value"
+              class="form-control" style="font-size:12px;padding:5px 8px">
+          </div>
+
+          <!-- Ações -->
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn btn-primary btn-sm" onclick="conv_abrirModalGrupo(${idx})">
+              📅 Criar Campanha
+            </button>
+            <button class="btn btn-secondary btn-sm" style="font-size:11px"
+              onclick="conv_expandirGrupo(${idx})">
+              <span id="conv-expand-icon-${idx}">▶</span> Ver registros
+            </button>
+          </div>
+        </div>
+
+        <!-- Registros expandidos -->
+        <div id="conv-grupo-expand-${idx}" style="display:none;border-top:1px solid var(--border-light)">
+          <div style="display:flex;gap:12px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--muted);background:var(--bg-light)">
+            <span style="flex:2">Empregado</span><span style="flex:1">Vencimento</span>
+          </div>
+          ${recordsHtml}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function conv_expandirGrupo(idx) {
+    const el   = document.getElementById(`conv-grupo-expand-${idx}`);
+    const icon = document.getElementById(`conv-expand-icon-${idx}`);
+    const open = el.style.display === 'none';
+    el.style.display = open ? '' : 'none';
+    icon.textContent = open ? '▼' : '▶';
+  }
+
+  function conv_setDataGrupo(idx, preset) {
+    const d = conv_calcDataPreset(preset);
+    _convGrupos[idx].dataEnvio = d;
+    const inp = document.getElementById(`conv-grupo-data-${idx}`);
+    if (inp) inp.value = d;
+  }
+
+  // ── MODAL CRIAR CAMPANHA DO GRUPO ────────────────────────────
+  function conv_calcDataPreset(preset) {
+    const now = new Date();
+    if (preset === 'ultimo-mes') {
+      return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    }
+    if (preset === 'domingo')  return conv_proximoDiaSemana(0);
+    if (preset === 'segunda')  return conv_proximoDiaSemana(1);
+    if (preset === 'hoje')     return now.toISOString().split('T')[0];
+    return now.toISOString().split('T')[0];
+  }
+
+  function conv_setDataRapida(preset) {
+    const inp = document.getElementById('conv-grupo-data');
+    if (inp) inp.value = conv_calcDataPreset(preset);
+  }
+
+  const CONV_TEMPLATES = {
+    'aniversário': `Prezados {{empresa}},
+
+Informamos que o(a) colaborador(a) {{empregado}} faz aniversário em {{vencimento}}.
+
+Aproveite a data para reconhecer e parabenizar!
+
+Atenciosamente,
+Equipe SCONT`,
+    'certificado': `Prezados {{empresa}},
+
+Atenção: o Certificado Digital da empresa vence em {{vencimento}}.
+
+Providencie a renovação com antecedência para evitar bloqueios em assinaturas digitais e transmissões ao governo.
+
+Atenciosamente,
+Equipe SCONT`,
+    'contrato': `Prezados {{empresa}},
+
+O contrato de experiência do(a) colaborador(a) {{empregado}} tem vencimento previsto para {{vencimento}} ({{tipo_evento}}).
+
+Providencie a decisão de efetivação ou encerramento do contrato antes dessa data.
+
+Atenciosamente,
+Equipe SCONT`,
+    'ferias': `Prezados {{empresa}},
+
+O(a) colaborador(a) {{empregado}} possui 2º período de férias vencendo em {{vencimento}}.
+
+O pagamento em dobro é obrigatório em caso de não concessão até o prazo legal.
+
+Atenciosamente,
+Equipe SCONT`,
+    'rescisao': `Prezados {{empresa}},
+
+Informamos aviso para o(a) colaborador(a) {{empregado}} com prazo em {{vencimento}} — {{tipo_evento}}.
+
+Entre em contato para providenciarmos a documentação necessária.
+
+Atenciosamente,
+Equipe SCONT`,
+    'saude': `Prezados {{empresa}},
+
+O(a) colaborador(a) {{empregado}} deve realizar exame de {{tipo_evento}} até {{vencimento}}.
+
+Organize o agendamento junto ao médico do trabalho com antecedência.
+
+Atenciosamente,
+Equipe SCONT`,
+    'retorno': `Prezados {{empresa}},
+
+O retorno do(a) colaborador(a) {{empregado}} de {{tipo_evento}} está previsto para {{vencimento}}.
+
+Prepare a reintegração e verifique a documentação necessária.
+
+Atenciosamente,
+Equipe SCONT`,
+  };
+
+  function conv_getTemplate(tipo) {
+    const t = tipo.toLowerCase();
+    if (t.includes('aniversário'))  return CONV_TEMPLATES['aniversário'];
+    if (t.includes('certificado'))  return CONV_TEMPLATES['certificado'];
+    if (t.includes('contrato'))     return CONV_TEMPLATES['contrato'];
+    if (t.includes('férias') || t.includes('ferias')) return CONV_TEMPLATES['ferias'];
+    if (t.includes('rescisão') || t.includes('esocial')) return CONV_TEMPLATES['rescisao'];
+    if (t.includes('saúde') || t.includes('saude'))  return CONV_TEMPLATES['saude'];
+    if (t.includes('retorno'))      return CONV_TEMPLATES['retorno'];
+    return `Prezados {{empresa}},\n\nInformamos: {{empregado}} — {{tipo_evento}} — Vencimento: {{vencimento}}.\n\nAtenciosamente,\nEquipe SCONT`;
+  }
+
+  function conv_abrirModalGrupo(idx) {
+    const g = _convGrupos[idx];
+    if (!g) return;
+
+    // Lê data atual do input (pode ter sido alterada pelo usuário)
+    const dataInput = document.getElementById(`conv-grupo-data-${idx}`);
+    if (dataInput?.value) g.dataEnvio = dataInput.value;
+
+    document.getElementById('conv-grupo-key').value = g.key;
+
+    // Info do grupo
+    document.getElementById('conv-grupo-info').innerHTML =
+      `<strong>${esc(g.empresa)}</strong> · CNPJ: ${esc(g.cnpj)}<br>
+       Tipo: <strong>${esc(g.tipo)}</strong> · <strong>${g.rows.length}</strong> registro(s)`;
+
+    // Nome e assunto pré-preenchidos
+    const mes = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const nome = `${g.tipo} — ${g.empresa} — ${mes}`;
+    document.getElementById('conv-grupo-nome').value    = nome;
+    document.getElementById('conv-grupo-assunto').value = nome;
+
+    // Data
+    document.getElementById('conv-grupo-data').value = g.dataEnvio || conv_calcDataPreset('segundo');
+
+    // Template
+    document.getElementById('conv-grupo-template').value = conv_getTemplate(g.tipo);
+
+    // Preview dos registros
+    document.getElementById('conv-grupo-records').innerHTML = `
+      <div style="display:flex;gap:12px;padding:5px 12px;font-size:11px;font-weight:700;color:var(--muted);background:var(--bg-light)">
+        <span style="flex:2">Empregado</span><span style="flex:1">Vencimento</span>
+      </div>
+      ${g.rows.map(([,, emp2,, venc]) =>
+        `<div style="display:flex;gap:12px;padding:5px 12px;border-bottom:1px solid var(--border-light);font-size:12px">
+          <span style="flex:2;color:var(--text)">${esc(emp2)}</span>
+          <span style="flex:1;color:var(--muted)">${esc(venc||'—')}</span>
+        </div>`
+      ).join('')}`;
+
+    document.getElementById('btn-conv-grupo-criar').disabled = false;
+    document.getElementById('btn-conv-grupo-criar').textContent = 'Criar Campanha';
+    openModal('modal-conv-grupo');
+  }
+
+  async function conv_criarCampanhaDoGrupo() {
+    const key  = document.getElementById('conv-grupo-key').value;
+    const g    = _convGrupos.find(x => x.key === key);
+    if (!g) return;
+
+    const nome     = document.getElementById('conv-grupo-nome').value.trim();
+    const assunto  = document.getElementById('conv-grupo-assunto').value.trim();
+    const template = document.getElementById('conv-grupo-template').value.trim();
+    const data     = document.getElementById('conv-grupo-data').value;
+
+    if (!nome)     { toast('Informe o nome da campanha.', 'error'); return; }
+    if (!template) { toast('Informe o template.', 'error'); return; }
+    if (!data)     { toast('Defina a data de envio.', 'error'); return; }
+
+    const btn = document.getElementById('btn-conv-grupo-criar');
+    btn.disabled = true;
+    btn.textContent = 'Criando…';
+
+    try {
+      // Criar campanha
+      const { data: camp, error: errCamp } = await sb.from('mala_direta_campanhas').insert({
+        nome,
+        assunto_email:    assunto || nome,
+        template,
+        tipo_confirmacao: 'nenhuma',
+        status:           'rascunho',
+        data_agendamento: data,
+        criado_por:       userId,
+      }).select().single();
+
+      if (errCamp) throw errCamp;
+
+      // Criar envios
+      const inserts = g.rows.map(([emp,, empregado, tipo, venc]) => {
+        const empresa = emp.replace(/^\d+\s*[-–]\s*/, '').trim();
+        const vars = { empresa, empregado, tipo_evento: tipo, vencimento: venc };
+        const msg  = template.replace(/\{\{([\w\s_áéíóúâêîôûãõçàèìòùü]+)\}\}/gi,
+          (_, k) => vars[k.trim()] ?? `{{${k}}}`);
+        return {
+          campanha_id:    camp.id,
+          nome:           empregado,
+          empresa,
+          cargo:          tipo || null,
+          mensagem_final: msg,
+          token:          crypto.randomUUID().replace(/-/g, ''),
+          canal:          'email',
+        };
+      });
+
+      for (let i = 0; i < inserts.length; i += 500) {
+        const { error } = await sb.from('mala_direta_envios').insert(inserts.slice(i, i + 500));
+        if (error) throw error;
+      }
+
+      await loadCampanhas();
+      toast(`✅ Campanha criada com ${inserts.length} destinatário(s) — agendada para ${data.split('-').reverse().join('/')}!`, 'success');
+      closeModal('modal-conv-grupo');
+    } catch(e) {
+      toast('Erro: ' + e.message, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Criar Campanha';
+    }
+  }
+
+  function conv_baixarExcel() {
+    if (!_convRows.length) return;
+    const headers = ['Empresa', 'CNPJ', 'Empregado', 'Tipo de Evento', 'Vencimento'];
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ..._convRows]);
+    ws['!cols'] = [55, 22, 50, 45, 15].map(w => ({ wch: w }));
+
+    // Header style (basic - xlsx free tier doesn't support full styles)
+    XLSX.utils.book_append_sheet(wb, ws, 'Vencimentos');
+    const dt = new Date();
+    const fname = `Avisos_Vencimento_${dt.getFullYear()}${String(dt.getMonth()+1).padStart(2,'0')}${String(dt.getDate()).padStart(2,'0')}.xlsx`;
+    XLSX.writeFile(wb, fname);
+    toast('Excel baixado!', 'success');
+  }
+
+  function openModal_conv_importar() {
+    const sel = document.getElementById('conv-camp-select');
+    sel.innerHTML = '<option value="">— Escolha uma campanha —</option>';
+    campanhas.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.nome + (c.status === 'encerrada' ? ' [encerrada]' : '');
+      sel.appendChild(opt);
+    });
+    document.getElementById('conv-import-preview').innerHTML = '';
+    document.getElementById('btn-conv-importar').disabled = true;
+    sel.onchange = () => {
+      document.getElementById('btn-conv-importar').disabled = !sel.value;
+      if (sel.value) {
+        const filtro = (document.getElementById('conv-filtro')?.value || '').toLowerCase();
+        const count = filtro
+          ? _convRows.filter(r => r.some(v => v.toLowerCase().includes(filtro))).length
+          : _convRows.length;
+        document.getElementById('conv-import-preview').innerHTML =
+          `<div style="font-size:13px;color:var(--text-light);background:var(--bg-light);border:1px solid var(--border-light);border-radius:6px;padding:12px">
+            Serão adicionados <strong>${count} destinatário(s)</strong> à campanha selecionada.<br>
+            Variáveis disponíveis no template: <code>{{empresa}}</code> <code>{{empregado}}</code> <code>{{tipo_evento}}</code> <code>{{vencimento}}</code>
+          </div>`;
+      } else {
+        document.getElementById('conv-import-preview').innerHTML = '';
+      }
+    };
+    openModal('modal-conv-importar');
+  }
+
+  async function conv_importarCampanha() {
+    const campId = document.getElementById('conv-camp-select').value;
+    if (!campId) return;
+    const btn = document.getElementById('btn-conv-importar');
+    btn.disabled = true;
+    btn.textContent = 'Importando…';
+
+    const filtro = (document.getElementById('conv-filtro')?.value || '').toLowerCase();
+    const toImport = filtro
+      ? _convRows.filter(r => r.some(v => v.toLowerCase().includes(filtro)))
+      : _convRows;
+
+    if (!toImport.length) {
+      toast('Nenhum registro para importar.', 'error');
+      btn.disabled = false;
+      btn.textContent = 'Importar';
+      return;
+    }
+
+    const campanha = campanhas.find(c => c.id === campId);
+    const inserts = toImport.map(([emp, cnpj, empregado, tipo, venc]) => {
+      const empresaLimpa = emp.replace(/^\d+\s*[-–]\s*/, '').trim();
+      const vars = { empresa: empresaLimpa, empregado, tipo_evento: tipo, vencimento: venc };
+      const template = campanha?.template || '';
+      const mensagem = template
+        ? template.replace(/\{\{([\w\s_áéíóúâêîôûãõçàèìòùü]+)\}\}/gi, (_, key) => vars[key.trim()] ?? `{{${key}}}`)
+        : `Empresa: ${empresaLimpa} | Empregado: ${empregado} | Evento: ${tipo} | Vencimento: ${venc}`;
+      return {
+        campanha_id:    campId,
+        nome:           empregado,
+        empresa:        empresaLimpa,
+        cargo:          tipo || null,
+        mensagem_final: mensagem,
+        token:          crypto.randomUUID().replace(/-/g, ''),
+        canal:          'email',
+      };
+    });
+
+    try {
+      for (let i = 0; i < inserts.length; i += 500) {
+        const { error } = await sb.from('mala_direta_envios').insert(inserts.slice(i, i + 500));
+        if (error) throw error;
+      }
+      toast(`✅ ${inserts.length} destinatário(s) adicionados à campanha!`, 'success');
+      closeModal('modal-conv-importar');
+    } catch(e) {
+      toast('Erro ao importar: ' + e.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Importar';
+  }
+
+  // ── CONFIGURAR ENVIO (conf_*) ─────────────────────────────────
+
+  function _conf_tipoColor(tipo) {
+    const t = tipo.toLowerCase();
+    if (t.includes('aniversário')) return '#E2EFDA';
+    if (t.includes('certificado')) return '#FCE4D6';
+    if (t.includes('1º vencimento') || t.includes('prorrogação')) return '#DDEBF7';
+    if (t.includes('férias') || t.includes('ferias')) return '#FFF2CC';
+    if (t.includes('rescisão') || t.includes('esocial')) return '#FDECEA';
+    if (t.includes('saúde') || t.includes('saude')) return '#EAF2FF';
+    if (t.includes('retorno')) return '#F3E5F5';
+    return '#F5F5F5';
+  }
+
+  function conf_renderTiposCheck() {
+    const container = document.getElementById('conf-tipos-checks');
+    if (!container) return;
+
+    const tiposPresentes = [...new Set(_convRows.map(r => r[3]).filter(Boolean))].sort();
+    _confTiposLista = tiposPresentes;
+
+    if (!tiposPresentes.length) {
+      container.innerHTML = '<div style="color:var(--muted);font-size:12px">Nenhum tipo encontrado. Importe um PDF primeiro.</div>';
+      return;
+    }
+
+    container.innerHTML = tiposPresentes.map((tipo, idx) => {
+      const checked = _confTiposSel.includes(tipo);
+      const color   = _conf_tipoColor(tipo);
+      return `
+        <label for="conf-tipo-${idx}" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:${color};border:1px solid ${color}cc;border-radius:6px;padding:5px 10px;font-size:12px;font-weight:500">
+          <input type="checkbox" id="conf-tipo-${idx}" ${checked ? 'checked' : ''}
+            onchange="conf_toggleTipo(${idx}, this.checked)"
+            style="width:14px;height:14px;flex-shrink:0">
+          ${esc(tipo)}
+        </label>`;
+    }).join('');
+  }
+
+  function conf_toggleTipo(idx, checked) {
+    const tipo = _confTiposLista[idx];
+    if (!tipo) return;
+    if (checked) {
+      if (!_confTiposSel.includes(tipo)) _confTiposSel.push(tipo);
+    } else {
+      _confTiposSel = _confTiposSel.filter(t => t !== tipo);
+    }
+    // Empresas dependem dos tipos selecionados
+    _confEmpresasSel = [];
+    conf_renderEmpresasCheck();
+    conf_renderPreview();
+  }
+
+  function conf_renderEmpresasCheck() {
+    const container = document.getElementById('conf-empresas-checks');
+    const countEl   = document.getElementById('conf-emp-count');
+    const allChk    = document.getElementById('conf-emp-todas');
+    if (!container) return;
+
+    // Empresas presentes nos tipos selecionados (ou em todos se nenhum tipo selecionado)
+    const todasEmpresas = [...new Set(
+      _convRows
+        .filter(r => !_confTiposSel.length || _confTiposSel.includes(r[3]))
+        .map(r => r[0])
+    )].sort();
+
+    _confEmpresasLista = todasEmpresas;
+    if (countEl) countEl.textContent = `${todasEmpresas.length} empresa(s)`;
+
+    if (!todasEmpresas.length) {
+      container.innerHTML = '<div style="color:var(--muted);font-size:12px">Selecione tipos de evento acima para ver as empresas.</div>';
+      return;
+    }
+
+    const todasMarcadas = _confEmpresasSel.length === 0;
+    if (allChk) allChk.checked = todasMarcadas;
+
+    container.innerHTML = todasEmpresas.map((emp, idx) => {
+      const checked = todasMarcadas || _confEmpresasSel.includes(emp);
+      return `
+        <label for="conf-emp-${idx}" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;background:var(--bg-light);border:1px solid var(--border-light);border-radius:5px;padding:4px 9px;font-size:11px;white-space:nowrap">
+          <input type="checkbox" id="conf-emp-${idx}" ${checked ? 'checked' : ''}
+            onchange="conf_toggleEmpresa(${idx}, this.checked)"
+            style="width:13px;height:13px;flex-shrink:0">
+          ${esc(emp)}
+        </label>`;
+    }).join('');
+  }
+
+  function conf_toggleEmpresa(idx, checked) {
+    const emp = _confEmpresasLista[idx];
+    if (!emp) return;
+    const allChk = document.getElementById('conf-emp-todas');
+
+    if (checked) {
+      if (!_confEmpresasSel.includes(emp)) _confEmpresasSel.push(emp);
+      // Se todas estão selecionadas → volta para "todas" (array vazio)
+      if (_confEmpresasSel.length === _confEmpresasLista.length) {
+        _confEmpresasSel = [];
+        conf_renderEmpresasCheck();
+      } else {
+        if (allChk) allChk.checked = false;
+      }
+    } else {
+      // Desmarcando: se estava em modo "todas", expande para lista completa e remove esta
+      if (_confEmpresasSel.length === 0) _confEmpresasSel = [..._confEmpresasLista];
+      _confEmpresasSel = _confEmpresasSel.filter(e => e !== emp);
+      if (allChk) allChk.checked = false;
+    }
+    conf_renderPreview();
+  }
+
+  function conf_toggleTodasEmpresas(checked) {
+    _confEmpresasSel = checked ? [] : [];
+    if (!checked) {
+      // Desmarca todas: seleciona nenhuma (mostra aviso no preview)
+      _confEmpresasSel = ['__nenhuma__'];
+    }
+    conf_renderEmpresasCheck();
+    conf_renderPreview();
+  }
+
+  function conf_setDestinatario(dest) {
+    _confDestinatario = dest;
+    const hint = document.getElementById('conf-dest-scont-hint');
+    if (hint) hint.style.display = (dest === 'scont' || dest === 'ambos') ? '' : 'none';
+    conf_renderPreview();
+  }
+
+  function conf_setFreq(freq) {
+    _confFreq = freq;
+    ['unica', 'semanal', 'mensal'].forEach(f => {
+      const div = document.getElementById(`conf-freq-${f}`);
+      const btn = document.getElementById(`conf-btn-${f}`);
+      if (div) div.style.display = f === freq ? '' : 'none';
+      if (btn) btn.className = f === freq ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+    });
+    conf_renderPreview();
+  }
+
+  function conf_setDiaSem(dow) {
+    _confDiaSem = dow;
+    for (let i = 0; i <= 6; i++) {
+      const btn = document.getElementById(`conf-dsem-${i}`);
+      if (btn) btn.className = i === dow ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+    }
+    conf_renderPreview();
+  }
+
+  function conf_setDiaMes(day) {
+    _confDiaMes = day;
+    const map = { 'ultimo': 'ultimo', 1: '1', 15: '15', 'custom': 'personalizado' };
+    Object.entries(map).forEach(([val, key]) => {
+      const btn = document.getElementById(`conf-dmes-${key}`);
+      if (btn) btn.className = (String(val) === String(day)) ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+    });
+    const numInp = document.getElementById('conf-dmes-num');
+    if (numInp) numInp.style.display = day === 'custom' ? '' : 'none';
+    conf_renderPreview();
+  }
+
+  function conf_setDataRapida(preset) {
+    const now = new Date();
+    let d;
+    if      (preset === 'hoje')       d = new Date();
+    else if (preset === 'domingo')   { d = new Date(); d.setDate(d.getDate() + (((0 - d.getDay() + 7) % 7) || 7)); }
+    else if (preset === 'ultima-mes') d = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    else d = new Date();
+    const str = d.toISOString().split('T')[0];
+    const inp = document.getElementById('conf-data-unica');
+    if (inp) inp.value = str;
+    _confDataUnica = str;
+    conf_renderPreview();
+  }
+
+  function conf_getPeriodo() {
+    const now = new Date();
+    const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const fmt  = d => d.toLocaleDateString('pt-BR');
+
+    if (_confFreq === 'unica') {
+      const sendDate = document.getElementById('conf-data-unica')?.value || now.toISOString().split('T')[0];
+      return { start: null, end: null, sendDate, label: 'Envio único em ' + sendDate.split('-').reverse().join('/'), periodLabel: '' };
+    }
+
+    if (_confFreq === 'semanal') {
+      const diff = (_confDiaSem - now.getDay() + 7) % 7;
+      const sendDay = new Date(now);
+      sendDay.setDate(now.getDate() + (diff === 0 ? 0 : diff));
+
+      // Semana começa no domingo e termina no sábado
+      const dow = sendDay.getDay(); // 0=Dom … 6=Sáb
+      const startOfWeek = new Date(sendDay);
+      startOfWeek.setDate(sendDay.getDate() - dow);     // recua até domingo
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);     // avança até sábado
+
+      const sendDate = sendDay.toISOString().split('T')[0];
+      return {
+        start: startOfWeek, end: endOfWeek, sendDate,
+        label: `Envio ${DIAS[_confDiaSem]} ${fmt(sendDay)} · Período: ${fmt(startOfWeek)} a ${fmt(endOfWeek)}`,
+        periodLabel: `${fmt(startOfWeek)} a ${fmt(endOfWeek)}`
+      };
+    }
+
+    if (_confFreq === 'mensal') {
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      let dayNum = _confDiaMes === 'ultimo' ? lastDay : (parseInt(_confDiaMes) || 1);
+      dayNum = Math.min(dayNum, lastDay);
+
+      const sendDay = new Date(now.getFullYear(), now.getMonth(), dayNum);
+      if (sendDay < now) sendDay.setMonth(sendDay.getMonth() + 1);
+
+      const start = new Date(sendDay.getFullYear(), sendDay.getMonth(), 1);
+      const end   = new Date(sendDay.getFullYear(), sendDay.getMonth() + 1, 0);
+      const sendDate = sendDay.toISOString().split('T')[0];
+      return {
+        start, end, sendDate,
+        label: `Envio ${fmt(sendDay)} · Período: ${start.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
+        periodLabel: start.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+      };
+    }
+
+    return { start: null, end: null, sendDate: now.toISOString().split('T')[0], label: '', periodLabel: '' };
+  }
+
+  function _conf_estaNoPeríodo(venc, start, end) {
+    if (!start || !end) return true;
+    if (!venc) return false;
+    const parts = venc.split('/');
+    if (parts.length < 2) return false;
+    const day   = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1;
+
+    if (parts.length >= 3) {
+      const d = new Date(parseInt(parts[2]), month, day);
+      return d >= start && d <= end;
+    }
+    // Partial date DD/MM (e.g. birthdays) — check current and next year
+    for (const y of [start.getFullYear(), end.getFullYear()]) {
+      const d = new Date(y, month, day);
+      if (d >= start && d <= end) return true;
+    }
+    return false;
+  }
+
+  function conf_computarEnvios() {
+    const periodo = conf_getPeriodo();
+    const agrupar = document.getElementById('conf-agrupar-empresa')?.checked !== false;
+
+    const filtered = _convRows.filter(([emp, , , tipo, venc]) => {
+      if (_confTiposSel.length && !_confTiposSel.includes(tipo)) return false;
+      if (_confEmpresasSel.includes('__nenhuma__')) return false;
+      if (_confEmpresasSel.length > 0 && !_confEmpresasSel.includes(emp)) return false;
+      return _conf_estaNoPeríodo(venc, periodo.start, periodo.end);
+    });
+
+    if (!agrupar) {
+      return filtered.map(([emp, cnpj, empregado, tipo, venc]) => ({
+        empresa: emp.replace(/^\d+\s*[-–]\s*/, '').trim(),
+        cnpj, empregado, tipo, venc,
+      }));
+    }
+
+    const map = new Map();
+    for (const [emp, cnpj, empregado, tipo, venc] of filtered) {
+      const empresaLimpa = emp.replace(/^\d+\s*[-–]\s*/, '').trim();
+      const key = cnpj || empresaLimpa;
+      if (!map.has(key)) map.set(key, { empresa: empresaLimpa, cnpj, empregados: [] });
+      map.get(key).empregados.push({ empregado, tipo, venc });
+    }
+    return [...map.values()].sort((a, b) => a.empresa.localeCompare(b.empresa));
+  }
+
+  function conf_renderPreview() {
+    const container = document.getElementById('conf-preview');
+    if (!container) return;
+
+    // Update periodo label for semanal/mensal
+    const periodo = conf_getPeriodo();
+    const plabelS = document.getElementById('conf-periodo-label');
+    const plabelM = document.getElementById('conf-periodo-label-m');
+    if (plabelS) plabelS.textContent = periodo.periodLabel ? `Período: ${periodo.periodLabel}` : '';
+    if (plabelM) plabelM.textContent = periodo.periodLabel ? `Período: ${periodo.periodLabel}` : '';
+
+    // Show/hide individual agrupar hint
+    const agruparEl = document.getElementById('conf-agrupar-empresa');
+    const indDesc   = document.getElementById('conf-agrupar-desc-individual');
+    if (indDesc) indDesc.style.display = agruparEl?.checked ? 'none' : '';
+
+    if (!_convRows.length || !_confTiposSel.length) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const envios  = conf_computarEnvios();
+    const agrupar = agruparEl?.checked !== false;
+
+    if (!envios.length) {
+      container.innerHTML = `
+        <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:14px;font-size:13px;color:#92400E">
+          ⚠️ Nenhum registro encontrado com os filtros selecionados para o período atual.
+        </div>`;
+      return;
+    }
+
+    const totalRegs = envios.reduce((s, e) => s + (e.empregados?.length || 1), 0);
+    const previewRows = envios.slice(0, 6).map(e => {
+      if (agrupar) {
+        const lista = e.empregados.map(x => `${x.empregado}${x.venc ? ' · ' + x.venc : ''}`).join('; ');
+        return `<div style="padding:8px 12px;border-bottom:1px solid var(--border-light);font-size:12px">
+          <strong>${esc(e.empresa)}</strong> · ${e.empregados.length} colaborador(es)<br>
+          <span style="color:var(--muted);font-size:11px">${esc(lista.slice(0, 120))}${lista.length > 120 ? '…' : ''}</span>
+        </div>`;
+      }
+      return `<div style="padding:8px 12px;border-bottom:1px solid var(--border-light);font-size:12px">
+        <strong>${esc(e.empresa)}</strong> · ${esc(e.empregado)} · <em>${esc(e.tipo)}</em> · ${esc(e.venc || '—')}
+      </div>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="background:var(--bg-light);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text);font-weight:600">
+          ${envios.length} envio(s) · ${totalRegs} registro(s) · <span style="font-weight:400">${esc(periodo.label)}</span>
+        </div>
+        ${previewRows}
+        ${envios.length > 6 ? `<div style="padding:8px 12px;font-size:11px;color:var(--muted);text-align:center">… e mais ${envios.length - 6} empresa(s)</div>` : ''}
+      </div>`;
+  }
+
+  function conf_getTemplate(tipos, agrupar) {
+    const t = (tipos || []).join(' ').toLowerCase();
+    if (agrupar) {
+      const intro = t.includes('aniversário') && tipos.length === 1
+        ? 'Informamos os aniversariantes do período:'
+        : 'Informamos os seguintes avisos de vencimento:';
+      return `Prezados {{empresa}},\n\n${intro}\n\n{{lista_empregados}}\n\nPeríodo: {{periodo}}\n\nAtenciosamente,\nEquipe SCONT`;
+    }
+    if (t.includes('aniversário') && tipos.length === 1)
+      return `Prezados {{empresa}},\n\nInformamos que o(a) colaborador(a) {{empregado}} faz aniversário em {{vencimento}}.\n\nAproveite a data para reconhecer e parabenizar!\n\nAtenciosamente,\nEquipe SCONT`;
+    if (t.includes('certificado') && tipos.length === 1)
+      return `Prezados {{empresa}},\n\nAtenção: o Certificado Digital da empresa vence em {{vencimento}}.\n\nProvidencie a renovação com antecedência.\n\nAtenciosamente,\nEquipe SCONT`;
+    if (t.includes('contrato'))
+      return `Prezados {{empresa}},\n\nO contrato de experiência do(a) colaborador(a) {{empregado}} vence em {{vencimento}} ({{tipo_evento}}).\n\nProvidencias necessárias com antecedência.\n\nAtenciosamente,\nEquipe SCONT`;
+    return `Prezados {{empresa}},\n\nInformamos: {{empregado}} — {{tipo_evento}} — Vencimento: {{vencimento}}.\n\nAtenciosamente,\nEquipe SCONT`;
+  }
+
+  function _conf_buildMsg(template, vars) {
+    return template.replace(/\{\{([\w\s_áéíóúâêîôûãõçàèìòùü]+)\}\}/gi,
+      (_, k) => vars[k.trim()] ?? `{{${k}}}`);
+  }
+
+  function conf_abrirModalCampanha(isRegra) {
+    if (!_convRows.length)     { toast('Importe um PDF primeiro.', 'error'); return; }
+    if (!_confTiposSel.length) { toast('Selecione pelo menos um tipo de evento.', 'error'); return; }
+
+    _confIsRegra = isRegra;
+    const periodo = conf_getPeriodo();
+    const agrupar = document.getElementById('conf-agrupar-empresa')?.checked !== false;
+    const envios  = conf_computarEnvios();
+
+    if (!envios.length) { toast('Nenhum registro encontrado com os filtros atuais.', 'error'); return; }
+
+    document.getElementById('modal-conf-titulo').textContent = isRegra ? '🔄 Salvar Regra Recorrente' : '📣 Criar Campanha';
+    document.getElementById('btn-conf-criar').textContent    = isRegra ? 'Salvar Regra' : 'Criar Campanha';
+    document.getElementById('conf-modal-regra-info').style.display = isRegra ? '' : 'none';
+
+    const totalRegs = envios.reduce((s, e) => s + (e.empregados?.length || 1), 0);
+    const freqTexto = { unica: 'Envio único', semanal: 'Semanal', mensal: 'Mensal' }[_confFreq];
+    document.getElementById('conf-modal-resumo').innerHTML = `
+      <strong>Tipos:</strong> ${esc(_confTiposSel.join(', '))}<br>
+      <strong>Frequência:</strong> ${freqTexto}<br>
+      <strong>Período:</strong> ${esc(periodo.label)}<br>
+      <strong>Envios:</strong> ${envios.length} ${agrupar ? 'empresa(s)' : 'destinatário(s)'} · ${totalRegs} registro(s)`;
+
+    const mes      = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    const tipoAbrev = _confTiposSel.length === 1 ? _confTiposSel[0] : `${_confTiposSel.length} tipos`;
+    const nome      = `${tipoAbrev} — ${mes}`;
+    document.getElementById('conf-camp-nome').value    = nome;
+    document.getElementById('conf-camp-assunto').value = nome;
+    document.getElementById('conf-camp-data').value    = periodo.sendDate || '';
+    document.getElementById('conf-camp-template').value = conf_getTemplate(_confTiposSel, agrupar);
+
+    const varsHint = agrupar
+      ? '{{empresa}} {{lista_empregados}} {{periodo}}'
+      : '{{empresa}} {{empregado}} {{tipo_evento}} {{vencimento}}';
+    document.getElementById('conf-modal-vars-hint').textContent = `Variáveis disponíveis: ${varsHint}`;
+
+    const previewHtml = envios.slice(0, 8).map(e => {
+      const txt = agrupar
+        ? `${e.empresa} · ${e.empregados.length} colaborador(es)`
+        : `${e.empresa} · ${e.empregado}`;
+      return `<div style="padding:6px 12px;border-bottom:1px solid var(--border-light);font-size:12px;color:var(--text)">${esc(txt)}</div>`;
+    }).join('') + (envios.length > 8 ? `<div style="padding:6px 12px;font-size:11px;color:var(--muted)">… e mais ${envios.length - 8}</div>` : '');
+    document.getElementById('conf-modal-preview-envios').innerHTML = previewHtml;
+
+    document.getElementById('btn-conf-criar').disabled = false;
+    openModal('modal-conf-campanha');
+  }
+
+  async function conf_criarCampanha() {
+    const nome     = document.getElementById('conf-camp-nome').value.trim();
+    const assunto  = document.getElementById('conf-camp-assunto').value.trim();
+    const template = document.getElementById('conf-camp-template').value.trim();
+    const data     = document.getElementById('conf-camp-data').value;
+
+    if (!nome)     { toast('Informe o nome da campanha.', 'error'); return; }
+    if (!template) { toast('Informe o template da mensagem.', 'error'); return; }
+    if (!data)     { toast('Defina a data de envio.', 'error'); return; }
+
+    const btn = document.getElementById('btn-conf-criar');
+    btn.disabled = true;
+    btn.textContent = _confIsRegra ? 'Salvando…' : 'Criando…';
+
+    const periodo = conf_getPeriodo();
+    const agrupar = document.getElementById('conf-agrupar-empresa')?.checked !== false;
+    const envios  = conf_computarEnvios();
+
+    try {
+      if (_confIsRegra) {
+        const { error } = await sb.from('mala_direta_regras').insert({
+          nome,
+          tipos:           _confTiposSel,
+          frequencia:      _confFreq,
+          dia_envio:       _confFreq === 'semanal' ? _confDiaSem
+                         : _confFreq === 'mensal' && typeof _confDiaMes === 'number' ? _confDiaMes
+                         : null,
+          dia_envio_tipo:  _confFreq === 'mensal' && _confDiaMes === 'ultimo' ? 'ultimo' : null,
+          agrupar_empresa: agrupar,
+          template,
+          assunto_email:   assunto || nome,
+          ativa:           true,
+          criado_por:      userId,
+        });
+        if (error) throw error;
+        toast('✅ Regra salva! Será executada automaticamente no dia configurado.', 'success');
+        await loadRegras();
+      } else {
+        const { data: camp, error: errCamp } = await sb.from('mala_direta_campanhas').insert({
+          nome,
+          assunto_email:    assunto || nome,
+          template,
+          tipo_confirmacao: 'nenhuma',
+          status:           'rascunho',
+          data_agendamento: data,
+          criado_por:       userId,
+        }).select().single();
+        if (errCamp) throw errCamp;
+
+        const scontEmail = document.getElementById('conf-scont-email')?.value?.trim() || 'herbertscont@gmail.com';
+
+        // Gera envios para as empresas (clientes)
+        const insertsEmpresa = (_confDestinatario !== 'scont') ? envios.map(e => {
+          if (agrupar) {
+            const lista = (e.empregados || []).map(x =>
+              `• ${x.empregado}${x.venc ? ' — ' + x.venc : ''}`
+            ).join('\n');
+            const vars = { empresa: e.empresa, lista_empregados: lista, periodo: periodo.periodLabel };
+            return { campanha_id: camp.id, nome: e.empresa, empresa: e.empresa,
+              mensagem_final: _conf_buildMsg(template, vars),
+              token: crypto.randomUUID().replace(/-/g, ''), canal: 'email' };
+          }
+          const vars = { empresa: e.empresa, empregado: e.empregado, tipo_evento: e.tipo, vencimento: e.venc || '' };
+          return { campanha_id: camp.id, nome: e.empregado, empresa: e.empresa, cargo: e.tipo || null,
+            mensagem_final: _conf_buildMsg(template, vars),
+            token: crypto.randomUUID().replace(/-/g, ''), canal: 'email' };
+        }) : [];
+
+        // Gera envio consolidado para SCONT (controle interno)
+        const insertScont = (_confDestinatario === 'scont' || _confDestinatario === 'ambos') ? (() => {
+          const resumo = envios.map(e => {
+            if (agrupar) {
+              const lista = (e.empregados || []).map(x =>
+                `  • ${x.empregado}${x.tipo ? ' — ' + x.tipo : ''}${x.venc ? ' (' + x.venc + ')' : ''}`
+              ).join('\n');
+              return `▸ ${e.empresa}\n${lista}`;
+            }
+            return `▸ ${e.empresa} — ${e.empregado} — ${e.tipo}${e.venc ? ' (' + e.venc + ')' : ''}`;
+          }).join('\n\n');
+
+          const msgScont = `Controle Interno — ${periodo.label}\n\n${resumo}`;
+          return { campanha_id: camp.id, nome: 'SCONT — Controle Interno', empresa: 'SCONT',
+            mensagem_final: msgScont,
+            token: crypto.randomUUID().replace(/-/g, ''), canal: 'email' };
+        })() : null;
+
+        const inserts = [...insertsEmpresa, ...(insertScont ? [insertScont] : [])];
+
+        for (let i = 0; i < inserts.length; i += 500) {
+          const { error } = await sb.from('mala_direta_envios').insert(inserts.slice(i, i + 500));
+          if (error) throw error;
+        }
+
+        await loadCampanhas();
+        const destLabel = { empresa: 'empresa(s)', scont: 'SCONT', ambos: 'empresa(s) + SCONT' }[_confDestinatario];
+        toast(`✅ Campanha criada com ${inserts.length} envio(s) para ${destLabel} — agendada para ${data.split('-').reverse().join('/')}!`, 'success');
+      }
+
+      closeModal('modal-conf-campanha');
+    } catch(e) {
+      toast('Erro: ' + e.message, 'error');
+      btn.disabled = false;
+      btn.textContent = _confIsRegra ? 'Salvar Regra' : 'Criar Campanha';
+    }
+  }
+
+  // ── ENVIOS RECORRENTES (regras_*) ─────────────────────────────
+
+  async function loadRegras() {
+    try {
+      const { data, error } = await sb.from('mala_direta_regras')
+        .select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      _regras = data || [];
+    } catch(e) {
+      _regras = [];
+    }
+  }
+
+  function renderRegras() {
+    const container = document.getElementById('regras-list');
+    if (!container) return;
+
+    if (!_regras.length) {
+      container.innerHTML = '<div class="empty"><span class="empty-icon">⏰</span><p>Nenhuma regra recorrente. Crie uma no Conversor PDF → Configurar Envio.</p></div>';
+      return;
+    }
+
+    const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    container.innerHTML = _regras.map(r => {
+      const freqDesc = r.frequencia === 'semanal'
+        ? `Toda ${DIAS[r.dia_envio] ?? '?'}`
+        : r.frequencia === 'mensal'
+          ? (r.dia_envio_tipo === 'ultimo' ? 'Último dia do mês' : `Dia ${r.dia_envio} do mês`)
+          : 'Único';
+      const ultimaExec = r.ultima_execucao
+        ? `Última execução: ${r.ultima_execucao.split('-').reverse().join('/')}`
+        : 'Nunca executada';
+      const badge = r.ativa
+        ? '<span style="background:#D1FAE5;color:#065F46;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">Ativa</span>'
+        : '<span style="background:#F3F4F6;color:#6B7280;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">Inativa</span>';
+
+      return `
+      <div class="card" style="margin-bottom:12px;border-left:4px solid ${r.ativa ? 'var(--primary)' : 'var(--border)'}">
+        <div style="display:flex;align-items:flex-start;gap:16px;padding:16px 18px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">${badge}
+              <span style="font-weight:700;font-size:14px;color:var(--text)">${esc(r.nome)}</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:4px">${freqDesc} · ${esc((r.tipos || []).join(', '))}</div>
+            <div style="font-size:11px;color:var(--muted)">${ultimaExec}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${r.ativa ? `<button class="btn btn-primary btn-sm" onclick="regra_executarAgora('${r.id}')">▶ Executar Agora</button>` : ''}
+            ${r.ativa ? `<button class="btn btn-secondary btn-sm" onclick="regra_desativar('${r.id}')">Desativar</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function regra_executarAgora(id) {
+    if (!_convRows.length) {
+      toast('Importe um PDF primeiro para executar a regra.', 'error');
+      showSection('conversor');
+      return;
+    }
+    const regra = _regras.find(r => r.id === id);
+    if (!regra) return;
+
+    // Temporarily apply regra settings
+    const prevTipos  = [..._confTiposSel];
+    const prevFreq   = _confFreq;
+    const prevDiaSem = _confDiaSem;
+    const prevDiaMes = _confDiaMes;
+
+    _confTiposSel = regra.tipos || [];
+    _confFreq     = regra.frequencia;
+    _confDiaSem   = regra.dia_envio ?? 0;
+    _confDiaMes   = regra.dia_envio_tipo === 'ultimo' ? 'ultimo' : (regra.dia_envio ?? 1);
+
+    const periodo = conf_getPeriodo();
+    const agrupar = regra.agrupar_empresa !== false;
+    const envios  = conf_computarEnvios();
+
+    _confTiposSel = prevTipos;
+    _confFreq     = prevFreq;
+    _confDiaSem   = prevDiaSem;
+    _confDiaMes   = prevDiaMes;
+
+    if (!envios.length) { toast('Nenhum registro encontrado para esta regra no período atual.', 'error'); return; }
+    if (!confirm(`Criar campanha "${regra.nome}" com ${envios.length} envio(s)?`)) return;
+
+    try {
+      const now = new Date();
+      const { data: camp, error: errCamp } = await sb.from('mala_direta_campanhas').insert({
+        nome:             `${regra.nome} — ${now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
+        assunto_email:    regra.assunto_email || regra.nome,
+        template:         regra.template,
+        tipo_confirmacao: 'nenhuma',
+        status:           'rascunho',
+        data_agendamento: periodo.sendDate,
+        criado_por:       userId,
+      }).select().single();
+      if (errCamp) throw errCamp;
+
+      const inserts = envios.map(e => {
+        if (agrupar) {
+          const lista = (e.empregados || []).map(x => `• ${x.empregado}${x.venc ? ' — ' + x.venc : ''}`).join('\n');
+          const vars = { empresa: e.empresa, lista_empregados: lista, periodo: periodo.periodLabel };
+          return { campanha_id: camp.id, nome: e.empresa, empresa: e.empresa,
+            mensagem_final: _conf_buildMsg(regra.template, vars),
+            token: crypto.randomUUID().replace(/-/g, ''), canal: 'email' };
+        }
+        const vars = { empresa: e.empresa, empregado: e.empregado, tipo_evento: e.tipo, vencimento: e.venc || '' };
+        return { campanha_id: camp.id, nome: e.empregado, empresa: e.empresa, cargo: e.tipo || null,
+          mensagem_final: _conf_buildMsg(regra.template, vars),
+          token: crypto.randomUUID().replace(/-/g, ''), canal: 'email' };
+      });
+
+      for (let i = 0; i < inserts.length; i += 500) {
+        const { error } = await sb.from('mala_direta_envios').insert(inserts.slice(i, i + 500));
+        if (error) throw error;
+      }
+
+      await sb.from('mala_direta_regras').update({ ultima_execucao: now.toISOString().split('T')[0] }).eq('id', id);
+      await Promise.all([loadRegras(), loadCampanhas()]);
+      renderRegras();
+      toast(`✅ Campanha criada com ${inserts.length} envio(s)!`, 'success');
+    } catch(e) {
+      toast('Erro: ' + e.message, 'error');
+    }
+  }
+
+  async function regra_desativar(id) {
+    if (!confirm('Desativar esta regra recorrente?')) return;
+    try {
+      const { error } = await sb.from('mala_direta_regras').update({ ativa: false }).eq('id', id);
+      if (error) throw error;
+      await loadRegras();
+      renderRegras();
+      toast('Regra desativada.', 'success');
+    } catch(e) {
+      toast('Erro: ' + e.message, 'error');
+    }
+  }
+
+  function regras_verificarDue() {
+    const hoje     = new Date();
+    const diaSem   = hoje.getDay();
+    const diaMes   = hoje.getDate();
+    const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate();
+    const hojeStr  = hoje.toISOString().split('T')[0];
+
+    const due = _regras.filter(r => {
+      if (!r.ativa) return false;
+      if (r.ultima_execucao === hojeStr) return false;
+      if (r.frequencia === 'semanal') return r.dia_envio === diaSem;
+      if (r.frequencia === 'mensal') {
+        if (r.dia_envio_tipo === 'ultimo') return diaMes === ultimoDia;
+        return diaMes === r.dia_envio;
+      }
+      return false;
+    });
+
+    if (!due.length) return;
+
+    const alertEl = document.getElementById('regras-alert');
+    if (!alertEl) return;
+    alertEl.style.display = '';
+    alertEl.innerHTML = `
+      ⏰ <strong>${due.length} regra(s)</strong> programada(s) para hoje:
+      ${due.map(r => `<strong>${esc(r.nome)}</strong>`).join(', ')}<br>
+      <a href="#" onclick="showSection('conversor');return false" style="font-weight:700;color:var(--primary)">
+        → Importe o PDF e execute as regras na seção Conversor PDF
+      </a>`;
+  }
+
   // ── CONFIGURAÇÕES ─────────────────────────────────────────────
   function getSettings() {
     return {
@@ -2271,7 +4080,15 @@ Equipe SCONT"></textarea>
   // ── HELPERS ───────────────────────────────────────────────────
   function esc(s) { const d = document.createElement('div'); d.textContent = String(s||''); return d.innerHTML; }
   function formatDate(iso) { return iso ? new Date(iso).toLocaleDateString('pt-BR') : ''; }
+  function formatDateBR(d) { if (!d) return ''; const [y,m,dy] = d.split('-'); return `${dy}/${m}/${y}`; }
   function formatDateTime(d) { if (!d) return ''; const dt = d instanceof Date ? d : new Date(d); return dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
+  function _convDiasRestantes(d) {
+    const dias = Math.round((new Date(d) - new Date(new Date().toDateString())) / 86400000);
+    if (dias === 0) return ' — HOJE';
+    if (dias === 1) return ' — amanhã';
+    if (dias > 0)   return ` — em ${dias}d`;
+    return ` — ${Math.abs(dias)}d atrás`;
+  }
   function labelStatus(s)  { return { rascunho:'Rascunho', ativa:'Ativa', encerrada:'Encerrada' }[s] || s; }
   function labelTipoConf(t){ return { leitura:'Confirmar leitura', interesse:'Confirmar interesse', nenhuma:'Sem confirmação' }[t] || t; }
   function labelCanal(c)   { return { email:'📧 Email', whatsapp:'💬 WhatsApp', ambos:'📧💬 Ambos' }[c] || c; }

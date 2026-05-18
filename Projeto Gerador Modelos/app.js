@@ -14,11 +14,13 @@ let excelHeaders = [];
 
 // Wizard
 let wizardStep = 1;
+let savedEditorRange = null;
 let wizardEmpresasSelecionadas = [];
 let wizardModeloSelecionado = null;
 let wizardRegistros = [];
 let wizardPreviewIndex = 0;
 let wizardCabecalho = 'completo';
+let wizardNomeEmpresaExcel = '';
 
 // Definição das variáveis disponíveis por fonte
 const VARS_DEF = {
@@ -324,6 +326,13 @@ function openModalModelo(id) {
   const el = document.getElementById('modal-modelo');
   el.classList.add('open');
 
+  // Reset excel ao abrir modal
+  excelData = []; excelHeaders = [];
+  const mef = document.getElementById('modal-excel-file');
+  if (mef) mef.value = '';
+  const mep = document.getElementById('modal-excel-preview');
+  if (mep) mep.innerHTML = '';
+
   // Reset
   document.getElementById('modelo-id').value = '';
   document.getElementById('modelo-nome').value = '';
@@ -354,12 +363,31 @@ function openModalModelo(id) {
     document.getElementById('modal-modelo-title').textContent = 'Novo Modelo';
   }
 
+  // Salva posição do cursor sempre que o editor perde foco
+  const editor = document.getElementById('modelo-template');
+  editor._blurHandler && editor.removeEventListener('blur', editor._blurHandler, true);
+  editor._blurHandler = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const r = sel.getRangeAt(0);
+      if (editor.contains(r.commonAncestorContainer)) {
+        savedEditorRange = r.cloneRange();
+      }
+    }
+  };
+  editor.addEventListener('blur', editor._blurHandler, true);
+
   renderVarsPanel();
   document.querySelectorAll('.fonte-cb').forEach(cb => cb.addEventListener('change', renderVarsPanel));
 }
 
 function closeModalModelo() {
   document.getElementById('modal-modelo').classList.remove('open');
+  excelData = []; excelHeaders = [];
+  const mef = document.getElementById('modal-excel-file');
+  if (mef) mef.value = '';
+  const mep = document.getElementById('modal-excel-preview');
+  if (mep) mep.innerHTML = '';
 }
 
 function renderVarsPanel() {
@@ -378,7 +406,7 @@ function renderVarsPanel() {
     html += `<div class="vars-group">
       <div class="vars-group-label">${def.label}</div>
       <div>
-        ${campos.map(([campo]) => `<span class="var-chip" onclick="insertVar('{{${def.prefix}.${campo}}}')">{{${def.prefix}.${campo}}}</span>`).join('')}
+        ${campos.map(([campo]) => `<span class="var-chip" onmousedown="event.preventDefault()" onclick="insertVar('{{${def.prefix}.${campo}}}')">{{${def.prefix}.${campo}}}</span>`).join('')}
       </div>
     </div>`;
   }
@@ -389,22 +417,33 @@ function insertVar(varStr) {
   const editor = document.getElementById('modelo-template');
   editor.focus();
   const sel = window.getSelection();
+
+  // Tenta usar a seleção ativa; se não estiver no editor, usa o range salvo
+  let range = null;
   if (sel && sel.rangeCount > 0) {
-    const range = sel.getRangeAt(0);
-    // verifica se o cursor está dentro do editor
-    if (editor.contains(range.commonAncestorContainer)) {
-      range.deleteContents();
-      const node = document.createTextNode(varStr);
-      range.insertNode(node);
-      range.setStartAfter(node);
-      range.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(range);
-      return;
-    }
+    const r = sel.getRangeAt(0);
+    if (editor.contains(r.commonAncestorContainer)) range = r;
+  }
+  if (!range && savedEditorRange) {
+    range = savedEditorRange;
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  if (range) {
+    range.deleteContents();
+    const node = document.createTextNode(varStr);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    savedEditorRange = range.cloneRange();
+    return;
   }
   // fallback: insere no final
-  editor.innerHTML += varStr;
+  const node = document.createTextNode(varStr);
+  editor.appendChild(node);
 }
 
 async function salvarModelo() {
@@ -463,13 +502,14 @@ async function carregarEmpresas() {
 
 // ── Wizard — sequência dinâmica ───────────────────────────────
 // Ordem fixa de painéis possíveis; a sequência ativa depende das fontes do modelo
-const WIZARD_PANELS_ORDER = ['modelo', 'empresas', 'empregados', 'socios', 'rubricas', 'exportar'];
+const WIZARD_PANELS_ORDER = ['modelo', 'empresas', 'empregados', 'socios', 'rubricas', 'planilha', 'exportar'];
 const WIZARD_PANEL_LABELS = {
   modelo:     'Modelo',
   empresas:   'Empresas',
   empregados: 'Empregados',
   socios:     'Sócios',
   rubricas:   'Rubricas',
+  planilha:   'Planilha',
   exportar:   'Exportar',
 };
 
@@ -487,11 +527,24 @@ let wizardSociosSelecionados     = []; // array de ids
 let wizardRubricasSelecionados   = []; // array de ids
 
 function calcularSequencia() {
-  const fontes = wizardModeloSelecionado?.fontes || [];
-  const seq = ['modelo', 'empresas'];
-  if (fontes.includes('empregados')) seq.push('empregados');
-  if (fontes.includes('socios'))     seq.push('socios');
-  if (fontes.includes('rubricas'))   seq.push('rubricas');
+  const fontes   = wizardModeloSelecionado?.fontes || [];
+  const template = wizardModeloSelecionado?.template || '';
+
+  // Usa Excel se estiver nas fontes OU se o template contiver variáveis {{excel.*}}
+  const usaExcel = fontes.includes('excel') || template.includes('{{excel.');
+
+  // Modo Excel puro: sem nenhuma fonte de banco de dados
+  const temFonteDB = fontes.some(f => ['empresas','empregados','socios','rubricas'].includes(f));
+  const soExcel    = usaExcel && !temFonteDB;
+
+  const seq = ['modelo'];
+  if (!soExcel) {
+    seq.push('empresas');
+    if (fontes.includes('empregados')) seq.push('empregados');
+    if (fontes.includes('socios'))     seq.push('socios');
+    if (fontes.includes('rubricas'))   seq.push('rubricas');
+  }
+  if (usaExcel) seq.push('planilha');
   seq.push('exportar');
   return seq;
 }
@@ -507,12 +560,22 @@ async function iniciarWizard() {
   wizardRegistros            = [];
   wizardPreviewIndex         = 0;
   wizardCabecalho            = 'completo';
+  wizardNomeEmpresaExcel     = '';
   _dbEmpregados = []; _dbSocios = []; _dbRubricas = [];
+  excelData = []; excelHeaders = [];
+  _limparUIPlanilha();
 
   renderWizardBar();
   mostrarPainel('modelo');
   await carregarEmpresas();
   renderModelosWizard();
+}
+
+function _limparUIPlanilha() {
+  const fi = document.getElementById('planilha-excel-file');
+  if (fi) fi.value = '';
+  const info = document.getElementById('planilha-excel-info');
+  if (info) info.innerHTML = '';
 }
 
 function renderWizardBar() {
@@ -550,11 +613,13 @@ async function wizardAvançar() {
     if (!wizardEmpresasSelecionadas.length) {
       toast('Selecione pelo menos uma empresa.', 'error'); return;
     }
-    // Carrega dados das tabelas ao avançar de empresas
     await carregarDadosDasEmpresas();
     if (proximo === 'empregados') renderEmpregadosWizard();
     if (proximo === 'socios')     renderSociosWizard();
     if (proximo === 'rubricas')   renderRubricasWizard();
+  }
+  if (wizardPanelAtual === 'planilha' && !excelData.length) {
+    toast('Faça o upload da planilha Excel para continuar.', 'error'); return;
   }
   if (wizardPanelAtual === 'empregados' && proximo === 'socios')   renderSociosWizard();
   if (wizardPanelAtual === 'empregados' && proximo === 'rubricas') renderRubricasWizard();
@@ -563,6 +628,14 @@ async function wizardAvançar() {
   if (proximo === 'empresas') renderEmpresasWizard();
 
   if (proximo === 'exportar') {
+    const fontes = wizardModeloSelecionado?.fontes || [];
+    const template = wizardModeloSelecionado?.template || '';
+    const usaExcel = fontes.includes('excel') || template.includes('{{excel.');
+    const temFonteDB = fontes.some(f => ['empresas','empregados','socios','rubricas'].includes(f));
+    const soExcel = usaExcel && !temFonteDB;
+    if (soExcel && !wizardNomeEmpresaExcel) {
+      abrirModalNomeEmpresaExcel(); return;
+    }
     construirRegistros();
     buildWizardResumo();
     renderPreview();
@@ -767,6 +840,22 @@ function atualizarContador(id, n, label) {
 function construirRegistros() {
   const modelo   = wizardModeloSelecionado;
   const fontes   = modelo?.fontes || [];
+  const template = modelo?.template || '';
+  const usaExcel = fontes.includes('excel') || template.includes('{{excel.');
+  const temFonteDB = fontes.some(f => ['empresas','empregados','socios','rubricas'].includes(f));
+  const soExcel  = usaExcel && !temFonteDB;
+
+  // Modo Excel puro: um documento por linha da planilha
+  if (soExcel) {
+    wizardRegistros = excelData.map(row => {
+      const map = {};
+      for (const h of excelHeaders) map[`excel.${h}`] = row[h] ?? '';
+      return map;
+    });
+    wizardPreviewIndex = 0;
+    return;
+  }
+
   const empsSel  = _dbEmpregados.filter(e => wizardEmpregadosSelecionados.includes(e.id));
   const socsSel  = _dbSocios.filter(s => wizardSociosSelecionados.includes(s.id));
   const rubsSel  = _dbRubricas.filter(r => wizardRubricasSelecionados.includes(r.id));
@@ -774,32 +863,34 @@ function construirRegistros() {
   const empresaMap = {};
   empresas.forEach(e => { empresaMap[e.codigo_empresa] = e; });
 
+  // Quando há Excel junto com DB, cada registro recebe a linha do Excel pelo índice
+  // (ou a primeira linha se houver menos linhas que registros)
+  const excelRow = (i) => excelData.length ? (excelData[i] || excelData[0]) : {};
+
   if (modelo.tipo === 'por_registro') {
-    // Base: empregados (se selecionados), caso contrário uma linha por empresa
     const base = fontes.includes('empregados') && empsSel.length ? empsSel : null;
     if (base) {
-      wizardRegistros = base.map(emp => {
+      wizardRegistros = base.map((emp, i) => {
         const empresa = empresaMap[emp.codigo_empresa] || {};
         const socio   = socsSel.find(s => s.codigo_empresa === emp.codigo_empresa) || {};
         const rubrica = rubsSel.find(r => r.codigo_empresa === emp.codigo_empresa) || {};
-        return buildVarMap(empresa, emp, socio, rubrica, excelData[0] || {});
+        return buildVarMap(empresa, emp, socio, rubrica, excelRow(i));
       });
     } else {
-      wizardRegistros = wizardEmpresasSelecionadas.map(cod => {
+      wizardRegistros = wizardEmpresasSelecionadas.map((cod, i) => {
         const empresa = empresaMap[cod] || {};
         const socio   = socsSel.find(s => s.codigo_empresa === cod) || {};
         const rubrica = rubsSel.find(r => r.codigo_empresa === cod) || {};
-        return buildVarMap(empresa, {}, socio, rubrica, excelData[0] || {});
+        return buildVarMap(empresa, {}, socio, rubrica, excelRow(i));
       });
     }
   } else {
-    // Consolidado: um registro por empresa selecionada
-    wizardRegistros = wizardEmpresasSelecionadas.map(cod => {
+    wizardRegistros = wizardEmpresasSelecionadas.map((cod, i) => {
       const empresa = empresaMap[cod] || {};
       const emp     = empsSel.find(e => e.codigo_empresa === cod) || {};
       const socio   = socsSel.find(s => s.codigo_empresa === cod) || {};
       const rubrica = rubsSel.find(r => r.codigo_empresa === cod) || {};
-      return buildVarMap(empresa, emp, socio, rubrica, excelData[0] || {});
+      return buildVarMap(empresa, emp, socio, rubrica, excelRow(i));
     });
   }
   wizardPreviewIndex = 0;
@@ -860,7 +951,7 @@ function buildWizardResumo() {
   document.getElementById('res-empresas').textContent = nomes.join(', ') || '—';
   document.getElementById('res-registros').textContent = wizardRegistros.length;
   const primeiraEmpresa = empresas.find(e => e.codigo_empresa === wizardEmpresasSelecionadas[0]);
-  document.getElementById('cab-neutro-empresa-name').textContent = primeiraEmpresa?.nome_empresa || 'Nome da Empresa';
+  document.getElementById('cab-neutro-empresa-name').textContent = primeiraEmpresa?.nome_empresa || wizardNomeEmpresaExcel || 'Nome da Empresa';
   document.getElementById('cab-neutro-titulo').textContent = m.nome;
   // Aplica cabeçalho padrão do modelo
   selectCabecalho(wizardCabecalho);
@@ -890,8 +981,30 @@ async function exportarPDF() {
   setTimeout(() => { printRoot.style.display = 'none'; }, 1000);
 }
 
+function abrirModalNomeEmpresaExcel() {
+  document.getElementById('modal-nome-empresa-excel').classList.add('open');
+  const inp = document.getElementById('input-nome-empresa-excel');
+  inp.value = wizardNomeEmpresaExcel || '';
+  setTimeout(() => inp.focus(), 100);
+}
+
+function confirmarNomeEmpresaExcel() {
+  const val = document.getElementById('input-nome-empresa-excel').value.trim();
+  if (!val) { toast('Informe o nome da empresa.', 'error'); return; }
+  wizardNomeEmpresaExcel = val;
+  document.getElementById('modal-nome-empresa-excel').classList.remove('open');
+  construirRegistros();
+  buildWizardResumo();
+  renderPreview();
+  mostrarPainel('exportar');
+}
+
+function fecharModalNomeEmpresaExcel() {
+  document.getElementById('modal-nome-empresa-excel').classList.remove('open');
+}
+
 function buildCabecalhoHtml(tipo, varMap, tituloModelo) {
-  const nomeEmpresa = varMap['empresa.nome_empresa'] || 'Empresa';
+  const nomeEmpresa = varMap['empresa.nome_empresa'] || wizardNomeEmpresaExcel || 'Empresa';
   if (tipo === 'completo') return `<div class="print-header-completo">
     <span class="ph-logo-text">SCONT</span><div class="ph-sep"></div>
     <div class="ph-texts"><strong class="ph-title">${esc(tituloModelo)}</strong>
@@ -936,7 +1049,6 @@ async function registrarGeracao() {
 }
 
 function resetWizard() {
-  excelData = []; excelHeaders = [];
   iniciarWizard();
 }
 
@@ -953,14 +1065,77 @@ function handleExcelUpload(event) {
     excelHeaders = Object.keys(json[0]);
     excelData    = json;
     renderVarsPanel();
-    toast('Planilha carregada: ' + excelHeaders.length + ' colunas.', 'success');
+    _renderModalExcelPreview();
+    toast('Planilha carregada: ' + excelHeaders.length + ' coluna(s).', 'success');
   };
   reader.readAsBinaryString(file);
 }
 
+function _renderModalExcelPreview() {
+  const prev = document.getElementById('modal-excel-preview');
+  if (!prev) return;
+  if (!excelHeaders.length) { prev.innerHTML = ''; return; }
+  prev.innerHTML = `
+    <div style="font-size:12px;color:var(--success);font-weight:600;margin-bottom:6px">
+      ✅ ${excelData.length} linha(s) · ${excelHeaders.length} coluna(s) disponíveis como variáveis:
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${excelHeaders.map(h => `<code style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer" onmousedown="event.preventDefault()" onclick="insertVar('{{excel.${h}}}')" title="Clique para inserir">{{excel.${h}}}</code>`).join('')}
+    </div>`;
+}
+
 function removeExcel() {
   excelData = []; excelHeaders = [];
+  const mef = document.getElementById('modal-excel-file');
+  if (mef) mef.value = '';
+  const mep = document.getElementById('modal-excel-preview');
+  if (mep) mep.innerHTML = '';
   renderVarsPanel();
+}
+
+function handleWizardExcel(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const wb   = XLSX.read(e.target.result, { type: 'binary' });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (!json.length) { toast('Planilha vazia.', 'error'); return; }
+    excelHeaders = Object.keys(json[0]);
+    excelData    = json;
+    _renderPlanilhaInfo();
+    toast(`Planilha carregada: ${excelData.length} linha(s), ${excelHeaders.length} coluna(s).`, 'success');
+  };
+  reader.readAsBinaryString(file);
+}
+
+function limparWizardExcel() {
+  excelData = []; excelHeaders = [];
+  _limparUIPlanilha();
+}
+
+function _renderPlanilhaInfo() {
+  const div = document.getElementById('planilha-excel-info');
+  if (!div) return;
+  if (!excelHeaders.length) { div.innerHTML = ''; return; }
+  const preview = excelData.slice(0, 3);
+  const cols = excelHeaders;
+  div.innerHTML = `
+    <div style="font-size:12px;color:var(--success);font-weight:600;margin-bottom:8px">
+      ✅ ${excelData.length} linha(s) · ${excelHeaders.length} coluna(s)
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead>
+          <tr>${cols.map(h => `<th style="padding:4px 8px;background:var(--bg-light);border:1px solid var(--border-light);text-align:left;white-space:nowrap">{{excel.${h}}}</th>`).join('')}</tr>
+        </thead>
+        <tbody>
+          ${preview.map(row => `<tr>${cols.map(h => `<td style="padding:4px 8px;border:1px solid var(--border-light);color:var(--text-light)">${esc(String(row[h] ?? ''))}</td>`).join('')}</tr>`).join('')}
+          ${excelData.length > 3 ? `<tr><td colspan="${cols.length}" style="padding:4px 8px;border:1px solid var(--border-light);color:var(--muted);text-align:center">… mais ${excelData.length - 3} linha(s)</td></tr>` : ''}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 // ── Histórico ─────────────────────────────────────────────────

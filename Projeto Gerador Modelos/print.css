@@ -69,11 +69,14 @@
 
     /* ── Corpo do documento ── */
     .print-body {
-        padding: 0 20px;
+        padding: 20px 24px;
         font-family: 'Segoe UI', Arial, sans-serif;
         font-size: 11px;
         line-height: 1.7;
         color: #2C3E50;
+        border: 1px solid #D8DEE6;
+        border-radius: 4px;
+        margin: 0 4px 4px 4px;
     }
 
     /* ── Quebra de página por registro ── */

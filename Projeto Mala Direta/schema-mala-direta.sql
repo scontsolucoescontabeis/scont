@@ -168,6 +168,16 @@ ALTER TABLE public.mala_direta_campanhas
     ADD COLUMN IF NOT EXISTS assunto_email TEXT;
 
 -- ============================================================
+-- AGENDAMENTO DE ENVIO (adicionado após criação inicial)
+-- Execute no SQL Editor do Supabase (projeto principal)
+-- ============================================================
+ALTER TABLE public.mala_direta_campanhas
+    ADD COLUMN IF NOT EXISTS data_agendamento DATE;
+
+COMMENT ON COLUMN public.mala_direta_campanhas.data_agendamento IS
+    'Data prevista de envio da campanha. Gerada automaticamente pelo Conversor PDF → Agrupar e Agendar.';
+
+-- ============================================================
 -- GRUPOS DE CONTATOS (adicionado após criação inicial)
 -- ============================================================
 
@@ -210,3 +220,32 @@ CREATE POLICY "md_gc_auth_all"
     ON public.mala_direta_grupo_contatos
     FOR ALL TO authenticated
     USING (TRUE) WITH CHECK (TRUE);
+
+-- ── TABELA: mala_direta_regras ────────────────────────────────
+-- Regras de envio recorrente geradas pelo Conversor PDF
+CREATE TABLE IF NOT EXISTS public.mala_direta_regras (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome            TEXT NOT NULL,
+    tipos           TEXT[] NOT NULL DEFAULT '{}',
+    frequencia      TEXT NOT NULL CHECK (frequencia IN ('semanal', 'mensal', 'unica')),
+    dia_envio       INTEGER,           -- day-of-week (0=Sun) or day-of-month
+    dia_envio_tipo  TEXT,              -- 'ultimo' for last day of month
+    agrupar_empresa BOOLEAN NOT NULL DEFAULT TRUE,
+    template        TEXT NOT NULL,
+    assunto_email   TEXT,
+    ativa           BOOLEAN NOT NULL DEFAULT TRUE,
+    ultima_execucao DATE,
+    criado_por      UUID REFERENCES public.usuarios(id),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.mala_direta_regras ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "md_regras_auth_all"
+    ON public.mala_direta_regras
+    FOR ALL TO authenticated
+    USING (TRUE) WITH CHECK (TRUE);
+
+-- ── COLUNA data_agendamento em campanhas ─────────────────────
+ALTER TABLE public.mala_direta_campanhas
+    ADD COLUMN IF NOT EXISTS data_agendamento DATE;

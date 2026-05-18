@@ -1,0 +1,281 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║          🎉 KIT COMPLETO - CONVERSOR PDF PARA EXCEL V1.0 🎉              ║
+║                                                                            ║
+║                  Avisos de Vencimento | Relatórios                        ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📦 ESTRUTURA DE ARQUIVOS
+═══════════════════════════════════════════════════════════════════════════
+
+conversao-vencimentos/
+│
+├── 📖 LEIA PRIMEIRO
+│   ├── 📋 INICIO_RAPIDO.md      ← 👈 COMECE AQUI! (5 min)
+│   ├── 📖 README.md             ← Documentação completa
+│   └── 📚 EXEMPLOS.md           ← 15+ exemplos práticos
+│
+├── 🚀 SCRIPTS EXECUTÁVEIS
+│   ├── 🐍 pdf_to_excel_vencimentos.py  ← Script principal (Python)
+│   ├── 🐧 converter_vencimentos.sh     ← Para macOS/Linux
+│   └── 🪟 converter_vencimentos.bat    ← Para Windows
+│
+├── ⚙️  CONFIGURAÇÃO
+│   ├── setup.py                 ← Instalador automático
+│   └── requirements.txt         ← Lista de dependências
+│
+└── ✅ RESULTADO
+    └── Avisos_de_Vencimento.xlsx ← Exemplo de saída
+
+═══════════════════════════════════════════════════════════════════════════
+
+🚀 INÍCIO RÁPIDO (3 PASSOS)
+═══════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PASSO 1: Instalar Dependências (Uma Vez)                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  $ python setup.py                                                     │
+│                                                                         │
+│  Ou manualmente:                                                       │
+│  $ pip install -r requirements.txt                                     │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PASSO 2: Colocar PDF no Diretório                                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Mover seu arquivo PDF para a mesma pasta dos scripts:                │
+│                                                                         │
+│  conversao-vencimentos/                                                │
+│  ├── converter_vencimentos.sh                                          │
+│  ├── seu_arquivo.pdf  ← AQUI                                          │
+│  └── ... (outros arquivos)                                            │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ PASSO 3: Converter                                                      │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  🪟 Windows (PowerShell/CMD):                                           │
+│     $ converter_vencimentos.bat seu_arquivo.pdf                        │
+│                                                                         │
+│  🐧 macOS/Linux (Terminal):                                             │
+│     $ chmod +x converter_vencimentos.sh                                │
+│     $ ./converter_vencimentos.sh seu_arquivo.pdf                       │
+│                                                                         │
+│  🐍 Qualquer Sistema:                                                   │
+│     $ python pdf_to_excel_vencimentos.py seu_arquivo.pdf               │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    ✅ Pronto! Arquivo criado: seu_arquivo_vencimentos.xlsx
+
+═══════════════════════════════════════════════════════════════════════════
+
+📂 GUIA DE ARQUIVOS
+═══════════════════════════════════════════════════════════════════════════
+
+📋 DOCUMENTAÇÃO
+───────────────────────────────────────────────────────────────────────────
+
+  INICIO_RAPIDO.md
+  └─ O que é (1 min)
+     Como instalar (2 min)
+     Primeiros passos (2 min)
+     ⭐ COMECE AQUI ⭐
+
+  README.md
+  └─ Instalação detalhada
+     Requisitos do sistema
+     Modo de uso completo
+     Solução de problemas
+     Dicas de personalização
+     Changelog
+
+  EXEMPLOS.md
+  └─ 15+ exemplos práticos
+     Automação com cron/Task Scheduler
+     Processamento em lote
+     Integração em scripts Python
+     FAQ
+
+🐍 SCRIPTS PYTHON
+───────────────────────────────────────────────────────────────────────────
+
+  pdf_to_excel_vencimentos.py (7.4K)
+  └─ Script principal
+     ├─ Requisitos: Python 3.7+, openpyxl, pypdf
+     ├─ Uso: python pdf_to_excel_vencimentos.py <pdf> [xlsx]
+     ├─ Lê PDF, extrai dados, formata Excel
+     ├─ Cores por tipo de evento
+     ├─ Cabeçalho congelado
+     ├─ Filtros automáticos
+     └─ Código bem documentado
+
+  setup.py (3.9K)
+  └─ Instalador automático
+     ├─ Verifica Python 3.7+
+     ├─ Verifica pip
+     ├─ Instala dependências
+     ├─ Valida arquivos
+     └─ Uso: python setup.py
+
+🐧 SCRIPTS SHELL (Unix/Linux/macOS)
+───────────────────────────────────────────────────────────────────────────
+
+  converter_vencimentos.sh (2.9K)
+  └─ Wrapper com interface colorida
+     ├─ Verifica dependências
+     ├─ Instala se necessário
+     ├─ Executa conversão
+     ├─ Mostra progresso
+     └─ Uso: ./converter_vencimentos.sh <pdf> [xlsx]
+
+🪟 SCRIPTS BATCH (Windows)
+───────────────────────────────────────────────────────────────────────────
+
+  converter_vencimentos.bat (2.9K)
+  └─ Script cmd/PowerShell
+     ├─ Interface colorida
+     ├─ Mensagens amigáveis
+     ├─ Verifica Python
+     ├─ Instala dependências
+     └─ Uso: converter_vencimentos.bat <pdf> [xlsx]
+
+⚙️  CONFIGURAÇÃO
+───────────────────────────────────────────────────────────────────────────
+
+  requirements.txt (29B)
+  └─ openpyxl>=3.0.0
+     pypdf>=3.0.0
+
+✅ RESULTADO
+───────────────────────────────────────────────────────────────────────────
+
+  Avisos_de_Vencimento.xlsx
+  └─ Exemplo de saída com 416 registros
+     ├─ Formatação profissional
+     ├─ Código de cores
+     ├─ Cabeçalho congelado
+     ├─ Filtros automáticos
+     └─ Pronto para mala direta
+
+═══════════════════════════════════════════════════════════════════════════
+
+🎯 FLUXO DE USO
+═══════════════════════════════════════════════════════════════════════════
+
+[Seu PDF]
+    ↓
+[setup.py] ← Instala dependências uma vez
+    ↓
+[converter_vencimentos.sh/bat/py] ← Executa conversão
+    ↓
+[Avisos_de_Vencimento.xlsx] ← Resultado pronto para usar
+
+═══════════════════════════════════════════════════════════════════════════
+
+📊 RECURSOS DA SAÍDA
+═══════════════════════════════════════════════════════════════════════════
+
+✅ Colunas:
+   • Empresa (55 chars)
+   • CNPJ (22 chars)
+   • Empregado (50 chars)
+   • Tipo (45 chars)
+   • Vencimento (38 chars)
+
+✅ Formatação:
+   • Cabeçalho azul (1F4E79)
+   • Bordas em todas as células
+   • Altura de linha otimizada
+   • Fontes Arial/10pt
+
+✅ Cores por Tipo:
+   🟢 Aniversário colaboradores        (E2EFDA)
+   🟠 Certificado digital             (FCE4D6)
+   🔵 Contrato experiência 1º         (DDEBF7)
+   🟦 Contrato experiência prorrogação (EBF3FB)
+   🟡 Vencimento de 2º Férias         (FFF2CC)
+   🔴 Aviso Prévio de rescisão        (FDECEA)
+   🩵 Monitoramento de Saúde          (EAF2FF)
+   🟣 Retorno de afastamento          (F3E5F5)
+
+✅ Funcionalidades:
+   • Cabeçalho congelado (Freeze Panes)
+   • Filtro automático ativo
+   • Dados organizados por empresa
+   • Pronto para filtro/ordenação
+   • Compatível com Excel/Calc/Sheets
+
+═══════════════════════════════════════════════════════════════════════════
+
+❓ PERGUNTAS FREQUENTES
+═══════════════════════════════════════════════════════════════════════════
+
+P: Preciso instalar algo além do Python?
+R: Não! Apenas Python 3.7+ e pip. Tudo mais é automático.
+
+P: Funciona offline?
+R: Sim! Completamente offline, sem Internet necessária.
+
+P: Quanto tempo demora?
+R: PDFs pequenos (<10MB): segundos. Grandes: minutos.
+
+P: Preciso do Excel instalado?
+R: Não! Cria arquivos compatíveis com qualquer leitor.
+
+P: Posso automatizar?
+R: Sim! Veja EXEMPLOS.md para cron/Task Scheduler.
+
+P: Posso modificar o código?
+R: Sim! É Python simples. Fique à vontade para customizar.
+
+═══════════════════════════════════════════════════════════════════════════
+
+🔗 PRÓXIMOS PASSOS
+═══════════════════════════════════════════════════════════════════════════
+
+1️⃣  Leia INICIO_RAPIDO.md (5 min)
+    ↓
+2️⃣  Execute: python setup.py
+    ↓
+3️⃣  Coloque seu PDF no diretório
+    ↓
+4️⃣  Execute: ./converter_vencimentos.sh seu_arquivo.pdf
+    ↓
+5️⃣  Abra o Excel gerado: seu_arquivo_vencimentos.xlsx
+    ↓
+✅  Sucesso!
+
+═══════════════════════════════════════════════════════════════════════════
+
+📞 SUPORTE RÁPIDO
+═══════════════════════════════════════════════════════════════════════════
+
+Erro: "Python não encontrado"
+Solução: Instale Python de https://www.python.org/downloads/
+
+Erro: "módulo não encontrado"
+Solução: pip install -r requirements.txt
+
+Erro: "Permissão negada" (Unix)
+Solução: chmod +x converter_vencimentos.sh
+
+Erro: "arquivo PDF não encontrado"
+Solução: Coloque PDF na mesma pasta ou use caminho completo
+
+═══════════════════════════════════════════════════════════════════════════
+
+✨ BOA SORTE! ✨
+
+Conversor PDF para Excel v1.0
+Compatível: Python 3.7+ | Windows | macOS | Linux
+Última atualização: Maio 2026
+
+═══════════════════════════════════════════════════════════════════════════

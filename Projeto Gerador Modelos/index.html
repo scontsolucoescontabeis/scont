@@ -224,6 +224,29 @@
           </div>
         </div>
 
+        <!-- ── Panel: Planilha ── -->
+        <div class="wizard-panel" id="wpanel-planilha">
+          <div class="card">
+            <div class="card-title">📊 Upload da Planilha Excel</div>
+            <div class="card-body">
+              <p style="font-size:13px;color:var(--text-light);margin-bottom:14px">
+                Faça o upload da planilha com os dados. A primeira linha deve conter os cabeçalhos — eles viram as variáveis <code>{{excel.COLUNA}}</code> no documento gerado.
+              </p>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="file" id="planilha-excel-file" accept=".xlsx,.xls" class="form-control" style="flex:1"
+                  onchange="handleWizardExcel(event)">
+                <button type="button" class="btn btn-secondary btn-sm" style="flex-shrink:0;white-space:nowrap"
+                  onclick="limparWizardExcel()">✕ Limpar</button>
+              </div>
+              <div id="planilha-excel-info" style="margin-top:14px"></div>
+            </div>
+          </div>
+          <div class="wizard-nav">
+            <button class="btn btn-secondary" onclick="wizardVoltar()">← Anterior</button>
+            <button class="btn btn-primary" onclick="wizardAvançar()">Próximo →</button>
+          </div>
+        </div>
+
         <!-- ── Panel: Exportar ── -->
         <div class="wizard-panel" id="wpanel-exportar">
 
@@ -388,51 +411,66 @@
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
               <input type="checkbox" value="rubricas" class="fonte-cb" style="accent-color:var(--primary)"> Rubricas
             </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+              <input type="checkbox" value="excel" class="fonte-cb" style="accent-color:var(--primary)"> Planilha Excel
+            </label>
           </div>
+          <div class="form-hint" style="margin-top:4px">Marcar "Planilha Excel" adiciona um passo de upload no wizard. Se for a única fonte, gera um documento por linha da planilha.</div>
+        </div>
+        <div class="form-group">
+          <label>📊 Planilha Excel — variáveis extras (opcional)</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="file" id="modal-excel-file" accept=".xlsx,.xls" class="form-control" style="flex:1"
+              onchange="handleExcelUpload(event)">
+            <button type="button" class="btn btn-secondary btn-sm" style="flex-shrink:0;white-space:nowrap"
+              onclick="removeExcel()">✕ Limpar</button>
+          </div>
+          <div class="form-hint">Suba uma planilha para liberar variáveis <code>{{excel.COLUNA}}</code> no template. Use para inserir dados personalizados sem precisar de uma tabela do sistema.</div>
+          <div id="modal-excel-preview" style="margin-top:8px"></div>
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label>Template do Documento</label>
           <div class="form-hint" style="margin-bottom:8px">Clique em uma variável para inserir no cursor. Use {{variavel}} para personalizar o texto.</div>
-          <div class="editor-layout">
-            <div class="editor-wrapper">
-              <!-- Toolbar -->
-              <div class="editor-toolbar">
-                <button type="button" class="tb-btn" onclick="document.execCommand('bold')" title="Negrito"><b>N</b></button>
-                <button type="button" class="tb-btn" onclick="document.execCommand('italic')" title="Itálico"><i>I</i></button>
-                <button type="button" class="tb-btn" onclick="document.execCommand('underline')" title="Sublinhado"><u>S</u></button>
-                <div class="tb-sep"></div>
-                <button type="button" class="tb-btn" onclick="document.execCommand('justifyLeft')" title="Alinhar esquerda">⬤≡</button>
-                <button type="button" class="tb-btn" onclick="document.execCommand('justifyCenter')" title="Centralizar">≡</button>
-                <button type="button" class="tb-btn" onclick="document.execCommand('justifyRight')" title="Alinhar direita">≡⬤</button>
-                <button type="button" class="tb-btn" onclick="document.execCommand('justifyFull')" title="Justificar">&#x2261;</button>
-                <div class="tb-sep"></div>
-                <select class="tb-select" title="Tamanho da fonte" onchange="aplicarTamanhoFonte(this.value);this.value=''">
-                  <option value="">Tamanho</option>
-                  <option value="10px">Pequeno (10)</option>
-                  <option value="13px">Normal (13)</option>
-                  <option value="16px">Médio (16)</option>
-                  <option value="20px">Grande (20)</option>
-                  <option value="26px">Extra grande (26)</option>
-                </select>
-                <select class="tb-select" title="Fonte" onchange="aplicarFonte(this.value);this.value=''">
-                  <option value="">Fonte</option>
-                  <option value="'Segoe UI', Arial, sans-serif">Segoe UI (padrão)</option>
-                  <option value="Arial, sans-serif">Arial</option>
-                  <option value="'Times New Roman', serif">Times New Roman</option>
-                  <option value="'Courier New', monospace">Courier New</option>
-                  <option value="Georgia, serif">Georgia</option>
-                </select>
-                <div class="tb-sep"></div>
-                <button type="button" class="tb-btn" onclick="document.execCommand('removeFormat')" title="Limpar formatação">✕ Fmt</button>
-              </div>
-              <!-- Área editável -->
-              <div id="modelo-template" class="editor-content" contenteditable="true"
-                data-placeholder="Digite aqui o conteúdo do modelo… Ex: Contrato firmado entre {{empresa.nome_empresa}} e {{empregado.nome_empregado}}."></div>
+          <!-- Painel de variáveis acima do editor -->
+          <div class="vars-panel" id="vars-panel">
+            <div class="vars-panel-title">Variáveis Disponíveis — clique para inserir no cursor</div>
+            <div id="vars-panel-content"></div>
+          </div>
+          <!-- Editor -->
+          <div class="editor-wrapper">
+            <!-- Toolbar -->
+            <div class="editor-toolbar">
+              <button type="button" class="tb-btn" onclick="document.execCommand('bold')" title="Negrito"><b>N</b></button>
+              <button type="button" class="tb-btn" onclick="document.execCommand('italic')" title="Itálico"><i>I</i></button>
+              <button type="button" class="tb-btn" onclick="document.execCommand('underline')" title="Sublinhado"><u>S</u></button>
+              <div class="tb-sep"></div>
+              <button type="button" class="tb-btn" onclick="document.execCommand('justifyLeft')" title="Alinhar esquerda">⬤≡</button>
+              <button type="button" class="tb-btn" onclick="document.execCommand('justifyCenter')" title="Centralizar">≡</button>
+              <button type="button" class="tb-btn" onclick="document.execCommand('justifyRight')" title="Alinhar direita">≡⬤</button>
+              <button type="button" class="tb-btn" onclick="document.execCommand('justifyFull')" title="Justificar">&#x2261;</button>
+              <div class="tb-sep"></div>
+              <select class="tb-select" title="Tamanho da fonte" onchange="aplicarTamanhoFonte(this.value);this.value=''">
+                <option value="">Tamanho</option>
+                <option value="10px">Pequeno (10)</option>
+                <option value="13px">Normal (13)</option>
+                <option value="16px">Médio (16)</option>
+                <option value="20px">Grande (20)</option>
+                <option value="26px">Extra grande (26)</option>
+              </select>
+              <select class="tb-select" title="Fonte" onchange="aplicarFonte(this.value);this.value=''">
+                <option value="">Fonte</option>
+                <option value="'Segoe UI', Arial, sans-serif">Segoe UI (padrão)</option>
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="'Times New Roman', serif">Times New Roman</option>
+                <option value="'Courier New', monospace">Courier New</option>
+                <option value="Georgia, serif">Georgia</option>
+              </select>
+              <div class="tb-sep"></div>
+              <button type="button" class="tb-btn" onclick="document.execCommand('removeFormat')" title="Limpar formatação">✕ Fmt</button>
             </div>
-            <div class="vars-panel" id="vars-panel">
-              <div class="vars-panel-title">Variáveis Disponíveis</div>
-              <div id="vars-panel-content"></div>
-            </div>
+            <!-- Área editável -->
+            <div id="modelo-template" class="editor-content" contenteditable="true"
+              data-placeholder="Digite aqui o conteúdo do modelo… Ex: Contrato firmado entre {{empresa.nome_empresa}} e {{empregado.nome_empregado}}."></div>
           </div>
         </div>
       </div>
@@ -447,6 +485,28 @@
   <div id="print-root"></div>
 
   <div id="toast"></div>
+
+  <!-- ══ MODAL: Nome da Empresa (Excel puro) ══ -->
+  <div class="modal-overlay" id="modal-nome-empresa-excel">
+    <div class="modal-box" style="max-width:440px">
+      <div class="modal-head">
+        <span>Nome da Empresa para o Cabeçalho</span>
+        <button class="modal-close" onclick="fecharModalNomeEmpresaExcel()">✕</button>
+      </div>
+      <div class="modal-body" style="padding:24px 20px">
+        <p style="margin:0 0 16px;font-size:14px;color:var(--text)">
+          Este modelo não possui empresa associada. Informe o nome da empresa que deve constar no cabeçalho dos documentos gerados.
+        </p>
+        <label class="form-label">Nome da Empresa</label>
+        <input id="input-nome-empresa-excel" class="form-input" type="text" placeholder="Ex: Empresa Exemplo Ltda"
+          onkeydown="if(event.key==='Enter') confirmarNomeEmpresaExcel()">
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px">
+        <button class="btn btn-secondary" onclick="fecharModalNomeEmpresaExcel()">Cancelar</button>
+        <button class="btn btn-primary" onclick="confirmarNomeEmpresaExcel()">Confirmar</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
