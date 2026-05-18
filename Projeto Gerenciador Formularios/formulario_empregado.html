@@ -1426,32 +1426,10 @@ const formData = {
             console.log('✅ Dados coletados:', formData);
 
             const supabase = getSupabaseClient();
-            
+
             if (!supabase) {
                 throw new Error('Supabase não inicializado. Verifique as credenciais.');
             }
-
-            // ===== VALIDAR CPF DUPLICADO NA MESMA EMPRESA =====
-            console.log('🔍 Verificando se CPF já está cadastrado nesta empresa...');
-
-            const { data: cpfExistente, error: cpfError } = await supabase
-                .from('empregados')
-                .select('id, nome_completo, nome_empresa')
-                .eq('cpf', formData.cpf)
-                .eq('nome_empresa', formData.nomeEmpresa)
-                .maybeSingle();
-
-            if (cpfExistente) {
-                console.warn('⚠️ CPF já registrado nesta empresa');
-                throw new Error(`Este CPF já está cadastrado para a empresa "${cpfExistente.nome_empresa}" (empregado: ${cpfExistente.nome_completo}). Caso seja um novo vínculo em outra empresa, verifique o campo "Nome da Empresa".`);
-            }
-
-            if (cpfError) {
-                console.error('❌ Erro ao verificar CPF:', cpfError);
-                throw cpfError;
-            }
-
-            console.log('✅ CPF validado - sem duplicação para esta empresa');
 
             console.log('💾 Salvando dados do empregado no banco de dados...');
 
@@ -1496,6 +1474,9 @@ const { data: empregadoData, error: empregadoError } = await supabase
 
             if (empregadoError) {
                 console.error('❌ Erro ao salvar empregado:', empregadoError);
+                if (empregadoError.code === '23505') {
+                    throw new Error(`Este CPF já está cadastrado para a empresa "${formData.nomeEmpresa}". Caso seja um novo vínculo em outra empresa, verifique o campo "Nome da Empresa".`);
+                }
                 throw new Error('Erro ao salvar empregado: ' + empregadoError.message);
             }
 
