@@ -1663,6 +1663,7 @@ const { data: empregadoData, error: empregadoError } = await supabase
         console.log('✅ Formulário de Empregado carregado com sucesso!');
 
         await window.RascunhoTemp.init(form, 'empregado', {
+            client: supabaseClient,
             customSerialize: function() {
                 // Serializar linhas de dependentes (usam classes, não name)
                 const rows = document.querySelectorAll('#dependentsTableBody tr');

@@ -5,15 +5,7 @@
  * formulario_rascunho_temp. O registro é deletado ao enviar o formulário.
  */
 (function () {
-    'use strict';
-
     const TABLE = 'formulario_rascunho_temp';
-
-    function getSb() {
-        return window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY, {
-            auth: { persistSession: false, autoRefreshToken: false }
-        });
-    }
 
     function getOrCreateToken() {
         const params = new URLSearchParams(location.search);
@@ -76,6 +68,7 @@
         _timer: null,
         _form: null,
         _tipo: null,
+        _sb: null,
         _customSerialize: null,
         _customRestore: null,
 
@@ -83,6 +76,7 @@
          * @param {HTMLFormElement} form
          * @param {string} tipoFormulario  'alteracao' | 'registro' | 'empregado'
          * @param {object} opts
+         * @param {object}   opts.client          cliente Supabase já inicializado pelo formulário (obrigatório)
          * @param {function} [opts.customSerialize]   retorna objeto com campos extras
          * @param {function} [opts.onBeforeRestore]   async, chamado com dados salvos antes de restaurar campos
          * @param {function} [opts.customRestore]     async, chamado com dados salvos após restaurar campos nomeados
@@ -91,12 +85,18 @@
             opts = opts || {};
             this._form = form;
             this._tipo = tipoFormulario;
+            this._sb = opts.client || null;
             this._customSerialize = opts.customSerialize || null;
             this._customRestore = opts.customRestore || null;
             this._token = getOrCreateToken();
 
+            if (!this._sb) {
+                console.warn('⚠️ RascunhoTemp: opts.client não informado — rascunho desativado.');
+                return;
+            }
+
             try {
-                const { data: row } = await getSb()
+                const { data: row } = await this._sb
                     .from(TABLE)
                     .select('dados')
                     .eq('token', this._token)
@@ -125,11 +125,11 @@
         },
 
         async save() {
-            if (!this._token || !this._form) return;
+            if (!this._token || !this._form || !this._sb) return;
             try {
                 const dados = serializeForm(this._form);
                 if (this._customSerialize) Object.assign(dados, this._customSerialize());
-                await getSb().from(TABLE).upsert({
+                await this._sb.from(TABLE).upsert({
                     token: this._token,
                     tipo_formulario: this._tipo,
                     dados: dados,
@@ -141,9 +141,9 @@
         },
 
         async deleteOnSubmit() {
-            if (!this._token) return;
+            if (!this._token || !this._sb) return;
             try {
-                await getSb().from(TABLE).delete().eq('token', this._token);
+                await this._sb.from(TABLE).delete().eq('token', this._token);
                 console.log('🗑️ Rascunho deletado após envio');
             } catch (e) {
                 console.warn('⚠️ Falha ao deletar rascunho:', e.message);
