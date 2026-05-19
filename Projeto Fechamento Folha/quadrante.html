@@ -13,195 +13,370 @@
 </head>
 <body>
 
-<!-- HEADER -->
-<div class="header">
-    <div class="header-container">
-        <img src="https://scontdf.com.br/wp-content/uploads/elementor/thumbs/LogoScont-peic298y16fua1mv1zkur66kgxw0v6rzhu846yyg3k.png" alt="SCONT" class="logo">
-        <div class="header-info">
-            <h1>SCONT – Fechamento Folha</h1>
-            <div class="header-subtitle" id="headerSubtitle">Quadrante Etiquetas · Código 453</div>
-        </div>
-        <div class="header-actions">
-            <a href="index.html" class="btn btn-secondary btn-small">← Empresas</a>
-            <a href="../portal.html" class="btn btn-secondary btn-small">🏠 Portal</a>
+<!-- HAMBURGER (mobile) -->
+<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="fecharSidebar()"></div>
+
+<!-- SIDEBAR ESTÁTICO -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+        <h2>Fechamento Folha</h2>
+        <p>Quadrante Etiquetas · 453</p>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="sidebar-section">Navegação</div>
+
+        <a href="../portal.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏠</span> Portal SCONT
+        </a>
+        <a href="index.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏭</span> Empresas
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">Ferramenta</div>
+
+        <button class="sidebar-item active" id="navProcessamento" onclick="navegarPara('processamento')">
+            <span class="sidebar-item-icon">📊</span> Processamento
+        </button>
+        <button class="sidebar-item" id="navConfig" onclick="navegarPara('config')">
+            <span class="sidebar-item-icon">⚙️</span> Configurações
+        </button>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-footer-info">
+            <strong>Código 453</strong>
+            Quadrante Etiquetas
         </div>
     </div>
-</div>
+</aside>
 
-<!-- CONTAINER PRINCIPAL -->
-<div class="container">
+<!-- CONTEÚDO PRINCIPAL -->
+<div class="main-content">
 
-    <!-- ===== STEP 1: UPLOAD PLANILHA + COMPETÊNCIA ===== -->
-    <div class="step-card" id="step1">
-        <div class="step-title">
-            <div class="step-number">1</div>
-            Upload da Planilha de Fechamento
+    <!-- PAGE HEADER -->
+    <div class="page-header">
+        <div>
+            <h1>Fechamento Folha · Quadrante Etiquetas</h1>
+            <div class="page-header-sub" id="headerSubtitle">Código 453 · Upload e processamento da planilha</div>
         </div>
+    </div>
 
-        <div class="form-group" style="max-width: 280px;">
-            <label for="competencia">Competência *</label>
-            <input type="text" id="competencia" placeholder="MM/AAAA" maxlength="7">
-            <small>Mês e ano do fechamento</small>
-        </div>
+    <!-- ===== TELA PROCESSAMENTO ===== -->
+    <div id="telaProcessamento">
+    <div class="container">
 
-        <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">
-            Planilha de Fechamento (Excel) *
-        </label>
-        <div class="upload-area" id="uploadAreaFolha" onclick="document.getElementById('inputFolha').click()">
-            <div class="upload-icon">📊</div>
-            <div class="upload-text">
-                Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
+        <!-- PAINEL: ENVIOS DO FORMULÁRIO -->
+        <div class="step-card" id="painelEnvios" style="border-left-color:#27AE60;">
+            <div class="step-title" style="color:#27AE60;">
+                <span style="font-size:18px;">📥</span>
+                Envios do Formulário de Fechamento
+                <button onclick="carregarEnvios()" style="margin-left:auto;font-size:12px;padding:5px 12px;border:1px solid var(--border-color);border-radius:6px;background:#fff;cursor:pointer;color:var(--text-primary);">↻ Atualizar</button>
             </div>
-            <div class="upload-text" style="font-size:11px; margin-top:4px;">
-                Formato: .xlsx – Padrão Quadrante (Folha de Pgto Etiquetas)
+            <div id="listaEnvios">
+                <div style="color:var(--text-secondary);font-size:13px;padding:10px 0;">Carregando envios...</div>
             </div>
-            <div class="upload-filename" id="filenameFolha"></div>
-            <input type="file" id="inputFolha" accept=".xlsx,.xls">
         </div>
 
-        <div class="btn-group">
-            <button class="btn btn-primary" onclick="processarPlanilha()">
-                ▶ Processar Planilha
-            </button>
-        </div>
-    </div>
-
-    <!-- ===== STEP 2: RELATÓRIO DE RUBRICAS ===== -->
-    <div class="step-card" id="step2" style="display:none;">
-        <div class="step-title">
-            <div class="step-number">2</div>
-            Relatório de Rubricas e Valores
-            <span id="labelCompetencia2" style="font-size:12px; font-weight:400; color:var(--text-secondary); margin-left:10px;"></span>
-        </div>
-
-        <div id="alertaSemMatch" class="alert alert-warning" style="display:none;">
-            ⚠️ Alguns funcionários não foram encontrados no cadastro do Supabase. Verifique os nomes em vermelho — eles não serão incluídos no TXT.
-        </div>
-
-        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
-            <input type="text" id="buscaRelatorio" placeholder="Filtrar por funcionário ou rubrica..."
-                   oninput="filtrarRelatorio()" style="flex:1; min-width:220px; padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:13px;">
-            <span id="contadorLinhas" style="font-size:12px; color:var(--text-secondary); white-space:nowrap;"></span>
-        </div>
-
-        <div class="table-wrapper">
-            <table id="tabelaRelatorio">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Funcionário</th>
-                        <th>Código Empr.</th>
-                        <th>Rubrica</th>
-                        <th>Cód. Rubrica</th>
-                        <th>Tipo</th>
-                        <th>Valor / Qtd</th>
-                        <th>Valor TXT</th>
-                    </tr>
-                </thead>
-                <tbody id="bodyRelatorio"></tbody>
-            </table>
-        </div>
-
-        <div id="totaisRelatorio" style="margin-top:15px;"></div>
-
-        <div class="btn-group">
-            <button class="btn btn-secondary" onclick="voltarStep(1)">← Voltar</button>
-            <button class="btn btn-primary" onclick="irStep3()">▶ Gerar TXT</button>
-            <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
-        </div>
-    </div>
-
-    <!-- ===== STEP 3: TXT ===== -->
-    <div class="step-card" id="step3" style="display:none;">
-        <div class="step-title">
-            <div class="step-number">3</div>
-            Arquivo TXT – Lançamentos de Folha
-            <span id="labelCompetencia3" style="font-size:12px; font-weight:400; color:var(--text-secondary); margin-left:10px;"></span>
-        </div>
-
-        <div class="alert alert-info" id="infoTxt">
-            O TXT será gerado apenas para funcionários com cadastro no Supabase e rubricas com valor diferente de zero.
-        </div>
-
-        <div id="resumoTxt" style="margin-bottom:12px; font-size:13px; color:var(--text-secondary);"></div>
-
-        <div class="txt-preview" id="previaTxt"></div>
-
-        <div class="btn-group">
-            <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar</button>
-            <button class="btn btn-success" onclick="baixarTXT()">⬇ Baixar TXT</button>
-            <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
-        </div>
-    </div>
-
-    <!-- ===== STEP 4: UPLOAD FÉRIAS ===== -->
-    <div class="step-card" id="step4" style="display:none;">
-        <div class="step-title">
-            <div class="step-number">4</div>
-            Programação de Férias – Upload
-        </div>
-
-        <div class="alert alert-info">
-            Faça o upload da planilha de programação de férias. A ferramenta ordenará os registros pela data de início do gozo.
-        </div>
-
-        <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">
-            Planilha de Férias (Excel) *
-        </label>
-        <div class="upload-area" id="uploadAreaFerias" onclick="document.getElementById('inputFerias').click()">
-            <div class="upload-icon">🏖️</div>
-            <div class="upload-text">
-                Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
+        <!-- STEP 1: UPLOAD PLANILHA + COMPETÊNCIA -->
+        <div class="step-card" id="step1">
+            <div class="step-title">
+                <div class="step-number">1</div>
+                Upload da Planilha de Fechamento
             </div>
-            <div class="upload-filename" id="filenameFerias"></div>
-            <input type="file" id="inputFerias" accept=".xlsx,.xls">
-        </div>
 
-        <div style="margin-top:16px;">
-            <label style="font-weight:600; font-size:13px; display:block; margin-bottom:5px;">
-                Coluna de ordenação (data de gozo)
+            <div class="form-group" style="max-width: 280px;">
+                <label for="competencia">Competência *</label>
+                <input type="text" id="competencia" placeholder="MM/AAAA" maxlength="7">
+                <small>Mês e ano do fechamento</small>
+            </div>
+
+            <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">
+                Planilha de Fechamento (Excel) *
             </label>
-            <select id="colunaOrdenacao" style="padding:9px; border:1px solid var(--border-color); border-radius:6px; font-size:13px; min-width:250px;">
-                <option value="">— Detectar automaticamente —</option>
-            </select>
-            <small style="color:var(--text-secondary); font-size:12px; display:block; margin-top:4px;">
-                Após selecionar o arquivo, as colunas disponíveis serão listadas aqui.
-            </small>
+            <div class="upload-area" id="uploadAreaFolha" onclick="document.getElementById('inputFolha').click()">
+                <div class="upload-icon">📊</div>
+                <div class="upload-text">
+                    Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
+                </div>
+                <div class="upload-text" style="font-size:11px; margin-top:4px;">
+                    Formato: .xlsx – Padrão Quadrante (Folha de Pgto Etiquetas)
+                </div>
+                <div class="upload-filename" id="filenameFolha"></div>
+                <input type="file" id="inputFolha" accept=".xlsx,.xls">
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="processarPlanilha()">
+                    ▶ Processar Planilha
+                </button>
+            </div>
         </div>
 
-        <div class="btn-group">
-            <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar ao Relatório</button>
-            <button class="btn btn-primary" onclick="processarFerias()">▶ Gerar Relatório de Férias</button>
+        <!-- STEP 2: RELATÓRIO DE RUBRICAS -->
+        <div class="step-card" id="step2" style="display:none;">
+            <div class="step-title">
+                <div class="step-number">2</div>
+                Relatório de Rubricas e Valores
+                <span id="labelCompetencia2" style="font-size:12px; font-weight:400; color:var(--text-secondary); margin-left:10px;"></span>
+            </div>
+
+            <div id="alertaSemMatch" class="alert alert-warning" style="display:none;">
+                ⚠️ Alguns funcionários não foram encontrados no cadastro do Supabase. Verifique os nomes em vermelho — eles não serão incluídos no TXT.
+            </div>
+
+            <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+                <input type="text" id="buscaRelatorio" placeholder="Filtrar por funcionário ou rubrica..."
+                       oninput="filtrarRelatorio()" style="flex:1; min-width:220px; padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:13px;">
+                <span id="contadorLinhas" style="font-size:12px; color:var(--text-secondary); white-space:nowrap;"></span>
+            </div>
+
+            <div class="table-wrapper">
+                <table id="tabelaRelatorio">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Funcionário</th>
+                            <th>Código Empr.</th>
+                            <th>Rubrica</th>
+                            <th>Cód. Rubrica</th>
+                            <th>Tipo</th>
+                            <th>Valor / Qtd</th>
+                            <th>Valor TXT</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bodyRelatorio"></tbody>
+                </table>
+            </div>
+
+            <div id="totaisRelatorio" style="margin-top:15px;"></div>
+
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="voltarStep(1)">← Voltar</button>
+                <button class="btn btn-primary" onclick="irStep3()">▶ Gerar TXT</button>
+                <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
+            </div>
+        </div>
+
+        <!-- STEP 3: TXT -->
+        <div class="step-card" id="step3" style="display:none;">
+            <div class="step-title">
+                <div class="step-number">3</div>
+                Arquivo TXT – Lançamentos de Folha
+                <span id="labelCompetencia3" style="font-size:12px; font-weight:400; color:var(--text-secondary); margin-left:10px;"></span>
+            </div>
+
+            <div class="alert alert-info" id="infoTxt">
+                O TXT será gerado apenas para funcionários com cadastro no Supabase e rubricas com valor diferente de zero.
+            </div>
+
+            <div id="resumoTxt" style="margin-bottom:12px; font-size:13px; color:var(--text-secondary);"></div>
+
+            <div class="txt-preview" id="previaTxt"></div>
+
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar</button>
+                <button class="btn btn-success" onclick="baixarTXT()">⬇ Baixar TXT</button>
+                <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
+            </div>
+        </div>
+
+        <!-- STEP 4: UPLOAD FÉRIAS -->
+        <div class="step-card" id="step4" style="display:none;">
+            <div class="step-title">
+                <div class="step-number">4</div>
+                Programação de Férias – Upload
+            </div>
+
+            <div class="alert alert-info">
+                Faça o upload da planilha de programação de férias. A ferramenta ordenará os registros pela data de início do gozo.
+            </div>
+
+            <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">
+                Planilha de Férias (Excel) *
+            </label>
+            <div class="upload-area" id="uploadAreaFerias" onclick="document.getElementById('inputFerias').click()">
+                <div class="upload-icon">🏖️</div>
+                <div class="upload-text">
+                    Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
+                </div>
+                <div class="upload-filename" id="filenameFerias"></div>
+                <input type="file" id="inputFerias" accept=".xlsx,.xls">
+            </div>
+
+            <div style="margin-top:16px;">
+                <label style="font-weight:600; font-size:13px; display:block; margin-bottom:5px;">
+                    Coluna de ordenação (data de gozo)
+                </label>
+                <select id="colunaOrdenacao" style="padding:9px; border:1px solid var(--border-color); border-radius:6px; font-size:13px; min-width:250px;">
+                    <option value="">— Detectar automaticamente —</option>
+                </select>
+                <small style="color:var(--text-secondary); font-size:12px; display:block; margin-top:4px;">
+                    Após selecionar o arquivo, as colunas disponíveis serão listadas aqui.
+                </small>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar ao Relatório</button>
+                <button class="btn btn-primary" onclick="processarFerias()">▶ Gerar Relatório de Férias</button>
+            </div>
+        </div>
+
+        <!-- STEP 5: RELATÓRIO FÉRIAS -->
+        <div class="step-card" id="step5" style="display:none;">
+            <div class="step-title">
+                <div class="step-number">5</div>
+                Programação de Férias – Ordenado por Data de Gozo
+            </div>
+
+            <div class="ferias-stats" id="feriasStats"></div>
+
+            <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
+                <input type="text" id="buscaFerias" placeholder="Filtrar por funcionário..."
+                       oninput="filtrarFerias()" style="flex:1; min-width:220px; padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:13px;">
+            </div>
+
+            <div class="table-wrapper">
+                <table id="tabelaFerias">
+                    <thead id="headFerias"></thead>
+                    <tbody id="bodyFerias"></tbody>
+                </table>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="voltarStep(4)">← Voltar</button>
+                <button class="btn btn-primary" onclick="imprimirFerias()">🖨️ Imprimir / Salvar PDF</button>
+            </div>
+        </div>
+
+    </div>
+    </div><!-- /telaProcessamento -->
+
+    <!-- ===== TELA CONFIGURAÇÕES ===== -->
+    <div id="telaConfig">
+    <div class="container">
+
+        <div class="config-card">
+            <h2>⚙️ Configurações · Rubricas</h2>
+
+            <div id="statusConfig" style="display:none;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:13px;"></div>
+
+            <!-- Formulário de adição -->
+            <div class="config-form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;">
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Empresa *</label>
+                    <select id="cfgEmpresa" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Descrição da Rubrica *</label>
+                    <input type="text" id="cfgDescricao" placeholder="Ex: Vale Transporte"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Código da Rubrica *</label>
+                    <input type="text" id="cfgCodigo" placeholder="Ex: 000050"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:monospace;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Tipo de Valor *</label>
+                    <select id="cfgTipoValor" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <option value="monetario">Monetário (R$)</option>
+                        <option value="minutos">Horas (HH:MM)</option>
+                        <option value="dias">Dias</option>
+                        <option value="booleano">Booleano</option>
+                    </select>
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <button class="btn btn-primary" onclick="salvarRubricaConfig()" style="white-space:nowrap;padding:9px 18px;">
+                        ➕ Adicionar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtro empresa para tabela -->
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+                <label style="font-weight:600;font-size:12px;color:#2C3E50;">Filtrar tabela:</label>
+                <select id="cfgFiltroEmpresa" onchange="carregarRubricasConfig()" style="padding:7px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                    <option value="">Todas as empresas</option>
+                </select>
+                <span id="cfgTotal" style="font-size:12px;color:#7F8C8D;margin-left:auto;"></span>
+            </div>
+
+            <!-- Tabela -->
+            <div class="config-table-wrap">
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Empresa</th>
+                            <th>Descrição da Rubrica</th>
+                            <th>Código da Rubrica</th>
+                            <th>Tipo de Valor</th>
+                            <th>Ativo</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cfgTableBody">
+                        <tr><td colspan="6" class="config-empty">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+    </div><!-- /telaConfig -->
+
+</div><!-- /main-content -->
+
+<!-- MODAL TIPO DE PROCESSO -->
+<div class="modal" id="modalTipoProcesso">
+    <div class="modal-content" style="max-width:480px;">
+        <div class="modal-header">
+            <h3>Tipo de Processo</h3>
+            <button class="modal-close" onclick="fecharModalTipoProcesso()">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+                Selecione o tipo de processamento para geração do TXT:
+            </p>
+            <div id="listaTipoProcesso" style="display:flex;flex-direction:column;gap:8px;">
+                <label class="tipo-processo-option">
+                    <input type="radio" name="tipoProcesso" value="11">
+                    <span class="tipo-processo-label"><strong>11</strong> — Folha Mensal</span>
+                </label>
+                <label class="tipo-processo-option">
+                    <input type="radio" name="tipoProcesso" value="41">
+                    <span class="tipo-processo-label"><strong>41</strong> — Adiantamento Salarial</span>
+                </label>
+                <label class="tipo-processo-option">
+                    <input type="radio" name="tipoProcesso" value="42">
+                    <span class="tipo-processo-label"><strong>42</strong> — Folha Complementar</span>
+                </label>
+                <label class="tipo-processo-option">
+                    <input type="radio" name="tipoProcesso" value="51">
+                    <span class="tipo-processo-label"><strong>51</strong> — Adiantamento de 13º Salário</span>
+                </label>
+                <label class="tipo-processo-option">
+                    <input type="radio" name="tipoProcesso" value="52">
+                    <span class="tipo-processo-label"><strong>52</strong> — 13º Salário (integral ou 2ª parcela)</span>
+                </label>
+                <label class="tipo-processo-option">
+                    <input type="radio" name="tipoProcesso" value="70">
+                    <span class="tipo-processo-label"><strong>70</strong> — PLR (Participação nos Lucros e Resultados)</span>
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary btn-small" onclick="fecharModalTipoProcesso()">Cancelar</button>
+            <button class="btn btn-primary btn-small" onclick="confirmarTipoProcesso()">▶ Gerar TXT</button>
         </div>
     </div>
-
-    <!-- ===== STEP 5: RELATÓRIO FÉRIAS ===== -->
-    <div class="step-card" id="step5" style="display:none;">
-        <div class="step-title">
-            <div class="step-number">5</div>
-            Programação de Férias – Ordenado por Data de Gozo
-        </div>
-
-        <div class="ferias-stats" id="feriasStats"></div>
-
-        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
-            <input type="text" id="buscaFerias" placeholder="Filtrar por funcionário..."
-                   oninput="filtrarFerias()" style="flex:1; min-width:220px; padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:13px;">
-        </div>
-
-        <div class="table-wrapper">
-            <table id="tabelaFerias">
-                <thead id="headFerias"></thead>
-                <tbody id="bodyFerias"></tbody>
-            </table>
-        </div>
-
-        <div class="btn-group">
-            <button class="btn btn-secondary" onclick="voltarStep(4)">← Voltar</button>
-            <button class="btn btn-primary" onclick="imprimirFerias()">🖨️ Imprimir / Salvar PDF</button>
-        </div>
-    </div>
-
 </div>
 
 <!-- MODAL MENSAGEM -->

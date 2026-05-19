@@ -175,7 +175,7 @@ const VARS_DEF = {
     label: '💰 Rubrica',
     prefix: 'rubrica',
     campos: [
-      ['evento','Evento'],
+      ['descricao_rubrica','Descrição Rubrica'],
       ['codigo_rubrica','Código Rubrica'],
     ]
   },
@@ -722,7 +722,7 @@ async function carregarDadosDasEmpresas() {
   const [r1, r2, r3] = await Promise.all([
     sb.from('rh_empregados').select('*').in('codigo_empresa', codigos).order('nome_empregado'),
     sb.from('rh_socios').select('*').in('codigo_empresa', codigos).order('nome_socio'),
-    sb.from('rh_rubricas').select('*').in('codigo_empresa', codigos).order('evento'),
+    sb.from('rh_rubricas').select('*').in('codigo_empresa', codigos).order('descricao_rubrica'),
   ]);
   _dbEmpregados = r1.data || [];
   _dbSocios     = r2.data || [];
@@ -797,7 +797,7 @@ function selecionarTodosSocios(sel) {
 function renderRubricasWizard() {
   const filtro = (document.getElementById('filtro-rubricas-wizard')?.value || '').toLowerCase();
   const lista  = _dbRubricas.filter(r =>
-    r.evento?.toLowerCase().includes(filtro) ||
+    (r.descricao_rubrica || r.evento || '').toLowerCase().includes(filtro) ||
     r.codigo_rubrica?.toLowerCase().includes(filtro));
   const div = document.getElementById('rubricas-wizard-list');
   if (!lista.length) {
@@ -811,7 +811,7 @@ function renderRubricasWizard() {
         ${wizardRubricasSelecionados.includes(r.id) ? 'checked' : ''}
         onchange="toggleItem(wizardRubricasSelecionados,'${r.id}',this.checked,'rubricas-selected-count','rubrica')">
       <div class="empresa-info">
-        <strong>${esc(r.evento)}</strong>
+        <strong>${esc(r.descricao_rubrica || r.evento || '')}</strong>
         <span>${esc(r.codigo_empresa)} · Cód. ${esc(r.codigo_rubrica)}</span>
       </div>
     </label>

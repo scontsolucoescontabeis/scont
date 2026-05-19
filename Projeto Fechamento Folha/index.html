@@ -11,33 +11,300 @@
 </head>
 <body>
 
-<div class="header">
-    <div class="header-container">
-        <img src="https://scontdf.com.br/wp-content/uploads/elementor/thumbs/LogoScont-peic298y16fua1mv1zkur66kgxw0v6rzhu846yyg3k.png" alt="SCONT" class="logo">
-        <div class="header-info">
-            <h1>SCONT – Fechamento Folha</h1>
-            <div class="header-subtitle">Processamento de fechamento de folha de pagamento por empresa</div>
-        </div>
-        <div class="header-actions">
-            <a href="../portal.html" class="btn btn-secondary btn-small">← Voltar ao Portal</a>
-        </div>
-    </div>
-</div>
+<!-- HAMBURGER (mobile) -->
+<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-<div class="container">
-    <div style="margin-bottom: 25px;">
-        <h2 style="color: var(--primary-color); font-size: 20px; margin-bottom: 6px;">Selecione a empresa</h2>
-        <p style="color: var(--text-secondary); font-size: 13px;">Escolha a empresa para iniciar o fechamento da folha de pagamento.</p>
+<!-- SIDEBAR ESTÁTICO -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+        <h2>Fechamento Folha</h2>
+        <p>Processamento de Folha</p>
     </div>
 
-    <div class="empresa-grid">
-        <a href="quadrante.html" class="empresa-card">
-            <div class="card-icon">🏭</div>
-            <h3>Quadrante Etiquetas</h3>
-            <p>Código 453 · Processamento via planilha Excel</p>
+    <nav class="sidebar-nav">
+        <div class="sidebar-section">Navegação</div>
+
+        <a href="../portal.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏠</span> Portal SCONT
         </a>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">Ferramenta</div>
+
+        <button class="sidebar-item active" id="navEmpresas" onclick="navegarPara('empresas')">
+            <span class="sidebar-item-icon">🏭</span> Empresas
+        </button>
+
+        <button class="sidebar-item" id="navConfig" onclick="navegarPara('config')">
+            <span class="sidebar-item-icon">⚙️</span> Configurações
+        </button>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-footer-info">
+            <strong>Fechamento Folha</strong>
+            SCONT · Módulo de Folha
+        </div>
     </div>
-</div>
+</aside>
+
+<!-- CONTEÚDO PRINCIPAL -->
+<div class="main-content">
+
+    <div class="page-header">
+        <div>
+            <h1 id="pageTitle">Fechamento Folha de Pagamento</h1>
+            <div class="page-header-sub" id="pageSub">Selecione a empresa para iniciar o processamento</div>
+        </div>
+    </div>
+
+    <!-- TELA EMPRESAS -->
+    <div id="telaEmpresas">
+        <div class="container">
+            <div class="empresa-grid">
+                <a href="quadrante.html" class="empresa-card">
+                    <div class="card-icon">🏭</div>
+                    <h3>Quadrante Etiquetas</h3>
+                    <p>Código 453 · Processamento via planilha Excel</p>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- TELA CONFIGURAÇÕES -->
+    <div id="telaConfig" style="display:none;">
+    <div class="container">
+
+        <div class="config-card">
+            <h2>⚙️ Configurações · Associação de Rubricas</h2>
+
+            <div id="statusConfig" style="display:none;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:13px;"></div>
+
+            <!-- Formulário de adição -->
+            <div class="config-form-row">
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Empresa *</label>
+                    <select id="cfgEmpresa" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Descrição da Rubrica *</label>
+                    <input type="text" id="cfgDescricao" placeholder="Ex: Salário Base"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Código da Rubrica *</label>
+                    <input type="text" id="cfgCodigo" placeholder="Ex: 000001"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <button class="btn btn-primary" onclick="salvarAssociacao()" style="white-space:nowrap;padding:9px 18px;">
+                        ➕ Adicionar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtro empresa para tabela -->
+            <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+                <label style="font-weight:600;font-size:12px;color:#2C3E50;">Filtrar tabela:</label>
+                <select id="cfgFiltroEmpresa" onchange="carregarAssociacoes()" style="padding:7px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                    <option value="">Todas as empresas</option>
+                </select>
+                <span id="cfgTotal" style="font-size:12px;color:#7F8C8D;margin-left:auto;"></span>
+            </div>
+
+            <!-- Tabela -->
+            <div class="config-table-wrap">
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Empresa</th>
+                            <th>Descrição da Rubrica</th>
+                            <th>Código da Rubrica</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cfgTableBody">
+                        <tr><td colspan="4" class="config-empty">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+    </div><!-- /telaConfig -->
+
+</div><!-- /main-content -->
+
+<script>
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── Mobile hamburger ──
+const hamburger   = document.getElementById('hamburger');
+const sidebar     = document.getElementById('sidebar');
+const overlay     = document.getElementById('sidebarOverlay');
+hamburger.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('active');
+});
+overlay.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('active');
+});
+
+// ── Navegação ──
+function navegarPara(modo) {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('active');
+
+    document.getElementById('navEmpresas').classList.toggle('active', modo === 'empresas');
+    document.getElementById('navConfig').classList.toggle('active', modo === 'config');
+
+    const telaEmp = document.getElementById('telaEmpresas');
+    const telaCfg = document.getElementById('telaConfig');
+
+    if (modo === 'config') {
+        telaEmp.style.display = 'none';
+        telaCfg.style.display = 'block';
+        document.getElementById('pageTitle').textContent = 'Configurações · Associação de Rubricas';
+        document.getElementById('pageSub').textContent   = 'Gerencie as associações de rubricas por empresa';
+        iniciarConfig();
+    } else {
+        telaEmp.style.display = '';
+        telaCfg.style.display = 'none';
+        document.getElementById('pageTitle').textContent = 'Fechamento Folha de Pagamento';
+        document.getElementById('pageSub').textContent   = 'Selecione a empresa para iniciar o processamento';
+    }
+}
+
+// ── Configurações ──
+let _assocEmpresas = [];
+let _configIniciado = false;
+
+async function iniciarConfig() {
+    if (!_configIniciado) {
+        await carregarEmpresasConfig();
+        _configIniciado = true;
+    }
+    await carregarAssociacoes();
+}
+
+async function carregarEmpresasConfig() {
+    try {
+        const { data } = await sb.from('rh_empresas')
+            .select('codigo_empresa, nome_empresa')
+            .order('nome_empresa');
+        _assocEmpresas = data || [];
+
+        const populaSelect = id => {
+            const sel = document.getElementById(id);
+            if (!sel) return;
+            const atual = sel.value;
+            const prefix = id === 'cfgFiltroEmpresa'
+                ? '<option value="">Todas as empresas</option>'
+                : '<option value="">Selecione...</option>';
+            sel.innerHTML = prefix + _assocEmpresas.map(e =>
+                `<option value="${e.codigo_empresa}">${e.codigo_empresa} – ${e.nome_empresa || ''}</option>`
+            ).join('');
+            if (atual) sel.value = atual;
+        };
+        populaSelect('cfgEmpresa');
+        populaSelect('cfgFiltroEmpresa');
+    } catch (err) {
+        console.error('Erro ao carregar empresas:', err);
+    }
+}
+
+async function carregarAssociacoes() {
+    const tbody = document.getElementById('cfgTableBody');
+    tbody.innerHTML = '<tr><td colspan="4" class="config-empty">Carregando...</td></tr>';
+    const filtroEmp = document.getElementById('cfgFiltroEmpresa')?.value || '';
+
+    try {
+        let q = sb.from('fechamento_rubrica_associacoes')
+            .select('*')
+            .order('codigo_empresa')
+            .order('descricao_rubrica');
+        if (filtroEmp) q = q.eq('codigo_empresa', filtroEmp);
+
+        const { data, error } = await q;
+        if (error) throw error;
+
+        const lista = data || [];
+        document.getElementById('cfgTotal').textContent = lista.length + ' associação(ões)';
+
+        if (!lista.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="config-empty">Nenhuma associação cadastrada.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = lista.map(r => `
+            <tr>
+                <td><strong>${r.codigo_empresa}</strong></td>
+                <td>${r.descricao_rubrica}</td>
+                <td style="font-family:monospace;font-weight:600;">${r.codigo_rubrica}</td>
+                <td><button class="btn btn-secondary btn-small"
+                    style="background:#E74C3C;border-color:#E74C3C;color:white;"
+                    onclick="deletarAssociacao('${r.id}')">Excluir</button></td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="4" class="config-empty" style="color:#E74C3C;">Erro: ${err.message}</td></tr>`;
+    }
+}
+
+async function salvarAssociacao() {
+    const empresa   = document.getElementById('cfgEmpresa').value.trim();
+    const descricao = document.getElementById('cfgDescricao').value.trim();
+    const codigo    = document.getElementById('cfgCodigo').value.trim();
+
+    if (!empresa || !descricao || !codigo) {
+        mostrarStatusConfig('Preencha todos os campos obrigatórios.', 'error'); return;
+    }
+
+    try {
+        const { error } = await sb.from('fechamento_rubrica_associacoes')
+            .upsert([{ codigo_empresa: empresa, descricao_rubrica: descricao, codigo_rubrica: codigo }],
+                    { onConflict: 'codigo_empresa,descricao_rubrica' });
+        if (error) throw error;
+
+        document.getElementById('cfgDescricao').value = '';
+        document.getElementById('cfgCodigo').value = '';
+        mostrarStatusConfig('✅ Associação salva com sucesso!', 'success');
+        carregarAssociacoes();
+    } catch (err) {
+        mostrarStatusConfig('❌ Erro: ' + err.message, 'error');
+    }
+}
+
+async function deletarAssociacao(id) {
+    if (!confirm('Excluir esta associação?')) return;
+    try {
+        const { error } = await sb.from('fechamento_rubrica_associacoes')
+            .delete().eq('id', id);
+        if (error) throw error;
+        mostrarStatusConfig('✅ Associação excluída.', 'success');
+        carregarAssociacoes();
+    } catch (err) {
+        mostrarStatusConfig('❌ Erro: ' + err.message, 'error');
+    }
+}
+
+function mostrarStatusConfig(msg, tipo) {
+    const el = document.getElementById('statusConfig');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = tipo === 'success' ? '#D4EDDA' : '#F8D7DA';
+    el.style.color      = tipo === 'success' ? '#155724' : '#721C24';
+    el.style.border     = '1px solid ' + (tipo === 'success' ? '#C3E6CB' : '#F5C6CB');
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+</script>
 
 </body>
 </html>

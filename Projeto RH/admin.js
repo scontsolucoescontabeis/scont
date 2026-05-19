@@ -840,52 +840,141 @@ async function deletarSocio(id) {
 
 // --- RUBRICAS ---
 
-const nomesEventos = {
-    'horasTrabalhadas': 'Horas Trabalhadas',
-    'horasExtras50': 'Horas Extras 50%',
-    'horasExtras100': 'Horas Extras 100%',
-    'horasNoturnaConvertida': 'Horas Noturnas Convertidas',
-    'horasDevidas': 'Horas Devidas (Faltas/Atrasos)'
-};
+const RUBRICAS_POR_PAG = 100;
+let _paginaRubricas = 1;
+let _totalRubricas = 0;
+let _filtroRubricasEmpresa = '';
+let _filtroRubricasTexto = '';
 
 async function carregarRubricas() {
-    try {
-        const { data, error } = await supabaseClient.from('rh_rubricas').select('*').order('codigo_empresa', { ascending: true });
-        if (error) throw error;
-        renderizarTabelaRubricas(data || []);
-    } catch (erro) { mostrarMensagem('Erro', 'Erro ao carregar rubricas.'); }
+    await Promise.all([carregarFiltroEmpresasRubricas(), buscarRubricas()]);
 }
 
-function renderizarTabelaRubricas(rubricas) {
+async function carregarFiltroEmpresasRubricas() {
+    const sel = document.getElementById('filtroRubricasEmpresa');
+    if (!sel || sel.options.length > 1) return;
+    try {
+        const { data } = await supabaseClient
+            .from('rh_empresas')
+            .select('codigo_empresa, nome_empresa')
+            .order('codigo_empresa', { ascending: true });
+        (data || []).forEach(e => {
+            const opt = document.createElement('option');
+            opt.value = e.codigo_empresa;
+            opt.textContent = `${e.codigo_empresa} – ${e.nome_empresa || e.codigo_empresa}`;
+            sel.appendChild(opt);
+        });
+    } catch (_) {}
+}
+
+async function buscarRubricas() {
+    const tbody = document.getElementById('rubricasTableBody');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;">Carregando...</td></tr>';
+
+    const ini = (_paginaRubricas - 1) * RUBRICAS_POR_PAG;
+    const fim = ini + RUBRICAS_POR_PAG - 1;
+
+    try {
+        let q = supabaseClient
+            .from('rh_rubricas')
+            .select('*', { count: 'exact' })
+            .order('codigo_empresa', { ascending: true })
+            .order('codigo_rubrica', { ascending: true })
+            .range(ini, fim);
+
+        if (_filtroRubricasEmpresa) q = q.eq('codigo_empresa', _filtroRubricasEmpresa);
+        if (_filtroRubricasTexto)   q = q.or(`codigo_rubrica.ilike.%${_filtroRubricasTexto}%,descricao_rubrica.ilike.%${_filtroRubricasTexto}%,empresa.ilike.%${_filtroRubricasTexto}%`);
+
+        const { data, error, count } = await q;
+        if (error) throw error;
+
+        _totalRubricas = count || 0;
+        document.getElementById('infoRubricas').textContent = _totalRubricas.toLocaleString('pt-BR') + ' rubrica(s)';
+        renderizarTabelaRubricas(data || []);
+        renderizarPaginacaoRubricas();
+    } catch (erro) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#E74C3C;">Erro: ' + erro.message + '</td></tr>';
+    }
+}
+
+function filtrarRubricas() {
+    _filtroRubricasEmpresa = document.getElementById('filtroRubricasEmpresa')?.value || '';
+    _filtroRubricasTexto   = (document.getElementById('filtroRubricasTexto')?.value || '').trim();
+    _paginaRubricas = 1;
+    buscarRubricas();
+}
+
+function renderizarPaginacaoRubricas() {
+    const div = document.getElementById('paginacaoRubricas');
+    if (!div) return;
+    const totalPags = Math.max(1, Math.ceil(_totalRubricas / RUBRICAS_POR_PAG));
+    div.innerHTML = '';
+    if (totalPags <= 1) return;
+    const btn = (txt, pg, dis) => {
+        const b = document.createElement('button');
+        b.textContent = txt; b.disabled = dis;
+        b.onclick = () => { _paginaRubricas = pg; buscarRubricas(); };
+        return b;
+    };
+    div.appendChild(btn('«', 1, _paginaRubricas === 1));
+    div.appendChild(btn('‹', _paginaRubricas - 1, _paginaRubricas === 1));
+    const info = document.createElement('span');
+    info.className = 'pag-info';
+    info.textContent = `Página ${_paginaRubricas} de ${totalPags}`;
+    div.appendChild(info);
+    div.appendChild(btn('›', _paginaRubricas + 1, _paginaRubricas === totalPags));
+    div.appendChild(btn('»', totalPags, _paginaRubricas === totalPags));
+}
+
+function renderizarTabelaRubricas(rubricas, total) {
     const tbody = document.getElementById('rubricasTableBody');
     tbody.innerHTML = '';
-    if (rubricas.length === 0) { tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #95A5A6;">Nenhuma rubrica cadastrada</td></tr>'; return; }
-    rubricas.forEach(rubrica => {
-        const nomeEvento = nomesEventos[rubrica.evento] || rubrica.evento;
-        tbody.innerHTML += `<tr><td><strong>${rubrica.codigo_empresa}</strong></td><td>${nomeEvento}</td><td>${rubrica.codigo_rubrica}</td><td><button type="button" class="btn-delete" onclick="deletarRubrica(${rubrica.id})">Deletar</button></td></tr>`;
+    if (!rubricas.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;">Nenhuma rubrica encontrada</td></tr>';
+        return;
+    }
+    rubricas.forEach(r => {
+        const desc = r.descricao_rubrica || r.evento || '–';
+        tbody.innerHTML += `<tr>
+            <td><strong>${r.codigo_empresa}</strong></td>
+            <td>${r.empresa || '–'}</td>
+            <td style="font-family:monospace;">${r.codigo_rubrica}</td>
+            <td>${desc}</td>
+            <td>${r.tipo || '–'}</td>
+            <td><button type="button" class="btn-delete" onclick="deletarRubrica('${r.id}')">Deletar</button></td>
+        </tr>`;
     });
 }
 
 async function adicionarRubrica() {
-    const codigoEmpresa = document.getElementById('rubricaEmpresaSelect').value;
-    const evento = document.getElementById('rubricaEventoSelect').value;
-    const codigoRubrica = document.getElementById('codigoRubrica').value.trim();
-    
-    if (!codigoEmpresa || !evento || !codigoRubrica) { mostrarStatus('statusRubricas', 'Preencha todos os campos', 'error'); return; }
-    
+    const codigoEmpresa  = document.getElementById('rubricaEmpresaSelect').value;
+    const codigoRubrica  = document.getElementById('codigoRubrica').value.trim();
+    const descricao      = document.getElementById('descricaoRubrica').value.trim();
+
+    if (!codigoEmpresa || !codigoRubrica || !descricao) {
+        mostrarStatus('statusRubricas', 'Preencha Empresa, Código e Descrição', 'error'); return;
+    }
+
+    // Buscar nome da empresa
+    const empresaObj = _todasEmpresas.find(e => String(e.codigo_empresa) === String(codigoEmpresa));
+
+    const row = {
+        codigo_empresa:    codigoEmpresa,
+        empresa:           empresaObj ? empresaObj.nome_empresa : '',
+        codigo_rubrica:    codigoRubrica,
+        descricao_rubrica: descricao,
+        tipo:              document.getElementById('tipoRubrica').value.trim() || null,
+    };
+
     try {
-        const { error } = await supabaseClient.from('rh_rubricas').upsert([{ 
-            codigo_empresa: codigoEmpresa, 
-            evento: evento, 
-            codigo_rubrica: codigoRubrica 
-        }], { onConflict: 'codigo_empresa, evento' });
-        
+        const { error } = await supabaseClient
+            .from('rh_rubricas')
+            .upsert([row], { onConflict: 'codigo_empresa,codigo_rubrica' });
         if (error) throw error;
-        
-        document.getElementById('codigoRubrica').value = '';
+        ['codigoRubrica','descricaoRubrica','tipoRubrica'].forEach(id => document.getElementById(id).value = '');
         mostrarStatus('statusRubricas', '✅ Rubrica salva com sucesso!', 'success');
         carregarRubricas();
-    } catch (erro) { mostrarStatus('statusRubricas', 'Erro ao salvar rubrica: ' + erro.message, 'error'); }
+    } catch (erro) { mostrarStatus('statusRubricas', 'Erro ao salvar: ' + erro.message, 'error'); }
 }
 
 async function deletarRubrica(id) {
@@ -895,7 +984,7 @@ async function deletarRubrica(id) {
         if (error) throw error;
         mostrarStatus('statusRubricas', '✅ Rubrica deletada com sucesso!', 'success');
         carregarRubricas();
-    } catch (erro) { mostrarStatus('statusRubricas', 'Erro ao deletar rubrica: ' + erro.message, 'error'); }
+    } catch (erro) { mostrarStatus('statusRubricas', 'Erro ao deletar: ' + erro.message, 'error'); }
 }
 
 // --- REGRAS DE RENOMEAÇÃO ---
@@ -1065,7 +1154,25 @@ function baixarModeloEmpresas() {
 
 // ── MODAL MODO IMPORTAÇÃO ─────────────────────────────────────
 
-function confirmarModoImportacao(entidade, qtd) {
+const _tabelaParaSupabase = {
+    'Empresas':  'rh_empresas',
+    'Empregados':'rh_empregados',
+    'Rubricas':  'rh_rubricas',
+    'Sócios':    'rh_socios',
+};
+
+async function confirmarModoImportacao(entidade, qtd) {
+    // Verificar se já há dados na tabela — se vazia, importa direto sem perguntar
+    try {
+        const tabela = _tabelaParaSupabase[entidade];
+        if (tabela) {
+            const { count } = await supabaseClient
+                .from(tabela)
+                .select('*', { count: 'exact', head: true });
+            if ((count || 0) === 0) return 'acrescentar';
+        }
+    } catch (_) {}
+
     return new Promise(resolve => {
         const modal = document.getElementById('modalImportMode');
         document.getElementById('modalImportTitle').textContent = `Importar ${entidade}`;
@@ -1325,14 +1432,9 @@ async function importarEmpregadosIndividual(file) {
 function baixarModeloRubricas() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([
-        ['Cód. Empresa', 'Cód. Rubrica', 'Evento'],
-        ['', '', 'horasTrabalhadas'],
-        ['', '', 'horasExtras50'],
-        ['', '', 'horasExtras100'],
-        ['', '', 'horasNoturnaConvertida'],
-        ['', '', 'horasDevidas'],
+        ['Cód. Empresa', 'Empresa', 'Cód. Rubrica', 'Descrição Rubrica', 'Tipo'],
     ]);
-    ws['!cols'] = [14, 14, 24].map(w => ({ wch: w }));
+    ws['!cols'] = [14, 30, 14, 35, 16].map(w => ({ wch: w }));
     XLSX.utils.book_append_sheet(wb, ws, 'Rubricas');
     XLSX.writeFile(wb, 'modelo_rubricas.xlsx');
 }
@@ -1344,25 +1446,34 @@ function handleImportarRubricas(event) {
 
 async function importarRubricasIndividual(file) {
     const ENT = 'Rubricas';
+    // Pode vir de dois inputs diferentes (aba Importar ou aba Rubricas)
+    const statusEl = document.getElementById('statusImportarRubricasTab');
+    const setStatus = (msg, tipo) => {
+        setStatusImport(ENT, msg, tipo);
+        if (statusEl) { statusEl.textContent = msg; statusEl.className = 'status-message ' + tipo; statusEl.style.display = msg ? 'block' : 'none'; }
+    };
     try {
-        setStatusImport(ENT, 'Lendo arquivo...', 'info');
+        setStatus('Lendo arquivo...', 'info');
         setProgresso(ENT, 10);
 
-        const rows = (await lerPlanilha(file, ['codigo_empresa','codigo_rubrica','evento']))
-            .filter(r => r.codigo_empresa && r.codigo_rubrica && r.evento)
+        const cols = ['codigo_empresa','empresa','codigo_rubrica','descricao_rubrica','tipo'];
+        const rows = (await lerPlanilha(file, cols))
+            .filter(r => r.codigo_empresa && r.codigo_rubrica)
             .map(r => ({
-                codigo_empresa:  String(r.codigo_empresa).trim(),
-                codigo_rubrica:  String(r.codigo_rubrica).trim(),
-                evento:          String(r.evento).trim(),
+                codigo_empresa:    String(r.codigo_empresa || '').trim(),
+                empresa:           String(r.empresa || '').trim() || null,
+                codigo_rubrica:    String(r.codigo_rubrica || '').trim(),
+                descricao_rubrica: String(r.descricao_rubrica || '').trim() || null,
+                tipo:              String(r.tipo || '').trim() || null,
             }));
 
-        if (!rows.length) throw new Error('Nenhuma linha válida encontrada. Verifique se o arquivo segue o modelo.');
+        if (!rows.length) throw new Error('Nenhuma linha válida. Verifique se o arquivo segue o modelo.');
 
         const modo = await confirmarModoImportacao('Rubricas', rows.length);
-        if (!modo) { setStatusImport(ENT, '', ''); setProgresso(ENT, null); return; }
+        if (!modo) { setStatus('', ''); setProgresso(ENT, null); return; }
 
         setProgresso(ENT, 50);
-        setStatusImport(ENT, `Salvando ${rows.length} rubrica(s)...`, 'info');
+        setStatus(`Salvando ${rows.length} rubrica(s)...`, 'info');
 
         if (modo === 'substituir') {
             const codigos = [...new Set(rows.map(r => r.codigo_empresa))];
@@ -1371,18 +1482,19 @@ async function importarRubricasIndividual(file) {
             const { error } = await supabaseClient.from('rh_rubricas').insert(rows);
             if (error) throw error;
         } else {
-            const { error } = await supabaseClient.from('rh_rubricas').upsert(rows, { onConflict: 'codigo_empresa,evento' });
+            const { error } = await supabaseClient.from('rh_rubricas').upsert(rows, { onConflict: 'codigo_empresa,codigo_rubrica' });
             if (error) throw error;
         }
 
         setProgresso(ENT, null);
-        setStatusImport(ENT, `✅ ${rows.length} rubrica(s) importada(s) com sucesso!`, 'success');
+        setStatus(`✅ ${rows.length} rubrica(s) importada(s) com sucesso!`, 'success');
         carregarRubricas();
     } catch (err) {
         setProgresso(ENT, null);
-        setStatusImport(ENT, '❌ ' + err.message, 'error');
+        setStatus('❌ ' + err.message, 'error');
     } finally {
         limparInput('fileRubricas');
+        limparInput('fileRubricasTab');
     }
 }
 
@@ -1425,9 +1537,21 @@ async function importarSocios(file) {
         ];
         const fmtDate = v => {
             if (!v) return null;
-            if (v instanceof Date) return v.toISOString().split('T')[0];
+            if (v instanceof Date) return isNaN(v) ? null : v.toISOString().split('T')[0];
             const s = String(v).trim();
-            return s || null;
+            if (!s) return null;
+            // DD/MM/AAAA → AAAA-MM-DD
+            const br = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (br) return `${br[3]}-${br[2].padStart(2,'0')}-${br[1].padStart(2,'0')}`;
+            // Já em ISO AAAA-MM-DD
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+            // Serial numérico do Excel
+            const n = parseFloat(s);
+            if (!isNaN(n) && n > 1000) {
+                const d = new Date(Math.round((n - 25569) * 86400 * 1000));
+                return d.toISOString().split('T')[0];
+            }
+            return null;
         };
         const rows = (await lerPlanilha(file, cols))
             .filter(r => r.codigo_empresa && r.nome_socio)
@@ -1470,6 +1594,7 @@ async function importarSocios(file) {
         setProgresso(ENT, null);
         const aviso = duplicatas > 0 ? ` (${duplicatas} duplicata(s) ignorada(s))` : '';
         setStatusImport(ENT, `✅ ${deduped.length} sócio(s) importado(s) com sucesso!${aviso}`, 'success');
+        carregarSocios();
     } catch (err) {
         setProgresso(ENT, null);
         setStatusImport(ENT, '❌ ' + err.message, 'error');
@@ -1559,14 +1684,16 @@ async function processarArquivo(file) {
         const rubricasSheet = workbook.Sheets['Rubricas'];
         let rubricasData = [];
         if (rubricasSheet) {
-            rubricasData = XLSX.utils.sheet_to_json(rubricasSheet, { 
-                header: ['codigo_empresa', 'codigo_rubrica', 'evento'], 
-                defval: '' 
-            }).filter(row => row.codigo_empresa && row.codigo_rubrica && row.evento)
+            rubricasData = XLSX.utils.sheet_to_json(rubricasSheet, {
+                header: ['codigo_empresa','empresa','codigo_rubrica','descricao_rubrica','tipo'],
+                defval: ''
+            }).filter(row => row.codigo_empresa && row.codigo_rubrica)
              .map(row => ({
-                codigo_empresa: String(row.codigo_empresa).trim(),
-                codigo_rubrica: String(row.codigo_rubrica).trim(),
-                evento: String(row.evento).trim()
+                codigo_empresa:    String(row.codigo_empresa).trim(),
+                empresa:           String(row.empresa || '').trim() || null,
+                codigo_rubrica:    String(row.codigo_rubrica).trim(),
+                descricao_rubrica: String(row.descricao_rubrica || '').trim() || null,
+                tipo:              String(row.tipo || '').trim() || null,
             }));
             
             console.log('📋 Rubricas lidas:', rubricasData);

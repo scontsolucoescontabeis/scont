@@ -66,7 +66,21 @@
                     <p>Gestão, validação e auditoria de registros</p>
                 </div>
                 <div class="topbar-right">
-                    <button class="btn btn-secondary" onclick="syncSupabase(this)">🔄 Sincronizar</button>
+                    <div class="form-links-group">
+                        <span class="form-links-label">🔗 Links dos Formulários</span>
+                        <div class="form-link-item">
+                            <a href="formulario_alteracao.html?modo=registro" target="_blank" class="form-link-btn">🏢 Registro de Empresa</a>
+                            <button class="form-link-copy" onclick="copiarLink('formulario_alteracao.html?modo=registro', this)" title="Copiar link">⎘</button>
+                        </div>
+                        <div class="form-link-item">
+                            <a href="formulario_alteracao.html" target="_blank" class="form-link-btn">✏️ Alteração de Empresa</a>
+                            <button class="form-link-copy" onclick="copiarLink('formulario_alteracao.html', this)" title="Copiar link">⎘</button>
+                        </div>
+                        <div class="form-link-item">
+                            <a href="formulario_empregado.html" target="_blank" class="form-link-btn">👤 Cadastro de Empregado</a>
+                            <button class="form-link-copy" onclick="copiarLink('formulario_empregado.html', this)" title="Copiar link">⎘</button>
+                        </div>
+                    </div>
                 </div>
             </header>
 
@@ -210,6 +224,21 @@
     <script src="utils.js"></script>
     <script src="cnaes.js"></script>
     <script src="app.js"></script>
+    <script>
+    function copiarLink(path, btn) {
+        const url = new URL(path, window.location.href).href;
+        navigator.clipboard.writeText(url).then(() => {
+            btn.classList.add('copied');
+            btn.textContent = '✔';
+            setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '⎘'; }, 2000);
+        }).catch(() => {
+            const ta = Object.assign(document.createElement('textarea'), { value: url, style: 'position:fixed;opacity:0' });
+            document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+            btn.classList.add('copied'); btn.textContent = '✔';
+            setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '⎘'; }, 2000);
+        });
+    }
+    </script>
     <script>
         document.addEventListener('DOMContentLoaded', async function() {
             const auth = await window.PortalAuthGuard.init(1);

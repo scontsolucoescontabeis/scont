@@ -300,40 +300,73 @@
         <!-- ABA RUBRICAS -->
         <div id="rubricas" class="admin-tab-content">
             <div class="admin-section">
-                <h2>Gerenciar Rubricas para Exportação (TXT)</h2>
+                <h2>Gerenciar Rubricas</h2>
                 <div id="statusRubricas" class="status-message"></div>
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #2C3E50; margin-bottom: 15px;">Vincular Rubrica</h3>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="rubricaEmpresaSelect">Empresa *</label>
-                            <select id="rubricaEmpresaSelect"><option value="">Selecione uma empresa...</option></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="rubricaEventoSelect">Evento *</label>
-                            <select id="rubricaEventoSelect">
-                                <option value="">Selecione o evento...</option>
-                                <option value="horasTrabalhadas">Horas Trabalhadas</option>
-                                <option value="horasExtras50">Horas Extras 50%</option>
-                                <option value="horasExtras100">Horas Extras 100%</option>
-                                <option value="horasNoturnaConvertida">Horas Noturnas Convertidas</option>
-                                <option value="horasDevidas">Horas Devidas (Faltas/Atrasos)</option>
-                            </select>
-                        </div>
+
+                <!-- Filtros e ações -->
+                <div style="background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+                    <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px;">
+                        <label>Empresa</label>
+                        <select id="filtroRubricasEmpresa" onchange="filtrarRubricas()">
+                            <option value="">Todas</option>
+                        </select>
                     </div>
-                    <div class="form-group">
-                        <label for="codigoRubrica">Código da Rubrica (Máx 9 dígitos) *</label>
-                        <input type="text" id="codigoRubrica" placeholder="Ex: 1285" maxlength="9" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                    <div class="form-group" style="margin-bottom:0;flex:2;min-width:180px;">
+                        <label>Buscar por código ou descrição</label>
+                        <input type="text" id="filtroRubricasTexto" placeholder="Digite para filtrar..." oninput="filtrarRubricas()">
                     </div>
-                    <button type="button" class="btn-save" onclick="adicionarRubrica()">➕ Salvar Rubrica</button>
+                    <div style="flex:0 0 auto;display:flex;gap:8px;align-items:flex-end;">
+                        <button type="button" onclick="document.getElementById('filtroRubricasEmpresa').value='';document.getElementById('filtroRubricasTexto').value='';filtrarRubricas();" style="padding:9px 16px;border:1px solid #C0C0C0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-weight:600;">✕ Limpar</button>
+                        <button type="button" class="btn-save" style="padding:9px 18px;" onclick="document.getElementById('fileRubricasTab').click()">📥 Importar Excel</button>
+                        <button type="button" onclick="baixarModeloRubricas()" style="padding:9px 18px;border:1px solid #8B3A3A;border-radius:6px;background:white;color:#8B3A3A;cursor:pointer;font-size:13px;font-weight:600;">⬇️ Modelo</button>
+                        <input type="file" id="fileRubricasTab" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportarRubricas(event)">
+                    </div>
+                    <span id="infoRubricas" style="font-size:12px;color:#7F8C8D;align-self:center;white-space:nowrap;"></span>
                 </div>
-                <h3 style="color: #2C3E50; margin-bottom: 15px;">Rubricas Cadastradas</h3>
-                <div class="table-container">
-                    <table class="admin-table">
-                        <thead><tr><th>Empresa</th><th>Evento</th><th>Código da Rubrica</th><th>Ações</th></tr></thead>
-                        <tbody id="rubricasTableBody"><tr><td colspan="4" style="text-align: center; color: #95A5A6;">Carregando...</td></tr></tbody>
+
+                <div id="statusImportarRubricasTab" class="status-message"></div>
+
+                <!-- Tabela -->
+                <div class="table-container" style="overflow-x:auto;">
+                    <table class="admin-table" id="rubricasTable">
+                        <thead><tr>
+                            <th>Cód.</th>
+                            <th>Empresa</th>
+                            <th>Cód. Rubrica</th>
+                            <th>Descrição Rubrica</th>
+                            <th>Tipo</th>
+                            <th>Ações</th>
+                        </tr></thead>
+                        <tbody id="rubricasTableBody"><tr><td colspan="6" style="text-align:center;color:#95A5A6;">Carregando...</td></tr></tbody>
                     </table>
                 </div>
+                <div class="paginacao" id="paginacaoRubricas"></div>
+
+                <!-- Formulário adicionar -->
+                <details style="margin-top:22px;border:1px solid #DEE2E6;border-radius:8px;padding:12px 16px;">
+                    <summary style="cursor:pointer;font-weight:600;color:#2C3E50;font-size:14px;user-select:none;">➕ Adicionar / Editar Rubrica</summary>
+                    <div style="margin-top:14px;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="rubricaEmpresaSelect">Empresa *</label>
+                                <select id="rubricaEmpresaSelect"><option value="">Selecione...</option></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="codigoRubrica">Código da Rubrica *</label>
+                                <input type="text" id="codigoRubrica" placeholder="Ex: 000001" maxlength="20">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="descricaoRubrica">Descrição da Rubrica *</label>
+                            <input type="text" id="descricaoRubrica" placeholder="Ex: Salário Base">
+                        </div>
+                        <div class="form-group">
+                            <label for="tipoRubrica">Tipo</label>
+                            <input type="text" id="tipoRubrica" placeholder="Ex: Vencimento">
+                        </div>
+                        <button type="button" class="btn-save" onclick="adicionarRubrica()">➕ Salvar Rubrica</button>
+                    </div>
+                </details>
             </div>
         </div>
 
@@ -484,11 +517,11 @@
                             <span class="import-card-icon">🏷️</span>
                             <div>
                                 <div class="import-card-title">Rubricas</div>
-                                <div class="import-card-subtitle">3 campos</div>
+                                <div class="import-card-subtitle">5 campos</div>
                             </div>
                             <button class="btn-modelo" onclick="baixarModeloRubricas()">⬇️ Modelo</button>
                         </div>
-                        <div class="import-fields">Cód. Empresa · Cód. Rubrica · Evento (horasTrabalhadas, horasExtras50, horasExtras100, horasNoturnaConvertida, horasDevidas)</div>
+                        <div class="import-fields">Cód. Empresa · Empresa · Cód. Rubrica · Descrição Rubrica · Tipo</div>
                         <div id="statusImportarRubricas" class="status-message"></div>
                         <div class="upload-area-sm" onclick="document.getElementById('fileRubricas').click()"
                              ondragover="event.preventDefault();this.style.borderColor='#8B3A3A'"
