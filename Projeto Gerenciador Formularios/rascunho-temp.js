@@ -2,7 +2,11 @@
  * rascunho-temp.js
  * Auto-salva rascunho de formulário para usuários não autenticados.
  * Usa um token UUID único na URL (?token=...) como chave na tabela
- * formulario_rascunho_temp. O registro é deletado ao enviar o formulário.
+ * formulario_rascunho_temp.
+ *
+ * Segurança: o token é enviado no header x-rascunho-token em cada
+ * requisição. A RLS do Supabase valida que o header bate com o token
+ * da linha — anon não consegue listar nem acessar linhas de outros.
  */
 (function () {
     const TABLE = 'formulario_rascunho_temp';
@@ -24,6 +28,15 @@
         return token;
     }
 
+    function makeSbClient(supabaseUrl, supabaseKey, token) {
+        return window.supabase.createClient(supabaseUrl, supabaseKey, {
+            auth: { persistSession: false, autoRefreshToken: false },
+            global: {
+                headers: { 'x-rascunho-token': token }
+            }
+        });
+    }
+
     function serializeForm(form) {
         const data = {};
         for (const el of form.elements) {
@@ -42,9 +55,8 @@
             if (name.startsWith('__')) continue;
             const els = form.elements[name];
             if (!els) continue;
-            // RadioNodeList (radio/checkbox groups)
             if (els.length !== undefined && typeof els.item === 'function') {
-                Array.from(els).forEach(el => {
+                Array.from(els).forEach(function (el) {
                     if (el.type === 'radio' || el.type === 'checkbox') {
                         el.checked = el.value === value;
                         el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -76,24 +88,27 @@
          * @param {HTMLFormElement} form
          * @param {string} tipoFormulario  'alteracao' | 'registro' | 'empregado'
          * @param {object} opts
-         * @param {object}   opts.client          cliente Supabase já inicializado pelo formulário (obrigatório)
-         * @param {function} [opts.customSerialize]   retorna objeto com campos extras
-         * @param {function} [opts.onBeforeRestore]   async, chamado com dados salvos antes de restaurar campos
-         * @param {function} [opts.customRestore]     async, chamado com dados salvos após restaurar campos nomeados
+         * @param {string}   opts.supabaseUrl       SUPABASE_URL (passado pelo HTML onde a const é visível)
+         * @param {string}   opts.supabaseKey       SUPABASE_KEY (passado pelo HTML onde a const é visível)
+         * @param {function} [opts.customSerialize]  retorna objeto com campos extras
+         * @param {function} [opts.onBeforeRestore]  async, chamado com dados salvos antes de restaurar campos
+         * @param {function} [opts.customRestore]    async, chamado com dados salvos após restaurar campos nomeados
          */
         async init(form, tipoFormulario, opts) {
             opts = opts || {};
             this._form = form;
             this._tipo = tipoFormulario;
-            this._sb = opts.client || null;
             this._customSerialize = opts.customSerialize || null;
             this._customRestore = opts.customRestore || null;
             this._token = getOrCreateToken();
 
-            if (!this._sb) {
-                console.warn('⚠️ RascunhoTemp: opts.client não informado — rascunho desativado.');
+            if (!opts.supabaseUrl || !opts.supabaseKey) {
+                console.warn('⚠️ RascunhoTemp: supabaseUrl/supabaseKey não informados — rascunho desativado.');
                 return;
             }
+
+            // Cliente dedicado com o token no header — RLS valida por linha
+            this._sb = makeSbClient(opts.supabaseUrl, opts.supabaseKey, this._token);
 
             try {
                 const { data: row } = await this._sb
@@ -106,7 +121,7 @@
                     if (opts.onBeforeRestore) await opts.onBeforeRestore(row.dados);
                     restoreForm(form, row.dados);
                     if (this._customRestore) await this._customRestore(row.dados);
-                    console.log('✅ Rascunho restaurado do servidor (token:', this._token, ')');
+                    console.log('✅ Rascunho restaurado (token:', this._token, ')');
                     this._showBanner();
                 }
             } catch (e) {

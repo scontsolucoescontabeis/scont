@@ -730,7 +730,8 @@ let isSubmitting = false; // CORREÇÃO: FLAG PARA PREVENIR DUPLICAÇÃO
             const modoUrl = new URLSearchParams(location.search).get('modo') || 'alteracao';
 
             await window.RascunhoTemp.init(form, modoUrl, {
-                client: supabaseClient,
+                supabaseUrl: SUPABASE_URL,
+                supabaseKey: SUPABASE_KEY,
                 customSerialize: function() {
                     return { __sociosCount__: sociosCount };
                 },
