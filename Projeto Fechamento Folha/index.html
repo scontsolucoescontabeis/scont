@@ -79,12 +79,12 @@
     <div class="container">
 
         <div class="config-card">
-            <h2>⚙️ Configurações · Associação de Rubricas</h2>
+            <h2>⚙️ Configurações · Rubricas</h2>
 
             <div id="statusConfig" style="display:none;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:13px;"></div>
 
             <!-- Formulário de adição -->
-            <div class="config-form-row">
+            <div class="config-form-row" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;align-items:end;">
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Empresa *</label>
                     <select id="cfgEmpresa" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
@@ -92,8 +92,8 @@
                     </select>
                 </div>
                 <div>
-                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Descrição da Rubrica *</label>
-                    <input type="text" id="cfgDescricao" placeholder="Ex: Salário Base"
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Coluna da Planilha *</label>
+                    <input type="text" id="cfgColuna" placeholder="Ex: SALÁRIO"
                         style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
                 </div>
                 <div>
@@ -102,7 +102,30 @@
                         style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
                 </div>
                 <div>
-                    <button class="btn btn-primary" onclick="salvarAssociacao()" style="white-space:nowrap;padding:9px 18px;">
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Tipo Processo</label>
+                    <input type="text" id="cfgTipoProcesso" placeholder="01" maxlength="4"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Tipo Valor *</label>
+                    <select id="cfgTipoValor" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <option value="monetario">Monetário</option>
+                        <option value="minutos">Minutos</option>
+                        <option value="dias">Dias</option>
+                        <option value="booleano">Booleano</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Descrição</label>
+                    <input type="text" id="cfgDescricao" placeholder="Ex: Salário Base"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;padding-bottom:2px;">
+                    <input type="checkbox" id="cfgAtivo" checked style="width:16px;height:16px;cursor:pointer;">
+                    <label for="cfgAtivo" style="font-weight:600;font-size:12px;color:#2C3E50;cursor:pointer;">Ativo</label>
+                </div>
+                <div>
+                    <button class="btn btn-primary" onclick="salvarRubrica()" style="white-space:nowrap;padding:9px 18px;width:100%;">
                         ➕ Adicionar
                     </button>
                 </div>
@@ -111,8 +134,14 @@
             <!-- Filtro empresa para tabela -->
             <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
                 <label style="font-weight:600;font-size:12px;color:#2C3E50;">Filtrar tabela:</label>
-                <select id="cfgFiltroEmpresa" onchange="carregarAssociacoes()" style="padding:7px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                <select id="cfgFiltroEmpresa" onchange="carregarRubricas()" style="padding:7px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
                     <option value="">Todas as empresas</option>
+                </select>
+                <label style="font-weight:600;font-size:12px;color:#2C3E50;margin-left:8px;">Status:</label>
+                <select id="cfgFiltroAtivo" onchange="carregarRubricas()" style="padding:7px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                    <option value="">Todos</option>
+                    <option value="true">Ativos</option>
+                    <option value="false">Inativos</option>
                 </select>
                 <span id="cfgTotal" style="font-size:12px;color:#7F8C8D;margin-left:auto;"></span>
             </div>
@@ -123,13 +152,17 @@
                     <thead>
                         <tr>
                             <th>Empresa</th>
-                            <th>Descrição da Rubrica</th>
-                            <th>Código da Rubrica</th>
+                            <th>Coluna Planilha</th>
+                            <th>Cód. Rubrica</th>
+                            <th>Tipo Processo</th>
+                            <th>Tipo Valor</th>
+                            <th>Descrição</th>
+                            <th>Ativo</th>
                             <th>Ações</th>
                         </tr>
                     </thead>
                     <tbody id="cfgTableBody">
-                        <tr><td colspan="4" class="config-empty">Carregando...</td></tr>
+                        <tr><td colspan="8" class="config-empty">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -190,7 +223,7 @@ async function iniciarConfig() {
         await carregarEmpresasConfig();
         _configIniciado = true;
     }
-    await carregarAssociacoes();
+    await carregarRubricas();
 }
 
 async function carregarEmpresasConfig() {
@@ -219,76 +252,111 @@ async function carregarEmpresasConfig() {
     }
 }
 
-async function carregarAssociacoes() {
+async function carregarRubricas() {
     const tbody = document.getElementById('cfgTableBody');
-    tbody.innerHTML = '<tr><td colspan="4" class="config-empty">Carregando...</td></tr>';
-    const filtroEmp = document.getElementById('cfgFiltroEmpresa')?.value || '';
+    tbody.innerHTML = '<tr><td colspan="8" class="config-empty">Carregando...</td></tr>';
+    const filtroEmp   = document.getElementById('cfgFiltroEmpresa')?.value || '';
+    const filtroAtivo = document.getElementById('cfgFiltroAtivo')?.value || '';
 
     try {
-        let q = sb.from('fechamento_rubrica_associacoes')
+        let q = sb.from('fechamento_rubricas_config')
             .select('*')
             .order('codigo_empresa')
-            .order('descricao_rubrica');
-        if (filtroEmp) q = q.eq('codigo_empresa', filtroEmp);
+            .order('coluna_planilha');
+        if (filtroEmp)   q = q.eq('codigo_empresa', filtroEmp);
+        if (filtroAtivo !== '') q = q.eq('ativo', filtroAtivo === 'true');
 
         const { data, error } = await q;
         if (error) throw error;
 
         const lista = data || [];
-        document.getElementById('cfgTotal').textContent = lista.length + ' associação(ões)';
+        document.getElementById('cfgTotal').textContent = lista.length + ' rubrica(s)';
 
         if (!lista.length) {
-            tbody.innerHTML = '<tr><td colspan="4" class="config-empty">Nenhuma associação cadastrada.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="config-empty">Nenhuma rubrica cadastrada.</td></tr>';
             return;
         }
+
+        const tipoValorLabel = { monetario: 'Monetário', minutos: 'Minutos', dias: 'Dias', booleano: 'Booleano' };
 
         tbody.innerHTML = lista.map(r => `
             <tr>
                 <td><strong>${r.codigo_empresa}</strong></td>
-                <td>${r.descricao_rubrica}</td>
+                <td style="font-family:monospace;">${r.coluna_planilha}</td>
                 <td style="font-family:monospace;font-weight:600;">${r.codigo_rubrica}</td>
-                <td><button class="btn btn-secondary btn-small"
-                    style="background:#E74C3C;border-color:#E74C3C;color:white;"
-                    onclick="deletarAssociacao('${r.id}')">Excluir</button></td>
+                <td style="text-align:center;">${r.tipo_processo}</td>
+                <td>${tipoValorLabel[r.tipo_valor] || r.tipo_valor}</td>
+                <td style="color:#7F8C8D;">${r.descricao || '—'}</td>
+                <td style="text-align:center;">
+                    <button class="btn btn-secondary btn-small"
+                        style="background:${r.ativo ? '#27AE60' : '#95a5a6'};border-color:${r.ativo ? '#27AE60' : '#95a5a6'};color:white;min-width:60px;"
+                        onclick="toggleAtivo('${r.id}', ${r.ativo})">${r.ativo ? '✔ Ativo' : 'Inativo'}</button>
+                </td>
+                <td>
+                    <button class="btn btn-secondary btn-small"
+                        style="background:#E74C3C;border-color:#E74C3C;color:white;"
+                        onclick="deletarRubrica('${r.id}')">Excluir</button>
+                </td>
             </tr>
         `).join('');
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="4" class="config-empty" style="color:#E74C3C;">Erro: ${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="config-empty" style="color:#E74C3C;">Erro: ${err.message}</td></tr>`;
     }
 }
 
-async function salvarAssociacao() {
-    const empresa   = document.getElementById('cfgEmpresa').value.trim();
-    const descricao = document.getElementById('cfgDescricao').value.trim();
-    const codigo    = document.getElementById('cfgCodigo').value.trim();
+async function salvarRubrica() {
+    const empresa      = document.getElementById('cfgEmpresa').value.trim();
+    const coluna       = document.getElementById('cfgColuna').value.trim();
+    const codigo       = document.getElementById('cfgCodigo').value.trim();
+    const tipoProcesso = document.getElementById('cfgTipoProcesso').value.trim() || '01';
+    const tipoValor    = document.getElementById('cfgTipoValor').value;
+    const descricao    = document.getElementById('cfgDescricao').value.trim();
+    const ativo        = document.getElementById('cfgAtivo').checked;
 
-    if (!empresa || !descricao || !codigo) {
-        mostrarStatusConfig('Preencha todos os campos obrigatórios.', 'error'); return;
+    if (!empresa || !coluna || !codigo) {
+        mostrarStatusConfig('Preencha os campos obrigatórios: Empresa, Coluna da Planilha e Código da Rubrica.', 'error');
+        return;
     }
 
     try {
-        const { error } = await sb.from('fechamento_rubrica_associacoes')
-            .upsert([{ codigo_empresa: empresa, descricao_rubrica: descricao, codigo_rubrica: codigo }],
-                    { onConflict: 'codigo_empresa,descricao_rubrica' });
+        const { error } = await sb.from('fechamento_rubricas_config')
+            .upsert([{ codigo_empresa: empresa, coluna_planilha: coluna, codigo_rubrica: codigo,
+                       tipo_processo: tipoProcesso, tipo_valor: tipoValor,
+                       descricao: descricao || null, ativo }],
+                    { onConflict: 'codigo_empresa,coluna_planilha' });
         if (error) throw error;
 
-        document.getElementById('cfgDescricao').value = '';
+        document.getElementById('cfgColuna').value = '';
         document.getElementById('cfgCodigo').value = '';
-        mostrarStatusConfig('✅ Associação salva com sucesso!', 'success');
-        carregarAssociacoes();
+        document.getElementById('cfgTipoProcesso').value = '';
+        document.getElementById('cfgDescricao').value = '';
+        document.getElementById('cfgAtivo').checked = true;
+        mostrarStatusConfig('✅ Rubrica salva com sucesso!', 'success');
+        carregarRubricas();
     } catch (err) {
         mostrarStatusConfig('❌ Erro: ' + err.message, 'error');
     }
 }
 
-async function deletarAssociacao(id) {
-    if (!confirm('Excluir esta associação?')) return;
+async function toggleAtivo(id, atualAtivo) {
     try {
-        const { error } = await sb.from('fechamento_rubrica_associacoes')
+        const { error } = await sb.from('fechamento_rubricas_config')
+            .update({ ativo: !atualAtivo }).eq('id', id);
+        if (error) throw error;
+        carregarRubricas();
+    } catch (err) {
+        mostrarStatusConfig('❌ Erro: ' + err.message, 'error');
+    }
+}
+
+async function deletarRubrica(id) {
+    if (!confirm('Excluir esta rubrica?')) return;
+    try {
+        const { error } = await sb.from('fechamento_rubricas_config')
             .delete().eq('id', id);
         if (error) throw error;
-        mostrarStatusConfig('✅ Associação excluída.', 'success');
-        carregarAssociacoes();
+        mostrarStatusConfig('✅ Rubrica excluída.', 'success');
+        carregarRubricas();
     } catch (err) {
         mostrarStatusConfig('❌ Erro: ' + err.message, 'error');
     }

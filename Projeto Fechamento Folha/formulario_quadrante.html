@@ -1100,43 +1100,119 @@ function coletarDados() {
 
 function scheduleAutoSave() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(salvarLocal, 1800);
+  saveTimer = setTimeout(salvarLocal, 3000);
 }
 
-function salvarLocal() {
+async function salvarLocal() {
+  const payload = {
+    competencia: document.getElementById('competencia').value,
+    tipoFolha:   document.getElementById('tipoFolha').value,
+    employees:   coletarDados(),
+    extraCols, convenios,
+    savedAt: new Date().toISOString(),
+  };
+
+  const legSave = document.getElementById('legSave');
+  const btn     = document.getElementById('btnSave');
+  legSave.textContent = '⏳ Salvando…';
+
+  let savedCloud = false;
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify({
-      competencia: document.getElementById('competencia').value,
-      tipoFolha: document.getElementById('tipoFolha').value,
-      employees: coletarDados(),
-      extraCols, convenios,
-      savedAt: new Date().toLocaleString('pt-BR'),
-    }));
-    const btn = document.getElementById('btnSave');
-    btn.classList.add('saved');
-    const now = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-    document.getElementById('legSave').textContent = 'Rascunho salvo às ' + now;
-    setTimeout(() => btn.classList.remove('saved'), 2000);
-  } catch(e) {
-    showToast('Erro ao salvar: ' + e.message, 'warn');
-  }
+    const { error } = await sbClient.from('quadrante_folha_rascunho').upsert({
+      empresa_codigo: '453',
+      competencia:    payload.competencia,
+      tipo_folha:     payload.tipoFolha,
+      dados:          payload,
+      updated_at:     payload.savedAt,
+    }, { onConflict: 'empresa_codigo,competencia,tipo_folha' });
+    if (!error) savedCloud = true;
+  } catch(_) {}
+
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(payload));
+  } catch(_) {}
+
+  btn.classList.add('saved');
+  setTimeout(() => btn.classList.remove('saved'), 2000);
+  const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  legSave.textContent = savedCloud ? `☁ Salvo às ${hora}` : `💾 Salvo localmente ${hora}`;
 }
 
-function carregarLocal() {
+function _aplicarRascunho(d) {
+  EMPLOYEES = d.employees || [];
+  extraCols = d.extraCols || [];
+  convenios = d.convenios || JSON.parse(JSON.stringify(CONVENIOS_DEF));
+  document.getElementById('competencia').value = d.competencia || '';
+  if (d.tipoFolha) document.getElementById('tipoFolha').value = d.tipoFolha;
+  const quando = d.savedAt
+    ? new Date(d.savedAt).toLocaleString('pt-BR')
+    : '—';
+  document.getElementById('legSave').textContent = `☁ Rascunho de ${quando}`;
+}
+
+async function carregarLocal() {
+  // Lê localStorage
+  let localData = null;
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return false;
-    const d = JSON.parse(raw);
-    if (!d.employees?.length) return false;
-    if (!confirm(`Rascunho salvo em ${d.savedAt}.\nCarregar dados salvos?\n\n(Cancelar usa os dados originais da planilha)`)) return false;
-    EMPLOYEES = d.employees;
-    extraCols  = d.extraCols || [];
-    convenios  = d.convenios || JSON.parse(JSON.stringify(CONVENIOS_DEF));
-    document.getElementById('competencia').value = d.competencia || '';
-    if (d.tipoFolha) document.getElementById('tipoFolha').value = d.tipoFolha;
-    document.getElementById('legSave').textContent = 'Rascunho de ' + d.savedAt;
-    return true;
-  } catch(e) { return false; }
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (d.employees?.length) localData = d;
+    }
+  } catch(_) {}
+
+  // Lê Supabase
+  let cloudData = null;
+  try {
+    const { data } = await sbClient.from('quadrante_folha_rascunho')
+      .select('dados, updated_at')
+      .eq('empresa_codigo', '453')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (data?.dados?.employees?.length) cloudData = data.dados;
+  } catch(_) {}
+
+  // Escolhe o mais recente
+  const candidato = (() => {
+    if (!localData && !cloudData) return null;
+    if (!localData) return cloudData;
+    if (!cloudData) return localData;
+    const tLocal = new Date(localData.savedAt || 0).getTime();
+    const tCloud = new Date(cloudData.savedAt || 0).getTime();
+    return tCloud >= tLocal ? cloudData : localData;
+  })();
+
+  if (!candidato) return false;
+
+  const quando = candidato.savedAt
+    ? new Date(candidato.savedAt).toLocaleString('pt-BR')
+    : '—';
+
+  return new Promise(resolve => {
+    // Toast de confirmação não-bloqueante
+    const toast = document.createElement('div');
+    toast.style.cssText = `position:fixed;bottom:80px;right:24px;z-index:9999;
+      background:#2C3E50;color:#fff;border-radius:10px;padding:16px 20px;
+      box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:13px;max-width:340px;`;
+    toast.innerHTML = `
+      <div style="font-weight:700;margin-bottom:8px;">📄 Rascunho encontrado</div>
+      <div style="font-size:12px;opacity:.8;margin-bottom:12px;">Salvo em ${quando}</div>
+      <div style="display:flex;gap:8px;">
+        <button id="_btnSim" style="flex:1;background:#27ae60;border:none;color:#fff;border-radius:7px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;">✔ Continuar</button>
+        <button id="_btnNao" style="flex:1;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:7px;padding:8px;font-size:12px;cursor:pointer;">Ignorar</button>
+      </div>`;
+    document.body.appendChild(toast);
+    toast.querySelector('#_btnSim').onclick = () => {
+      _aplicarRascunho(candidato);
+      toast.remove();
+      resolve(true);
+    };
+    toast.querySelector('#_btnNao').onclick = () => {
+      toast.remove();
+      resolve(false);
+    };
+  });
 }
 
 // ══════════════════════════════════════════════════════
@@ -1380,8 +1456,8 @@ document.getElementById('competencia').addEventListener('input', e => {
 // ══════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
-  const loaded = carregarLocal();
+document.addEventListener('DOMContentLoaded', async () => {
+  const loaded = await carregarLocal();
   if (!loaded) {
     EMPLOYEES = JSON.parse(JSON.stringify(EMPLOYEES_DEFAULT));
     convenios = JSON.parse(JSON.stringify(CONVENIOS_DEF));

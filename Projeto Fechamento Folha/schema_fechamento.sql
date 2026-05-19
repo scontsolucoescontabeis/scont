@@ -58,3 +58,36 @@ VALUES
     ('453', ' Plano Saúde  ',          '000012', '01', 'monetario', 'Plano de Saúde'),
     ('453', 'Cota Custeio  Sindicato', '000013', '01', 'booleano',  'Cota Sindicato (Sim/Não)')
 ON CONFLICT (codigo_empresa, coluna_planilha) DO NOTHING;
+
+
+-- ============================================================
+-- RASCUNHO DO FORMULÁRIO QUADRANTE
+-- Salva o preenchimento parcial para continuidade
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.quadrante_folha_rascunho (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    empresa_codigo TEXT NOT NULL,
+    competencia    TEXT NOT NULL,
+    tipo_folha     TEXT NOT NULL,
+    dados          JSONB NOT NULL,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT quadrante_rascunho_unique UNIQUE (empresa_codigo, competencia, tipo_folha)
+);
+
+CREATE INDEX IF NOT EXISTS idx_quadrante_rascunho_empresa
+    ON public.quadrante_folha_rascunho (empresa_codigo, updated_at DESC);
+
+ALTER TABLE public.quadrante_folha_rascunho ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "rascunho: leitura autenticado" ON public.quadrante_folha_rascunho;
+DROP POLICY IF EXISTS "rascunho: escrita autenticado"  ON public.quadrante_folha_rascunho;
+
+CREATE POLICY "rascunho: leitura autenticado"
+    ON public.quadrante_folha_rascunho FOR SELECT
+    TO authenticated USING (TRUE);
+
+CREATE POLICY "rascunho: escrita autenticado"
+    ON public.quadrante_folha_rascunho FOR ALL
+    TO authenticated USING (TRUE) WITH CHECK (TRUE);
