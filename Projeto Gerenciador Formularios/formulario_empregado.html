@@ -7,6 +7,7 @@
     <script src="../supabase-config.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="rascunho-temp.js"></script>
     <style>
         /* ===== RESET E VARIÁVEIS ===== */
         * {
@@ -1594,6 +1595,7 @@ const { data: empregadoData, error: empregadoError } = await supabase
             document.getElementById('submissionName').textContent = formData.nomeCompleto;
             document.getElementById('submissionCompany').textContent = formData.nomeEmpresa;
             window.showModal();
+            await window.RascunhoTemp.deleteOnSubmit();
 
             window.resetForm();
 
@@ -1655,10 +1657,58 @@ const { data: empregadoData, error: empregadoError } = await supabase
     });
 
     // ===== INICIALIZAR SUPABASE AO CARREGAR =====
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', async function() {
         console.log('🚀 Inicializando formulário...');
         initSupabase();
         console.log('✅ Formulário de Empregado carregado com sucesso!');
+
+        await window.RascunhoTemp.init(form, 'empregado', {
+            customSerialize: function() {
+                // Serializar linhas de dependentes (usam classes, não name)
+                const rows = document.querySelectorAll('#dependentsTableBody tr');
+                const dependentes = [];
+                rows.forEach(function(row) {
+                    const nome = row.querySelector('.dependent-name');
+                    const cpf  = row.querySelector('.dependent-cpf');
+                    const nasc = row.querySelector('.dependent-birth');
+                    const rel  = row.querySelector('.dependent-relationship');
+                    if (nome) dependentes.push({
+                        nome: nome.value,
+                        cpf: cpf ? cpf.value : '',
+                        nascimento: nasc ? nasc.value : '',
+                        parentesco: rel ? rel.value : ''
+                    });
+                });
+                return { __dependentes__: dependentes };
+            },
+            onBeforeRestore: async function(dados) {
+                // Adicionar linhas de dependentes antes de restaurar
+                const deps = dados.__dependentes__;
+                if (Array.isArray(deps) && deps.length > 0) {
+                    for (let i = 0; i < deps.length; i++) {
+                        window.addDependentRow();
+                    }
+                }
+            },
+            customRestore: async function(dados) {
+                // Preencher linhas de dependentes
+                const deps = dados.__dependentes__;
+                if (!Array.isArray(deps)) return;
+                const rows = document.querySelectorAll('#dependentsTableBody tr');
+                deps.forEach(function(dep, i) {
+                    const row = rows[i];
+                    if (!row) return;
+                    const nome = row.querySelector('.dependent-name');
+                    const cpf  = row.querySelector('.dependent-cpf');
+                    const nasc = row.querySelector('.dependent-birth');
+                    const rel  = row.querySelector('.dependent-relationship');
+                    if (nome) nome.value = dep.nome || '';
+                    if (cpf)  cpf.value  = dep.cpf  || '';
+                    if (nasc) nasc.value = dep.nascimento || '';
+                    if (rel)  rel.value  = dep.parentesco || '';
+                });
+            }
+        });
     });
 </script>
 
