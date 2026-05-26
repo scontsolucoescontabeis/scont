@@ -48,11 +48,17 @@ ALTER TABLE public.triagem_resumo    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.triagem_conversas ENABLE ROW LEVEL SECURITY;
 
 -- Leitura: qualquer usuário autenticado
+DROP POLICY IF EXISTS "triagem_read"  ON public.triagem_demandas;
+DROP POLICY IF EXISTS "triagem_read"  ON public.triagem_resumo;
+DROP POLICY IF EXISTS "triagem_read"  ON public.triagem_conversas;
 CREATE POLICY "triagem_read" ON public.triagem_demandas  FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "triagem_read" ON public.triagem_resumo    FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "triagem_read" ON public.triagem_conversas FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Escrita: qualquer usuário autenticado (upload via ferramenta protegida pelo auth guard)
+DROP POLICY IF EXISTS "triagem_write" ON public.triagem_demandas;
+DROP POLICY IF EXISTS "triagem_write" ON public.triagem_resumo;
+DROP POLICY IF EXISTS "triagem_write" ON public.triagem_conversas;
 CREATE POLICY "triagem_write" ON public.triagem_demandas  FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "triagem_write" ON public.triagem_resumo    FOR ALL USING (auth.role() = 'authenticated');
 CREATE POLICY "triagem_write" ON public.triagem_conversas FOR ALL USING (auth.role() = 'authenticated');
