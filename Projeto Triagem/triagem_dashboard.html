@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Triagem — SCONT</title>
+  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico" />
+  <link rel="stylesheet" href="../shared.css">
+  <script src="../supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../portal-auth-guard.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    /* Header */
+    .app-header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color:#fff; padding:16px 24px;
+      display:flex; align-items:center; gap:12px;
+      position:sticky; top:0; z-index:200; box-shadow:var(--shadow-md);
+    }
+    .header-title { font-size:20px; font-weight:700; flex:1; }
+    .header-sub   { font-size:12px; opacity:.75; }
+    .btn-icon {
+      background:rgba(255,255,255,.15); border:none; border-radius:var(--radius-sm);
+      padding:8px 10px; cursor:pointer; font-size:16px; color:#fff; transition:background .2s;
+    }
+    .btn-icon:hover { background:rgba(255,255,255,.28); }
+
+    /* Welcome */
+    .welcome {
+      display:flex; flex-direction:column; align-items:center;
+      justify-content:center; padding:80px 24px; text-align:center; gap:16px;
+    }
+    .welcome-icon { font-size:64px; }
+    .welcome-title { font-size:22px; font-weight:700; }
+    .welcome-sub { font-size:14px; color:var(--muted); max-width:440px; }
+    .btn-primary {
+      background:var(--primary); color:#fff; border:none; border-radius:var(--radius-sm);
+      padding:12px 28px; font-size:15px; font-weight:600; cursor:pointer; transition:background .2s;
+    }
+    .btn-primary:hover { background:var(--primary-hover); }
+    .btn-sm {
+      background:var(--primary); color:#fff; border:none; border-radius:var(--radius-sm);
+      padding:7px 14px; font-size:13px; font-weight:600; cursor:pointer; transition:background .2s;
+    }
+    .btn-sm:hover { background:var(--primary-hover); }
+
+    /* Main layout */
+    .dashboard { padding:24px; display:none; }
+
+    /* Metadata bar */
+    .meta-bar {
+      display:flex; align-items:center; flex-wrap:wrap; gap:12px;
+      background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+      padding:12px 18px; margin-bottom:20px; box-shadow:var(--shadow-sm);
+      font-size:13px; color:var(--text-light);
+    }
+    .meta-bar strong { color:var(--text); }
+    .meta-bar .sep { color:var(--border); }
+    .meta-bar .right { margin-left:auto; display:flex; gap:8px; }
+
+    /* Summary cards */
+    .summary-grid {
+      display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+      gap:14px; margin-bottom:20px;
+    }
+    .sum-card {
+      background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+      padding:16px 18px; box-shadow:var(--shadow-sm); text-align:center;
+    }
+    .sum-card .val { font-size:32px; font-weight:800; line-height:1; }
+    .sum-card .lbl { font-size:12px; color:var(--muted); margin-top:4px; }
+    .sum-card.alta   .val { color:var(--danger); }
+    .sum-card.media  .val { color:var(--warning); }
+    .sum-card.baixa  .val { color:var(--info); }
+    .sum-card.total  .val { color:var(--primary); }
+    .sum-card.dept   .val { color:var(--secondary); }
+
+    /* Charts row */
+    .charts-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
+    @media (max-width:700px) { .charts-row { grid-template-columns:1fr; } }
+    .chart-card {
+      background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+      padding:16px 18px; box-shadow:var(--shadow-sm);
+    }
+    .chart-card h3 { font-size:14px; font-weight:700; margin-bottom:12px; color:var(--secondary); }
+    .bar-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:13px; }
+    .bar-row .bar-label { min-width:110px; color:var(--text-light); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .bar-row .bar-track { flex:1; background:var(--bg); border-radius:4px; height:14px; }
+    .bar-row .bar-fill  { height:14px; border-radius:4px; transition:width .4s; }
+    .bar-row .bar-qty   { min-width:24px; text-align:right; font-weight:700; }
+
+    /* Alerts card */
+    .alerts-card {
+      background:#FFF8F0; border:1px solid #F5C97A; border-radius:var(--radius);
+      padding:16px 18px; box-shadow:var(--shadow-sm); margin-bottom:20px;
+    }
+    .alerts-card h3 { font-size:14px; font-weight:700; color:#8B6914; margin-bottom:10px; }
+    .alert-item {
+      font-size:13px; color:#6B4C14; padding:6px 0;
+      border-bottom:1px dashed #F5C97A; line-height:1.5;
+    }
+    .alert-item:last-child { border-bottom:none; }
+
+    /* Encaminhamento card */
+    .enc-card {
+      background:#F0F8FF; border:1px solid #90CAF9; border-radius:var(--radius);
+      padding:16px 18px; box-shadow:var(--shadow-sm); margin-bottom:20px;
+      font-size:13px; color:#1565C0; line-height:1.6;
+    }
+    .enc-card h3 { font-weight:700; margin-bottom:8px; font-size:14px; color:#0D47A1; }
+
+    /* Table section */
+    .section-header {
+      display:flex; align-items:center; gap:12px; margin-bottom:12px;
+    }
+    .section-header h2 { font-size:16px; font-weight:700; color:var(--secondary); }
+    .section-header .count { background:var(--primary); color:#fff; border-radius:12px; padding:2px 10px; font-size:12px; font-weight:700; }
+
+    .table-wrap { overflow-x:auto; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-sm); }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    thead th {
+      background:linear-gradient(135deg, rgba(139,58,58,.08) 0%, rgba(44,62,80,.05) 100%);
+      color:var(--secondary); font-weight:700; text-align:left;
+      padding:11px 12px; border-bottom:2px solid var(--border);
+      white-space:nowrap;
+    }
+    tbody tr { border-bottom:1px solid var(--border); transition:background .15s; }
+    tbody tr:last-child { border-bottom:none; }
+    tbody tr:hover { background:#F6F8FA; }
+    tbody td { padding:10px 12px; vertical-align:top; }
+    .td-num { color:var(--muted); font-weight:700; text-align:center; width:36px; }
+    .td-cliente { font-weight:600; min-width:160px; }
+    .td-dept { white-space:nowrap; }
+    .td-cat { min-width:120px; }
+    .td-prazo { white-space:nowrap; }
+    .td-pend { max-width:200px; color:var(--text-light); }
+    .td-conv { text-align:center; }
+
+    /* Priority badges */
+    .badge {
+      display:inline-block; border-radius:12px; padding:2px 10px;
+      font-size:11px; font-weight:700; white-space:nowrap;
+    }
+    .badge-alta  { background:#FDEDED; color:var(--danger); }
+    .badge-media { background:#FFF3E0; color:var(--warning); }
+    .badge-baixa { background:#E3F2FD; color:var(--info); }
+    .badge-dept-dp      { background:#EDE7F6; color:#5E35B1; }
+    .badge-dept-trib    { background:#E8F5E9; color:#2E7D32; }
+    .badge-dept-fiscal  { background:#FFF8E1; color:#F57F17; }
+    .badge-dept-contabil{ background:#E1F5FE; color:#01579B; }
+
+    /* Conversation link */
+    .conv-link {
+      display:inline-flex; align-items:center; gap:4px;
+      color:var(--primary); font-weight:600; font-size:12px;
+      text-decoration:none; cursor:pointer; background:none; border:none;
+      padding:3px 8px; border-radius:6px; border:1px solid rgba(139,58,58,.3);
+      transition:background .15s;
+    }
+    .conv-link:hover { background:rgba(139,58,58,.08); }
+    .conv-link.no-conv { color:var(--muted); cursor:default; border-color:var(--border); }
+    .conv-link.no-conv:hover { background:none; }
+
+    /* Modal */
+    .modal-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,.5);
+      display:flex; align-items:center; justify-content:center;
+      z-index:500; padding:16px;
+      opacity:0; pointer-events:none; transition:opacity .2s;
+    }
+    .modal-overlay.open { opacity:1; pointer-events:all; }
+    .modal {
+      background:var(--card); border-radius:var(--radius);
+      box-shadow:0 8px 40px rgba(0,0,0,.25);
+      width:100%; max-width:680px; max-height:85vh;
+      display:flex; flex-direction:column;
+      transform:translateY(20px); transition:transform .2s;
+    }
+    .modal-overlay.open .modal { transform:translateY(0); }
+    .modal-header {
+      padding:16px 20px; border-bottom:1px solid var(--border);
+      display:flex; align-items:flex-start; gap:10px;
+    }
+    .modal-title { flex:1; }
+    .modal-title h3 { font-size:16px; font-weight:700; color:var(--text); }
+    .modal-title p  { font-size:12px; color:var(--muted); margin-top:2px; }
+    .modal-close {
+      background:none; border:none; font-size:20px; cursor:pointer;
+      color:var(--muted); padding:0 4px; line-height:1; transition:color .15s;
+    }
+    .modal-close:hover { color:var(--text); }
+    .modal-body { flex:1; overflow-y:auto; padding:16px 20px; }
+
+    /* Conversation bubbles */
+    .conv-day { text-align:center; margin:12px 0 6px; }
+    .conv-day span {
+      background:var(--border); color:var(--muted);
+      font-size:11px; font-weight:700; padding:2px 10px; border-radius:10px;
+    }
+    .msg-row { display:flex; margin-bottom:8px; }
+    .msg-row.cliente  { justify-content:flex-start; }
+    .msg-row.atendente{ justify-content:flex-end; }
+    .msg-row.system   { justify-content:center; }
+    .bubble {
+      max-width:80%; padding:8px 12px; border-radius:12px;
+      font-size:13px; line-height:1.5; white-space:pre-wrap; word-break:break-word;
+    }
+    .bubble.cliente {
+      background:#E3F2FD; color:#1565C0;
+      border-bottom-left-radius:4px;
+    }
+    .bubble.atendente {
+      background:#E8F5E9; color:#2E7D32;
+      border-bottom-right-radius:4px;
+    }
+    .bubble.system {
+      background:var(--bg); color:var(--muted);
+      font-size:12px; font-style:italic; text-align:center;
+      border-radius:8px; max-width:90%;
+    }
+    .bubble .meta { font-size:10px; opacity:.65; margin-top:3px; }
+    .msg-row.atendente .meta { text-align:right; }
+    .no-msgs { color:var(--muted); font-style:italic; font-size:13px; text-align:center; padding:24px 0; }
+
+    /* Toast */
+    #toastContainer { position:fixed; bottom:24px; right:24px; z-index:9999; display:flex; flex-direction:column; gap:8px; }
+    .toast { background:var(--secondary); color:#fff; padding:10px 16px; border-radius:var(--radius-sm); font-size:13px; box-shadow:var(--shadow-md); animation:slideIn .25s ease; }
+    .toast.error { background:var(--danger); }
+    @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+
+    @media (max-width:640px) {
+      .app-header { padding:12px 16px; }
+      .header-title { font-size:16px; }
+      .dashboard { padding:16px; }
+      .summary-grid { grid-template-columns:repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<header class="app-header">
+  <span style="font-size:26px">📋</span>
+  <div style="flex:1">
+    <div class="header-title">Dashboard Triagem de Atendimentos</div>
+    <div class="header-sub">Gestta Messenger — SCONT</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn-icon" id="btnTrocar" title="Trocar arquivo" onclick="pickFile()" style="display:none">📂 Trocar</button>
+    <button class="btn-icon" onclick="window.location.href='../portal.html'" title="Portal">🏠</button>
+  </div>
+</header>
+
+<!-- Welcome -->
+<div class="welcome" id="welcomeScreen">
+  <div class="welcome-icon">📊</div>
+  <div class="welcome-title">Dashboard Triagem</div>
+  <div class="welcome-sub">
+    Selecione o arquivo <strong>triagem_atendimento.xlsx</strong> para visualizar o dashboard com resumo, tabela e conversas.
+    <br><br>
+    Caminho padrão: <code>Desktop\captura_messenger\Triagem de Atendimentos - Gestta\triagem_atendimento.xlsx</code>
+  </div>
+  <button class="btn-primary" onclick="pickFile()">📂 Abrir triagem_atendimento.xlsx</button>
+</div>
+
+<!-- Dashboard -->
+<div class="dashboard" id="dashboard">
+
+  <!-- Meta bar -->
+  <div class="meta-bar" id="metaBar">
+    <span>📄 <strong id="metaFile">—</strong></span>
+    <span class="sep">|</span>
+    <span>Gerado em: <strong id="metaDate">—</strong></span>
+    <div class="right">
+      <button class="btn-sm" onclick="pickFile()">📂 Trocar arquivo</button>
+    </div>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="summary-grid" id="summaryGrid"></div>
+
+  <!-- Charts -->
+  <div class="charts-row" id="chartsRow"></div>
+
+  <!-- Alerts -->
+  <div class="alerts-card" id="alertsCard" style="display:none">
+    <h3>⚠️ Alertas</h3>
+    <div id="alertsList"></div>
+  </div>
+
+  <!-- Encaminhamento -->
+  <div class="enc-card" id="encCard" style="display:none">
+    <h3>📌 Encaminhamento</h3>
+    <div id="encText"></div>
+  </div>
+
+  <!-- Table -->
+  <div class="section-header">
+    <h2>Demandas Triadas</h2>
+    <span class="count" id="demandaCount">0</span>
+  </div>
+  <div class="table-wrap">
+    <table id="triTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Cliente / Empresa</th>
+          <th>Depto</th>
+          <th>Categoria</th>
+          <th>Subtipo</th>
+          <th>Funcionário(s)</th>
+          <th>Prazo</th>
+          <th>Prioridade</th>
+          <th>Pendências</th>
+          <th>Conversa</th>
+        </tr>
+      </thead>
+      <tbody id="triBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <h3 id="modalTitle">Conversa</h3>
+        <p id="modalSub"></p>
+      </div>
+      <button class="modal-close" onclick="closeModalBtn()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script>
+// ── Auth guard ─────────────────────────────────────────────────────────────
+window.PortalAuthGuard.init(1);
+
+// ── State ──────────────────────────────────────────────────────────────────
+let triagemRows   = [];   // [{num, cliente, dept, cat, sub, func, prazo, prio, dados, pend, dom}, ...]
+let resumoData    = {};   // {total, byDept:{}, byPrio:{}, dataHora}
+let conversations = {};   // keyed by normalized contact name → [{type,time,text}, ...]
+let alerts        = [];
+let encText       = '';
+
+// ── File pick ──────────────────────────────────────────────────────────────
+function pickFile() {
+  const input = document.createElement('input');
+  input.type  = 'file';
+  input.accept= '.xlsx,.xls';
+  input.onchange = () => { if (input.files[0]) loadFile(input.files[0]); };
+  input.click();
+}
+
+async function loadFile(file) {
+  try {
+    const buf  = await file.arrayBuffer();
+    const wb   = XLSX.read(buf, { type:'array' });
+    parseWorkbook(wb);
+    document.getElementById('metaFile').textContent = file.name;
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('dashboard').style.display     = '';
+    renderDashboard();
+    toast(`Arquivo carregado — ${triagemRows.length} demanda(s)`, 'success');
+  } catch(e) {
+    toast('Erro ao ler arquivo: ' + e.message, 'error');
+    console.error(e);
+  }
+}
+
+// ── Parse workbook ─────────────────────────────────────────────────────────
+function parseWorkbook(wb) {
+  parseTriagem(wb);
+  parseResumo(wb);
+  parseTriagemCompleta(wb);
+}
+
+function parseTriagem(wb) {
+  triagemRows = [];
+  alerts      = [];
+  encText     = '';
+  const ws = wb.Sheets['Triagem'];
+  if (!ws) return;
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null });
+
+  let inAlerts = false, inEnc = false;
+  for (let i = 2; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.every(c => c === null)) continue;
+    const first = String(r[0] || '').trim();
+
+    // Section markers
+    if (first.includes('ALERTAS')) { inAlerts = true; inEnc = false; continue; }
+    if (first.includes('ENCAMINHAMENTO')) { inAlerts = false; inEnc = true; continue; }
+
+    if (inAlerts) { if (first) alerts.push(first); continue; }
+    if (inEnc)    { if (first) encText += first + ' '; continue; }
+
+    // Data row
+    if (typeof r[0] === 'number') {
+      triagemRows.push({
+        num   : r[0],
+        cliente: r[1] || '',
+        dept  : r[2] || '',
+        cat   : r[3] || '',
+        sub   : r[4] || '',
+        func  : r[5] || '',
+        prazo : r[6] || '',
+        prio  : r[7] || '',
+        dados : r[8] || '',
+        pend  : r[9] || '',
+        dom   : r[10]|| '',
+      });
+    }
+  }
+}
+
+function parseResumo(wb) {
+  resumoData = { total:0, byDept:{}, byPrio:{}, dataHora:'' };
+  const ws = wb.Sheets['Resumo'];
+  if (!ws) return;
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null });
+
+  let mode = null;
+  for (const r of rows) {
+    if (!r || r.every(c => c === null)) continue;
+    const k = String(r[0] || '').trim();
+    const v = r[1];
+
+    if (k.startsWith('Data/hora')) { resumoData.dataHora = k.replace('Data/hora geração: ','').trim(); continue; }
+    if (k === 'Total de demandas:') { resumoData.total = v; continue; }
+    if (k === 'Por Departamento') { mode = 'dept'; continue; }
+    if (k === 'Por Prioridade')   { mode = 'prio'; continue; }
+    if (k === 'Quantidade')       { continue; }
+
+    if (mode === 'dept' && k && typeof v === 'number') resumoData.byDept[k] = v;
+    if (mode === 'prio' && k && typeof v === 'number') resumoData.byPrio[k] = v;
+  }
+}
+
+function parseTriagemCompleta(wb) {
+  conversations = {};
+  const wsName = wb.SheetNames.find(n => n.toLowerCase().includes('completa'));
+  if (!wsName) return;
+  const ws = wb.Sheets[wsName];
+  const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:null });
+
+  let curKey = null;
+  let curAba = '';
+
+  for (const r of rows) {
+    const line = String(r[0] || '').trim();
+    if (!line) continue;
+
+    // CONTATO line
+    const mContact = line.match(/CONTATO\s*:\s*(.+)/i);
+    if (mContact) {
+      const raw = mContact[1];
+      const nameRaw = raw.split(/\s*[|(+]/)[0].trim();
+      curKey = normName(nameRaw);
+      if (!conversations[curKey]) conversations[curKey] = { raw: nameRaw, aba: '', msgs: [] };
+      continue;
+    }
+
+    // ABA line
+    const mAba = line.match(/ABA\s*:\s*(.+)/i);
+    if (mAba && curKey) {
+      conversations[curKey].aba = mAba[1].trim();
+      curAba = mAba[1].trim();
+      continue;
+    }
+
+    if (!curKey) continue;
+
+    // Separators / section headers — reset
+    if (/^[-=★]+$/.test(line.replace(/\s/g,''))) continue;
+    if (/^(PENDENTES|EM ATENDIMENTO|DIA:|Capturado em:|GESTTA|Última atualização|INSTRUÇÕES|Mantenha|============)/i.test(line)) { curKey = null; continue; }
+    if (line === '(nenhuma mensagem no período)') {
+      conversations[normName(conversations[curKey]?.raw || curKey)]?.msgs.push({ type:'system', time:'', text:'(sem mensagens no período)' });
+      continue;
+    }
+
+    // Message line: "  DD/MM/YYYY - HH:MM  [>>>] [CLIENTE|ATENDENTE]  text"
+    const mMsg = line.match(/^(\d{2}\/\d{2}\/\d{4})\s*-\s*(\d{2}:\d{2})\s*(>>>)?\s*\[(CLIENTE|ATENDENTE)\]\s*(.*)/i);
+    if (mMsg) {
+      const [, date, time, arrow, role, text] = mMsg;
+      conversations[curKey].msgs.push({
+        type: role.toLowerCase(),
+        time: `${date} ${time}`,
+        text: text.trim(),
+        continued: false,
+      });
+    } else if (curKey && conversations[curKey].msgs.length > 0) {
+      // Continuation line — append to last message
+      const last = conversations[curKey].msgs[conversations[curKey].msgs.length - 1];
+      if (last && last.type !== 'system') {
+        last.text += '\n' + line;
+        last.continued = true;
+      }
+    }
+  }
+}
+
+function normName(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+// ── Match triagem row to conversation ──────────────────────────────────────
+function findConv(clienteStr) {
+  // "Brenna Costa (Lumen)" → "brenna costa"
+  const base = normName(clienteStr.split('(')[0].trim());
+  // Try exact
+  if (conversations[base]) return conversations[base];
+  // Try starts-with or includes
+  for (const [k, v] of Object.entries(conversations)) {
+    if (k.startsWith(base) || base.startsWith(k) || k.includes(base) || base.includes(k)) return v;
+  }
+  // Try first two words
+  const words = base.split(' ').slice(0,2).join(' ');
+  for (const [k, v] of Object.entries(conversations)) {
+    if (k.includes(words)) return v;
+  }
+  return null;
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  document.getElementById('metaDate').textContent = resumoData.dataHora || '—';
+  renderSummary();
+  renderCharts();
+  renderAlerts();
+  renderTable();
+}
+
+function renderSummary() {
+  const grid = document.getElementById('summaryGrid');
+  const prioMap = resumoData.byPrio || {};
+  const cards = [
+    { cls:'total', val: resumoData.total || triagemRows.length, lbl:'Total de Demandas' },
+    { cls:'alta',  val: prioMap['Alta']  || 0, lbl:'Prioridade Alta' },
+    { cls:'media', val: prioMap['Média'] || 0, lbl:'Prioridade Média' },
+    { cls:'baixa', val: prioMap['Baixa'] || 0, lbl:'Prioridade Baixa' },
+    ...Object.entries(resumoData.byDept || {}).map(([d,q]) => ({ cls:'dept', val:q, lbl:d })),
+  ];
+  grid.innerHTML = cards.map(c => `
+    <div class="sum-card ${c.cls}">
+      <div class="val">${c.val}</div>
+      <div class="lbl">${escHtml(c.lbl)}</div>
+    </div>`).join('');
+}
+
+function renderCharts() {
+  const row = document.getElementById('chartsRow');
+  const maxD = Math.max(...Object.values(resumoData.byDept || {}), 1);
+  const maxP = Math.max(...Object.values(resumoData.byPrio || {}), 1);
+
+  const deptColors = { 'DP':'#7C3AED','Tributário':'#059669','Fiscal':'#D97706','Contábil':'#0369A1' };
+  const prioColors = { 'Alta':'#E74C3C','Média':'#E67E22','Baixa':'#2980B9' };
+
+  const deptBars = Object.entries(resumoData.byDept || {}).map(([k,v]) => `
+    <div class="bar-row">
+      <span class="bar-label">${escHtml(k)}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${(v/maxD*100).toFixed(0)}%;background:${deptColors[k]||'#8B3A3A'}"></div></div>
+      <span class="bar-qty">${v}</span>
+    </div>`).join('');
+
+  const prioBars = Object.entries(resumoData.byPrio || {}).map(([k,v]) => `
+    <div class="bar-row">
+      <span class="bar-label">${escHtml(k)}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${(v/maxP*100).toFixed(0)}%;background:${prioColors[k]||'#8B3A3A'}"></div></div>
+      <span class="bar-qty">${v}</span>
+    </div>`).join('');
+
+  row.innerHTML = `
+    <div class="chart-card"><h3>📂 Por Departamento</h3>${deptBars || '<p style="color:var(--muted);font-size:13px">—</p>'}</div>
+    <div class="chart-card"><h3>🔴 Por Prioridade</h3>${prioBars || '<p style="color:var(--muted);font-size:13px">—</p>'}</div>`;
+}
+
+function renderAlerts() {
+  const card = document.getElementById('alertsCard');
+  const list = document.getElementById('alertsList');
+  if (alerts.length === 0) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  list.innerHTML = alerts.map(a => `<div class="alert-item">• ${escHtml(a)}</div>`).join('');
+
+  const enc = document.getElementById('encCard');
+  if (encText.trim()) {
+    enc.style.display = '';
+    document.getElementById('encText').textContent = encText.trim();
+  }
+}
+
+function renderTable() {
+  const body = document.getElementById('triBody');
+  document.getElementById('demandaCount').textContent = triagemRows.length;
+
+  body.innerHTML = triagemRows.map(r => {
+    const conv = findConv(r.cliente);
+    const convBtn = conv
+      ? `<button class="conv-link" onclick="openModal(${r.num - 1})">💬 Ver</button>`
+      : `<span class="conv-link no-conv" title="Sem conversa correspondente">—</span>`;
+
+    return `<tr>
+      <td class="td-num">${r.num}</td>
+      <td class="td-cliente">${escHtml(r.cliente)}</td>
+      <td class="td-dept">${deptBadge(r.dept)}</td>
+      <td class="td-cat">${escHtml(r.cat)}</td>
+      <td>${escHtml(r.sub)}</td>
+      <td>${escHtml(r.func)}</td>
+      <td class="td-prazo">${escHtml(r.prazo)}</td>
+      <td>${prioBadge(r.prio)}</td>
+      <td class="td-pend">${escHtml(r.pend)}</td>
+      <td class="td-conv">${convBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────
+function openModal(idx) {
+  const row  = triagemRows[idx];
+  const conv = findConv(row.cliente);
+
+  document.getElementById('modalTitle').textContent = row.cliente;
+  document.getElementById('modalSub').textContent   = conv
+    ? `${conv.aba} · ${conv.msgs.filter(m=>m.type!=='system').length} mensagem(ns)`
+    : 'Sem conversa encontrada';
+
+  const body = document.getElementById('modalBody');
+  if (!conv || conv.msgs.length === 0) {
+    body.innerHTML = '<p class="no-msgs">Nenhuma mensagem encontrada para este contato.</p>';
+  } else {
+    let lastDay = '';
+    body.innerHTML = conv.msgs.map(m => {
+      let html = '';
+      if (m.type === 'system') {
+        return `<div class="msg-row system"><div class="bubble system">${escHtml(m.text)}</div></div>`;
+      }
+      const day = m.time.split(' ')[0] || '';
+      if (day && day !== lastDay) {
+        html += `<div class="conv-day"><span>${day}</span></div>`;
+        lastDay = day;
+      }
+      const timeOnly = m.time.split(' ')[1] || m.time;
+      html += `<div class="msg-row ${m.type}">
+        <div class="bubble ${m.type}">
+          ${escHtml(m.text)}
+          <div class="meta">${m.type === 'cliente' ? '👤 Cliente' : '🎧 Atendente'} · ${timeOnly}</div>
+        </div>
+      </div>`;
+      return html;
+    }).join('');
+  }
+
+  // Scroll to bottom
+  setTimeout(() => { body.scrollTop = body.scrollHeight; }, 50);
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModalBtn();
+}
+function closeModalBtn() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function prioBadge(p) {
+  const cls = p === 'Alta' ? 'badge-alta' : p === 'Média' ? 'badge-media' : 'badge-baixa';
+  return `<span class="badge ${cls}">${escHtml(p)}</span>`;
+}
+function deptBadge(d) {
+  const cls = d === 'DP' ? 'badge-dept-dp'
+    : d === 'Tributário' ? 'badge-dept-trib'
+    : d === 'Fiscal'     ? 'badge-dept-fiscal'
+    : d === 'Contábil'   ? 'badge-dept-contabil'
+    : '';
+  return `<span class="badge ${cls}">${escHtml(d)}</span>`;
+}
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function toast(msg, type='') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+// ── Toast on success alias ─────────────────────────────────────────────────
+function toast(msg, type='') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+</script>
+</body>
+</html>

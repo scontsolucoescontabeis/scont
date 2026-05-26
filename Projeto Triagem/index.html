@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Triagem de Atendimentos — SCONT</title>
+  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico" />
+  <link rel="stylesheet" href="../shared.css">
+  <script src="../supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../portal-auth-guard.js"></script>
+  <style>
+    :root {
+      --sidebar-w: 220px;
+    }
+
+    body {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      background: linear-gradient(135deg, #8B3A3A 0%, #2C3E50 100%);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 100;
+      box-shadow: 2px 0 12px rgba(0,0,0,.18);
+    }
+    .sidebar-brand {
+      padding: 20px 18px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.3;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: rgba(255,255,255,.6);
+      margin-top: 2px;
+    }
+    .sidebar-nav {
+      flex: 1;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      color: rgba(255,255,255,.75);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      text-align: left;
+      width: 100%;
+      transition: background .15s, color .15s;
+    }
+    .nav-item:hover { background: rgba(255,255,255,.12); color: #fff; }
+    .nav-item.active { background: rgba(255,255,255,.2); color: #fff; font-weight: 700; }
+    .nav-icon { font-size: 18px; width: 22px; text-align: center; }
+    .sidebar-footer {
+      padding: 14px 10px;
+      border-top: 1px solid rgba(255,255,255,.12);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .btn-portal {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.18);
+      color: rgba(255,255,255,.85);
+      font-size: 13px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-portal:hover { background: rgba(255,255,255,.2); }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: rgba(255,255,255,.55);
+    }
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+    }
+    .status-dot.ok { background: var(--success); }
+    .status-dot.pulse {
+      background: var(--warning);
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%      { opacity: .3; }
+    }
+
+    /* ── Main area ── */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Top header ── */
+    .app-header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: var(--shadow-sm);
+      flex-shrink: 0;
+    }
+    .header-page-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+      flex: 1;
+    }
+    .header-meta {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .btn-open {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .2s;
+    }
+    .btn-open:hover { background: var(--primary-hover); }
+    .btn-open:disabled { opacity: .5; cursor: default; }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(0,0,0,.15);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    .spinner.show { display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Page content ── */
+    .page-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+
+    /* ── Welcome screen ── */
+    .welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 70vh;
+      text-align: center;
+      gap: 16px;
+    }
+    .welcome-icon { font-size: 60px; }
+    .welcome-title { font-size: 22px; font-weight: 700; }
+    .welcome-sub { font-size: 14px; color: var(--muted); max-width: 420px; }
+    .welcome-path {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      font-size: 12px;
+      color: var(--text-light);
+      font-family: monospace;
+    }
+
+    /* ── Summary cards ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .sum-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-sm);
+      text-align: center;
+    }
+    .sum-card .val { font-size: 34px; font-weight: 800; line-height: 1; }
+    .sum-card .lbl { font-size: 12px; color: var(--muted); margin-top: 5px; }
+    .sum-card.total  .val { color: var(--primary); }
+    .sum-card.alta   .val { color: var(--danger); }
+    .sum-card.media  .val { color: var(--warning); }
+    .sum-card.baixa  .val { color: var(--info); }
+    .sum-card.dept   .val { color: var(--secondary); font-size: 28px; }
+
+    /* ── Charts ── */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 700px) { .charts-row { grid-template-columns: 1fr; } }
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      box-shadow: var(--shadow-sm);
+    }
+    .chart-card h3 { font-size: 14px; font-weight: 700; color: var(--secondary); margin-bottom: 14px; }
+    .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; }
+    .bar-row .bar-label { min-width: 100px; color: var(--text-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-row .bar-track { flex: 1; background: var(--bg); border-radius: 4px; height: 14px; }
+    .bar-row .bar-fill  { height: 14px; border-radius: 4px; transition: width .5s ease; }
+    .bar-row .bar-qty   { min-width: 24px; text-align: right; font-weight: 700; color: var(--text); }
+
+    /* ── Alerts & Enc cards ── */
+    .alerts-card {
+      background: #FFF8F0;
+      border: 1px solid #F5C97A;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+    }
+    .alerts-card h3 { font-size: 14px; font-weight: 700; color: #8B6914; margin-bottom: 10px; }
+    .alert-item {
+      font-size: 13px;
+      color: #6B4C14;
+      padding: 5px 0;
+      border-bottom: 1px dashed #F5C97A;
+      line-height: 1.5;
+    }
+    .alert-item:last-child { border-bottom: none; }
+    .enc-card {
+      background: #F0F8FF;
+      border: 1px solid #90CAF9;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #1565C0;
+      line-height: 1.7;
+    }
+    .enc-card h3 { font-weight: 700; margin-bottom: 8px; font-size: 14px; color: #0D47A1; }
+
+    /* ── Section header ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .section-header h2 { font-size: 15px; font-weight: 700; color: var(--secondary); }
+    .count-badge {
+      background: var(--primary);
+      color: #fff;
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* ── Table ── */
+    .table-wrap {
+      overflow-x: auto;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      background: linear-gradient(135deg, rgba(139,58,58,.07) 0%, rgba(44,62,80,.04) 100%);
+      color: var(--secondary);
+      font-weight: 700;
+      text-align: left;
+      padding: 11px 12px;
+      border-bottom: 2px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background .12s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #F2F4F8; }
+    tbody td { padding: 10px 12px; vertical-align: top; }
+    .td-num { color: var(--muted); font-weight: 700; text-align: center; width: 36px; }
+    .td-cliente { font-weight: 600; min-width: 160px; }
+    .td-pend { max-width: 220px; color: var(--text-light); }
+    .td-conv { text-align: center; white-space: nowrap; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      border-radius: 12px;
+      padding: 2px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge-alta   { background: #FDEDED; color: var(--danger); }
+    .badge-media  { background: #FFF3E0; color: var(--warning); }
+    .badge-baixa  { background: #E3F2FD; color: var(--info); }
+    .badge-dp     { background: #EDE7F6; color: #5E35B1; }
+    .badge-trib   { background: #E8F5E9; color: #2E7D32; }
+    .badge-fiscal { background: #FFF8E1; color: #F57F17; }
+    .badge-cont   { background: #E1F5FE; color: #01579B; }
+
+    /* ── Conv icon ── */
+    .conv-icon {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--primary);
+      font-weight: 600;
+    }
+    .conv-icon.none { color: var(--muted); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+      padding: 16px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 40px rgba(0,0,0,.25);
+      width: 100%;
+      max-width: 700px;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      transform: translateY(24px);
+      transition: transform .2s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .modal-avatar {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .modal-info { flex: 1; }
+    .modal-info h3 { font-size: 16px; font-weight: 700; }
+    .modal-info p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .modal-badges  { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+      padding: 2px 4px;
+      transition: color .15s;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+
+    /* ── Chat bubbles ── */
+    .conv-day { text-align: center; margin: 14px 0 6px; }
+    .conv-day span {
+      background: var(--border);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 10px;
+    }
+    .msg-row { display: flex; margin-bottom: 8px; }
+    .msg-row.cliente   { justify-content: flex-start; }
+    .msg-row.atendente { justify-content: flex-end; }
+    .msg-row.system    { justify-content: center; }
+    .bubble {
+      max-width: 78%;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .bubble.cliente {
+      background: #E3F2FD;
+      color: #1565C0;
+      border-bottom-left-radius: 4px;
+    }
+    .bubble.atendente {
+      background: #E8F5E9;
+      color: #2E7D32;
+      border-bottom-right-radius: 4px;
+    }
+    .bubble.system {
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 12px;
+      font-style: italic;
+      text-align: center;
+      border-radius: 8px;
+      max-width: 90%;
+    }
+    .bubble .meta {
+      font-size: 10px;
+      opacity: .65;
+      margin-top: 4px;
+    }
+    .msg-row.atendente .meta { text-align: right; }
+    .no-msgs {
+      color: var(--muted);
+      font-style: italic;
+      font-size: 13px;
+      text-align: center;
+      padding: 32px 0;
+    }
+
+    /* ── Toast ── */
+    #toastContainer {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      background: var(--secondary);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      box-shadow: var(--shadow-md);
+      animation: slideIn .25s ease;
+      max-width: 320px;
+    }
+    .toast.success { background: var(--success); }
+    .toast.error   { background: var(--danger); }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ── Filter bar ── */
+    .filter-bar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .filter-bar input,
+    .filter-bar select {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      background: var(--card);
+      color: var(--text);
+      outline: none;
+      transition: border .2s;
+    }
+    .filter-bar input:focus,
+    .filter-bar select:focus { border-color: var(--primary-light); }
+    .filter-bar input { flex: 1; min-width: 180px; }
+    .filter-bar select { min-width: 140px; }
+    .filter-clear {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-size: 13px;
+      color: var(--muted);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s, color .15s;
+    }
+    .filter-clear:hover { background: var(--bg); color: var(--text); }
+    .filter-results {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      align-self: center;
+    }
+    tbody tr.hidden { display: none; }
+
+    /* ── Responsive ── */
+    @media (max-width: 640px) {
+      .sidebar { width: 60px; }
+      .brand-title, .brand-sub, .nav-item span, .sidebar-footer .btn-portal span { display: none; }
+      .page-content { padding: 16px; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-title">🎯 Triagem</div>
+    <div class="brand-sub">SCONT · Gestta</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <button class="nav-item active" id="navDash" onclick="switchPage('dashboard')">
+      <span class="nav-icon">📊</span>
+      <span>Dashboard</span>
+    </button>
+    <button class="nav-item" id="navTri" onclick="switchPage('triagem')">
+      <span class="nav-icon">📋</span>
+      <span>Triagem</span>
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <button class="btn-portal" onclick="window.location.href='../portal.html'">
+      <span>🏠</span>
+      <span>Portal</span>
+    </button>
+    <div class="status-indicator">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Sem arquivo</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-page-title" id="pageTitle">Dashboard</div>
+    <span class="spinner" id="spinner"></span>
+    <span class="header-meta" id="headerMeta"></span>
+    <a class="btn-open" href="upload.html" title="Enviar nova planilha para o Supabase">
+      📤 Upload planilha
+    </a>
+  </header>
+
+  <!-- Page: Dashboard -->
+  <div class="page-content" id="pageDashboard">
+
+    <!-- Welcome -->
+    <div class="welcome" id="welcomeDash">
+      <div class="welcome-icon">📊</div>
+      <div class="welcome-title">Dashboard de Triagem</div>
+      <div class="welcome-sub">Nenhum dado encontrado. Faça o upload da planilha <strong>triagem_atendimento.xlsx</strong> para começar.</div>
+      <a class="btn-open" style="font-size:15px;padding:12px 28px" href="upload.html">📤 Ir para Upload</a>
+    </div>
+
+    <!-- Dashboard content -->
+    <div id="dashContent" style="display:none">
+      <div class="summary-grid" id="summaryGrid"></div>
+      <div class="charts-row" id="chartsRow"></div>
+      <div class="alerts-card" id="alertsCard" style="display:none">
+        <h3>⚠️ Alertas</h3>
+        <div id="alertsList"></div>
+      </div>
+      <div class="enc-card" id="encCard" style="display:none">
+        <h3>📌 Encaminhamento</h3>
+        <div id="encText"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page: Triagem -->
+  <div class="page-content" id="pageTriagem" style="display:none">
+
+    <!-- Welcome -->
+    <div class="welcome" id="welcomeTri">
+      <div class="welcome-icon">📋</div>
+      <div class="welcome-title">Demandas Triadas</div>
+      <div class="welcome-sub">Nenhum dado encontrado. Faça o upload da planilha para visualizar as demandas e conversas.</div>
+      <a class="btn-open" style="font-size:15px;padding:12px 28px" href="upload.html">📤 Ir para Upload</a>
+    </div>
+
+    <!-- Table content -->
+    <div id="triContent" style="display:none">
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <input type="text" id="fCliente" placeholder="🔍 Buscar cliente…" oninput="applyFilters()" />
+        <select id="fDept" onchange="applyFilters()">
+          <option value="">Todos os departamentos</option>
+        </select>
+        <select id="fPrio" onchange="applyFilters()">
+          <option value="">Todas as prioridades</option>
+          <option value="Alta">🔴 Alta</option>
+          <option value="Média">🟠 Média</option>
+          <option value="Baixa">🔵 Baixa</option>
+        </select>
+        <button class="filter-clear" onclick="clearFilters()">✕ Limpar</button>
+        <span class="filter-results" id="filterResults"></span>
+      </div>
+
+      <div class="section-header">
+        <h2>Demandas Triadas</h2>
+        <span class="count-badge" id="demandaCount">0</span>
+      </div>
+      <div class="table-wrap">
+        <table id="triTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cliente / Empresa</th>
+              <th>Depto</th>
+              <th>Categoria</th>
+              <th>Subtipo</th>
+              <th>Funcionário(s)</th>
+              <th>Prazo</th>
+              <th>Prioridade</th>
+              <th>Pendências</th>
+              <th>Conversa</th>
+            </tr>
+          </thead>
+          <tbody id="triBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.main -->
+
+<!-- ── Modal ── -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-avatar" id="modalAvatar"></div>
+      <div class="modal-info">
+        <h3 id="modalTitle">—</h3>
+        <p id="modalSub"></p>
+        <div class="modal-badges" id="modalBadges"></div>
+      </div>
+      <button class="modal-close" onclick="closeModalBtn()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<script>
+// ── Auth guard + Supabase client ──────────────────────────────────────────
+let _sb = null;
+(async () => {
+  const auth = await window.PortalAuthGuard.init(1);
+  if (!auth) return;
+  _sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  await loadFromSupabase();
+  scheduleAutoRefresh();
+})();
+
+// ── State ─────────────────────────────────────────────────────────────────
+let triagemRows   = [];
+let resumoData    = {};
+let conversations = {};
+let alerts        = [];
+let encTextStr    = '';
+let refreshTimer  = null;
+let currentPage   = 'dashboard';
+let lastLoaded    = null;
+
+const REFRESH_MS = 30_000;
+
+// ── Supabase load ─────────────────────────────────────────────────────────
+async function loadFromSupabase() {
+  if (!_sb) return;
+  showSpinner(true);
+  try {
+    const [rDemandas, rResumo, rConversas] = await Promise.all([
+      _sb.from('triagem_demandas').select('*').order('num'),
+      _sb.from('triagem_resumo').select('*').eq('id', 1).maybeSingle(),
+      _sb.from('triagem_conversas').select('contact_key, raw_name, aba, msgs'),
+    ]);
+
+    if (rDemandas.error) throw rDemandas.error;
+    if (rConversas.error) throw rConversas.error;
+
+    triagemRows = (rDemandas.data || []).map(r => ({
+      num    : r.num,
+      cliente: r.cliente || '',
+      dept   : r.dept    || '',
+      cat    : r.cat     || '',
+      sub    : r.sub     || '',
+      func   : r.func    || '',
+      prazo  : r.prazo   || '',
+      prio   : r.prio    || '',
+      dados  : r.dados   || '',
+      pend   : r.pend    || '',
+      dom    : r.dom     || '',
+    }));
+
+    const res = rResumo.data;
+    resumoData = {
+      total   : res?.total    || triagemRows.length,
+      byDept  : res?.by_dept  || {},
+      byPrio  : res?.by_prio  || {},
+      dataHora: res?.data_hora || '',
+    };
+    alerts     = res?.alerts   || [];
+    encTextStr = res?.enc_text || '';
+
+    conversations = {};
+    for (const c of (rConversas.data || [])) {
+      conversations[c.contact_key] = { raw: c.raw_name, aba: c.aba, msgs: c.msgs || [] };
+    }
+
+    lastLoaded = new Date();
+    document.getElementById('headerMeta').textContent =
+      'Atualizado: ' + lastLoaded.toLocaleTimeString('pt-BR');
+    setStatus('ok', res?.data_hora ? `Ref: ${res.data_hora}` : 'Dados carregados');
+    renderAll();
+  } catch (e) {
+    setStatus('', 'Erro ao carregar');
+    toast('Erro ao consultar Supabase: ' + e.message, 'error');
+  } finally {
+    showSpinner(false);
+  }
+}
+
+function scheduleAutoRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(async () => {
+    setStatus('pulse', 'Atualizando…');
+    await loadFromSupabase();
+  }, REFRESH_MS);
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────
+function switchPage(page) {
+  currentPage = page;
+  document.getElementById('pageDashboard').style.display = page === 'dashboard' ? '' : 'none';
+  document.getElementById('pageTriagem').style.display   = page === 'triagem'   ? '' : 'none';
+  document.getElementById('navDash').classList.toggle('active', page === 'dashboard');
+  document.getElementById('navTri').classList.toggle('active', page === 'triagem');
+  document.getElementById('pageTitle').textContent = page === 'dashboard' ? 'Dashboard' : 'Triagem de Demandas';
+}
+
+function normName(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function findConv(clienteStr) {
+  const base  = normName(clienteStr.split('(')[0].trim());
+  if (conversations[base]) return conversations[base];
+  for (const [k, v] of Object.entries(conversations)) {
+    if (k.startsWith(base) || base.startsWith(k) || k.includes(base) || base.includes(k)) return v;
+  }
+  const words = base.split(' ').slice(0, 2).join(' ');
+  for (const [k, v] of Object.entries(conversations)) {
+    if (k.includes(words)) return v;
+  }
+  return null;
+}
+
+// ── Render all ────────────────────────────────────────────────────────────
+function renderAll() {
+  const hasData = triagemRows.length > 0 || Object.keys(resumoData.byDept).length > 0;
+
+  // Show/hide welcomes
+  document.getElementById('welcomeDash').style.display = hasData ? 'none' : '';
+  document.getElementById('dashContent').style.display = hasData ? '' : 'none';
+  document.getElementById('welcomeTri').style.display  = hasData ? 'none' : '';
+  document.getElementById('triContent').style.display  = hasData ? '' : 'none';
+
+  if (!hasData) return;
+  renderSummary();
+  renderCharts();
+  renderAlerts();
+  renderTable();
+}
+
+function renderSummary() {
+  const grid    = document.getElementById('summaryGrid');
+  const prioMap = resumoData.byPrio || {};
+  const cards = [
+    { cls: 'total', val: resumoData.total || triagemRows.length, lbl: 'Total de Demandas' },
+    { cls: 'alta',  val: prioMap['Alta']  || 0, lbl: 'Prioridade Alta' },
+    { cls: 'media', val: prioMap['Média'] || 0, lbl: 'Prioridade Média' },
+    { cls: 'baixa', val: prioMap['Baixa'] || 0, lbl: 'Prioridade Baixa' },
+    ...Object.entries(resumoData.byDept || {}).map(([d, q]) => ({ cls: 'dept', val: q, lbl: d })),
+  ];
+  grid.innerHTML = cards.map(c => `
+    <div class="sum-card ${c.cls}">
+      <div class="val">${c.val}</div>
+      <div class="lbl">${esc(c.lbl)}</div>
+    </div>`).join('');
+}
+
+function renderCharts() {
+  const row  = document.getElementById('chartsRow');
+  const maxD = Math.max(...Object.values(resumoData.byDept || {}), 1);
+  const maxP = Math.max(...Object.values(resumoData.byPrio || {}), 1);
+
+  const deptColors = { 'DP': '#7C3AED', 'Tributário': '#059669', 'Fiscal': '#D97706', 'Contábil': '#0369A1' };
+  const prioColors = { 'Alta': '#E74C3C', 'Média': '#E67E22', 'Baixa': '#2980B9' };
+
+  const deptBars = Object.entries(resumoData.byDept || {}).map(([k, v]) => `
+    <div class="bar-row">
+      <span class="bar-label">${esc(k)}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${(v/maxD*100).toFixed(0)}%;background:${deptColors[k]||'#8B3A3A'}"></div></div>
+      <span class="bar-qty">${v}</span>
+    </div>`).join('');
+
+  const prioBars = Object.entries(resumoData.byPrio || {}).map(([k, v]) => `
+    <div class="bar-row">
+      <span class="bar-label">${esc(k)}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${(v/maxP*100).toFixed(0)}%;background:${prioColors[k]||'#8B3A3A'}"></div></div>
+      <span class="bar-qty">${v}</span>
+    </div>`).join('');
+
+  row.innerHTML = `
+    <div class="chart-card"><h3>📂 Por Departamento</h3>${deptBars || '<p style="color:var(--muted);font-size:13px">Sem dados</p>'}</div>
+    <div class="chart-card"><h3>🔴 Por Prioridade</h3>${prioBars || '<p style="color:var(--muted);font-size:13px">Sem dados</p>'}</div>`;
+}
+
+function renderAlerts() {
+  const card = document.getElementById('alertsCard');
+  if (alerts.length === 0) { card.style.display = 'none'; }
+  else {
+    card.style.display = '';
+    document.getElementById('alertsList').innerHTML = alerts.map(a => `<div class="alert-item">• ${esc(a)}</div>`).join('');
+  }
+
+  const enc = document.getElementById('encCard');
+  if (encTextStr.trim()) {
+    enc.style.display = '';
+    document.getElementById('encText').textContent = encTextStr.trim();
+  } else {
+    enc.style.display = 'none';
+  }
+}
+
+function populateDeptFilter() {
+  const sel    = document.getElementById('fDept');
+  const cur    = sel.value;
+  const depts  = [...new Set(triagemRows.map(r => r.dept).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos os departamentos</option>' +
+    depts.map(d => `<option value="${esc(d)}" ${d === cur ? 'selected' : ''}>${esc(d)}</option>`).join('');
+}
+
+function applyFilters() {
+  const qCliente = document.getElementById('fCliente').value.toLowerCase().trim();
+  const qDept    = document.getElementById('fDept').value;
+  const qPrio    = document.getElementById('fPrio').value;
+
+  const rows = document.querySelectorAll('#triBody tr');
+  let visible = 0;
+
+  triagemRows.forEach((r, idx) => {
+    const tr = rows[idx];
+    if (!tr) return;
+    const matchCliente = !qCliente || r.cliente.toLowerCase().includes(qCliente);
+    const matchDept    = !qDept    || r.dept === qDept;
+    const matchPrio    = !qPrio    || r.prio === qPrio;
+    const show = matchCliente && matchDept && matchPrio;
+    tr.classList.toggle('hidden', !show);
+    if (show) visible++;
+  });
+
+  const total = triagemRows.length;
+  const el    = document.getElementById('filterResults');
+  el.textContent = visible < total ? `${visible} de ${total} demandas` : '';
+}
+
+function clearFilters() {
+  document.getElementById('fCliente').value = '';
+  document.getElementById('fDept').value    = '';
+  document.getElementById('fPrio').value    = '';
+  applyFilters();
+}
+
+function renderTable() {
+  const body = document.getElementById('triBody');
+  document.getElementById('demandaCount').textContent = triagemRows.length;
+
+  populateDeptFilter();
+
+  body.innerHTML = triagemRows.map((r, idx) => {
+    const conv    = findConv(r.cliente);
+    const convCell = conv
+      ? `<span class="conv-icon">💬 ${conv.msgs.filter(m => m.type !== 'system').length} msg</span>`
+      : `<span class="conv-icon none">—</span>`;
+
+    return `<tr onclick="openModal(${idx})" title="Clique para ver a conversa">
+      <td class="td-num">${r.num}</td>
+      <td class="td-cliente">${esc(r.cliente)}</td>
+      <td>${deptBadge(r.dept)}</td>
+      <td>${esc(r.cat)}</td>
+      <td>${esc(r.sub)}</td>
+      <td>${esc(r.func)}</td>
+      <td style="white-space:nowrap">${esc(r.prazo)}</td>
+      <td>${prioBadge(r.prio)}</td>
+      <td class="td-pend">${esc(r.pend)}</td>
+      <td class="td-conv">${convCell}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────
+function openModal(idx) {
+  const row  = triagemRows[idx];
+  const conv = findConv(row.cliente);
+
+  // Avatar initials
+  const initials = row.cliente.split(/\s+/).map(w => w[0] || '').join('').slice(0, 2).toUpperCase();
+  document.getElementById('modalAvatar').textContent = initials;
+
+  document.getElementById('modalTitle').textContent = row.cliente;
+  document.getElementById('modalSub').textContent   = conv
+    ? `${conv.aba || 'Triagem Completa'} · ${conv.msgs.filter(m => m.type !== 'system').length} mensagem(ns)`
+    : 'Sem conversa encontrada nesta planilha';
+
+  // Badges
+  document.getElementById('modalBadges').innerHTML =
+    deptBadge(row.dept) + ' ' + prioBadge(row.prio) +
+    (row.cat  ? ` <span class="badge" style="background:#F3F4F6;color:#374151">${esc(row.cat)}</span>` : '') +
+    (row.prazo ? ` <span class="badge" style="background:#F3F4F6;color:#374151">📅 ${esc(row.prazo)}</span>` : '');
+
+  const body = document.getElementById('modalBody');
+
+  if (!conv || conv.msgs.length === 0) {
+    body.innerHTML = `
+      <p class="no-msgs">Nenhuma mensagem encontrada para <strong>${esc(row.cliente)}</strong>.<br>
+      Verifique se o nome na planilha corresponde ao contato na aba "Triagem Completa".</p>`;
+  } else {
+    let lastDay = '';
+    body.innerHTML = conv.msgs.map(m => {
+      if (m.type === 'system') {
+        return `<div class="msg-row system"><div class="bubble system">${esc(m.text)}</div></div>`;
+      }
+      const day      = m.time.split(' ')[0] || '';
+      const timeOnly = m.time.split(' ')[1] || m.time;
+      let   html     = '';
+      if (day && day !== lastDay) {
+        html    += `<div class="conv-day"><span>${day}</span></div>`;
+        lastDay  = day;
+      }
+      html += `<div class="msg-row ${m.type}">
+        <div class="bubble ${m.type}">
+          ${esc(m.text)}
+          <div class="meta">${m.type === 'cliente' ? '👤 Cliente' : '🎧 Atendente'} · ${timeOnly}</div>
+        </div>
+      </div>`;
+      return html;
+    }).join('');
+  }
+
+  setTimeout(() => { body.scrollTop = body.scrollHeight; }, 60);
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModalBtn();
+}
+function closeModalBtn() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalBtn(); });
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function prioBadge(p) {
+  const cls = p === 'Alta' ? 'badge-alta' : p === 'Média' ? 'badge-media' : 'badge-baixa';
+  return `<span class="badge ${cls}">${esc(p)}</span>`;
+}
+function deptBadge(d) {
+  const cls = d === 'DP'          ? 'badge-dp'
+            : d === 'Tributário'  ? 'badge-trib'
+            : d === 'Fiscal'      ? 'badge-fiscal'
+            : d === 'Contábil'    ? 'badge-cont'
+            : '';
+  return `<span class="badge ${cls}">${esc(d)}</span>`;
+}
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function setStatus(state, text) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot' + (state ? ' ' + state : '');
+  document.getElementById('statusText').textContent = text.length > 22 ? text.slice(0, 20) + '…' : text;
+}
+function showSpinner(on) {
+  document.getElementById('spinner').classList.toggle('show', on);
+}
+function toast(msg, type = '') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 4500);
+}
+</script>
+</body>
+</html>
