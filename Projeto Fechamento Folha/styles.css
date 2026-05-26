@@ -1,3 +1,5 @@
+@import url('../shared.css');
+
 /* ============================================
    SCONT – FECHAMENTO FOLHA DE PAGAMENTO
    Sidebar estático · Identidade Portal SCONT
@@ -454,6 +456,18 @@ tbody tr.total-row { background: #f9f0f0; font-weight: 700; color: var(--primary
 .config-table td { padding: 10px 12px; border-bottom: 1px solid #EEE; }
 .config-table tbody tr:hover { background: #FFF5F5; }
 .config-empty { text-align: center; color: var(--text-secondary); padding: 24px; font-size: 13px; }
+
+/* Select de edição de tipo no relatório */
+.tipo-select {
+    font-size: 11px;
+    padding: 2px 6px;
+    border: 1px solid #D0D0D0;
+    border-radius: 4px;
+    background: #fff;
+    color: var(--text-primary, #2C3E50);
+    cursor: pointer;
+}
+.tipo-select:hover { border-color: var(--primary-color, #8B3A3A); }
 
 /* Inline register form no relatório */
 .inline-register-form {

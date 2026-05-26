@@ -1,3 +1,5 @@
+@import url('../shared.css');
+
 /* ===== RESET E VARIÁVEIS ===== */
 * {
     margin: 0;
@@ -449,6 +451,16 @@ html, body {
 
 .btn-danger:hover {
     background: #b02a37;
+    transform: translateY(-2px);
+}
+
+.btn-success {
+    background: #198754;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #146c43;
     transform: translateY(-2px);
 }
 
