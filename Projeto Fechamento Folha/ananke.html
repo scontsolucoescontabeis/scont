@@ -3,13 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quadrante – Fechamento Folha – SCONT</title>
+    <title>Anankê – Fechamento Folha – SCONT</title>
     <link rel="stylesheet" href="styles.css">
     <script src="../supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../portal-auth-guard.js"></script>
     <!-- SheetJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1B4F8A;
+            --primary-dark: #143A6B;
+            --background-color: #EEF4FB;
+        }
+    </style>
 </head>
 <body>
 
@@ -22,7 +29,7 @@
     <div class="sidebar-brand">
         <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
         <h2>Fechamento Folha</h2>
-        <p>Quadrante Etiquetas · 453</p>
+        <p>Anankê · 293</p>
     </div>
 
     <nav class="sidebar-nav">
@@ -78,8 +85,8 @@
 
     <div class="sidebar-footer">
         <div class="sidebar-footer-info">
-            <strong>Código 453</strong>
-            Quadrante Etiquetas
+            <strong>293</strong>
+            Anankê
         </div>
     </div>
 </aside>
@@ -90,8 +97,8 @@
     <!-- PAGE HEADER -->
     <div class="page-header">
         <div>
-            <h1>Fechamento Folha · Quadrante Etiquetas</h1>
-            <div class="page-header-sub" id="headerSubtitle">Código 453 · Upload e processamento da planilha</div>
+            <h1>Fechamento Folha · Anankê</h1>
+            <div class="page-header-sub" id="headerSubtitle">Anankê · 293 · Upload e processamento da planilha</div>
         </div>
     </div>
 
@@ -100,12 +107,12 @@
     <div class="container">
 
         <!-- PAINEL: ENVIOS DO FORMULÁRIO -->
-        <div class="step-card" id="painelEnvios" style="border-left-color:#27AE60;">
-            <div class="step-title" style="color:#27AE60;">
+        <div class="step-card" id="painelEnvios" style="border-left-color:#1B4F8A;">
+            <div class="step-title" style="color:#1B4F8A;">
                 <span style="font-size:18px;">📋</span>
                 Processamentos
                 <button onclick="carregarEnvios()" style="margin-left:auto;font-size:12px;padding:5px 12px;border:1px solid var(--border-color);border-radius:6px;background:#fff;cursor:pointer;color:var(--text-primary);">↻ Atualizar</button>
-                <a href="formulario_quadrante.html" class="btn btn-primary btn-small" style="text-decoration:none;margin-left:8px;">✏ Abrir Formulário</a>
+                <a href="formulario_ananke.html" class="btn btn-primary btn-small" style="text-decoration:none;margin-left:8px;">✏ Abrir Formulário</a>
             </div>
             <div id="listaEnvios">
                 <div style="color:var(--text-secondary);font-size:13px;padding:10px 0;">Carregando envios...</div>
@@ -134,7 +141,7 @@
                     Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
                 </div>
                 <div class="upload-text" style="font-size:11px; margin-top:4px;">
-                    Formato: .xlsx – Padrão Quadrante (Folha de Pgto Etiquetas)
+                    Formato: .xlsx – Padrão Anankê (MATRIZ 36.756.427/0001-61)
                 </div>
                 <div class="upload-filename" id="filenameFolha"></div>
                 <input type="file" id="inputFolha" accept=".xlsx,.xls">
@@ -426,6 +433,6 @@
     </div>
 </div>
 
-<script src="quadrante.js"></script>
+<script src="ananke.js"></script>
 </body>
 </html>

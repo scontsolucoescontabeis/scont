@@ -1,0 +1,19 @@
+﻿Abas: ['Triagem', 'Resumo', 'Triagem Completa (texto)']
+=== Triagem rows=27 cols=11 ===
+('Triagem de Atendimento — Herbert | 23/05/2026 22:57', None, None, None, None, None, None, None, None, None, None)
+('#', 'Cliente/Empresa', 'Departamento', 'Categoria', 'Subtipo', 'Funcionário(s)', 'Prazo / Competência', 'Prioridade', 'Dados Relevantes', 'Pendências', 'Domínio (módulo/rotina)')
+(1, 'Brenna Costa (Lumen)', 'DP', 'Afastamentos', 'Atestado até 15 dias', 'Lorena e Thay', '21/05/2026', 'Média', 'Exame médico documentado', 'Confirmação do afastamento', 'eSocial S-2230')
+(2, 'Hamana Karla (R2 MED / VETMED)', 'Tributário', 'Consultoria', 'Dúvida sobre legislação', '[Não informado]', '[Não informado]', 'Baixa', 'Confirmação: não obrigadas declarar IR (bens <R$800k)', 'CPF, fonte de renda, investimentos', 'Sistema de IR')
+
+=== Resumo rows=16 cols=2 ===
+('📋 Resumo da Triagem — Herbert', None)
+('Data/hora geração: 23/05/2026 22:57', None)
+(None, None)
+('Total de demandas:', 15)
+
+=== Triagem Completa (texto) rows=416 cols=1 ===
+('Resposta completa do agente Herbert (texto original)',)
+('GESTTA MESSENGER — HISTÓRICO COMPLETO DE CONVERSAS',)
+('Última atualização: 23/05/2026, 10:22:46',)
+('============================================================',)
+

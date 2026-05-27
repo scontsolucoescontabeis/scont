@@ -1,0 +1,438 @@
+// ============================================================
+// GESTTA MESSENGER — Histórico Indefinido (v7 - ACUMULADO)
+// A cada ciclo: lê mensagens dos ÚLTIMOS 3 DIAS de todas as
+// conversas (Pendentes + Em Atendimento) e gera UM ÚNICO
+// arquivo acumulado com TODO O HISTÓRICO preservado.
+// Nome fixo: gestta_historico.txt (substitui o anterior)
+// Cole no console (F12) e pressione Enter.
+// ============================================================
+
+(function () {
+
+  const INTERVALO_MINUTOS  = 5;  // Altere aqui se quiser outro intervalo
+  const DIAS_HISTORICO     = 3;  // Quantos dias anteriores capturar
+  const NOME_ARQUIVO       = 'gestta_historico.txt'; // Nome FIXO — 1 único arquivo
+  const STORAGE_HISTORICO  = 'gestta_historico_dias';
+
+  // ---------- Utilitários ----------
+  function loadJSON(key, def) {
+    try { return JSON.parse(localStorage.getItem(key) || 'null') || def; }
+    catch { return def; }
+  }
+  function saveJSON(key, val) {
+    localStorage.setItem(key, JSON.stringify(val));
+  }
+  function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ---------- Gerar lista de datas dos últimos N dias (formato pt-BR) ----------
+  function gerarDatas(quantidadeDias) {
+    const datas = [];
+    for (let i = 0; i < quantidadeDias; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      datas.push(d.toLocaleDateString('pt-BR'));
+    }
+    return datas; // [hoje, ontem, anteontem]
+  }
+
+  // ---------- Aguardar hashchange com timeout ----------
+  function aguardarHashChange(timeout = 3500) {
+    return new Promise(resolve => {
+      let done = false;
+      const handler = () => {
+        if (!done) { done = true; resolve(window.location.hash); }
+        window.removeEventListener('hashchange', handler);
+      };
+      window.addEventListener('hashchange', handler);
+      setTimeout(() => {
+        window.removeEventListener('hashchange', handler);
+        if (!done) { done = true; resolve(window.location.hash); }
+      }, timeout);
+    });
+  }
+
+  // ---------- Clicar em aba e aguardar carregamento ----------
+  async function clicarAba(dataQe) {
+    const aba = document.querySelector(`[data-qe-id="${dataQe}"]`);
+    if (!aba) return;
+    aba.click();
+    await wait(1500);
+  }
+
+  // ---------- Remover filtro de atendente (Em Atendimento) ----------
+  async function limparFiltroAtendente() {
+    const limpar = Array.from(document.querySelectorAll('div, span'))
+      .find(el => el.innerText?.trim() === 'Limpar Seleção');
+    if (limpar) {
+      limpar.click();
+      await wait(1200);
+      console.log('[Gestta]   🧹 Filtro de atendente removido');
+    }
+  }
+
+  // ---------- Scroll da lista lateral para carregar todos os itens ----------
+  async function scrollLista() {
+    const allDivs = document.querySelectorAll('div');
+    let container = null;
+    for (let d of allDivs) {
+      if (d.scrollHeight > d.clientHeight + 50 &&
+          d.querySelectorAll('[data-qe-id^="conversation-item-"]').length > 0) {
+        container = d;
+        break;
+      }
+    }
+    if (!container) return;
+    let prev = -1;
+    for (let i = 0; i < 40; i++) {
+      container.scrollTop += 500;
+      await wait(250);
+      if (Math.abs(container.scrollTop - prev) < 5) break;
+      prev = container.scrollTop;
+    }
+    container.scrollTop = 0;
+    await wait(400);
+  }
+
+  // ---------- Abrir conversa e aguardar chat carregar ----------
+  async function abrirConversa(item) {
+    const jaAtivo = (item.className || '').toString().includes('iuhGVl');
+    if (jaAtivo) {
+      await wait(600);
+      return;
+    }
+    const innerDiv = item.querySelector('.sc-lkCrJH') || item.children[1] || item.children[0];
+    if (innerDiv) innerDiv.click();
+    await aguardarHashChange(3500);
+    await wait(1000);
+  }
+
+  // ---------- Localizar container do chat ----------
+  function encontrarChat() {
+    // Tenta seletor fixo primeiro
+    const fixo = document.querySelector('.sc-fuNSHy');
+    if (fixo && fixo.querySelectorAll('[name="bubble-container"]').length > 0) return fixo;
+
+    // Busca por qualquer div scrollável que contenha bubbles
+    const candidatos = [];
+    for (let d of document.querySelectorAll('div')) {
+      const bubbles = d.querySelectorAll('[name="bubble-container"]');
+      if (bubbles.length === 0) continue;
+      const style = getComputedStyle(d);
+      if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && d.scrollHeight > d.clientHeight) {
+        candidatos.push({ el: d, total: bubbles.length });
+      }
+    }
+    if (candidatos.length === 0) return null;
+    // Preferir o que tem mais bubbles (mais provável ser o container real)
+    candidatos.sort((a, b) => b.total - a.total);
+    return candidatos[0].el;
+  }
+
+  // ---------- Scroll do chat para carregar TODAS as mensagens ----------
+  async function scrollChatCompleto() {
+    const chat = encontrarChat();
+    if (!chat) {
+      console.warn('[Gestta] ⚠️  Container do chat não encontrado');
+      return;
+    }
+
+    const style = getComputedStyle(chat);
+    const isColumnReverse = style.flexDirection === 'column-reverse';
+
+    let prevCount = 0;
+    for (let i = 0; i < 40; i++) {
+      if (isColumnReverse) {
+        // column-reverse: valores negativos vão para mensagens antigas
+        chat.scrollTop = -999999;
+      } else {
+        // normal: scrollTop = 0 vai para o topo (mensagens antigas)
+        chat.scrollTop = 0;
+      }
+      await wait(700);
+
+      const count = chat.querySelectorAll('[name="bubble-container"]').length;
+      if (count === prevCount && i > 0) break; // estabilizou
+      prevCount = count;
+    }
+
+    // Aguardar renderização final
+    await wait(500);
+  }
+
+  // ---------- Extrair dataHora do bubble (múltiplos seletores) ----------
+  function extrairDataHora(bubble) {
+    // Tenta seletores conhecidos do Gestta para o timestamp
+    const seletores = [
+      '.sc-bJFmQb',
+      '[class*="MessageDate"]',
+      '[class*="message-date"]',
+      '[class*="timestamp"]',
+      '[class*="Timestamp"]',
+      'time',
+      '[class*="Time"]',
+      '[class*="time"]',
+    ];
+    for (const sel of seletores) {
+      const el = bubble.querySelector(sel);
+      const txt = el?.innerText?.trim();
+      if (txt && txt.length > 3) return txt;
+    }
+    // Busca qualquer texto que pareça uma data/hora dentro do bubble
+    for (const el of bubble.querySelectorAll('span, small, p')) {
+      const txt = el.innerText?.trim() || '';
+      if (/\d{2}\/\d{2}\/\d{4}/.test(txt) || /^\d{2}:\d{2}/.test(txt)) return txt;
+    }
+    return '';
+  }
+
+  // ---------- Extrair texto da mensagem (múltiplos seletores) ----------
+  function extrairTexto(bubble) {
+    // 1. Mensagem de texto com seletor fixo
+    const textEl = bubble.querySelector('[data-qe-id="text-message"]');
+    if (textEl) return textEl.innerText?.trim() || '';
+
+    // 2. Arquivo com seletor fixo
+    const fileEl = bubble.querySelector('[data-qe-id="file-message"]');
+    if (fileEl) {
+      const nome = fileEl.querySelector('[class*="jXlzyD"]')?.innerText?.trim()
+                || fileEl.querySelector('span')?.innerText?.trim()
+                || 'arquivo';
+      const tipo = fileEl.querySelector('[class*="hbCQjt"]')?.innerText?.trim() || '';
+      return `[Arquivo: ${nome}${tipo ? ' (' + tipo + ')' : ''}]`;
+    }
+
+    // 3. Busca por parágrafo ou span com conteúdo dentro do bubble
+    //    excluindo elementos de data/hora já extraídos
+    const candidatos = bubble.querySelectorAll('p, span');
+    for (const el of candidatos) {
+      const txt = el.innerText?.trim();
+      if (!txt || txt.length < 2) continue;
+      // Ignora se parece timestamp
+      if (/^\d{2}:\d{2}/.test(txt) || /^\d{2}\/\d{2}\/\d{4}/.test(txt)) continue;
+      // Ignora elementos sem texto próprio (só contêm filhos)
+      if (el.children.length > 0 && el.innerText === el.children[0]?.innerText) continue;
+      return txt;
+    }
+
+    // 4. Fallback: innerText completo do bubble sem timestamps
+    const raw = bubble.innerText?.trim().replace(/\n+/g, ' ') || '';
+    return raw;
+  }
+
+  // ---------- Extrair mensagens dos ÚLTIMOS N DIAS do chat aberto ----------
+  function extrairMensagensDias(datasValidas) {
+    const bubbles = document.querySelectorAll('[name="bubble-container"]');
+    const hoje = datasValidas[0]; // primeiro item = hoje
+    // Agrupa por dia: { 'DD/MM/YYYY': [...msgs] }
+    const porDia = {};
+
+    for (let b of bubbles) {
+      // Direção: atendente ou cliente
+      const innerDiv = b.querySelector('.sc-chKHoF');
+      const innerCls = (innerDiv?.className || b.className || '').toString();
+      const direcao  = innerCls.includes('xAHEz') ? 'ATENDENTE' : 'CLIENTE';
+
+      // Data/hora da mensagem
+      const dataHora = extrairDataHora(b);
+
+      // Identifica a qual data (DD/MM/YYYY) essa mensagem pertence
+      let diaMsg = datasValidas.find(d => dataHora.startsWith(d));
+
+      // Fallback: timestamp só com horário (ex: "14:30") → assume hoje
+      if (!diaMsg && /^\d{2}:\d{2}/.test(dataHora)) diaMsg = hoje;
+
+      if (!diaMsg) continue;
+
+      // Texto da mensagem
+      let texto = extrairTexto(b);
+      if (b.querySelector('p.sc-gnVZno') && !texto.startsWith('['))
+        texto = '[Encaminhada] ' + texto;
+
+      if (!texto) continue; // ignorar bubble sem texto identificável
+
+      if (!porDia[diaMsg]) porDia[diaMsg] = [];
+      porDia[diaMsg].push({ direcao, dataHora, texto: texto.substring(0, 500) });
+    }
+
+    // Ordenar da mais antiga para a mais recente dentro de cada dia
+    for (const dia of Object.keys(porDia)) {
+      porDia[dia].sort((a, b) => a.dataHora.localeCompare(b.dataHora));
+    }
+    return porDia;
+  }
+
+  // ---------- Formatar bloco de uma conversa para um dia específico ----------
+  function formatarConversaDia(nome, aba, msgs) {
+    const linha = '-'.repeat(58);
+    let txt = `\n${linha}\n`;
+    txt += `  CONTATO : ${nome}\n`;
+    txt += `  ABA     : ${aba}\n`;
+    txt += `${linha}\n`;
+    if (!msgs || msgs.length === 0) {
+      txt += '  (nenhuma mensagem no período)\n';
+    } else {
+      for (let m of msgs) {
+        const hora  = m.dataHora.split(' - ')[1] || m.dataHora;
+        const quem  = m.direcao === 'ATENDENTE' ? '>>> [ATENDENTE]' : '    [CLIENTE]  ';
+        txt += `  ${hora}  ${quem}  ${m.texto}\n`;
+      }
+    }
+    return txt;
+  }
+
+  // ---------- Processar todas as conversas de uma aba ----------
+  async function processarAba(dataQeAba, labelAba, datasValidas) {
+    // blocosNovos: { 'DD/MM/YYYY': string }
+    const blocosNovos = {};
+    for (const d of datasValidas) blocosNovos[d] = '';
+
+    await clicarAba(dataQeAba);
+    await wait(600);
+
+    if (dataQeAba === 'attendance-tab-ongoing') {
+      await limparFiltroAtendente();
+    }
+
+    await scrollLista();
+
+    const totalItens = document.querySelectorAll('[data-qe-id^="conversation-item-"]').length;
+    console.log(`[Gestta] 📋 ${labelAba}: ${totalItens} conversas encontradas`);
+
+    for (let i = 0; i < totalItens; i++) {
+      const itemsAgora = document.querySelectorAll('[data-qe-id^="conversation-item-"]');
+      const item = itemsAgora[i];
+      if (!item) continue;
+
+      const nomeEl = item.querySelector('span[title]');
+      const nome   = nomeEl
+        ? nomeEl.getAttribute('title')
+        : item.innerText?.split('\n')[0] || '?';
+
+      console.log(`[Gestta]   [${i + 1}/${totalItens}] ${nome.substring(0, 50)}`);
+
+      await abrirConversa(item);
+      await scrollChatCompleto();
+      await wait(400);
+
+      const msgsPorDia = extrairMensagensDias(datasValidas);
+
+      for (const dia of datasValidas) {
+        const msgs = msgsPorDia[dia] || [];
+        blocosNovos[dia] += formatarConversaDia(nome, labelAba, msgs);
+        if (msgs.length > 0) {
+          console.log(`[Gestta]     → ${dia}: ${msgs.length} mensagem(ns)`);
+        }
+      }
+
+      await clicarAba(dataQeAba);
+      await wait(600);
+    }
+
+    return blocosNovos; // { 'DD/MM/YYYY': texto_bloco }
+  }
+
+  // ---------- Mesclar captura atual com histórico salvo ----------
+  function mesclarHistorico(dadosNovos, datasCapturadas) {
+    const historico = loadJSON(STORAGE_HISTORICO, {});
+
+    // Para cada dia capturado agora, sobrescrever com snapshot mais recente
+    for (const dia of datasCapturadas) {
+      if (dadosNovos[dia] && dadosNovos[dia].trim()) {
+        historico[dia] = dadosNovos[dia];
+      } else if (!historico[dia]) {
+        historico[dia] = ''; // garante a chave existir mesmo sem msgs
+      }
+    }
+
+    saveJSON(STORAGE_HISTORICO, historico);
+    return historico;
+  }
+
+  // ---------- Gerar e baixar o arquivo (nome FIXO) ----------
+  function gerarArquivo(historico) {
+    const agora = new Date().toLocaleString('pt-BR');
+    let arquivo  = `GESTTA MESSENGER — HISTÓRICO COMPLETO DE CONVERSAS\n`;
+    arquivo     += `Última atualização: ${agora}\n`;
+    arquivo     += `${'='.repeat(60)}\n`;
+    arquivo     += `INSTRUÇÕES: Este arquivo é substituído a cada captura.\n`;
+    arquivo     += `Mantenha APENAS O ARQUIVO MAIS RECENTE na pasta captura_messenger.\n`;
+    arquivo     += `${'='.repeat(60)}\n`;
+
+    const diasOrdenados = Object.keys(historico).sort((a, b) => {
+      const [da, ma, aa] = a.split('/').map(Number);
+      const [db, mb, ab] = b.split('/').map(Number);
+      return new Date(aa, ma - 1, da) - new Date(ab, mb - 1, db);
+    });
+
+    for (const dia of diasOrdenados) {
+      arquivo += `\n${'='.repeat(60)}\n  DIA: ${dia}\n${'='.repeat(60)}\n`;
+      arquivo += historico[dia] || '  (sem registros)\n';
+    }
+
+    const blob = new Blob([arquivo], { type: 'text/plain;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = NOME_ARQUIVO; // sempre o mesmo nome
+    a.click();
+    URL.revokeObjectURL(url);
+    console.log(`[Gestta] ✅ Arquivo gerado: ${NOME_ARQUIVO} (mover para pasta captura_messenger se necessário)`);
+  }
+
+  // ---------- ROTINA PRINCIPAL ----------
+  async function capturar() {
+    const agora = new Date();
+    const datasValidas = gerarDatas(DIAS_HISTORICO); // [hoje, ontem, anteontem]
+    const hashOriginal = window.location.hash;
+
+    console.log(`\n[Gestta] 🔄 ===== CAPTURA INICIADA: ${agora.toLocaleString('pt-BR')} =====`);
+    console.log(`[Gestta] 📅 Capturando dias: ${datasValidas.join(' | ')}`);
+
+    // Acumular blocos por dia de ambas as abas
+    const acumuladoPorDia = {};
+    for (const d of datasValidas) acumuladoPorDia[d] = '';
+
+    // ── PENDENTES ──
+    const blocosPendentes = await processarAba('attendance-tab-pending', 'PENDENTES', datasValidas);
+    for (const dia of datasValidas) {
+      acumuladoPorDia[dia] += `\n${'★'.repeat(58)}\n  PENDENTES\n${'★'.repeat(58)}\n`;
+      acumuladoPorDia[dia] += blocosPendentes[dia] || '';
+    }
+
+    // ── EM ATENDIMENTO ──
+    const blocosAtendimento = await processarAba('attendance-tab-ongoing', 'EM ATENDIMENTO', datasValidas);
+    for (const dia of datasValidas) {
+      acumuladoPorDia[dia] += `\n${'★'.repeat(58)}\n  EM ATENDIMENTO\n${'★'.repeat(58)}\n`;
+      acumuladoPorDia[dia] += blocosAtendimento[dia] || '';
+    }
+
+    // Adicionar cabeçalho de captura por dia
+    for (const dia of datasValidas) {
+      acumuladoPorDia[dia] = `  Capturado em: ${agora.toLocaleString('pt-BR')}\n` + acumuladoPorDia[dia];
+    }
+
+    // Mesclar com histórico e gerar arquivo
+    const historico = mesclarHistorico(acumuladoPorDia, datasValidas);
+    gerarArquivo(historico);
+
+    // Restaurar visualização original
+    try {
+      if (hashOriginal && hashOriginal !== window.location.hash) {
+        window.location.hash = hashOriginal;
+      }
+    } catch (e) {}
+
+    console.log(`[Gestta] ✔️  Ciclo concluído. Próxima captura em ${INTERVALO_MINUTOS} min.\n`);
+  }
+
+  // ---------- INICIAR ----------
+  console.log(`[Gestta] 🚀 Script v4 iniciado! Intervalo: ${INTERVALO_MINUTOS} min.`);
+  console.log(`[Gestta] 📁 Arquivo gerado: ${NOME_ARQUIVO} (sempre o mesmo nome)`);
+  console.log('[Gestta] Para parar: clearInterval(window._gesttaTimer)');
+  console.log('[Gestta] Para limpar histórico: localStorage.removeItem("gestta_historico_dias")');
+
+  capturar(); // Executa imediatamente
+  const timer = setInterval(capturar, INTERVALO_MINUTOS * 60 * 1000);
+  window._gesttaTimer = timer;
+
+})();

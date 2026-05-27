@@ -1,0 +1,78 @@
+# Gestta Chat Extractor
+========================================
+
+## O que faz
+Extrai automaticamente as mensagens de todas as conversas das abas
+"Pendentes" e "Em Atendimento" do Gestta Messenger e salva em:
+
+  Desktop\atendimentos\atendimentos.txt
+
+O arquivo é INCREMENTAL: apenas mensagens NOVAS são adicionadas a cada
+execução. O histórico completo é mantido no mesmo arquivo.
+
+========================================
+## INSTALAÇÃO (apenas uma vez)
+
+1. Instale o Python:
+   https://www.python.org/downloads/
+   (marque a opção "Add Python to PATH" durante a instalação)
+
+2. Instale as dependências (abra o Prompt de Comando e execute):
+   pip install selenium webdriver-manager
+
+3. Copie o arquivo gestta_chat_extractor.py para:
+   C:\Users\SEU_USUARIO\Desktop\atendimentos\
+
+========================================
+## EXECUÇÃO MANUAL
+
+Abra o Prompt de Comando e execute:
+  python "%USERPROFILE%\Desktop\atendimentos\gestta_chat_extractor.py"
+
+Na primeira execução, se não estiver logado, o Chrome vai abrir e
+você precisará fazer login no Gestta manualmente. Depois pressione
+ENTER no terminal.
+
+========================================
+## AGENDAMENTO AUTOMÁTICO (a cada 5 minutos)
+
+1. Clique com botão direito em "agendar_gestta.bat"
+2. Selecione "Executar como administrador"
+3. Pronto! A extração rodará automaticamente a cada 5 minutos.
+
+Para cancelar o agendamento:
+  schtasks /delete /tn "GestaChatExtractor" /f
+
+========================================
+## FORMATO DO ARQUIVO DE SAÍDA
+
+Cada linha tem o formato:
+  [DATA - HORA] [NOME DA CONVERSA] REMETENTE: TEXTO DA MENSAGEM
+
+Exemplo:
+  [21/05/2026 - 15:04] [Scont Gestão Financeira] CLIENTE: Boa tarde@
+  [21/05/2026 - 15:05] [Scont Gestão Financeira] ATENDENTE (Lorena Castro): Olá!
+
+Eventos de sistema (transferência, conclusão) são ignorados.
+Arquivos/mídias aparecem como [Arquivo/Mídia].
+
+========================================
+## PERSONALIZAÇÃO
+
+Abra gestta_chat_extractor.py num editor de texto e ajuste:
+
+  PAGE_LOAD_WAIT = 2.5  # aumente se a internet for lenta
+  WAIT_TIMEOUT   = 15   # tempo máximo de espera por elemento
+
+Para rodar em segundo plano (sem abrir janela do Chrome),
+descomente a linha:
+  # opts.add_argument("--headless=new")
+
+========================================
+## RESOLUÇÃO DE PROBLEMAS
+
+- "Chrome não encontrado": Instale o Google Chrome
+- "Selenium não encontrado": Execute: pip install selenium webdriver-manager
+- "Login expirado": O Chrome abrirá para você logar manualmente
+- Seletores parados de funcionar: O site mudou. Verifique os seletores
+  CSS no arquivo .py (seção "Seletores CSS")

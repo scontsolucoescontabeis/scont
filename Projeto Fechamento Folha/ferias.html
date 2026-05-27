@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Programação de Férias – SCONT</title>
+<link rel="stylesheet" href="styles.css">
+<script src="../supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../portal-auth-guard.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root {
+    --primary-color: #2C6E49;
+    --primary-dark:  #1E4D33;
+    --background-color: #EEF7F1;
+    --theme-accent: #D5F0E0;
+}
+
+/* ── step indicator ── */
+.steps-bar {
+    display: flex;
+    align-items: center;
+    margin: 0 28px;
+    padding: 18px 0 0;
+}
+.step-node { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.step-circle {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+    border: 2px solid #D0D0D0; background: #fff; color: #AAAAAA;
+    transition: all .25s;
+}
+.step-circle.active { background: var(--primary-color); border-color: var(--primary-color); color: #fff; }
+.step-circle.done   { background: var(--primary-color); border-color: var(--primary-color); color: #fff; }
+.step-text { font-size: 12px; font-weight: 600; color: #AAAAAA; white-space: nowrap; transition: color .25s; }
+.step-text.active, .step-text.done { color: var(--primary-color); }
+.step-line { flex: 1; height: 2px; background: #D0D0D0; margin: 0 10px; transition: background .25s; min-width: 20px; }
+.step-line.done { background: var(--primary-color); }
+
+/* ── upload ── */
+.upload-area {
+    border: 2px dashed #D0D8E0; border-radius: 12px;
+    padding: 40px 24px; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s; background: #FAFAFA; display: block;
+}
+.upload-area:hover, .upload-area.drag-over { border-color: var(--primary-color); background: #F0FAF5; }
+.upload-area input[type=file] { display: none; }
+.upload-icon { font-size: 44px; margin-bottom: 10px; }
+.upload-label { font-size: 14px; color: #7F8C8D; line-height: 1.6; }
+.upload-filename {
+    margin-top: 12px; font-size: 13px; color: var(--primary-color);
+    font-weight: 600; background: var(--theme-accent);
+    border-radius: 6px; padding: 8px 14px; display: inline-block;
+}
+
+/* ── config grid ── */
+.config-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+@media (max-width: 760px) { .config-grid { grid-template-columns: 1fr; } }
+.config-section-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
+    color: var(--primary-color); margin-bottom: 10px;
+    border-bottom: 2px solid var(--theme-accent); padding-bottom: 6px;
+}
+
+/* ── col list ── */
+.col-list {
+    display: flex; flex-direction: column; gap: 5px;
+    max-height: 400px; overflow-y: auto; padding: 2px 2px 2px 0;
+}
+.col-item {
+    display: flex; align-items: center; gap: 7px; padding: 6px 9px;
+    background: #fff; border: 1px solid #E4E9EF; border-radius: 7px;
+    transition: box-shadow .12s, border-color .12s;
+}
+.col-item:hover { box-shadow: 0 1px 4px rgba(0,0,0,.08); border-color: #C8D4DF; }
+.col-item.hidden-col { opacity: .4; background: #F7F7F7; }
+.col-item input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; accent-color: var(--primary-color); }
+.col-orig { font-size: 10px; color: #B0B8C2; white-space: nowrap; flex-shrink: 0; font-family: monospace; }
+.col-label-input {
+    flex: 1; border: 1px solid #E4E9EF; border-radius: 5px;
+    padding: 3px 7px; font-size: 12px; background: transparent; transition: border-color .15s;
+}
+.col-label-input:focus { outline: none; border-color: var(--primary-color); background: #fff; }
+.col-arrows { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+.col-arrows button {
+    border: none; background: #EAEEF2; border-radius: 3px;
+    cursor: pointer; font-size: 9px; padding: 2px 5px; line-height: 1.2; color: #666;
+    transition: background .12s;
+}
+.col-arrows button:hover { background: var(--primary-color); color: #fff; }
+.col-arrows button:disabled { opacity: .25; cursor: default; }
+
+/* ── theme picker ── */
+.theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+.theme-card {
+    border: 2px solid #E4E9EF; border-radius: 8px; padding: 8px 5px;
+    cursor: pointer; text-align: center; transition: border-color .18s, transform .12s;
+}
+.theme-card:hover { transform: translateY(-1px); }
+.theme-card.selected { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(44,110,73,.2); }
+.theme-swatch { width: 100%; height: 22px; border-radius: 5px; margin-bottom: 5px; }
+.theme-card-label { font-size: 10px; font-weight: 600; color: #555; }
+
+/* ── header style ── */
+.hs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hs-option {
+    border: 2px solid #E4E9EF; border-radius: 8px; padding: 10px;
+    cursor: pointer; transition: border-color .18s;
+}
+.hs-option.selected { border-color: var(--primary-color); background: #F5FCF8; }
+.hs-option-title { font-size: 12px; font-weight: 700; color: #2C3E50; margin-bottom: 3px; }
+.hs-option-desc { font-size: 11px; color: #7F8C8D; line-height: 1.4; }
+.hs-preview { margin-top: 8px; padding: 6px 8px; border-radius: 5px; font-size: 10px; line-height: 1.5; }
+.hs-preview.completo { background: #2C6E49; color: #fff; }
+.hs-preview.simples   { background: #F0F0F0; color: #555; text-align: center; }
+#wrapEmpresa { margin-top: 12px; }
+#wrapEmpresa label { font-size: 11px; font-weight: 600; color: #555; display: block; margin-bottom: 4px; }
+#inputEmpresa { width: 100%; padding: 7px 10px; border: 1px solid #E4E9EF; border-radius: 6px; font-size: 12px; }
+
+/* ── report header ── */
+.rpt-header-completo {
+    border-radius: 8px; padding: 14px 20px; margin-bottom: 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 10px;
+    background-color: var(--primary-color);   /* fallback */
+    color: #fff;
+}
+.rpt-header-empresa { font-size: 15px; font-weight: 700; }
+.rpt-header-cnpj { font-size: 11px; opacity: .8; margin-top: 2px; }
+.rpt-header-titulo-bloco { text-align: right; }
+.rpt-header-titulo { font-size: 14px; font-weight: 600; }
+.rpt-header-data { font-size: 11px; opacity: .8; margin-top: 2px; }
+.rpt-header-simples { border-bottom: 3px solid var(--primary-color); margin-bottom: 16px; padding-bottom: 10px; }
+.rpt-titulo { font-size: 20px; font-weight: 700; color: var(--primary-color); }
+.rpt-sub { font-size: 12px; color: #7F8C8D; margin-top: 4px; }
+
+/* ── sort bar (relatório) ── */
+.sort-bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+    padding: 10px 14px; background: #F8F9FA;
+    border: 1px solid #E4E9EF; border-radius: 8px; margin-bottom: 10px;
+}
+.sort-bar-label { font-size: 12px; font-weight: 600; color: #555; white-space: nowrap; flex-shrink: 0; }
+.sort-bar select {
+    flex: 1; min-width: 140px; padding: 7px 10px;
+    border: 1px solid #E4E9EF; border-radius: 6px; font-size: 12px;
+}
+.sort-bar select:focus { outline: none; border-color: var(--primary-color); }
+.sort-dir-btn {
+    padding: 7px 12px; border: 1px solid #E4E9EF; border-radius: 6px;
+    background: #fff; font-size: 12px; cursor: pointer; white-space: nowrap;
+    flex-shrink: 0; transition: background .12s, color .12s, border-color .12s;
+    font-weight: 600;
+}
+.sort-dir-btn:hover { border-color: var(--primary-color); background: #F0FAF5; }
+.sort-dir-btn.ativo { background: var(--primary-color); color: #fff; border-color: var(--primary-color); }
+
+/* ── busca bar ── */
+.busca-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.busca-bar input {
+    flex: 1; min-width: 200px; padding: 8px 12px;
+    border: 1px solid #E4E9EF; border-radius: 6px; font-size: 13px;
+}
+.busca-bar input:focus { outline: none; border-color: var(--primary-color); }
+
+/* ── table ── */
+.ferias-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid #E4E9EF; }
+.ferias-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ferias-table th {
+    background: var(--primary-color); color: #fff;
+    padding: 9px 11px; text-align: left; white-space: nowrap;
+    cursor: pointer; user-select: none;
+    position: sticky; top: 0; z-index: 1;
+    transition: background .12s;
+}
+.ferias-table th:hover { background: var(--primary-dark); }
+.ferias-table th.col-sort-active { background: var(--primary-dark); }
+.ferias-table th .sort-arrow {
+    display: inline-block; margin-left: 5px; font-size: 11px;
+    opacity: .45; transition: opacity .15s;
+}
+.ferias-table th.col-sort-active .sort-arrow { opacity: 1; }
+.ferias-table th.col-acoes { cursor: default; }
+.ferias-table th.col-acoes:hover { background: var(--primary-color); }
+.ferias-table td { padding: 7px 11px; border-bottom: 1px solid #F0F4F8; vertical-align: middle; }
+.ferias-table tr.main-row:hover td { background: var(--theme-accent) !important; }
+.ferias-table tr.main-row:nth-child(4n+3) td { background: #F9FAFB; }
+.ferias-table tr.continuation-row td {
+    font-size: 11px; color: #555;
+    padding-top: 3px; padding-bottom: 3px;
+    border-bottom: none; background: #F6FAF7;
+}
+.ferias-table tr.continuation-row td:first-child { padding-left: 24px; color: #7F8C8D; }
+.ferias-table tr.continuation-row:hover td { background: #E8F5EE !important; }
+.ferias-table tr.group-end td { border-bottom: 2px solid #DDE6EE; }
+.ferias-table tr.empty-row td { text-align: center; color: #999; padding: 24px; }
+
+/* ── delete button ── */
+.btn-del {
+    border: none; background: transparent; color: #CCCCCC; cursor: pointer;
+    font-size: 15px; padding: 2px 5px; border-radius: 4px; line-height: 1;
+    transition: color .15s, background .15s; display: block; margin: auto;
+}
+.btn-del:hover { color: #E74C3C; background: #FDEDEC; }
+.ferias-table th.col-acoes, .ferias-table td.col-acoes { width: 30px; padding: 2px 4px; text-align: center; }
+
+/* ── modal ── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 2000; align-items: center; justify-content: center; }
+.modal-overlay.active { display: flex; }
+.modal-box { background: #fff; border-radius: 12px; padding: 28px 32px; max-width: 440px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,.18); }
+.modal-box h3 { margin: 0 0 10px; color: var(--primary-color); }
+.modal-box p  { margin: 0 0 18px; font-size: 14px; color: #555; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* ── helpers ── */
+.section-divider { height: 1px; background: #EEF2F7; margin: 18px 0; }
+
+/* ── print ── */
+@media print {
+    .sidebar, .hamburger, .sidebar-overlay,
+    #painelUpload, #painelConfig, .steps-bar,
+    .sort-bar, .busca-bar, .no-print { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+    #painelRelatorio { display: block !important; }
+    .container { padding: 0 !important; }
+    .step-card { box-shadow: none !important; border: none !important; padding: 0 !important; }
+    .ferias-wrap { border: none !important; overflow: visible !important; }
+    .ferias-table { font-size: 10px !important; }
+    .ferias-table th {
+        background: var(--primary-color) !important;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        position: static !important;
+    }
+    .ferias-table tr.continuation-row td { background: #F6FAF7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .rpt-header-completo { background-color: var(--primary-color) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="fecharSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+        <h2>Fechamento Folha</h2>
+        <p>Programação de Férias</p>
+    </div>
+    <nav class="sidebar-nav">
+        <div class="sidebar-section">Empresas</div>
+        <a href="quadrante.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏭</span> Quadrante Etiquetas
+        </a>
+        <a href="trackfield.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏃</span> Track &amp; Field
+        </a>
+        <a href="ananke.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏥</span> Anankê
+        </a>
+
+        <div class="sidebar-section">Formulários</div>
+        <a href="formulario_quadrante.html" class="sidebar-item">
+            <span class="sidebar-item-icon">📄</span> Quadrante
+        </a>
+        <a href="formulario_trackfield.html" class="sidebar-item">
+            <span class="sidebar-item-icon">📄</span> Track &amp; Field
+        </a>
+        <a href="formulario_ananke.html" class="sidebar-item">
+            <span class="sidebar-item-icon">📄</span> Anankê
+        </a>
+
+        <div class="sidebar-section">Ferramentas</div>
+        <a href="fluxo.html" class="sidebar-item">
+            <span class="sidebar-item-icon">📋</span> Fluxo de Fechamento
+        </a>
+
+        <div class="sidebar-section">Navegação</div>
+        <a href="index.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏠</span> Início
+        </a>
+        <a href="../portal.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🌐</span> Portal SCONT
+        </a>
+    </nav>
+    <div class="sidebar-footer">
+        <div class="sidebar-footer-info">
+            <strong>Programação de Férias</strong>
+            SCONT · Relatório
+        </div>
+    </div>
+</aside>
+
+<div class="main-content">
+
+    <div class="page-header">
+        <div>
+            <h1>🏖️ Programação de Férias</h1>
+            <div class="page-header-sub">Importe o PDF, configure e gere o relatório</div>
+        </div>
+    </div>
+
+    <!-- STEP INDICATOR -->
+    <div class="steps-bar" id="stepsBar">
+        <div class="step-node">
+            <div class="step-circle active" id="sc1">1</div>
+            <span class="step-text active" id="st1">Importar</span>
+        </div>
+        <div class="step-line" id="sl1"></div>
+        <div class="step-node">
+            <div class="step-circle" id="sc2">2</div>
+            <span class="step-text" id="st2">Configurar</span>
+        </div>
+        <div class="step-line" id="sl2"></div>
+        <div class="step-node">
+            <div class="step-circle" id="sc3">3</div>
+            <span class="step-text" id="st3">Relatório</span>
+        </div>
+    </div>
+
+    <!-- PAINEL UPLOAD -->
+    <div class="container" id="painelUpload">
+        <div class="step-card">
+            <div class="step-title">
+                <div class="step-number">1</div>
+                Importar PDF de Férias
+            </div>
+            <label class="upload-area" id="uploadArea" for="inputFerias">
+                <div class="upload-icon">📄</div>
+                <div class="upload-label">Arraste o arquivo aqui ou clique para selecionar<br>
+                    <small>Formato aceito: .pdf (Programação de Férias exportada do sistema)</small></div>
+                <input type="file" id="inputFerias" accept=".pdf">
+            </label>
+            <div class="upload-filename" id="filenameFerias" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- PAINEL CONFIGURAÇÃO -->
+    <div class="container" id="painelConfig" style="display:none;">
+        <div class="step-card">
+            <div class="step-title">
+                <div class="step-number">2</div>
+                Configurar Relatório
+                <button onclick="voltarUpload()" class="btn btn-secondary btn-small no-print" style="margin-left:auto;">← Outro arquivo</button>
+            </div>
+
+            <!-- Título -->
+            <div style="margin-bottom:22px;">
+                <label style="font-weight:600;font-size:12px;color:#2C3E50;display:block;margin-bottom:5px;">Título do Relatório</label>
+                <input type="text" id="inputTitulo" placeholder="Ex: Programação de Férias – Quadrante – 2026"
+                    style="width:100%;padding:9px 12px;border:1px solid #E4E9EF;border-radius:7px;font-size:14px;box-sizing:border-box;">
+            </div>
+
+            <div class="config-grid">
+                <!-- ── COLUNAS ── -->
+                <div>
+                    <div class="config-section-label">Colunas do Relatório</div>
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                        <span id="contadorCols" style="font-size:11px;color:#7F8C8D;flex:1;"></span>
+                        <button onclick="marcarTodas(true)"  class="btn btn-secondary btn-small">Todas</button>
+                        <button onclick="marcarTodas(false)" class="btn btn-secondary btn-small">Nenhuma</button>
+                    </div>
+                    <div class="col-list" id="colList"></div>
+                </div>
+
+                <!-- ── ESTÉTICA ── -->
+                <div>
+                    <!-- Tema de Cores -->
+                    <div class="config-section-label">Tema de Cores</div>
+                    <div class="theme-grid" id="themeGrid"></div>
+
+                    <div class="section-divider"></div>
+
+                    <!-- Cabeçalho -->
+                    <div class="config-section-label">Cabeçalho do Relatório</div>
+                    <div class="hs-grid">
+                        <div class="hs-option selected" id="hs-completo" onclick="selecionarHS('completo')">
+                            <div class="hs-option-title">Com empresa</div>
+                            <div class="hs-option-desc">Nome da empresa e título em destaque</div>
+                            <div class="hs-preview completo">EMPRESA<br>Férias 2026</div>
+                        </div>
+                        <div class="hs-option" id="hs-simples" onclick="selecionarHS('simples')">
+                            <div class="hs-option-title">Somente título</div>
+                            <div class="hs-option-desc">Apenas o título do relatório</div>
+                            <div class="hs-preview simples">Programação de Férias</div>
+                        </div>
+                    </div>
+                    <div id="wrapEmpresa">
+                        <label>Nome da Empresa</label>
+                        <input type="text" id="inputEmpresa" placeholder="Ex: Quadrante Etiquetas Ltda">
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top:24px;">
+                <button class="btn btn-primary" onclick="gerarRelatorio()">📋 Gerar Relatório</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAINEL RELATÓRIO -->
+    <div class="container" id="painelRelatorio" style="display:none;">
+        <div class="step-card">
+            <div class="step-title no-print">
+                <div class="step-number">3</div>
+                Relatório
+                <div style="margin-left:auto;display:flex;gap:8px;">
+                    <button onclick="voltarConfig()" class="btn btn-secondary btn-small">← Configurar</button>
+                    <button onclick="gerarPDF()" class="btn btn-secondary btn-small" id="btnPdf">📄 PDF</button>
+                    <button onclick="imprimirRelatorio()" class="btn btn-primary btn-small">🖨️ Imprimir</button>
+                </div>
+            </div>
+
+            <!-- CONTEÚDO DO RELATÓRIO (capturado para PDF) -->
+            <div id="pdfContent">
+
+                <div id="reportHeader"></div>
+
+                <!-- Sort bar -->
+                <div class="sort-bar no-print">
+                    <span class="sort-bar-label">Ordenar por</span>
+                    <select id="sortBarCol" onchange="aplicarSortBar()">
+                        <option value="">— Sem ordenação —</option>
+                    </select>
+                    <button class="sort-dir-btn" id="sortDirBtn" onclick="toggleSortDir()">↑ Crescente</button>
+                    <button onclick="limparSort()" class="btn btn-secondary btn-small" style="flex-shrink:0;">✕ Limpar</button>
+                    <span style="flex:1;"></span>
+                    <span id="contadorLinhas" style="font-size:12px;color:#7F8C8D;white-space:nowrap;"></span>
+                </div>
+
+                <!-- Busca -->
+                <div class="busca-bar no-print">
+                    <input type="text" id="buscaFerias" placeholder="🔍  Buscar em qualquer coluna..." oninput="filtrarTabela()">
+                </div>
+
+                <div class="ferias-wrap">
+                    <table class="ferias-table" id="tabelaFerias">
+                        <thead id="theadFerias"></thead>
+                        <tbody id="tbodyFerias"></tbody>
+                    </table>
+                </div>
+            </div><!-- /pdfContent -->
+        </div>
+    </div>
+
+</div><!-- /main-content -->
+
+<!-- Modal -->
+<div class="modal-overlay" id="messageModal">
+    <div class="modal-box">
+        <h3 id="messageTitle"></h3>
+        <p  id="messageText"></p>
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="fecharModal()">OK</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────
+// TEMAS
+// ──────────────────────────────────────────────
+const THEMES = {
+    verde:  { label: 'Verde',    primary: '#2C6E49', dark: '#1E4D33', bg: '#EEF7F1', accent: '#D5F0E0' },
+    azul:   { label: 'Azul',     primary: '#1A6FA8', dark: '#135382', bg: '#EAF4FB', accent: '#CCE5F5' },
+    bordo:  { label: 'Bordô',    primary: '#8B3A3A', dark: '#6B2A2A', bg: '#FDF0F0', accent: '#F7D9D9' },
+    cinza:  { label: 'Clássico', primary: '#424949', dark: '#2C3333', bg: '#F2F3F4', accent: '#D5D8DC' },
+};
+
+// ──────────────────────────────────────────────
+// ESTADO
+// ──────────────────────────────────────────────
+let rawRows         = [];
+let allHeaders      = [];
+let colConfig       = [];
+let employeeGroups  = [];   // [{main, continuations:[]}] — fonte de verdade após geração
+let filteredGroups  = [];   // subconjunto visível (após busca)
+let activeSort      = { colIdx: null, dir: 'asc' };
+let currentTheme    = 'verde';
+let headerStyle     = 'completo';
+let metaEmpresa     = '';
+let metaCNPJ        = '';
+
+// ──────────────────────────────────────────────
+// AUTH + INIT
+// ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+    if (!auth) return;
+    configurarUploadArea();
+    renderThemeGrid();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const ham = document.getElementById('hamburger');
+    if (ham) ham.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebarOverlay').classList.toggle('active');
+    });
+});
+
+function fecharSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('active');
+}
+
+// ──────────────────────────────────────────────
+// MODAL
+// ──────────────────────────────────────────────
+function mostrarMensagem(titulo, texto) {
+    document.getElementById('messageTitle').textContent = titulo;
+    document.getElementById('messageText').textContent  = texto;
+    document.getElementById('messageModal').classList.add('active');
+}
+function fecharModal() { document.getElementById('messageModal').classList.remove('active'); }
+
+// ──────────────────────────────────────────────
+// STEP INDICATOR
+// ──────────────────────────────────────────────
+function atualizarSteps(step) {
+    for (let i = 1; i <= 3; i++) {
+        document.getElementById(`sc${i}`).className = 'step-circle' + (i < step ? ' done' : i === step ? ' active' : '');
+        document.getElementById(`st${i}`).className = 'step-text'   + (i <= step ? (i < step ? ' done' : ' active') : '');
+    }
+    for (let i = 1; i <= 2; i++)
+        document.getElementById(`sl${i}`).className = 'step-line' + (i < step ? ' done' : '');
+}
+
+// ──────────────────────────────────────────────
+// UPLOAD
+// ──────────────────────────────────────────────
+function configurarUploadArea() {
+    const area  = document.getElementById('uploadArea');
+    const input = document.getElementById('inputFerias');
+    input.addEventListener('change', () => { if (input.files[0]) carregarArquivo(input.files[0]); });
+    area.addEventListener('dragover',  e => { e.preventDefault(); area.classList.add('drag-over'); });
+    area.addEventListener('dragleave', () => area.classList.remove('drag-over'));
+    area.addEventListener('drop', e => {
+        e.preventDefault(); area.classList.remove('drag-over');
+        const f = e.dataTransfer.files[0]; if (f) carregarArquivo(f);
+    });
+}
+
+async function carregarArquivo(file) {
+    const el = document.getElementById('filenameFerias');
+    el.style.display = 'inline-block';
+    el.textContent   = '⏳ Lendo ' + file.name + '...';
+    try {
+        const resultado = await parsearPDF(file);
+        if (!resultado) {
+            mostrarMensagem('Atenção', 'Não foi possível detectar os dados no PDF. Verifique o arquivo.');
+            el.style.display = 'none'; return;
+        }
+        allHeaders  = resultado.headers;
+        metaEmpresa = resultado.empresa || '';
+        metaCNPJ    = resultado.cnpj    || '';
+        rawRows     = resultado.rows;
+
+        el.textContent = '✔ ' + file.name + ' · ' + rawRows.length + ' linhas';
+        document.getElementById('inputTitulo').value = file.name.replace(/\.pdf$/i, '').replace(/_/g, ' ');
+        if (metaEmpresa) document.getElementById('inputEmpresa').value = metaEmpresa;
+
+        construirColConfig();
+        document.getElementById('painelConfig').style.display    = '';
+        document.getElementById('painelRelatorio').style.display = 'none';
+        document.getElementById('painelConfig').scrollIntoView({ behavior: 'smooth' });
+        atualizarSteps(2);
+    } catch (err) {
+        console.error(err);
+        mostrarMensagem('Erro', 'Falha ao ler o PDF: ' + err.message);
+        el.style.display = 'none';
+    }
+}
+
+// ──────────────────────────────────────────────
+// PARSE DE PDF (PDF.js) — extrai linhas e colunas
+// ──────────────────────────────────────────────
+async function parsearPDF(file) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const buffer = await file.arrayBuffer();
+    const pdf    = await pdfjsLib.getDocument({ data: buffer }).promise;
+
+    // ── 1. Coleta todos os itens de texto de todas as páginas ────────────────
+    const allItems = [];
+    let yOffset = 0;
+    for (let p = 1; p <= pdf.numPages; p++) {
+        const page     = await pdf.getPage(p);
+        const vp       = page.getViewport({ scale: 1 });
+        const content  = await page.getTextContent();
+        content.items.forEach(item => {
+            const s = (item.str || '').replace(/\s+/g, ' ').trim();
+            if (!s) return;
+            allItems.push({
+                str:  s,
+                x:    item.transform[4],
+                y:    (vp.height - item.transform[5]) + yOffset,
+                w:    item.width || 0,
+                page: p,
+            });
+        });
+        yOffset += vp.height + 60;
+    }
+
+    // ── 2. Agrupa itens em linhas por proximidade vertical (tolerância 6 pt) ─
+    allItems.sort((a, b) => a.y - b.y || a.x - b.x);
+    const Y_TOL = 6;
+    const linhas = [];
+    let cur = null;
+    allItems.forEach(item => {
+        if (cur && Math.abs(item.y - cur.baseY) <= Y_TOL) {
+            cur.items.push(item);
+        } else {
+            cur = { baseY: item.y, items: [item] };
+            linhas.push(cur);
+        }
+    });
+    linhas.forEach(l => l.items.sort((a, b) => a.x - b.x));
+
+    // ── 3. Localiza a primeira linha de cabeçalho (Código + Empregado) ───────
+    let hdrIdx = -1;
+    for (let i = 0; i < linhas.length; i++) {
+        const txt = linhas[i].items.map(it => it.str).join(' ');
+        if (/c[oó]digo/i.test(txt) && /empregado/i.test(txt)) { hdrIdx = i; break; }
+    }
+    if (hdrIdx === -1) return null;
+
+    // ── 4. Metadados (empresa, CNPJ) das linhas acima do cabeçalho ───────────
+    let empresa = '', cnpj = '';
+    for (let i = 0; i < hdrIdx; i++) {
+        // Pega apenas o item mais à esquerda da linha (nome da empresa costuma ser o primeiro)
+        const leftmost = linhas[i].items[0];
+        if (!leftmost) continue;
+        const s = leftmost.str.trim();
+        const mC = linhas[i].items.map(it => it.str).join(' ').match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/);
+        if (mC && !cnpj) cnpj = mC[0];
+        if (!empresa && s.length > 8
+            && /^[A-ZÀ-Ú]/.test(s)                             // começa com maiúscula
+            && !/^(CNPJ|Data\s*base|P[aá]g|Emiss[aã]o|Horas|PROGRAMA[ÇC]|Sistema)/i.test(s)
+            && !/^\d/.test(s))                                   // não começa com número
+            empresa = s.replace(/\s+/g, ' ').substring(0, 100);
+    }
+
+    // ── 5. Constrói definições de colunas ────────────────────────────────────
+    const subItems = linhas[hdrIdx].items;
+
+    // Linha acima: verifica se é o cabeçalho de grupo (Data, Vencto., Início…)
+    const prevItems = hdrIdx > 0 ? linhas[hdrIdx - 1].items : [];
+    const prevTxt   = prevItems.map(it => it.str).join(' ');
+    const isGrpRow  = /data|vencto\.?|in[ií]cio|fim\b/i.test(prevTxt) && !/\d{4}/.test(prevTxt);
+
+    const colDefs = subItems.map(si => {
+        const sub = si.str.trim();
+        let grp   = '';
+        if (isGrpRow) {
+            // Encontra o item de grupo mais próximo (dentro de 60 pt)
+            const closest = prevItems.reduce((best, gi) => {
+                const d = Math.abs(gi.x - si.x);
+                return (!best || d < Math.abs(best.x - si.x)) ? gi : best;
+            }, null);
+            if (closest && Math.abs(closest.x - si.x) < 60) grp = closest.str.trim();
+        }
+        let label;
+        if (!grp || grp.toLowerCase() === sub.toLowerCase()) label = sub;
+        else if (sub.toLowerCase().startsWith(grp.toLowerCase().slice(0, 4))) label = sub;
+        else label = `${grp} ${sub}`;
+        return { x: si.x, label };
+    });
+
+    // Fronteiras de coluna
+    // Regra geral: ponto médio entre colunas adjacentes.
+    // Exceção para a 1ª coluna (Código): códigos de empregado são alinhados à direita
+    // no PDF, então números curtos ("86") ficam mais à direita que "242". Para não
+    // mapeá-los para a coluna Empregado, a fronteira direita da 1ª coluna vai até
+    // 90 % do espaço até a próxima coluna (em vez de 50 %).
+    for (let i = 0; i < colDefs.length; i++) {
+        colDefs[i].xStart = i === 0
+            ? -Infinity
+            : colDefs[i - 1].xEnd;
+
+        if (i === colDefs.length - 1) {
+            colDefs[i].xEnd = Infinity;
+        } else if (i === 0) {
+            // Primeira coluna: fronteira alargada para acomodar alinhamento à direita
+            colDefs[i].xEnd = colDefs[i].x + (colDefs[i + 1].x - colDefs[i].x) * 0.90;
+        } else {
+            colDefs[i].xEnd = (colDefs[i].x + colDefs[i + 1].x) / 2;
+        }
+    }
+
+    // ── 6. Fingerprint do cabeçalho para detectar repetições (pág. 2+) ───────
+    // Uma linha é "cabeçalho repetido" se tiver os mesmos itens em x próximos
+    const hdrXs  = subItems.map(it => Math.round(it.x));
+    const isHdrRepeat = (items) => {
+        if (!items.length) return false;
+        const txt = items.map(it => it.str).join(' ');
+        if (/c[oó]digo/i.test(txt) && /empregado/i.test(txt)) return true;
+        // Sub-cabeçalho de grupo repetido (ex.: "admissão férias venc. pro. aquisitivo…")
+        if (/admiss[aã]o|venc\.|aquisitivo/i.test(txt) && !/\d{2}\/\d{2}\/\d{4}/.test(txt)) return true;
+        // Linha de grupo (Data Vencto. Início Fim Dias…) sem datas reais
+        if (/^(Data\b|Vencto\.?|In[ií]cio\b)/i.test(txt.trim()) && !/\d{2}\/\d{2}\/\d{4}/.test(txt)) return true;
+        return false;
+    };
+    const isFooter = (items) => {
+        const txt = items.map(it => it.str).join(' ');
+        return /sistema licenciado|observa[çc][oõ]es|total de empregados/i.test(txt)
+            || /^(p[aá]gina|emiss[aã]o|horas|data\s*base|cnpj)\b/i.test(txt.trim());
+    };
+
+    // Valor placeholder do PDF (ex.: ..../..../......  ou  ....)
+    const isPlaceholder = (s) => /^[.\-/\s]+$/.test(s.trim());
+
+    // ── 7. Processa linhas de dados ──────────────────────────────────────────
+    const dataRows = [];
+    for (let i = hdrIdx + 1; i < linhas.length; i++) {
+        const items = linhas[i].items;
+        if (!items.length) continue;
+        if (isHdrRepeat(items) || isFooter(items)) continue;
+
+        // Atribui cada item de texto à coluna pela fronteira de x
+        const rowArr = new Array(colDefs.length).fill('');
+        items.forEach(item => {
+            let ci = colDefs.findIndex(c => item.x >= c.xStart && item.x < c.xEnd);
+            if (ci === -1) {
+                // Fallback: centro mais próximo
+                let bestD = Infinity;
+                colDefs.forEach((c, idx) => {
+                    const d = Math.abs(item.x - c.x);
+                    if (d < bestD) { bestD = d; ci = idx; }
+                });
+            }
+            rowArr[ci] = rowArr[ci] ? rowArr[ci] + ' ' + item.str : item.str;
+        });
+
+        // Normaliza placeholders → string vazia (mantém '-' que é dado real)
+        const clean = rowArr.map(c => {
+            const v = c.trim();
+            return isPlaceholder(v) ? '' : v;
+        });
+
+        // Descarta linhas completamente vazias após normalização
+        if (clean.every(c => !c)) continue;
+
+        dataRows.push(clean);
+    }
+
+    return { headers: colDefs.map(c => c.label), rows: dataRows, empresa, cnpj };
+}
+
+// ──────────────────────────────────────────────
+// CONFIGURAÇÃO DE COLUNAS
+// ──────────────────────────────────────────────
+function construirColConfig() {
+    colConfig = allHeaders.map((h, i) => ({ origIdx: i, label: h, visible: !!h }));
+    renderizarColList();
+}
+
+function renderizarColList() {
+    const list = document.getElementById('colList');
+    list.innerHTML = '';
+    colConfig.forEach((col, pos) => {
+        const div = document.createElement('div');
+        div.className = 'col-item' + (col.visible ? '' : ' hidden-col');
+        const orig = allHeaders[col.origIdx] || '(vazio)';
+        div.innerHTML = `
+            <input type="checkbox" ${col.visible ? 'checked' : ''} onchange="toggleCol(${pos}, this.checked)" accent-color="var(--primary-color)">
+            <span class="col-orig" title="${escHtml(orig)}">#${col.origIdx + 1}</span>
+            <input class="col-label-input" type="text" value="${escHtml(col.label)}" oninput="renomearCol(${pos}, this.value)" placeholder="${escHtml(orig)}">
+            <div class="col-arrows">
+                <button onclick="moverCol(${pos},-1)" ${pos === 0 ? 'disabled' : ''}>▲</button>
+                <button onclick="moverCol(${pos},+1)" ${pos === colConfig.length - 1 ? 'disabled' : ''}>▼</button>
+            </div>`;
+        list.appendChild(div);
+    });
+    const vis = colConfig.filter(c => c.visible).length;
+    document.getElementById('contadorCols').textContent = `${vis} de ${colConfig.length} visíveis`;
+}
+
+function toggleCol(pos, v)   { colConfig[pos].visible = v; renderizarColList(); }
+function renomearCol(pos, v) { colConfig[pos].label = v; }
+function moverCol(pos, d)    {
+    const a = pos + d; if (a < 0 || a >= colConfig.length) return;
+    [colConfig[pos], colConfig[a]] = [colConfig[a], colConfig[pos]]; renderizarColList();
+}
+function marcarTodas(v) { colConfig.forEach(c => c.visible = v); renderizarColList(); }
+
+// ──────────────────────────────────────────────
+// TEMA DE CORES
+// ──────────────────────────────────────────────
+function renderThemeGrid() {
+    const grid = document.getElementById('themeGrid');
+    grid.innerHTML = '';
+    Object.entries(THEMES).forEach(([key, t]) => {
+        const card = document.createElement('div');
+        card.className = 'theme-card' + (key === currentTheme ? ' selected' : '');
+        card.innerHTML = `<div class="theme-swatch" style="background:${t.primary};"></div><div class="theme-card-label">${t.label}</div>`;
+        card.addEventListener('click', () => aplicarTema(key));
+        grid.appendChild(card);
+    });
+}
+
+function aplicarTema(key) {
+    currentTheme = key;
+    const t = THEMES[key];
+    document.documentElement.style.setProperty('--primary-color',    t.primary);
+    document.documentElement.style.setProperty('--primary-dark',     t.dark);
+    document.documentElement.style.setProperty('--background-color', t.bg);
+    document.documentElement.style.setProperty('--theme-accent',     t.accent);
+    renderThemeGrid();
+}
+
+// ──────────────────────────────────────────────
+// ESTILO DE CABEÇALHO
+// ──────────────────────────────────────────────
+function selecionarHS(style) {
+    headerStyle = style;
+    document.getElementById('hs-completo').classList.toggle('selected', style === 'completo');
+    document.getElementById('hs-simples').classList.toggle('selected',  style === 'simples');
+    document.getElementById('wrapEmpresa').style.display = style === 'completo' ? '' : 'none';
+}
+
+// ──────────────────────────────────────────────
+// GERAR RELATÓRIO
+// ──────────────────────────────────────────────
+function gerarRelatorio() {
+    const visCols = colConfig.filter(c => c.visible);
+    if (!visCols.length) { mostrarMensagem('Atenção', 'Selecione ao menos uma coluna para o relatório.'); return; }
+
+    const pkIdx = visCols[0].origIdx;
+    employeeGroups = agruparLinhas(rawRows, pkIdx);
+    activeSort     = { colIdx: null, dir: 'asc' };
+    filteredGroups = employeeGroups;
+
+    preencherSortBar(visCols);
+    renderizarHeader();
+    renderizarTabela(filteredGroups);
+    document.getElementById('buscaFerias').value = '';
+
+    document.getElementById('painelRelatorio').style.display = '';
+    document.getElementById('painelRelatorio').scrollIntoView({ behavior: 'smooth' });
+    atualizarSteps(3);
+}
+
+function agruparLinhas(rows, pkIdx) {
+    const groups = [];
+    let current  = null;
+    rows.forEach(row => {
+        const temDados = row.some(c => String(c).trim() !== '');
+        if (!temDados) return;
+
+        // Linha principal: alguma das 3 primeiras colunas contém exclusivamente
+        // um inteiro positivo — padrão de código de empregado (ex: "86", "242").
+        // Linhas de continuação começam com datas (DD/MM/YYYY) ou campos vazios.
+        const ehPrincipal = row.slice(0, 3).some(c => /^\d{1,6}$/.test(String(c || '').trim()));
+
+        if (ehPrincipal) {
+            current = { main: row, continuations: [] };
+            groups.push(current);
+        } else if (current) {
+            current.continuations.push(row);
+        } else {
+            current = { main: row, continuations: [] };
+            groups.push(current);
+        }
+    });
+    return groups;
+}
+
+// ──────────────────────────────────────────────
+// CABEÇALHO DO RELATÓRIO
+// ──────────────────────────────────────────────
+function renderizarHeader() {
+    const titulo  = document.getElementById('inputTitulo').value.trim() || 'Programação de Férias';
+    const empresa = headerStyle === 'completo'
+        ? (document.getElementById('inputEmpresa').value.trim() || metaEmpresa || '') : '';
+    const dataGer = new Date().toLocaleDateString('pt-BR');
+    const t       = THEMES[currentTheme];
+    let html = '';
+
+    if (headerStyle === 'completo') {
+        html = `<div class="rpt-header-completo" style="background-color:${t.primary};">
+            <div>
+                ${empresa ? `<div class="rpt-header-empresa">${escHtml(empresa)}</div>` : ''}
+                ${metaCNPJ ? `<div class="rpt-header-cnpj">CNPJ: ${escHtml(metaCNPJ)}</div>` : ''}
+            </div>
+            <div class="rpt-header-titulo-bloco">
+                <div class="rpt-header-titulo">${escHtml(titulo)}</div>
+                <div class="rpt-header-data">Gerado em ${dataGer} · ${filteredGroups.length} empregado(s)</div>
+            </div>
+        </div>`;
+    } else {
+        html = `<div class="rpt-header-simples" style="border-bottom-color:${t.primary};">
+            <div class="rpt-titulo" style="color:${t.primary};">${escHtml(titulo)}</div>
+            <div class="rpt-sub">Gerado em ${dataGer} · ${filteredGroups.length} empregado(s)</div>
+        </div>`;
+    }
+    document.getElementById('reportHeader').innerHTML = html;
+}
+
+// ──────────────────────────────────────────────
+// SORT BAR (no relatório)
+// ──────────────────────────────────────────────
+function preencherSortBar(visCols) {
+    const sel = document.getElementById('sortBarCol');
+    sel.innerHTML = '<option value="">— Sem ordenação —</option>';
+    visCols.forEach(c => {
+        if (!c.label) return;
+        const opt = document.createElement('option');
+        opt.value = c.origIdx;
+        opt.textContent = c.label;
+        sel.appendChild(opt);
+    });
+    atualizarSortBarUI();
+}
+
+function atualizarSortBarUI() {
+    const sel = document.getElementById('sortBarCol');
+    const btn = document.getElementById('sortDirBtn');
+    sel.value = activeSort.colIdx !== null ? String(activeSort.colIdx) : '';
+    btn.textContent = activeSort.dir === 'asc' ? '↑ Crescente' : '↓ Decrescente';
+    btn.classList.toggle('ativo', activeSort.colIdx !== null);
+}
+
+function aplicarSortBar() {
+    const val = document.getElementById('sortBarCol').value;
+    activeSort.colIdx = val !== '' ? parseInt(val, 10) : null;
+    aplicarOrdenacao();
+    atualizarSortBarUI();
+}
+
+function toggleSortDir() {
+    activeSort.dir = activeSort.dir === 'asc' ? 'desc' : 'asc';
+    aplicarOrdenacao();
+    atualizarSortBarUI();
+}
+
+function limparSort() {
+    activeSort = { colIdx: null, dir: 'asc' };
+    filteredGroups = [...employeeGroups]; // restaurar ordem original, sem filtro de texto
+    document.getElementById('buscaFerias').value = '';
+    filtrarTabela(); // re-aplica filtro de texto (vazio → mostra tudo)
+    atualizarSortBarUI();
+}
+
+function aplicarOrdenacao() {
+    if (activeSort.colIdx === null) { filteredGroups = [...filteredGroups]; }
+    else {
+        filteredGroups = [...filteredGroups].sort((a, b) =>
+            compararCelulas(a.main[activeSort.colIdx], b.main[activeSort.colIdx], activeSort.dir)
+        );
+    }
+    renderizarTabela(filteredGroups);
+    renderizarHeader();
+}
+
+// ──────────────────────────────────────────────
+// RENDERIZAÇÃO DA TABELA
+// ──────────────────────────────────────────────
+function renderizarTabela(groups) {
+    const visCols  = colConfig.filter(c => c.visible);
+    const nCols    = visCols.length;
+    const t        = THEMES[currentTheme];
+
+    // Detectar colunas de data pelo label
+    const idxDatas = new Set(
+        visCols
+            .filter(c => /data|admiss[aã]o|gozo|in[ií]cio|fim|per[ií]odo|vencto|vencimento|limite/i.test(c.label))
+            .map(c => c.origIdx)
+    );
+
+    // Cabeçalho
+    document.getElementById('theadFerias').innerHTML =
+        '<tr>' + visCols.map(c => {
+            const isActive = activeSort.colIdx === c.origIdx;
+            const arrow    = isActive ? (activeSort.dir === 'asc' ? '▲' : '▼') : '⇅';
+            const cls      = isActive ? ' class="col-sort-active"' : '';
+            return `<th${cls} onclick="clicarCabecalho(${c.origIdx})">${escHtml(c.label)}<span class="sort-arrow">${arrow}</span></th>`;
+        }).join('') +
+        `<th class="col-acoes no-print" style="background:${t.primary};"></th></tr>`;
+
+    // Corpo
+    const tbody = document.getElementById('tbodyFerias');
+    if (!groups.length) {
+        tbody.innerHTML = `<tr class="empty-row"><td colspan="${nCols + 1}">Nenhum registro encontrado.</td></tr>`;
+        document.getElementById('contadorLinhas').textContent = '0 registros';
+        return;
+    }
+
+    const linhas = [];
+    groups.forEach((g, gi) => {
+        const isLastGroup = gi === groups.length - 1;
+        const hasConts    = g.continuations.length > 0;
+        const mainClass   = 'main-row' + ((!hasConts && !isLastGroup) ? ' group-end' : '');
+        linhas.push(`<tr class="${mainClass}">` +
+            visCols.map(c => {
+                const val = g.main[c.origIdx];
+                const txt = idxDatas.has(c.origIdx) ? formatarData(val) : formatarCelula(val);
+                return `<td>${escHtml(txt)}</td>`;
+            }).join('') +
+            `<td class="col-acoes no-print"><button class="btn-del" onclick="deletarGrupo(${gi})" title="Remover empregado">🗑</button></td>` +
+            '</tr>');
+
+        g.continuations.forEach((cont, ci) => {
+            const isLast  = ci === g.continuations.length - 1;
+            const contCls = 'continuation-row' + (isLast && !isLastGroup ? ' group-end' : '');
+            linhas.push(`<tr class="${contCls}">` +
+                visCols.map((c, colPos) => {
+                    const val = cont[c.origIdx];
+                    const txt = idxDatas.has(c.origIdx) ? formatarData(val) : formatarCelula(val);
+                    const cel = colPos === 0 ? `<em style="color:#AAB;font-size:10px;">↳ período</em>` : escHtml(txt);
+                    return `<td>${cel}</td>`;
+                }).join('') +
+                `<td class="col-acoes no-print"><button class="btn-del" onclick="deletarContinuacao(${gi},${ci})" title="Remover período">×</button></td>` +
+                '</tr>');
+        });
+    });
+
+    tbody.innerHTML = linhas.join('');
+    const total = groups.reduce((s, g) => s + 1 + g.continuations.length, 0);
+    document.getElementById('contadorLinhas').textContent = `${groups.length} empregado(s) · ${total} linha(s)`;
+}
+
+// ──────────────────────────────────────────────
+// ORDENAÇÃO POR CLIQUE NO CABEÇALHO
+// ──────────────────────────────────────────────
+function clicarCabecalho(colIdx) {
+    if (activeSort.colIdx === colIdx) {
+        activeSort.dir = activeSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        activeSort.colIdx = colIdx;
+        activeSort.dir    = 'asc';
+    }
+    filteredGroups = [...filteredGroups].sort((a, b) =>
+        compararCelulas(a.main[colIdx], b.main[colIdx], activeSort.dir)
+    );
+    atualizarSortBarUI();
+    renderizarTabela(filteredGroups);
+}
+
+// ──────────────────────────────────────────────
+// FILTRO DE BUSCA
+// ──────────────────────────────────────────────
+function filtrarTabela() {
+    const termo = (document.getElementById('buscaFerias').value || '')
+        .trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+    let base = employeeGroups;
+    if (activeSort.colIdx !== null)
+        base = [...base].sort((a, b) => compararCelulas(a.main[activeSort.colIdx], b.main[activeSort.colIdx], activeSort.dir));
+
+    filteredGroups = !termo ? base : base.filter(g =>
+        [g.main, ...g.continuations].some(row =>
+            row.some(c => String(c).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(termo))
+        )
+    );
+    renderizarTabela(filteredGroups);
+    renderizarHeader();
+}
+
+// ──────────────────────────────────────────────
+// EXCLUSÃO DE LINHAS NA PRÉVIA
+// ──────────────────────────────────────────────
+function deletarGrupo(gi) {
+    const grupo = filteredGroups[gi];
+    filteredGroups.splice(gi, 1);
+    const empIdx = employeeGroups.indexOf(grupo);
+    if (empIdx !== -1) employeeGroups.splice(empIdx, 1);
+    renderizarTabela(filteredGroups);
+    renderizarHeader();
+}
+
+function deletarContinuacao(gi, ci) {
+    filteredGroups[gi].continuations.splice(ci, 1);
+    renderizarTabela(filteredGroups);
+    renderizarHeader();
+}
+
+// ──────────────────────────────────────────────
+// GERAR PDF — jsPDF + AutoTable, paisagem, largura dinâmica
+// ──────────────────────────────────────────────
+async function gerarPDF() {
+    const titulo = document.getElementById('inputTitulo').value.trim() || 'Programação de Férias';
+    const btn    = document.getElementById('btnPdf');
+    btn.disabled    = true;
+    btn.textContent = '⏳ Gerando...';
+
+    try {
+        const t       = THEMES[currentTheme];
+        const rgb     = hexToRgb(t.primary);
+        const rgbDark = hexToRgb(t.dark);
+        const visCols = colConfig.filter(c => c.visible);
+
+        // 1. Montar dados da tabela
+        const head = [visCols.map(c => c.label || '')];
+        const body = [];
+        filteredGroups.forEach(g => {
+            body.push(visCols.map(c => {
+                const v = g.main[c.origIdx];
+                return celulaPDF(v, c.label);
+            }));
+            g.continuations.forEach(cont => {
+                body.push(visCols.map((c, ci) => {
+                    if (ci === 0) return '↳';
+                    return celulaPDF(cont[c.origIdx], c.label);
+                }));
+            });
+        });
+
+        // 2. Calcular largura de página dinâmica
+        //    Cada coluna precisa de ~14 mm mínimo; mínimo absoluto A4 paisagem (297 mm)
+        const MM_PER_COL = 14;
+        const MARGEM     = 10;
+        const pageW      = Math.max(297, visCols.length * MM_PER_COL + MARGEM * 2);
+        const pageH      = 210;
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: 'landscape' });
+
+        // 3. Cabeçalho do relatório
+        const empresa  = headerStyle === 'completo'
+            ? (document.getElementById('inputEmpresa').value.trim() || metaEmpresa || '') : '';
+        const dataGer  = new Date().toLocaleDateString('pt-BR');
+        let startY     = MARGEM;
+
+        if (headerStyle === 'completo') {
+            const barH = metaCNPJ ? 18 : 13;
+            doc.setFillColor(rgb.r, rgb.g, rgb.b);
+            doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, barH, 2, 2, 'F');
+            doc.setTextColor(255, 255, 255);
+            if (empresa) {
+                doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+                doc.text(empresa, MARGEM + 4, MARGEM + 6);
+            }
+            if (metaCNPJ) {
+                doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+                doc.text('CNPJ: ' + metaCNPJ, MARGEM + 4, MARGEM + 12);
+            }
+            doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+            doc.text(titulo, pageW - MARGEM - 4, MARGEM + 6, { align: 'right' });
+            doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+            doc.text('Gerado em ' + dataGer + ' · ' + filteredGroups.length + ' empregado(s)',
+                pageW - MARGEM - 4, MARGEM + 12, { align: 'right' });
+            startY = MARGEM + barH + 4;
+        } else {
+            doc.setTextColor(rgb.r, rgb.g, rgb.b);
+            doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+            doc.text(titulo, MARGEM, MARGEM + 6);
+            doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+            doc.setTextColor(127, 140, 141);
+            doc.text('Gerado em ' + dataGer + ' · ' + filteredGroups.length + ' empregado(s)',
+                MARGEM, MARGEM + 12);
+            startY = MARGEM + 18;
+        }
+
+        // 4. Tabela
+        doc.autoTable({
+            head,
+            body,
+            startY,
+            margin: { left: MARGEM, right: MARGEM },
+            tableWidth: pageW - MARGEM * 2,
+            styles:          { fontSize: 6.5, cellPadding: 1.8, valign: 'middle', overflow: 'linebreak' },
+            headStyles:      { fillColor: [rgb.r, rgb.g, rgb.b], textColor: 255, fontStyle: 'bold', fontSize: 6.5 },
+            alternateRowStyles: { fillColor: [249, 250, 251] },
+            didParseCell: data => {
+                if (data.section === 'body' && data.row.raw[0] === '↳') {
+                    data.cell.styles.fontSize     = 6;
+                    data.cell.styles.textColor    = [85, 85, 85];
+                    data.cell.styles.fillColor    = [246, 250, 247];
+                    data.cell.styles.fontStyle    = 'italic';
+                }
+            },
+        });
+
+        doc.save(titulo.replace(/[/\\:*?"<>|]/g, '_') + '.pdf');
+
+    } catch (e) {
+        console.error('PDF error:', e);
+        mostrarMensagem('Erro', 'Falha ao gerar PDF: ' + e.message);
+    } finally {
+        btn.disabled    = false;
+        btn.textContent = '📄 PDF';
+    }
+}
+
+function hexToRgb(hex) {
+    return {
+        r: parseInt(hex.slice(1, 3), 16),
+        g: parseInt(hex.slice(3, 5), 16),
+        b: parseInt(hex.slice(5, 7), 16),
+    };
+}
+
+function celulaPDF(val, label) {
+    if (/data|admiss[aã]o|gozo|in[ií]cio|fim|per[ií]odo|vencto|vencimento|limite/i.test(label))
+        return formatarData(val);
+    return formatarCelula(val);
+}
+
+// ──────────────────────────────────────────────
+// UTILITÁRIOS
+// ──────────────────────────────────────────────
+function compararCelulas(a, b, dir) {
+    const da = parseData(a), db = parseData(b);
+    let cmp;
+    if (da && db) { cmp = da - db; }
+    else {
+        const sa = String(a ?? '').trim().toLowerCase();
+        const sb = String(b ?? '').trim().toLowerCase();
+        const na = parseFloat(sa.replace(',', '.')), nb = parseFloat(sb.replace(',', '.'));
+        cmp = !isNaN(na) && !isNaN(nb) ? na - nb : sa.localeCompare(sb, 'pt-BR');
+    }
+    return dir === 'desc' ? -cmp : cmp;
+}
+
+function parseData(val) {
+    if (!val && val !== 0) return null;
+    if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+    const s = String(val).trim();
+    if (!s || /^[.\/ ]+$/.test(s)) return null;
+    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+    const n = parseFloat(s);
+    if (!isNaN(n) && n > 40000 && n < 60000) return new Date(Math.round((n - 25569) * 86400000));
+    return null;
+}
+
+function formatarData(val) {
+    const d = parseData(val);
+    if (!d || isNaN(d.getTime()) || d.getFullYear() > 9000 || d.getFullYear() < 1900)
+        return String(val ?? '') || '–';
+    return d.toLocaleDateString('pt-BR');
+}
+
+function formatarCelula(val) {
+    if (val === null || val === undefined || val === '') return '–';
+    if (val instanceof Date) return formatarData(val);
+    return String(val);
+}
+
+function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ──────────────────────────────────────────────
+// NAVEGAÇÃO
+// ──────────────────────────────────────────────
+function voltarUpload() {
+    document.getElementById('painelConfig').style.display    = 'none';
+    document.getElementById('painelRelatorio').style.display = 'none';
+    document.getElementById('filenameFerias').style.display  = 'none';
+    document.getElementById('inputFerias').value = '';
+    document.getElementById('painelUpload').scrollIntoView({ behavior: 'smooth' });
+    atualizarSteps(1);
+}
+
+function voltarConfig() {
+    document.getElementById('painelRelatorio').style.display = 'none';
+    document.getElementById('painelConfig').scrollIntoView({ behavior: 'smooth' });
+    atualizarSteps(2);
+}
+
+function imprimirRelatorio() { window.print(); }
+</script>
+</body>
+</html>

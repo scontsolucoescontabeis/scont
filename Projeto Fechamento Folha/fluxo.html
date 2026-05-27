@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fluxo de Fechamento – SCONT</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="../supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../portal-auth-guard.js"></script>
+<style>
+/* ── Variáveis do Fluxo (mapeadas para paleta SCONT/Fechamento) ─────────── */
+:root {
+  --fl-bg:      #F5F3EE;
+  --fl-bg2:     #EEEBE4;
+  --fl-surface: #FDFCFA;
+  --fl-border:  #D6D0C4;
+  --fl-border2: #C4BDB0;
+  --fl-text:    #1C1A16;
+  --fl-text2:   #5C5750;
+  --fl-text3:   #8C8680;
+  --fl-accent:      #2C6E49;
+  --fl-accent-light:#E0EDE8;
+  --fl-blue-dark:   #1A3C5C;
+  --fl-blue-light:  #DDE8F0;
+  --fl-amber:       #7A4D0A;
+  --fl-amber-light: #F5EAD9;
+  --fl-coral:       #8C2510;
+  --fl-coral-light: #F5E0DA;
+  --fl-fn: 'DM Sans', sans-serif;
+  --fl-fm: 'DM Mono', monospace;
+  --fl-r:  10px;
+  --fl-rl: 16px;
+  --fl-sh:  0 1px 3px rgba(0,0,0,.06), 0 2px 8px rgba(0,0,0,.04);
+  --fl-shh: 0 4px 16px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
+  --fl-tr:  .18s ease;
+}
+
+/* ── Área de conteúdo do fluxo ──────────────────────────────────────────── */
+.fluxo-area {
+  font-family: var(--fl-fn);
+  color: var(--fl-text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── Botões de ação no page-header ──────────────────────────────────────── */
+.fl-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--fl-fn); font-size: 12px; font-weight: 500;
+  padding: 6px 13px; border-radius: 8px; border: 1px solid transparent;
+  cursor: pointer; transition: all var(--fl-tr); white-space: nowrap;
+}
+.fl-btn-o  { background: transparent; border-color: var(--fl-border); color: var(--fl-text2); }
+.fl-btn-o:hover { background: var(--fl-bg2); border-color: var(--fl-border2); color: var(--fl-text); }
+.fl-btn-p  { background: var(--fl-accent); color: #fff; border-color: var(--fl-accent); }
+.fl-btn-p:hover { background: #234E3A; }
+.fl-btn-d  { background: var(--fl-coral-light); color: var(--fl-coral); border-color: #E8B8AD; }
+.fl-btn-d:hover { background: #EDD5CE; }
+
+/* ── Barra de progresso na sidebar ─────────────────────────────────────── */
+.fl-prog-box {
+  padding: 10px 12px; background: rgba(255,255,255,.08);
+  border-radius: 8px; margin: 4px 0 8px;
+}
+.fl-prog-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.fl-prog-label { font-size: 11px; color: rgba(255,255,255,.65); }
+.fl-prog-pct   { font-family: var(--fl-fm); font-size: 11px; font-weight: 500; color: #fff; }
+.fl-prog-track { background: rgba(255,255,255,.2); border-radius: 99px; height: 5px; overflow: hidden; }
+.fl-prog-bar   { height: 100%; background: #fff; border-radius: 99px; transition: width .4s ease; }
+.fl-prog-sub   { font-family: var(--fl-fm); font-size: 10px; color: rgba(255,255,255,.5); margin-top: 4px; display: block; }
+
+/* ── Legenda ────────────────────────────────────────────────────────────── */
+.lgd { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 18px; }
+.lgd-i { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--fl-text2); }
+.lgd-d { width: 9px; height: 9px; border-radius: 2px; }
+
+/* ── Conector entre etapas ──────────────────────────────────────────────── */
+.s-conn { display: flex; flex-direction: column; align-items: center; margin: 0 0 0 30px; pointer-events: none; }
+.s-line { width: 2px; height: 16px; background: var(--fl-border); }
+.s-clbl {
+  font-family: var(--fl-fm); font-size: 10px; color: var(--fl-text3);
+  background: var(--fl-bg); padding: 2px 8px; border-radius: 99px;
+  border: 1px solid var(--fl-border); margin: 3px 0; letter-spacing: .03em;
+}
+
+/* ── Card de etapa ──────────────────────────────────────────────────────── */
+.step-wrap  { margin-bottom: 8px; }
+.step-card  {
+  background: var(--fl-surface); border: 1px solid var(--fl-border);
+  border-radius: var(--fl-rl); overflow: hidden;
+  box-shadow: var(--fl-sh); transition: box-shadow var(--fl-tr);
+}
+.step-card:hover    { box-shadow: var(--fl-shh); }
+.step-card.editing  { border-color: var(--fl-accent); box-shadow: 0 0 0 2px var(--fl-accent-light), var(--fl-shh); }
+.step-card.done-card .s-title { color: var(--fl-text3); }
+
+.s-hdr { display: flex; align-items: flex-start; gap: 11px; padding: 13px 15px; cursor: pointer; user-select: none; }
+.s-numwrap { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.s-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--fl-fm); font-size: 11px; font-weight: 500; flex-shrink: 0;
+}
+.s-done {
+  width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--fl-border);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all var(--fl-tr); flex-shrink: 0;
+}
+.s-done.done { background: var(--fl-accent); border-color: var(--fl-accent); }
+.s-done.done::after {
+  content: ''; display: block; width: 6px; height: 4px;
+  border-left: 2px solid #fff; border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) translate(1px,-1px);
+}
+.s-hdr-c { flex: 1; min-width: 0; }
+.s-meta  { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 3px; }
+.s-tag   { font-family: var(--fl-fm); font-size: 9px; padding: 2px 7px; border-radius: 99px; letter-spacing: .04em; }
+.s-timing { font-family: var(--fl-fm); font-size: 10px; color: var(--fl-text3); }
+.s-title { font-size: 14px; font-weight: 600; color: var(--fl-text); letter-spacing: -.01em; line-height: 1.3; }
+.s-acts  { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.ic-btn {
+  width: 26px; height: 26px; border-radius: 6px; border: 1px solid transparent;
+  background: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: var(--fl-text3); transition: all var(--fl-tr);
+}
+.ic-btn:hover      { background: var(--fl-bg2); border-color: var(--fl-border); color: var(--fl-text); }
+.ic-btn.active     { background: var(--fl-accent-light); color: var(--fl-accent); border-color: var(--fl-accent-light); }
+.ic-btn:disabled   { opacity: .3; cursor: default; }
+.chev              { transition: transform var(--fl-tr); }
+.chev.open         { transform: rotate(180deg); }
+
+.s-body         { display: none; padding: 0 15px 15px 54px; }
+.s-body.open    { display: block; }
+.desc-box {
+  font-size: 13px; color: var(--fl-text2); line-height: 1.65; margin-bottom: 11px;
+  padding: 9px 11px; background: var(--fl-bg); border-radius: 8px;
+  border-left: 3px solid var(--fl-border2);
+}
+.alert-box {
+  display: flex; gap: 8px; align-items: flex-start;
+  background: var(--fl-amber-light); border: 1px solid #E0C090; border-radius: 8px;
+  padding: 9px 11px; font-size: 12px; color: var(--fl-amber); line-height: 1.5; margin-bottom: 11px;
+}
+.sec-lbl {
+  font-family: var(--fl-fm); font-size: 9px; letter-spacing: .08em;
+  color: var(--fl-text3); text-transform: uppercase; margin-bottom: 7px; margin-top: 11px;
+}
+.cl  { display: flex; flex-direction: column; gap: 5px; }
+.ci  { display: flex; align-items: flex-start; gap: 7px; }
+.cb  {
+  width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--fl-border2);
+  cursor: pointer; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center;
+  justify-content: center; transition: all var(--fl-tr); background: var(--fl-surface);
+}
+.cb:hover  { border-color: var(--fl-accent); }
+.cb.checked { background: var(--fl-accent); border-color: var(--fl-accent); }
+.cb.checked::after {
+  content: ''; display: block; width: 6px; height: 4px;
+  border-left: 2px solid #fff; border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) translate(1px,-1px);
+}
+.ct         { font-size: 13px; color: var(--fl-text2); line-height: 1.5; transition: color var(--fl-tr); }
+.ct.checked { color: var(--fl-text3); text-decoration: line-through; }
+.fl-hr      { border: none; border-top: 1px solid var(--fl-border); margin: 11px 0; }
+
+/* ── Painel de edição ───────────────────────────────────────────────────── */
+.ep         { border-top: 1px solid var(--fl-border); padding: 13px 15px 15px 54px; display: none; }
+.ep.open    { display: block; }
+.el         { font-size: 11px; font-weight: 500; color: var(--fl-text2); margin-bottom: 3px; display: block; }
+.ei, .eta, .esel {
+  width: 100%; font-family: var(--fl-fn); font-size: 13px; color: var(--fl-text);
+  background: var(--fl-bg); border: 1px solid var(--fl-border); border-radius: 8px;
+  padding: 7px 9px; outline: none; line-height: 1.5; transition: border-color var(--fl-tr);
+  box-sizing: border-box;
+}
+.ei:focus, .eta:focus, .esel:focus { border-color: var(--fl-accent); }
+.eta        { min-height: 60px; resize: none; }
+.ef         { margin-bottom: 9px; }
+.cel        { display: flex; flex-direction: column; gap: 5px; margin-bottom: 7px; }
+.cer        { display: flex; align-items: center; gap: 5px; }
+.cei {
+  flex: 1; font-family: var(--fl-fn); font-size: 12px; color: var(--fl-text);
+  background: var(--fl-bg); border: 1px solid var(--fl-border); border-radius: 6px;
+  padding: 5px 7px; outline: none; transition: border-color var(--fl-tr);
+}
+.cei:focus  { border-color: var(--fl-accent); }
+.dcb {
+  width: 22px; height: 22px; border-radius: 5px; flex-shrink: 0;
+  border: 1px solid var(--fl-border); background: none; cursor: pointer;
+  color: var(--fl-text3); display: flex; align-items: center; justify-content: center;
+  transition: all var(--fl-tr);
+}
+.dcb:hover  { background: var(--fl-coral-light); border-color: #E8B8AD; color: var(--fl-coral); }
+.acb {
+  display: flex; align-items: center; gap: 5px; font-size: 11px;
+  color: var(--fl-accent); background: none; border: 1px dashed var(--fl-accent);
+  border-radius: 6px; padding: 4px 9px; cursor: pointer; transition: all var(--fl-tr); font-family: var(--fl-fn);
+}
+.acb:hover  { background: var(--fl-accent-light); }
+.ea         { display: flex; gap: 7px; margin-top: 13px; }
+
+/* ── Adicionar etapa ────────────────────────────────────────────────────── */
+.add-step {
+  display: flex; align-items: center; justify-content: center; padding: 16px; margin-top: 9px;
+  border: 2px dashed var(--fl-border); border-radius: var(--fl-rl); cursor: pointer;
+  transition: all var(--fl-tr); color: var(--fl-text3); gap: 7px; font-size: 13px;
+  background: transparent; width: 100%; font-family: var(--fl-fn);
+}
+.add-step:hover { border-color: var(--fl-accent); color: var(--fl-accent); background: var(--fl-accent-light); }
+
+/* ── Observações ────────────────────────────────────────────────────────── */
+.obs {
+  background: var(--fl-blue-light); border: 1px solid #AFC8E0; border-radius: 10px;
+  padding: 13px 15px; font-size: 13px; color: var(--fl-blue-dark); line-height: 1.6; margin-top: 24px;
+}
+.obs h3     { font-size: 13px; font-weight: 600; margin-bottom: 7px; }
+.obs ul     { padding-left: 15px; display: flex; flex-direction: column; gap: 3px; }
+
+/* ── Cores das categorias ───────────────────────────────────────────────── */
+.c-teal .s-num, .c-teal .s-tag   { background: #C0EDD8; color: #0F6E56; }
+.c-blue .s-num, .c-blue .s-tag   { background: #B5D4F4; color: #0C447C; }
+.c-purple .s-num, .c-purple .s-tag { background: #CECBF6; color: #3C3489; }
+.c-amber .s-num, .c-amber .s-tag  { background: #FAC775; color: #633806; }
+.c-green .s-num, .c-green .s-tag  { background: #C0DD97; color: #27500A; }
+.c-coral .s-num, .c-coral .s-tag  { background: #F5C4B3; color: #712B13; }
+
+/* ── Calendário — toolbar e filtros ────────────────────────────────────── */
+.cal-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.cal-filters { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.fchip {
+  font-family: var(--fl-fm); font-size: 9px; padding: 3px 9px;
+  border-radius: 99px; border: 1px solid var(--fl-border); background: transparent;
+  cursor: pointer; color: var(--fl-text2); transition: all var(--fl-tr); letter-spacing: .03em;
+}
+.fchip:hover { border-color: var(--fl-border2); background: var(--fl-bg2); }
+.fchip.active { color: #fff; border-color: transparent; }
+.fchip[data-t="Recebimento"].active          { background: #1D9E75; }
+.fchip[data-t="Recebimento URGENTE"].active  { background: #8C2510; }
+.fchip[data-t="Obrigação fiscal"].active     { background: #8C2510; }
+.fchip[data-t="Fechamento parcial"].active   { background: #3D2B6B; }
+.fchip[data-t="Fechamento geral"].active     { background: #3D2B6B; }
+.fchip[data-t="Apuração"].active             { background: #1A3C5C; }
+.fchip[data-t="Preparação"].active           { background: #7A4D0A; }
+.fchip[data-t="Geração folha"].active        { background: #2A5C45; }
+.fchip[data-t="Coordenação"].active          { background: #B85C1A; }
+.fchip[data-t="Envio benefícios"].active     { background: #534AB7; }
+.fchip[data-t="Entrega"].active              { background: #993C1D; }
+.fchip[data-t="Pagamento"].active            { background: #5F1A1A; }
+.fchip[data-t="Boleto"].active, .fchip[data-t="Boleto sindicato"].active { background: #0C447C; }
+.fchip[data-t="Conferência"].active          { background: #5C5750; }
+.fchip[data-t="Prévia"].active               { background: #4B1528; }
+.fchip[data-t="Integração fiscal"].active    { background: #042C53; }
+.fchip[data-t="Envio relatório"].active      { background: #173404; }
+.fchip[data-t="Lançamento manual"].active    { background: #501313; }
+.fchip[data-t="Mapeamento"].active           { background: #26215C; }
+
+/* ── Badges de criticidade ──────────────────────────────────────────────── */
+.cb-c { font-family: var(--fl-fm); font-size: 9px; padding: 2px 6px; border-radius: 99px; letter-spacing: .04em; white-space: nowrap; }
+.cc-critica { background: #F7C1C1; color: #501313; }
+.cc-alta    { background: #FAC775; color: #412402; }
+.cc-media   { background: #C0DD97; color: #173404; }
+.cc-baixa   { background: #B5D4F4; color: #042C53; }
+
+/* ── Grupos de dias ─────────────────────────────────────────────────────── */
+.dg     { margin-bottom: 7px; }
+.dg-hdr {
+  display: flex; align-items: center; gap: 9px; padding: 9px 13px;
+  background: var(--fl-surface); border: 1px solid var(--fl-border);
+  border-radius: var(--fl-r); cursor: pointer; user-select: none; transition: all var(--fl-tr);
+}
+.dg-hdr:hover  { background: var(--fl-bg2); }
+.dg-badge      { font-family: var(--fl-fm); font-size: 12px; font-weight: 500; min-width: 56px; color: var(--fl-text); }
+.dg-sum        { flex: 1; display: flex; gap: 4px; flex-wrap: wrap; }
+.dg-cnt        { font-family: var(--fl-fm); font-size: 10px; color: var(--fl-text3); background: var(--fl-bg2); padding: 2px 7px; border-radius: 99px; border: 1px solid var(--fl-border); }
+.dg-chev       { color: var(--fl-text3); transition: transform var(--fl-tr); flex-shrink: 0; }
+.dg-chev.open  { transform: rotate(180deg); }
+.dg-body       { display: flex; flex-direction: column; gap: 5px; padding: 6px 0 3px; }
+.dg-body.collapsed { display: none; }
+
+/* ── Card de tarefa ─────────────────────────────────────────────────────── */
+.tc         { background: var(--fl-surface); border: 1px solid var(--fl-border); border-radius: 9px; overflow: hidden; box-shadow: var(--fl-sh); transition: box-shadow var(--fl-tr); }
+.tc:hover   { box-shadow: var(--fl-shh); }
+.tc.editing { border-color: var(--fl-accent); box-shadow: 0 0 0 2px var(--fl-accent-light); }
+.tc-hdr     { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; }
+.tck {
+  width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--fl-border2);
+  cursor: pointer; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center;
+  justify-content: center; transition: all var(--fl-tr); background: var(--fl-surface);
+}
+.tck:hover   { border-color: var(--fl-accent); }
+.tck.checked { background: var(--fl-accent); border-color: var(--fl-accent); }
+.tck.checked::after {
+  content: ''; display: block; width: 6px; height: 4px;
+  border-left: 2px solid #fff; border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) translate(1px,-1px);
+}
+.tc-c       { flex: 1; min-width: 0; }
+.tc-meta    { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 3px; }
+.tc-type    { font-family: var(--fl-fm); font-size: 9px; padding: 2px 7px; border-radius: 99px; letter-spacing: .04em; }
+.tc-title   { font-size: 13px; font-weight: 500; color: var(--fl-text); line-height: 1.4; }
+.tc-title.checked { color: var(--fl-text3); text-decoration: line-through; }
+.tc-cos     { font-size: 11px; color: var(--fl-text3); margin-top: 3px; line-height: 1.4; }
+.tc-acts    { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+
+.te         { border-top: 1px solid var(--fl-border); padding: 11px 12px 13px 35px; display: none; }
+.te.open    { display: block; }
+.te-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 7px; }
+
+/* tipos de tarefa */
+.tt-rec{background:#C0EDD8;color:#085041;} .tt-obs{background:#F7C1C1;color:#501313;}
+.tt-fec{background:#CECBF6;color:#26215C;} .tt-apu{background:#B5D4F4;color:#042C53;}
+.tt-pre{background:#FAC775;color:#412402;} .tt-ger{background:#C0DD97;color:#173404;}
+.tt-coo{background:#F5C4B3;color:#4A1B0C;} .tt-env{background:#E1F5EE;color:#04342C;}
+.tt-ent{background:#FAECE7;color:#4A1B0C;} .tt-pag{background:#F5DADA;color:#501313;}
+.tt-bol{background:#DDE8F0;color:#042C53;} .tt-con{background:#F1EFE8;color:#2C2C2A;}
+.tt-prv{background:#FBEAF0;color:#4B1528;} .tt-int{background:#E6F1FB;color:#042C53;}
+.tt-evr{background:#EAF3DE;color:#173404;} .tt-lan{background:#FCEBEB;color:#501313;}
+.tt-map{background:#EEEDFE;color:#26215C;} .tt-urg{background:#F5DADA;color:#501313;}
+.tt-bos{background:#DDE8F0;color:#042C53;} .tt-def{background:#F1EFE8;color:#2C2C2A;}
+
+.add-task-btn, .add-day-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;
+  padding: 8px; border: 2px dashed var(--fl-border); border-radius: 8px; background: transparent;
+  cursor: pointer; font-size: 12px; color: var(--fl-text3); font-family: var(--fl-fn); transition: all var(--fl-tr);
+}
+.add-day-btn    { padding: 13px; font-size: 13px; border-radius: var(--fl-r); margin-top: 9px; }
+.add-task-btn:hover, .add-day-btn:hover { border-color: var(--fl-accent); color: var(--fl-accent); background: var(--fl-accent-light); }
+
+/* ── Criticidade — legenda na sidebar ───────────────────────────────────── */
+.crit-legend  { padding: 0 4px; display: flex; flex-direction: column; gap: 5px; }
+.crit-row     { display: flex; align-items: center; gap: 7px; }
+.crit-label   { font-size: 11px; color: rgba(255,255,255,.65); }
+
+/* ── Modal ──────────────────────────────────────────────────────────────── */
+.fl-mo       { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 200; display: none; align-items: center; justify-content: center; }
+.fl-mo.open  { display: flex; }
+.fl-mo-box   { background: var(--fl-surface); border-radius: var(--fl-rl); padding: 22px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+.fl-mo-box h2 { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: var(--fl-text); }
+.fl-mo-acts  { display: flex; gap: 7px; margin-top: 18px; justify-content: flex-end; }
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+.fl-toast {
+  position: fixed; bottom: 20px; right: 20px; z-index: 999;
+  background: var(--fl-text); color: #fff; padding: 8px 14px;
+  border-radius: 8px; font-size: 13px; box-shadow: 0 4px 20px rgba(0,0,0,.2);
+  transform: translateY(70px); opacity: 0; transition: all .3s ease; pointer-events: none;
+}
+.fl-toast.show { transform: translateY(0); opacity: 1; }
+
+/* ── Item da sidebar para troca de aba ──────────────────────────────────── */
+.sidebar-item.tab-nav-item { cursor: pointer; }
+</style>
+</head>
+<body>
+
+<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="fecharSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+    <h2>Fechamento Folha</h2>
+    <p>Fluxo de Procedimentos</p>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Visualização</div>
+    <button class="sidebar-item tab-nav-item active" id="navFluxo" onclick="switchTab('fluxo')">
+      <span class="sidebar-item-icon">📋</span> Fluxo de Fechamento
+    </button>
+    <button class="sidebar-item tab-nav-item" id="navCalendario" onclick="switchTab('calendario')">
+      <span class="sidebar-item-icon">📅</span> Calendário Mensal
+    </button>
+
+    <div class="sidebar-section" id="sbProgTitle">Progresso do Mês</div>
+    <div class="fl-prog-box">
+      <div class="fl-prog-row">
+        <span class="fl-prog-label" id="sbProgLabel">Checklist</span>
+        <span class="fl-prog-pct"  id="fpct">0%</span>
+      </div>
+      <div class="fl-prog-track">
+        <div class="fl-prog-bar" id="fbar" style="width:0%"></div>
+      </div>
+      <span class="fl-prog-sub" id="flbl">0 de 0 itens</span>
+    </div>
+
+    <div class="sidebar-section">Empresas</div>
+    <a href="quadrante.html" class="sidebar-item">
+      <span class="sidebar-item-icon">🏭</span> Quadrante Etiquetas
+    </a>
+    <a href="trackfield.html" class="sidebar-item">
+      <span class="sidebar-item-icon">🏃</span> Track &amp; Field
+    </a>
+    <a href="ananke.html" class="sidebar-item">
+      <span class="sidebar-item-icon">🏥</span> Anankê
+    </a>
+
+    <div class="sidebar-section">Formulários</div>
+    <a href="formulario_quadrante.html" class="sidebar-item">
+      <span class="sidebar-item-icon">📄</span> Quadrante
+    </a>
+    <a href="formulario_trackfield.html" class="sidebar-item">
+      <span class="sidebar-item-icon">📄</span> Track &amp; Field
+    </a>
+    <a href="formulario_ananke.html" class="sidebar-item">
+      <span class="sidebar-item-icon">📄</span> Anankê
+    </a>
+
+    <div class="sidebar-section">Ferramentas</div>
+    <a href="ferias.html" class="sidebar-item">
+      <span class="sidebar-item-icon">🏖️</span> Programação de Férias
+    </a>
+
+    <div class="sidebar-section">Navegação</div>
+    <a href="index.html" class="sidebar-item">
+      <span class="sidebar-item-icon">🏠</span> Início
+    </a>
+    <a href="../portal.html" class="sidebar-item">
+      <span class="sidebar-item-icon">🌐</span> Portal SCONT
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-info">
+      <strong>Fluxo de Fechamento</strong>
+      SCONT · Departamento Pessoal
+    </div>
+  </div>
+</aside>
+
+<div class="main-content">
+
+  <div class="page-header">
+    <div>
+      <h1 id="pgTitle">📋 Fluxo de Fechamento da Folha</h1>
+      <div class="page-header-sub" id="pgSub">Processo mensal — etapas, checklists e acompanhamento de progresso</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-shrink:0;flex-wrap:wrap;">
+      <button class="fl-btn fl-btn-o" onclick="exportAll()">⬇ Exportar</button>
+      <button class="fl-btn fl-btn-o" onclick="resetAll()">↺ Reiniciar</button>
+      <button class="fl-btn fl-btn-p" onclick="window.print()">🖨️ Imprimir</button>
+    </div>
+  </div>
+
+  <!-- ═══ FLUXO ═══ -->
+  <div id="page-fluxo" class="container fluxo-area">
+    <div class="lgd">
+      <div class="lgd-i"><div class="lgd-d" style="background:#C0EDD8"></div>Coleta de dados</div>
+      <div class="lgd-i"><div class="lgd-d" style="background:#B5D4F4"></div>Processamento</div>
+      <div class="lgd-i"><div class="lgd-d" style="background:#CECBF6"></div>Validação</div>
+      <div class="lgd-i"><div class="lgd-d" style="background:#FAC775"></div>Conclusão</div>
+      <div class="lgd-i"><div class="lgd-d" style="background:#C0DD97"></div>Geração de docs</div>
+      <div class="lgd-i"><div class="lgd-d" style="background:#F5C4B3"></div>Obrigações fiscais</div>
+    </div>
+    <div id="fflow"></div>
+    <button class="add-step" onclick="fAddStep()">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg>
+      Adicionar nova etapa
+    </button>
+    <div class="obs">
+      <h3>📋 Observações e Procedimentos Específicos — Quadrante Etiquetas</h3>
+      <ul>
+        <li><strong>Admissões:</strong> cliente envia documentação com bom prazo. Obrigatório seguir modelo padrão em <code style="font-size:11px;background:rgba(0,0,0,.06);padding:1px 4px;border-radius:3px">Z:\ARQUIVO EMPRESAS\QUADRANTE ETIQUETAS INDUSTRIA E COMERCIO LTDA\DEPARTAMENTO PESSOAL\Admissões\Modelos de Arquivos</code></li>
+        <li><strong>Rescisões:</strong> cliente realiza contagem do pagamento após o último dia de trabalho do funcionário.</li>
+        <li><strong>Férias:</strong> solicitadas pela empresa diretamente na plataforma Onvio.</li>
+        <li><strong>Relatório de Líquido:</strong> modelo customizado conforme solicitação do cliente. Salvar em <code style="font-size:11px;background:rgba(0,0,0,.06);padding:1px 4px;border-radius:3px">Z:\ARQUIVO EMPRESAS\QUADRANTE ETIQUETAS INDUSTRIA E COMERCIO LTDA\DEPARTAMENTO PESSOAL</code></li>
+        <li><strong>Envio de documentos:</strong> todos via Onvio. Avisar Milene após cada postagem, especialmente durante o período de adaptação.</li>
+        <li><strong>FGTS — ATENÇÃO:</strong> a empresa NÃO realiza pagamentos de FGTS mensais. O FGTS é pago somente no momento da rescisão do funcionário.</li>
+        <li><strong>Guia FGTS Consignado:</strong> solicitada separadamente pelo cliente quando necessário.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ CALENDÁRIO ═══ -->
+  <div id="page-calendario" class="container fluxo-area" style="display:none;">
+    <div class="cal-toolbar">
+      <div class="cal-filters" id="cal-filters"></div>
+      <button class="fl-btn fl-btn-o" onclick="expandAll()" style="font-size:11px;flex-shrink:0;">Expandir tudo</button>
+    </div>
+    <div id="ccont"></div>
+    <button class="add-day-btn" onclick="openModal()">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg>
+      Adicionar novo grupo de tarefas
+    </button>
+  </div>
+
+</div><!-- /main-content -->
+
+<!-- Modal -->
+<div class="fl-mo" id="modal">
+  <div class="fl-mo-box">
+    <h2>Novo grupo de tarefas</h2>
+    <div class="ef"><label class="el">Dia(s) do mês</label><input class="ei" id="modal-day" placeholder="Ex: 15 ou 15-16"></div>
+    <div class="fl-mo-acts">
+      <button class="fl-btn fl-btn-o" onclick="closeModal()">Cancelar</button>
+      <button class="fl-btn fl-btn-p" onclick="confirmModal()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<div class="fl-toast" id="toast"></div>
+
+<script>
+/* ── HELPERS ────────────────────────────────────────────────────────────── */
+const H = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const $ = id => document.getElementById(id);
+const toast = m => { const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); };
+
+/* ── SIDEBAR / HAMBURGER ────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', async () => {
+    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+    if (!auth) return;
+    loadState();
+    renderFlow();
+    renderCal();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const ham = $('hamburger');
+    if (ham) ham.addEventListener('click', () => {
+        $('sidebar').classList.toggle('open');
+        $('sidebarOverlay').classList.toggle('active');
+    });
+});
+
+function fecharSidebar() {
+    $('sidebar').classList.remove('open');
+    $('sidebarOverlay').classList.remove('active');
+}
+
+/* ── TAB ────────────────────────────────────────────────────────────────── */
+function switchTab(t) {
+    $('page-fluxo').style.display     = t === 'fluxo'     ? '' : 'none';
+    $('page-calendario').style.display = t === 'calendario' ? '' : 'none';
+    $('navFluxo').classList.toggle('active',     t === 'fluxo');
+    $('navCalendario').classList.toggle('active', t === 'calendario');
+
+    if (t === 'fluxo') {
+        $('pgTitle').textContent  = '📋 Fluxo de Fechamento da Folha';
+        $('pgSub').textContent    = 'Processo mensal — etapas, checklists e acompanhamento de progresso';
+        $('sbProgLabel').textContent = 'Checklist';
+        updateFProg();
+    } else {
+        $('pgTitle').textContent  = '📅 Calendário Mensal de Tarefas';
+        $('pgSub').textContent    = 'Tarefas recorrentes do Departamento Pessoal organizadas por dia';
+        $('sbProgLabel').textContent = 'Tarefas';
+        updateCProg();
+    }
+}
+
+/* ── ESTADO ─────────────────────────────────────────────────────────────── */
+const FCATS = ['Coleta de dados','Processamento','Validação','Conclusão','Geração de docs','Obrigações fiscais'];
+const FCOL  = {
+    'Coleta de dados':'c-teal', 'Processamento':'c-blue', 'Validação':'c-purple',
+    'Conclusão':'c-amber',      'Geração de docs':'c-green', 'Obrigações fiscais':'c-coral'
+};
+
+let fSteps, fChk, fDone, cDays, cChk;
+let fNextId = 100, cNextTask = 9000, cNextDay = 50;
+let activeFilters = new Set();
+
+function loadState() {
+    fSteps = JSON.parse(localStorage.getItem('qf_s') || 'null') || deepCopy(FLOW_DATA);
+    fChk   = JSON.parse(localStorage.getItem('qf_c') || '{}');
+    fDone  = JSON.parse(localStorage.getItem('qf_d') || '{}');
+    cDays  = JSON.parse(localStorage.getItem('qc_d') || 'null') || deepCopy(CAL_DATA);
+    cChk   = JSON.parse(localStorage.getItem('qc_c') || '{}');
+    fNextId    = Math.max(...fSteps.map(s => s.id), 99) + 1;
+    cNextTask  = Math.max(...cDays.flatMap(d => d.tasks.map(t => t.id)), 8999) + 1;
+    cNextDay   = Math.max(...cDays.map(d => d.id), 49) + 1;
+}
+function saveState() {
+    localStorage.setItem('qf_s', JSON.stringify(fSteps));
+    localStorage.setItem('qf_c', JSON.stringify(fChk));
+    localStorage.setItem('qf_d', JSON.stringify(fDone));
+    localStorage.setItem('qc_d', JSON.stringify(cDays));
+    localStorage.setItem('qc_c', JSON.stringify(cChk));
+}
+function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
+
+function ns(col) {
+    return ({'c-teal':'background:#C0EDD8;color:#0F6E56','c-blue':'background:#B5D4F4;color:#0C447C',
+             'c-purple':'background:#CECBF6;color:#3C3489','c-amber':'background:#FAC775;color:#633806',
+             'c-green':'background:#C0DD97;color:#27500A','c-coral':'background:#F5C4B3;color:#712B13'}[col] || '');
+}
+function typeClass(t) {
+    return ({'Recebimento':'tt-rec','Obrigação fiscal':'tt-obs','Fechamento parcial':'tt-fec',
+             'Fechamento geral':'tt-fec','Apuração':'tt-apu','Preparação':'tt-pre','Geração folha':'tt-ger',
+             'Coordenação':'tt-coo','Envio benefícios':'tt-env','Entrega':'tt-ent','Pagamento':'tt-pag',
+             'Boleto':'tt-bol','Boleto sindicato':'tt-bos','Conferência':'tt-con','Prévia':'tt-prv',
+             'Integração fiscal':'tt-int','Envio relatório':'tt-evr','Lançamento manual':'tt-lan',
+             'Mapeamento':'tt-map','Recebimento URGENTE':'tt-urg'}[t] || 'tt-def');
+}
+function critClass(c) {
+    const k = (c || '').toUpperCase();
+    if (k === 'CRÍTICA' || k === 'CRITICA') return 'cc-critica';
+    if (k === 'ALTA')  return 'cc-alta';
+    if (k === 'BAIXA') return 'cc-baixa';
+    return 'cc-media';
+}
+
+/* ── FLUXO — RENDER ─────────────────────────────────────────────────────── */
+function renderFlow() { renderFFlow(); updateFProg(); }
+
+function renderFFlow() {
+    const c = $('fflow'); c.innerHTML = '';
+    fSteps.forEach((s, i) => {
+        const col = FCOL[s.category] || 'c-blue';
+        const isDone = !!fDone[s.id];
+        if (i > 0) {
+            const conn = document.createElement('div'); conn.className = 's-conn';
+            conn.innerHTML = s.connector
+                ? `<div class="s-line"></div><div class="s-clbl">${H(s.connector)}</div><div class="s-line"></div>`
+                : `<div class="s-line" style="height:13px"></div>`;
+            c.appendChild(conn);
+        }
+        const w = document.createElement('div');
+        w.className = `step-wrap ${col}`; w.id = 'fs-' + s.id;
+        const dc = (s.checklist || []).filter((_, ci) => fChk[`${s.id}-${ci}`]).length;
+        w.innerHTML = `
+<div class="step-card${isDone ? ' done-card' : ''}" id="fcard-${s.id}">
+  <div class="s-hdr" onclick="fTogBody(${s.id})">
+    <div class="s-numwrap">
+      <div class="s-num" style="${ns(col)}">${i+1}</div>
+      <div class="s-done${isDone?' done':''}" onclick="event.stopPropagation();fTogDone(${s.id})" title="Marcar etapa concluída"></div>
+    </div>
+    <div class="s-hdr-c">
+      <div class="s-meta">
+        <span class="s-tag" style="${ns(col)}">${H(s.category)}</span>
+        ${s.timing ? `<span class="s-timing">🗓 ${H(s.timing)}</span>` : ''}
+        ${s.checklist?.length ? `<span style="font-family:var(--fl-fm);font-size:9px;color:var(--fl-text3)">✓ ${dc}/${s.checklist.length}</span>` : ''}
+      </div>
+      <div class="s-title">${H(s.title)}</div>
+    </div>
+    <div class="s-acts" onclick="event.stopPropagation()">
+      <button class="ic-btn" onclick="fMove(${s.id},-1)" ${i===0?'disabled':''} title="↑ Subir">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12V4M4 7l4-4 4 4"/></svg>
+      </button>
+      <button class="ic-btn" onclick="fMove(${s.id},1)" ${i===fSteps.length-1?'disabled':''} title="↓ Descer">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4v8M4 9l4 4 4-4"/></svg>
+      </button>
+      <button class="ic-btn" id="fedb-${s.id}" onclick="fTogEdit(${s.id})" title="Editar">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-9 9H2v-3L11 2z"/></svg>
+      </button>
+      <button class="ic-btn" onclick="fDel(${s.id})" title="Excluir">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"/></svg>
+      </button>
+      <button class="ic-btn chev" id="fchev-${s.id}" onclick="event.stopPropagation();fTogBody(${s.id})">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="s-body" id="fbody-${s.id}">
+    ${s.desc  ? `<div class="desc-box">${H(s.desc)}</div>` : ''}
+    ${s.alert ? `<div class="alert-box"><span style="flex-shrink:0">⚠️</span><span>${H(s.alert)}</span></div>` : ''}
+    ${fRenderCL(s)}
+  </div>
+  <div class="ep" id="fep-${s.id}">${fRenderEP(s)}</div>
+</div>`;
+        c.appendChild(w);
+    });
+}
+
+function fRenderCL(s) {
+    if (!s.checklist?.length) return '';
+    return `<div class="sec-lbl">Checklist</div><div class="cl">${
+        s.checklist.map((item, ci) => {
+            const k = `${s.id}-${ci}`; const ch = !!fChk[k];
+            return `<div class="ci"><div class="cb${ch?' checked':''}" onclick="fTogChk('${k}',${s.id})"></div><span class="ct${ch?' checked':''}">${H(item)}</span></div>`;
+        }).join('')
+    }</div>`;
+}
+
+function fRenderEP(s) {
+    const catOpts = FCATS.map(c => `<option value="${H(c)}"${s.category===c?' selected':''}>${H(c)}</option>`).join('');
+    const chkRows = (s.checklist || []).map((v, ci) =>
+        `<div class="cer" id="fcr-${s.id}-${ci}"><input class="cei" type="text" value="${H(v)}" id="fcv-${s.id}-${ci}"><button class="dcb" onclick="fDelChk(${s.id},${ci})"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 8h12"/></svg></button></div>`
+    ).join('');
+    return `<div style="font-family:var(--fl-fm);font-size:9px;letter-spacing:.08em;color:var(--fl-text3);margin-bottom:11px">✏️ EDITANDO ETAPA</div>
+  <div class="ef"><label class="el">Título</label><input class="ei" type="text" id="fet-${s.id}" value="${H(s.title)}"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+    <div class="ef"><label class="el">Categoria</label><select class="esel" id="fec-${s.id}">${catOpts}</select></div>
+    <div class="ef"><label class="el">Prazo / timing</label><input class="ei" type="text" id="feT-${s.id}" value="${H(s.timing||'')}"></div>
+  </div>
+  <div class="ef"><label class="el">Rótulo do conector</label><input class="ei" type="text" id="feCo-${s.id}" value="${H(s.connector||'')}" placeholder="Ex: Dados recebidos"></div>
+  <div class="ef"><label class="el">Descrição</label><textarea class="eta" id="fed-${s.id}">${H(s.desc||'')}</textarea></div>
+  <div class="ef"><label class="el">Alerta / observação especial</label><input class="ei" type="text" id="fea-${s.id}" value="${H(s.alert||'')}"></div>
+  <div class="ef"><label class="el">Checklist</label><div class="cel" id="fcl-${s.id}">${chkRows}</div>
+    <button class="acb" onclick="fAddChk(${s.id})"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg> Adicionar item</button>
+  </div>
+  <div class="ea">
+    <button class="fl-btn fl-btn-p" onclick="fSaveEdit(${s.id})">Salvar</button>
+    <button class="fl-btn fl-btn-o" onclick="fTogEdit(${s.id})">Cancelar</button>
+    <button class="fl-btn fl-btn-d" onclick="fDel(${s.id})" style="margin-left:auto">Excluir etapa</button>
+  </div>`;
+}
+
+function fTogBody(id)  { const b=$('fbody-'+id),ch=$('fchev-'+id); const o=b.classList.contains('open'); b.classList.toggle('open',!o); ch?.classList.toggle('open',!o); }
+function fTogEdit(id)  { const p=$('fep-'+id),eb=$('fedb-'+id),card=$('fcard-'+id); const o=p.classList.contains('open'); p.classList.toggle('open',!o); eb?.classList.toggle('active',!o); card?.classList.toggle('editing',!o); if(!o)$('fbody-'+id)?.classList.add('open'); }
+function fTogDone(id)  { fDone[id]=!fDone[id]; saveState(); renderFlow(); }
+function fTogChk(key, sid) {
+    fChk[key]=!fChk[key]; saveState();
+    const s=fSteps.find(x=>x.id===sid); if(!s) return;
+    const b=$('fbody-'+sid); if(b){ const cl=b.querySelector('.cl'); if(cl) cl.outerHTML=fRenderCL(s); }
+    updateFProg();
+}
+function fMove(id, dir) {
+    const i=fSteps.findIndex(s=>s.id===id), ni=i+dir;
+    if(ni<0||ni>=fSteps.length) return;
+    [fSteps[i],fSteps[ni]]=[fSteps[ni],fSteps[i]]; saveState(); renderFlow(); toast('Etapa movida');
+}
+function fDel(id) {
+    if(!confirm('Excluir esta etapa?')) return;
+    fSteps=fSteps.filter(s=>s.id!==id); saveState(); renderFlow(); toast('Etapa excluída');
+}
+function fAddStep() {
+    const ns2={id:fNextId++,category:'Processamento',title:'Nova etapa',timing:'',connector:'',desc:'',checklist:[],alert:''};
+    fSteps.push(ns2); saveState(); renderFlow();
+    setTimeout(()=>{ fTogEdit(ns2.id); $('fs-'+ns2.id)?.scrollIntoView({behavior:'smooth',block:'center'}); $('fet-'+ns2.id)?.focus(); }, 60);
+}
+function fReadChks(s) { const l=$('fcl-'+s.id); if(!l) return; s.checklist=Array.from(l.querySelectorAll('.cei')).map(i=>i.value); }
+function fAddChk(sid) {
+    const s=fSteps.find(x=>x.id===sid); if(!s) return;
+    const ci=s.checklist.length; s.checklist.push('');
+    const l=$('fcl-'+sid);
+    const row=document.createElement('div'); row.className='cer'; row.id=`fcr-${sid}-${ci}`;
+    row.innerHTML=`<input class="cei" type="text" id="fcv-${sid}-${ci}" placeholder="Novo item"><button class="dcb" onclick="fDelChk(${sid},${ci})"><svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 8h12"/></svg></button>`;
+    l.appendChild(row); $(`fcv-${sid}-${ci}`)?.focus();
+}
+function fDelChk(sid, ci) { const s=fSteps.find(x=>x.id===sid); if(!s) return; fReadChks(s); s.checklist.splice(ci,1); $('fep-'+sid).innerHTML=fRenderEP(s); }
+function fSaveEdit(id) {
+    const s=fSteps.find(x=>x.id===id); if(!s) return;
+    s.title=$('fet-'+id)?.value||s.title;
+    s.category=$('fec-'+id)?.value||s.category;
+    s.timing=$('feT-'+id)?.value||'';
+    s.connector=$('feCo-'+id)?.value||'';
+    s.desc=$('fed-'+id)?.value||'';
+    s.alert=$('fea-'+id)?.value||'';
+    fReadChks(s); saveState(); renderFlow(); toast('Etapa salva');
+    setTimeout(()=>$('fbody-'+id)?.classList.add('open'), 30);
+}
+function updateFProg() {
+    let total=0, done=0;
+    fSteps.forEach(s=>(s.checklist||[]).forEach((_,ci)=>{ total++; if(fChk[`${s.id}-${ci}`]) done++; }));
+    const p = total ? Math.round(done/total*100) : 0;
+    $('fbar').style.width = p+'%'; $('fpct').textContent = p+'%'; $('flbl').textContent = `${done} de ${total} itens`;
+}
+
+/* ── CALENDÁRIO — RENDER ────────────────────────────────────────────────── */
+function renderCal() { renderCCont(); renderFilters(); updateCProg(); }
+
+function renderFilters() {
+    const wrap=$('cal-filters'); wrap.innerHTML='';
+    const types=new Set();
+    cDays.forEach(d=>d.tasks.forEach(t=>types.add(t.type)));
+    Array.from(types).sort().forEach(type=>{
+        const ch=document.createElement('button');
+        ch.className='fchip'+(activeFilters.has(type)?' active':'');
+        ch.dataset.t=type; ch.textContent=type;
+        ch.onclick=()=>{ activeFilters.has(type)?activeFilters.delete(type):activeFilters.add(type); renderCCont(); renderFilters(); };
+        wrap.appendChild(ch);
+    });
+}
+
+function renderCCont() {
+    const c=$('ccont'); c.innerHTML='';
+    cDays.forEach(d=>{
+        const filtered=activeFilters.size===0?d.tasks:d.tasks.filter(t=>activeFilters.has(t.type));
+        if(filtered.length===0&&activeFilters.size>0) return;
+        const isCol=!!d.collapsed&&activeFilters.size===0;
+        const cc={}; d.tasks.forEach(t=>{ const k=t.criticality?.toUpperCase()==='CRÍTICA'||t.criticality?.toUpperCase()==='CRITICA'?'CRÍTICA':t.criticality||'Média'; cc[k]=(cc[k]||0)+1; });
+        const cs=Object.entries(cc).map(([k,v])=>`<span class="cb-c ${critClass(k)}">${v} ${k}</span>`).join('');
+        const grp=document.createElement('div'); grp.className='dg'; grp.id='cday-'+d.id;
+        grp.innerHTML=`
+<div class="dg-hdr" onclick="cTogDay(${d.id})">
+  <div class="dg-badge">DIA ${H(d.day)}</div>
+  <div class="dg-sum">${cs}</div>
+  <div class="dg-cnt">${filtered.length} tarefa${filtered.length!==1?'s':''}</div>
+  <div class="dg-chev${isCol?'':' open'}" id="dchev-${d.id}">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l4 4 4-4"/></svg>
+  </div>
+  <button class="ic-btn" onclick="event.stopPropagation();cEditDay(${d.id})" title="Editar dia" style="margin-left:3px">
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-9 9H2v-3L11 2z"/></svg>
+  </button>
+  <button class="ic-btn" onclick="event.stopPropagation();cDelDay(${d.id})" title="Excluir grupo">
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"/></svg>
+  </button>
+</div>
+<div class="dg-body${isCol?' collapsed':''}" id="dbody-${d.id}">
+  ${filtered.map(t=>renderTaskCard(d.id,t)).join('')}
+  <button class="add-task-btn" onclick="cAddTask(${d.id})">
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg>
+    Adicionar tarefa neste dia
+  </button>
+</div>`;
+        c.appendChild(grp);
+    });
+}
+
+function renderTaskCard(dayId, t) {
+    const tc=typeClass(t.type), cc=critClass(t.criticality), checked=!!cChk[t.id];
+    const ALL_TYPES=['Recebimento','Recebimento URGENTE','Obrigação fiscal','Fechamento parcial','Fechamento geral','Apuração','Preparação','Geração folha','Coordenação','Envio benefícios','Entrega','Pagamento','Boleto','Boleto sindicato','Conferência','Prévia','Integração fiscal','Envio relatório','Lançamento manual','Mapeamento'];
+    const typeOpts=ALL_TYPES.map(tp=>`<option value="${H(tp)}"${t.type===tp?' selected':''}>${H(tp)}</option>`).join('');
+    const critOpts=['CRÍTICA','Alta','Média','Baixa'].map(cr=>`<option value="${H(cr)}"${(t.criticality||'Média')===cr?' selected':''}>${H(cr)}</option>`).join('');
+    return `<div class="tc" id="tcard-${t.id}">
+  <div class="tc-hdr">
+    <div class="tck${checked?' checked':''}" onclick="cTogChk(${t.id})" title="Concluída"></div>
+    <div class="tc-c">
+      <div class="tc-meta">
+        <span class="tc-type ${tc}">${H(t.type)}</span>
+        <span class="cb-c ${cc}">${H(t.criticality||'Média')}</span>
+      </div>
+      <div class="tc-title${checked?' checked':''}">${H(t.title)}</div>
+      ${t.companies?`<div class="tc-cos">${H(t.companies)}</div>`:''}
+    </div>
+    <div class="tc-acts">
+      <button class="ic-btn" id="tedb-${t.id}" onclick="cTogTaskEdit(${t.id})" title="Editar">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2l3 3-9 9H2v-3L11 2z"/></svg>
+      </button>
+      <button class="ic-btn" onclick="cDelTask(${dayId},${t.id})" title="Excluir">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="te" id="te-${t.id}">
+    <div class="te-grid">
+      <div class="ef"><label class="el">Título</label><input class="ei" type="text" id="tt-${t.id}" value="${H(t.title)}"></div>
+      <div class="ef"><label class="el">Tipo</label><select class="esel" id="ttype-${t.id}">${typeOpts}</select></div>
+      <div class="ef"><label class="el">Criticidade</label><select class="esel" id="tcrit-${t.id}">${critOpts}</select></div>
+      <div class="ef"><label class="el">Dia(s)</label><input class="ei" type="text" id="tday-${t.id}" value="${H(t.day||'')}"></div>
+    </div>
+    <div class="ef"><label class="el">Empresas envolvidas</label><textarea class="eta" style="min-height:44px" id="tcos-${t.id}">${H(t.companies||'')}</textarea></div>
+    <div class="ea">
+      <button class="fl-btn fl-btn-p" onclick="cSaveTask(${dayId},${t.id})">Salvar</button>
+      <button class="fl-btn fl-btn-o" onclick="cTogTaskEdit(${t.id})">Cancelar</button>
+      <button class="fl-btn fl-btn-d" onclick="cDelTask(${dayId},${t.id})" style="margin-left:auto">Excluir</button>
+    </div>
+  </div>
+</div>`;
+}
+
+function cTogDay(id)  { const d=cDays.find(x=>x.id===id); if(!d) return; d.collapsed=!d.collapsed; $('dbody-'+id)?.classList.toggle('collapsed',d.collapsed); $('dchev-'+id)?.classList.toggle('open',!d.collapsed); }
+function expandAll()  { cDays.forEach(d=>d.collapsed=false); renderCCont(); }
+function cEditDay(id) { const d=cDays.find(x=>x.id===id); if(!d) return; const v=prompt('Editar dia(s):',d.day); if(v===null) return; d.day=v; saveState(); renderCal(); toast('Dia atualizado'); }
+function cDelDay(id)  { if(!confirm('Excluir este grupo?')) return; cDays=cDays.filter(d=>d.id!==id); saveState(); renderCal(); toast('Grupo excluído'); }
+function cTogTaskEdit(tid) { const p=$('te-'+tid),card=$('tcard-'+tid); const o=p.classList.contains('open'); p.classList.toggle('open',!o); card?.classList.toggle('editing',!o); }
+function cTogChk(tid) { cChk[tid]=!cChk[tid]; saveState(); $('tcard-'+tid)?.querySelector('.tck')?.classList.toggle('checked',!!cChk[tid]); $('tcard-'+tid)?.querySelector('.tc-title')?.classList.toggle('checked',!!cChk[tid]); updateCProg(); }
+function cAddTask(dayId) {
+    const d=cDays.find(x=>x.id===dayId); if(!d) return;
+    const nt={id:cNextTask++,title:'Nova tarefa',type:'Recebimento',criticality:'Média',companies:'',day:d.day};
+    d.tasks.push(nt); saveState();
+    const body=$('dbody-'+dayId);
+    if(body){ const addBtn=body.querySelector('.add-task-btn'); const div=document.createElement('div'); div.innerHTML=renderTaskCard(dayId,nt); body.insertBefore(div.firstElementChild,addBtn); d.collapsed=false; }
+    setTimeout(()=>{ cTogTaskEdit(nt.id); $('tt-'+nt.id)?.focus(); }, 30);
+}
+function cSaveTask(dayId, tid) {
+    const d=cDays.find(x=>x.id===dayId); if(!d) return;
+    const t=d.tasks.find(x=>x.id===tid); if(!t) return;
+    t.title=$('tt-'+tid)?.value||t.title; t.type=$('ttype-'+tid)?.value||t.type;
+    t.criticality=$('tcrit-'+tid)?.value||t.criticality; t.day=$('tday-'+tid)?.value||t.day;
+    t.companies=$('tcos-'+tid)?.value||''; saveState(); renderCal(); toast('Tarefa salva');
+}
+function cDelTask(dayId, tid) {
+    if(!confirm('Excluir esta tarefa?')) return;
+    const d=cDays.find(x=>x.id===dayId); if(!d) return;
+    d.tasks=d.tasks.filter(t=>t.id!==tid); saveState(); renderCal(); toast('Tarefa excluída');
+}
+function updateCProg() {
+    let total=0,done=0; cDays.forEach(day=>day.tasks.forEach(task=>{ total++; if(cChk[task.id]) done++; }));
+    const p=total?Math.round(done/total*100):0;
+    $('fbar').style.width=p+'%'; $('fpct').textContent=p+'%'; $('flbl').textContent=`${done} de ${total}`;
+}
+
+/* ── MODAL ──────────────────────────────────────────────────────────────── */
+function openModal()    { $('modal').classList.add('open'); $('modal-day').value=''; $('modal-day').focus(); }
+function closeModal()   { $('modal').classList.remove('open'); }
+function confirmModal() {
+    const v=$('modal-day').value.trim(); if(!v){ alert('Informe o dia.'); return; }
+    cDays.push({id:cNextDay++,day:v,collapsed:false,tasks:[]});
+    cDays.sort((a,b)=>parseInt(a.day)-parseInt(b.day));
+    saveState(); renderCal(); closeModal(); toast('Grupo criado');
+}
+$('modal').addEventListener('click', e=>{ if(e.target===e.currentTarget) closeModal(); });
+
+/* ── GLOBAL ─────────────────────────────────────────────────────────────── */
+function exportAll() {
+    const blob=new Blob([JSON.stringify({fSteps,fChk,fDone,cDays,cChk,at:new Date().toISOString()},null,2)],{type:'application/json'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='scont_fluxo_folha.json'; a.click(); toast('Exportado');
+}
+function resetAll() {
+    if(!confirm('Reiniciar todas as marcações do mês?')) return;
+    fChk={}; fDone={}; cChk={}; saveState(); renderFlow(); renderCal(); updateFProg(); toast('Reiniciado');
+}
+
+/* ── DADOS — FLUXO ──────────────────────────────────────────────────────── */
+const FLOW_DATA=[
+  {id:1,category:'Coleta de dados',title:'Encerramento da folha de ponto',timing:'Dia 25 de cada mês',connector:'',desc:'O período de apuração é encerrado no dia 25 de cada mês. Este é o marco inicial do ciclo de fechamento da folha de pagamento da Quadrante Etiquetas.',checklist:['Confirmar encerramento do registro de ponto no dia 25','Verificar registros de ausências e atrasos no período','Checar horas extras lançadas no período','Confirmar férias e afastamentos do mês','Checar admissões e desligamentos ocorridos no período'],alert:''},
+  {id:2,category:'Coleta de dados',title:'Recebimento da planilha de ponto via e-mail',timing:'Dia 27 de cada mês',connector:'',desc:'O cliente (Milene) envia a planilha de ponto por e-mail todos os dias 27. Este arquivo é a base de dados para o processamento da folha.',checklist:['Receber planilha de ponto via e-mail de Milene (milene@quadranterotulos.com)','Confirmar recebimento e integridade do arquivo','Verificar se todos os colaboradores estão contemplados na planilha','Checar consistência dos dados: datas, horas e tipos de lançamento','Salvar planilha no diretório correto (Z:\\ARQUIVO EMPRESAS\\QUADRANTE...\\DEPARTAMENTO PESSOAL)'],alert:''},
+  {id:3,category:'Processamento',title:'Lançamento de rubricas no sistema',timing:'Dias 27–28',connector:'Dados recebidos',desc:'O lançamento é realizado manualmente no sistema (Onvio). Inclui todos os eventos de remuneração do período: salários, horas extras, faltas, descontos e benefícios.',checklist:['Acessar o sistema Onvio','Selecionar a competência correta (mês/ano de referência)','Lançar horas normais trabalhadas','Lançar horas extras com o adicional correto (50% ou 100%)','Lançar faltas e atrasos com os respectivos descontos','Lançar adicionais, benefícios e outros eventos do período','Lançar afastamentos (INSS, licenças, etc.)','Conferir totais lançados antes de prosseguir'],alert:''},
+  {id:4,category:'Processamento',title:'Conferência interna dos dados lançados',timing:'Dia 28',connector:'',desc:'Após o lançamento, o auxiliar responsável confere todos os dados inseridos no sistema. A conferência é etapa obrigatória antes de gerar a simulação.',checklist:['Conferir total de colaboradores incluídos na folha','Checar rubricas lançadas versus planilha recebida','Verificar bases de cálculo: INSS, FGTS e IRRF','Validar descontos e adicionais aplicados','Checar colaboradores em férias no período','Confirmar dados de eventuais admissões recentes'],alert:''},
+  {id:5,category:'Validação',title:'Envio da simulação (prévia) para aprovação de Milene',timing:'Até o dia 28',connector:'Conferência ok',desc:'Após a conferência, é gerada uma simulação da folha no Onvio e enviada por e-mail para Milene validar. O responsável deve aguardar a confirmação de Milene antes de prosseguir com o fechamento.',checklist:['Gerar simulação da folha no Onvio','Exportar relatório de prévia em PDF','Enviar por e-mail para Milene (milene@quadranterotulos.com) com assunto claro','Registrar data e hora do envio','Aguardar retorno de aprovação ou solicitação de correção','Em caso de correção: ajustar, gerar nova simulação e reenviar'],alert:''},
+  {id:6,category:'Processamento',title:'Recebimento e inclusão das comissões',timing:'1º dia útil do mês seguinte',connector:'Prévia aprovada',desc:'Milene envia os dados de comissão no 1º dia útil de cada mês. Após o recebimento, as comissões são incluídas no sistema para complementar a folha antes do fechamento definitivo.',checklist:['Receber dados de comissão de Milene no 1º dia útil do mês','Verificar lista de colaboradores e valores de comissão','Lançar comissões no sistema Onvio','Conferir impacto nos encargos: INSS, FGTS e IRRF'],alert:''},
+  {id:7,category:'Conclusão',title:'Fechamento definitivo da folha e geração de documentação',timing:'Após inclusão das comissões',connector:'Comissões incluídas',desc:'Com a simulação aprovada por Milene e as comissões devidamente incluídas, o responsável conclui o fechamento definitivo da folha no Onvio e gera toda a documentação.',checklist:['Confirmar aprovação da simulação por Milene','Confirmar inclusão das comissões','Executar fechamento/conclusão da folha no Onvio','Verificar totais finais: líquidos e encargos','Registrar data de fechamento','Gerar contracheques em PDF (padrão do sistema)','Gerar contracheques em TXT (se solicitado pelo cliente)','Gerar Relatório de Líquido (modelo customizado conforme solicitação)','Salvar Relatório de Líquido em: Z:\\ARQUIVO EMPRESAS\\QUADRANTE ETIQUETAS INDUSTRIA E COMERCIO LTDA\\DEPARTAMENTO PESSOAL','Gerar Relatório de Férias (gerado e enviado junto com a folha, conforme solicitação)'],alert:''},
+  {id:8,category:'Obrigações fiscais',title:'Geração das guias fiscais — DARF INSS e FGTS',timing:'Após fechamento da folha',connector:'',desc:'As guias de impostos e contribuições são geradas após o fechamento. Atenção especial à particularidade do FGTS da Quadrante Etiquetas.',checklist:['Gerar DARF INSS (gerada automaticamente após conclusão da folha)','Verificar FGTS Mensal — ATENÇÃO: Quadrante NÃO realiza pagamentos de FGTS mensais','Verificar se o cliente solicitou Guia FGTS Consignado (solicitada separadamente)','Conferir vencimentos e competências de todas as guias geradas'],alert:'ATENÇÃO — PARTICULARIDADE: A empresa Quadrante Etiquetas NÃO realiza pagamentos de FGTS mensais. O FGTS é pago somente no momento da rescisão do funcionário. A Guia FGTS Consignado é solicitada separadamente pelo cliente quando necessário.'},
+  {id:9,category:'Geração de docs',title:'Postagem e envio de todos os documentos via Onvio',timing:'Após geração de toda a documentação',connector:'Guias geradas',desc:'Todos os documentos gerados devem ser enviados via Onvio. Sempre que um documento for postado, Milene deve ser avisada — especialmente durante o período de adaptação ao sistema.',checklist:['Postar contracheques (PDF) no Onvio','Postar contracheques (TXT) no Onvio, se aplicável','Postar Relatório de Líquido no Onvio','Postar Relatório de Férias no Onvio (se houver)','Postar DARF INSS no Onvio','Postar Guia FGTS Consignado no Onvio (se solicitada)','Notificar Milene (milene@quadranterotulos.com) após cada postagem','Confirmar recebimento e aceite com Milene','Arquivar cópia local conforme diretório padrão'],alert:''}
+];
+
+/* ── DADOS — CALENDÁRIO ─────────────────────────────────────────────────── */
+const CAL_DATA=[
+  {id:1,day:'01',collapsed:false,tasks:[{id:1001,day:'01',title:'Receber adiantamento salarial (ARTE & COMPANY — Enio)',type:'Recebimento',criticality:'Média',companies:'ARTE & COMPANY'},{id:1002,day:'01',title:'Receber folha de ponto mensal (clientes que enviam todo dia 1)',type:'Recebimento',criticality:'Alta',companies:'ARTE & COMPANY, EDSON FAZENDA, EDSON CHACARA, ESTHERA CLINIC, G. M. DE QUEIROZ, HALIFAX COMÉRCIO, N DE QUEIROZ DROGARIA'},{id:1003,day:'01',title:'Atualizar taxa de câmbio Libra Esterlina (Sara — Primeira Igreja Águas Claras)',type:'Conferência',criticality:'CRÍTICA',companies:'PRIMEIRA IGREJA — ÁGUAS CLARAS'},{id:1004,day:'01',title:'Verificar status de empresas INATIVAS / sem movimento',type:'Conferência',criticality:'Baixa',companies:'ALISSON CARVALHO ADVOCACIA (baixada), ARTE E SONHO (baixada), CLINICA QNO 01 — SEM MOV, ITC TELECOMUNICAÇÕES — Cancelar impostos, LESCIARA* RESCISÃO 12/2024, LETY SHAKE COMÉRCIO (Paralisada)'}]},
+  {id:2,day:'05',collapsed:false,tasks:[{id:2001,day:'05',title:'Encerrar período de fechamento "5° ao 5°" — VA/VT Tradição',type:'Fechamento parcial',criticality:'Alta',companies:'TRADIÇÃO ATACADISTA, TRADIÇÃO COMERCIO, TRADIÇÃO LIMPEZA'},{id:2002,day:'05',title:'JUBALANDIA TOYS — período 01 a 05',type:'Fechamento parcial',criticality:'Média',companies:'JUBALANDIA TOYS'},{id:2003,day:'05',title:'Apuração de pontos recebidos no dia 01 e envio para validação',type:'Apuração',criticality:'Alta',companies:'EMPÓRIO COMÉRCIO (MATRIZ), FOLLOW UP (MATRIZ), IGREJA BATISTA BOAS NOVAS, KEROLAINE PEREIRA — Doméstica'}]},
+  {id:3,day:'10',collapsed:false,tasks:[{id:3001,day:'10',title:'⚠ ENVIAR IMPOSTOS — clientes vinculados ao fiscal (todo dia 10)',type:'Obrigação fiscal',criticality:'CRÍTICA',companies:'EDSON FAZENDA, EDSON CHACARA, ESTHERA CLINIC, HALIFAX COMÉRCIO'},{id:3002,day:'10',title:'Sincronizar com setor fiscal as tarefas vinculadas',type:'Coordenação',criticality:'CRÍTICA',companies:'Fernanda (responsável)'}]},
+  {id:4,day:'18',collapsed:false,tasks:[{id:4001,day:'18',title:'Iniciar revisão de folhas fixas com particularidade',type:'Preparação',criticality:'Média',companies:'A.M.S TOP CAR, BARONESA COMERCIO, CLINICA DOM PEDRO LTDA, C7 ENERGY, CONSULTÓRIO DRA. BIANCA, DROGARIA SHALOM, EDSON ADVOGADOS, EDSON FAZENDA e demais — 20 empresas no total'}]},
+  {id:5,day:'20',collapsed:false,tasks:[{id:5001,day:'20',title:'Receber relatório VT/VA — AMARAL & FERNANDES (Dra. Hellen)',type:'Recebimento',criticality:'Alta',companies:'AMARAL & FERNANDES'},{id:5002,day:'20',title:'Receber folha de pastores — Igreja Batista Central Taguatinga',type:'Recebimento',criticality:'Alta',companies:'IGREJA BATISTA CENTRAL DE TAGUATINGA'},{id:5003,day:'20',title:'Receber folha de ponto — Igreja Batista Boas Novas (Telma)',type:'Recebimento',criticality:'Média',companies:'IGREJA BATISTA BOAS NOVAS'},{id:5004,day:'20',title:'Enviar relatório de impostos — Centro de Neuropsicologia (M. Eduarda)',type:'Envio relatório',criticality:'CRÍTICA',companies:'CENTRO DE NEUROPSICOLOGIA INC'},{id:5005,day:'20',title:'Receber folha — Sport Plus Treinamento (Leandro)',type:'Recebimento',criticality:'Média',companies:'SPORT PLUS TREINAMENTO'}]},
+  {id:6,day:'20-22',collapsed:false,tasks:[{id:6001,day:'20-22',title:'Receber prévia — ANANKE (Célia) — aguardar confirmação',type:'Prévia',criticality:'Alta',companies:'ANANKE'}]},
+  {id:7,day:'25',collapsed:false,tasks:[{id:7001,day:'25',title:'Receber dados de fechamento — Igreja Batista Sião (Patricia)',type:'Recebimento',criticality:'Média',companies:'IGREJA BATISTA SIAO'},{id:7002,day:'25',title:'Confirmar lançamentos com empresas categoria H (sem padrão definido)',type:'Mapeamento',criticality:'CRÍTICA',companies:'179 empresas — ver Aba 6 da planilha'}]},
+  {id:8,day:'27',collapsed:false,tasks:[{id:8001,day:'27',title:'Receber fechamento via Onvio — DALA / LA / LD Transportes (Ivone)',type:'Recebimento',criticality:'Alta',companies:'DALA TRANSPORTES, LA TRANSPORTES, LD TRANSPORTES'}]},
+  {id:9,day:'27-28',collapsed:false,tasks:[{id:9001,day:'27-28',title:'Receber dados FORZA SOLUÇÕES (Ivo) — pagamento previsto dia 30',type:'Recebimento URGENTE',criticality:'CRÍTICA',companies:'FORZA SOLUÇÕES'},{id:9002,day:'27-28',title:'Enviar relatório para setor fiscal — FORZA (NF para financeiro)',type:'Integração fiscal',criticality:'CRÍTICA',companies:'FORZA SOLUÇÕES'}]},
+  {id:10,day:'28',collapsed:false,tasks:[{id:10001,day:'28',title:'Gerar folha das categorias B + C (folha fixa simples e com particularidade)',type:'Geração folha',criticality:'Alta',companies:'34 empresas'},{id:10002,day:'28',title:'Aplicar +15 faltas Rodrigo (farmacêutico) — DROGARIA SHALOM',type:'Lançamento manual',criticality:'CRÍTICA',companies:'DROGARIA SHALOM'}]},
+  {id:11,day:'30',collapsed:false,tasks:[{id:11001,day:'30',title:'Enviar VT e VA — clientes com envio dia 30',type:'Envio benefícios',criticality:'Alta',companies:'FORZA SOLUÇÕES, GA MOVEIS, IGREJA BATISTA CENTRAL DE TAGUATINGA, R.ALMEIDA, SMMF ALIMENTOS LTDA'},{id:11002,day:'30',title:'LRR FAULA BOLOS — Luzia envia tudo',type:'Recebimento',criticality:'Média',companies:'LRR FAULA BOLOS'},{id:11003,day:'30',title:'Gerar boleto VA no portal Ticket — Igreja Batista Central Taguatinga',type:'Boleto',criticality:'Alta',companies:'IGREJA BATISTA CENTRAL DE TAGUATINGA'},{id:11004,day:'30',title:'Gerar boleto sindicato — LA TRANSPORTES',type:'Boleto sindicato',criticality:'Alta',companies:'LA TRANSPORTES'},{id:11005,day:'30',title:'LA BELLE BETE — entregar folha de pagamento ATÉ O DIA 30 (prazo solicitado pelo cliente)',type:'Entrega',criticality:'CRÍTICA',companies:'LA BELLE BETE VESTUÁRIO'},{id:11006,day:'30',title:'Efetuar pagamento FORZA SOLUÇÕES (dados recebidos dias 27-28)',type:'Pagamento',criticality:'CRÍTICA',companies:'FORZA SOLUÇÕES'},{id:11007,day:'30',title:'Fechar e enviar contracheques — todas as demais empresas ativas',type:'Fechamento geral',criticality:'Alta',companies:'Todas as empresas categorias B–G'}]}
+];
+</script>
+</body>
+</html>

@@ -24,12 +24,41 @@
     </div>
 
     <nav class="sidebar-nav">
-        <div class="sidebar-section">Ferramenta</div>
-
         <button class="sidebar-item active" id="navEmpresas" onclick="navegarPara('empresas')">
-            <span class="sidebar-item-icon">🏭</span> Empresas
+            <span class="sidebar-item-icon">🏠</span> Visão Geral
         </button>
 
+        <div class="sidebar-section">Processamento</div>
+        <a href="quadrante.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏭</span> Quadrante Etiquetas
+        </a>
+        <a href="trackfield.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏃</span> Track &amp; Field
+        </a>
+        <a href="ananke.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏥</span> Anankê
+        </a>
+
+        <div class="sidebar-section">Formulários</div>
+        <a href="formulario_quadrante.html" class="sidebar-item">
+            <span class="sidebar-item-icon">📄</span> Quadrante
+        </a>
+        <a href="formulario_trackfield.html" class="sidebar-item">
+            <span class="sidebar-item-icon">📄</span> Track &amp; Field
+        </a>
+        <a href="formulario_ananke.html" class="sidebar-item">
+            <span class="sidebar-item-icon">📄</span> Anankê
+        </a>
+
+        <div class="sidebar-section">Ferramentas</div>
+        <a href="fluxo.html" class="sidebar-item">
+            <span class="sidebar-item-icon">📋</span> Fluxo de Fechamento
+        </a>
+        <a href="ferias.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏖️</span> Programação de Férias
+        </a>
+
+        <div class="sidebar-section">Administração</div>
         <button class="sidebar-item" id="navConfig" onclick="navegarPara('config')">
             <span class="sidebar-item-icon">⚙️</span> Configurações
         </button>
@@ -52,25 +81,65 @@
     <div class="page-header">
         <div>
             <h1 id="pageTitle">Fechamento Folha de Pagamento</h1>
-            <div class="page-header-sub" id="pageSub">Selecione a empresa para iniciar o processamento</div>
+            <div class="page-header-sub" id="pageSub">Acesse o processamento de folha, formulários e ferramentas do módulo</div>
         </div>
     </div>
 
     <!-- TELA EMPRESAS -->
     <div id="telaEmpresas">
         <div class="container">
+
+            <div class="section-header">
+                <h2>Empresas</h2>
+                <p>Acesse o processamento via planilha Excel ou o preenchimento manual do formulário de folha</p>
+            </div>
             <div class="empresa-grid">
-                <a href="quadrante.html" class="empresa-card">
+                <div class="empresa-card empresa-group">
                     <div class="card-icon">🏭</div>
                     <h3>Quadrante Etiquetas</h3>
-                    <p>Código 453 · Processamento via planilha Excel</p>
-                </a>
-                <a href="formulario_quadrante.html" class="empresa-card">
+                    <p>Código 453</p>
+                    <div class="card-actions">
+                        <a href="quadrante.html" class="btn btn-primary btn-small">📊 Planilha</a>
+                        <a href="formulario_quadrante.html" class="btn btn-secondary btn-small">📄 Formulário</a>
+                    </div>
+                </div>
+                <div class="empresa-card empresa-group">
+                    <div class="card-icon">🏃</div>
+                    <h3>Track &amp; Field</h3>
+                    <p>Código TF</p>
+                    <div class="card-actions">
+                        <a href="trackfield.html" class="btn btn-primary btn-small">📊 Planilha</a>
+                        <a href="formulario_trackfield.html" class="btn btn-secondary btn-small">📄 Formulário</a>
+                    </div>
+                </div>
+                <div class="empresa-card empresa-group">
+                    <div class="card-icon">🏥</div>
+                    <h3>Anankê</h3>
+                    <p>Código 293</p>
+                    <div class="card-actions">
+                        <a href="ananke.html" class="btn btn-primary btn-small">📊 Planilha</a>
+                        <a href="formulario_ananke.html" class="btn btn-secondary btn-small">📄 Formulário</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-header">
+                <h2>Ferramentas</h2>
+                <p>Utilitários do módulo de fechamento de folha</p>
+            </div>
+            <div class="empresa-grid">
+                <a href="fluxo.html" class="empresa-card">
                     <div class="card-icon">📋</div>
-                    <h3>Quadrante · Formulário de Folha</h3>
-                    <p>Código 453 · Preenchimento manual dos dados de folha</p>
+                    <h3>Fluxo de Fechamento</h3>
+                    <p>Acompanhe o progresso e o calendário do fechamento da folha</p>
+                </a>
+                <a href="ferias.html" class="empresa-card">
+                    <div class="card-icon">🏖️</div>
+                    <h3>Programação de Férias</h3>
+                    <p>Importe o PDF, configure colunas e gere o relatório</p>
                 </a>
             </div>
+
         </div>
     </div>
 
@@ -174,6 +243,8 @@
 </div><!-- /main-content -->
 
 <script>
+window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── Mobile hamburger ──
@@ -210,7 +281,7 @@ function navegarPara(modo) {
         telaEmp.style.display = '';
         telaCfg.style.display = 'none';
         document.getElementById('pageTitle').textContent = 'Fechamento Folha de Pagamento';
-        document.getElementById('pageSub').textContent   = 'Selecione a empresa para iniciar o processamento';
+        document.getElementById('pageSub').textContent   = 'Acesse o processamento de folha, formulários e ferramentas do módulo';
     }
 }
 

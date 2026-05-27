@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Folha de Pagamento – Quadrante Etiquetas – SCONT</title>
+<title>Folha de Pagamento – Anankê – SCONT</title>
 <script src="../supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../portal-auth-guard.js"></script>
 <style>
 :root {
-  --primary:       #8B3A3A;
-  --primary-dark:  #6B2A2A;
-  --primary-light: #A85050;
+  --primary:       #1B4F8A;
+  --primary-dark:  #143A6B;
+  --primary-light: #2563EB;
   --prov-color:    #1a6b2e;
   --prov-bg:       #f0faf3;
   --prov-border:   #6abf7b;
@@ -69,7 +69,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
   max-width: 220px;
 }
-.comp-pill select option { background: #6B2A2A; color: #fff; }
+.comp-pill select option { background: #143A6B; color: #fff; }
 .hspacer { flex: 1; }
 .hbtn {
   display: flex; align-items: center; gap: 6px;
@@ -187,8 +187,8 @@ th.extra-col-header { position: relative; }
 tbody tr { transition: background .12s; }
 tbody tr:nth-child(even) { background: #fafbfc; }
 tbody tr:nth-child(odd)  { background: #fff; }
-tbody tr:hover           { background: #fdf6f6 !important; }
-tbody tr.row-active      { background: #fff9f0 !important; }
+tbody tr:hover           { background: #f0f5ff !important; }
+tbody tr.row-active      { background: #eef4fb !important; }
 
 tbody td {
   border-bottom: 1px solid #ebebeb;
@@ -232,7 +232,7 @@ tbody tr:hover .del-row-btn { opacity: 1; }
   height: 30px;
 }
 .cell-input:hover  { background: rgba(0,0,0,.03); border-color: #d0d0d0; }
-.cell-input:focus  { background: #fffdf5; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.12); }
+.cell-input:focus  { background: #f0f5ff; border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
 .cell-input[type="number"],
 .cell-input.is-number { text-align: right; }
 .cell-input.is-hours  { text-align: center; font-family: monospace; font-size: 13px; letter-spacing: .5px; }
@@ -282,45 +282,6 @@ tfoot td.ft-fixed { color: #ecf0f1; }
 .toast.warn      { border-left: 4px solid #f39c12; }
 .toast-icon      { font-size: 16px; }
 
-/* ── CONVÊNIO ── */
-.conv-grid { display: flex; flex-direction: column; gap: 16px; margin-top: 24px; }
-.conv-card {
-  background: var(--surface); border-radius: var(--radius);
-  box-shadow: 0 2px 12px rgba(0,0,0,.08); overflow: hidden;
-}
-.conv-card-head {
-  background: linear-gradient(135deg, var(--primary-dark), var(--primary));
-  color: #fff; padding: 8px 14px; font-size: 12px; font-weight: 700;
-  display: flex; align-items: center; gap: 8px;
-}
-.conv-card-body { padding: 10px 14px; }
-.conv-obs {
-  background: #d4edda; border-left: 3px solid #28a745;
-  border-radius: 6px; padding: 5px 10px; font-size: 10px; margin-bottom: 10px; color: #155724;
-}
-.conv-table { border-collapse: collapse; width: 100%; border-radius: 8px; overflow: hidden; }
-.conv-table thead th {
-  background: #f0f0f0; font-size: 10px; font-weight: 700;
-  padding: 5px 8px; text-align: left; border-bottom: 2px solid #e0e0e0; color: var(--text);
-}
-.conv-table tbody tr:nth-child(even) { background: #fafafa; }
-.conv-table td { padding: 4px 8px; font-size: 11px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-.conv-table td[contenteditable]:hover { background: #fef9f0; outline: 1px dashed #ccc; border-radius: 4px; }
-.conv-nome-wrap {
-  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  padding-right: 8px;
-}
-.conv-input {
-  border: 1px solid #ddd; background: #fafafa; outline: none;
-  font-size: 12px; width: 90px; text-align: right; font-family: inherit;
-  border-radius: 6px; padding: 6px 8px; transition: background .12s, border-color .12s, box-shadow .12s;
-}
-.conv-input:hover  { background: #f0f0f0; border-color: #bbb; }
-.conv-input:focus  { background: #fffdf5; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.18); }
-.conv-total-row    { background: #f0f0f0 !important; font-weight: 700; }
-.conv-total-val    { text-align: right; color: var(--primary); font-weight: 700; font-size: 13px; }
-.conv-add-btn      { margin-top: 12px; }
-
 /* ── MODAL ── */
 .modal-overlay {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
@@ -339,7 +300,7 @@ tfoot td.ft-fixed { color: #ecf0f1; }
   border-radius: 8px; font-size: 13px; font-family: inherit; outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
-.modal-field input:focus, .modal-field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(139,58,58,.12); }
+.modal-field input:focus, .modal-field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(27,79,138,.12); }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
 
 /* ── MODAL RESUMO ENVIO ── */
@@ -393,8 +354,8 @@ tfoot td.ft-fixed { color: #ecf0f1; }
     <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
     <div class="vline"></div>
     <div>
-      <div class="header-title">Folha de Pagamento · Quadrante Etiquetas</div>
-      <div class="header-sub">Código 453 · Fechamento mensal</div>
+      <div class="header-title">Folha de Pagamento · Anankê</div>
+      <div class="header-sub">Anankê · 293 · Fechamento mensal</div>
     </div>
   </div>
   <div class="comp-pill">
@@ -458,16 +419,6 @@ tfoot td.ft-fixed { color: #ecf0f1; }
     </div>
   </div>
 
-  <!-- CONVÊNIOS -->
-  <div class="section-card">
-    <div class="section-header">
-      <h3>🏥 Convênios – Plano Unimed</h3>
-    </div>
-    <div style="padding:20px 20px 24px;">
-      <div class="conv-grid" id="convenio-wrap"></div>
-    </div>
-  </div>
-
 </div>
 
 <!-- ═══ MODAL RUBRICA ═══ -->
@@ -505,76 +456,34 @@ tfoot td.ft-fixed { color: #ecf0f1; }
 //  DADOS
 // ══════════════════════════════════════════════════════
 const EMPLOYEES_DEFAULT = [
-  {nome:"Amanda Soares do Nascimento",funcao:"Assistente Comercial III",salario:2990.26,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Anderson Ricardo Tavares Maroque",funcao:"Assistente de Pré Impressão Junior",salario:2398,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Andrei Pedroso Pimentel",funcao:"Analista de Pré Impressão Sênior",salario:4967.9,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Cleiton Vagner Souto da Silva",funcao:"Analista de Expedição Pleno",salario:3600,he65:"00:31",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Cleuton Santos da Guerra",funcao:"Motorista II",salario:3875.23,he65:"",he100:"",adicnot:"00:00",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Cosmelito Soares Barreto",funcao:"Impressor de Corte Senior",salario:3875.23,he65:"02:19",he100:"00:23",adicnot:"00:00",comissao:"",premio:"",vt:254.4,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Cristina Maria da Silva",funcao:"Revisor de Impressão Pleno",salario:2899.48,he65:"02:03",he100:"00:23",adicnot:"00:00",comissao:"",premio:"",vt:265,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Daniela Aparecida Fonseca",funcao:"Ger. de Contas Especiais",salario:5918.36,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:1749,plano:1733,cotasind:"Não"},
-  {nome:"Danilo Cavalcante Santos",funcao:"Impressor Flexográfico Senior",salario:4496.71,he65:"01:55",he100:"00:55",adicnot:"00:30",comissao:"",premio:"",vt:275.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:91.28,cotasind:"Não"},
-  {nome:"Denis de Souza",funcao:"Tecnico de Qualidade",salario:6342,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:100.9,cotasind:"Não"},
-  {nome:"Eduardo Alves Junior",funcao:"Lider de Produção",salario:6000,he65:"01:59",he100:"",adicnot:"00:04",comissao:"",premio:"",vt:254.4,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Eduardo Santos de Abreus",funcao:"Assistente de Embalagem Pleno",salario:3065.3,he65:"00:13",he100:"00:10",adicnot:"",comissao:"",premio:"",vt:233.2,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Fabiana Molina",funcao:"Analista Comercial Junior",salario:3709.15,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Fernando de Souza",funcao:"Revisor de Impressão Pleno",salario:2899.47,he65:"00:23",he100:"",adicnot:"",comissao:"",premio:"",vt:233.2,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Gessi da Silva Mendes",funcao:"Analista de Qualidade Junior",salario:3321.62,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Gilmar Abreu de Almeida",funcao:"Impressor Flexografico Senior",salario:4496,he65:"03:21",he100:"00:15",adicnot:"00:36",comissao:"",premio:"",vt:265,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Hildo Correia de Araujo Junior",funcao:"Revisor de Impressão Junior",salario:2635.88,he65:"04:02",he100:"00:18",adicnot:"00:50",comissao:"",premio:"",vt:275.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Igo Oliveira Freire",funcao:"Lider de Pre Impressao",salario:6342,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Sim"},
-  {nome:"Isabella Vicentini Fernandes",funcao:"Gerente de Produção",salario:10570,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Jiliane Rodrigues da Silva",funcao:"Gerente de Processos e Qualidade",salario:12037.08,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Joice Teles Mariano",funcao:"Analista Financeiro Senior",salario:6600,he65:"",he100:"",adicnot:"00:03",comissao:"",premio:"",vt:0,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"João Victor Souza Freire",funcao:"Assistente de Impressão",salario:2635.88,he65:"02:31",he100:"",adicnot:"00:39",comissao:"",premio:"",vt:243.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Juliana Lourdes Tavares Caballer",funcao:"Orçamentista Pleno",salario:5536.04,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Laila Luana Quaresma",funcao:"Líder Administrativo Comercial",salario:4428.83,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Leandro Alves Ferreira",funcao:"Comprador",salario:5868.2,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Leandro Monteiro Sabino",funcao:"Revisor de Impressão Senior",salario:2899.48,he65:"00:20",he100:"",adicnot:"",comissao:"",premio:"",vt:233.2,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Lucas Purita Pereira",funcao:"Assistente de Embalagem Junior",salario:2396.27,he65:"00:41",he100:"",adicnot:"",comissao:"",premio:"",vt:243.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Luciano das Graças Mendes",funcao:"Coordenador de Impressao Digital",salario:7399,he65:"03:31",he100:"00:38",adicnot:"00:07",comissao:"",premio:"",vt:0,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Marcos de Souza",funcao:"Motorista I",salario:3171,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Sim"},
-  {nome:"Marcos Batista da Silva",funcao:"Impressor Flexográfico Junior",salario:4000,he65:"03:01",he100:"00:20",adicnot:"00:51",comissao:"",premio:"",vt:254.4,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Sim"},
-  {nome:"Marcelo de Almeida Gobbi",funcao:"Impressor Flexgráfico Master",salario:6643.24,he65:"01:49",he100:"00:23",adicnot:"00:01",comissao:"",premio:"",vt:243.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
-  {nome:"Marcelo Gonçalves Ribeiro",funcao:"Colorista Master",salario:6342,he65:"01:25",he100:"00:05",adicnot:"",comissao:"",premio:"",vt:265,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Milene Di Cesare da Silva",funcao:"Gerente de RH",salario:12592.27,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:1154.74,cotasind:"Não"},
-  {nome:"Mônica Araujo Lima",funcao:"Analista Financeiro Junior",salario:3709.15,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:0,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Nathany Lopes Amaro",funcao:"Analista Comercial Junior",salario:3709.15,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
-  {nome:"Newton Carlos Santos Santana",funcao:"Administrador",salario:2398,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:0,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Paulo Cesar Rocha de Oliveira",funcao:"Impressor de Sleeve",salario:4200,he65:"02:24",he100:"",adicnot:"",comissao:"",premio:"",vt:380,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Pedro Henrique Stengel Lins",funcao:"Analista de Expedição Junior",salario:3171,he65:"00:10",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Rafael de Souza Ignacio",funcao:"Analista de RH Senior",salario:4333.7,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
-  {nome:"Ronaldo Adriano Torres",funcao:"Operador de Acabamento Jr",salario:2659.82,he65:"02:49",he100:"00:20",adicnot:"00:24",comissao:"",premio:"",vt:254.4,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Roger Farias da Cruz",funcao:"Revisor de Impressão Junior",salario:2635.88,he65:"00:43",he100:"",adicnot:"00:00",comissao:"",premio:"",vt:233.2,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Raphaela Jennifer L. Ribeiro",funcao:"Auxiliar de Produção",salario:2398,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:0,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Sim"},
-  {nome:"Thiago Augusto Machado Sales dos Anjos",funcao:"Impressor Flexografico IV",salario:5396.05,he65:"03:10",he100:"",adicnot:"03:09",comissao:"",premio:"",vt:254.4,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:100.9,cotasind:"Não"},
-  {nome:"Thiago Simão",funcao:"Operador de Acabamento Jr",salario:2635.88,he65:"01:31",he100:"",adicnot:"00:53",comissao:"",premio:"",vt:233.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Tatiana Correia e Silva",funcao:"Auxiliar de Limpeza II",salario:2642.5,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:233.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Sim"},
-  {nome:"Walter Luciano Batista",funcao:"Impressor Flexografico Jr",salario:4000,he65:"01:38",he100:"",adicnot:"02:37",comissao:"",premio:"",vt:254.4,faltas:5,faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Wender de Souza Melo",funcao:"Impressor de Corte Junior",salario:2768.02,he65:"00:56",he100:"",adicnot:"",comissao:"",premio:"",vt:233.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
-  {nome:"Welton Evangilista de Macedo",funcao:"Revisor de Impressão Senior",salario:2899.48,he65:"00:07",he100:"",adicnot:"00:00",comissao:"",premio:"",vt:233.2,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
-  {nome:"William Dantas",funcao:"Assistente de Impressão Senior",salario:2635.88,he65:"01:34",he100:"",adicnot:"00:02",comissao:"",premio:"",vt:243.8,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
+  {nome:'ADRIANA JANAINA', cargo:'PSICOLOGA NIVEL 2', ins02:'',ins04:'',trienio:'',prod:'',adfuncao:'',substcc:'',ajuda1:'',ajuda2:'',supervisao:'',he:'',grat:'',valeaniv:'',adiant:'',vt:'',medica:'',farmacia:'',atraso:''},
+  {nome:'ADRIANA MOREIRA QUIRINO', cargo:'PSICOLOGO NÍVEL III', ins02:'',ins04:'',trienio:'',prod:'',adfuncao:'',substcc:'',ajuda1:'',ajuda2:'',supervisao:'',he:'',grat:'',valeaniv:'',adiant:'',vt:'',medica:'',farmacia:'',atraso:''},
+  {nome:'ADRIANO FRANCISCO RIBEIRO ABREU', cargo:'SUPERV.FATURAMENTO', ins02:'',ins04:'',trienio:'',prod:'',adfuncao:'',substcc:'',ajuda1:'',ajuda2:'',supervisao:'',he:'',grat:'',valeaniv:'',adiant:'',vt:'',medica:'',farmacia:'',atraso:''},
 ];
 
 // ══════════════════════════════════════════════════════
 //  ESTRUTURA DE COLUNAS
 // ══════════════════════════════════════════════════════
 const FIXED_COLS = [
-  {f:'nome',     label:'FUNCIONÁRIO',        type:'text',  group:'fixed', minW:220, grpStart:false},
-  {f:'funcao',   label:'FUNÇÃO',             type:'text',  group:'fixed', minW:240, grpStart:false},
-  {f:'salario',  label:'SALÁRIO',            type:'money', group:'fixed', minW:100, grpStart:false},
-  {f:'he65',     label:'HORAS EXTRAS 65%',        type:'hours', group:'prov',  minW:110, grpStart:true},
-  {f:'he100',    label:'HORAS EXTRAS 100%',       type:'hours', group:'prov',  minW:110, grpStart:false},
-  {f:'adicnot',  label:'ADICIONAL NOTURNO (AUTOM)',type:'hours', group:'prov',  minW:150, grpStart:false},
-  {f:'comissao', label:'COMISSOES',               type:'money', group:'prov',  minW:100, grpStart:false},
-  {f:'premio',   label:'PREMIO',                  type:'money', group:'prov',  minW:88,  grpStart:false},
-  {f:'vt',       label:'VALE TRANSPORTE',         type:'money', group:'prov',  minW:115, grpStart:false},
-  {f:'faltas',   label:'DIAS FALTAS',             type:'days',  group:'desc',  minW:90,  grpStart:true},
-  {f:'faltasdsr',label:'DIAS FALTAS DSR',         type:'days',  group:'desc',  minW:100, grpStart:false},
-  {f:'atrasos',  label:'HORAS FALTAS',            type:'hours', group:'desc',  minW:100, grpStart:false},
-  {f:'descaut',  label:'DESCONTOS AUTORIZADOS',   type:'money', group:'desc',  minW:140, grpStart:false},
-  {f:'plano',    label:'DESCONTO PLANO DE SAÚDE', type:'money', group:'desc',  minW:145, grpStart:false},
-  {f:'cotasind', label:'COTA SIND.',         type:'select',group:'info',  minW:82,  grpStart:true},
+  {f:'nome',      label:'FUNCIONÁRIO',                    type:'text',  group:'fixed', minW:220, grpStart:false},
+  {f:'cargo',     label:'CARGO',                          type:'text',  group:'fixed', minW:200, grpStart:false},
+  {f:'ins02',     label:'INSALUBRIDADE 0,2',              type:'money', group:'prov',  minW:120, grpStart:true},
+  {f:'ins04',     label:'INSALUBRIDADE 0,4',              type:'money', group:'prov',  minW:120, grpStart:false},
+  {f:'trienio',   label:'TRIÊNIO',                        type:'money', group:'prov',  minW:100, grpStart:false},
+  {f:'prod',      label:'PROD. SL BASE',                  type:'money', group:'prov',  minW:100, grpStart:false},
+  {f:'adfuncao',  label:'AD FUNÇÃO',                      type:'money', group:'prov',  minW:100, grpStart:false},
+  {f:'substcc',   label:'SUBST CC',                       type:'money', group:'prov',  minW:100, grpStart:false},
+  {f:'ajuda1',    label:'AJUDA DE CUSTO 1',               type:'money', group:'prov',  minW:110, grpStart:false},
+  {f:'ajuda2',    label:'AJUDA DE CUSTO 2',               type:'money', group:'prov',  minW:110, grpStart:false},
+  {f:'supervisao',label:'SUPERVISÃO',                     type:'money', group:'prov',  minW:100, grpStart:false},
+  {f:'he',        label:'H.E',                            type:'hours', group:'prov',  minW:90,  grpStart:false},
+  {f:'grat',      label:'GRAT. RELATÓRIOS',               type:'money', group:'prov',  minW:130, grpStart:false},
+  {f:'valeaniv',  label:'VALE ANIVERSÁRIO',               type:'money', group:'prov',  minW:120, grpStart:false},
+  {f:'adiant',    label:'ADIANT. SALÁRIO',                type:'money', group:'prov',  minW:110, grpStart:false},
+  {f:'vt',        label:'AUXILIO TRANSPORTE',             type:'money', group:'prov',  minW:120, grpStart:false},
+  {f:'medica',    label:'ASSIST. MÉDICA',                 type:'money', group:'desc',  minW:110, grpStart:true},
+  {f:'farmacia',  label:'FARMÁCIA',                       type:'money', group:'desc',  minW:100, grpStart:false},
+  {f:'atraso',    label:'ATRASO',                         type:'hours', group:'desc',  minW:90,  grpStart:false},
 ];
 
 const GROUPS = {
@@ -587,7 +496,7 @@ const GROUPS = {
 let EMPLOYEES  = [];
 let extraCols  = [];
 let saveTimer  = null;
-const LS_KEY   = 'quadrante_folha_v3';
+const LS_KEY   = 'ananke_folha_v1';
 
 // ══════════════════════════════════════════════════════
 //  HH:MM — utilitários
@@ -725,7 +634,7 @@ function renderHeaders() {
   ftNum.className = 'ft-num'; ftNum.textContent = 'Σ';
   fr.appendChild(ftNum);
 
-  // Label cell spans 2 fixed cols (nome + funcao)
+  // Label cell spans 2 fixed cols (nome + cargo)
   const ftLbl = document.createElement('td');
   ftLbl.className = 'ft-label'; ftLbl.colSpan = 2;
   ftLbl.style.textAlign = 'right'; ftLbl.textContent = 'TOTAIS';
@@ -979,112 +888,6 @@ function removeCol(id) {
 }
 
 // ══════════════════════════════════════════════════════
-//  CONVÊNIOS
-// ══════════════════════════════════════════════════════
-const CONVENIOS_DEF = {
-  daniela: {
-    titulo: 'Daniela Aparecida Fonseca',
-    linhas: [
-      {nome:'Func: Daniela Aparecida Fonseca', val:0},
-      {nome:'Dep: Lais de Oliveira', val:150},
-      {nome:'Dep: Eduarda de Oliveira', val:0},
-      {nome:'Dep: Daniel Oliveira Fonseca de Lima', val:0},
-    ],
-  },
-  milene: {
-    titulo: 'Milene Di Cesare da Silva',
-    linhas: [
-      {nome:'Func: Milene Di Cesare da Silva', val:0},
-      {nome:'Dep: Sophia Di Cesare da Silva', val:0},
-    ],
-  },
-};
-let convenios = JSON.parse(JSON.stringify(CONVENIOS_DEF));
-
-function fmtConvVal(v) {
-  if (v == null || v === '') return '';
-  const n = parseFloat(String(v).replace(',','.'));
-  if (isNaN(n) || n === 0) return '';
-  return n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
-function parseConvVal(s) {
-  if (!s) return 0;
-  // suporta "1.234,56" ou "1234.56" ou "1234,56"
-  let clean = s.trim().replace(/[^\d,\.]/g,'');
-  if (clean.includes(',') && clean.includes('.')) {
-    clean = clean.replace(/\./g,'').replace(',','.');
-  } else {
-    clean = clean.replace(',','.');
-  }
-  return parseFloat(clean) || 0;
-}
-
-function renderConvenios() {
-  const wrap = document.getElementById('convenio-wrap');
-  wrap.innerHTML = '';
-  Object.entries(convenios).forEach(([key, card]) => {
-    const div = document.createElement('div');
-    div.className = 'conv-card';
-    div.innerHTML = `
-      <div class="conv-card-head">🏥 Plano Unimed — ${card.titulo}</div>
-      <div class="conv-card-body">
-        <div class="conv-obs">Plano Unimed: apenas colaboradores <strong>Daniela</strong> e <strong>Milene</strong></div>
-        <table class="conv-table">
-          <thead><tr><th>Nome</th><th style="width:95px;text-align:right">Valor (R$)</th></tr></thead>
-          <tbody id="conv-body-${key}">
-            ${card.linhas.map((l,li) => `
-              <tr>
-                <td contenteditable="true" onblur="convenios['${key}'].linhas[${li}].nome=this.textContent.trim()">
-                  <div class="conv-nome-wrap">${l.nome}</div>
-                </td>
-                <td style="text-align:right; padding:4px 8px;">
-                  <input type="text" inputmode="decimal" class="conv-input"
-                    data-card="${key}" data-li="${li}"
-                    value="${l.val != null && l.val !== '' ? fmtConvVal(l.val) : ''}"
-                    placeholder="0,00">
-                </td>
-              </tr>`).join('')}
-          </tbody>
-          <tfoot><tr class="conv-total-row">
-            <td style="font-weight:700">Total</td>
-            <td class="conv-total-val" id="conv-tot-${key}">R$ 0,00</td>
-          </tr></tfoot>
-        </table>
-        <button class="tbtn tbtn-primary conv-add-btn" onclick="addConvRow('${key}')">➕ Dependente</button>
-      </div>`;
-    wrap.appendChild(div);
-  });
-  document.querySelectorAll('.conv-input').forEach(inp => {
-    inp.addEventListener('input', () => {
-      convenios[inp.dataset.card].linhas[+inp.dataset.li].val = parseConvVal(inp.value);
-      updateConvTotals();
-      scheduleAutoSave();
-    });
-    inp.addEventListener('blur', () => {
-      const v = convenios[inp.dataset.card].linhas[+inp.dataset.li].val;
-      inp.value = v ? fmtConvVal(v) : '';
-    });
-  });
-  updateConvTotals();
-}
-
-function updateConvTotals() {
-  Object.entries(convenios).forEach(([key, card]) => {
-    const t  = card.linhas.reduce((s,l) => s + (parseFloat(l.val)||0), 0);
-    const el = document.getElementById('conv-tot-' + key);
-    if (el) el.textContent = fmtMoneyTot(t);
-  });
-}
-
-function addConvRow(key) {
-  const nome = prompt('Nome do dependente:');
-  if (!nome) return;
-  convenios[key].linhas.push({nome, val:0});
-  renderConvenios();
-  scheduleAutoSave();
-}
-
-// ══════════════════════════════════════════════════════
 //  AUTO-SAVE
 // ══════════════════════════════════════════════════════
 function coletarDados() {
@@ -1109,7 +912,7 @@ async function salvarLocal() {
     competencia: document.getElementById('competencia').value,
     tipoFolha:   document.getElementById('tipoFolha').value,
     employees:   coletarDados(),
-    extraCols, convenios,
+    extraCols,
     savedAt: new Date().toISOString(),
   };
 
@@ -1120,7 +923,7 @@ async function salvarLocal() {
   let savedCloud = false;
   try {
     const { error } = await sbClient.from('quadrante_folha_rascunho').upsert({
-      empresa_codigo: '453',
+      empresa_codigo: '293',
       competencia:    payload.competencia,
       tipo_folha:     payload.tipoFolha,
       dados:          payload,
@@ -1142,7 +945,6 @@ async function salvarLocal() {
 function _aplicarRascunho(d) {
   EMPLOYEES = d.employees || [];
   extraCols = d.extraCols || [];
-  convenios = d.convenios || JSON.parse(JSON.stringify(CONVENIOS_DEF));
   document.getElementById('competencia').value = d.competencia || '';
   if (d.tipoFolha) document.getElementById('tipoFolha').value = d.tipoFolha;
   const quando = d.savedAt
@@ -1167,7 +969,7 @@ async function carregarLocal() {
   try {
     const { data } = await sbClient.from('quadrante_folha_rascunho')
       .select('dados, updated_at')
-      .eq('empresa_codigo', '453')
+      .eq('empresa_codigo', '293')
       .order('updated_at', { ascending: false })
       .limit(1)
       .single();
@@ -1234,7 +1036,7 @@ function exportCSV() {
   const blob = new Blob(['﻿' + rows.join('\n')], {type:'text/csv;charset=utf-8;'});
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(blob),
-    download: `folha_quadrante_${tipo}_${comp.replace('/','_')}.csv`,
+    download: `folha_ananke_${tipo}_${comp.replace('/','_')}.csv`,
   });
   a.click(); URL.revokeObjectURL(a.href);
   showToast('CSV exportado com sucesso', 'success');
@@ -1268,7 +1070,6 @@ function coletarDadosEnvio() {
     tipo_folha:  document.getElementById('tipoFolha').value,
     employees,
     extraCols,
-    convenios,
     savedAt: new Date().toISOString(),
   };
 }
@@ -1303,10 +1104,6 @@ function abrirResumoEnvio() {
     });
   });
 
-  // Convênios
-  let totalConv = 0;
-  Object.values(convenios).forEach(card => card.linhas.forEach(l => { totalConv += parseFloat(l.val) || 0; }));
-
   // Cabeçalhos da tabela
   const thsHtml = ['#', 'Funcionário', ...colsAtivas.map(c => c.label)].map(h => `<th>${h}</th>`).join('');
 
@@ -1316,22 +1113,12 @@ function abrirResumoEnvio() {
     return `<tr><td>${i+1}</td><td style="white-space:nowrap">${emp.nome}</td>${tds}</tr>`;
   }).join('');
 
-  // Convênios
-  let convHtml = '';
-  Object.values(convenios).forEach(card => {
-    card.linhas.forEach(l => {
-      if (parseFloat(l.val)) {
-        convHtml += `<tr><td>${l.nome}</td><td class="num">${fmtBRL(l.val)}</td></tr>`;
-      }
-    });
-  });
-
   document.getElementById('modalResumoEnvio').innerHTML = `
     <div class="modal-box modal-resumo">
       <div class="modal-resumo-head">
         <h3>📋 Resumo do Formulário — Revisão antes do Envio</h3>
         <div class="modal-resumo-meta">
-          <div class="resumo-meta-item">Empresa <strong>Quadrante Etiquetas · 453</strong></div>
+          <div class="resumo-meta-item">Empresa <strong>Anankê · 293</strong></div>
           <div class="resumo-meta-item">Competência <strong>${dados.competencia}</strong></div>
           <div class="resumo-meta-item">Tipo <strong>${dados.tipo_folha} – ${tipoLabel}</strong></div>
           <div class="resumo-meta-item">Funcionários <strong>${dados.employees.length}</strong></div>
@@ -1349,7 +1136,7 @@ function abrirResumoEnvio() {
           </div>
           <div class="resumo-total-card rtc-desc">
             <div class="rtc-label">Total Descontos</div>
-            <div class="rtc-val">${fmtBRL(totalDesc + totalConv)}</div>
+            <div class="rtc-val">${fmtBRL(totalDesc)}</div>
           </div>
         </div>
 
@@ -1362,14 +1149,6 @@ function abrirResumoEnvio() {
             </table>
           </div>
         </div>
-
-        ${convHtml ? `<div class="resumo-section">
-          <div class="resumo-section-title">Plano Unimed</div>
-          <table class="resumo-table">
-            <thead><tr><th>Beneficiário</th><th>Valor</th></tr></thead>
-            <tbody>${convHtml}</tbody>
-          </table>
-        </div>` : ''}
       </div>
       <div class="modal-resumo-foot">
         <span style="font-size:11px;color:var(--text-sec);flex:1;">Revise os dados. Após confirmar, o formulário será enviado para a ferramenta de Fechamento.</span>
@@ -1387,10 +1166,10 @@ function salvarResumoHTML() {
   const head = document.querySelector('#modalResumoEnvio .modal-resumo-head').innerHTML;
   const w = window.open('', '_blank', 'width=1100,height=800');
   w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-    <title>Resumo Folha</title>
+    <title>Resumo Folha Anankê</title>
     <style>
       body{font-family:-apple-system,sans-serif;font-size:12px;padding:24px;color:#2C3E50}
-      h3{color:#8B3A3A;margin-bottom:8px} table{border-collapse:collapse;width:100%;margin-bottom:16px}
+      h3{color:#1B4F8A;margin-bottom:8px} table{border-collapse:collapse;width:100%;margin-bottom:16px}
       th{background:#f5f5f5;padding:6px 10px;text-align:left;font-size:11px;border-bottom:2px solid #ddd}
       td{padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:11px}
       .num{text-align:right} .resumo-meta{display:flex;gap:20px;flex-wrap:wrap;margin:8px 0 16px;font-size:12px}
@@ -1420,7 +1199,7 @@ async function confirmarEnvio() {
 
   try {
     const { error } = await sbClient.from('quadrante_folha_envios').insert({
-      empresa_codigo: '453',
+      empresa_codigo: '293',
       competencia:    dados.competencia,
       tipo_folha:     dados.tipo_folha,
       dados:          dados,
@@ -1429,7 +1208,7 @@ async function confirmarEnvio() {
 
     // Salvar rascunho também (upsert)
     await sbClient.from('quadrante_folha_rascunho').upsert({
-      empresa_codigo: '453',
+      empresa_codigo: '293',
       competencia:    dados.competencia,
       tipo_folha:     dados.tipo_folha,
       dados:          dados,
@@ -1464,7 +1243,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loaded = await carregarLocal();
   if (!loaded) {
     EMPLOYEES = JSON.parse(JSON.stringify(EMPLOYEES_DEFAULT));
-    convenios = JSON.parse(JSON.stringify(CONVENIOS_DEF));
   }
 
   // Competência padrão: mês/ano corrente (só se não veio do rascunho)
@@ -1475,7 +1253,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   renderTable();
-  renderConvenios();
 });
 </script>
 </body>

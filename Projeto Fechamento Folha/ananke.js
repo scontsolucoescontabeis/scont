@@ -1,16 +1,21 @@
 /**
  * SCONT – Fechamento Folha de Pagamento
- * Empresa: Quadrante Etiquetas (código 453)
+ * Empresa: Anankê (código 293)
  */
 
-const CODIGO_EMPRESA = '453';
-const LINHA_CABECALHO = 4; // linha do Excel (1-based) com os nomes das colunas
-const LINHA_DADOS_INI = 5; // primeira linha de dados
+const CODIGO_EMPRESA       = '293';
+const LINHA_CABECALHO      = 3;  // linha do Excel (1-based) com os nomes das colunas de rubrica
+const LINHA_SUB_CABECALHO  = 4;  // linha com qualificadores (ex: "Insalubridade 20%" / "40%")
+const LINHA_DADOS_INI      = 5;  // primeira linha de dados
+const COL_NOME          = 1;     // coluna do nome do funcionário (0-based)
+const COL_CARGO         = 3;     // coluna do cargo (0-based)
+const COL_REG           = 5;     // coluna do código do empregado na planilha (0-based)
+const COL_RUBRICAS_START = 7;    // primeira coluna de rubrica (0-based)
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Estado global
-let planilhaData      = []; // [{nome, funcao, colunas: {colNome: valorBruto}}]
+let planilhaData      = []; // [{nome, cargo, codEmpregadoSheet, colunas, colunasRubrica}]
 let funcionariosMap   = {}; // nome_normalizado → codigo_empregado
 let rubricasConfig    = []; // [{coluna_planilha, codigo_rubrica, tipo_processo, tipo_valor, descricao}]
 let rhRubricasData    = []; // [{descricao_rubrica, codigo_rubrica}] — fallback de resolução
@@ -110,7 +115,7 @@ function parseHoras(s) {
     if (!s && s !== 0) return 0;
     const str = String(s).trim();
 
-    // Formatos "4h30m", "04h:30M", "4h30", "4h"
+    // Formatos "4h30m", "04h:30M", "4h30", "4h" (com ou sem minutos, separador opcional)
     const mH = str.match(/^(\d+)\s*h[:\.]?\s*(\d*)\s*m?$/i);
     if (mH) {
         const h = parseInt(mH[1], 10) || 0;
@@ -118,13 +123,15 @@ function parseHoras(s) {
         return h * 100 + m;
     }
 
+    // Formato "HH:MM" ou "HH:MM:SS"
     if (str.includes(':')) {
         const partes = str.split(':');
         const h = parseInt(partes[0], 10) || 0;
         const m = parseInt(partes[1], 10) || 0;
         return h * 100 + m;
     }
-    // Valor numérico direto (ex: Excel serial de hora)
+
+    // Valor numérico do Excel (serial de hora, ex: 0.1875 = 4h30)
     const n = parseFloat(str);
     if (isNaN(n) || n <= 0) return 0;
     const totalMin = Math.round(n * 24 * 60);
@@ -242,9 +249,16 @@ function resolverColuna(header) {
     }
 
     // 2. Fuzzy match em fechamento_rubricas_config
+    // Guard: não cruzar percentuais diferentes (ex: "20%" ≠ "40%")
+    const extrairPct = s => { const m = s.match(/\b(\d+)%/); return m ? m[1] : null; };
+    const pctQuery   = extrairPct(normH);
+
     let melhorScore = 0, melhorCfg = null;
     for (const c of rubricasConfig) {
-        const s1 = similaridade(normH, normalizarNome(c.coluna_planilha));
+        const normCfg = normalizarNome(c.coluna_planilha);
+        const pctCfg  = extrairPct(normCfg);
+        if (pctQuery && pctCfg && pctQuery !== pctCfg) continue; // percentuais diferentes → pular
+        const s1 = similaridade(normH, normCfg);
         const s2 = similaridade(normH, normalizarNome(c.descricao || ''));
         const s  = Math.max(s1, s2);
         if (s > melhorScore) { melhorScore = s; melhorCfg = c; }
@@ -332,36 +346,73 @@ async function processarPlanilha() {
         await Promise.all([carregarFuncionarios(), carregarRubricas(), carregarEmpregadosConfig(), carregarRubricasIgnoradas()]);
 
         // Ler Excel
-        const buffer   = await arquivoFolha.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
-        const sheet    = workbook.Sheets[workbook.SheetNames[0]];
-        const rows     = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        const buffer = await arquivoFolha.arrayBuffer();
+        const wb     = XLSX.read(buffer, { type: 'array' });
 
-        // Linha 4 (índice 3) = cabeçalhos
-        const headers = rows[LINHA_CABECALHO - 1] || [];
+        // Selecionar aba MATRIZ
+        const sheetName = wb.SheetNames.find(s => s.toUpperCase().includes('MATRIZ')) || wb.SheetNames[0];
+        const sheet     = wb.Sheets[sheetName];
+        const rows      = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
-        // Colunas de rubrica: todas a partir do índice 2 (A=nome, B=funcao), com cabeçalho não-vazio
+        // Linha LINHA_CABECALHO (índice LINHA_CABECALHO - 1) = cabeçalhos de rubrica
+        const headers    = rows[LINHA_CABECALHO     - 1] || [];
+        const subHeaders = rows[LINHA_SUB_CABECALHO - 1] || [];
+
+        // Interpreta o sub-cabeçalho da linha 4 para colunas de insalubridade.
+        // O Excel armazena 0.2 e 0.4 como números (não como texto "20%"/"40%").
+        // Células mescladas resultam em None na coluna vizinha; a linha 4 é usada para
+        // identificar essas colunas e distinguir o percentual.
+        function resolverHeaderInsalubridade(subVal) {
+            const n = parseFloat(String(subVal || '').replace(',', '.'));
+            if (isNaN(n)) return null;
+            if (Math.abs(n - 0.4) < 0.01) return 'INSALUBRIDADE 40%';
+            if (Math.abs(n - 0.2) < 0.01) return 'INSALUBRIDADE 20%';
+            return null;
+        }
+
+        // Colunas de rubrica: a partir do índice COL_RUBRICAS_START, com cabeçalho não-vazio
         const colunasRubrica = []; // [{idx, header, resolucao}]
         headers.forEach((h, i) => {
-            if (i < 2) return;
-            const header = String(h || '').trim();
-            if (!header) return;
+            if (i < COL_RUBRICAS_START) return;
+            let header = String(h || '').trim();
+            const sub  = subHeaders[i];
+
+            if (!header) {
+                // Célula mesclada: derivar o header a partir da linha de sub-cabeçalho
+                const qualificado = resolverHeaderInsalubridade(sub);
+                if (!qualificado) return; // realmente vazio — ignorar
+                header = qualificado;
+            } else if (/insalubridade/i.test(header)) {
+                // Header preenchido de insalubridade: qualificar pelo sub-cabeçalho
+                const qualificado = resolverHeaderInsalubridade(sub);
+                if (qualificado) header = qualificado;
+            }
+
             colunasRubrica.push({ idx: i, header, resolucao: resolverColuna(header) });
         });
 
-        // Linhas de dados: a partir da linha 5 até linha vazia (sem nome)
+        // Linhas de dados: a partir da linha LINHA_DADOS_INI até parar quando col 0 vazia ou não numérica
         planilhaData = [];
         for (let r = LINHA_DADOS_INI - 1; r < rows.length; r++) {
-            const row  = rows[r];
-            const nome = String(row[0] || '').trim();
-            if (!nome) break;
+            const row = rows[r];
+            const num = parseInt(String(row[0] || '').trim());
+            if (isNaN(num) || num <= 0) break;
+
+            const nome              = String(row[COL_NOME]  || '').trim();
+            const codEmpregadoSheet = String(row[COL_REG]   || '').trim();
 
             const colunas = {};
             colunasRubrica.forEach(({ idx, header }) => {
                 colunas[header] = String(row[idx] || '').trim();
             });
 
-            planilhaData.push({ nome, funcao: String(row[1] || ''), colunas, colunasRubrica });
+            planilhaData.push({
+                nome,
+                cargo: String(row[COL_CARGO] || ''),
+                codEmpregadoSheet,
+                colunas,
+                colunasRubrica,
+            });
         }
 
         tipoFolhaAtual = '11'; // Excel não tem tipo definido — padrão Folha Mensal
@@ -417,9 +468,9 @@ function construirRelatorio(comp) {
             linhasRelatorio.push({
                 nome:          func.nome,
                 codEmpregado,
-                funcao:        func.funcao,
+                funcao:        func.cargo,
                 coluna:        header,
-                descricao:     resolucao.descricao || header,
+                descricao:     header,
                 codigoRubrica: resolucao.codigo_rubrica,
                 fonteRubrica:  resolucao.fonte,
                 tipoValor,
@@ -497,9 +548,9 @@ function renderizarRelatorio(linhas) {
 
         const tr = document.createElement('tr');
         tr.id = `rel-row-${i}`;
-        if (ignorada)       { tr.style.background = '#f5f5f5'; tr.style.opacity = '0.6'; }
-        else if (semFuncionario) tr.style.background = '#fff8f8';
-        else if (semRubrica)     tr.style.background = '#fffbf0';
+        if (ignorada)            { tr.style.background = '#f5f5f5'; tr.style.opacity = '0.6'; }
+        else if (semFuncionario)   tr.style.background = '#fff8f8';
+        else if (semRubrica)       tr.style.background = '#fffbf0';
 
         tr.innerHTML = `
             <td>${i + 1}</td>
@@ -635,8 +686,8 @@ async function salvarRubricaInline(idx) {
         return;
     }
 
-    const linha   = linhasRelatorio[idx];
-    const coluna  = linha.coluna;
+    const linha  = linhasRelatorio[idx];
+    const coluna = linha.coluna;
 
     try {
         const { error } = await supabaseClient
@@ -840,7 +891,7 @@ function baixarTXT() {
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
     a.href     = url;
-    a.download = `Fechamento_Quadrante_${comp}.txt`;
+    a.download = `Fechamento_Ananke_${comp}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -943,7 +994,7 @@ async function processarFerias() {
             })
         );
 
-        // Coluna de ordenação: preferir "Início gozo férias" (col 22, índice base-0)
+        // Coluna de ordenação
         let colOrd = parseInt(document.getElementById('colunaOrdenacao').value, 10);
         if (isNaN(colOrd)) {
             colOrd = feriasHeaders.findIndex(h => /gozo/i.test(h));
@@ -1004,7 +1055,6 @@ function renderizarFerias() {
 
     // Stats
     const total = feriasSorted.length;
-    const anos  = new Set(feriasSorted.map(r => parseDataFerias(r[isNaN(colOrd) ? 0 : colOrd]).getFullYear())).size;
     document.getElementById('feriasStats').innerHTML = `
         <div class="stat-card">
             <div class="stat-value">${total}</div>
@@ -1130,7 +1180,6 @@ async function carregarEmpresasConfig() {
         console.error('Erro ao carregar empresas config:', err);
     }
 }
-
 
 async function carregarRubricasConfig() {
     const tbody = document.getElementById('cfgTableBody');
@@ -1294,7 +1343,7 @@ async function carregarEnvios() {
             ${badge}
             <div class="envio-info">
                 <div class="envio-info-title">Competência ${env.competencia} · ${env.tipo_folha} – ${tipoLabel}</div>
-                <div class="envio-info-sub">Fonte: ${fonteLabel} · Enviado em ${enviadoEm} · Quadrante Etiquetas 453</div>
+                <div class="envio-info-sub">Fonte: ${fonteLabel} · Enviado em ${enviadoEm} · Anankê · 293</div>
             </div>
             <div class="envio-actions">
                 <button class="btn-processar-envio ${proc || isPlanilha ? 'processado' : ''}"
@@ -1336,7 +1385,7 @@ async function recarregarPlanilha(envioRow) {
 
     tipoFolhaAtual = tipoFolha;
     document.getElementById('competencia').value = competencia;
-    document.getElementById('headerSubtitle').textContent = `Código 453 · ${label} · via Planilha`;
+    document.getElementById('headerSubtitle').textContent = `Anankê · 293 · ${label} · via Planilha`;
     document.getElementById('labelCompetencia2').textContent = 'Competência: ' + label;
     document.getElementById('labelCompetencia3').textContent = 'Competência: ' + label;
 
@@ -1359,23 +1408,29 @@ async function processarDadosFormulario(envioRow) {
     tipoFolhaAtual = tipoFolha; // pré-seleciona no modal de TXT
     document.getElementById('competencia').value = competencia;
     document.getElementById('headerSubtitle').textContent =
-        `Código 453 · ${label} · via Formulário`;
+        `Anankê · 293 · ${label} · via Formulário`;
     document.getElementById('labelCompetencia2').textContent = 'Competência: ' + label;
     document.getElementById('labelCompetencia3').textContent = 'Competência: ' + label;
 
-    // Mapa campo do formulário → header para resolverColuna (mesmos nomes do formulário)
+    // Mapa campo do formulário → header da planilha para resolverColuna
     const campoParaHeader = {
-        he65:      'HORAS EXTRAS 65%',
-        he100:     'HORAS EXTRAS 100%',
-        adicnot:   'ADICIONAL NOTURNO (AUTOM)',
-        comissao:  'COMISSOES',
-        premio:    'PREMIO',
-        vt:        'VALE TRANSPORTE',
-        faltas:    'DIAS FALTAS',
-        faltasdsr: 'DIAS FALTAS DSR',
-        atrasos:   'HORAS FALTAS',
-        descaut:   'DESCONTOS AUTORIZADOS',
-        plano:     'DESCONTO PLANO DE SAUDE',
+        ins02:      'INSALUBRIDADE 20%',
+        ins04:      'INSALUBRIDADE 40%',
+        trienio:    'TRIÊNIO',
+        prod:       'PROD. (SOBRE SL BASE)',
+        adfuncao:   'AD FUNÇÃO',
+        substcc:    'SUBST      .CC.',
+        ajuda1:     'AJUDA DE CUSTO ',
+        ajuda2:     'AJUDA DE CUSTO',
+        supervisao: 'SUPERVISÃO',
+        he:         'H.E',
+        grat:       'GRATIFICAÇÃO.RELATÓRIOS',
+        valeaniv:   'VALE ANIV.',
+        adiant:     'ADIANT. DE SALÁRIO',
+        vt:         'AUXILIO TRANSPORTE',
+        medica:     'ASSIST. MÉDICA',
+        farmacia:   'FARMACIA',
+        atraso:     'ATRASO',
     };
 
     // Resolver rubricas uma vez (igual ao que construirRelatorio faz com colunasRubrica)
@@ -1384,9 +1439,6 @@ async function processarDadosFormulario(envioRow) {
         header,
         resolucao: resolverColuna(header) || { codigo_rubrica: null, tipo_valor: null, descricao: header, fonte: null },
     }));
-
-    // Resolver rubrica do plano Unimed uma vez
-    const resUnimed = resolverColuna('DESCONTO PLANO DE SAUDE');
 
     // Diagnóstico: logar nomes normalizados vs mapa de funcionários
     console.group('🔍 Diagnóstico — nomes do formulário vs rh_empregados');
@@ -1420,7 +1472,7 @@ async function processarDadosFormulario(envioRow) {
             linhasRelatorio.push({
                 nome:          emp.nome,
                 codEmpregado,
-                funcao:        emp.funcao || '',
+                funcao:        emp.cargo || '',
                 coluna:        header,
                 descricao:     resolucao.descricao || header,
                 codigoRubrica: resolucao.codigo_rubrica,
@@ -1430,33 +1482,6 @@ async function processarDadosFormulario(envioRow) {
                 valorInt,
             });
         });
-
-        // Plano Unimed: cada linha do convênio é um lançamento independente
-        if (d.convenios) {
-            Object.values(d.convenios).forEach(card => {
-                card.linhas.forEach(linha => {
-                    const val = parseFloat(linha.val) || 0;
-                    if (!val) return;
-                    // Associar ao funcionário pelo primeiro nome (Daniela/Milene)
-                    const primeiroNomeLinha = normalizarNome(linha.nome || '').split(' ')[0];
-                    const primeiroNomeEmp   = normalizarNome(emp.nome).split(' ')[0];
-                    if (primeiroNomeLinha !== primeiroNomeEmp) return;
-
-                    linhasRelatorio.push({
-                        nome:          emp.nome,
-                        codEmpregado,
-                        funcao:        emp.funcao || '',
-                        coluna:        'PLANO UNIMED',
-                        descricao:     `Unimed – ${linha.nome}`,
-                        codigoRubrica: resUnimed ? resUnimed.codigo_rubrica : null,
-                        fonteRubrica:  resUnimed ? resUnimed.fonte : null,
-                        tipoValor:     'monetario',
-                        bruto:         val,
-                        valorInt:      Math.round(val * 100),
-                    });
-                });
-            });
-        }
     });
 
     console.groupEnd();
@@ -1466,10 +1491,7 @@ async function processarDadosFormulario(envioRow) {
     await supabaseClient.from('quadrante_folha_envios')
         .update({ processado: true }).eq('id', envioRow.id);
 
-    // renderizarRelatorio chama construirTotais internamente — totais por tipo corretos
     renderizarRelatorio(linhasRelatorio);
     mostrarStep(2);
     carregarEnvios();
 }
-
-// carregarEnvios é chamado no DOMContentLoaded existente (linha ~239)

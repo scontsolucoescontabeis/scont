@@ -3,13 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quadrante – Fechamento Folha – SCONT</title>
+    <title>Track &amp; Field – Fechamento Folha – SCONT</title>
     <link rel="stylesheet" href="styles.css">
     <script src="../supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../portal-auth-guard.js"></script>
     <!-- SheetJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* Sobrescreve cor primária para Track & Field (verde) */
+        :root {
+            --primary-color: #1a6b3a;
+            --primary-dark:  #0e4025;
+            --primary-hover: #2d8c53;
+        }
+        .page-header h1 { color: #1a6b3a; }
+        .step-number { background: #1a6b3a !important; }
+        .btn-primary { background: #1a6b3a !important; border-color: #1a6b3a !important; }
+        .btn-primary:hover { background: #0e4025 !important; }
+        .btn-success { background: #27ae60 !important; border-color: #27ae60 !important; }
+        .sidebar-brand { background: linear-gradient(135deg, #0e4025 0%, #1a6b3a 100%) !important; }
+        .envio-badge { background: #e8f5e9 !important; color: #1a6b3a !important; }
+        .envio-badge.processado { background: #1a6b3a !important; color: #fff !important; }
+        .btn-processar-envio { background: #1a6b3a !important; border-color: #1a6b3a !important; }
+    </style>
 </head>
 <body>
 
@@ -17,12 +34,12 @@
 <button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="fecharSidebar()"></div>
 
-<!-- SIDEBAR ESTÁTICO -->
+<!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
         <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
         <h2>Fechamento Folha</h2>
-        <p>Quadrante Etiquetas · 453</p>
+        <p>Track &amp; Field · TF</p>
     </div>
 
     <nav class="sidebar-nav">
@@ -78,8 +95,8 @@
 
     <div class="sidebar-footer">
         <div class="sidebar-footer-info">
-            <strong>Código 453</strong>
-            Quadrante Etiquetas
+            <strong>Track &amp; Field</strong>
+            Código TF · Fechamento Folha
         </div>
     </div>
 </aside>
@@ -90,8 +107,8 @@
     <!-- PAGE HEADER -->
     <div class="page-header">
         <div>
-            <h1>Fechamento Folha · Quadrante Etiquetas</h1>
-            <div class="page-header-sub" id="headerSubtitle">Código 453 · Upload e processamento da planilha</div>
+            <h1>Fechamento Folha · Track &amp; Field</h1>
+            <div class="page-header-sub" id="headerSubtitle">Código TF · Upload e processamento da planilha</div>
         </div>
     </div>
 
@@ -100,23 +117,27 @@
     <div class="container">
 
         <!-- PAINEL: ENVIOS DO FORMULÁRIO -->
-        <div class="step-card" id="painelEnvios" style="border-left-color:#27AE60;">
-            <div class="step-title" style="color:#27AE60;">
+        <div class="step-card" id="painelEnvios" style="border-left-color:#1a6b3a;">
+            <div class="step-title" style="color:#1a6b3a;">
                 <span style="font-size:18px;">📋</span>
                 Processamentos
                 <button onclick="carregarEnvios()" style="margin-left:auto;font-size:12px;padding:5px 12px;border:1px solid var(--border-color);border-radius:6px;background:#fff;cursor:pointer;color:var(--text-primary);">↻ Atualizar</button>
-                <a href="formulario_quadrante.html" class="btn btn-primary btn-small" style="text-decoration:none;margin-left:8px;">✏ Abrir Formulário</a>
+                <a href="formulario_trackfield.html" class="btn btn-primary btn-small" style="text-decoration:none;margin-left:8px;">✏ Abrir Formulário</a>
             </div>
             <div id="listaEnvios">
                 <div style="color:var(--text-secondary);font-size:13px;padding:10px 0;">Carregando envios...</div>
             </div>
         </div>
 
-        <!-- STEP 1: UPLOAD PLANILHA + COMPETÊNCIA -->
+        <!-- STEP 1: UPLOAD PLANILHA -->
         <div class="step-card" id="step1">
             <div class="step-title">
                 <div class="step-number">1</div>
                 Upload da Planilha de Fechamento
+            </div>
+
+            <div class="alert alert-info" style="margin-bottom:16px;">
+                📋 <strong>Formato esperado:</strong> Planilha Track &amp; Field com colunas na linha 3 (LOJA, CARGO, ADMISSÃO, COLABORADOR, SALÁRIO FIXO, COMISSÃO, COM. DOMINGOS/FERIADOS, VT, GRAT. VR, PREMIAÇÃO META, ATESTADOS, FALTAS, OBSERVAÇÕES)
             </div>
 
             <div class="form-group" style="max-width: 280px;">
@@ -134,7 +155,7 @@
                     Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
                 </div>
                 <div class="upload-text" style="font-size:11px; margin-top:4px;">
-                    Formato: .xlsx – Padrão Quadrante (Folha de Pgto Etiquetas)
+                    Formato: .xlsx – Padrão Track &amp; Field (04_SALÁRIOS_TF_MMAAAA.xlsx)
                 </div>
                 <div class="upload-filename" id="filenameFolha"></div>
                 <input type="file" id="inputFolha" accept=".xlsx,.xls">
@@ -147,7 +168,7 @@
             </div>
         </div>
 
-        <!-- STEP 2: RELATÓRIO DE RUBRICAS -->
+        <!-- STEP 2: RELATÓRIO -->
         <div class="step-card" id="step2" style="display:none;">
             <div class="step-title">
                 <div class="step-number">2</div>
@@ -156,11 +177,11 @@
             </div>
 
             <div id="alertaSemMatch" class="alert alert-warning" style="display:none;">
-                ⚠️ Alguns funcionários não foram encontrados no cadastro do Supabase. Verifique os nomes em vermelho — eles não serão incluídos no TXT.
+                ⚠️ Alguns colaboradores não foram encontrados no cadastro. Verifique os nomes em vermelho — eles não serão incluídos no TXT.
             </div>
 
             <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
-                <input type="text" id="buscaRelatorio" placeholder="Filtrar por funcionário ou rubrica..."
+                <input type="text" id="buscaRelatorio" placeholder="Filtrar por colaborador ou rubrica..."
                        oninput="filtrarRelatorio()" style="flex:1; min-width:220px; padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:13px;">
                 <span id="contadorLinhas" style="font-size:12px; color:var(--text-secondary); white-space:nowrap;"></span>
             </div>
@@ -171,7 +192,8 @@
                         <tr>
                             <th>#</th>
                             <th>Cód. Empresa</th>
-                            <th>Funcionário</th>
+                            <th>Loja</th>
+                            <th>Colaborador</th>
                             <th>Código Empr.</th>
                             <th>Rubrica</th>
                             <th>Cód. Rubrica</th>
@@ -190,7 +212,6 @@
             <div class="btn-group">
                 <button class="btn btn-secondary" onclick="voltarStep(1)">← Voltar</button>
                 <button class="btn btn-primary" onclick="irStep3()">▶ Gerar TXT</button>
-                <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
             </div>
         </div>
 
@@ -203,7 +224,7 @@
             </div>
 
             <div class="alert alert-info" id="infoTxt">
-                O TXT será gerado apenas para funcionários com cadastro no Supabase e rubricas com valor diferente de zero.
+                O TXT será gerado apenas para colaboradores com cadastro no sistema e rubricas com valor diferente de zero.
             </div>
 
             <div id="resumoTxt" style="margin-bottom:12px; font-size:13px; color:var(--text-secondary);"></div>
@@ -213,75 +234,6 @@
             <div class="btn-group">
                 <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar</button>
                 <button class="btn btn-success" onclick="baixarTXT()">⬇ Baixar TXT</button>
-                <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
-            </div>
-        </div>
-
-        <!-- STEP 4: UPLOAD FÉRIAS -->
-        <div class="step-card" id="step4" style="display:none;">
-            <div class="step-title">
-                <div class="step-number">4</div>
-                Programação de Férias – Upload
-            </div>
-
-            <div class="alert alert-info">
-                Faça o upload da planilha de programação de férias. A ferramenta ordenará os registros pela data de início do gozo.
-            </div>
-
-            <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">
-                Planilha de Férias (Excel) *
-            </label>
-            <div class="upload-area" id="uploadAreaFerias" onclick="document.getElementById('inputFerias').click()">
-                <div class="upload-icon">🏖️</div>
-                <div class="upload-text">
-                    Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
-                </div>
-                <div class="upload-filename" id="filenameFerias"></div>
-                <input type="file" id="inputFerias" accept=".xlsx,.xls">
-            </div>
-
-            <div style="margin-top:16px;">
-                <label style="font-weight:600; font-size:13px; display:block; margin-bottom:5px;">
-                    Coluna de ordenação (data de gozo)
-                </label>
-                <select id="colunaOrdenacao" style="padding:9px; border:1px solid var(--border-color); border-radius:6px; font-size:13px; min-width:250px;">
-                    <option value="">— Detectar automaticamente —</option>
-                </select>
-                <small style="color:var(--text-secondary); font-size:12px; display:block; margin-top:4px;">
-                    Após selecionar o arquivo, as colunas disponíveis serão listadas aqui.
-                </small>
-            </div>
-
-            <div class="btn-group">
-                <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar ao Relatório</button>
-                <button class="btn btn-primary" onclick="processarFerias()">▶ Gerar Relatório de Férias</button>
-            </div>
-        </div>
-
-        <!-- STEP 5: RELATÓRIO FÉRIAS -->
-        <div class="step-card" id="step5" style="display:none;">
-            <div class="step-title">
-                <div class="step-number">5</div>
-                Programação de Férias – Ordenado por Data de Gozo
-            </div>
-
-            <div class="ferias-stats" id="feriasStats"></div>
-
-            <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
-                <input type="text" id="buscaFerias" placeholder="Filtrar por funcionário..."
-                       oninput="filtrarFerias()" style="flex:1; min-width:220px; padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:13px;">
-            </div>
-
-            <div class="table-wrapper">
-                <table id="tabelaFerias">
-                    <thead id="headFerias"></thead>
-                    <tbody id="bodyFerias"></tbody>
-                </table>
-            </div>
-
-            <div class="btn-group">
-                <button class="btn btn-secondary" onclick="voltarStep(4)">← Voltar</button>
-                <button class="btn btn-primary" onclick="imprimirFerias()">🖨️ Imprimir / Salvar PDF</button>
             </div>
         </div>
 
@@ -293,11 +245,10 @@
     <div class="container">
 
         <div class="config-card">
-            <h2>⚙️ Configurações · Rubricas</h2>
+            <h2>⚙️ Configurações · Rubricas – Track &amp; Field</h2>
 
             <div id="statusConfig" style="display:none;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:13px;"></div>
 
-            <!-- Formulário de adição -->
             <div class="config-form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto;">
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Empresa *</label>
@@ -307,7 +258,7 @@
                 </div>
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Descrição da Rubrica *</label>
-                    <input type="text" id="cfgDescricao" placeholder="Ex: Vale Transporte"
+                    <input type="text" id="cfgDescricao" placeholder="Ex: Comissão de Vendas"
                         style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
                 </div>
                 <div>
@@ -331,7 +282,6 @@
                 </div>
             </div>
 
-            <!-- Filtro empresa para tabela -->
             <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
                 <label style="font-weight:600;font-size:12px;color:#2C3E50;">Filtrar tabela:</label>
                 <select id="cfgFiltroEmpresa" onchange="carregarRubricasConfig()" style="padding:7px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
@@ -340,7 +290,6 @@
                 <span id="cfgTotal" style="font-size:12px;color:#7F8C8D;margin-left:auto;"></span>
             </div>
 
-            <!-- Tabela -->
             <div class="config-table-wrap">
                 <table class="config-table">
                     <thead>
@@ -426,6 +375,6 @@
     </div>
 </div>
 
-<script src="quadrante.js"></script>
+<script src="trackfield.js"></script>
 </body>
 </html>

@@ -169,6 +169,9 @@ function createFormCard(form) {
                 <button class="btn btn-primary btn-small" onclick="event.stopPropagation(); editFormCard('${form.id}')">
                     ✏️ Editar
                 </button>
+                <button class="btn btn-success btn-small" onclick="event.stopPropagation(); exportarExcel('${form.id}')" title="Exportar para Excel">
+                    📊
+                </button>
                 <button class="btn btn-danger btn-small" onclick="event.stopPropagation(); deleteForm('${form.id}', '${(nome).replace(/'/g, '\\\'')}')" title="Excluir formulário">
                     🗑️
                 </button>
@@ -2020,6 +2023,61 @@ function filterCnaes() {
     );
 
     renderCnaeTable(filtered);
+}
+
+async function exportarExcel(formId) {
+    const form = (window.allForms || []).find(f => f.id == formId);
+    if (!form) { showError('Formulário não encontrado.'); return; }
+
+    const tipo = form.tipo_formulario || form.tipo || '';
+    const isEmpregado = tipo === 'empregado';
+
+    const labelsEmpregado = {
+        id: 'ID', tipo_formulario: 'Tipo', status: 'Status',
+        nome_completo: 'Nome Completo', nomeCompleto: 'Nome Completo',
+        cpf: 'CPF', email: 'E-mail', telefone: 'Telefone', celular: 'Celular',
+        nome_empresa: 'Empresa', nomeEmpresa: 'Empresa', empresa_id: 'ID Empresa',
+        cargo: 'Cargo', salario: 'Salário', data_admissao: 'Data Admissão',
+        responsavel: 'Responsável', observacoes: 'Observações',
+        created_at: 'Data Criação', data_preenchimento: 'Data Preenchimento'
+    };
+
+    const labelsFormulario = {
+        id: 'ID', tipo_formulario: 'Tipo', status: 'Status',
+        nome_empresa: 'Nome da Empresa', nomeEmpresa: 'Nome da Empresa',
+        cnpj: 'CNPJ', email: 'E-mail', emailComercial: 'E-mail Comercial',
+        email_comercial: 'E-mail Comercial', telefone: 'Telefone',
+        telefone_comercial: 'Telefone Comercial', telefoneComercial: 'Telefone Comercial',
+        responsavel: 'Responsável', observacoes: 'Observações',
+        endereco: 'Endereço', numero: 'Número', complemento: 'Complemento',
+        bairro: 'Bairro', cidade: 'Cidade', estado: 'Estado', cep: 'CEP',
+        cnae_principal: 'CNAE Principal', capital_social: 'Capital Social',
+        created_at: 'Data Criação', data_preenchimento: 'Data Preenchimento'
+    };
+
+    const labels = isEmpregado ? labelsEmpregado : labelsFormulario;
+    const skipKeys = new Set(['__rowNum__']);
+
+    const row = {};
+    for (const [key, label] of Object.entries(labels)) {
+        if (key in form && !skipKeys.has(key)) {
+            let val = form[key];
+            if (val === null || val === undefined) val = '';
+            if (typeof val === 'object') val = JSON.stringify(val);
+            row[label] = val;
+        }
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet([row]);
+
+    // Largura automática por coluna
+    const colWidths = Object.keys(row).map(k => ({ wch: Math.max(k.length, String(row[k]).length, 15) }));
+    ws['!cols'] = colWidths;
+
+    const nomeArquivo = (form.nome_empresa || form.nome_completo || form.nomeEmpresa || form.nomeCompleto || 'formulario').replace(/[^a-zA-Z0-9À-ú ]/g, '').trim();
+    XLSX.utils.book_append_sheet(wb, ws, 'Formulário');
+    XLSX.writeFile(wb, `${nomeArquivo}.xlsx`);
 }
 
 function selectCnae(codigo, descricao) {

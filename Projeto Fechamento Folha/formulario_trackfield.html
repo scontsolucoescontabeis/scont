@@ -3,15 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Folha de Pagamento – Quadrante Etiquetas – SCONT</title>
+<title>Folha de Pagamento – Track &amp; Field – SCONT</title>
 <script src="../supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../portal-auth-guard.js"></script>
 <style>
 :root {
-  --primary:       #8B3A3A;
-  --primary-dark:  #6B2A2A;
-  --primary-light: #A85050;
+  --primary:       #1a6b3a;
+  --primary-dark:  #0e4025;
+  --primary-light: #2d8c53;
   --prov-color:    #1a6b2e;
   --prov-bg:       #f0faf3;
   --prov-border:   #6abf7b;
@@ -31,7 +31,6 @@
   --text-sec:      #7F8C8D;
   --radius:        10px;
   --row-h:         42px;
-  /* Heights para sticky */
   --h-header:  60px;
   --h-toolbar: 54px;
   --h-legend:  30px;
@@ -69,7 +68,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
   max-width: 220px;
 }
-.comp-pill select option { background: #6B2A2A; color: #fff; }
+.comp-pill select option { background: #0e4025; color: #fff; }
 .hspacer { flex: 1; }
 .hbtn {
   display: flex; align-items: center; gap: 6px;
@@ -100,10 +99,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .tbtn-desc    { background: var(--desc-color); color: #fff; }
 .tbtn-info    { background: var(--info-color); color: #fff; }
 .tbtn-neutral { background: #6c757d; color: #fff; }
-.tbtn-dark    { background: #343a40; color: #fff; }
 .toolbar-hint { margin-left: auto; font-size: 11px; color: var(--text-sec); background: #f7f7f7; border-radius: 6px; padding: 5px 10px; }
 
-/* ─── LEGEND STRIP ─── */
+/* ─── LEGEND ─── */
 .legend-strip {
   display: flex; gap: 20px; padding: 7px 24px;
   background: var(--surface); border-bottom: 1px solid var(--border);
@@ -124,7 +122,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .section-card {
   background: var(--surface); border-radius: var(--radius);
   box-shadow: 0 2px 12px rgba(0,0,0,.08);
-  /* SEM overflow:hidden — quebraria position:sticky nos th */
   margin-bottom: 24px;
 }
 .section-header {
@@ -143,30 +140,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   overflow-y: auto;
   max-height: calc(100vh - var(--h-header) - var(--h-toolbar) - var(--h-legend) - 60px);
 }
-table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 1200px; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 1600px; }
 
-/* Group header row — top:0 relativo ao .table-scroll */
 thead tr.h-group th {
   padding: 8px 6px; text-align: center; font-size: 10px; font-weight: 800;
   letter-spacing: .8px; text-transform: uppercase; border-bottom: none;
   border-right: 1px solid rgba(255,255,255,.2);
-  position: sticky;
-  top: 0;
-  z-index: 12;
+  position: sticky; top: 0; z-index: 12;
 }
 .hg-fixed { background: #3a3a3a; color: #fff; }
 .hg-prov  { background: var(--prov-color); color: #fff; }
 .hg-desc  { background: var(--desc-color); color: #fff; }
 .hg-info  { background: var(--info-color); color: #fff; }
 
-/* Column header row — top = altura do h-group */
 thead tr.h-main th {
   padding: 9px 8px; text-align: center; font-size: 10px; font-weight: 700;
   white-space: nowrap; border-bottom: 2px solid rgba(0,0,0,.15);
   border-right: 1px solid rgba(255,255,255,.15);
-  position: sticky;
-  top: var(--h-hgroup);
-  z-index: 11;
+  position: sticky; top: var(--h-hgroup); z-index: 11;
 }
 .hm-fixed { background: #555; color: #fff; }
 .hm-prov  { background: #2d9148; color: #fff; }
@@ -183,12 +174,11 @@ th.extra-col-header { position: relative; }
 }
 .del-col-btn:hover { background: rgba(220,53,69,.8); }
 
-/* BODY */
 tbody tr { transition: background .12s; }
 tbody tr:nth-child(even) { background: #fafbfc; }
 tbody tr:nth-child(odd)  { background: #fff; }
-tbody tr:hover           { background: #fdf6f6 !important; }
-tbody tr.row-active      { background: #fff9f0 !important; }
+tbody tr:hover           { background: #f0faf3 !important; }
+tbody tr.row-active      { background: #f0faf3 !important; }
 
 tbody td {
   border-bottom: 1px solid #ebebeb;
@@ -197,12 +187,10 @@ tbody td {
   height: var(--row-h);
 }
 
-/* Group left-border accent */
 td.grp-start-prov  { border-left: 3px solid var(--prov-border) !important; }
 td.grp-start-desc  { border-left: 3px solid var(--desc-border) !important; }
 td.grp-start-info  { border-left: 3px solid var(--info-border) !important; }
 
-/* Row number cell */
 td.td-num {
   width: 44px; min-width: 44px; text-align: center;
   background: linear-gradient(180deg,#f5f5f5,#ededed);
@@ -212,15 +200,14 @@ td.td-num {
 .row-num       { font-size: 10px; color: #aaa; display: block; line-height: 1.2; }
 .del-row-btn {
   background: none; border: none; cursor: pointer; color: #dc3545;
-  font-size: 12px; padding: 0; line-height: 1; display: block; margin: 0 auto;
-  opacity: 0; transition: opacity .15s;
+  font-size: 12px; padding: 0; line-height: 1;
   width: 20px; height: 20px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; margin: 2px auto 0;
+  opacity: 0; transition: opacity .15s;
 }
 tbody tr:hover .del-row-btn { opacity: 1; }
 .del-row-btn:hover { background: #fde8e8; }
 
-/* ── INPUTS inside cells ── */
 .cell-wrap {
   padding: 4px 6px; height: var(--row-h); display: flex; align-items: center;
 }
@@ -232,24 +219,13 @@ tbody tr:hover .del-row-btn { opacity: 1; }
   height: 30px;
 }
 .cell-input:hover  { background: rgba(0,0,0,.03); border-color: #d0d0d0; }
-.cell-input:focus  { background: #fffdf5; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.12); }
+.cell-input:focus  { background: #f0faf3; border-color: #27ae60; box-shadow: 0 0 0 3px rgba(39,174,96,.12); }
 .cell-input[type="number"],
 .cell-input.is-number { text-align: right; }
-.cell-input.is-hours  { text-align: center; font-family: monospace; font-size: 13px; letter-spacing: .5px; }
 
-/* Colored focus per group */
 td[data-g="prov"] .cell-input:focus { background: var(--prov-bg); border-color: var(--prov-border); box-shadow: 0 0 0 3px rgba(26,107,46,.1); }
 td[data-g="desc"] .cell-input:focus { background: var(--desc-bg); border-color: var(--desc-border); box-shadow: 0 0 0 3px rgba(181,40,28,.1); }
 td[data-g="info"] .cell-input:focus { background: var(--info-bg); border-color: var(--info-border); box-shadow: 0 0 0 3px rgba(21,73,184,.1); }
-
-.cell-select {
-  width: 100%; border: 1px solid transparent; border-radius: 6px;
-  background: transparent; font-size: 12px; font-family: inherit;
-  padding: 5px 8px; outline: none; cursor: pointer; height: 30px;
-  transition: background .12s, border-color .12s;
-}
-.cell-select:hover  { background: rgba(0,0,0,.03); border-color: #d0d0d0; }
-.cell-select:focus  { background: var(--info-bg); border-color: var(--info-border); }
 
 /* ── FOOTER ── */
 tfoot tr { background: linear-gradient(135deg, #2C3E50, #34495e) !important; }
@@ -282,45 +258,6 @@ tfoot td.ft-fixed { color: #ecf0f1; }
 .toast.warn      { border-left: 4px solid #f39c12; }
 .toast-icon      { font-size: 16px; }
 
-/* ── CONVÊNIO ── */
-.conv-grid { display: flex; flex-direction: column; gap: 16px; margin-top: 24px; }
-.conv-card {
-  background: var(--surface); border-radius: var(--radius);
-  box-shadow: 0 2px 12px rgba(0,0,0,.08); overflow: hidden;
-}
-.conv-card-head {
-  background: linear-gradient(135deg, var(--primary-dark), var(--primary));
-  color: #fff; padding: 8px 14px; font-size: 12px; font-weight: 700;
-  display: flex; align-items: center; gap: 8px;
-}
-.conv-card-body { padding: 10px 14px; }
-.conv-obs {
-  background: #d4edda; border-left: 3px solid #28a745;
-  border-radius: 6px; padding: 5px 10px; font-size: 10px; margin-bottom: 10px; color: #155724;
-}
-.conv-table { border-collapse: collapse; width: 100%; border-radius: 8px; overflow: hidden; }
-.conv-table thead th {
-  background: #f0f0f0; font-size: 10px; font-weight: 700;
-  padding: 5px 8px; text-align: left; border-bottom: 2px solid #e0e0e0; color: var(--text);
-}
-.conv-table tbody tr:nth-child(even) { background: #fafafa; }
-.conv-table td { padding: 4px 8px; font-size: 11px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-.conv-table td[contenteditable]:hover { background: #fef9f0; outline: 1px dashed #ccc; border-radius: 4px; }
-.conv-nome-wrap {
-  display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  padding-right: 8px;
-}
-.conv-input {
-  border: 1px solid #ddd; background: #fafafa; outline: none;
-  font-size: 12px; width: 90px; text-align: right; font-family: inherit;
-  border-radius: 6px; padding: 6px 8px; transition: background .12s, border-color .12s, box-shadow .12s;
-}
-.conv-input:hover  { background: #f0f0f0; border-color: #bbb; }
-.conv-input:focus  { background: #fffdf5; border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,.18); }
-.conv-total-row    { background: #f0f0f0 !important; font-weight: 700; }
-.conv-total-val    { text-align: right; color: var(--primary); font-weight: 700; font-size: 13px; }
-.conv-add-btn      { margin-top: 12px; }
-
 /* ── MODAL ── */
 .modal-overlay {
   display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
@@ -339,11 +276,11 @@ tfoot td.ft-fixed { color: #ecf0f1; }
   border-radius: 8px; font-size: 13px; font-family: inherit; outline: none;
   transition: border-color .15s, box-shadow .15s;
 }
-.modal-field input:focus, .modal-field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(139,58,58,.12); }
+.modal-field input:focus, .modal-field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,107,58,.12); }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
 
-/* ── MODAL RESUMO ENVIO ── */
-.modal-resumo { width: 96vw; max-width: 1300px; max-height: 92vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+/* ── MODAL RESUMO ── */
+.modal-resumo { width: 96vw; max-width: 1400px; max-height: 92vh; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .modal-resumo-head { padding: 20px 28px 14px; border-bottom: 1px solid var(--border); }
 .modal-resumo-head h3 { margin: 0; }
 .modal-resumo-meta { display: flex; gap: 24px; margin-top: 10px; flex-wrap: wrap; }
@@ -371,15 +308,13 @@ tfoot td.ft-fixed { color: #ecf0f1; }
 .btn-cancelar-resumo { background: transparent; border: 1.5px solid var(--border); color: var(--text); border-radius: 8px; padding: 10px 18px; font-size: 13px; cursor: pointer; }
 .btn-cancelar-resumo:hover { background: #f0f0f0; }
 
-/* ── PRINT ── */
 @media print {
   .header, .toolbar, .legend-strip { display: none; }
   body { background: #fff; font-size: 11px; }
   .section-card { box-shadow: none; border: 1px solid #ccc; }
   .del-row-btn, .del-col-btn { display: none; }
-  .cell-input, .cell-select { border: none !important; box-shadow: none !important; background: transparent !important; }
+  .cell-input { border: none !important; box-shadow: none !important; background: transparent !important; }
   thead tr.h-group th, thead tr.h-main th { position: static; top: auto; }
-  .legend-strip { position: static; }
   tfoot tr { background: #eee !important; }
   tfoot td { color: #000 !important; border-top: 1px solid #ccc !important; }
 }
@@ -393,8 +328,8 @@ tfoot td.ft-fixed { color: #ecf0f1; }
     <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
     <div class="vline"></div>
     <div>
-      <div class="header-title">Folha de Pagamento · Quadrante Etiquetas</div>
-      <div class="header-sub">Código 453 · Fechamento mensal</div>
+      <div class="header-title">Folha de Pagamento · Track &amp; Field</div>
+      <div class="header-sub">Código TF · Fechamento mensal</div>
     </div>
   </div>
   <div class="comp-pill">
@@ -422,10 +357,10 @@ tfoot td.ft-fixed { color: #ecf0f1; }
 
 <!-- ═══ TOOLBAR ═══ -->
 <div class="toolbar">
-  <button class="tbtn tbtn-primary"  onclick="addEmployee()">➕ Funcionário</button>
-  <button class="tbtn tbtn-prov"     onclick="abrirModalRubrica('prov')">➕ Provento</button>
-  <button class="tbtn tbtn-desc"     onclick="abrirModalRubrica('desc')">➕ Desconto</button>
-  <button class="tbtn tbtn-info"     onclick="abrirModalRubrica('info')">➕ Informativo</button>
+  <button class="tbtn tbtn-primary" onclick="addEmployee()">➕ Colaborador</button>
+  <button class="tbtn tbtn-prov"    onclick="abrirModalRubrica('prov')">➕ Provento</button>
+  <button class="tbtn tbtn-desc"    onclick="abrirModalRubrica('desc')">➕ Desconto</button>
+  <button class="tbtn tbtn-info"    onclick="abrirModalRubrica('info')">➕ Informativo</button>
   <div class="toolbar-hint">💡 Cole células do Excel direto na tabela · Tab / Enter para navegar</div>
 </div>
 
@@ -440,11 +375,10 @@ tfoot td.ft-fixed { color: #ecf0f1; }
 
 <!-- ═══ PAGE ═══ -->
 <div class="page">
-
   <div class="section-card">
     <div class="section-header">
-      <h3>📋 Lançamentos de Folha</h3>
-      <span class="badge" id="badgeCount">0 funcionários</span>
+      <h3>🏪 Lançamentos de Folha · Track &amp; Field</h3>
+      <span class="badge" id="badgeCount">0 colaboradores</span>
     </div>
     <div class="table-scroll">
       <table id="payroll-table">
@@ -457,21 +391,9 @@ tfoot td.ft-fixed { color: #ecf0f1; }
       </table>
     </div>
   </div>
-
-  <!-- CONVÊNIOS -->
-  <div class="section-card">
-    <div class="section-header">
-      <h3>🏥 Convênios – Plano Unimed</h3>
-    </div>
-    <div style="padding:20px 20px 24px;">
-      <div class="conv-grid" id="convenio-wrap"></div>
-    </div>
-  </div>
-
 </div>
 
 <!-- ═══ MODAL RUBRICA ═══ -->
-<!-- MODAL RESUMO ENVIO -->
 <div class="modal-overlay" id="modalResumoEnvio" onclick="if(event.target===this)fecharResumoEnvio()"></div>
 
 <div class="modal-overlay" id="modalRubrica">
@@ -479,7 +401,7 @@ tfoot td.ft-fixed { color: #ecf0f1; }
     <h3 id="modalTitulo">Nova Rubrica</h3>
     <div class="modal-field">
       <label>Nome da Rubrica *</label>
-      <input type="text" id="modalNome" placeholder="Ex: Adicional de Periculosidade">
+      <input type="text" id="modalNome" placeholder="Ex: Adicional de Insalubridade">
     </div>
     <div class="modal-field">
       <label>Tipo de Valor</label>
@@ -502,135 +424,79 @@ tfoot td.ft-fixed { color: #ecf0f1; }
 
 <script>
 // ══════════════════════════════════════════════════════
-//  DADOS
+//  CONSTANTES
+// ══════════════════════════════════════════════════════
+const EMPRESA_CODIGO = 'TF';
+const LS_KEY = 'trackfield_folha_v1';
+
+// ══════════════════════════════════════════════════════
+//  DADOS PADRÃO
 // ══════════════════════════════════════════════════════
 const EMPLOYEES_DEFAULT = [
-  {nome:"Amanda Soares do Nascimento",funcao:"Assistente Comercial III",salario:2990.26,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Anderson Ricardo Tavares Maroque",funcao:"Assistente de Pré Impressão Junior",salario:2398,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Andrei Pedroso Pimentel",funcao:"Analista de Pré Impressão Sênior",salario:4967.9,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Cleiton Vagner Souto da Silva",funcao:"Analista de Expedição Pleno",salario:3600,he65:"00:31",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Cleuton Santos da Guerra",funcao:"Motorista II",salario:3875.23,he65:"",he100:"",adicnot:"00:00",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Cosmelito Soares Barreto",funcao:"Impressor de Corte Senior",salario:3875.23,he65:"02:19",he100:"00:23",adicnot:"00:00",comissao:"",premio:"",vt:254.4,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Cristina Maria da Silva",funcao:"Revisor de Impressão Pleno",salario:2899.48,he65:"02:03",he100:"00:23",adicnot:"00:00",comissao:"",premio:"",vt:265,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Daniela Aparecida Fonseca",funcao:"Ger. de Contas Especiais",salario:5918.36,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:1749,plano:1733,cotasind:"Não"},
-  {nome:"Danilo Cavalcante Santos",funcao:"Impressor Flexográfico Senior",salario:4496.71,he65:"01:55",he100:"00:55",adicnot:"00:30",comissao:"",premio:"",vt:275.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:91.28,cotasind:"Não"},
-  {nome:"Denis de Souza",funcao:"Tecnico de Qualidade",salario:6342,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:100.9,cotasind:"Não"},
-  {nome:"Eduardo Alves Junior",funcao:"Lider de Produção",salario:6000,he65:"01:59",he100:"",adicnot:"00:04",comissao:"",premio:"",vt:254.4,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Eduardo Santos de Abreus",funcao:"Assistente de Embalagem Pleno",salario:3065.3,he65:"00:13",he100:"00:10",adicnot:"",comissao:"",premio:"",vt:233.2,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Fabiana Molina",funcao:"Analista Comercial Junior",salario:3709.15,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Fernando de Souza",funcao:"Revisor de Impressão Pleno",salario:2899.47,he65:"00:23",he100:"",adicnot:"",comissao:"",premio:"",vt:233.2,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Gessi da Silva Mendes",funcao:"Analista de Qualidade Junior",salario:3321.62,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Gilmar Abreu de Almeida",funcao:"Impressor Flexografico Senior",salario:4496,he65:"03:21",he100:"00:15",adicnot:"00:36",comissao:"",premio:"",vt:265,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Hildo Correia de Araujo Junior",funcao:"Revisor de Impressão Junior",salario:2635.88,he65:"04:02",he100:"00:18",adicnot:"00:50",comissao:"",premio:"",vt:275.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Igo Oliveira Freire",funcao:"Lider de Pre Impressao",salario:6342,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Sim"},
-  {nome:"Isabella Vicentini Fernandes",funcao:"Gerente de Produção",salario:10570,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Jiliane Rodrigues da Silva",funcao:"Gerente de Processos e Qualidade",salario:12037.08,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Joice Teles Mariano",funcao:"Analista Financeiro Senior",salario:6600,he65:"",he100:"",adicnot:"00:03",comissao:"",premio:"",vt:0,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"João Victor Souza Freire",funcao:"Assistente de Impressão",salario:2635.88,he65:"02:31",he100:"",adicnot:"00:39",comissao:"",premio:"",vt:243.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Juliana Lourdes Tavares Caballer",funcao:"Orçamentista Pleno",salario:5536.04,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Laila Luana Quaresma",funcao:"Líder Administrativo Comercial",salario:4428.83,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Leandro Alves Ferreira",funcao:"Comprador",salario:5868.2,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Leandro Monteiro Sabino",funcao:"Revisor de Impressão Senior",salario:2899.48,he65:"00:20",he100:"",adicnot:"",comissao:"",premio:"",vt:233.2,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Lucas Purita Pereira",funcao:"Assistente de Embalagem Junior",salario:2396.27,he65:"00:41",he100:"",adicnot:"",comissao:"",premio:"",vt:243.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Luciano das Graças Mendes",funcao:"Coordenador de Impressao Digital",salario:7399,he65:"03:31",he100:"00:38",adicnot:"00:07",comissao:"",premio:"",vt:0,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Marcos de Souza",funcao:"Motorista I",salario:3171,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Sim"},
-  {nome:"Marcos Batista da Silva",funcao:"Impressor Flexográfico Junior",salario:4000,he65:"03:01",he100:"00:20",adicnot:"00:51",comissao:"",premio:"",vt:254.4,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Sim"},
-  {nome:"Marcelo de Almeida Gobbi",funcao:"Impressor Flexgráfico Master",salario:6643.24,he65:"01:49",he100:"00:23",adicnot:"00:01",comissao:"",premio:"",vt:243.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
-  {nome:"Marcelo Gonçalves Ribeiro",funcao:"Colorista Master",salario:6342,he65:"01:25",he100:"00:05",adicnot:"",comissao:"",premio:"",vt:265,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Milene Di Cesare da Silva",funcao:"Gerente de RH",salario:12592.27,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:1154.74,cotasind:"Não"},
-  {nome:"Mônica Araujo Lima",funcao:"Analista Financeiro Junior",salario:3709.15,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:0,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Nathany Lopes Amaro",funcao:"Analista Comercial Junior",salario:3709.15,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
-  {nome:"Newton Carlos Santos Santana",funcao:"Administrador",salario:2398,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:0,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Paulo Cesar Rocha de Oliveira",funcao:"Impressor de Sleeve",salario:4200,he65:"02:24",he100:"",adicnot:"",comissao:"",premio:"",vt:380,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Pedro Henrique Stengel Lins",funcao:"Analista de Expedição Junior",salario:3171,he65:"00:10",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Não"},
-  {nome:"Rafael de Souza Ignacio",funcao:"Analista de RH Senior",salario:4333.7,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:222.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
-  {nome:"Ronaldo Adriano Torres",funcao:"Operador de Acabamento Jr",salario:2659.82,he65:"02:49",he100:"00:20",adicnot:"00:24",comissao:"",premio:"",vt:254.4,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Roger Farias da Cruz",funcao:"Revisor de Impressão Junior",salario:2635.88,he65:"00:43",he100:"",adicnot:"00:00",comissao:"",premio:"",vt:233.2,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Raphaela Jennifer L. Ribeiro",funcao:"Auxiliar de Produção",salario:2398,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:0,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Sim"},
-  {nome:"Thiago Augusto Machado Sales dos Anjos",funcao:"Impressor Flexografico IV",salario:5396.05,he65:"03:10",he100:"",adicnot:"03:09",comissao:"",premio:"",vt:254.4,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:100.9,cotasind:"Não"},
-  {nome:"Thiago Simão",funcao:"Operador de Acabamento Jr",salario:2635.88,he65:"01:31",he100:"",adicnot:"00:53",comissao:"",premio:"",vt:233.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Tatiana Correia e Silva",funcao:"Auxiliar de Limpeza II",salario:2642.5,he65:"",he100:"",adicnot:"",comissao:"",premio:"",vt:233.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:0,cotasind:"Sim"},
-  {nome:"Walter Luciano Batista",funcao:"Impressor Flexografico Jr",salario:4000,he65:"01:38",he100:"",adicnot:"02:37",comissao:"",premio:"",vt:254.4,faltas:5,faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Sim"},
-  {nome:"Wender de Souza Melo",funcao:"Impressor de Corte Junior",salario:2768.02,he65:"00:56",he100:"",adicnot:"",comissao:"",premio:"",vt:233.6,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
-  {nome:"Welton Evangilista de Macedo",funcao:"Revisor de Impressão Senior",salario:2899.48,he65:"00:07",he100:"",adicnot:"00:00",comissao:"",premio:"",vt:233.2,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
-  {nome:"William Dantas",funcao:"Assistente de Impressão Senior",salario:2635.88,he65:"01:34",he100:"",adicnot:"00:02",comissao:"",premio:"",vt:243.8,faltas:"",faltasdsr:"",atrasos:"",descaut:"",plano:"",cotasind:"Não"},
+  // AEROPORTO
+  {loja:'AEROPORTO',cargo:'GERENTE',admissao:'01/11/2024',colaborador:'SARA DE CARVALHO RODRIGUES',salario:'1681',comissao:'2374,52',comdoming:'',vt:'308',gratvr:'',premiacao:'',atestados:'',faltas:'',observacoes:''},
+  {loja:'AEROPORTO',cargo:'VENDEDOR RESPONSÁVEL',admissao:'10/03/2025',colaborador:'JAQUELINE COSTA BATISTA',salario:'',comissao:'3163,90',comdoming:'12/04/26 - R$ 670,43; 19/04/26 - R$ 87,00',vt:'253',gratvr:'300',premiacao:'121,50',atestados:'',faltas:'',observacoes:''},
+  {loja:'AEROPORTO',cargo:'VENDEDOR',admissao:'17/04/2026',colaborador:'JULIANA COSTA BATISTA',salario:'',comissao:'749,47',comdoming:'21/04/26 - R$ 174,00',vt:'121',gratvr:'',premiacao:'',atestados:'',faltas:'',observacoes:''},
+  {loja:'AEROPORTO',cargo:'VENDEDOR',admissao:'23/10/2024',colaborador:'JUSSIMARA MELISSA DE SOUSA CAVALCANTE',salario:'',comissao:'2985,02',comdoming:'05/04/26 - R$ 168,01; 12/04/26 - R$ 87,00; 26/04/26 - R$ 489,87; 21/04/26 - R$ 181,70',vt:'242',gratvr:'',premiacao:'83',atestados:'',faltas:'',observacoes:''},
+  {loja:'AEROPORTO',cargo:'VENDEDOR',admissao:'02/04/2026',colaborador:'KHEMILLY DA SILVA MATOS',salario:'',comissao:'1407,84',comdoming:'05/04/26 - R$ 87,00; 19/04/26 - R$ 266,17; 26/04/26 - R$ 109,30; 21/04/26 - R$ 386,84',vt:'231',gratvr:'',premiacao:'42,50',atestados:'',faltas:'',observacoes:''},
+  {loja:'AEROPORTO',cargo:'VENDEDOR',admissao:'17/09/2024',colaborador:'MILENA DA SILVA OLIVERIA',salario:'',comissao:'564,94',comdoming:'05/04/26 - R$ 283,08',vt:'110',gratvr:'',premiacao:'',atestados:'4 DIAS - 06, 10, 11 E 12/04',faltas:'1 DIA - 01/04',observacoes:'DESCONTAR VT - R$ 55,00'},
+  {loja:'AEROPORTO',cargo:'VENDEDOR',admissao:'06/02/2025',colaborador:'SUSANA LINS ELUAN',salario:'',comissao:'',comdoming:'',vt:'',gratvr:'',premiacao:'',atestados:'',faltas:'',observacoes:'LICENÇA MATERNIDADE'},
+  // CONJUNTO NACIONAL
+  {loja:'CONJUNTO NACIONAL',cargo:'VENDEDOR RESPONSÁVEL',admissao:'17/06/2025',colaborador:'CARLA ALESSANDRA ALVES DE SOUSA',salario:'',comissao:'3110,24',comdoming:'05/04/26 - R$ 187,40; 19/04/26 - R$ 101,96; 26/04/26 - R$ 178,43',vt:'254',gratvr:'300',premiacao:'115,50',atestados:'',faltas:'',observacoes:''},
+  {loja:'CONJUNTO NACIONAL',cargo:'VENDEDOR',admissao:'18/02/2025',colaborador:'KARLLA PRISCILLA DA SILVA',salario:'',comissao:'3039,98',comdoming:'05/04/26 - R$ 170,15; 12/04/26 - R$ 97,45; 26/04/26 - R$ 140,20; 21/04/26 - R$ 174,00',vt:'231',gratvr:'',premiacao:'62',atestados:'20/04/2026 - 1 DIA',faltas:'',observacoes:'DESCONTAR 1 DIA DE VT - R$ 11'},
+  {loja:'CONJUNTO NACIONAL',cargo:'VENDEDOR',admissao:'20/08/2024',colaborador:'REBEKA ALVES VIEIRA',salario:'',comissao:'',comdoming:'',vt:'',gratvr:'',premiacao:'',atestados:'',faltas:'',observacoes:'FÉRIAS'},
+  {loja:'CONJUNTO NACIONAL',cargo:'VENDEDOR',admissao:'22/10/2025',colaborador:'THAYNARA DE SOUSA BRITO',salario:'',comissao:'1848,42',comdoming:'12/04/26 - R$ 141,66; 19/04/26 - R$ 116,72; 21/04/26 - R$ 213,21',vt:'242',gratvr:'',premiacao:'',atestados:'28/04/2026 - 1 DIA',faltas:'',observacoes:'DESCONTAR 1 DIA DE VT - R$ 11'},
+  // DF PLAZA
+  {loja:'DF PLAZA',cargo:'VENDEDOR',admissao:'18/02/2025',colaborador:'EMILLY NICOLLY RODRIGUES',salario:'',comissao:'731,26',comdoming:'05/04/26 - R$ 87,00; 19/04/26 - R$ 87,00; 21/04/26 - R$ 174,00',vt:'159,60',gratvr:'',premiacao:'',atestados:'27 e 28/04 - 2 DIAS',faltas:'',observacoes:'DESCONTAR 2 DIAS DE VT - R$ 22'},
+  {loja:'DF PLAZA',cargo:'VENDEDOR',admissao:'07/11/2025',colaborador:'MARIA RITA SAMPAIO PINTO',salario:'',comissao:'1359,19',comdoming:'05/04/26 - R$ 103,23; 26/04/26 - R$ 104,17; 21/04/26 - R$ 174,00',vt:'242',gratvr:'',premiacao:'',atestados:'20/04 - 1 DIA',faltas:'',observacoes:'DESCONTAR 1 DIA DE VT - R$ 11'},
+  {loja:'DF PLAZA',cargo:'VENDEDOR RESPONSÁVEL',admissao:'02/04/2024',colaborador:'PAMELLA DE CARVALHO ROCHA',salario:'',comissao:'2549,22',comdoming:'12/04/26 - R$ 87,00; 26/04/26 - R$ 87,00; 21/04/26 - R$ 299,52',vt:'254',gratvr:'300',premiacao:'476',atestados:'',faltas:'',observacoes:''},
+  {loja:'DF PLAZA',cargo:'VENDEDOR',admissao:'26/07/2025',colaborador:'TAMIRES GOMES MONTEIRO',salario:'',comissao:'3246,04',comdoming:'12/04/26 - R$ 98,20; 19/04/26 - R$ 87,00',vt:'253',gratvr:'',premiacao:'242,50',atestados:'',faltas:'',observacoes:''},
+  // PÁTIO BRASIL
+  {loja:'PÁTIO BRASIL',cargo:'VENDEDORA',admissao:'01/06/2025',colaborador:'ANA CAROLINA VIANA RAMOS',salario:'',comissao:'2840,40',comdoming:'12/04/26 - R$ 87,00; 19/04/26 - R$ 131,71; 21/04/26 - R$ 407,72',vt:'242',gratvr:'',premiacao:'166',atestados:'',faltas:'',observacoes:''},
+  {loja:'PÁTIO BRASIL',cargo:'VENDEDORA',admissao:'10/04/2026',colaborador:'BIANCA ALVES DA SILVA',salario:'',comissao:'1920,97',comdoming:'19/04/26 - R$ 155,90',vt:'187',gratvr:'210',premiacao:'140',atestados:'',faltas:'',observacoes:''},
+  {loja:'PÁTIO BRASIL',cargo:'VENDEDORA',admissao:'01/12/2023',colaborador:'FRANCIELE BASTOS',salario:'145,60',comissao:'2770,24',comdoming:'12/04/26 - R$ 87,00; 26/04/26 - R$ 116,96; 21/04/26 - R$ 526,30',vt:'242',gratvr:'',premiacao:'105',atestados:'',faltas:'',observacoes:''},
+  {loja:'PÁTIO BRASIL',cargo:'VENDEDORA',admissao:'03/09/2024',colaborador:'MARIA EDUARDA DA SILVA',salario:'',comissao:'2751,39',comdoming:'05/04/26 - R$ 87,00; 26/04/26 - R$ 87,00; 21/04/26 - R$ 206,90',vt:'242',gratvr:'',premiacao:'44',atestados:'',faltas:'',observacoes:''},
 ];
 
 // ══════════════════════════════════════════════════════
 //  ESTRUTURA DE COLUNAS
 // ══════════════════════════════════════════════════════
 const FIXED_COLS = [
-  {f:'nome',     label:'FUNCIONÁRIO',        type:'text',  group:'fixed', minW:220, grpStart:false},
-  {f:'funcao',   label:'FUNÇÃO',             type:'text',  group:'fixed', minW:240, grpStart:false},
-  {f:'salario',  label:'SALÁRIO',            type:'money', group:'fixed', minW:100, grpStart:false},
-  {f:'he65',     label:'HORAS EXTRAS 65%',        type:'hours', group:'prov',  minW:110, grpStart:true},
-  {f:'he100',    label:'HORAS EXTRAS 100%',       type:'hours', group:'prov',  minW:110, grpStart:false},
-  {f:'adicnot',  label:'ADICIONAL NOTURNO (AUTOM)',type:'hours', group:'prov',  minW:150, grpStart:false},
-  {f:'comissao', label:'COMISSOES',               type:'money', group:'prov',  minW:100, grpStart:false},
-  {f:'premio',   label:'PREMIO',                  type:'money', group:'prov',  minW:88,  grpStart:false},
-  {f:'vt',       label:'VALE TRANSPORTE',         type:'money', group:'prov',  minW:115, grpStart:false},
-  {f:'faltas',   label:'DIAS FALTAS',             type:'days',  group:'desc',  minW:90,  grpStart:true},
-  {f:'faltasdsr',label:'DIAS FALTAS DSR',         type:'days',  group:'desc',  minW:100, grpStart:false},
-  {f:'atrasos',  label:'HORAS FALTAS',            type:'hours', group:'desc',  minW:100, grpStart:false},
-  {f:'descaut',  label:'DESCONTOS AUTORIZADOS',   type:'money', group:'desc',  minW:140, grpStart:false},
-  {f:'plano',    label:'DESCONTO PLANO DE SAÚDE', type:'money', group:'desc',  minW:145, grpStart:false},
-  {f:'cotasind', label:'COTA SIND.',         type:'select',group:'info',  minW:82,  grpStart:true},
+  {f:'loja',       label:'LOJA',                       type:'text',  group:'fixed', minW:155,  grpStart:false},
+  {f:'cargo',      label:'CARGO',                      type:'text',  group:'fixed', minW:175,  grpStart:false},
+  {f:'admissao',   label:'ADMISSÃO',                   type:'text',  group:'fixed', minW:100,  grpStart:false},
+  {f:'colaborador',label:'COLABORADOR',                type:'text',  group:'fixed', minW:230,  grpStart:false},
+  {f:'salario',    label:'SALÁRIO FIXO',               type:'money', group:'prov',  minW:105,  grpStart:true},
+  {f:'comissao',   label:'COMISSÃO / QUEBRA CAIXA',    type:'money', group:'prov',  minW:165,  grpStart:false},
+  {f:'comdoming',  label:'COM. DOMINGOS/FERIADOS',     type:'text',  group:'prov',  minW:240,  grpStart:false},
+  {f:'vt',         label:'VALE TRANSPORTE',            type:'money', group:'prov',  minW:125,  grpStart:false},
+  {f:'gratvr',     label:'GRAT. VR / QUEBRA CAIXA',   type:'money', group:'prov',  minW:160,  grpStart:false},
+  {f:'premiacao',  label:'PREMIAÇÃO META BATIDA',      type:'money', group:'prov',  minW:155,  grpStart:false},
+  {f:'atestados',  label:'ATESTADOS',                  type:'text',  group:'desc',  minW:180,  grpStart:true},
+  {f:'faltas',     label:'FALTAS',                     type:'text',  group:'desc',  minW:130,  grpStart:false},
+  {f:'observacoes',label:'OBSERVAÇÕES',                type:'text',  group:'info',  minW:220,  grpStart:true},
 ];
 
+// Número de colunas do grupo 'fixed' (para o rodapé)
+const NUM_FIXED = FIXED_COLS.filter(c => c.group === 'fixed').length;
+
 const GROUPS = {
-  fixed: {label:'DADOS FIXOS',  hgClass:'hg-fixed', hmClass:'hm-fixed', ftClass:'ft-fixed'},
-  prov:  {label:'PROVENTOS',    hgClass:'hg-prov',  hmClass:'hm-prov',  ftClass:'ft-prov'},
-  desc:  {label:'DESCONTOS',    hgClass:'hg-desc',  hmClass:'hm-desc',  ftClass:'ft-desc'},
-  info:  {label:'INFORMATIVOS', hgClass:'hg-info',  hmClass:'hm-info',  ftClass:'ft-info'},
+  fixed: {label:'IDENTIFICAÇÃO',  hgClass:'hg-fixed', hmClass:'hm-fixed', ftClass:'ft-fixed'},
+  prov:  {label:'PROVENTOS',      hgClass:'hg-prov',  hmClass:'hm-prov',  ftClass:'ft-prov'},
+  desc:  {label:'DESCONTOS',      hgClass:'hg-desc',  hmClass:'hm-desc',  ftClass:'ft-desc'},
+  info:  {label:'INFORMATIVOS',   hgClass:'hg-info',  hmClass:'hm-info',  ftClass:'ft-info'},
 };
 
-let EMPLOYEES  = [];
-let extraCols  = [];
-let saveTimer  = null;
-const LS_KEY   = 'quadrante_folha_v3';
+let EMPLOYEES = [];
+let extraCols = [];
+let saveTimer = null;
 
 // ══════════════════════════════════════════════════════
-//  HH:MM — utilitários
-// ══════════════════════════════════════════════════════
-function parseHHMM(v) {
-  if (v === '' || v == null) return 0;
-  const s = String(v).trim();
-  if (s.includes(':')) {
-    const [h, m] = s.split(':').map(n => parseInt(n, 10) || 0);
-    return h * 60 + m;
-  }
-  // decimal (ex: 2.5 → 150 min)
-  const n = parseFloat(s.replace(',', '.'));
-  return isNaN(n) ? 0 : Math.round(n * 60);
-}
-
-function fmtHHMM(totalMin) {
-  if (!totalMin) return '';
-  const h = Math.floor(Math.abs(totalMin) / 60);
-  const m = Math.abs(totalMin) % 60;
-  return (totalMin < 0 ? '-' : '') + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
-}
-
-function normalizeHHMM(raw) {
-  if (!raw || raw.trim() === '') return '';
-  const min = parseHHMM(raw);
-  return min === 0 ? '' : fmtHHMM(min);
-}
-
-function maskHHMM(inp) {
-  let v = inp.value.replace(/[^0-9]/g, '');
-  if (v.length > 4) v = v.slice(0, 4);
-  if (v.length >= 3) v = v.slice(0, v.length - 2) + ':' + v.slice(-2);
-  inp.value = v;
-}
-
-// ══════════════════════════════════════════════════════
-//  FORMATAÇÃO / PARSE DINHEIRO
+//  FORMATAÇÃO / PARSE
 // ══════════════════════════════════════════════════════
 function parseMoney(v) {
   if (v === '' || v == null) return 0;
   const s = String(v).replace(/R\$\s*/g,'').trim();
-  // suporte a formato PT-BR: "2.990,26" e decimal: "2990.26"
   if (s.includes(',')) return parseFloat(s.replace(/\./g,'').replace(',','.')) || 0;
   return parseFloat(s.replace(/[^\d.-]/g,'')) || 0;
 }
@@ -638,9 +504,9 @@ function fmtMoneyTot(v) {
   if (!v) return '—';
   return 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
-function fmtHoursTot(totalMin) {
-  if (!totalMin) return '—';
-  return fmtHHMM(totalMin);
+function fmtBRL(v) {
+  const n = parseFloat(v) || 0;
+  return n.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 }
 
 // ══════════════════════════════════════════════════════
@@ -649,7 +515,7 @@ function fmtHoursTot(totalMin) {
 let toastTimer;
 const ICONS = {success:'✅', info:'ℹ️', warn:'⚠️'};
 function showToast(msg, type='info', ms=2800) {
-  const el  = document.getElementById('toast');
+  const el = document.getElementById('toast');
   document.getElementById('toastMsg').textContent = msg;
   el.querySelector('.toast-icon').textContent = ICONS[type] || '';
   el.className = `toast ${type}`;
@@ -725,14 +591,14 @@ function renderHeaders() {
   ftNum.className = 'ft-num'; ftNum.textContent = 'Σ';
   fr.appendChild(ftNum);
 
-  // Label cell spans 2 fixed cols (nome + funcao)
+  // Label cell abrange as colunas fixas de identificação
   const ftLbl = document.createElement('td');
-  ftLbl.className = 'ft-label'; ftLbl.colSpan = 2;
+  ftLbl.className = 'ft-label'; ftLbl.colSpan = NUM_FIXED;
   ftLbl.style.textAlign = 'right'; ftLbl.textContent = 'TOTAIS';
   fr.appendChild(ftLbl);
 
   cols.forEach((col, ci) => {
-    if (ci === 0 || ci === 1) return; // covered by ftLbl
+    if (ci < NUM_FIXED) return;
     const td = document.createElement('td');
     td.className = 'ft-val ' + GROUPS[col.group].ftClass;
     td.id = 'tot_' + col.f;
@@ -748,7 +614,6 @@ function buildRow(emp, ri) {
   const tr = document.createElement('tr');
   tr.dataset.row = ri;
 
-  // # cell
   const tdN = document.createElement('td');
   tdN.className = 'td-num';
   tdN.innerHTML = `<span class="row-num">${ri+1}</span>
@@ -756,7 +621,7 @@ function buildRow(emp, ri) {
   tr.appendChild(tdN);
 
   allCols().forEach((col, ci) => {
-    const td  = document.createElement('td');
+    const td = document.createElement('td');
     td.dataset.g = col.group;
     if (col.grpStart) {
       const cls = col.group === 'prov' ? 'grp-start-prov' : col.group === 'desc' ? 'grp-start-desc' : 'grp-start-info';
@@ -766,45 +631,24 @@ function buildRow(emp, ri) {
     const wrap = document.createElement('div');
     wrap.className = 'cell-wrap';
 
-    if (col.type === 'select') {
-      const sel = document.createElement('select');
-      sel.className = 'cell-select';
-      sel.dataset.field = col.f; sel.dataset.row = ri; sel.dataset.col = ci;
-      ['Sim','Não','—'].forEach(o => {
-        const op = document.createElement('option');
-        op.value = o; op.textContent = o;
-        if (String(emp[col.f]||'—').trim() === o) op.selected = true;
-        sel.appendChild(op);
-      });
-      sel.addEventListener('change', () => { scheduleAutoSave(); updateTotals(); });
-      wrap.appendChild(sel);
-    } else {
-      const inp = document.createElement('input');
-      inp.type  = 'text';
-      inp.className = 'cell-input' + (col.type === 'hours' ? ' is-hours' : col.type !== 'text' ? ' is-number' : '');
-      inp.dataset.field = col.f; inp.dataset.row = ri; inp.dataset.col = ci;
-      inp.dataset.type  = col.type;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.className = 'cell-input' + (col.type !== 'text' && col.type !== 'hours' ? ' is-number' : '');
+    inp.dataset.field = col.f; inp.dataset.row = ri; inp.dataset.col = ci;
+    inp.dataset.type = col.type;
 
-      const raw = emp[col.f];
-      if (col.type === 'hours') {
-        inp.value = raw ? normalizeHHMM(String(raw)) : '';
-        inp.placeholder = '00:00';
-        inp.addEventListener('input',  () => maskHHMM(inp));
-        inp.addEventListener('blur',   () => { inp.value = normalizeHHMM(inp.value); scheduleAutoSave(); updateTotals(); });
-      } else {
-        inp.value = (raw === '' || raw == null) ? '' : String(raw);
-        inp.placeholder = col.type === 'money' ? '0,00' : col.type === 'days' ? '0' : '';
-        inp.addEventListener('blur', () => { scheduleAutoSave(); updateTotals(); });
-      }
+    const raw = emp[col.f];
+    inp.value = (raw === '' || raw == null) ? '' : String(raw);
+    inp.placeholder = col.type === 'money' ? '0,00' : '';
 
-      inp.addEventListener('input',   updateTotals);
-      inp.addEventListener('keydown', onCellKeydown);
-      inp.addEventListener('paste',   onCellPaste);
-      inp.addEventListener('focus',   () => { tr.classList.add('row-active'); });
-      inp.addEventListener('blur',    () => { tr.classList.remove('row-active'); });
-      wrap.appendChild(inp);
-    }
+    inp.addEventListener('blur',    () => { scheduleAutoSave(); updateTotals(); });
+    inp.addEventListener('input',   updateTotals);
+    inp.addEventListener('keydown', onCellKeydown);
+    inp.addEventListener('paste',   onCellPaste);
+    inp.addEventListener('focus',   () => tr.classList.add('row-active'));
+    inp.addEventListener('blur',    () => tr.classList.remove('row-active'));
 
+    wrap.appendChild(inp);
     td.appendChild(wrap);
     tr.appendChild(td);
   });
@@ -817,7 +661,8 @@ function renderTable() {
   const tb = document.getElementById('payroll-body');
   tb.innerHTML = '';
   EMPLOYEES.forEach((e, i) => tb.appendChild(buildRow(e, i)));
-  document.getElementById('badgeCount').textContent = EMPLOYEES.length + ' funcionário' + (EMPLOYEES.length !== 1 ? 's' : '');
+  document.getElementById('badgeCount').textContent =
+    EMPLOYEES.length + ' colaborador' + (EMPLOYEES.length !== 1 ? 'es' : '');
   updateTotals();
 }
 
@@ -828,18 +673,11 @@ function updateTotals() {
   allCols().forEach(col => {
     const el = document.getElementById('tot_' + col.f);
     if (!el) return;
-    if (col.type === 'select' || col.type === 'text') { el.textContent = '—'; return; }
-
+    if (col.type === 'text') { el.textContent = '—'; return; }
     const inputs = document.querySelectorAll(`#payroll-body [data-field="${col.f}"]`);
-    if (col.type === 'hours') {
-      let totalMin = 0;
-      inputs.forEach(i => { totalMin += parseHHMM(i.value); });
-      el.textContent = fmtHoursTot(totalMin);
-    } else {
-      let sum = 0;
-      inputs.forEach(i => { sum += parseMoney(i.value); });
-      el.textContent = fmtMoneyTot(sum);
-    }
+    let sum = 0;
+    inputs.forEach(i => { sum += parseMoney(i.value); });
+    el.textContent = fmtMoneyTot(sum);
   });
 }
 
@@ -863,17 +701,17 @@ function focusCell(row, col) {
 }
 
 // ══════════════════════════════════════════════════════
-//  PASTE INTELIGENTE — múltiplas células do Excel
+//  PASTE INTELIGENTE
 // ══════════════════════════════════════════════════════
 function onCellPaste(e) {
   const text = (e.clipboardData || window.clipboardData).getData('text');
-  if (!text.includes('\t') && !text.includes('\n')) return; // paste simples
+  if (!text.includes('\t') && !text.includes('\n')) return;
 
   e.preventDefault();
   const startRow = parseInt(e.target.dataset.row);
   const startCol = parseInt(e.target.dataset.col);
-  const cols     = allCols();
-  const tbRows   = document.getElementById('payroll-body').querySelectorAll('tr');
+  const cols = allCols();
+  const tbRows = document.getElementById('payroll-body').querySelectorAll('tr');
 
   const matrix = text
     .replace(/\r\n/g,'\n').replace(/\r/g,'\n').replace(/\n$/,'')
@@ -886,20 +724,9 @@ function onCellPaste(e) {
     rowData.forEach((val, ci) => {
       const tCol = startCol + ci;
       if (tCol >= cols.length) return;
-      const colDef = cols[tCol];
-      if (colDef.type === 'select') return;
       const inp = tbRows[tRow]?.querySelector(`[data-col="${tCol}"]`);
       if (!inp) return;
-      // Limpar e normalizar
-      let clean = val.trim().replace(/^R\$\s*/, '');
-      if (colDef.type === 'hours') {
-        clean = normalizeHHMM(clean);
-      } else {
-        // converter vírgula decimal PT-BR se não for formato de milhar
-        clean = clean.replace(/\./g, '').replace(',', '.');
-        if (clean === '' || isNaN(parseFloat(clean))) clean = val.trim();
-      }
-      inp.value = clean;
+      inp.value = val.trim();
       inp.dispatchEvent(new Event('input'));
       filled++;
     });
@@ -914,7 +741,7 @@ function onCellPaste(e) {
 // ══════════════════════════════════════════════════════
 function addEmployee() {
   const emp = {};
-  FIXED_COLS.forEach(c => { emp[c.f] = c.type === 'select' ? 'Não' : ''; });
+  FIXED_COLS.forEach(c => { emp[c.f] = ''; });
   extraCols.forEach(c => { emp[c.id] = ''; });
   EMPLOYEES.push(emp);
   renderTable();
@@ -926,7 +753,7 @@ function addEmployee() {
 }
 
 function removeRow(idx) {
-  if (!confirm(`Remover "${EMPLOYEES[idx]?.nome || 'este funcionário'}"?`)) return;
+  if (!confirm(`Remover "${EMPLOYEES[idx]?.colaborador || 'este colaborador'}"?`)) return;
   EMPLOYEES.splice(idx, 1);
   renderTable();
   scheduleAutoSave();
@@ -949,19 +776,21 @@ function abrirModalRubrica(group) {
 }
 function fecharModal() { document.getElementById('modalRubrica').classList.remove('active'); }
 
-document.getElementById('modalNome').addEventListener('keydown', e => {
-  if (e.key === 'Enter')  confirmarRubrica();
-  if (e.key === 'Escape') fecharModal();
-});
-document.getElementById('modalRubrica').addEventListener('click', e => {
-  if (e.target === e.currentTarget) fecharModal();
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('modalNome').addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmarRubrica();
+    if (e.key === 'Escape') fecharModal();
+  });
+  document.getElementById('modalRubrica').addEventListener('click', e => {
+    if (e.target === e.currentTarget) fecharModal();
+  });
 });
 
 function confirmarRubrica() {
   const label = document.getElementById('modalNome').value.trim();
   if (!label) { document.getElementById('modalNome').focus(); return; }
-  const tipo  = document.getElementById('modalTipo').value;
-  const id    = 'extra_' + Date.now();
+  const tipo = document.getElementById('modalTipo').value;
+  const id   = 'extra_' + Date.now();
   extraCols.push({id, label, type: tipo, group: _modalGroup});
   EMPLOYEES.forEach(e => { e[id] = ''; });
   fecharModal();
@@ -975,112 +804,6 @@ function removeCol(id) {
   extraCols = extraCols.filter(c => c.id !== id);
   EMPLOYEES.forEach(e => { delete e[id]; });
   renderTable();
-  scheduleAutoSave();
-}
-
-// ══════════════════════════════════════════════════════
-//  CONVÊNIOS
-// ══════════════════════════════════════════════════════
-const CONVENIOS_DEF = {
-  daniela: {
-    titulo: 'Daniela Aparecida Fonseca',
-    linhas: [
-      {nome:'Func: Daniela Aparecida Fonseca', val:0},
-      {nome:'Dep: Lais de Oliveira', val:150},
-      {nome:'Dep: Eduarda de Oliveira', val:0},
-      {nome:'Dep: Daniel Oliveira Fonseca de Lima', val:0},
-    ],
-  },
-  milene: {
-    titulo: 'Milene Di Cesare da Silva',
-    linhas: [
-      {nome:'Func: Milene Di Cesare da Silva', val:0},
-      {nome:'Dep: Sophia Di Cesare da Silva', val:0},
-    ],
-  },
-};
-let convenios = JSON.parse(JSON.stringify(CONVENIOS_DEF));
-
-function fmtConvVal(v) {
-  if (v == null || v === '') return '';
-  const n = parseFloat(String(v).replace(',','.'));
-  if (isNaN(n) || n === 0) return '';
-  return n.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
-}
-function parseConvVal(s) {
-  if (!s) return 0;
-  // suporta "1.234,56" ou "1234.56" ou "1234,56"
-  let clean = s.trim().replace(/[^\d,\.]/g,'');
-  if (clean.includes(',') && clean.includes('.')) {
-    clean = clean.replace(/\./g,'').replace(',','.');
-  } else {
-    clean = clean.replace(',','.');
-  }
-  return parseFloat(clean) || 0;
-}
-
-function renderConvenios() {
-  const wrap = document.getElementById('convenio-wrap');
-  wrap.innerHTML = '';
-  Object.entries(convenios).forEach(([key, card]) => {
-    const div = document.createElement('div');
-    div.className = 'conv-card';
-    div.innerHTML = `
-      <div class="conv-card-head">🏥 Plano Unimed — ${card.titulo}</div>
-      <div class="conv-card-body">
-        <div class="conv-obs">Plano Unimed: apenas colaboradores <strong>Daniela</strong> e <strong>Milene</strong></div>
-        <table class="conv-table">
-          <thead><tr><th>Nome</th><th style="width:95px;text-align:right">Valor (R$)</th></tr></thead>
-          <tbody id="conv-body-${key}">
-            ${card.linhas.map((l,li) => `
-              <tr>
-                <td contenteditable="true" onblur="convenios['${key}'].linhas[${li}].nome=this.textContent.trim()">
-                  <div class="conv-nome-wrap">${l.nome}</div>
-                </td>
-                <td style="text-align:right; padding:4px 8px;">
-                  <input type="text" inputmode="decimal" class="conv-input"
-                    data-card="${key}" data-li="${li}"
-                    value="${l.val != null && l.val !== '' ? fmtConvVal(l.val) : ''}"
-                    placeholder="0,00">
-                </td>
-              </tr>`).join('')}
-          </tbody>
-          <tfoot><tr class="conv-total-row">
-            <td style="font-weight:700">Total</td>
-            <td class="conv-total-val" id="conv-tot-${key}">R$ 0,00</td>
-          </tr></tfoot>
-        </table>
-        <button class="tbtn tbtn-primary conv-add-btn" onclick="addConvRow('${key}')">➕ Dependente</button>
-      </div>`;
-    wrap.appendChild(div);
-  });
-  document.querySelectorAll('.conv-input').forEach(inp => {
-    inp.addEventListener('input', () => {
-      convenios[inp.dataset.card].linhas[+inp.dataset.li].val = parseConvVal(inp.value);
-      updateConvTotals();
-      scheduleAutoSave();
-    });
-    inp.addEventListener('blur', () => {
-      const v = convenios[inp.dataset.card].linhas[+inp.dataset.li].val;
-      inp.value = v ? fmtConvVal(v) : '';
-    });
-  });
-  updateConvTotals();
-}
-
-function updateConvTotals() {
-  Object.entries(convenios).forEach(([key, card]) => {
-    const t  = card.linhas.reduce((s,l) => s + (parseFloat(l.val)||0), 0);
-    const el = document.getElementById('conv-tot-' + key);
-    if (el) el.textContent = fmtMoneyTot(t);
-  });
-}
-
-function addConvRow(key) {
-  const nome = prompt('Nome do dependente:');
-  if (!nome) return;
-  convenios[key].linhas.push({nome, val:0});
-  renderConvenios();
   scheduleAutoSave();
 }
 
@@ -1109,7 +832,7 @@ async function salvarLocal() {
     competencia: document.getElementById('competencia').value,
     tipoFolha:   document.getElementById('tipoFolha').value,
     employees:   coletarDados(),
-    extraCols, convenios,
+    extraCols,
     savedAt: new Date().toISOString(),
   };
 
@@ -1120,7 +843,7 @@ async function salvarLocal() {
   let savedCloud = false;
   try {
     const { error } = await sbClient.from('quadrante_folha_rascunho').upsert({
-      empresa_codigo: '453',
+      empresa_codigo: EMPRESA_CODIGO,
       competencia:    payload.competencia,
       tipo_folha:     payload.tipoFolha,
       dados:          payload,
@@ -1129,69 +852,55 @@ async function salvarLocal() {
     if (!error) savedCloud = true;
   } catch(_) {}
 
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(payload));
-  } catch(_) {}
+  try { localStorage.setItem(LS_KEY, JSON.stringify(payload)); } catch(_) {}
 
   btn.classList.add('saved');
   setTimeout(() => btn.classList.remove('saved'), 2000);
-  const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const hora = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
   legSave.textContent = savedCloud ? `☁ Salvo às ${hora}` : `💾 Salvo localmente ${hora}`;
 }
 
 function _aplicarRascunho(d) {
   EMPLOYEES = d.employees || [];
-  extraCols = d.extraCols || [];
-  convenios = d.convenios || JSON.parse(JSON.stringify(CONVENIOS_DEF));
+  extraCols  = d.extraCols || [];
   document.getElementById('competencia').value = d.competencia || '';
   if (d.tipoFolha) document.getElementById('tipoFolha').value = d.tipoFolha;
-  const quando = d.savedAt
-    ? new Date(d.savedAt).toLocaleString('pt-BR')
-    : '—';
+  const quando = d.savedAt ? new Date(d.savedAt).toLocaleString('pt-BR') : '—';
   document.getElementById('legSave').textContent = `☁ Rascunho de ${quando}`;
 }
 
 async function carregarLocal() {
-  // Lê localStorage
   let localData = null;
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (raw) {
-      const d = JSON.parse(raw);
-      if (d.employees?.length) localData = d;
-    }
+    if (raw) { const d = JSON.parse(raw); if (d.employees?.length) localData = d; }
   } catch(_) {}
 
-  // Lê Supabase
   let cloudData = null;
   try {
     const { data } = await sbClient.from('quadrante_folha_rascunho')
       .select('dados, updated_at')
-      .eq('empresa_codigo', '453')
+      .eq('empresa_codigo', EMPRESA_CODIGO)
       .order('updated_at', { ascending: false })
       .limit(1)
       .single();
     if (data?.dados?.employees?.length) cloudData = data.dados;
   } catch(_) {}
 
-  // Escolhe o mais recente
   const candidato = (() => {
     if (!localData && !cloudData) return null;
     if (!localData) return cloudData;
     if (!cloudData) return localData;
-    const tLocal = new Date(localData.savedAt || 0).getTime();
-    const tCloud = new Date(cloudData.savedAt || 0).getTime();
-    return tCloud >= tLocal ? cloudData : localData;
+    const tL = new Date(localData.savedAt || 0).getTime();
+    const tC = new Date(cloudData.savedAt || 0).getTime();
+    return tC >= tL ? cloudData : localData;
   })();
 
   if (!candidato) return false;
 
-  const quando = candidato.savedAt
-    ? new Date(candidato.savedAt).toLocaleString('pt-BR')
-    : '—';
+  const quando = candidato.savedAt ? new Date(candidato.savedAt).toLocaleString('pt-BR') : '—';
 
   return new Promise(resolve => {
-    // Toast de confirmação não-bloqueante
     const toast = document.createElement('div');
     toast.style.cssText = `position:fixed;bottom:80px;right:24px;z-index:9999;
       background:#2C3E50;color:#fff;border-radius:10px;padding:16px 20px;
@@ -1204,15 +913,8 @@ async function carregarLocal() {
         <button id="_btnNao" style="flex:1;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:7px;padding:8px;font-size:12px;cursor:pointer;">Ignorar</button>
       </div>`;
     document.body.appendChild(toast);
-    toast.querySelector('#_btnSim').onclick = () => {
-      _aplicarRascunho(candidato);
-      toast.remove();
-      resolve(true);
-    };
-    toast.querySelector('#_btnNao').onclick = () => {
-      toast.remove();
-      resolve(false);
-    };
+    toast.querySelector('#_btnSim').onclick = () => { _aplicarRascunho(candidato); toast.remove(); resolve(true); };
+    toast.querySelector('#_btnNao').onclick = () => { toast.remove(); resolve(false); };
   });
 }
 
@@ -1225,7 +927,7 @@ function exportCSV() {
   const cols = allCols();
   const rows = [['#', ...cols.map(c => c.label)].join(';')];
   document.getElementById('payroll-body').querySelectorAll('tr').forEach((tr, ri) => {
-    const cells = [ri+1, ...cols.map((col,ci) => {
+    const cells = [ri+1, ...cols.map((col, ci) => {
       const el = tr.querySelector(`[data-col="${ci}"]`);
       return `"${el ? el.value : ''}"`;
     })];
@@ -1234,7 +936,7 @@ function exportCSV() {
   const blob = new Blob(['﻿' + rows.join('\n')], {type:'text/csv;charset=utf-8;'});
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(blob),
-    download: `folha_quadrante_${tipo}_${comp.replace('/','_')}.csv`,
+    download: `folha_trackfield_${tipo}_${comp.replace('/','_')}.csv`,
   });
   a.click(); URL.revokeObjectURL(a.href);
   showToast('CSV exportado com sucesso', 'success');
@@ -1248,7 +950,7 @@ const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 // ══════════════════════════════════════════════════════
-//  RESUMO + ENVIO PARA FECHAMENTO
+//  RESUMO + ENVIO
 // ══════════════════════════════════════════════════════
 const TIPO_FOLHA_LABELS = {
   '11':'Folha Mensal','41':'Adiantamento Salarial','42':'Folha Complementar',
@@ -1256,91 +958,77 @@ const TIPO_FOLHA_LABELS = {
   '70':'PLR (Participação nos Lucros e Resultados)'
 };
 
-function fmtBRL(v) {
-  const n = parseFloat(v) || 0;
-  return n.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-}
-
 function coletarDadosEnvio() {
-  const employees = coletarDados();
   return {
     competencia: document.getElementById('competencia').value,
     tipo_folha:  document.getElementById('tipoFolha').value,
-    employees,
+    employees:   coletarDados(),
     extraCols,
-    convenios,
     savedAt: new Date().toISOString(),
   };
 }
 
 function fmtCelula(val, type) {
   if (val === '' || val == null) return '–';
-  if (type === 'money') { const n = parseFloat(String(val).replace(',','.')); return isNaN(n) ? '–' : fmtBRL(n); }
+  if (type === 'money') {
+    const n = parseMoney(val);
+    return n ? fmtBRL(n) : '–';
+  }
   return String(val);
 }
 
 function abrirResumoEnvio() {
   const dados = coletarDadosEnvio();
   if (!dados.competencia) { showToast('Informe a competência antes de enviar.', 'warn'); return; }
-  if (!dados.employees.length) { showToast('Nenhum funcionário no formulário.', 'warn'); return; }
+  if (!dados.employees.length) { showToast('Nenhum colaborador no formulário.', 'warn'); return; }
 
   const tipoLabel = TIPO_FOLHA_LABELS[dados.tipo_folha] || dados.tipo_folha;
-  const cols = allCols(); // TODAS as colunas (fixas + extras)
+  const cols = allCols();
 
-  // Detectar quais colunas têm ao menos um valor preenchido
   const colsAtivas = cols.filter(col =>
     dados.employees.some(emp => emp[col.f] !== '' && emp[col.f] != null)
   );
 
-  // Calcular totais
   let totalProv = 0, totalDesc = 0;
   dados.employees.forEach(emp => {
     colsAtivas.forEach(col => {
       if (col.type !== 'money') return;
-      const v = parseFloat(String(emp[col.f] || '').replace(',','.')) || 0;
+      const v = parseMoney(emp[col.f] || '');
       if (col.group === 'prov') totalProv += v;
       if (col.group === 'desc') totalDesc += v;
     });
   });
 
-  // Convênios
-  let totalConv = 0;
-  Object.values(convenios).forEach(card => card.linhas.forEach(l => { totalConv += parseFloat(l.val) || 0; }));
+  // Agrupar por loja para exibição
+  const lojas = [...new Set(dados.employees.map(e => e.loja || '—'))];
 
-  // Cabeçalhos da tabela
-  const thsHtml = ['#', 'Funcionário', ...colsAtivas.map(c => c.label)].map(h => `<th>${h}</th>`).join('');
+  const thsHtml = ['#', 'Loja', 'Colaborador', ...colsAtivas.filter(c => c.group !== 'fixed').map(c => c.label)]
+    .map(h => `<th>${h}</th>`).join('');
 
-  // Linhas
   const linhasHtml = dados.employees.map((emp, i) => {
-    const tds = colsAtivas.map(col => `<td class="${col.type==='money'||col.type==='hours'||col.type==='days'?'num':''}">${fmtCelula(emp[col.f], col.type)}</td>`).join('');
-    return `<tr><td>${i+1}</td><td style="white-space:nowrap">${emp.nome}</td>${tds}</tr>`;
+    const colsNaoFixed = colsAtivas.filter(c => c.group !== 'fixed');
+    const tds = colsNaoFixed.map(col =>
+      `<td class="${col.type==='money'?'num':''}">${fmtCelula(emp[col.f], col.type)}</td>`
+    ).join('');
+    return `<tr><td>${i+1}</td><td style="white-space:nowrap">${emp.loja||'—'}</td><td style="white-space:nowrap">${emp.colaborador||'—'}</td>${tds}</tr>`;
   }).join('');
-
-  // Convênios
-  let convHtml = '';
-  Object.values(convenios).forEach(card => {
-    card.linhas.forEach(l => {
-      if (parseFloat(l.val)) {
-        convHtml += `<tr><td>${l.nome}</td><td class="num">${fmtBRL(l.val)}</td></tr>`;
-      }
-    });
-  });
 
   document.getElementById('modalResumoEnvio').innerHTML = `
     <div class="modal-box modal-resumo">
       <div class="modal-resumo-head">
-        <h3>📋 Resumo do Formulário — Revisão antes do Envio</h3>
+        <h3>📋 Resumo do Formulário — Track &amp; Field · Revisão antes do Envio</h3>
         <div class="modal-resumo-meta">
-          <div class="resumo-meta-item">Empresa <strong>Quadrante Etiquetas · 453</strong></div>
+          <div class="resumo-meta-item">Empresa <strong>Track &amp; Field · ${EMPRESA_CODIGO}</strong></div>
           <div class="resumo-meta-item">Competência <strong>${dados.competencia}</strong></div>
           <div class="resumo-meta-item">Tipo <strong>${dados.tipo_folha} – ${tipoLabel}</strong></div>
-          <div class="resumo-meta-item">Funcionários <strong>${dados.employees.length}</strong></div>
+          <div class="resumo-meta-item">Colaboradores <strong>${dados.employees.length}</strong></div>
+          <div class="resumo-meta-item">Lojas <strong>${lojas.filter(l=>l&&l!=='—').join(', ')}</strong></div>
         </div>
       </div>
       <div class="modal-resumo-body">
         <div class="resumo-totais">
           <div class="resumo-total-card rtc-func">
-            <div class="rtc-label">Funcionários</div>
+            <div class="rtc-label">Colaboradores</div>
             <div class="rtc-val">${dados.employees.length}</div>
           </div>
           <div class="resumo-total-card rtc-prov">
@@ -1349,12 +1037,11 @@ function abrirResumoEnvio() {
           </div>
           <div class="resumo-total-card rtc-desc">
             <div class="rtc-label">Total Descontos</div>
-            <div class="rtc-val">${fmtBRL(totalDesc + totalConv)}</div>
+            <div class="rtc-val">${fmtBRL(totalDesc)}</div>
           </div>
         </div>
-
         <div class="resumo-section" style="margin-top:20px;">
-          <div class="resumo-section-title">Funcionários e Valores</div>
+          <div class="resumo-section-title">Colaboradores e Valores</div>
           <div style="overflow-x:auto;">
             <table class="resumo-table">
               <thead><tr>${thsHtml}</tr></thead>
@@ -1362,14 +1049,6 @@ function abrirResumoEnvio() {
             </table>
           </div>
         </div>
-
-        ${convHtml ? `<div class="resumo-section">
-          <div class="resumo-section-title">Plano Unimed</div>
-          <table class="resumo-table">
-            <thead><tr><th>Beneficiário</th><th>Valor</th></tr></thead>
-            <tbody>${convHtml}</tbody>
-          </table>
-        </div>` : ''}
       </div>
       <div class="modal-resumo-foot">
         <span style="font-size:11px;color:var(--text-sec);flex:1;">Revise os dados. Após confirmar, o formulário será enviado para a ferramenta de Fechamento.</span>
@@ -1385,16 +1064,16 @@ function abrirResumoEnvio() {
 function salvarResumoHTML() {
   const body = document.querySelector('#modalResumoEnvio .modal-resumo-body').innerHTML;
   const head = document.querySelector('#modalResumoEnvio .modal-resumo-head').innerHTML;
-  const w = window.open('', '_blank', 'width=1100,height=800');
+  const w = window.open('', '_blank', 'width=1200,height=800');
   w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-    <title>Resumo Folha</title>
+    <title>Resumo Folha – Track &amp; Field</title>
     <style>
       body{font-family:-apple-system,sans-serif;font-size:12px;padding:24px;color:#2C3E50}
-      h3{color:#8B3A3A;margin-bottom:8px} table{border-collapse:collapse;width:100%;margin-bottom:16px}
+      h3{color:#1a6b3a;margin-bottom:8px} table{border-collapse:collapse;width:100%;margin-bottom:16px}
       th{background:#f5f5f5;padding:6px 10px;text-align:left;font-size:11px;border-bottom:2px solid #ddd}
       td{padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:11px}
       .num{text-align:right} .resumo-meta{display:flex;gap:20px;flex-wrap:wrap;margin:8px 0 16px;font-size:12px}
-      .resumo-meta strong{color:#2C3E50} .resumo-totais{display:flex;gap:12px;margin-bottom:20px}
+      .resumo-totais{display:flex;gap:12px;margin-bottom:20px}
       .rtc{background:#f8f8f8;border-radius:6px;padding:8px 14px;min-width:120px}
       .rtc-label{font-size:10px;font-weight:700;text-transform:uppercase;color:#7F8C8D}
       .rtc-val{font-size:15px;font-weight:700;margin-top:2px}
@@ -1420,16 +1099,15 @@ async function confirmarEnvio() {
 
   try {
     const { error } = await sbClient.from('quadrante_folha_envios').insert({
-      empresa_codigo: '453',
+      empresa_codigo: EMPRESA_CODIGO,
       competencia:    dados.competencia,
       tipo_folha:     dados.tipo_folha,
       dados:          dados,
     });
     if (error) throw error;
 
-    // Salvar rascunho também (upsert)
     await sbClient.from('quadrante_folha_rascunho').upsert({
-      empresa_codigo: '453',
+      empresa_codigo: EMPRESA_CODIGO,
       competencia:    dados.competencia,
       tipo_folha:     dados.tipo_folha,
       dados:          dados,
@@ -1446,12 +1124,14 @@ async function confirmarEnvio() {
 }
 
 // ══════════════════════════════════════════════════════
-//  COMPETÊNCIA — máscara
+//  MÁSCARA COMPETÊNCIA
 // ══════════════════════════════════════════════════════
-document.getElementById('competencia').addEventListener('input', e => {
-  let v = e.target.value.replace(/\D/g,'');
-  if (v.length >= 2) v = v.slice(0,2) + '/' + v.slice(2,6);
-  e.target.value = v;
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('competencia').addEventListener('input', e => {
+    let v = e.target.value.replace(/\D/g,'');
+    if (v.length >= 2) v = v.slice(0,2) + '/' + v.slice(2,6);
+    e.target.value = v;
+  });
 });
 
 // ══════════════════════════════════════════════════════
@@ -1464,10 +1144,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const loaded = await carregarLocal();
   if (!loaded) {
     EMPLOYEES = JSON.parse(JSON.stringify(EMPLOYEES_DEFAULT));
-    convenios = JSON.parse(JSON.stringify(CONVENIOS_DEF));
   }
 
-  // Competência padrão: mês/ano corrente (só se não veio do rascunho)
   if (!document.getElementById('competencia').value) {
     const hoje = new Date();
     const mm   = String(hoje.getMonth() + 1).padStart(2, '0');
@@ -1475,7 +1153,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   renderTable();
-  renderConvenios();
 });
 </script>
 </body>
