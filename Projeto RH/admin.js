@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarRegras();
     carregarMapeamentos();
     configurarUpload();
+    _carregarTimestampsImportacao();
 });
 
 // --- NAVEGAÇÃO DE ABAS ---
@@ -408,7 +409,7 @@ function renderizarTabelaEmpregados() {
             const title = (v !== null && v !== undefined && v !== '') ? ` title="${String(v).replace(/"/g, '&quot;')}"` : '';
             return `<td${title}>${display}</td>`;
         }).join('');
-        return `<tr>${cells}<td><button type="button" class="btn-delete" onclick="deletarEmpregado(${e.id})">🗑</button></td></tr>`;
+        return `<tr>${cells}<td><button type="button" class="btn-delete" onclick="deletarEmpregado('${e.codigo_empresa}','${e.codigo_empregado}')">🗑</button></td></tr>`;
     }).join('');
 
     if (info) info.textContent = `${_empregadosFiltrados.length} empregado(s) encontrado(s)`;
@@ -639,10 +640,12 @@ async function adicionarEmpregado() {
     } catch (erro) { mostrarStatus('statusEmpregados', 'Erro ao adicionar empregado: ' + erro.message, 'error'); }
 }
 
-async function deletarEmpregado(id) {
+async function deletarEmpregado(codigoEmpresa, codigoEmpregado) {
     if (!confirm('Tem certeza que deseja deletar este empregado?')) return;
     try {
-        const { error } = await supabaseClient.from('rh_empregados').delete().eq('id', id);
+        const { error } = await supabaseClient.from('rh_empregados').delete()
+            .eq('codigo_empresa', codigoEmpresa)
+            .eq('codigo_empregado', codigoEmpregado);
         if (error) throw error;
         mostrarStatus('statusEmpregados', '✅ Empregado deletado com sucesso!', 'success');
         carregarEmpregados();
@@ -1194,6 +1197,30 @@ async function confirmarModoImportacao(entidade, qtd) {
 
 // ─────────────────────────────────────────────────────────────
 
+// ── TIMESTAMP DE IMPORTAÇÃO ───────────────────────────────────
+
+function _salvarTimestampImportacao(tipo) {
+    const iso = new Date().toISOString();
+    localStorage.setItem(`rh_ultima_importacao_${tipo}`, iso);
+    _exibirTimestampImportacao(tipo, iso);
+}
+
+function _exibirTimestampImportacao(tipo, iso) {
+    const el = document.getElementById(`ultimaImportacao${tipo}`);
+    if (!el) return;
+    const d = new Date(iso);
+    const fmt = d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    el.querySelector('span').textContent = fmt;
+    el.style.display = 'block';
+}
+
+function _carregarTimestampsImportacao() {
+    ['Empresas', 'Empregados', 'Rubricas', 'Socios'].forEach(tipo => {
+        const iso = localStorage.getItem(`rh_ultima_importacao_${tipo}`);
+        if (iso) _exibirTimestampImportacao(tipo, iso);
+    });
+}
+
 function handleImportarEmpresas(event) {
     const file = event.target.files?.[0];
     if (file) importarEmpresas(file);
@@ -1249,6 +1276,7 @@ async function importarEmpresas(file) {
 
         setProgresso(ENT, null);
         setStatusImport(ENT, `✅ ${rows.length} empresa(s) importada(s) com sucesso!`, 'success');
+        _salvarTimestampImportacao('Empresas');
         carregarEmpresas();
     } catch (err) {
         setProgresso(ENT, null);
@@ -1418,6 +1446,7 @@ async function importarEmpregadosIndividual(file) {
 
         setProgresso(ENT, null);
         setStatusImport(ENT, `✅ ${rows.length} empregado(s) importado(s) com sucesso!`, 'success');
+        _salvarTimestampImportacao('Empregados');
         carregarEmpregados();
     } catch (err) {
         setProgresso(ENT, null);
@@ -1488,6 +1517,7 @@ async function importarRubricasIndividual(file) {
 
         setProgresso(ENT, null);
         setStatus(`✅ ${rows.length} rubrica(s) importada(s) com sucesso!`, 'success');
+        _salvarTimestampImportacao('Rubricas');
         carregarRubricas();
     } catch (err) {
         setProgresso(ENT, null);
@@ -1594,6 +1624,7 @@ async function importarSocios(file) {
         setProgresso(ENT, null);
         const aviso = duplicatas > 0 ? ` (${duplicatas} duplicata(s) ignorada(s))` : '';
         setStatusImport(ENT, `✅ ${deduped.length} sócio(s) importado(s) com sucesso!${aviso}`, 'success');
+        _salvarTimestampImportacao('Socios');
         carregarSocios();
     } catch (err) {
         setProgresso(ENT, null);

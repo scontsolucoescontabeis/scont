@@ -106,6 +106,13 @@ function inicializarEventos() {
     document.getElementById('closeFeriadosBtnTop').addEventListener('click', () => document.getElementById('feriadosModal').classList.remove('active'));
     document.getElementById('addFeriadoBtn').addEventListener('click', adicionarFeriado);
     document.getElementById('addTabBtn').addEventListener('click', adicionarNovaFolha);
+
+    document.getElementById('importarExcelInput').addEventListener('change', (e) => {
+        if (e.target.files[0]) {
+            importarExcel(e.target.files[0]);
+            e.target.value = '';
+        }
+    });
 }
 
 // --- RETOMADA DE DADOS (SAVES) ---
@@ -1468,11 +1475,76 @@ XLSX.utils.book_append_sheet(wb, wsConsolidado, "Consolidado Geral");
 }
 
 // --- EXPORTAÇÃO TXT ---
+
+const TXT_RUBRICAS_KEY = 'rh_txt_rubricas';
+
+function _carregarConfigNoCampos(prefixo, c) {
+    const f = id => document.getElementById(id);
+    const setVal = (id, val) => { const el = f(id); if (el) el.value = val || ''; };
+    const setOpt = (id, val, def) => { const el = f(id); if (el) el.value = val || def; };
+    setVal(`${prefixo}RubHE50`,    c.rubHE50);
+    setOpt(`${prefixo}TipoHE50`,   c.tipoHE50,   'minutos');
+    setVal(`${prefixo}RubHE100`,   c.rubHE100);
+    setOpt(`${prefixo}TipoHE100`,  c.tipoHE100,  'minutos');
+    setVal(`${prefixo}RubNoturno`, c.rubNoturno);
+    setOpt(`${prefixo}TipoNoturno`,c.tipoNoturno,'minutos');
+    setVal(`${prefixo}RubAtraso`,  c.rubAtraso);
+    setOpt(`${prefixo}TipoAtraso`, c.tipoAtraso, 'minutos');
+    setVal(`${prefixo}RubFalta`,   c.rubFalta);
+    setOpt(`${prefixo}TipoFalta`,  c.tipoFalta,  'dias');
+}
+
+function _lerCamposConfig(prefixo, radioName) {
+    const g = id => (document.getElementById(id) || {}).value || '';
+    return {
+        tipoProcesso: document.querySelector(`input[name="${radioName}"]:checked`)?.value || '11',
+        rubHE50:    g(`${prefixo}RubHE50`).trim(),
+        tipoHE50:   g(`${prefixo}TipoHE50`)   || 'minutos',
+        rubHE100:   g(`${prefixo}RubHE100`).trim(),
+        tipoHE100:  g(`${prefixo}TipoHE100`)  || 'minutos',
+        rubNoturno: g(`${prefixo}RubNoturno`).trim(),
+        tipoNoturno:g(`${prefixo}TipoNoturno`)|| 'minutos',
+        rubAtraso:  g(`${prefixo}RubAtraso`).trim(),
+        tipoAtraso: g(`${prefixo}TipoAtraso`) || 'minutos',
+        rubFalta:   g(`${prefixo}RubFalta`).trim(),
+        tipoFalta:  g(`${prefixo}TipoFalta`)  || 'dias',
+    };
+}
+
+function _encMinutos(mins) {
+    return mins > 0 ? Math.round(mins / 60 * 100) : 0;
+}
+function _encDias(count) {
+    return count > 0 ? Math.round(count * 100) : 0;
+}
+function _linhasTxt(config, codEmp, compFmt, codEmpresa, linhas_he50, linhas_he100, linhas_not, linhas_atr, linhas_falta) {
+    const tp = String(config.tipoProcesso).padStart(2, '0');
+    const empFmt = String(codEmp).padStart(10, '0');
+    const empFmt2 = String(codEmpresa).padStart(10, '0');
+    const base = `10${empFmt}${compFmt}`;
+    const rub = r => String(r).replace(/\D/g, '').padStart(9, '0');
+    const linha = (rubrica, valorInt) => {
+        if (!rubrica || valorInt <= 0) return '';
+        return `${base}${rub(rubrica)}${tp}${String(valorInt).padStart(9,'0')}${empFmt2}\n`;
+    };
+    return [
+        linha(config.rubHE50,    linhas_he50),
+        linha(config.rubHE100,   linhas_he100),
+        linha(config.rubNoturno, linhas_not),
+        linha(config.rubAtraso,  linhas_atr),
+        linha(config.rubFalta,   linhas_falta),
+    ].join('');
+}
+
 function abrirModalExportacaoTXT() {
     document.getElementById('exportTxtModal').classList.add('active');
     document.getElementById('exportCompetencia').value = state.competencia || '';
     document.getElementById('exportEmpresasContainer').style.display = 'none';
+    document.getElementById('expTxtPrevia').style.display = 'none';
     document.getElementById('btnGerarTXT').style.display = 'none';
+    document.getElementById('btnPreviewTXT').style.display = 'none';
+    const saved = localStorage.getItem(TXT_RUBRICAS_KEY);
+    if (saved) { try { _carregarConfigNoCampos('exp', JSON.parse(saved)); } catch(e) {} }
 }
 
 function fecharModalExportacaoTXT() {
@@ -1481,21 +1553,12 @@ function fecharModalExportacaoTXT() {
 
 async function buscarEmpresasParaExportacao() {
     const comp = document.getElementById('exportCompetencia').value;
-    if (!validarCompetencia(comp)) {
-        mostrarMensagem('Erro', 'Competência inválida.');
-        return;
-    }
+    if (!validarCompetencia(comp)) { mostrarMensagem('Erro', 'Competência inválida.'); return; }
     try {
-        const { data, error } = await supabaseClient
-            .from('rh_saves')
-            .select('empresa_codigo')
-            .eq('competencia', comp);
+        const { data, error } = await supabaseClient.from('rh_saves').select('empresa_codigo').eq('competencia', comp);
         if (error) throw error;
         const codigosUnicos = [...new Set(data.map(item => item.empresa_codigo))];
-        if (codigosUnicos.length === 0) {
-            mostrarMensagem('Aviso', 'Nenhum dado processado encontrado para esta competência.');
-            return;
-        }
+        if (codigosUnicos.length === 0) { mostrarMensagem('Aviso', 'Nenhum dado processado encontrado para esta competência.'); return; }
         const empresasFiltradas = state.empresas.filter(emp => codigosUnicos.includes(emp.codigo_empresa));
         renderizarListaEmpresasExportacao(empresasFiltradas);
     } catch (erro) {
@@ -1516,113 +1579,139 @@ function renderizarListaEmpresasExportacao(empresas) {
         `;
     });
     document.getElementById('exportEmpresasContainer').style.display = 'block';
+    document.getElementById('btnPreviewTXT').style.display = 'inline-flex';
     document.getElementById('btnGerarTXT').style.display = 'block';
 }
 
-async function gerarArquivoTXT() {
+async function _construirConteudoTXTExportacao() {
     const comp = document.getElementById('exportCompetencia').value;
-    const tipoProcesso = document.getElementById('exportTipoProcesso').value;
+    if (!validarCompetencia(comp)) throw new Error('Competência inválida.');
+    const config = _lerCamposConfig('exp', 'exportTipoProcesso');
     const checkboxes = document.querySelectorAll('#exportEmpresasList input[type="checkbox"]:checked');
     const empresasSelecionadas = Array.from(checkboxes).map(cb => cb.value);
-    if (empresasSelecionadas.length === 0) {
-        mostrarMensagem('Erro', 'Selecione pelo menos uma empresa.');
-        return;
-    }
-    try {
-        const { data: savesData, error: errSaves } = await supabaseClient
-            .from('rh_saves')
-            .select('*')
-            .in('empresa_codigo', empresasSelecionadas)
-            .eq('competencia', comp)
-            .order('data_criacao', { ascending: false });
-        if (errSaves) throw errSaves;
-        const ultimasVersoes = {};
-        savesData.forEach(reg => {
-            const chave = `${reg.empresa_codigo}_${reg.nome_trabalhador}`;
-            if (!ultimasVersoes[chave]) ultimasVersoes[chave] = reg;
-        });
-        const { data: empregadosData, error: errEmpregados } = await supabaseClient
-            .from('rh_empregados')
-            .select('codigo_empresa, codigo_empregado, nome_empregado')
-            .in('codigo_empresa', empresasSelecionadas);
-        if (errEmpregados) throw errEmpregados;
-        let conteudoTXT = '';
-        const fixo = "10";
-        const compParts = comp.split('/');
-        const compFormatada = compParts[1] + compParts[0];
-        const tipoProcFormatado = String(tipoProcesso).padStart(2, '0');
-        Object.values(ultimasVersoes).forEach(save => {
-            const empCodigo = save.empresa_codigo;
-            const nomeTrab = save.nome_trabalhador;
-            const empregadoInfo = empregadosData.find(e => e.codigo_empresa === empCodigo && e.nome_empregado === nomeTrab);
-            if (!empregadoInfo) return;
-            const codEmpregadoFormatado = String(empregadoInfo.codigo_empregado).padStart(10, '0');
-            const codEmpresaFormatada = String(empCodigo).padStart(10, '0');
-            const folhaTemp = { nome: nomeTrab, empregadoId: empregadoInfo.codigo_empregado, dados: JSON.parse(save.dados_json) };
-            const stateTemp = { jornada: save.jornada, ruleExtra100Optional: save.rule_extra_100_opcional, feriados: JSON.parse(save.feriados_json) };
-            const jornadaMinutos = converterHoraParaMinutos(stateTemp.jornada);
-            let tTrab = 0, tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0;
-            folhaTemp.dados.forEach(dia => {
-                const isFeriado = stateTemp.feriados.some(f => f.data === dia.data);
-                const isDomingo = dia.diaSemana === 'Dom';
-                const isDiaDescanso = isFeriado || isDomingo;
-                const minTrab = calcularHorasTrabalhadas(dia.entrada1, dia.saida1) + calcularHorasTrabalhadas(dia.entrada2, dia.saida2);
-                const minNot = calcularHorasNoturnas(dia.entrada1, dia.saida1, dia.entrada2, dia.saida2);
-                let ex50 = 0, ex100 = 0, dev = 0;
-                if (minTrab > 0) {
-                    if (isDiaDescanso) {
-                        ex100 = minTrab;
+    if (empresasSelecionadas.length === 0) throw new Error('Selecione pelo menos uma empresa.');
+
+    const { data: savesData, error: errSaves } = await supabaseClient
+        .from('rh_saves').select('*')
+        .in('empresa_codigo', empresasSelecionadas).eq('competencia', comp)
+        .order('data_criacao', { ascending: false });
+    if (errSaves) throw errSaves;
+
+    const ultimasVersoes = {};
+    savesData.forEach(reg => {
+        const chave = `${reg.empresa_codigo}_${reg.nome_trabalhador}`;
+        if (!ultimasVersoes[chave]) ultimasVersoes[chave] = reg;
+    });
+
+    const { data: empregadosData, error: errEmpregados } = await supabaseClient
+        .from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado')
+        .in('codigo_empresa', empresasSelecionadas);
+    if (errEmpregados) throw errEmpregados;
+
+    const compParts = comp.split('/');
+    const compFmt = compParts[1] + compParts[0]; // AAAAMM
+    let conteudoTXT = '';
+
+    Object.values(ultimasVersoes).forEach(save => {
+        const empCodigo = save.empresa_codigo;
+        const nomeTrab  = save.nome_trabalhador;
+        const empInfo   = empregadosData.find(e => e.codigo_empresa === empCodigo && e.nome_empregado === nomeTrab);
+        if (!empInfo) return;
+
+        const feriados   = JSON.parse(save.feriados_json || '[]');
+        const dsrDias    = JSON.parse(save.dsr_dias    || '[]');
+        const flagsFolga = JSON.parse(save.flags_folga || '{}');
+        const jornadaMin = converterHoraParaMinutos(save.jornada || '08:00');
+        const rule100    = save.rule_extra_100_opcional || false;
+        const dados      = JSON.parse(save.dados_json || '[]');
+
+        let tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0;
+        dados.forEach(dia => {
+            const isFeriado    = feriados.some(f => f.data === dia.data);
+            const isDSR        = dsrDias.includes(dia.data);
+            const isDiaDescanso = isFeriado || isDSR;
+            const minTrab = calcularHorasTrabalhadas(dia.entrada1, dia.saida1) + calcularHorasTrabalhadas(dia.entrada2, dia.saida2);
+            const minNot  = calcularHorasNoturnas(dia.entrada1, dia.saida1, dia.entrada2, dia.saida2);
+            const minNotConv = Math.round(minNot / 0.875);
+            let ex50 = 0, ex100 = 0, dev = 0;
+            if (minTrab > 0) {
+                if (isDiaDescanso) {
+                    ex100 = minNotConv > 0 ? minNotConv : minTrab;
+                } else {
+                    const ref = minNotConv > 0 ? minNotConv : minTrab;
+                    if (ref > jornadaMin) {
+                        const extra = ref - jornadaMin;
+                        if (rule100) { ex50 = Math.min(extra, 120); ex100 = Math.max(0, extra - 120); }
+                        else { ex50 = extra; }
                     } else {
-                        if (minTrab > jornadaMinutos) {
-                            const minEx = minTrab - jornadaMinutos;
-                            if (stateTemp.ruleExtra100Optional) {
-                                if (minEx <= 120) ex50 = minEx;
-                                else { ex50 = 120; ex100 = minEx - 120; }
-                            } else {
-                                ex50 = minEx;
-                            }
-                        } else if (minTrab < jornadaMinutos) {
-                            dev = jornadaMinutos - minTrab;
-                        }
+                        dev = jornadaMin - ref;
                     }
-                } else if (!isDiaDescanso) {
-                    dev = jornadaMinutos;
                 }
-                tTrab += minTrab;
-                tEx50 += ex50;
-                tEx100 += ex100;
-                tNot += minNot;
-                tDev += dev;
-            });
-            const gerarLinha = (eventoNome, valorMinutos) => {
-                if (valorMinutos <= 0) return;
-                const horasDecimais = (valorMinutos / 60).toFixed(2);
-                const valorLimpo = horasDecimais.replace('.', '');
-                const valFormatado = String(valorLimpo).padStart(9, '0');
-                conteudoTXT += `${fixo}${codEmpregadoFormatado}${compFormatada}0000000000${tipoProcFormatado}${valFormatado}${codEmpresaFormatada}\n`;
-            };
-            gerarLinha('horasTrabalhadas', tTrab);
-            gerarLinha('horasExtras50', tEx50);
-            gerarLinha('horasExtras100', tEx100);
-            gerarLinha('horasNoturnaConvertida', tNot);
-            gerarLinha('horasDevidas', tDev);
+            } else if (!isDiaDescanso) {
+                const flag = flagsFolga[dia.data];
+                if (flag === 'falta') { dev = jornadaMin; tFaltaDias++; }
+                else if (!flag)       { dev = jornadaMin; tFaltaDias++; }
+            }
+            tEx50  += ex50;
+            tEx100 += ex100;
+            tNot   += minNotConv;
+            tDev   += dev;
         });
-        if (!conteudoTXT) {
-            mostrarMensagem('Aviso', 'Nenhum dado gerado.');
-            return;
+
+        // Compensar devidas com extras
+        let devidasRestantes = tDev;
+        if (devidasRestantes > 0) {
+            const abate50  = Math.min(tEx50,  devidasRestantes); tEx50  -= abate50;  devidasRestantes -= abate50;
+            const abate100 = Math.min(tEx100, devidasRestantes); tEx100 -= abate100; devidasRestantes -= abate100;
+            tDev = Math.max(0, devidasRestantes);
         }
+
+        conteudoTXT += _linhasTxt(
+            config,
+            empInfo.codigo_empregado,
+            compFmt,
+            empCodigo,
+            _encMinutos(tEx50),
+            _encMinutos(tEx100),
+            _encMinutos(tNot),
+            _encMinutos(tDev),
+            _encDias(tFaltaDias)
+        );
+    });
+
+    localStorage.setItem(TXT_RUBRICAS_KEY, JSON.stringify(_lerCamposConfig('exp', 'exportTipoProcesso')));
+    return { conteudoTXT, compFmt, comp };
+}
+
+async function gerarPreviewTXTExportacao() {
+    mostrarMensagem('Aguarde', 'Gerando prévia...');
+    try {
+        const { conteudoTXT } = await _construirConteudoTXTExportacao();
+        fecharModalMensagem();
+        _mostrarPrevia('expTxtPrevia', 'expTxtPreviaConteudo', 'expTxtPreviaInfo', '#exportTxtModal', conteudoTXT);
+    } catch (erro) {
+        fecharModalMensagem();
+        mostrarMensagem('Erro', erro.message || 'Falha ao gerar prévia.');
+    }
+}
+
+async function gerarArquivoTXT() {
+    mostrarMensagem('Aguarde', 'Gerando arquivo TXT...');
+    try {
+        const { conteudoTXT, compFmt } = await _construirConteudoTXTExportacao();
+        fecharModalMensagem();
+        if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor positivo encontrado para as rubricas configuradas.'); return; }
         const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
         a.href = url;
-        a.download = `Exportacao_Folha_${compFormatada}_${Date.now()}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        a.download = `Lancamentos_${compFmt}_${Date.now()}.txt`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
         fecharModalExportacaoTXT();
         mostrarMensagem('Sucesso', 'Arquivo TXT gerado e baixado com sucesso!');
     } catch (erro) {
+        fecharModalMensagem();
         console.error('Erro ao gerar TXT:', erro);
         mostrarMensagem('Erro', 'Falha ao gerar o arquivo TXT: ' + erro.message);
     }
@@ -1768,4 +1857,247 @@ function gerarDiasDoMes(competencia) {
         });
     }
     return dias;
+}
+
+// ===== MODELO EXCEL / IMPORTAÇÃO =====
+
+async function gerarModeloExcel() {
+    const comp   = document.getElementById('competencia').value;
+    const codEmp = document.getElementById('codigoEmpresa').value;
+
+    if (!validarCompetencia(comp)) {
+        mostrarMensagem('Aviso', 'Preencha a competência antes de baixar o modelo.');
+        return;
+    }
+    if (!codEmp) {
+        mostrarMensagem('Aviso', 'Selecione a empresa antes de baixar o modelo.');
+        return;
+    }
+
+    mostrarMensagem('Aguarde', 'Gerando modelo Excel...');
+
+    try {
+        const { data: empregados, error } = await supabaseClient
+            .from('rh_empregados')
+            .select('codigo_empregado, nome_empregado')
+            .eq('codigo_empresa', codEmp)
+            .order('nome_empregado', { ascending: true });
+
+        if (error) throw error;
+        if (!empregados || empregados.length === 0) {
+            fecharModalMensagem();
+            mostrarMensagem('Aviso', 'Esta empresa não possui empregados cadastrados.');
+            return;
+        }
+
+        const diasDoMes = gerarDiasDoMes(comp);
+        const wb = XLSX.utils.book_new();
+
+        empregados.forEach(emp => {
+            const nomeSheet = `${emp.codigo_empregado} ${emp.nome_empregado}`.substring(0, 31);
+            const header = ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2'];
+            const rows   = [header, ...diasDoMes.map(d => [d.data, d.diaSemana, '', '', '', ''])];
+            const ws     = XLSX.utils.aoa_to_sheet(rows);
+
+            // Forçar coluna Data como texto para evitar auto-conversão do Excel
+            for (let r = 1; r < rows.length; r++) {
+                const addr = XLSX.utils.encode_cell({ r, c: 0 });
+                ws[addr] = { t: 's', v: rows[r][0] };
+            }
+
+            ws['!cols'] = [
+                { wch: 13 }, { wch: 14 },
+                { wch: 12 }, { wch: 12 },
+                { wch: 12 }, { wch: 12 }
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, nomeSheet);
+        });
+
+        const [mm, aaaa] = comp.split('/');
+        XLSX.writeFile(wb, `Modelo_FolhaPonto_${codEmp}_${mm}-${aaaa}.xlsx`);
+        fecharModalMensagem();
+    } catch (erro) {
+        console.error('Erro ao gerar modelo:', erro);
+        fecharModalMensagem();
+        mostrarMensagem('Erro', 'Falha ao gerar o modelo: ' + erro.message);
+    }
+}
+
+async function importarExcel(file) {
+    if (!file) return;
+    mostrarMensagem('Importando', 'Processando o arquivo Excel...');
+
+    try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
+
+        const normalizeHora = (v) => {
+            if (v === null || v === undefined || v === '') return '';
+            if (typeof v === 'number') {
+                // Serial de tempo do Excel: fração de 24h
+                const total = Math.round(v * 24 * 60);
+                const h = Math.floor(total / 60) % 24;
+                const m = total % 60;
+                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            }
+            const s = String(v).trim();
+            const match = s.match(/^(\d{1,2}):(\d{2})/);
+            return match ? `${match[1].padStart(2, '0')}:${match[2]}` : '';
+        };
+
+        let importados = 0;
+        const avisos = [];
+
+        wb.SheetNames.forEach(sheetName => {
+            const codEmp   = sheetName.split(' ')[0].trim();
+            const empregado = state.empregadosDisponiveis.find(e => e.codigo_empregado === codEmp);
+
+            if (!empregado) {
+                avisos.push(`Aba "${sheetName}": código "${codEmp}" não encontrado na empresa.`);
+                return;
+            }
+
+            let folhaIdx = state.folhas.findIndex(f => f.empregadoId === empregado.codigo_empregado);
+            if (folhaIdx === -1) {
+                state.folhas.push({
+                    empregadoId: empregado.codigo_empregado,
+                    nome: empregado.nome_empregado,
+                    dados: gerarDiasDoMes(state.competencia),
+                    dsrDias: [],
+                    flagsFolga: {}
+                });
+                folhaIdx = state.folhas.length - 1;
+            } else {
+                state.folhas[folhaIdx].nome       = empregado.nome_empregado;
+                state.folhas[folhaIdx].empregadoId = empregado.codigo_empregado;
+            }
+
+            const linhas = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+
+            for (let r = 1; r < linhas.length; r++) {
+                const row = linhas[r];
+                if (!row || !row[0]) continue;
+                const dataStr = String(row[0]).trim();
+                if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) continue;
+
+                const diaIdx = state.folhas[folhaIdx].dados.findIndex(d => d.data === dataStr);
+                if (diaIdx === -1) continue;
+
+                state.folhas[folhaIdx].dados[diaIdx].entrada1 = normalizeHora(row[2]);
+                state.folhas[folhaIdx].dados[diaIdx].saida1   = normalizeHora(row[3]);
+                state.folhas[folhaIdx].dados[diaIdx].entrada2 = normalizeHora(row[4]);
+                state.folhas[folhaIdx].dados[diaIdx].saida2   = normalizeHora(row[5]);
+            }
+            importados++;
+        });
+
+        state.abaAtivaIndex = 0;
+        renderizarAbas();
+        fecharModalMensagem();
+
+        const msg = avisos.length > 0
+            ? `${importados} folha(s) importada(s).\n\nAvisos:\n${avisos.join('\n')}`
+            : `${importados} folha(s) importada(s) com sucesso.`;
+        mostrarMensagem(avisos.length > 0 ? 'Importação concluída' : 'Sucesso', msg);
+    } catch (erro) {
+        console.error('Erro ao importar Excel:', erro);
+        fecharModalMensagem();
+        mostrarMensagem('Erro', 'Falha ao ler o arquivo: ' + erro.message);
+    }
+}
+
+// ===== GERAÇÃO DE TXT A PARTIR DOS RESULTADOS =====
+
+function abrirModalTxtResultados() {
+    if (!state.resultados || state.resultados.length === 0) {
+        mostrarMensagem('Aviso', 'Não há dados processados para gerar o TXT.');
+        return;
+    }
+    const saved = localStorage.getItem(TXT_RUBRICAS_KEY);
+    if (saved) { try { _carregarConfigNoCampos('res', JSON.parse(saved)); } catch(e) {} }
+    document.getElementById('resTxtPrevia').style.display = 'none';
+    document.getElementById('txtRubricasModal').classList.add('active');
+}
+
+function fecharModalTxtResultados() {
+    document.getElementById('txtRubricasModal').classList.remove('active');
+}
+
+function _construirConteudoTXTResultados(salvar = false) {
+    const config = _lerCamposConfig('res', 'resTipoProcesso');
+    if (![config.rubHE50, config.rubHE100, config.rubNoturno, config.rubAtraso, config.rubFalta].some(r => r)) {
+        throw new Error('Preencha ao menos uma rubrica para gerar o TXT.');
+    }
+    if (salvar) localStorage.setItem(TXT_RUBRICAS_KEY, JSON.stringify(config));
+
+    const compParts = state.competencia.split('/');
+    const compFmt = compParts[1] + compParts[0];
+    const codEmpresa = state.empresaSelecionada.codigo_empresa;
+    let conteudoTXT = '';
+
+    state.resultados.forEach(res => {
+        let he50 = converterHoraParaMinutos(res.totais.extra50);
+        let he100 = converterHoraParaMinutos(res.totais.extra100);
+        let devRest = converterHoraParaMinutos(res.totais.faltante);
+        const abate50 = Math.min(he50, devRest); he50 -= abate50; devRest -= abate50;
+        const abate100 = Math.min(he100, devRest); he100 -= abate100;
+        conteudoTXT += _linhasTxt(
+            config,
+            res.empregadoId,
+            compFmt,
+            codEmpresa,
+            _encMinutos(he50),
+            _encMinutos(he100),
+            _encMinutos(converterHoraParaMinutos(res.totais.noturnoConvertido)),
+            _encMinutos(converterHoraParaMinutos(res.totais.devidas)),
+            _encDias(res.dias.filter(d => d.flagFalta).length)
+        );
+    });
+
+    return { conteudoTXT, compFmt };
+}
+
+function _mostrarPrevia(previaId, previaConteudoId, previaInfoId, modalBodySelector, conteudoTXT) {
+    if (!conteudoTXT.trim()) {
+        mostrarMensagem('Aviso', 'Nenhum valor positivo encontrado para as rubricas configuradas (todos os totais estão zerados).');
+        return;
+    }
+    const linhas = conteudoTXT.trimEnd().split('\n');
+    document.getElementById(previaConteudoId).textContent =
+        linhas.slice(0, 20).join('\n') + (linhas.length > 20 ? `\n... (+${linhas.length - 20} linhas)` : '');
+    document.getElementById(previaInfoId).textContent = `Total: ${linhas.length} linha(s)`;
+    const previaEl = document.getElementById(previaId);
+    previaEl.style.display = 'block';
+    // scroll modal-body para mostrar a prévia
+    const modalBody = document.querySelector(`${modalBodySelector} .modal-body`);
+    if (modalBody) setTimeout(() => { modalBody.scrollTop = modalBody.scrollHeight; }, 50);
+}
+
+function gerarPreviewTXTResultados() {
+    try {
+        const { conteudoTXT } = _construirConteudoTXTResultados(false);
+        _mostrarPrevia('resTxtPrevia', 'resTxtPreviaConteudo', 'resTxtPreviaInfo', '#txtRubricasModal', conteudoTXT);
+    } catch (erro) {
+        mostrarMensagem('Aviso', erro.message);
+    }
+}
+
+function gerarTXTResultados() {
+    try {
+        const { conteudoTXT } = _construirConteudoTXTResultados(true);
+        if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor positivo encontrado para as rubricas configuradas.'); return; }
+        const [mm, aaaa] = state.competencia.split('/');
+        const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href = url;
+        a.download = `Lancamentos_${state.empresaSelecionada.codigo_empresa}_${mm}-${aaaa}.txt`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        fecharModalTxtResultados();
+        mostrarMensagem('Sucesso', 'Arquivo TXT gerado com sucesso!');
+    } catch (erro) {
+        mostrarMensagem('Aviso', erro.message);
+    }
 }

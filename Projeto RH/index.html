@@ -62,7 +62,10 @@
                 <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">▶️ Continuar</button>
             </form>
             
-            <div style="margin-top: 20px; text-align: center; border-top: 1px solid #eee; padding-top: 20px;">
+            <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; display: flex; flex-direction: column; gap: 8px;">
+                <button type="button" class="btn btn-secondary" onclick="gerarModeloExcel()" style="width: 100%; font-size: 13px;">
+                    📥 Baixar Modelo Excel (por empresa)
+                </button>
                 <button type="button" class="btn btn-secondary" onclick="abrirModalExportacaoTXT()" style="width: 100%; font-size: 13px;">
                     📄 Exportar dados para lançamento na folha (TXT)
                 </button>
@@ -111,8 +114,9 @@
 
             <!-- BOTÕES DE AÇÃO -->
             <div class="action-buttons">
-                <!-- ✅ ALTERADO: Agora chama iniciarSalvamento() em vez de processarFolhaComSalvamento() -->
                 <button type="button" class="btn btn-primary" onclick="iniciarSalvamento()">✅ Processar e Salvar Folha</button>
+                <label for="importarExcelInput" class="btn btn-secondary" style="cursor:pointer; margin:0;">📥 Importar Excel</label>
+                <input type="file" id="importarExcelInput" accept=".xlsx,.xls" style="display:none">
                 <button type="button" class="btn btn-danger" id="resetBtn">🔄 Limpar Dados</button>
             </div>
         </div>
@@ -121,8 +125,9 @@
         <div id="resultsScreen" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
                 <h2 style="color: var(--primary-color); margin: 0;">📊 Resultados do Processamento</h2>
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button type="button" class="btn btn-success" id="exportXlsxBtn">📥 Exportar Excel</button>
+                    <button type="button" class="btn btn-primary" onclick="abrirModalTxtResultados()">📄 Gerar TXT</button>
                     <button type="button" class="btn btn-secondary" id="backToEditBtn">✏️ Voltar para Edição</button>
                 </div>
             </div>
@@ -135,14 +140,16 @@
 
     <!-- ================= MODAIS ================= -->
 
-    <!-- MODAL: EXPORTAÇÃO TXT -->
+    <!-- MODAL: EXPORTAÇÃO TXT (tela inicial) -->
     <div id="exportTxtModal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-content" style="max-width: 660px;">
             <div class="modal-header">
                 <h3 style="color: var(--primary-color); margin: 0;">📄 Exportar para Folha (TXT)</h3>
                 <button type="button" class="modal-close" onclick="fecharModalExportacaoTXT()">×</button>
             </div>
-            <div class="modal-body" style="padding: 20px;">
+            <div class="modal-body" style="padding: 20px; max-height: 75vh; overflow-y: auto;">
+
+                <!-- Competência -->
                 <div class="form-group">
                     <label for="exportCompetencia">Competência (MM/AAAA) *</label>
                     <div style="display: flex; gap: 10px;">
@@ -151,28 +158,93 @@
                     </div>
                 </div>
 
-                <div id="exportEmpresasContainer" style="display: none; margin-top: 20px;">
-                    <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 5px;">Selecione as Empresas *</label>
-                    <div id="exportEmpresasList" style="border: 1px solid var(--border-color); border-radius: 6px; max-height: 150px; overflow-y: auto; padding: 10px; background: var(--background-color); margin-bottom: 15px;">
-                        <!-- Preenchido via JS -->
+                <!-- Rubricas (sempre visível) -->
+                <div style="margin-top: 16px;">
+                    <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 8px; color: var(--text-primary);">Configuração de Rubricas</label>
+                    <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                        <div style="background: var(--background-color); padding: 8px 14px; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px;">
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Evento</span>
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Código da Rubrica</span>
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Tipo de Valor</span>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Horas Extras 50%</span>
+                            <input type="text" id="expRubHE50" maxlength="9" placeholder="Ex: 000050" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="expTipoHE50" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="minutos">Horas (HH:MM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                                <option value="dias">Dias</option>
+                            </select>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Horas Extras 100%</span>
+                            <input type="text" id="expRubHE100" maxlength="9" placeholder="Ex: 000100" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="expTipoHE100" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="minutos">Horas (HH:MM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                                <option value="dias">Dias</option>
+                            </select>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Adicional Noturno</span>
+                            <input type="text" id="expRubNoturno" maxlength="9" placeholder="Ex: 000310" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="expTipoNoturno" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="minutos">Horas (HH:MM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                                <option value="dias">Dias</option>
+                            </select>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Atraso</span>
+                            <input type="text" id="expRubAtraso" maxlength="9" placeholder="Ex: 000410" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="expTipoAtraso" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="minutos">Horas (HH:MM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                                <option value="dias">Dias</option>
+                            </select>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Falta (em dias)</span>
+                            <input type="text" id="expRubFalta" maxlength="9" placeholder="Ex: 000510" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="expTipoFalta" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="dias">Dias</option>
+                                <option value="minutos">Horas (HH:MM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                            </select>
+                        </div>
                     </div>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">Rubricas com valor zero não serão incluídas. Configurações salvas automaticamente.</p>
+                </div>
 
-                    <div class="form-group">
-                        <label for="exportTipoProcesso">Tipo do Processo *</label>
-                        <select id="exportTipoProcesso">
-                            <option value="11">11 - Mensal</option>
-                            <option value="41">41 - Adiantamento</option>
-                            <option value="42">42 - Complementar</option>
-                            <option value="51">51 - Adiantamento 13º</option>
-                            <option value="52">52 - 13º Salário</option>
-                            <option value="70">70 - Participação de Lucros</option>
-                        </select>
+                <!-- Empresas + Tipo Processo (aparece após Buscar) -->
+                <div id="exportEmpresasContainer" style="display: none; margin-top: 18px;">
+                    <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px; color: var(--text-primary);">Selecione as Empresas *</label>
+                    <div id="exportEmpresasList" style="border: 1px solid var(--border-color); border-radius: 6px; max-height: 130px; overflow-y: auto; padding: 8px; background: var(--background-color); margin-bottom: 16px;"></div>
+
+                    <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 8px; color: var(--text-primary);">Tipo do Processo *</label>
+                    <div style="display: flex; flex-direction: column; gap: 6px;">
+                        <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="exportTipoProcesso" value="11" checked> <span><strong>11</strong> — Folha Mensal</span></label>
+                        <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="exportTipoProcesso" value="41"> <span><strong>41</strong> — Adiantamento Salarial</span></label>
+                        <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="exportTipoProcesso" value="42"> <span><strong>42</strong> — Folha Complementar</span></label>
+                        <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="exportTipoProcesso" value="51"> <span><strong>51</strong> — Adiantamento de 13º Salário</span></label>
+                        <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="exportTipoProcesso" value="52"> <span><strong>52</strong> — 13º Salário (integral ou 2ª parcela)</span></label>
+                        <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="exportTipoProcesso" value="70"> <span><strong>70</strong> — PLR (Participação nos Lucros)</span></label>
                     </div>
                 </div>
+
+                <!-- Prévia do TXT (aparece após Pré-visualizar) -->
+                <div id="expTxtPrevia" style="display:none; margin-top: 18px;">
+                    <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px; color: var(--text-primary);">Prévia do Arquivo</label>
+                    <pre id="expTxtPreviaConteudo" style="background:#1e1e1e;color:#d4d4d4;padding:14px;border-radius:6px;font-size:11px;font-family:monospace;max-height:200px;overflow-y:auto;white-space:pre;line-height:1.6;margin:0;"></pre>
+                    <div id="expTxtPreviaInfo" style="font-size:11px;color:var(--text-secondary);margin-top:5px;"></div>
+                </div>
             </div>
-            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 15px 20px; border-top: 1px solid #eee;">
-                <button type="button" class="btn btn-secondary" onclick="fecharModalExportacaoTXT()">Cancelar</button>
-                <button type="button" class="btn btn-primary" id="btnGerarTXT" onclick="gerarArquivoTXT()" style="display: none;">Gerar TXT</button>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid #eee;">
+                <button type="button" id="btnPreviewTXT" class="btn btn-secondary btn-small" onclick="gerarPreviewTXTExportacao()" style="display:none; font-size: 12px;">👁 Pré-visualizar</button>
+                <div style="display:flex; gap:10px; margin-left:auto;">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalExportacaoTXT()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnGerarTXT" onclick="gerarArquivoTXT()" style="display: none;">📄 Baixar TXT</button>
+                </div>
             </div>
         </div>
     </div>
@@ -296,6 +368,101 @@
             <div class="modal-footer" style="display: flex; justify-content: space-between; padding: 15px 20px; border-top: 1px solid #eee;">
                 <button type="button" class="btn btn-secondary" onclick="fecharModalPreenchimentos()">Cancelar</button>
                 <button type="button" class="btn btn-primary" id="btnNovoPreenchimento">Iniciar Nova Folha (Em Branco)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: GERAR TXT (tela de resultados) -->
+    <div id="txtRubricasModal" class="modal">
+        <div class="modal-content" style="max-width: 660px;">
+            <div class="modal-header">
+                <h3 style="color: var(--primary-color); margin: 0;">📄 Gerar TXT para Folha de Pagamento</h3>
+                <button type="button" class="modal-close" onclick="fecharModalTxtResultados()">×</button>
+            </div>
+            <div class="modal-body" style="padding: 20px; max-height: 75vh; overflow-y: auto;">
+
+                <!-- Rubricas -->
+                <div style="margin-bottom: 18px;">
+                    <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 8px; color: var(--text-primary);">Configuração de Rubricas</label>
+                    <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                        <div style="background: var(--background-color); padding: 8px 14px; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px;">
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Evento</span>
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Código da Rubrica</span>
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Tipo de Valor</span>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Horas Extras 50%</span>
+                            <input type="text" id="resRubHE50" maxlength="9" placeholder="Ex: 000050" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="resTipoHE50" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="minutos">Horas (HH:MM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                                <option value="dias">Dias</option>
+                            </select>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Horas Extras 100%</span>
+                            <input type="text" id="resRubHE100" maxlength="9" placeholder="Ex: 000100" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="resTipoHE100" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="minutos">Horas (HH:MM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                                <option value="dias">Dias</option>
+                            </select>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Adicional Noturno</span>
+                            <input type="text" id="resRubNoturno" maxlength="9" placeholder="Ex: 000310" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="resTipoNoturno" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="minutos">Horas (HH:MM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                                <option value="dias">Dias</option>
+                            </select>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Atraso</span>
+                            <input type="text" id="resRubAtraso" maxlength="9" placeholder="Ex: 000410" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="resTipoAtraso" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="minutos">Horas (HH:MM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                                <option value="dias">Dias</option>
+                            </select>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Falta (em dias)</span>
+                            <input type="text" id="resRubFalta" maxlength="9" placeholder="Ex: 000510" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="resTipoFalta" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="dias">Dias</option>
+                                <option value="minutos">Horas (HH:MM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">Rubricas com valor zero não serão incluídas. Configurações salvas automaticamente.</p>
+                </div>
+
+                <!-- Tipo do Processo -->
+                <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 8px; color: var(--text-primary);">Tipo do Processo *</label>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="resTipoProcesso" value="11" checked> <span><strong>11</strong> — Folha Mensal</span></label>
+                    <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="resTipoProcesso" value="41"> <span><strong>41</strong> — Adiantamento Salarial</span></label>
+                    <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="resTipoProcesso" value="42"> <span><strong>42</strong> — Folha Complementar</span></label>
+                    <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="resTipoProcesso" value="51"> <span><strong>51</strong> — Adiantamento de 13º Salário</span></label>
+                    <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="resTipoProcesso" value="52"> <span><strong>52</strong> — 13º Salário (integral ou 2ª parcela)</span></label>
+                    <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="resTipoProcesso" value="70"> <span><strong>70</strong> — PLR (Participação nos Lucros)</span></label>
+                </div>
+
+                <!-- Prévia do TXT -->
+                <div id="resTxtPrevia" style="display:none; margin-top: 18px;">
+                    <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px; color: var(--text-primary);">Prévia do Arquivo</label>
+                    <pre id="resTxtPreviaConteudo" style="background:#1e1e1e;color:#d4d4d4;padding:14px;border-radius:6px;font-size:11px;font-family:monospace;max-height:200px;overflow-y:auto;white-space:pre;line-height:1.6;margin:0;"></pre>
+                    <div id="resTxtPreviaInfo" style="font-size:11px;color:var(--text-secondary);margin-top:5px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid #eee;">
+                <button type="button" class="btn btn-secondary btn-small" onclick="gerarPreviewTXTResultados()" style="font-size: 12px;">👁 Pré-visualizar</button>
+                <div style="display:flex; gap:10px;">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalTxtResultados()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="gerarTXTResultados()">📄 Baixar TXT</button>
+                </div>
             </div>
         </div>
     </div>
