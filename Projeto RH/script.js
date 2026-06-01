@@ -1326,6 +1326,12 @@ function renderizarTabelasDiarias() {
             if (dia.flagFalta) {
                 flags += '<span style="background: #fee2e2; color: #991b1b; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">FALTA</span>';
             }
+            if (dia.flagAtestado) {
+                flags += '<span style="background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">ATESTADO</span>';
+            }
+            if (dia.flagSemRegistro) {
+                flags += '<span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">SEM REGISTRO</span>';
+            }
             if (isFeriado) {
                 flags += '<span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px;">FERIADO</span>';
             }
