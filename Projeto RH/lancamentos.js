@@ -234,13 +234,47 @@ function avancarParaParametros() {
 
 // --- ✅ NOVO: SISTEMA DE ACÚMULO DE PARAMETRIZAÇÕES ---
 
-function gerarConteudoTXT(comp, tipoProcesso, rubrica, valor, empregados) {
+function encodeValorParaTipo(valor, tipoValor) {
+    if (tipoValor === 'horas') {
+        // Aceita HH:MM → converte para HHMM como inteiro (ex: "01:30" → 130)
+        const partes = String(valor).replace(/[^\d:]/g, '').split(':');
+        const h = parseInt(partes[0] || '0', 10);
+        const m = parseInt(partes[1] || '0', 10);
+        return h * 100 + m;
+    }
+    if (tipoValor === 'monetario') {
+        // Aceita "150,50" ou "150.50" → remove separador → 15050
+        const limpo = String(valor).replace(/[^\d]/g, '');
+        return parseInt(limpo || '0', 10);
+    }
+    // dias: inteiro
+    return parseInt(String(valor).replace(/\D/g, '') || '0', 10);
+}
+
+function atualizarPlaceholderValor() {
+    const tipo = document.getElementById('lanTipoValor').value;
+    const input = document.getElementById('lanValor');
+    const dica = document.getElementById('lanValorDica');
+    if (tipo === 'horas') {
+        input.placeholder = 'Ex: 01:30';
+        dica.textContent = 'Formato HH:MM (ex: 01:30 = 1 hora e 30 minutos)';
+    } else if (tipo === 'monetario') {
+        input.placeholder = 'Ex: 150,50';
+        dica.textContent = 'Valor em reais com centavos (ex: 150,50)';
+    } else {
+        input.placeholder = 'Ex: 3';
+        dica.textContent = 'Número inteiro de dias';
+    }
+}
+
+function gerarConteudoTXT(comp, tipoProcesso, rubrica, valor, tipoValor, empregados) {
     const fixo = "10";
     const compParts = comp.split('/');
     const compFormatada = compParts[1] + compParts[0]; // AAAA + MM
     const tipoProcFormatado = String(tipoProcesso).padStart(2, '0');
     const rubFormatada = String(rubrica).padStart(9, '0');
-    const valFormatado = String(valor).padStart(9, '0');
+    const valorInt = encodeValorParaTipo(valor, tipoValor);
+    const valFormatado = String(valorInt).padStart(9, '0');
 
     let conteudo = '';
     empregados.forEach(empData => {
@@ -258,6 +292,7 @@ function gerarPrevia() {
     const tipoProcesso = document.getElementById('lanTipoProcesso').value;
     const rubrica = document.getElementById('lanRubrica').value.trim();
     const valor = document.getElementById('lanValor').value.trim();
+    const tipoValor = document.getElementById('lanTipoValor').value;
 
     // Validações
     if (!tipoProcesso) {
@@ -270,8 +305,8 @@ function gerarPrevia() {
         return;
     }
 
-    if (!valor || !/^\d+$/.test(valor)) {
-        mostrarMensagem('Atenção', 'Informe um Valor válido (apenas números inteiros).');
+    if (!valor) {
+        mostrarMensagem('Atenção', 'Informe um Valor.');
         return;
     }
 
@@ -281,7 +316,7 @@ function gerarPrevia() {
     }
 
     // ✅ NOVO: Gerar TXT para esta parametrização
-    const conteudoTXT = gerarConteudoTXT(comp, tipoProcesso, rubrica, valor, empregadosSelecionadosAtual);
+    const conteudoTXT = gerarConteudoTXT(comp, tipoProcesso, rubrica, valor, tipoValor, empregadosSelecionadosAtual);
 
     // ✅ NOVO: Armazenar parametrização
     const parametrizacao = {
@@ -290,6 +325,7 @@ function gerarPrevia() {
         tipoProcesso: tipoProcesso,
         rubrica: rubrica,
         valor: valor,
+        tipoValor: tipoValor,
         empregados: empregadosSelecionadosAtual,
         conteudoTXT: conteudoTXT,
         dataHora: new Date().toLocaleString('pt-BR')
@@ -344,6 +380,8 @@ function novaParametrizacao() {
     document.getElementById('lanTipoProcesso').value = '';
     document.getElementById('lanRubrica').value = '';
     document.getElementById('lanValor').value = '';
+    document.getElementById('lanTipoValor').value = 'horas';
+    atualizarPlaceholderValor();
 
     // Voltar ao Step 3 para nova parametrização
     ativarStep('step1');
@@ -404,8 +442,10 @@ function baixarTXT() {
     document.getElementById('lanTipoProcesso').value = '';
     document.getElementById('lanRubrica').value = '';
     document.getElementById('lanValor').value = '';
+    document.getElementById('lanTipoValor').value = 'horas';
     document.getElementById('buscaEmpresa').value = '';
     document.getElementById('buscaEmpregado').value = '';
+    atualizarPlaceholderValor();
     
     ativarStep('step1');
 }

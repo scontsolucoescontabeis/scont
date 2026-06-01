@@ -151,9 +151,17 @@
                     <small>Máximo 9 dígitos numéricos</small>
                 </div>
                 <div class="form-group">
+                    <label for="lanTipoValor">Tipo do Valor *</label>
+                    <select id="lanTipoValor" onchange="atualizarPlaceholderValor()">
+                        <option value="horas">Horas (HH:MM)</option>
+                        <option value="monetario">Monetário (R$ 0,00)</option>
+                        <option value="dias">Dias (inteiro)</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label for="lanValor">Valor do Evento *</label>
-                    <input type="text" id="lanValor" placeholder="Ex: 150" maxlength="9" oninput="this.value = this.value.replace(/\D/g, '')">
-                    <small>Apenas números inteiros (sem vírgula ou decimais)</small>
+                    <input type="text" id="lanValor" placeholder="Ex: 01:30" maxlength="9">
+                    <small id="lanValorDica">Formato HH:MM (ex: 01:30)</small>
                 </div>
             </div>
             <button type="button" class="btn btn-primary" onclick="gerarPrevia()" style="margin-top: 20px; width: 100%;">

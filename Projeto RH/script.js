@@ -1498,13 +1498,13 @@ function _carregarConfigNoCampos(prefixo, c) {
     const setVal = (id, val) => { const el = f(id); if (el) el.value = val || ''; };
     const setOpt = (id, val, def) => { const el = f(id); if (el) el.value = val || def; };
     setVal(`${prefixo}RubHE50`,    c.rubHE50);
-    setOpt(`${prefixo}TipoHE50`,   c.tipoHE50,   'minutos');
+    setOpt(`${prefixo}TipoHE50`,   c.tipoHE50,   'horas');
     setVal(`${prefixo}RubHE100`,   c.rubHE100);
-    setOpt(`${prefixo}TipoHE100`,  c.tipoHE100,  'minutos');
+    setOpt(`${prefixo}TipoHE100`,  c.tipoHE100,  'horas');
     setVal(`${prefixo}RubNoturno`, c.rubNoturno);
-    setOpt(`${prefixo}TipoNoturno`,c.tipoNoturno,'minutos');
+    setOpt(`${prefixo}TipoNoturno`,c.tipoNoturno,'horas');
     setVal(`${prefixo}RubAtraso`,  c.rubAtraso);
-    setOpt(`${prefixo}TipoAtraso`, c.tipoAtraso, 'minutos');
+    setOpt(`${prefixo}TipoAtraso`, c.tipoAtraso, 'horas');
     setVal(`${prefixo}RubFalta`,   c.rubFalta);
     setOpt(`${prefixo}TipoFalta`,  c.tipoFalta,  'dias');
 }
@@ -1514,25 +1514,32 @@ function _lerCamposConfig(prefixo, radioName) {
     return {
         tipoProcesso: document.querySelector(`input[name="${radioName}"]:checked`)?.value || '11',
         rubHE50:    g(`${prefixo}RubHE50`).trim(),
-        tipoHE50:   g(`${prefixo}TipoHE50`)   || 'minutos',
+        tipoHE50:   g(`${prefixo}TipoHE50`)   || 'horas',
         rubHE100:   g(`${prefixo}RubHE100`).trim(),
-        tipoHE100:  g(`${prefixo}TipoHE100`)  || 'minutos',
+        tipoHE100:  g(`${prefixo}TipoHE100`)  || 'horas',
         rubNoturno: g(`${prefixo}RubNoturno`).trim(),
-        tipoNoturno:g(`${prefixo}TipoNoturno`)|| 'minutos',
+        tipoNoturno:g(`${prefixo}TipoNoturno`)|| 'horas',
         rubAtraso:  g(`${prefixo}RubAtraso`).trim(),
-        tipoAtraso: g(`${prefixo}TipoAtraso`) || 'minutos',
+        tipoAtraso: g(`${prefixo}TipoAtraso`) || 'horas',
         rubFalta:   g(`${prefixo}RubFalta`).trim(),
         tipoFalta:  g(`${prefixo}TipoFalta`)  || 'dias',
     };
 }
 
-function _encMinutos(mins) {
-    return mins > 0 ? Math.round(mins / 60 * 100) : 0;
+function _encMinutosParaTipo(mins, tipo) {
+    if (mins <= 0) return 0;
+    if (tipo === 'horas') {
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return h * 100 + m; // HHMM: 90min → 0130 → 130
+    }
+    if (tipo === 'dias') return Math.round(mins / 60); // converte min → horas inteiras, uso raro
+    return 0; // monetario não é calculável a partir de minutos
 }
 function _encDias(count) {
-    return count > 0 ? Math.round(count * 100) : 0;
+    return count > 0 ? Math.round(count) : 0;
 }
-function _linhasTxt(config, codEmp, compFmt, codEmpresa, linhas_he50, linhas_he100, linhas_not, linhas_atr, linhas_falta) {
+function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_he50, mins_he100, mins_not, mins_atr, dias_falta) {
     const tp = String(config.tipoProcesso).padStart(2, '0');
     const empFmt = String(codEmp).padStart(10, '0');
     const empFmt2 = String(codEmpresa).padStart(10, '0');
@@ -1543,11 +1550,11 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, linhas_he50, linhas_he1
         return `${base}${rub(rubrica)}${tp}${String(valorInt).padStart(9,'0')}${empFmt2}\n`;
     };
     return [
-        linha(config.rubHE50,    linhas_he50),
-        linha(config.rubHE100,   linhas_he100),
-        linha(config.rubNoturno, linhas_not),
-        linha(config.rubAtraso,  linhas_atr),
-        linha(config.rubFalta,   linhas_falta),
+        linha(config.rubHE50,    _encMinutosParaTipo(mins_he50,  config.tipoHE50)),
+        linha(config.rubHE100,   _encMinutosParaTipo(mins_he100, config.tipoHE100)),
+        linha(config.rubNoturno, _encMinutosParaTipo(mins_not,   config.tipoNoturno)),
+        linha(config.rubAtraso,  _encMinutosParaTipo(mins_atr,   config.tipoAtraso)),
+        linha(config.rubFalta,   config.tipoFalta === 'dias' ? _encDias(dias_falta) : _encMinutosParaTipo(dias_falta * 480, config.tipoFalta)),
     ].join('');
 }
 
@@ -1664,8 +1671,8 @@ async function _construirConteudoTXTExportacao() {
                 }
             } else if (!isDiaDescanso) {
                 const flag = flagsFolga[dia.data];
-                if (flag === 'falta') { dev = jornadaMin; tFaltaDias++; }
-                else if (!flag)       { dev = jornadaMin; tFaltaDias++; }
+                if (flag === 'falta') { tFaltaDias++; }
+                // folga, atestado e sem registro não geram horas devidas nem faltas
             }
             tEx50  += ex50;
             tEx100 += ex100;
@@ -1686,11 +1693,11 @@ async function _construirConteudoTXTExportacao() {
             empInfo.codigo_empregado,
             compFmt,
             empCodigo,
-            _encMinutos(tEx50),
-            _encMinutos(tEx100),
-            _encMinutos(tNot),
-            _encMinutos(tDev),
-            _encDias(tFaltaDias)
+            tEx50,
+            tEx100,
+            tNot,
+            tDev,
+            tFaltaDias
         );
     });
 
