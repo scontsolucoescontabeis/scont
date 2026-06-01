@@ -1268,6 +1268,10 @@ function renderizarConsolidado() {
                         <div style="font-size: 11px; color: #991b1b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Horas Faltantes</div>
                         <div style="font-size: 24px; font-weight: 800; color: #991b1b; margin-top: 8px;">${res.totais.faltante}</div>
                     </div>
+                    <div style="background: #fff5f5; padding: 20px 15px; text-align: center;">
+                        <div style="font-size: 11px; color: #991b1b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Faltas</div>
+                        <div style="font-size: 24px; font-weight: 800; color: #991b1b; margin-top: 8px;">${res.totais.faltas} ${res.totais.faltas === 1 ? 'dia' : 'dias'}</div>
+                    </div>
                     <div style="background: #fef3c7; padding: 20px 15px; text-align: center;">
                         <div style="font-size: 11px; color: #92400e; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Horas Devidas</div>
                         <div style="font-size: 24px; font-weight: 800; color: #92400e; margin-top: 8px;">${res.totais.devidas}</div>
