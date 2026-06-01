@@ -27,6 +27,7 @@ Cada dia de trabalho cai em exatamente um dos seguintes estados:
 | Dia com horas < jornada | Horas faltantes | `faltante` em horas → soma `totalFaltante` |
 | Sem horas + flag "falta" (manual) | Falta | `flagFalta = true` → soma `totalFaltas` (+1 dia) |
 | Sem horas + flag "folga" | Folga | `flagFolga = true` (sem impacto em totais) |
+| Sem horas + flag "atestado" | Atestado Médico | `flagAtestado = true` (sem impacto em totais — mesmo comportamento da folga) |
 | Sem horas + sem flag | Sem registro | `flagSemRegistro = true` (sem impacto em totais) |
 | DSR / Feriado | Descanso | Lógica existente de extra 100% se trabalhado |
 
@@ -38,11 +39,13 @@ Cada dia de trabalho cai em exatamente um dos seguintes estados:
 
 ### Por dia (objeto retornado no `map`)
 
-Adicionar campo:
+Adicionar campos:
 - `flagSemRegistro: boolean` — true quando sem horas e sem flag explícito
+- `flagAtestado: boolean` — true quando marcado manualmente como atestado médico
 
 Alterar comportamento:
 - `flagFalta = true` + flag manual → `faltante = 0` (não soma em horas faltantes)
+- `flagAtestado = true` → `faltante = 0` (mesmo comportamento da folga)
 - Sem horas + sem flag → `faltante = 0`, `flagSemRegistro = true`
 
 ### Totalizadores
@@ -62,6 +65,7 @@ Sem mudança:
 |---|---|
 | Falta | Vermelho — "FALTA" (existente) |
 | Folga | Cinza — "FOLGA" (existente) |
+| Atestado Médico | Azul — "ATESTADO" (novo) |
 | Sem Registro | Amarelo/laranja — "SEM REGISTRO" (novo) |
 | Horas faltantes | Coluna `faltante` com valor HH:MM (existente) |
 
@@ -85,7 +89,7 @@ O badge "SEM REGISTRO" é puramente informativo — sinaliza ao operador que o d
 - Lógica de horas noturnas e conversão
 - Cálculo de horas devidas (compensação entre extras e faltantes)
 - Flag de folga e DSR
-- Estrutura do banco de dados (flags existentes `folga/falta` são reutilizados)
+- Estrutura do banco de dados (flags existentes `folga/falta` são reutilizados; `atestado` é novo valor no mesmo campo)
 
 ---
 
