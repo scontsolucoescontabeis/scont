@@ -1529,12 +1529,12 @@ function _lerCamposConfig(prefixo, radioName) {
 function _encMinutosParaTipo(mins, tipo) {
     if (mins <= 0) return 0;
     if (tipo === 'horas') {
-        const h = Math.floor(mins / 60);
-        const m = mins % 60;
-        return h * 100 + m; // HHMM: 90min → 0130 → 130
+        const hhmm = converterMinutosParaHora(mins); // "HH:MM"
+        const [h, m] = hhmm.split(':').map(Number);
+        return h * 100 + m; // HHMM: "01:30" → 130
     }
-    if (tipo === 'dias') return Math.round(mins / 60); // converte min → horas inteiras, uso raro
-    return 0; // monetario não é calculável a partir de minutos
+    if (tipo === 'dias') return Math.round(mins / 60);
+    return 0;
 }
 function _encDias(count) {
     return count > 0 ? Math.round(count) : 0;
