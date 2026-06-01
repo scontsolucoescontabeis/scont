@@ -660,6 +660,7 @@ function renderizarConteudoAba() {
                             <option value="">-</option>
                             <option value="folga" ${flagFolga === 'folga' ? 'selected' : ''}>Folga</option>
                             <option value="falta" ${flagFolga === 'falta' ? 'selected' : ''}>Falta</option>
+                            <option value="atestado" ${flagFolga === 'atestado' ? 'selected' : ''}>Atestado Médico</option>
                         </select>
                     ` : '-'}
                 </td>
