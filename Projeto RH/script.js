@@ -2069,11 +2069,11 @@ function _construirConteudoTXTResultados(salvar = false) {
             res.empregadoId,
             compFmt,
             codEmpresa,
-            _encMinutos(he50),
-            _encMinutos(he100),
-            _encMinutos(converterHoraParaMinutos(res.totais.noturnoConvertido)),
-            _encMinutos(converterHoraParaMinutos(res.totais.devidas)),
-            _encDias(res.dias.filter(d => d.flagFalta).length)
+            he50,
+            he100,
+            converterHoraParaMinutos(res.totais.noturnoConvertido),
+            converterHoraParaMinutos(res.totais.devidas),
+            res.dias.filter(d => d.flagFalta).length
         );
     });
 
