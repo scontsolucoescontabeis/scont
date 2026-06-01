@@ -1039,7 +1039,7 @@ function simpleHash(str) {
 // --- MOTOR DE CÁLCULO ---
 function calcularFolha(folha) {
     const jornadaMinutos = converterHoraParaMinutos(state.jornada);
-    let totalTrabalhado = 0, totalExtra50 = 0, totalExtra100 = 0, totalNoturno = 0, totalNoturnoConvertido = 0, totalFaltante = 0;
+    let totalTrabalhado = 0, totalExtra50 = 0, totalExtra100 = 0, totalNoturno = 0, totalNoturnoConvertido = 0, totalFaltante = 0, totalFaltas = 0;
     
     const diasCalculados = folha.dados.map(dia => {
         const isFeriado = state.feriados.some(f => f.data === dia.data);
@@ -1052,7 +1052,7 @@ function calcularFolha(folha) {
         
         let extra50 = 0, extra100 = 0, faltante = 0;
         let flagDSR = isDSRCustomizado;
-        let flagFolga = false, flagFalta = false;
+        let flagFolga = false, flagFalta = false, flagAtestado = false, flagSemRegistro = false;
         
         if (minTrabalhados > 0) {
             if (isDiaDescanso) {
@@ -1095,12 +1095,13 @@ function calcularFolha(folha) {
             const flagFolgaData = folha.flagsFolga[dia.data];
             if (flagFolgaData === 'folga') {
                 flagFolga = true;
+            } else if (flagFolgaData === 'atestado') {
+                flagAtestado = true;
             } else if (flagFolgaData === 'falta') {
-                faltante = jornadaMinutos;
                 flagFalta = true;
+                totalFaltas += 1;
             } else {
-                faltante = jornadaMinutos;
-                flagFalta = true;
+                flagSemRegistro = true;
             }
         }
         
@@ -1132,7 +1133,9 @@ function calcularFolha(folha) {
             isDiaDescanso: isDiaDescanso,
             flagDSR: flagDSR,
             flagFolga: flagFolga,
-            flagFalta: flagFalta
+            flagFalta: flagFalta,
+            flagAtestado: flagAtestado,
+            flagSemRegistro: flagSemRegistro
         };
     });
     
@@ -1181,6 +1184,7 @@ function calcularFolha(folha) {
             noturno: converterMinutosParaHora(totalNoturno),
             noturnoConvertido: converterMinutosParaHora(totalNoturnoConvertido),
             faltante: converterMinutosParaHora(totalFaltante),
+            faltas: totalFaltas,
             devidas: converterMinutosParaHora(horasDevidasMinutos)
         }
     };
