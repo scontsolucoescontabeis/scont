@@ -1547,6 +1547,16 @@ function _encMinutosParaTipo(mins, tipo) {
 function _encDias(count) {
     return count > 0 ? Math.round(count) : 0;
 }
+function _linhasFaltas(diasFalta) {
+    // diasFalta: array de objetos { data: 'DD/MM/AAAA', flagDSR: bool }
+    return diasFalta.map(dia => {
+        const p = dia.data.split('/');
+        const dataFmt = p[2] + p[1] + p[0]; // AAAAMMDD
+        const tipo = dia.flagDSR ? '2' : '1';
+        return `11${dataFmt}${tipo}\n`;
+    }).join('');
+}
+
 function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_he50, mins_he100, mins_not, mins_atr, dias_falta) {
     const tp = String(config.tipoProcesso).padStart(2, '0');
     const empFmt = String(codEmp).padStart(10, '0');
@@ -1656,6 +1666,7 @@ async function _construirConteudoTXTExportacao() {
         const dados      = JSON.parse(save.dados_json || '[]');
 
         let tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0;
+        const diasFaltaDetalhes = [];
         dados.forEach(dia => {
             const isFeriado    = feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
             const isDSR        = dsrDias.includes(dia.data);
@@ -1682,7 +1693,10 @@ async function _construirConteudoTXTExportacao() {
                     }
                 }
             } else if (!isDiaDescanso) {
-                if (flag === 'falta') { tFaltaDias++; }
+                if (flag === 'falta') {
+                    tFaltaDias++;
+                    diasFaltaDetalhes.push({ data: dia.data, flagDSR: isDSR });
+                }
                 // folga, atestado e sem registro não geram horas devidas nem faltas
             }
             tEx50  += ex50;
@@ -1710,6 +1724,7 @@ async function _construirConteudoTXTExportacao() {
             tDev,
             tFaltaDias
         );
+        conteudoTXT += _linhasFaltas(diasFaltaDetalhes);
     });
 
     localStorage.setItem(TXT_RUBRICAS_KEY, JSON.stringify(_lerCamposConfig('exp', 'exportTipoProcesso')));
@@ -2075,6 +2090,7 @@ function _construirConteudoTXTResultados(salvar = false) {
         let devRest = converterHoraParaMinutos(res.totais.faltante);
         const abate50 = Math.min(he50, devRest); he50 -= abate50; devRest -= abate50;
         const abate100 = Math.min(he100, devRest); he100 -= abate100;
+        const diasFaltaRes = res.dias.filter(d => d.flagFalta);
         conteudoTXT += _linhasTxt(
             config,
             res.empregadoId,
@@ -2084,8 +2100,9 @@ function _construirConteudoTXTResultados(salvar = false) {
             he100,
             converterHoraParaMinutos(res.totais.noturnoConvertido),
             converterHoraParaMinutos(res.totais.devidas),
-            res.dias.filter(d => d.flagFalta).length
+            diasFaltaRes.length
         );
+        conteudoTXT += _linhasFaltas(diasFaltaRes);
     });
 
     return { conteudoTXT, compFmt };
