@@ -1055,12 +1055,22 @@ function calcularFolha(folha) {
         let flagFolga = false, flagFalta = false, flagAtestado = false, flagAtestadoComparecimento = false, flagSemRegistro = false;
 
         const flagFolgaData = folha.flagsFolga[dia.data];
-        const isAtestado = flagFolgaData === 'atestado' || flagFolgaData === 'atestado_comparecimento';
-        if (flagFolgaData === 'atestado') flagAtestado = true;
-        if (flagFolgaData === 'atestado_comparecimento') flagAtestadoComparecimento = true;
+        const isAtestadoMedico = flagFolgaData === 'atestado';
+        const isAtestadoComp   = flagFolgaData === 'atestado_comparecimento';
+        const isAtestado = isAtestadoMedico || isAtestadoComp;
+        if (isAtestadoMedico) flagAtestado = true;
+        if (isAtestadoComp)   flagAtestadoComparecimento = true;
 
-        if (isAtestado) {
-            // dia desconsiderado — sem horas, sem falta, sem extras
+        if (isAtestadoMedico) {
+            // dia totalmente desconsiderado
+        } else if (isAtestadoComp) {
+            // isenção de metade da jornada: só conta faltante abaixo de jornada/2
+            const metadeJornada = Math.floor(jornadaMinutos / 2);
+            const horasRef = (minNoturnos > 0) ? minNoturnosConvertidos : minTrabalhados;
+            if (horasRef < metadeJornada) {
+                faltante = metadeJornada - horasRef;
+            }
+            totalTrabalhado += minTrabalhados;
         } else if (minTrabalhados > 0) {
             if (isDiaDescanso) {
                 // ✅ DSR/Feriado: 100% sobre HORAS NOTURNAS CONVERTIDAS se houver noturno, senão sobre horas trabalhadas
@@ -1105,7 +1115,7 @@ function calcularFolha(folha) {
             } else if (flagFolgaData === 'falta') {
                 flagFalta = true;
                 totalFaltas += 1;
-            } else if (!isAtestado) {
+            } else if (!isAtestado && !isAtestadoComp) {
                 flagSemRegistro = true;
             }
         }
@@ -1115,7 +1125,7 @@ function calcularFolha(folha) {
         extra100 = Math.max(0, extra100);
         faltante = Math.max(0, faltante);
         
-        totalTrabalhado += isAtestado ? 0 : minTrabalhados;
+        totalTrabalhado += isAtestadoMedico ? 0 : minTrabalhados;
         totalExtra50 += extra50;
         totalExtra100 += extra100;
         totalNoturno += minNoturnos;
@@ -1676,9 +1686,15 @@ async function _construirConteudoTXTExportacao() {
             const minNotConv = Math.round(minNot / 0.875);
             let ex50 = 0, ex100 = 0, dev = 0;
             const flag = flagsFolga[dia.data];
-            const isAtestadoExp = flag === 'atestado' || flag === 'atestado_comparecimento';
-            if (isAtestadoExp) {
-                // dia desconsiderado
+            const isAtestadoMedicoExp = flag === 'atestado';
+            const isAtestadoCompExp   = flag === 'atestado_comparecimento';
+            if (isAtestadoMedicoExp) {
+                // dia totalmente desconsiderado
+            } else if (isAtestadoCompExp) {
+                // isenção de metade da jornada
+                const metade = Math.floor(jornadaMin / 2);
+                const ref = minNotConv > 0 ? minNotConv : minTrab;
+                if (ref < metade) dev = metade - ref;
             } else if (minTrab > 0) {
                 if (isDiaDescanso) {
                     ex100 = minNotConv > 0 ? minNotConv : minTrab;
