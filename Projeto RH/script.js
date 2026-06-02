@@ -629,7 +629,7 @@ function renderizarConteudoAba() {
     `;
     
     folha.dados.forEach((dia, diaIndex) => {
-        const isFeriado = state.feriados.some(f => f.data === dia.data);
+        const isFeriado = state.feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
         const isDSR = folha.dsrDias.includes(dia.data);
         const rowClass = (isFeriado || isDSR) ? 'holiday-row' : '';
         const infoExtra = isFeriado ? `<span style="color: var(--danger-color); font-size: 11px; display: block;">Feriado</span>` : '';
@@ -1043,7 +1043,7 @@ function calcularFolha(folha) {
     let totalTrabalhado = 0, totalExtra50 = 0, totalExtra100 = 0, totalNoturno = 0, totalNoturnoConvertido = 0, totalFaltante = 0, totalFaltas = 0;
     
     const diasCalculados = folha.dados.map(dia => {
-        const isFeriado = state.feriados.some(f => f.data === dia.data);
+        const isFeriado = state.feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
         const isDSRCustomizado = folha.dsrDias.includes(dia.data);
         const isDiaDescanso = isFeriado || isDSRCustomizado;
         
@@ -1311,7 +1311,7 @@ function renderizarTabelasDiarias() {
         `;
         
         res.dias.forEach((dia, index) => {
-            const isFeriado = state.feriados.some(f => f.data === dia.data);
+            const isFeriado = state.feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
             const isDescanso = dia.isDiaDescanso;
             
             let rowStyle = index % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f9fafb;';
@@ -1405,7 +1405,7 @@ state.resultados.forEach(res => {
 
     // Adicionar dias
     res.dias.forEach(dia => {
-        const isFeriado = state.feriados.some(f => f.data === dia.data);
+        const isFeriado = state.feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
         const tipoDia = isFeriado ? 'Feriado' : dia.diaSemana;
         const marcacoes = [dia.entrada1, dia.saida1, dia.entrada2, dia.saida2].filter(v => v).join(' - ') || '-';
         
@@ -1649,7 +1649,7 @@ async function _construirConteudoTXTExportacao() {
 
         let tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0;
         dados.forEach(dia => {
-            const isFeriado    = feriados.some(f => f.data === dia.data);
+            const isFeriado    = feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
             const isDSR        = dsrDias.includes(dia.data);
             const isDiaDescanso = isFeriado || isDSR;
             const minTrab = calcularHorasTrabalhadas(dia.entrada1, dia.saida1) + calcularHorasTrabalhadas(dia.entrada2, dia.saida2);
