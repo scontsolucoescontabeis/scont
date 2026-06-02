@@ -1739,6 +1739,44 @@ async function gerarArquivoTXT() {
     }
 }
 
+// --- EXPORTAÇÃO TXT DE FALTAS ---
+function gerarTxtFaltas() {
+    if (!state.resultados || state.resultados.length === 0) {
+        mostrarMensagem('Aviso', 'Não há dados processados para exportar.');
+        return;
+    }
+
+    let conteudo = '';
+
+    state.resultados.forEach(res => {
+        res.dias.forEach(dia => {
+            if (!dia.flagFalta) return;
+
+            // Converter data "DD/MM/AAAA" → "AAAAMMDD"
+            const partes = dia.data.split('/');
+            const dataFmt = partes[2] + partes[1] + partes[0];
+
+            const tipo = dia.flagDSR ? '2' : '1';
+
+            conteudo += `11${dataFmt}${tipo}\n`;
+        });
+    });
+
+    if (!conteudo.trim()) {
+        mostrarMensagem('Aviso', 'Nenhuma falta encontrada nos resultados.');
+        return;
+    }
+
+    const compFmt = state.competencia ? state.competencia.split('/').reverse().join('') : Date.now();
+    const blob = new Blob([conteudo], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Faltas_${compFmt}.txt`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 // --- NAVEGAÇÃO E UTILITÁRIOS ---
 function mostrarTela(telaId) {
     document.getElementById('selectionScreen').style.display = 'none';
