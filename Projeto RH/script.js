@@ -661,6 +661,7 @@ function renderizarConteudoAba() {
                             <option value="folga" ${flagFolga === 'folga' ? 'selected' : ''}>Folga</option>
                             <option value="falta" ${flagFolga === 'falta' ? 'selected' : ''}>Falta</option>
                             <option value="atestado" ${flagFolga === 'atestado' ? 'selected' : ''}>Atestado Médico</option>
+                            <option value="atestado_comparecimento" ${flagFolga === 'atestado_comparecimento' ? 'selected' : ''}>Atestado de Comparecimento</option>
                         </select>
                     ` : '-'}
                 </td>
@@ -1053,7 +1054,7 @@ function calcularFolha(folha) {
         
         let extra50 = 0, extra100 = 0, faltante = 0;
         let flagDSR = isDSRCustomizado;
-        let flagFolga = false, flagFalta = false, flagAtestado = false, flagSemRegistro = false;
+        let flagFolga = false, flagFalta = false, flagAtestado = false, flagAtestadoComparecimento = false, flagSemRegistro = false;
         
         if (minTrabalhados > 0) {
             if (isDiaDescanso) {
@@ -1098,6 +1099,8 @@ function calcularFolha(folha) {
                 flagFolga = true;
             } else if (flagFolgaData === 'atestado') {
                 flagAtestado = true;
+            } else if (flagFolgaData === 'atestado_comparecimento') {
+                flagAtestadoComparecimento = true;
             } else if (flagFolgaData === 'falta') {
                 flagFalta = true;
                 totalFaltas += 1;
@@ -1136,6 +1139,7 @@ function calcularFolha(folha) {
             flagFolga: flagFolga,
             flagFalta: flagFalta,
             flagAtestado: flagAtestado,
+            flagAtestadoComparecimento: flagAtestadoComparecimento,
             flagSemRegistro: flagSemRegistro
         };
     });
@@ -1332,6 +1336,9 @@ function renderizarTabelasDiarias() {
             }
             if (dia.flagAtestado) {
                 flags += '<span style="background: #dbeafe; color: #1e40af; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">ATESTADO</span>';
+            }
+            if (dia.flagAtestadoComparecimento) {
+                flags += '<span style="background: #ede9fe; color: #5b21b6; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">AT. COMPARECIMENTO</span>';
             }
             if (dia.flagSemRegistro) {
                 flags += '<span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">SEM REGISTRO</span>';
