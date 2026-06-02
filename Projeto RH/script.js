@@ -655,15 +655,13 @@ function renderizarConteudoAba() {
                     <input type="checkbox" ${isDSR ? 'checked' : ''} onchange="atualizarDSRDia(${state.abaAtivaIndex}, '${dia.data}', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
                 </td>
                 <td style="text-align: center;">
-                    ${!temEntrada ? `
-                        <select onchange="atualizarFlagFolga(${state.abaAtivaIndex}, '${dia.data}', this.value)" style="padding: 4px; border-radius: 4px; border: 1px solid #ced4da; font-size: 12px;">
-                            <option value="">-</option>
-                            <option value="folga" ${flagFolga === 'folga' ? 'selected' : ''}>Folga</option>
-                            <option value="falta" ${flagFolga === 'falta' ? 'selected' : ''}>Falta</option>
-                            <option value="atestado" ${flagFolga === 'atestado' ? 'selected' : ''}>Atestado Médico</option>
-                            <option value="atestado_comparecimento" ${flagFolga === 'atestado_comparecimento' ? 'selected' : ''}>Atestado de Comparecimento</option>
-                        </select>
-                    ` : '-'}
+                    <select onchange="atualizarFlagFolga(${state.abaAtivaIndex}, '${dia.data}', this.value)" style="padding: 4px; border-radius: 4px; border: 1px solid #ced4da; font-size: 12px;">
+                        <option value="">-</option>
+                        ${!temEntrada ? `<option value="folga" ${flagFolga === 'folga' ? 'selected' : ''}>Folga</option>` : ''}
+                        ${!temEntrada ? `<option value="falta" ${flagFolga === 'falta' ? 'selected' : ''}>Falta</option>` : ''}
+                        <option value="atestado" ${flagFolga === 'atestado' ? 'selected' : ''}>Atestado Médico</option>
+                        <option value="atestado_comparecimento" ${flagFolga === 'atestado_comparecimento' ? 'selected' : ''}>Atestado de Comparecimento</option>
+                    </select>
                 </td>
                 <td><button type="button" class="btn-icon" onclick="limparLinha(${state.abaAtivaIndex}, ${diaIndex})" title="Limpar linha">🗑️</button></td>
             </tr>
@@ -1055,8 +1053,15 @@ function calcularFolha(folha) {
         let extra50 = 0, extra100 = 0, faltante = 0;
         let flagDSR = isDSRCustomizado;
         let flagFolga = false, flagFalta = false, flagAtestado = false, flagAtestadoComparecimento = false, flagSemRegistro = false;
-        
-        if (minTrabalhados > 0) {
+
+        const flagFolgaData = folha.flagsFolga[dia.data];
+        const isAtestado = flagFolgaData === 'atestado' || flagFolgaData === 'atestado_comparecimento';
+        if (flagFolgaData === 'atestado') flagAtestado = true;
+        if (flagFolgaData === 'atestado_comparecimento') flagAtestadoComparecimento = true;
+
+        if (isAtestado) {
+            // dia desconsiderado — sem horas, sem falta, sem extras
+        } else if (minTrabalhados > 0) {
             if (isDiaDescanso) {
                 // ✅ DSR/Feriado: 100% sobre HORAS NOTURNAS CONVERTIDAS se houver noturno, senão sobre horas trabalhadas
                 if (minNoturnos > 0) {
@@ -1094,17 +1099,13 @@ function calcularFolha(folha) {
                 }
             }
         } else if (!isDiaDescanso) {
-            const flagFolgaData = folha.flagsFolga[dia.data];
+            // atestados já tratados acima; aqui só dias sem horas e sem atestado
             if (flagFolgaData === 'folga') {
                 flagFolga = true;
-            } else if (flagFolgaData === 'atestado') {
-                flagAtestado = true;
-            } else if (flagFolgaData === 'atestado_comparecimento') {
-                flagAtestadoComparecimento = true;
             } else if (flagFolgaData === 'falta') {
                 flagFalta = true;
                 totalFaltas += 1;
-            } else {
+            } else if (!isAtestado) {
                 flagSemRegistro = true;
             }
         }
@@ -1114,7 +1115,7 @@ function calcularFolha(folha) {
         extra100 = Math.max(0, extra100);
         faltante = Math.max(0, faltante);
         
-        totalTrabalhado += minTrabalhados;
+        totalTrabalhado += isAtestado ? 0 : minTrabalhados;
         totalExtra50 += extra50;
         totalExtra100 += extra100;
         totalNoturno += minNoturnos;
@@ -1663,7 +1664,11 @@ async function _construirConteudoTXTExportacao() {
             const minNot  = calcularHorasNoturnas(dia.entrada1, dia.saida1, dia.entrada2, dia.saida2);
             const minNotConv = Math.round(minNot / 0.875);
             let ex50 = 0, ex100 = 0, dev = 0;
-            if (minTrab > 0) {
+            const flag = flagsFolga[dia.data];
+            const isAtestadoExp = flag === 'atestado' || flag === 'atestado_comparecimento';
+            if (isAtestadoExp) {
+                // dia desconsiderado
+            } else if (minTrab > 0) {
                 if (isDiaDescanso) {
                     ex100 = minNotConv > 0 ? minNotConv : minTrab;
                 } else {
@@ -1677,7 +1682,6 @@ async function _construirConteudoTXTExportacao() {
                     }
                 }
             } else if (!isDiaDescanso) {
-                const flag = flagsFolga[dia.data];
                 if (flag === 'falta') { tFaltaDias++; }
                 // folga, atestado e sem registro não geram horas devidas nem faltas
             }
