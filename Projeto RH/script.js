@@ -2110,12 +2110,20 @@ function _construirConteudoTXTResultados(salvar = false) {
     const codEmpresa = state.empresaSelecionada.codigo_empresa;
     let conteudoTXT = '';
 
+    const naoCompensar = document.getElementById('resNaoCompensar').checked;
+
     state.resultados.forEach(res => {
         let he50 = converterHoraParaMinutos(res.totais.extra50);
         let he100 = converterHoraParaMinutos(res.totais.extra100);
-        let devRest = converterHoraParaMinutos(res.totais.faltante);
-        const abate50 = Math.min(he50, devRest); he50 -= abate50; devRest -= abate50;
-        const abate100 = Math.min(he100, devRest); he100 -= abate100;
+        let minsAtr;
+        if (naoCompensar) {
+            minsAtr = converterHoraParaMinutos(res.totais.faltante);
+        } else {
+            let devRest = converterHoraParaMinutos(res.totais.faltante);
+            const abate50 = Math.min(he50, devRest); he50 -= abate50; devRest -= abate50;
+            const abate100 = Math.min(he100, devRest); he100 -= abate100;
+            minsAtr = converterHoraParaMinutos(res.totais.devidas);
+        }
         const diasFaltaRes = res.dias.filter(d => d.flagFalta);
         conteudoTXT += _linhasTxt(
             config,
@@ -2125,7 +2133,7 @@ function _construirConteudoTXTResultados(salvar = false) {
             he50,
             he100,
             converterHoraParaMinutos(res.totais.noturnoConvertido),
-            converterHoraParaMinutos(res.totais.devidas),
+            minsAtr,
             diasFaltaRes.length
         );
         conteudoTXT += _linhasFaltas(diasFaltaRes);
