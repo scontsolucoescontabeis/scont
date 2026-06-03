@@ -1569,8 +1569,9 @@ function _linhasFaltas(diasFalta) {
 }
 
 function _toggleNaoCompensar(prefix) {
-    const checked = document.getElementById(prefix + 'NaoCompensar').checked;
-    document.getElementById(prefix + 'LabelAtraso').textContent = checked ? 'Horas Faltantes' : 'Atraso';
+    const checked = document.getElementById(prefix + 'NaoCompensar')?.checked ?? false;
+    const label = document.getElementById(prefix + 'LabelAtraso');
+    if (label) label.textContent = checked ? 'Horas Faltantes' : 'Atraso';
 }
 
 function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_he50, mins_he100, mins_not, mins_atr, dias_falta) {
