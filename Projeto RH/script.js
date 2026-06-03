@@ -1669,6 +1669,7 @@ async function _construirConteudoTXTExportacao() {
     const compParts = comp.split('/');
     const compFmt = compParts[1] + compParts[0]; // AAAAMM
     let conteudoTXT = '';
+    const naoCompensar = document.getElementById('expNaoCompensar')?.checked ?? false;
 
     Object.values(ultimasVersoes).forEach(save => {
         const empCodigo = save.empresa_codigo;
@@ -1730,11 +1731,13 @@ async function _construirConteudoTXTExportacao() {
         });
 
         // Compensar devidas com extras
-        let devidasRestantes = tDev;
-        if (devidasRestantes > 0) {
-            const abate50  = Math.min(tEx50,  devidasRestantes); tEx50  -= abate50;  devidasRestantes -= abate50;
-            const abate100 = Math.min(tEx100, devidasRestantes); tEx100 -= abate100; devidasRestantes -= abate100;
-            tDev = Math.max(0, devidasRestantes);
+        if (!naoCompensar) {
+            let devidasRestantes = tDev;
+            if (devidasRestantes > 0) {
+                const abate50  = Math.min(tEx50,  devidasRestantes); tEx50  -= abate50;  devidasRestantes -= abate50;
+                const abate100 = Math.min(tEx100, devidasRestantes); tEx100 -= abate100; devidasRestantes -= abate100;
+                tDev = Math.max(0, devidasRestantes);
+            }
         }
 
         conteudoTXT += _linhasTxt(
