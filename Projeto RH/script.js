@@ -1427,13 +1427,14 @@ state.resultados.forEach(res => {
         const tipoDia = isFeriado ? 'Feriado' : dia.diaSemana;
         const marcacoes = [dia.entrada1, dia.saida1, dia.entrada2, dia.saida2].filter(v => v).join(' - ') || '-';
         
-     // ✅ NOVO: Gerar string de flags com DSR
-// ✅ NOVO: Gerar string de flags com DSR
-let flagsStr = '';
-if (dia.flagDSR) flagsStr += 'DSR '; // ✅ Verificar flagDSR
-if (dia.flagFolga) flagsStr += 'FOLGA ';
-if (dia.flagFalta) flagsStr += 'FALTA ';
-if (isFeriado) flagsStr += 'FERIADO ';
+        let flagsStr = '';
+        if (dia.flagDSR) flagsStr += 'DSR ';
+        if (dia.flagFolga) flagsStr += 'FOLGA ';
+        if (dia.flagFalta) flagsStr += 'FALTA ';
+        if (dia.flagAtestado) flagsStr += 'ATESTADO MÉDICO ';
+        if (dia.flagAtestadoComparecimento) flagsStr += 'ATESTADO DE COMPARECIMENTO ';
+        if (dia.flagSemRegistro) flagsStr += 'SEM REGISTRO ';
+        if (isFeriado) flagsStr += 'FERIADO ';
 
 dadosAbaIndividual.push({
     'Data': dia.data,
@@ -1567,6 +1568,11 @@ function _linhasFaltas(diasFalta) {
     }).join('');
 }
 
+function _toggleNaoCompensar(prefix) {
+    const checked = document.getElementById(prefix + 'NaoCompensar').checked;
+    document.getElementById(prefix + 'LabelAtraso').textContent = checked ? 'Horas Faltantes' : 'Atraso';
+}
+
 function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_he50, mins_he100, mins_not, mins_atr, dias_falta) {
     const tp = String(config.tipoProcesso).padStart(2, '0');
     const empFmt = String(codEmp).padStart(10, '0');
@@ -1587,6 +1593,8 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_he50, mins_he100, 
 }
 
 function abrirModalExportacaoTXT() {
+    document.getElementById('expNaoCompensar').checked = false;
+    document.getElementById('expLabelAtraso').textContent = 'Atraso';
     document.getElementById('exportTxtModal').classList.add('active');
     document.getElementById('exportCompetencia').value = state.competencia || '';
     document.getElementById('exportEmpresasContainer').style.display = 'none';
@@ -2078,6 +2086,8 @@ function abrirModalTxtResultados() {
         mostrarMensagem('Aviso', 'Não há dados processados para gerar o TXT.');
         return;
     }
+    document.getElementById('resNaoCompensar').checked = false;
+    document.getElementById('resLabelAtraso').textContent = 'Atraso';
     const saved = localStorage.getItem(TXT_RUBRICAS_KEY);
     if (saved) { try { _carregarConfigNoCampos('res', JSON.parse(saved)); } catch(e) {} }
     document.getElementById('resTxtPrevia').style.display = 'none';
