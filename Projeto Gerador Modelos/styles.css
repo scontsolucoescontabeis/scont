@@ -279,6 +279,13 @@ textarea.form-control { min-height: 120px; resize: vertical; }
     cursor: pointer; margin: 2px; color: var(--text); transition: var(--transition);
 }
 .var-chip:hover { background: var(--primary); color: white; border-color: var(--primary); transform: translateY(-1px); }
+.var-chip-ext {
+    display: inline-block; background: white; border: 1px solid #d97706;
+    border-radius: 4px; padding: 2px 5px; font-size: 10px; font-family: monospace;
+    cursor: pointer; margin: 2px 2px 2px -3px; color: #d97706; transition: var(--transition);
+    vertical-align: middle;
+}
+.var-chip-ext:hover { background: #d97706; color: white; transform: translateY(-1px); }
 
 /* ── WIZARD ───────────────────────────────────────────────── */
 .wizard-steps {

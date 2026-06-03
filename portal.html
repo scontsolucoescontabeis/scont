@@ -507,20 +507,27 @@
         async function checkAuth() {
             const saved = sessionStorage.getItem('userAuth');
             if (!saved) {
-                window.location.href = 'login.html';
+                window.location.replace('login.html');
                 return null;
             }
             let auth;
             try {
                 auth = JSON.parse(saved);
             } catch {
-                window.location.href = 'login.html';
+                sessionStorage.removeItem('userAuth');
+                window.location.replace('login.html');
                 return null;
             }
-            const { data: { session } } = await sb.auth.getSession();
-            if (!session) {
+            try {
+                const { data: { session } } = await sb.auth.getSession();
+                if (!session) {
+                    sessionStorage.removeItem('userAuth');
+                    window.location.replace('login.html');
+                    return null;
+                }
+            } catch {
                 sessionStorage.removeItem('userAuth');
-                window.location.href = 'login.html';
+                window.location.replace('login.html');
                 return null;
             }
             return auth;
@@ -656,7 +663,7 @@
             if (!confirm('Deseja sair?')) return;
             sessionStorage.removeItem('userAuth');
             await sb.auth.signOut();
-            window.location.href = 'login.html';
+            window.location.replace('login.html');
         });
 
         // ─── INICIALIZAR ───────────────────────────────────────────

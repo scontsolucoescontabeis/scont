@@ -549,11 +549,21 @@ let editingFId         = null;   // ferramenta.id em edição (null = nova)
 // ─── AUTH ──────────────────────────────────────────────────
 async function checkAuth() {
     const saved = sessionStorage.getItem('adminAuth');
-    if (!saved) { window.location.href = 'admin-login.html'; return null; }
+    if (!saved) { window.location.replace('admin-login.html'); return null; }
     let auth;
-    try { auth = JSON.parse(saved); } catch { window.location.href = 'admin-login.html'; return null; }
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) { sessionStorage.removeItem('adminAuth'); window.location.href = 'admin-login.html'; return null; }
+    try { auth = JSON.parse(saved); } catch {
+        sessionStorage.removeItem('adminAuth');
+        window.location.replace('admin-login.html');
+        return null;
+    }
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) { sessionStorage.removeItem('adminAuth'); window.location.replace('admin-login.html'); return null; }
+    } catch {
+        sessionStorage.removeItem('adminAuth');
+        window.location.replace('admin-login.html');
+        return null;
+    }
     return auth;
 }
 
@@ -1376,7 +1386,7 @@ document.getElementById('logoutBtn').addEventListener('click', async () => {
     if (!confirm('Deseja sair?')) return;
     sessionStorage.removeItem('adminAuth');
     await sb.auth.signOut();
-    window.location.href = 'login.html';
+    window.location.replace('login.html');
 });
 
 // ─── NAVEGAÇÃO ─────────────────────────────────────────────
@@ -1416,7 +1426,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         alert('⚠️ Acesso insuficiente ao banco de dados.\n\n' + msg);
         sessionStorage.removeItem('adminAuth');
         await sb.auth.signOut();
-        window.location.href = 'admin-login.html';
+        window.location.replace('admin-login.html');
         return;
     }
 

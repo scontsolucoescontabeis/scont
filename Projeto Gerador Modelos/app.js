@@ -406,7 +406,12 @@ function renderVarsPanel() {
     html += `<div class="vars-group">
       <div class="vars-group-label">${def.label}</div>
       <div>
-        ${campos.map(([campo]) => `<span class="var-chip" onmousedown="event.preventDefault()" onclick="insertVar('{{${def.prefix}.${campo}}}')">{{${def.prefix}.${campo}}}</span>`).join('')}
+        ${campos.map(([campo]) => {
+          const safe = campo.replace(/'/g, '&#39;');
+          const main = `<span class="var-chip" onmousedown="event.preventDefault()" onclick="insertVar('{{${def.prefix}.${safe}}}')">{{${def.prefix}.${campo}}}</span>`;
+          const ext  = fonte === 'excel' ? `<span class="var-chip-ext" onmousedown="event.preventDefault()" onclick="insertVar('{{extenso:${def.prefix}.${safe}}}')">ext</span>` : '';
+          return main + ext;
+        }).join('')}
       </div>
     </div>`;
   }
@@ -906,13 +911,60 @@ function buildVarMap(empresa, empregado, socio, rubrica, excelRow) {
   return map;
 }
 
+// ── Por Extenso ───────────────────────────────────────────────
+function _grupo(n) {
+  const U = ['','um','dois','três','quatro','cinco','seis','sete','oito','nove',
+             'dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+  const D = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+  const C = ['','cento','duzentos','trezentos','quatrocentos','quinhentos',
+             'seiscentos','setecentos','oitocentos','novecentos'];
+  if (n === 0) return '';
+  if (n === 100) return 'cem';
+  if (n < 20) return U[n];
+  if (n < 100) { const d = Math.floor(n/10), u = n%10; return u ? D[d]+' e '+U[u] : D[d]; }
+  const c = Math.floor(n/100), r = n%100;
+  return C[c] + (r ? ' e '+_grupo(r) : '');
+}
+
+function _numExtenso(n) {
+  if (n === 0) return 'zero';
+  const p = [];
+  const bi = Math.floor(n/1000000000); n %= 1000000000;
+  if (bi) p.push(_grupo(bi) + (bi === 1 ? ' bilhão' : ' bilhões'));
+  const mi = Math.floor(n/1000000); n %= 1000000;
+  if (mi) p.push(_grupo(mi) + (mi === 1 ? ' milhão' : ' milhões'));
+  const mil = Math.floor(n/1000); n %= 1000;
+  if (mil) p.push(mil === 1 ? 'mil' : _grupo(mil)+' mil');
+  if (n > 0) p.push(_grupo(n));
+  return p.join(' e ');
+}
+
+function valorPorExtenso(valor) {
+  let str = String(valor ?? '').trim().replace(/R\$\s*/g, '');
+  if (/\d\.\d{3}(,|$)/.test(str)) str = str.replace(/\./g, '').replace(',', '.');
+  else str = str.replace(',', '.');
+  const num = parseFloat(str.replace(/[^\d.]/g, ''));
+  if (isNaN(num)) return String(valor);
+  const inteiro  = Math.floor(Math.abs(num));
+  const centavos = Math.round((Math.abs(num) - inteiro) * 100);
+  const pInt  = inteiro  === 0 ? '' : _numExtenso(inteiro)  + (inteiro  === 1 ? ' real'    : ' reais');
+  const pCent = centavos === 0 ? '' : _numExtenso(centavos) + (centavos === 1 ? ' centavo' : ' centavos');
+  if (!pInt && !pCent) return 'zero reais';
+  if (!pInt)  return pCent;
+  if (!pCent) return pInt;
+  return pInt + ' e ' + pCent;
+}
+
 function substituirVars(template, varMap, highlight = false) {
   return template.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
-    const val = varMap[key.trim()];
+    key = key.trim();
+    let extenso = false;
+    if (key.startsWith('extenso:')) { extenso = true; key = key.slice(8).trim(); }
+    const val = varMap[key];
     if (val === undefined || val === null || val === '') {
       return highlight ? `<span class="var-missing">${esc(match)}</span>` : match;
     }
-    return esc(String(val));
+    return esc(extenso ? valorPorExtenso(val) : String(val));
   });
 }
 
@@ -963,22 +1015,78 @@ async function exportarPDF() {
   if (!wizardModeloSelecionado || !wizardRegistros.length) {
     toast('Nenhum dado para exportar.', 'error'); return;
   }
-  const modelo    = wizardModeloSelecionado;
-  const printRoot = document.getElementById('print-root');
 
-  const paginasHtml = wizardRegistros.map((varMap, idx) => {
-    const corpo       = substituirVars(modelo.template, varMap, false);
-    const isUltimo    = idx === wizardRegistros.length - 1;
-    const pageClass   = modelo.tipo === 'por_registro' && !isUltimo ? 'print-page-break' : '';
-    const cabecalho   = buildCabecalhoHtml(wizardCabecalho, varMap, modelo.nome);
-    return `<div class="${pageClass}">${cabecalho}<div class="print-body">${corpo}</div></div>`;
+  toast('Gerando PDF…', '');
+  const modelo = wizardModeloSelecionado;
+
+  const S = {
+    hdr:   'background:#8B3A3A;color:white;padding:12px 18px;display:flex;align-items:center;gap:14px;',
+    logo:  'font-size:18px;font-weight:900;letter-spacing:2px;color:white;border:2px solid rgba(255,255,255,.6);padding:2px 7px;border-radius:3px;flex-shrink:0',
+    sep:   'width:1px;background:rgba(255,255,255,.4);height:30px;flex-shrink:0',
+    title: 'font-size:12px;font-weight:700;color:white;display:block;line-height:1.2',
+    sub:   'font-size:10px;color:rgba(255,255,255,.8);display:block;margin-top:2px',
+    body:  'padding:16px 18px;font-family:Segoe UI,Arial,sans-serif;font-size:11px;line-height:1.7;color:#2C3E50;',
+  };
+
+  const buildHdr = (varMap) => {
+    const emp = varMap['empresa.nome_empresa'] || wizardNomeEmpresaExcel || 'Empresa';
+    if (wizardCabecalho === 'completo') return `<div style="${S.hdr}">
+      <span style="${S.logo}">SCONT</span><div style="${S.sep}"></div>
+      <div><strong style="${S.title}">${esc(modelo.nome)}</strong>
+      <span style="${S.sub}">SCONT Soluções Contábeis — Gestão de RH</span></div></div>`;
+    if (wizardCabecalho === 'neutro') return `<div style="${S.hdr}">
+      <div><strong style="${S.title}">${esc(emp)}</strong>
+      <span style="${S.sub}">${esc(modelo.nome)}</span></div></div>`;
+    return '';
+  };
+
+  const porRegistro = modelo.tipo === 'por_registro';
+  const paginas = wizardRegistros.map((varMap, idx) => {
+    const corpo    = substituirVars(modelo.template, varMap, false);
+    const isUltimo = idx === wizardRegistros.length - 1;
+    const pageBreak = porRegistro && !isUltimo
+      ? 'page-break-after:always;break-after:page;'
+      : '';
+    return `<div style="${pageBreak}">${buildHdr(varMap)}<div style="${S.body}">${corpo}</div></div>`;
   });
 
-  printRoot.innerHTML = paginasHtml.join('');
-  printRoot.style.display = 'block';
+  const innerHtml = paginas.join('');
+
+  const printWin = window.open('', '_blank');
+  if (!printWin) {
+    toast('Permita pop-ups nesta página para exportar PDF.', 'error');
+    return;
+  }
+
+  const printCss = `
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 11px;
+      line-height: 1.7;
+      color: #2C3E50;
+      background: #fff;
+    }
+    @page { size: A4 portrait; margin: 12mm 15mm; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  `;
+
+  printWin.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
+    <meta charset="UTF-8">
+    <title>${esc(modelo.nome)}</title>
+    <style>${printCss}</style>
+  </head><body>
+    ${innerHtml}
+    <script>
+      window.onload = function() { setTimeout(function() { window.print(); }, 300); };
+    </script>
+  </body></html>`);
+  printWin.document.close();
+
   await registrarGeracao();
-  window.print();
-  setTimeout(() => { printRoot.style.display = 'none'; }, 1000);
+  toast('Diálogo de impressão aberto — desmarque "Cabeçalhos e rodapés" para remover a data.', 'success');
 }
 
 function abrirModalNomeEmpresaExcel() {
@@ -1053,6 +1161,17 @@ function resetWizard() {
 }
 
 // ── Excel Upload ──────────────────────────────────────────────
+function _normalizeExcelData(json) {
+  const rawHeaders = Object.keys(json[0]);
+  const headers = rawHeaders.map(h => h.replace(/[\r\n]+/g, ' ').trim().replace(/\s+/g, ' '));
+  const data = json.map(row => {
+    const r = {};
+    rawHeaders.forEach((raw, i) => { r[headers[i]] = row[raw] ?? ''; });
+    return r;
+  });
+  return { headers, data };
+}
+
 function handleExcelUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -1062,8 +1181,9 @@ function handleExcelUpload(event) {
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
     if (!json.length) { toast('Planilha vazia.', 'error'); return; }
-    excelHeaders = Object.keys(json[0]);
-    excelData    = json;
+    const { headers, data } = _normalizeExcelData(json);
+    excelHeaders = headers;
+    excelData    = data;
     renderVarsPanel();
     _renderModalExcelPreview();
     toast('Planilha carregada: ' + excelHeaders.length + ' coluna(s).', 'success');
@@ -1080,7 +1200,10 @@ function _renderModalExcelPreview() {
       ✅ ${excelData.length} linha(s) · ${excelHeaders.length} coluna(s) disponíveis como variáveis:
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:6px">
-      ${excelHeaders.map(h => `<code style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer" onmousedown="event.preventDefault()" onclick="insertVar('{{excel.${h}}}')" title="Clique para inserir">{{excel.${h}}}</code>`).join('')}
+      ${excelHeaders.map(h => {
+        const safe = h.replace(/'/g, '&#39;');
+        return `<code style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:4px;padding:2px 6px;font-size:11px;cursor:pointer" onmousedown="event.preventDefault()" onclick="insertVar('{{excel.${safe}}}')" title="Clique para inserir">{{excel.${h}}}</code><span class="var-chip-ext" onmousedown="event.preventDefault()" onclick="insertVar('{{extenso:excel.${safe}}}')">ext</span>`;
+      }).join('')}
     </div>`;
 }
 
@@ -1102,8 +1225,9 @@ function handleWizardExcel(event) {
     const ws   = wb.Sheets[wb.SheetNames[0]];
     const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
     if (!json.length) { toast('Planilha vazia.', 'error'); return; }
-    excelHeaders = Object.keys(json[0]);
-    excelData    = json;
+    const { headers, data } = _normalizeExcelData(json);
+    excelHeaders = headers;
+    excelData    = data;
     _renderPlanilhaInfo();
     toast(`Planilha carregada: ${excelData.length} linha(s), ${excelHeaders.length} coluna(s).`, 'success');
   };

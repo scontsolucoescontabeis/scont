@@ -11,6 +11,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../portal-auth-guard.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
@@ -313,10 +315,9 @@
                 <div><div class="stat-label">Registros</div><div style="font-size:14px;font-weight:600;color:var(--text)" id="res-registros">—</div></div>
               </div>
               <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <button class="btn btn-primary" onclick="exportarPDF()">🖨️ Imprimir / Salvar PDF</button>
+                <button class="btn btn-primary" onclick="exportarPDF()">📄 Salvar PDF</button>
                 <button class="btn btn-success" onclick="exportarExcel()">📊 Exportar Excel</button>
               </div>
-              <div class="form-hint" style="margin-top:12px">Para salvar como PDF, na janela de impressão escolha "Salvar como PDF" como destino.</div>
             </div>
           </div>
 

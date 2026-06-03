@@ -135,12 +135,16 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 });
 
 // ─── REDIRECT SE JÁ LOGADO ─────────────────────────────────
-document.addEventListener('DOMContentLoaded', async () => {
-    const { data: { session } } = await sb.auth.getSession();
-    const saved = sessionStorage.getItem('adminAuth');
-    if (session && saved)  { window.location.href = 'admin-dashboard.html'; return; }
-    if (!session && saved)   sessionStorage.removeItem('adminAuth');
-});
+async function _checkAutoLogin() {
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        const saved = sessionStorage.getItem('adminAuth');
+        if (session && saved) { window.location.replace('admin-dashboard.html'); return; }
+        if (!session && saved) sessionStorage.removeItem('adminAuth');
+    } catch { /* ignorar erros de inicialização do cliente */ }
+}
+document.addEventListener('DOMContentLoaded', _checkAutoLogin);
+window.addEventListener('pageshow', (e) => { if (e.persisted) _checkAutoLogin(); });
 </script>
 </body>
 </html>
