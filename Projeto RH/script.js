@@ -2110,7 +2110,7 @@ function _construirConteudoTXTResultados(salvar = false) {
     const codEmpresa = state.empresaSelecionada.codigo_empresa;
     let conteudoTXT = '';
 
-    const naoCompensar = document.getElementById('resNaoCompensar').checked;
+    const naoCompensar = document.getElementById('resNaoCompensar')?.checked ?? false;
 
     state.resultados.forEach(res => {
         let he50 = converterHoraParaMinutos(res.totais.extra50);
