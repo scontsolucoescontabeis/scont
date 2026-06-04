@@ -6,7 +6,7 @@ import { buscarMeuPerfil } from '@/services/crm.service'
 import CRMPage from '@/pages/CRMPage'
 import MetricasPage from '@/pages/MetricasPage'
 import UsuariosPage from '@/pages/UsuariosPage'
-import SolicitarAcessoPage from '@/pages/SolicitarAcessoPage'
+import SemAcessoPage from '@/pages/SemAcessoPage'
 
 // ============================================================
 // Tela de Login
@@ -276,9 +276,9 @@ export default function App() {
   // Não autenticado → tela de login
   if (!session) return <LoginPage />
 
-  // Autenticado mas sem perfil CRM → solicitar acesso
+  // Autenticado mas sem acesso ao CRM → tela informativa
   if (!perfil) {
-    return <SolicitarAcessoPage user={session.user} onSair={() => supabase.auth.signOut()} />
+    return <SemAcessoPage email={session.user.email} onSair={() => supabase.auth.signOut()} />
   }
 
   const isAdmin = perfil.role === 'ADMIN'

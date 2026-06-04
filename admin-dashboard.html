@@ -205,6 +205,7 @@
         <li><button class="menu-btn" data-tab="usuarios">👥 Usuários</button></li>
         <li><button class="menu-btn" data-tab="ferramentas">🔧 Ferramentas</button></li>
         <li><button class="menu-btn" data-tab="acessos">🔐 Acessos</button></li>
+        <li><button class="menu-btn" data-tab="crm">💬 CRM Messenger</button></li>
         <li><button class="menu-btn" data-tab="configuracoes">⚙️ Configurações</button></li>
     </ul>
     <div class="sidebar-footer">
@@ -283,6 +284,46 @@
                 <table>
                     <thead><tr><th>Usuário</th><th>E-mail</th><th>Ferramenta</th><th>Concedido em</th><th>Ações</th></tr></thead>
                     <tbody id="tblAcessos"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- CRM MESSENGER -->
+    <div id="crm" class="tab-content">
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <h3 style="margin:0">💬 CRM Messenger — Controle de Acesso</h3>
+                <button class="btn-primary-sm" onclick="loadCRMUsuarios()">🔄 Atualizar</button>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:18px;">
+                Configure quais usuários do portal têm acesso ao CRM e seus departamentos.
+                <strong>Administradores do portal são automaticamente administradores do CRM.</strong>
+            </p>
+
+            <!-- Sem acesso -->
+            <h4 style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">
+                Sem acesso ao CRM
+            </h4>
+            <div class="table-wrap" style="margin-bottom:24px;">
+                <table>
+                    <thead><tr>
+                        <th>Usuário</th><th>E-mail</th><th>Tipo no portal</th><th>Conceder acesso</th>
+                    </tr></thead>
+                    <tbody id="tblCRMSemAcesso"><tr><td colspan="4" class="empty-cell">Carregando...</td></tr></tbody>
+                </table>
+            </div>
+
+            <!-- Com acesso -->
+            <h4 style="font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;">
+                Com acesso ao CRM
+            </h4>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr>
+                        <th>Usuário</th><th>E-mail</th><th>Departamento</th><th>Role CRM</th><th>Ações</th>
+                    </tr></thead>
+                    <tbody id="tblCRMComAcesso"><tr><td colspan="5" class="empty-cell">Carregando...</td></tr></tbody>
                 </table>
             </div>
         </div>
@@ -1408,6 +1449,99 @@ document.querySelectorAll('.tab-btn[data-filter]').forEach(btn => btn.addEventLi
     renderSolicitacoes();
 }));
 
+// ─── CRM MESSENGER — GESTÃO DE ACESSO ─────────────────────
+let crmUsuarios = []
+let crmEditandoId = null
+
+async function loadCRMUsuarios() {
+    const tbSem = document.getElementById('tblCRMSemAcesso')
+    const tbCom = document.getElementById('tblCRMComAcesso')
+    tbSem.innerHTML = '<tr><td colspan="4" class="empty-cell">Carregando...</td></tr>'
+    tbCom.innerHTML = '<tr><td colspan="5" class="empty-cell">Carregando...</td></tr>'
+
+    const { data, error } = await sb.from('usuarios').select('id, nome, email, is_admin, departamento, role, ativo').order('nome')
+    if (error) {
+        tbSem.innerHTML = `<tr><td colspan="4" class="empty-cell" style="color:var(--danger)">⚠️ ${sanitize(error.message)}</td></tr>`
+        return
+    }
+    crmUsuarios = data || []
+    renderCRMUsuarios()
+}
+
+function renderCRMUsuarios() {
+    const DEPTOS = { PESSOAL: '#1D4ED8', CONTABIL: '#065F46', ADMINISTRATIVO: '#92400E', TRIBUTARIO: '#5B21B6' }
+    const semAcesso = crmUsuarios.filter(u => !u.departamento)
+    const comAcesso = crmUsuarios.filter(u => !!u.departamento)
+
+    const tbSem = document.getElementById('tblCRMSemAcesso')
+    const tbCom = document.getElementById('tblCRMComAcesso')
+
+    if (semAcesso.length === 0) {
+        tbSem.innerHTML = '<tr><td colspan="4" class="empty-cell">Todos os usuários já têm acesso ao CRM.</td></tr>'
+    } else {
+        tbSem.innerHTML = semAcesso.map(u => `
+            <tr>
+                <td>${u.is_admin ? '🛡️ ' : ''}${sanitize(u.nome)}</td>
+                <td style="color:var(--muted)">${sanitize(u.email || '—')}</td>
+                <td><span class="badge ${u.is_admin ? 'badge-approved' : 'badge-pending'}">${u.is_admin ? 'Admin portal' : 'Usuário'}</span></td>
+                <td><button class="btn-sm btn-approve" onclick='abrirModalCRM(${JSON.stringify(u)})'>➕ Conceder acesso</button></td>
+            </tr>`).join('')
+    }
+
+    if (comAcesso.length === 0) {
+        tbCom.innerHTML = '<tr><td colspan="5" class="empty-cell">Nenhum usuário com acesso ao CRM.</td></tr>'
+    } else {
+        tbCom.innerHTML = comAcesso.map(u => {
+            const cor = DEPTOS[u.departamento] || '#888480'
+            const roleLabel = u.is_admin ? 'Admin (portal)' : (u.role || 'AGENTE')
+            return `<tr>
+                <td>${u.is_admin ? '🛡️ ' : ''}${sanitize(u.nome)}</td>
+                <td style="color:var(--muted)">${sanitize(u.email || '—')}</td>
+                <td><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:3px;background:${cor}22;color:${cor}">${u.departamento}</span></td>
+                <td style="color:var(--muted);font-size:12px">${roleLabel}</td>
+                <td>
+                    <button class="btn-sm btn-edit" onclick='abrirModalCRM(${JSON.stringify(u)})'>✏️ Editar</button>
+                    ${!u.is_admin ? `<button class="btn-sm btn-reject" onclick="revogarCRM('${u.id}','${sanitize(u.nome)}')">🗑️ Revogar</button>` : ''}
+                </td>
+            </tr>`
+        }).join('')
+    }
+}
+
+function abrirModalCRM(u) {
+    crmEditandoId = u.id
+    document.getElementById('crmNome').value        = u.nome
+    document.getElementById('crmEmail').value       = u.email || '—'
+    document.getElementById('crmIsAdmin').textContent = u.is_admin ? '🛡️ Admin portal — será Admin CRM automaticamente' : 'Usuário comum'
+    document.getElementById('crmDepto').value       = u.departamento || ''
+    const roleGroup = document.getElementById('crmRoleGroup')
+    roleGroup.style.display = u.is_admin ? 'none' : 'block'
+    if (!u.is_admin) document.getElementById('crmRole').value = u.role || 'AGENTE'
+    document.getElementById('modalCRM').classList.add('active')
+}
+
+async function confirmarAcessoCRM() {
+    const depto = document.getElementById('crmDepto').value
+    if (!depto) { alert('Selecione um departamento.'); return }
+    const role = document.getElementById('crmRole')?.value || 'AGENTE'
+    const isAdmin = crmUsuarios.find(u => u.id === crmEditandoId)?.is_admin
+
+    const { error } = await sb.from('usuarios')
+        .update({ departamento: depto, role: isAdmin ? 'ADMIN' : role })
+        .eq('id', crmEditandoId)
+
+    if (error) { alert('Erro: ' + error.message); return }
+    closeModal('modalCRM')
+    loadCRMUsuarios()
+}
+
+async function revogarCRM(id, nome) {
+    if (!confirm(`Revogar acesso CRM de "${nome}"?`)) return
+    const { error } = await sb.from('usuarios').update({ departamento: null, role: null }).eq('id', id)
+    if (error) { alert('Erro: ' + error.message); return }
+    loadCRMUsuarios()
+}
+
 // ─── INICIALIZAR ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
     const auth = await checkAuth();
@@ -1437,9 +1571,55 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await loadFerramentas();   // carregar primeiro (usado nos modais)
     loadSolicitacoes();
+    setInterval(loadSolicitacoes, 30000);
 
-    setInterval(loadSolicitacoes, 30000);   // refresh automático a cada 30s
+    // Carrega dados CRM quando a aba é aberta pela primeira vez
+    document.querySelectorAll('.menu-btn[data-tab="crm"]').forEach(btn => {
+        btn.addEventListener('click', () => loadCRMUsuarios(), { once: true })
+    })
 });
 </script>
+<!-- MODAL CRM -->
+<div class="modal" id="modalCRM">
+  <div class="modal-content" style="max-width:480px">
+    <div class="modal-header">
+        <h2>💬 Acesso ao CRM Messenger</h2>
+        <button class="modal-close" data-close="modalCRM">✕</button>
+    </div>
+    <div class="form-group">
+        <label>Usuário</label>
+        <input id="crmNome" type="text" readonly>
+    </div>
+    <div class="form-group">
+        <label>E-mail</label>
+        <input id="crmEmail" type="text" readonly>
+    </div>
+    <div class="form-group">
+        <label>Nível no portal</label>
+        <p id="crmIsAdmin" style="font-size:13px;padding:8px 0;margin:0;font-weight:600;color:var(--primary)"></p>
+    </div>
+    <div class="form-group">
+        <label>Departamento CRM *</label>
+        <select id="crmDepto">
+            <option value="">Selecione...</option>
+            <option value="PESSOAL">Pessoal</option>
+            <option value="CONTABIL">Contábil</option>
+            <option value="ADMINISTRATIVO">Administrativo</option>
+            <option value="TRIBUTARIO">Tributário</option>
+        </select>
+    </div>
+    <div class="form-group" id="crmRoleGroup">
+        <label>Role no CRM</label>
+        <select id="crmRole">
+            <option value="AGENTE">Agente</option>
+            <option value="ADMIN">Admin CRM</option>
+        </select>
+    </div>
+    <div class="modal-actions">
+        <button class="btn-modal btn-modal-secondary" data-close="modalCRM">Cancelar</button>
+        <button class="btn-modal btn-modal-primary" onclick="confirmarAcessoCRM()">✅ Confirmar acesso</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

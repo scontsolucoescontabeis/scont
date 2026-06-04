@@ -1,22 +1,19 @@
 import { supabase } from '@/lib/supabaseClient'
 
+// Busca perfil CRM do usuário autenticado via RPC (vincula por email)
 export async function buscarMeuPerfil() {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const { data } = await supabase
-    .from('usuarios')
-    .select('id, nome, email, departamento, role, ativo')
-    .eq('id', user.id)
-    .single()
-  return data
+  const { data, error } = await supabase.rpc('get_meu_perfil_crm')
+  if (error || !data || data.length === 0) return null
+  return data[0]
 }
 
 export async function buscarAgentesDoDepto(departamento) {
   const { data } = await supabase
     .from('usuarios')
-    .select('id, nome, departamento')
+    .select('id, nome, departamento, email')
     .eq('departamento', departamento)
     .eq('ativo', true)
+    .not('departamento', 'is', null)
     .order('nome')
   return data ?? []
 }
@@ -24,25 +21,35 @@ export async function buscarAgentesDoDepto(departamento) {
 export async function buscarTodosAgentes() {
   const { data } = await supabase
     .from('usuarios')
-    .select('id, nome, email, departamento, role, ativo, criado_em')
+    .select('id, nome, email, departamento, role, ativo, is_admin')
+    .not('departamento', 'is', null)  // só quem tem acesso CRM
     .order('nome')
   return data ?? []
 }
 
-export async function criarUsuario(email, senha, nome, departamento, role = 'AGENTE') {
-  const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password: senha,
-    email_confirm: true,
-  })
-  if (error) throw error
-
-  const { error: profileError } = await supabase
+export async function buscarTodosUsuariosPortal() {
+  // Retorna TODOS os usuarios do portal (para admin configurar acesso ao CRM)
+  const { data } = await supabase
     .from('usuarios')
-    .insert({ id: data.user.id, nome, email, departamento, role })
-  if (profileError) throw profileError
+    .select('id, nome, email, departamento, role, ativo, is_admin')
+    .order('nome')
+  return data ?? []
+}
 
-  return data.user
+export async function configurarAcessoCRM(usuarioId, departamento, role) {
+  const { error } = await supabase
+    .from('usuarios')
+    .update({ departamento, role })
+    .eq('id', usuarioId)
+  if (error) throw error
+}
+
+export async function revogarAcessoCRM(usuarioId) {
+  const { error } = await supabase
+    .from('usuarios')
+    .update({ departamento: null, role: null })
+    .eq('id', usuarioId)
+  if (error) throw error
 }
 
 export async function buscarMetricas() {
@@ -55,19 +62,13 @@ export async function buscarMetricas() {
     supabase.from('conversas').select('id', { count: 'exact', head: true })
       .eq('status', 'ENCERRADA')
       .gte('encerrado_em', hoje.toISOString()),
-    supabase.from('conversas')
-      .select('departamento, usuarios(nome)')
-      .eq('status', 'ENCERRADA'),
+    supabase.from('conversas').select('departamento').eq('status', 'ENCERRADA'),
   ])
 
   const porDepto = { PESSOAL: 0, CONTABIL: 0, ADMINISTRATIVO: 0, TRIBUTARIO: 0 }
-  const rankingAgentes = {}
-
   if (ranking.data) {
     for (const c of ranking.data) {
       if (c.departamento) porDepto[c.departamento] = (porDepto[c.departamento] ?? 0) + 1
-      const nome = c.usuarios?.nome
-      if (nome) rankingAgentes[nome] = (rankingAgentes[nome] ?? 0) + 1
     }
   }
 
@@ -76,8 +77,5 @@ export async function buscarMetricas() {
     emAtendimento: emAtendimento.count ?? 0,
     encerradasHoje: encerradasHoje.count ?? 0,
     porDepto,
-    rankingAgentes: Object.entries(rankingAgentes)
-      .map(([nome, total]) => ({ nome, total }))
-      .sort((a, b) => b.total - a.total),
   }
 }
