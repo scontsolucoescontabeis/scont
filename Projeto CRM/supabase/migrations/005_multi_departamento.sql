@@ -79,6 +79,8 @@ CREATE POLICY "anotacoes_select" ON anotacoes_internas FOR SELECT TO authenticat
   ));
 
 -- 5. Atualiza RPC get_meu_perfil_crm para retornar array
+-- DROP obrigatório: mudança no tipo de retorno (departamento → departamentos[])
+DROP FUNCTION IF EXISTS get_meu_perfil_crm();
 CREATE OR REPLACE FUNCTION get_meu_perfil_crm()
 RETURNS TABLE (
   id            UUID,
