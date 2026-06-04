@@ -1971,7 +1971,25 @@ function gerarDiasDoMes(competencia) {
 
 // ===== MODELO EXCEL / IMPORTAÇÃO =====
 
-async function gerarModeloExcel() {
+function perguntarTurnosModelo() {
+    const comp   = document.getElementById('competencia').value;
+    const codEmp = document.getElementById('codigoEmpresa').value;
+    if (!validarCompetencia(comp)) {
+        mostrarMensagem('Aviso', 'Preencha a competência antes de baixar o modelo.');
+        return;
+    }
+    if (!codEmp) {
+        mostrarMensagem('Aviso', 'Selecione a empresa antes de baixar o modelo.');
+        return;
+    }
+    document.getElementById('modeloTurnosModal').classList.add('active');
+}
+
+function fecharModalModeloTurnos() {
+    document.getElementById('modeloTurnosModal').classList.remove('active');
+}
+
+async function gerarModeloExcel(comTerceiroTurno = false) {
     const comp   = document.getElementById('competencia').value;
     const codEmp = document.getElementById('codigoEmpresa').value;
 
@@ -2005,10 +2023,10 @@ async function gerarModeloExcel() {
 
         empregados.forEach(emp => {
             const nomeSheet = `${emp.codigo_empregado} ${emp.nome_empregado}`.substring(0, 31);
-            const header = state.terceiroTurno
+            const header = comTerceiroTurno
                 ? ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Entrada 3', 'Saída 3']
                 : ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2'];
-            const rows   = [header, ...diasDoMes.map(d => state.terceiroTurno
+            const rows   = [header, ...diasDoMes.map(d => comTerceiroTurno
                 ? [d.data, d.diaSemana, '', '', '', '', '', '']
                 : [d.data, d.diaSemana, '', '', '', ''])];
             const ws     = XLSX.utils.aoa_to_sheet(rows);
@@ -2019,7 +2037,7 @@ async function gerarModeloExcel() {
                 ws[addr] = { t: 's', v: rows[r][0] };
             }
 
-            ws['!cols'] = state.terceiroTurno
+            ws['!cols'] = comTerceiroTurno
                 ? [{ wch: 13 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }]
                 : [{ wch: 13 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
 

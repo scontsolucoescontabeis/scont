@@ -63,7 +63,7 @@
             </form>
             
             <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; display: flex; flex-direction: column; gap: 8px;">
-                <button type="button" class="btn btn-secondary" onclick="gerarModeloExcel()" style="width: 100%; font-size: 13px;">
+                <button type="button" class="btn btn-secondary" onclick="perguntarTurnosModelo()" style="width: 100%; font-size: 13px;">
                     📥 Baixar Modelo Excel (por empresa)
                 </button>
                 <button type="button" class="btn btn-secondary" onclick="abrirModalExportacaoTXT()" style="width: 100%; font-size: 13px;">
@@ -320,6 +320,27 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary" id="messageOk" onclick="fecharModalMensagem()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: TURNOS DO MODELO EXCEL -->
+    <div id="modeloTurnosModal" class="modal">
+        <div class="modal-content" style="max-width: 420px; text-align: center;">
+            <div class="modal-header">
+                <h3>Baixar Modelo Excel</h3>
+                <button type="button" class="modal-close" onclick="fecharModalModeloTurnos()">×</button>
+            </div>
+            <div class="modal-body" style="padding: 24px 20px;">
+                <p style="margin: 0 0 20px; font-size: 14px; color: var(--text-secondary);">Esta empresa possui <strong>3 turnos</strong> de trabalho por dia?</p>
+                <div style="display: flex; gap: 12px; justify-content: center;">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalModeloTurnos(); gerarModeloExcel(false);" style="flex: 1; max-width: 160px;">
+                        2 Turnos<br><small style="font-weight: normal; opacity: .7;">Padrão</small>
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="fecharModalModeloTurnos(); gerarModeloExcel(true);" style="flex: 1; max-width: 160px;">
+                        3 Turnos<br><small style="font-weight: normal; opacity: .8;">Com Entrada 3 / Saída 3</small>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
