@@ -1,12 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { MessageSquare, BarChart2, Users, LogOut, ClipboardList } from 'lucide-react'
+import { MessageSquare, BarChart2, Users, LogOut, ClipboardList, BookUser } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { buscarMeuPerfil } from '@/services/crm.service'
 import CRMPage from '@/pages/CRMPage'
 import MetricasPage from '@/pages/MetricasPage'
 import UsuariosPage from '@/pages/UsuariosPage'
 import TarefasPage from '@/pages/TarefasPage'
+import ContatosPage from '@/pages/ContatosPage'
 import SemAcessoPage from '@/pages/SemAcessoPage'
 
 // ============================================================
@@ -172,6 +173,10 @@ function Sidebar({ isAdmin, onLogout }) {
           <ClipboardList size={15} />
           Tarefas
         </NavLink>
+        <NavLink to="/crm/contatos" style={navLinkStyle}>
+          <BookUser size={15} />
+          Contatos
+        </NavLink>
 
         {isAdmin && (
           <>
@@ -300,6 +305,7 @@ export default function App() {
               <Route path="/" element={<Navigate to="/crm" replace />} />
               <Route path="/crm" element={<CRMPage perfil={perfil} />} />
               <Route path="/crm/tarefas" element={<TarefasPage perfil={perfil} />} />
+              <Route path="/crm/contatos" element={<ContatosPage />} />
               {isAdmin && <Route path="/crm/metricas" element={<MetricasPage />} />}
               {isAdmin && <Route path="/crm/usuarios" element={<UsuariosPage />} />}
               <Route path="*" element={<Navigate to="/crm" replace />} />

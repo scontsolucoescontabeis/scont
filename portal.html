@@ -636,13 +636,23 @@
         }
 
         // ─── ABRIR FERRAMENTA ──────────────────────────────────────
-        // Abre em nova aba se: URL absoluta (http/https diferente da origem atual)
-        function abrirFerramenta(url) {
+        // Passa tokens de sessão no hash para apps React (Supabase detectSessionInUrl)
+        async function abrirFerramenta(url) {
             if (!url) { alert('URL não configurada para esta ferramenta.'); return; }
             try {
-                const href = new URL(url, window.location.href).href;
+                let href = new URL(url, window.location.href).href;
                 const mesmaOrigem = new URL(href).origin === window.location.origin;
                 if (!mesmaOrigem) {
+                    const { data: { session } } = await sb.auth.getSession();
+                    if (session) {
+                        const params = new URLSearchParams({
+                            access_token:  session.access_token,
+                            refresh_token: session.refresh_token,
+                            expires_in:    session.expires_in ?? 3600,
+                            token_type:    'bearer',
+                        });
+                        href = href.split('#')[0] + '#' + params.toString();
+                    }
                     window.open(href, '_blank', 'noopener');
                 } else {
                     window.location.href = href;
