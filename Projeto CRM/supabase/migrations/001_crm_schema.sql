@@ -28,6 +28,11 @@ CREATE TABLE IF NOT EXISTS usuarios (
   ativo        BOOLEAN NOT NULL DEFAULT true,
   criado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Garante colunas mesmo quando a tabela já existia com esquema anterior
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS departamento departamento_enum;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS role         role_enum NOT NULL DEFAULT 'AGENTE';
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS ativo        BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS criado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE TABLE IF NOT EXISTS contatos (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -49,6 +54,12 @@ CREATE TABLE IF NOT EXISTS conversas (
   encerrado_em  TIMESTAMPTZ,
   atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE conversas ADD COLUMN IF NOT EXISTS departamento  departamento_enum NOT NULL DEFAULT 'ADMINISTRATIVO';
+ALTER TABLE conversas ADD COLUMN IF NOT EXISTS status        status_conversa NOT NULL DEFAULT 'ABERTA';
+ALTER TABLE conversas ADD COLUMN IF NOT EXISTS agente_id     UUID REFERENCES usuarios(id);
+ALTER TABLE conversas ADD COLUMN IF NOT EXISTS protocolo     TEXT NOT NULL DEFAULT '';
+ALTER TABLE conversas ADD COLUMN IF NOT EXISTS encerrado_em  TIMESTAMPTZ;
+ALTER TABLE conversas ADD COLUMN IF NOT EXISTS atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE TABLE IF NOT EXISTS mensagens (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,6 +73,11 @@ CREATE TABLE IF NOT EXISTS mensagens (
   lida            BOOLEAN NOT NULL DEFAULT false,
   criado_em       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS tipo            TEXT NOT NULL DEFAULT 'text';
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS media_url       TEXT;
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS whatsapp_msg_id TEXT;
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS agente_id       UUID REFERENCES usuarios(id);
+ALTER TABLE mensagens ADD COLUMN IF NOT EXISTS lida            BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS transferencias (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
