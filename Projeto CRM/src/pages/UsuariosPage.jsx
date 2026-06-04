@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Plus, UserCheck, UserX, Search } from 'lucide-react'
+import { Plus, UserCheck, UserX, Bell, Check, X } from 'lucide-react'
 import { buscarTodosAgentes } from '@/services/crm.service'
 import { supabase } from '@/lib/supabaseClient'
+import { useRealtime } from '@/hooks/useRealtime'
 
 const DEPTOS = ['PESSOAL', 'CONTABIL', 'ADMINISTRATIVO', 'TRIBUTARIO']
 const DEPTO_COLORS = {
@@ -11,20 +12,80 @@ const DEPTO_COLORS = {
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
+  const [solicitacoes, setSolicitacoes] = useState([])
   const [loading, setLoading] = useState(true)
   const [mostrarForm, setMostrarForm] = useState(false)
-  // Formulário: vincula usuário Auth existente ao CRM (sem criar novo Auth)
   const [form, setForm] = useState({ email: '', nome: '', departamento: 'PESSOAL', role: 'AGENTE' })
+  const [aprovando, setAprovando] = useState(null) // id da solicitação sendo aprovada
+  const [aprovacaoDepto, setAprovacaoDepto] = useState('')
+  const [aprovacaoRole, setAprovacaoRole] = useState('AGENTE')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
   const [sucesso, setSucesso] = useState('')
 
   const carregar = () => {
     setLoading(true)
-    buscarTodosAgentes().then(u => { setUsuarios(u); setLoading(false) })
+    Promise.all([
+      buscarTodosAgentes(),
+      supabase.from('solicitacoes_acesso').select('*').eq('status', 'PENDENTE').order('criado_em'),
+    ]).then(([agentes, { data: sols }]) => {
+      setUsuarios(agentes)
+      setSolicitacoes(sols ?? [])
+      setLoading(false)
+    })
   }
 
   useEffect(() => { carregar() }, [])
+
+  // Atualiza lista em tempo real quando chega nova solicitação
+  useRealtime({ onConversaAtualizada: null, onNovaMensagem: null })
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('solicitacoes-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'solicitacoes_acesso' }, carregar)
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [])
+
+  const handleAprovar = async (sol) => {
+    if (!aprovacaoDepto) return
+    setSalvando(true)
+    // 1. Cria perfil CRM para o usuário
+    const { error: insertError } = await supabase.from('usuarios').insert({
+      id:          sol.auth_user_id,
+      nome:        sol.nome,
+      email:       sol.email,
+      departamento: aprovacaoDepto,
+      role:        aprovacaoRole,
+    })
+    if (insertError && !insertError.message.includes('duplicate')) {
+      setErro(insertError.message); setSalvando(false); return
+    }
+    // 2. Atualiza solicitação como aprovada
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('solicitacoes_acesso').update({
+      status: 'APROVADA',
+      respondido_em: new Date().toISOString(),
+      respondido_por: user.id,
+      role_aprovada: aprovacaoRole,
+    }).eq('id', sol.id)
+
+    setAprovando(null)
+    setSalvando(false)
+    carregar()
+  }
+
+  const handleRejeitar = async (solId, motivo = '') => {
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('solicitacoes_acesso').update({
+      status: 'REJEITADA',
+      respondido_em: new Date().toISOString(),
+      respondido_por: user.id,
+      motivo_recusa: motivo || null,
+    }).eq('id', solId)
+    carregar()
+  }
 
   const handleSalvar = async (e) => {
     e.preventDefault()
@@ -109,7 +170,94 @@ export default function UsuariosPage() {
         Usuários do portal já cadastrados no Supabase Auth. Defina departamento e perfil de acesso ao CRM.
       </p>
 
-      {/* Formulário */}
+      {/* Solicitações pendentes */}
+      {solicitacoes.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <Bell size={14} color="#b87a00" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>
+              Solicitações pendentes ({solicitacoes.length})
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {solicitacoes.map(sol => (
+              <div key={sol.id} style={{
+                background: '#FFFBEB', border: '1px solid #fde047',
+                borderRadius: 8, padding: '12px 16px',
+              }}>
+                {aprovando === sol.id ? (
+                  // Mini-form de aprovação
+                  <div>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#1a1a1a', marginBottom: 10, marginTop: 0 }}>
+                      Aprovar acesso para <strong>{sol.nome}</strong> ({sol.email})
+                    </p>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <select
+                        value={aprovacaoDepto}
+                        onChange={e => setAprovacaoDepto(e.target.value)}
+                        style={{ fontSize: 12, border: '1px solid #e0dcd8', borderRadius: 4, padding: '5px 8px', outline: 'none' }}
+                      >
+                        <option value="">Departamento *</option>
+                        {DEPTOS.map(d => (
+                          <option key={d} value={d}>{d[0] + d.slice(1).toLowerCase()}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={aprovacaoRole}
+                        onChange={e => setAprovacaoRole(e.target.value)}
+                        style={{ fontSize: 12, border: '1px solid #e0dcd8', borderRadius: 4, padding: '5px 8px', outline: 'none' }}
+                      >
+                        <option value="AGENTE">Agente</option>
+                        <option value="ADMIN">Admin</option>
+                      </select>
+                      <button
+                        onClick={() => handleAprovar(sol)}
+                        disabled={!aprovacaoDepto || salvando}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 4, border: 'none', background: !aprovacaoDepto ? '#c5c0ba' : '#2d7a4f', color: '#fff', fontSize: 12, fontWeight: 600, cursor: !aprovacaoDepto ? 'not-allowed' : 'pointer' }}
+                      >
+                        <Check size={12} /> Confirmar
+                      </button>
+                      <button
+                        onClick={() => setAprovando(null)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 4, border: '1px solid #e0dcd8', background: '#fff', color: '#888480', fontSize: 12, cursor: 'pointer' }}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>{sol.nome}</span>
+                      <span style={{ fontSize: 12, color: '#888480', marginLeft: 8 }}>{sol.email}</span>
+                      <span style={{ fontSize: 11, background: '#f0e8e8', color: '#7a1e1e', borderRadius: 3, padding: '1px 6px', marginLeft: 8, fontWeight: 600 }}>
+                        Solicitou: {sol.departamento}
+                      </span>
+                      {sol.justificativa && (
+                        <div style={{ fontSize: 11, color: '#888480', marginTop: 3 }}>"{sol.justificativa}"</div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { setAprovando(sol.id); setAprovacaoDepto(sol.departamento); setAprovacaoRole('AGENTE') }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 4, border: 'none', background: '#2d7a4f', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      <Check size={11} /> Aprovar
+                    </button>
+                    <button
+                      onClick={() => handleRejeitar(sol.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', borderRadius: 4, border: '1px solid #e0dcd8', background: '#fff', color: '#b83232', fontSize: 11, cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      <X size={11} /> Recusar
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Formulário de vínculo manual */}
       {mostrarForm && (
         <div style={{
           background: '#fff', border: '1px solid #e0dcd8', borderRadius: 10,

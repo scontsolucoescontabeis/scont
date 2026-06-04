@@ -6,6 +6,7 @@ import { buscarMeuPerfil } from '@/services/crm.service'
 import CRMPage from '@/pages/CRMPage'
 import MetricasPage from '@/pages/MetricasPage'
 import UsuariosPage from '@/pages/UsuariosPage'
+import SolicitarAcessoPage from '@/pages/SolicitarAcessoPage'
 
 // ============================================================
 // Tela de Login
@@ -244,8 +245,8 @@ function Header({ perfil }) {
 // App principal
 // ============================================================
 export default function App() {
-  const [session, setSession]   = useState(undefined)
-  const [perfil, setPerfil]     = useState(null)
+  const [session, setSession]       = useState(undefined)
+  const [perfil, setPerfil]         = useState(undefined) // undefined = carregando
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -255,13 +256,16 @@ export default function App() {
 
   useEffect(() => {
     if (session) {
-      buscarMeuPerfil().then(setPerfil).catch(() => setPerfil(null))
-    } else {
+      buscarMeuPerfil()
+        .then(p => setPerfil(p))       // null = autenticado mas sem perfil CRM
+        .catch(() => setPerfil(null))
+    } else if (session === null) {
       setPerfil(null)
     }
   }, [session])
 
-  if (session === undefined) {
+  // Aguardando verificação inicial
+  if (session === undefined || (session && perfil === undefined)) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f2f2f0' }}>
         <div style={{ color: '#888480', fontSize: 13 }}>Carregando...</div>
@@ -269,10 +273,15 @@ export default function App() {
     )
   }
 
+  // Não autenticado → tela de login
   if (!session) return <LoginPage />
 
-  const isAdmin = perfil?.role === 'ADMIN'
+  // Autenticado mas sem perfil CRM → solicitar acesso
+  if (!perfil) {
+    return <SolicitarAcessoPage user={session.user} onSair={() => supabase.auth.signOut()} />
+  }
 
+  const isAdmin = perfil.role === 'ADMIN'
   const handleLogout = () => supabase.auth.signOut()
 
   return (
