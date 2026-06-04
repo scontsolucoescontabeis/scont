@@ -11,8 +11,8 @@ const DEPTO_COLORS = {
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
-  const [editando, setEditando] = useState(null)       // id do usuario em edição
-  const [editDepto, setEditDepto] = useState('')
+  const [editando, setEditando] = useState(null)
+  const [editDeptos, setEditDeptos] = useState([])     // array multi-select
   const [editRole, setEditRole] = useState('AGENTE')
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
@@ -24,13 +24,21 @@ export default function UsuariosPage() {
 
   useEffect(() => { carregar() }, [])
 
+  const toggleDepto = (depto) => {
+    setEditDeptos(prev =>
+      prev.includes(depto) ? prev.filter(d => d !== depto) : [...prev, depto]
+    )
+  }
+
   const handleConfigurar = async (u) => {
+    if (!editDeptos.length && !u.is_admin) { setErro('Selecione ao menos um departamento.'); return }
     setErro('')
     setSalvando(true)
     try {
-      // Portal admin sempre fica como ADMIN no CRM
       const roleEfetivo = u.is_admin ? 'ADMIN' : editRole
-      await configurarAcessoCRM(u.id, editDepto, roleEfetivo)
+      // Admin portal → todos os deptos implícitos via role; não forçar array
+      const deptos = u.is_admin ? (editDeptos.length ? editDeptos : DEPTOS) : editDeptos
+      await configurarAcessoCRM(u.id, deptos, roleEfetivo)
       setEditando(null)
       carregar()
     } catch (err) {
@@ -46,8 +54,41 @@ export default function UsuariosPage() {
     carregar()
   }
 
-  const semAcesso = usuarios.filter(u => !u.departamento)
-  const comAcesso = usuarios.filter(u => !!u.departamento)
+  const semAcesso = usuarios.filter(u => !u.is_admin && (!u.departamentos || !u.departamentos.length))
+  const comAcesso = usuarios.filter(u => u.is_admin || (u.departamentos && u.departamentos.length > 0))
+
+  const DeptosBadges = ({ deptos = [] }) => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+      {deptos.map(d => (
+        <span key={d} style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3, background: `${DEPTO_COLORS[d]}18`, color: DEPTO_COLORS[d] ?? '#374151' }}>
+          {d}
+        </span>
+      ))}
+    </div>
+  )
+
+  const CheckboxDeptos = ({ selectedDeptos, isAdmin }) => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {isAdmin && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#888480', fontStyle: 'italic' }}>
+          <input type="checkbox" checked disabled style={{ width: 14, height: 14 }} />
+          Todos (admin)
+        </label>
+      )}
+      {!isAdmin && DEPTOS.map(d => (
+        <label key={d} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, cursor: 'pointer',
+          padding: '3px 8px', borderRadius: 4, border: '1px solid',
+          borderColor: editDeptos.includes(d) ? DEPTO_COLORS[d] : '#e0dcd8',
+          background: editDeptos.includes(d) ? `${DEPTO_COLORS[d]}15` : '#fff',
+          color: editDeptos.includes(d) ? DEPTO_COLORS[d] : '#888480',
+        }}>
+          <input type="checkbox" checked={editDeptos.includes(d)} onChange={() => toggleDepto(d)}
+            style={{ width: 13, height: 13, accentColor: DEPTO_COLORS[d], cursor: 'pointer' }} />
+          {d[0] + d.slice(1).toLowerCase()}
+        </label>
+      ))}
+    </div>
+  )
 
   const selectStyle = { fontSize: 12, border: '1px solid #e0dcd8', borderRadius: 4, padding: '4px 8px', outline: 'none', background: '#fff' }
 
@@ -94,38 +135,31 @@ export default function UsuariosPage() {
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       {editando === u.id ? (
-                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <select value={editDepto} onChange={e => setEditDepto(e.target.value)} style={selectStyle}>
-                            <option value="">Departamento *</option>
-                            {DEPTOS.map(d => <option key={d} value={d}>{d[0] + d.slice(1).toLowerCase()}</option>)}
-                          </select>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <CheckboxDeptos selectedDeptos={editDeptos} isAdmin={u.is_admin} />
                           {!u.is_admin && (
                             <select value={editRole} onChange={e => setEditRole(e.target.value)} style={selectStyle}>
                               <option value="AGENTE">Agente</option>
                               <option value="ADMIN">Admin CRM</option>
                             </select>
                           )}
-                          <button
-                            onClick={() => handleConfigurar(u)}
-                            disabled={!editDepto || salvando}
-                            style={{ padding: '4px 10px', borderRadius: 4, border: 'none', background: !editDepto ? '#c5c0ba' : '#2d7a4f', color: '#fff', fontSize: 11, fontWeight: 600, cursor: !editDepto ? 'not-allowed' : 'pointer' }}
-                          >
-                            {salvando ? '...' : 'Confirmar'}
-                          </button>
-                          <button onClick={() => setEditando(null)}
-                            style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #e0dcd8', background: '#fff', color: '#888480', fontSize: 11, cursor: 'pointer' }}>
-                            Cancelar
-                          </button>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={() => handleConfigurar(u)} disabled={(!editDeptos.length && !u.is_admin) || salvando}
+                              style={{ padding: '4px 10px', borderRadius: 4, border: 'none', background: (!editDeptos.length && !u.is_admin) ? '#c5c0ba' : '#2d7a4f', color: '#fff', fontSize: 11, fontWeight: 600, cursor: (!editDeptos.length && !u.is_admin) ? 'not-allowed' : 'pointer' }}>
+                              {salvando ? '...' : 'Confirmar'}
+                            </button>
+                            <button onClick={() => setEditando(null)} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #e0dcd8', background: '#fff', color: '#888480', fontSize: 11, cursor: 'pointer' }}>
+                              Cancelar
+                            </button>
+                          </div>
+                          {erro && editando === u.id && <p style={{ fontSize: 11, color: '#b83232', margin: 0 }}>{erro}</p>}
                         </div>
                       ) : (
-                        <button
-                          onClick={() => { setEditando(u.id); setEditDepto(''); setEditRole('AGENTE'); setErro('') }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 4, border: '1px solid #2d7a4f', background: '#ECFDF5', color: '#2d7a4f', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
-                        >
+                        <button onClick={() => { setEditando(u.id); setEditDeptos([]); setEditRole('AGENTE'); setErro('') }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 4, border: '1px solid #2d7a4f', background: '#ECFDF5', color: '#2d7a4f', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                           <UserCheck size={12} /> Conceder acesso
                         </button>
                       )}
-                      {erro && editando === u.id && <p style={{ fontSize: 11, color: '#b83232', marginTop: 4 }}>{erro}</p>}
                     </td>
                   </tr>
                 ))}
@@ -163,29 +197,29 @@ export default function UsuariosPage() {
                   <td style={{ padding: '10px 14px', fontSize: 12, color: '#888480' }}>{u.email ?? '—'}</td>
                   <td style={{ padding: '10px 14px' }}>
                     {editando === u.id ? (
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <select value={editDepto || u.departamento} onChange={e => setEditDepto(e.target.value)} style={selectStyle}>
-                          {DEPTOS.map(d => <option key={d} value={d}>{d[0] + d.slice(1).toLowerCase()}</option>)}
-                        </select>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <CheckboxDeptos selectedDeptos={editDeptos} isAdmin={u.is_admin} />
                         {!u.is_admin && (
-                          <select value={editRole || u.role || 'AGENTE'} onChange={e => setEditRole(e.target.value)} style={selectStyle}>
+                          <select value={editRole} onChange={e => setEditRole(e.target.value)} style={selectStyle}>
                             <option value="AGENTE">Agente</option>
                             <option value="ADMIN">Admin CRM</option>
                           </select>
                         )}
-                        <button onClick={() => handleConfigurar(u)} disabled={salvando}
-                          style={{ padding: '4px 10px', borderRadius: 4, border: 'none', background: '#7a1e1e', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                          {salvando ? '...' : 'Salvar'}
-                        </button>
-                        <button onClick={() => setEditando(null)}
-                          style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #e0dcd8', background: '#fff', color: '#888480', fontSize: 11, cursor: 'pointer' }}>
-                          Cancelar
-                        </button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button onClick={() => handleConfigurar(u)} disabled={salvando}
+                            style={{ padding: '4px 10px', borderRadius: 4, border: 'none', background: '#7a1e1e', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                            {salvando ? '...' : 'Salvar'}
+                          </button>
+                          <button onClick={() => setEditando(null)}
+                            style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid #e0dcd8', background: '#fff', color: '#888480', fontSize: 11, cursor: 'pointer' }}>
+                            Cancelar
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 3, background: `${DEPTO_COLORS[u.departamento]}18`, color: DEPTO_COLORS[u.departamento] ?? '#374151' }}>
-                        {u.departamento}
-                      </span>
+                      u.is_admin
+                        ? <span style={{ fontSize: 10, fontStyle: 'italic', color: '#888480' }}>Todos (admin)</span>
+                        : <DeptosBadges deptos={u.departamentos ?? (u.departamento ? [u.departamento] : [])} />
                     )}
                   </td>
                   <td style={{ padding: '10px 14px', fontSize: 12, color: '#888480' }}>
@@ -197,7 +231,7 @@ export default function UsuariosPage() {
                     </span>
                   </td>
                   <td style={{ padding: '10px 14px', display: 'flex', gap: 4 }}>
-                    <button onClick={() => { setEditando(u.id); setEditDepto(u.departamento); setEditRole(u.role ?? 'AGENTE') }}
+                    <button onClick={() => { setEditando(u.id); setEditDeptos(u.departamentos ?? (u.departamento ? [u.departamento] : [])); setEditRole(u.role ?? 'AGENTE') }}
                       title="Editar" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
                       <Settings size={14} color="#888480" />
                     </button>

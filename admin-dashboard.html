@@ -1492,12 +1492,15 @@ function renderCRMUsuarios() {
         tbCom.innerHTML = '<tr><td colspan="5" class="empty-cell">Nenhum usuário com acesso ao CRM.</td></tr>'
     } else {
         tbCom.innerHTML = comAcesso.map(u => {
-            const cor = DEPTOS[u.departamento] || '#888480'
+            const deptos = u.departamentos || (u.departamento ? [u.departamento] : [])
+            const badges = u.is_admin
+                ? '<span style="font-size:10px;color:var(--muted);font-style:italic">Todos (admin)</span>'
+                : deptos.map(d => `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;background:${DEPTOS[d] || '#888'}22;color:${DEPTOS[d] || '#888'}">${d}</span>`).join(' ')
             const roleLabel = u.is_admin ? 'Admin (portal)' : (u.role || 'AGENTE')
             return `<tr>
                 <td>${u.is_admin ? '🛡️ ' : ''}${sanitize(u.nome)}</td>
                 <td style="color:var(--muted)">${sanitize(u.email || '—')}</td>
-                <td><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:3px;background:${cor}22;color:${cor}">${u.departamento}</span></td>
+                <td style="white-space:normal">${badges}</td>
                 <td style="color:var(--muted);font-size:12px">${roleLabel}</td>
                 <td>
                     <button class="btn-sm btn-edit" onclick='abrirModalCRM(${JSON.stringify(u)})'>✏️ Editar</button>
@@ -1508,27 +1511,51 @@ function renderCRMUsuarios() {
     }
 }
 
+function selecionarTodosDeptos(sel) {
+    document.querySelectorAll('.crm-depto-cb').forEach(cb => { cb.checked = sel; cb.disabled = false })
+}
+
 function abrirModalCRM(u) {
     crmEditandoId = u.id
-    document.getElementById('crmNome').value        = u.nome
-    document.getElementById('crmEmail').value       = u.email || '—'
-    document.getElementById('crmIsAdmin').textContent = u.is_admin ? '🛡️ Admin portal — será Admin CRM automaticamente' : 'Usuário comum'
-    document.getElementById('crmDepto').value       = u.departamento || ''
+    document.getElementById('crmNome').value  = u.nome
+    document.getElementById('crmEmail').value = u.email || '—'
+    document.getElementById('crmIsAdmin').textContent = u.is_admin
+        ? '🛡️ Admin portal — terá acesso Admin ao CRM'
+        : 'Usuário comum — configure os departamentos abaixo'
+
+    // Marcar checkboxes com departamentos atuais
+    const depAtual = u.departamentos || (u.departamento ? [u.departamento] : [])
+    document.querySelectorAll('.crm-depto-cb').forEach(cb => {
+        cb.checked  = u.is_admin ? true : depAtual.includes(cb.value)
+        cb.disabled = !!u.is_admin  // admin: todos marcados e bloqueados
+    })
+
     const roleGroup = document.getElementById('crmRoleGroup')
     roleGroup.style.display = u.is_admin ? 'none' : 'block'
     if (!u.is_admin) document.getElementById('crmRole').value = u.role || 'AGENTE'
+
     document.getElementById('modalCRM').classList.add('active')
 }
 
 async function confirmarAcessoCRM() {
-    const depto = document.getElementById('crmDepto').value
-    if (!depto) { alert('Selecione um departamento.'); return }
-    const role = document.getElementById('crmRole')?.value || 'AGENTE'
-    const isAdmin = crmUsuarios.find(u => u.id === crmEditandoId)?.is_admin
+    const u = crmUsuarios.find(x => x.id === crmEditandoId)
+    const isAdmin = u?.is_admin
 
-    const { error } = await sb.from('usuarios')
-        .update({ departamento: depto, role: isAdmin ? 'ADMIN' : role })
-        .eq('id', crmEditandoId)
+    const departamentos = isAdmin
+        ? ['PESSOAL','CONTABIL','ADMINISTRATIVO','TRIBUTARIO']
+        : Array.from(document.querySelectorAll('.crm-depto-cb:checked')).map(cb => cb.value)
+
+    if (!isAdmin && departamentos.length === 0) {
+        alert('Selecione ao menos um departamento.'); return
+    }
+
+    const role = isAdmin ? 'ADMIN' : (document.getElementById('crmRole')?.value || 'AGENTE')
+
+    const { error } = await sb.from('usuarios').update({
+        departamentos,
+        departamento: departamentos[0] ?? null,
+        role,
+    }).eq('id', crmEditandoId)
 
     if (error) { alert('Erro: ' + error.message); return }
     closeModal('modalCRM')
@@ -1599,14 +1626,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         <p id="crmIsAdmin" style="font-size:13px;padding:8px 0;margin:0;font-weight:600;color:var(--primary)"></p>
     </div>
     <div class="form-group">
-        <label>Departamento CRM *</label>
-        <select id="crmDepto">
-            <option value="">Selecione...</option>
-            <option value="PESSOAL">Pessoal</option>
-            <option value="CONTABIL">Contábil</option>
-            <option value="ADMINISTRATIVO">Administrativo</option>
-            <option value="TRIBUTARIO">Tributário</option>
-        </select>
+        <label>Departamentos CRM *</label>
+        <p style="font-size:11px;color:var(--muted);margin:2px 0 8px">Selecione um ou mais departamentos. Admin portal tem acesso a todos automaticamente.</p>
+        <div id="crmDeptoCheckboxes" class="checkbox-group" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            <label class="checkbox-item"><input type="checkbox" value="PESSOAL" class="crm-depto-cb"> Pessoal</label>
+            <label class="checkbox-item"><input type="checkbox" value="CONTABIL" class="crm-depto-cb"> Contábil</label>
+            <label class="checkbox-item"><input type="checkbox" value="ADMINISTRATIVO" class="crm-depto-cb"> Administrativo</label>
+            <label class="checkbox-item"><input type="checkbox" value="TRIBUTARIO" class="crm-depto-cb"> Tributário</label>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+            <button type="button" onclick="selecionarTodosDeptos(true)" style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);cursor:pointer">✅ Todos</button>
+            <button type="button" onclick="selecionarTodosDeptos(false)" style="font-size:11px;padding:3px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);cursor:pointer">☐ Nenhum</button>
+        </div>
     </div>
     <div class="form-group" id="crmRoleGroup">
         <label>Role no CRM</label>

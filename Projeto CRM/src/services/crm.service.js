@@ -36,10 +36,15 @@ export async function buscarTodosUsuariosPortal() {
   return data ?? []
 }
 
-export async function configurarAcessoCRM(usuarioId, departamento, role) {
+export async function configurarAcessoCRM(usuarioId, departamentos, role) {
+  // departamentos: string[] ex: ['PESSOAL','CONTABIL'] ou [] para revogar
   const { error } = await supabase
     .from('usuarios')
-    .update({ departamento, role })
+    .update({
+      departamentos: departamentos.length ? departamentos : null,
+      departamento:  departamentos[0] ?? null,   // mantém coluna legada em sync
+      role:          departamentos.length ? role : null,
+    })
     .eq('id', usuarioId)
   if (error) throw error
 }
@@ -47,7 +52,7 @@ export async function configurarAcessoCRM(usuarioId, departamento, role) {
 export async function revogarAcessoCRM(usuarioId) {
   const { error } = await supabase
     .from('usuarios')
-    .update({ departamento: null, role: null })
+    .update({ departamentos: null, departamento: null, role: null })
     .eq('id', usuarioId)
   if (error) throw error
 }
