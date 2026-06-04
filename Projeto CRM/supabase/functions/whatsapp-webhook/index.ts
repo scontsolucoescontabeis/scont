@@ -139,13 +139,11 @@ async function baixarEGuardarMidia(mediaId: string, tipo: string, conversaId: st
     const nomeArquivo = `${conversaId}/${Date.now()}.${extensao[tipo] || 'bin'}`
 
     const { data } = await supabase.storage
-      .from('crm-midias')
+      .from('crm-midia')
       .upload(nomeArquivo, blob, { upsert: false })
 
-    if (data) {
-      const { data: urlData } = supabase.storage.from('crm-midias').getPublicUrl(nomeArquivo)
-      return urlData.publicUrl
-    }
+    // Salva apenas o path — URL assinada gerada no frontend (bucket privado)
+    if (data) return nomeArquivo
   } catch {
     // Falha silenciosa no upload de mídia — não bloqueia o fluxo
   }

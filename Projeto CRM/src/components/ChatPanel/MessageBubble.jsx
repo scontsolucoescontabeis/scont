@@ -1,10 +1,31 @@
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { Lock, FileText, Volume2, Video } from 'lucide-react'
+import { Lock, FileText, Volume2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabaseClient'
+
+// Resolve path do Storage privado → URL assinada (1h).
+// Se já for URL absoluta (legado público), retorna direto.
+function useSignedUrl(mediaPath) {
+  const [url, setUrl] = useState(null)
+
+  useEffect(() => {
+    if (!mediaPath) return
+    if (mediaPath.startsWith('http')) { setUrl(mediaPath); return }
+
+    supabase.storage
+      .from('crm-midia')
+      .createSignedUrl(mediaPath, 3600)
+      .then(({ data }) => { if (data?.signedUrl) setUrl(data.signedUrl) })
+  }, [mediaPath])
+
+  return url
+}
 
 export function MessageBubble({ item }) {
   const hora = format(new Date(item.criado_em), 'HH:mm', { locale: ptBR })
   const isAnotacao = item._tipo === 'anotacao'
+  const mediaUrl = useSignedUrl(item.media_url ?? null)
 
   // Anotação interna — fundo amarelo suave com cadeado
   if (isAnotacao) {
@@ -30,7 +51,7 @@ export function MessageBubble({ item }) {
     )
   }
 
-  const { origem, tipo, conteudo, media_url, usuarios: agente } = item
+  const { origem, tipo, conteudo, usuarios: agente } = item
 
   // Mensagem de sistema / bot — texto centralizado itálico
   if (origem === 'SISTEMA' || origem === 'BOT') {
@@ -64,34 +85,42 @@ export function MessageBubble({ item }) {
           </p>
         )}
 
-        {tipo === 'image' && media_url && (
-          <img src={media_url} alt="imagem" style={{ maxWidth: '100%', borderRadius: 6, marginBottom: 4, display: 'block' }} />
+        {tipo === 'image' && (
+          mediaUrl
+            ? <img src={mediaUrl} alt="imagem" style={{ maxWidth: '100%', borderRadius: 6, marginBottom: 4, display: 'block' }} />
+            : <div style={{ fontSize: 12, color: '#888480', marginBottom: 4 }}>🖼 Carregando imagem...</div>
         )}
 
-        {tipo === 'audio' && media_url && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <Volume2 size={14} color="#888480" />
-            <audio controls src={media_url} style={{ height: 28 }} />
-          </div>
+        {tipo === 'audio' && (
+          mediaUrl
+            ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Volume2 size={14} color="#888480" />
+                <audio controls src={mediaUrl} style={{ height: 28 }} />
+              </div>
+            )
+            : <div style={{ fontSize: 12, color: '#888480', marginBottom: 4 }}>🎵 Carregando áudio...</div>
         )}
 
         {tipo === 'document' && (
-          <a
-            href={media_url ?? '#'}
-            target="_blank"
-            rel="noreferrer"
-            style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#7a1e1e', textDecoration: 'none', fontSize: 13, marginBottom: 4 }}
-          >
-            <FileText size={14} />
-            {conteudo || 'Documento'}
-          </a>
+          mediaUrl
+            ? (
+              <a href={mediaUrl} target="_blank" rel="noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#7a1e1e', textDecoration: 'none', fontSize: 13, marginBottom: 4 }}>
+                <FileText size={14} />
+                {conteudo || 'Documento'}
+              </a>
+            )
+            : <div style={{ fontSize: 12, color: '#888480', marginBottom: 4 }}>📄 {conteudo || 'Documento'}</div>
         )}
 
-        {tipo === 'video' && media_url && (
-          <video controls src={media_url} style={{ maxWidth: '100%', borderRadius: 6, marginBottom: 4 }} />
+        {tipo === 'video' && (
+          mediaUrl
+            ? <video controls src={mediaUrl} style={{ maxWidth: '100%', borderRadius: 6, marginBottom: 4 }} />
+            : <div style={{ fontSize: 12, color: '#888480', marginBottom: 4 }}>🎥 Carregando vídeo...</div>
         )}
 
-        {(tipo === 'text' || !media_url) && (
+        {(tipo === 'text' || (!item.media_url && tipo !== 'image' && tipo !== 'audio' && tipo !== 'document' && tipo !== 'video')) && (
           <p style={{ fontSize: 13, color: '#1a1a1a', margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
             {conteudo}
           </p>
