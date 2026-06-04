@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { UserCheck, ArrowRightLeft, XCircle, Tag } from 'lucide-react'
+import { UserCheck, ArrowRightLeft, XCircle, ClipboardList } from 'lucide-react'
 import { useMensagens } from '@/hooks/useMensagens'
 import { useRealtime } from '@/hooks/useRealtime'
 import { useWhatsApp } from '@/hooks/useWhatsApp'
 import { MessageBubble } from './MessageBubble'
 import { InputBar } from './InputBar'
 import { ModalTransferencia } from './ModalTransferencia'
+import { ModalTarefa } from './ModalTarefa'
 
 const STATUS_LABELS = {
   ABERTA:         'Aberta',
@@ -17,7 +18,8 @@ const STATUS_LABELS = {
 export function ChatPanel({ conversa, perfil, onConversaAtualizada }) {
   const { timeline, loading, adicionarMensagem, adicionarAnotacao, refresh } = useMensagens(conversa?.id)
   const { sending, enviarMensagem, encerrarConversa, transferirConversa, assumirConversa, salvarAnotacao, marcarLidas } = useWhatsApp()
-  const [mostrarModal, setMostrarModal] = useState(false)
+  const [mostrarModal, setMostrarModal]         = useState(false)
+  const [mostrarModalTarefa, setMostrarModalTarefa] = useState(false)
   const [confirmandoEncerrar, setConfirmandoEncerrar] = useState(false)
   const endRef = useRef(null)
 
@@ -108,6 +110,10 @@ export function ChatPanel({ conversa, perfil, onConversaAtualizada }) {
                 <UserCheck size={14} /> Assumir
               </button>
             )}
+            <button onClick={() => setMostrarModalTarefa(true)} title="Abrir tarefa"
+              style={toolbarBtn('#5B21B6', '#F5F3FF')}>
+              <ClipboardList size={14} /> Tarefa
+            </button>
             <button onClick={() => setMostrarModal(true)} title="Transferir"
               style={toolbarBtn('#1D4ED8', '#EFF6FF')}>
               <ArrowRightLeft size={14} /> Transferir
@@ -161,6 +167,15 @@ export function ChatPanel({ conversa, perfil, onConversaAtualizada }) {
           deptoAtual={conversa.departamento}
           onConfirmar={handleTransferir}
           onFechar={() => setMostrarModal(false)}
+        />
+      )}
+
+      {mostrarModalTarefa && (
+        <ModalTarefa
+          conversa={conversa}
+          perfil={perfil}
+          onCriada={() => {}}
+          onFechar={() => setMostrarModalTarefa(false)}
         />
       )}
     </div>

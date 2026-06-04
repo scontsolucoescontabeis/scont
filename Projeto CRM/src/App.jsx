@@ -1,11 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { MessageSquare, BarChart2, Users, LogOut, Menu, X } from 'lucide-react'
+import { MessageSquare, BarChart2, Users, LogOut, ClipboardList } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { buscarMeuPerfil } from '@/services/crm.service'
 import CRMPage from '@/pages/CRMPage'
 import MetricasPage from '@/pages/MetricasPage'
 import UsuariosPage from '@/pages/UsuariosPage'
+import TarefasPage from '@/pages/TarefasPage'
 import SemAcessoPage from '@/pages/SemAcessoPage'
 
 // ============================================================
@@ -167,6 +168,10 @@ function Sidebar({ isAdmin, onLogout }) {
           <MessageSquare size={15} />
           WhatsApp CRM
         </NavLink>
+        <NavLink to="/crm/tarefas" style={navLinkStyle}>
+          <ClipboardList size={15} />
+          Tarefas
+        </NavLink>
 
         {isAdmin && (
           <>
@@ -294,6 +299,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/crm" replace />} />
               <Route path="/crm" element={<CRMPage perfil={perfil} />} />
+              <Route path="/crm/tarefas" element={<TarefasPage perfil={perfil} />} />
               {isAdmin && <Route path="/crm/metricas" element={<MetricasPage />} />}
               {isAdmin && <Route path="/crm/usuarios" element={<UsuariosPage />} />}
               <Route path="*" element={<Navigate to="/crm" replace />} />
