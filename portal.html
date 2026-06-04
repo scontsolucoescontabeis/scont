@@ -590,7 +590,7 @@
             const btn = document.createElement('button');
             btn.className = 'btn-acessar';
             btn.textContent = 'Acessar →';
-            const acessar = () => abrirFerramenta(f.url_base);
+            const acessar = () => abrirFerramenta(f.url_base, f.nova_aba);
             card.addEventListener('click', acessar);
             btn.addEventListener('click', (e) => { e.stopPropagation(); acessar(); });
             card.appendChild(icon);
@@ -636,11 +636,12 @@
         }
 
         // ─── ABRIR FERRAMENTA ──────────────────────────────────────
-        function abrirFerramenta(url) {
+        function abrirFerramenta(url, novaAba) {
             if (!url) { alert('URL não configurada para esta ferramenta.'); return; }
-            // Abre no mesmo tab para preservar sessionStorage nas ferramentas internas
             try {
-                window.location.href = new URL(url, window.location.href).href;
+                const href = new URL(url, window.location.href).href;
+                if (novaAba) { window.open(href, '_blank', 'noopener'); }
+                else { window.location.href = href; }
             } catch {
                 alert('URL inválida para esta ferramenta.');
             }

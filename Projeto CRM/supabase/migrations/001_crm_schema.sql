@@ -1,0 +1,222 @@
+-- ============================================================
+-- SCONT Messenger CRM — Migration 001
+-- ============================================================
+
+-- ENUMs
+CREATE TYPE departamento_enum AS ENUM ('PESSOAL', 'CONTABIL', 'ADMINISTRATIVO', 'TRIBUTARIO');
+CREATE TYPE role_enum          AS ENUM ('ADMIN', 'AGENTE');
+CREATE TYPE status_conversa    AS ENUM ('ABERTA', 'EM_ATENDIMENTO', 'ENCERRADA', 'AGUARDANDO');
+CREATE TYPE origem_mensagem    AS ENUM ('CLIENTE', 'AGENTE', 'SISTEMA', 'BOT');
+
+-- ============================================================
+-- Tabelas
+-- ============================================================
+
+CREATE TABLE usuarios (
+  id           UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  nome         TEXT NOT NULL,
+  email        TEXT NOT NULL UNIQUE,
+  departamento departamento_enum NOT NULL,
+  role         role_enum NOT NULL DEFAULT 'AGENTE',
+  ativo        BOOLEAN NOT NULL DEFAULT true,
+  criado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE contatos (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  telefone      TEXT NOT NULL UNIQUE,
+  nome          TEXT,
+  empresa       TEXT,
+  criado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE conversas (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  contato_id    UUID NOT NULL REFERENCES contatos(id),
+  departamento  departamento_enum NOT NULL DEFAULT 'ADMINISTRATIVO',
+  status        status_conversa NOT NULL DEFAULT 'ABERTA',
+  agente_id     UUID REFERENCES usuarios(id),
+  protocolo     TEXT NOT NULL UNIQUE DEFAULT '',
+  aberto_em     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  encerrado_em  TIMESTAMPTZ,
+  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE mensagens (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversa_id     UUID NOT NULL REFERENCES conversas(id) ON DELETE CASCADE,
+  origem          origem_mensagem NOT NULL,
+  tipo            TEXT NOT NULL DEFAULT 'text',
+  conteudo        TEXT NOT NULL,
+  media_url       TEXT,
+  whatsapp_msg_id TEXT UNIQUE,
+  agente_id       UUID REFERENCES usuarios(id),
+  lida            BOOLEAN NOT NULL DEFAULT false,
+  criado_em       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE transferencias (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversa_id       UUID NOT NULL REFERENCES conversas(id),
+  de_departamento   departamento_enum,
+  para_departamento departamento_enum NOT NULL,
+  de_agente_id      UUID REFERENCES usuarios(id),
+  para_agente_id    UUID REFERENCES usuarios(id),
+  motivo            TEXT,
+  criado_em         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE anotacoes_internas (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversa_id UUID NOT NULL REFERENCES conversas(id) ON DELETE CASCADE,
+  agente_id   UUID NOT NULL REFERENCES usuarios(id),
+  conteudo    TEXT NOT NULL,
+  criado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE tags (
+  id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome TEXT NOT NULL UNIQUE,
+  cor  TEXT NOT NULL DEFAULT '#888480'
+);
+
+CREATE TABLE conversa_tags (
+  conversa_id UUID NOT NULL REFERENCES conversas(id) ON DELETE CASCADE,
+  tag_id      UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (conversa_id, tag_id)
+);
+
+-- ============================================================
+-- Triggers
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION gerar_protocolo()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.protocolo IS NULL OR NEW.protocolo = '' THEN
+    NEW.protocolo := 'SCT-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' ||
+                     LPAD(FLOOR(RANDOM() * 999999)::TEXT, 6, '0');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_protocolo
+  BEFORE INSERT ON conversas
+  FOR EACH ROW
+  EXECUTE FUNCTION gerar_protocolo();
+
+CREATE OR REPLACE FUNCTION atualizar_conversa_em_mensagem()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE conversas SET atualizado_em = NOW() WHERE id = NEW.conversa_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_atualiza_conversa
+  AFTER INSERT ON mensagens
+  FOR EACH ROW
+  EXECUTE FUNCTION atualizar_conversa_em_mensagem();
+
+-- ============================================================
+-- Indices
+-- ============================================================
+
+CREATE INDEX idx_mensagens_conversa     ON mensagens(conversa_id);
+CREATE INDEX idx_conversas_departamento ON conversas(departamento);
+CREATE INDEX idx_conversas_status       ON conversas(status);
+CREATE INDEX idx_conversas_agente       ON conversas(agente_id);
+CREATE INDEX idx_conversas_atualizado   ON conversas(atualizado_em DESC);
+CREATE INDEX idx_contatos_telefone      ON contatos(telefone);
+
+-- ============================================================
+-- Supabase Realtime
+-- ============================================================
+
+ALTER PUBLICATION supabase_realtime ADD TABLE mensagens;
+ALTER PUBLICATION supabase_realtime ADD TABLE conversas;
+ALTER PUBLICATION supabase_realtime ADD TABLE anotacoes_internas;
+
+-- ============================================================
+-- Row Level Security
+-- ============================================================
+
+ALTER TABLE usuarios           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contatos           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversas          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mensagens          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transferencias     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE anotacoes_internas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tags               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE conversa_tags      ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION get_user_role()
+RETURNS role_enum AS $$
+  SELECT role FROM usuarios WHERE id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION get_user_departamento()
+RETURNS departamento_enum AS $$
+  SELECT departamento FROM usuarios WHERE id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- usuarios
+CREATE POLICY "usuarios_select"     ON usuarios FOR SELECT TO authenticated USING (true);
+CREATE POLICY "usuarios_update_own" ON usuarios FOR UPDATE TO authenticated USING (id = auth.uid());
+
+-- contatos
+CREATE POLICY "contatos_select" ON contatos FOR SELECT TO authenticated USING (true);
+CREATE POLICY "contatos_insert" ON contatos FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "contatos_update" ON contatos FOR UPDATE TO authenticated USING (true);
+
+-- conversas
+CREATE POLICY "conversas_select_admin"  ON conversas FOR SELECT TO authenticated
+  USING (get_user_role() = 'ADMIN');
+CREATE POLICY "conversas_select_agente" ON conversas FOR SELECT TO authenticated
+  USING (get_user_role() = 'AGENTE' AND departamento = get_user_departamento());
+CREATE POLICY "conversas_insert"        ON conversas FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "conversas_update_admin"  ON conversas FOR UPDATE TO authenticated
+  USING (get_user_role() = 'ADMIN');
+CREATE POLICY "conversas_update_agente" ON conversas FOR UPDATE TO authenticated
+  USING (get_user_role() = 'AGENTE' AND departamento = get_user_departamento());
+
+-- mensagens
+CREATE POLICY "mensagens_select" ON mensagens FOR SELECT TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM conversas c WHERE c.id = conversa_id
+    AND (get_user_role() = 'ADMIN' OR c.departamento = get_user_departamento())
+  ));
+CREATE POLICY "mensagens_insert" ON mensagens FOR INSERT TO authenticated WITH CHECK (true);
+
+-- transferencias
+CREATE POLICY "transferencias_select" ON transferencias FOR SELECT TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM conversas c WHERE c.id = conversa_id
+    AND (get_user_role() = 'ADMIN' OR c.departamento = get_user_departamento())
+  ));
+CREATE POLICY "transferencias_insert" ON transferencias FOR INSERT TO authenticated WITH CHECK (true);
+
+-- anotacoes_internas
+CREATE POLICY "anotacoes_select" ON anotacoes_internas FOR SELECT TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM conversas c WHERE c.id = conversa_id
+    AND (get_user_role() = 'ADMIN' OR c.departamento = get_user_departamento())
+  ));
+CREATE POLICY "anotacoes_insert" ON anotacoes_internas FOR INSERT TO authenticated WITH CHECK (true);
+
+-- tags
+CREATE POLICY "tags_select" ON tags FOR SELECT TO authenticated USING (true);
+CREATE POLICY "tags_insert" ON tags FOR INSERT TO authenticated WITH CHECK (get_user_role() = 'ADMIN');
+
+-- conversa_tags
+CREATE POLICY "conversa_tags_select" ON conversa_tags FOR SELECT TO authenticated USING (true);
+CREATE POLICY "conversa_tags_insert" ON conversa_tags FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "conversa_tags_delete" ON conversa_tags FOR DELETE TO authenticated USING (true);
+
+-- ============================================================
+-- Storage bucket para midias
+-- Executar no SQL Editor do Supabase apos rodar esta migration:
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('crm-midia', 'crm-midia', true);
+-- ============================================================

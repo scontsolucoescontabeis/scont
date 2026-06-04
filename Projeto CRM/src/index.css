@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --scont-primary: #7a1e1e;
+  --scont-primary-dark: #5c1515;
+  --scont-primary-light: #9b2c2c;
+  --scont-primary-muted: #f0e8e8;
+  --scont-bg: #f2f2f0;
+  --scont-surface: #ffffff;
+  --scont-surface-2: #f7f6f4;
+  --scont-border: #e0dcd8;
+  --scont-text: #1a1a1a;
+  --scont-text-muted: #888480;
+  --scont-ok: #2d7a4f;
+  --scont-warn: #b87a00;
+  --scont-danger: #b83232;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  background-color: var(--scont-bg);
+  color: var(--scont-text);
+  margin: 0;
+  padding: 0;
+}
+
+.font-serif {
+  font-family: 'Merriweather', Georgia, serif;
+}
+
+.font-mono {
+  font-family: 'DM Mono', monospace;
+}
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--scont-surface-2);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scont-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scont-text-muted);
+}
