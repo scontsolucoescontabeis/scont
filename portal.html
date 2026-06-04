@@ -544,7 +544,7 @@
                 if (isAdmin) {
                     const { data, error } = await sb
                         .from('ferramentas')
-                        .select('id, nome, descricao, icone, url_base, ativa, ordem, nova_aba')
+                        .select('id, nome, descricao, icone, url_base, ativa, ordem')
                         .eq('ativa', true)
                         .order('ordem');
                     if (error) throw error;
@@ -552,7 +552,7 @@
                 } else {
                     const { data, error } = await sb
                         .from('usuario_ferramentas')
-                        .select('ferramentas ( id, nome, descricao, icone, url_base, ativa, ordem, nova_aba )');
+                        .select('ferramentas ( id, nome, descricao, icone, url_base, ativa, ordem )');
                     if (error) throw error;
                     ferramentas = (data || [])
                         .map(row => row.ferramentas)
@@ -590,7 +590,7 @@
             const btn = document.createElement('button');
             btn.className = 'btn-acessar';
             btn.textContent = 'Acessar →';
-            const acessar = () => abrirFerramenta(f.url_base, f.nova_aba);
+            const acessar = () => abrirFerramenta(f.url_base);
             card.addEventListener('click', acessar);
             btn.addEventListener('click', (e) => { e.stopPropagation(); acessar(); });
             card.appendChild(icon);
@@ -636,12 +636,17 @@
         }
 
         // ─── ABRIR FERRAMENTA ──────────────────────────────────────
-        function abrirFerramenta(url, novaAba) {
+        // Abre em nova aba se: URL absoluta (http/https diferente da origem atual)
+        function abrirFerramenta(url) {
             if (!url) { alert('URL não configurada para esta ferramenta.'); return; }
             try {
                 const href = new URL(url, window.location.href).href;
-                if (novaAba) { window.open(href, '_blank', 'noopener'); }
-                else { window.location.href = href; }
+                const mesmaOrigem = new URL(href).origin === window.location.origin;
+                if (!mesmaOrigem) {
+                    window.open(href, '_blank', 'noopener');
+                } else {
+                    window.location.href = href;
+                }
             } catch {
                 alert('URL inválida para esta ferramenta.');
             }
