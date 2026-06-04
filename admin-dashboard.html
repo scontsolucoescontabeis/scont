@@ -556,6 +556,10 @@
             <input type="checkbox" id="fAtiva" checked style="width:16px;height:16px;">
             <label for="fAtiva" style="font-weight:500;text-transform:none;">Ferramenta ativa</label>
         </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="fNovaAba" style="width:16px;height:16px;">
+            <label for="fNovaAba" style="font-weight:500;text-transform:none;">Abrir em nova aba</label>
+        </div>
         <div class="modal-actions">
             <button type="button" class="btn-modal btn-modal-secondary" data-close="modalFerramenta">Cancelar</button>
             <button type="submit" class="btn-modal btn-modal-primary">Salvar</button>
@@ -629,7 +633,7 @@ async function loadFerramentas() {
     const tbody = document.getElementById('tblFerramentas');
     const { data, error } = await sb
         .from('ferramentas')
-        .select('id, nome, descricao, icone, url_base, ativa, ordem, sub_permissoes')
+        .select('id, nome, descricao, icone, url_base, ativa, ordem, sub_permissoes, nova_aba')
         .order('ordem', { ascending: true });
     if (error) {
         console.error('loadFerramentas:', error);
@@ -758,7 +762,10 @@ function renderFerramentas() {
             <td style="font-size:22px">${sanitize(f.icone || '🔧')}</td>
             <td><strong>${sanitize(f.nome)}</strong></td>
             <td>${sanitize(f.descricao || '—')}</td>
-            <td style="font-size:12px;word-break:break-all">${sanitize(f.url_base || '—')}</td>
+            <td style="font-size:12px;word-break:break-all">
+                ${sanitize(f.url_base || '—')}
+                ${f.nova_aba ? '<span style="font-size:10px;background:#EFF6FF;color:#1D4ED8;padding:1px 5px;border-radius:3px;margin-left:4px">nova aba</span>' : ''}
+            </td>
             <td>${sanitize(f.ordem)}</td>
             <td><span class="badge ${f.ativa ? 'badge-active' : 'badge-inactive'}">${f.ativa ? 'Ativa' : 'Inativa'}</span></td>
             <td class="acts"></td>`;
@@ -1207,7 +1214,8 @@ function abrirModalFerramenta(f = null) {
     document.getElementById('fIcone').value    = f?.icone    || '';
     document.getElementById('fUrl').value      = f?.url_base || '';
     document.getElementById('fOrdem').value    = f?.ordem    ?? '';
-    document.getElementById('fAtiva').checked  = f ? f.ativa : true;
+    document.getElementById('fAtiva').checked   = f ? f.ativa    : true;
+    document.getElementById('fNovaAba').checked = f ? !!f.nova_aba : false;
     openModal('modalFerramenta');
 }
 
@@ -1221,7 +1229,8 @@ document.getElementById('formFerramenta').addEventListener('submit', async (e) =
         icone:     document.getElementById('fIcone').value.trim()     || null,
         url_base:  document.getElementById('fUrl').value.trim()       || null,
         ordem:     parseInt(document.getElementById('fOrdem').value)  || 0,
-        ativa:     document.getElementById('fAtiva').checked
+        ativa:     document.getElementById('fAtiva').checked,
+        nova_aba:  document.getElementById('fNovaAba').checked
     };
     if (!payload.nome) { alert('Informe o nome.'); return; }
 

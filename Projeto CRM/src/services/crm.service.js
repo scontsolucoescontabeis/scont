@@ -37,24 +37,43 @@ export async function buscarTodosUsuariosPortal() {
 }
 
 export async function configurarAcessoCRM(usuarioId, departamentos, role) {
-  // departamentos: string[] ex: ['PESSOAL','CONTABIL'] ou [] para revogar
-  const { error } = await supabase
+  // Tenta gravar com coluna array (migration 005). Se não existir, usa coluna singular.
+  const payload = {
+    departamento: departamentos[0] ?? null,
+    role: departamentos.length ? role : null,
+  }
+  const { error: err1 } = await supabase
     .from('usuarios')
-    .update({
-      departamentos: departamentos.length ? departamentos : null,
-      departamento:  departamentos[0] ?? null,   // mantém coluna legada em sync
-      role:          departamentos.length ? role : null,
-    })
+    .update({ ...payload, departamentos: departamentos.length ? departamentos : null })
     .eq('id', usuarioId)
-  if (error) throw error
+
+  if (err1?.message?.includes('departamentos')) {
+    // Coluna array ainda não existe (migration 005 pendente) — usa só o singular
+    const { error: err2 } = await supabase
+      .from('usuarios')
+      .update(payload)
+      .eq('id', usuarioId)
+    if (err2) throw err2
+    return
+  }
+  if (err1) throw err1
 }
 
 export async function revogarAcessoCRM(usuarioId) {
-  const { error } = await supabase
+  const { error: err1 } = await supabase
     .from('usuarios')
     .update({ departamentos: null, departamento: null, role: null })
     .eq('id', usuarioId)
-  if (error) throw error
+
+  if (err1?.message?.includes('departamentos')) {
+    const { error: err2 } = await supabase
+      .from('usuarios')
+      .update({ departamento: null, role: null })
+      .eq('id', usuarioId)
+    if (err2) throw err2
+    return
+  }
+  if (err1) throw err1
 }
 
 export async function buscarMetricas() {

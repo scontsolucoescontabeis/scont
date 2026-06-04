@@ -544,7 +544,7 @@
                 if (isAdmin) {
                     const { data, error } = await sb
                         .from('ferramentas')
-                        .select('id, nome, descricao, icone, url_base, ativa, ordem')
+                        .select('id, nome, descricao, icone, url_base, ativa, ordem, nova_aba')
                         .eq('ativa', true)
                         .order('ordem');
                     if (error) throw error;
@@ -552,7 +552,7 @@
                 } else {
                     const { data, error } = await sb
                         .from('usuario_ferramentas')
-                        .select('ferramentas ( id, nome, descricao, icone, url_base, ativa, ordem )');
+                        .select('ferramentas ( id, nome, descricao, icone, url_base, ativa, ordem, nova_aba )');
                     if (error) throw error;
                     ferramentas = (data || [])
                         .map(row => row.ferramentas)
