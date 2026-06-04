@@ -104,6 +104,14 @@
     </div>
     <small style="display: block; margin-top: 5px;">Primeiras 2h = 50%, A partir da 3ª = 100%</small>
 </div>
+                   <div class="setting-card">
+    <h4>Turnos</h4>
+    <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+        <input type="checkbox" id="terceiroTurno" onchange="alternarTerceiroTurno(this.checked)" style="width: 18px; height: 18px; cursor: pointer;">
+        <label for="terceiroTurno" style="font-size: 13px; cursor: pointer; margin: 0;">Empresa com 3 turnos (Entrada 3 / Saída 3)</label>
+    </div>
+    <small style="display: block; margin-top: 5px;">Ativa colunas e cálculos do terceiro período de trabalho</small>
+</div>
                     <div class="setting-card">
                         <h4>Feriados</h4>
                         <button type="button" class="btn btn-secondary btn-small" id="openFeriadosBtn" style="margin-top: 5px; width: 100%;">📅 Gerenciar Feriados</button>

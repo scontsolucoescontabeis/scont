@@ -18,6 +18,7 @@ const state = {
     feriados: [],
     jornada: '08:00',
     ruleExtra100Optional: false,
+    terceiroTurno: false,
     resultados: []
 };
 
@@ -35,6 +36,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await carregarEmpresas();
     carregarFeriadosPadrao();
     inicializarEventos();
+    state.terceiroTurno = localStorage.getItem('rh_terceiro_turno') === 'true';
+    document.getElementById('terceiroTurno').checked = state.terceiroTurno;
 });
 
 // --- CARREGAMENTO DE DADOS (SUPABASE) ---
@@ -76,6 +79,12 @@ async function carregarEmpregados(codigoEmpresa) {
 }
 
 // --- EVENTOS PRINCIPAIS ---
+function alternarTerceiroTurno(checked) {
+    state.terceiroTurno = checked;
+    localStorage.setItem('rh_terceiro_turno', checked);
+    renderizarConteudoAba();
+}
+
 function inicializarEventos() {
     document.getElementById('selectionForm').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -620,6 +629,7 @@ function renderizarConteudoAba() {
                         <th>Saída 1</th>
                         <th>Entrada 2</th>
                         <th>Saída 2</th>
+                        ${state.terceiroTurno ? '<th>Entrada 3</th><th>Saída 3</th>' : ''}
                         <th>DSR</th>
                         <th>Folga/Falta</th>
                         <th>Ação</th>
@@ -634,7 +644,7 @@ function renderizarConteudoAba() {
         const rowClass = (isFeriado || isDSR) ? 'holiday-row' : '';
         const infoExtra = isFeriado ? `<span style="color: var(--danger-color); font-size: 11px; display: block;">Feriado</span>` : '';
         
-        const temEntrada = dia.entrada1 || dia.entrada2;
+        const temEntrada = dia.entrada1 || dia.entrada2 || (state.terceiroTurno && dia.entrada3);
         const flagFolga = folha.flagsFolga[dia.data] || '';
         
         html += `
@@ -651,6 +661,9 @@ function renderizarConteudoAba() {
                 <td><input type="text" class="time-input" value="${dia.saida1}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'saida1', this.value)" placeholder="00:00" maxlength="5"></td>
                 <td><input type="text" class="time-input" value="${dia.entrada2}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'entrada2', this.value)" placeholder="00:00" maxlength="5"></td>
                 <td><input type="text" class="time-input" value="${dia.saida2}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'saida2', this.value)" placeholder="00:00" maxlength="5"></td>
+                ${state.terceiroTurno ? `
+                <td><input type="text" class="time-input" value="${dia.entrada3}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'entrada3', this.value)" placeholder="00:00" maxlength="5"></td>
+                <td><input type="text" class="time-input" value="${dia.saida3}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'saida3', this.value)" placeholder="00:00" maxlength="5"></td>` : ''}
                 <td style="text-align: center;">
                     <input type="checkbox" ${isDSR ? 'checked' : ''} onchange="atualizarDSRDia(${state.abaAtivaIndex}, '${dia.data}', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
                 </td>
@@ -756,6 +769,8 @@ window.limparLinha = function(folhaIndex, diaIndex) {
     state.folhas[folhaIndex].dados[diaIndex].saida1 = '';
     state.folhas[folhaIndex].dados[diaIndex].entrada2 = '';
     state.folhas[folhaIndex].dados[diaIndex].saida2 = '';
+    state.folhas[folhaIndex].dados[diaIndex].entrada3 = '';
+    state.folhas[folhaIndex].dados[diaIndex].saida3 = '';
     renderizarConteudoAba();
 };
 
@@ -1046,8 +1061,15 @@ function calcularFolha(folha) {
         const isDSRCustomizado = folha.dsrDias.includes(dia.data);
         const isDiaDescanso = isFeriado || isDSRCustomizado;
         
-        const minTrabalhados = calcularHorasTrabalhadas(dia.entrada1, dia.saida1) + calcularHorasTrabalhadas(dia.entrada2, dia.saida2);
-        const minNoturnos = calcularHorasNoturnas(dia.entrada1, dia.saida1, dia.entrada2, dia.saida2);
+        const minTrabalhados = calcularHorasTrabalhadas(dia.entrada1, dia.saida1)
+            + calcularHorasTrabalhadas(dia.entrada2, dia.saida2)
+            + (state.terceiroTurno ? calcularHorasTrabalhadas(dia.entrada3, dia.saida3) : 0);
+        const minNoturnos = calcularHorasNoturnas(
+            dia.entrada1, dia.saida1,
+            dia.entrada2, dia.saida2,
+            state.terceiroTurno ? dia.entrada3 : null,
+            state.terceiroTurno ? dia.saida3 : null
+        );
         const minNoturnosConvertidos = Math.round(minNoturnos / 0.875);
         
         let extra50 = 0, extra100 = 0, faltante = 0;
@@ -1139,6 +1161,8 @@ function calcularFolha(folha) {
             saida1: dia.saida1,
             entrada2: dia.entrada2,
             saida2: dia.saida2,
+            entrada3: dia.entrada3 || '',
+            saida3: dia.saida3 || '',
             trabalhado: converterMinutosParaHora(minTrabalhados),
             extra50: converterMinutosParaHora(extra50),
             extra100: converterMinutosParaHora(extra100),
@@ -1214,7 +1238,7 @@ function calcularHorasTrabalhadas(entrada, saida) {
     return minSaida - minEntrada;
 }
 
-function calcularHorasNoturnas(e1, s1, e2, s2) {
+function calcularHorasNoturnas(e1, s1, e2, s2, e3, s3) {
     const inicioNoturno = 22 * 60, fimNoturno = 5 * 60;
     let minNoturnos = 0;
     const calcularNoturnoIntervalo = (entrada, saida) => {
@@ -1233,6 +1257,7 @@ function calcularHorasNoturnas(e1, s1, e2, s2) {
     };
     minNoturnos += calcularNoturnoIntervalo(e1, s1);
     minNoturnos += calcularNoturnoIntervalo(e2, s2);
+    minNoturnos += calcularNoturnoIntervalo(e3, s3);
     return minNoturnos;
 }
 
@@ -1332,7 +1357,7 @@ function renderizarTabelasDiarias() {
             let rowStyle = index % 2 === 0 ? 'background-color: #ffffff;' : 'background-color: #f9fafb;';
             if (isDescanso) rowStyle = 'background-color: #fef2f2; color: #991b1b;';
             
-            const marcacoes = [dia.entrada1, dia.saida1, dia.entrada2, dia.saida2].filter(v => v).join(' - ') || '-';
+            const marcacoes = [dia.entrada1, dia.saida1, dia.entrada2, dia.saida2, dia.entrada3, dia.saida3].filter(v => v).join(' - ') || '-';
             
             // ✅ CORRIGIDO: Incluir DSR nos flags
             let flags = '';
@@ -1691,8 +1716,15 @@ async function _construirConteudoTXTExportacao() {
             const isFeriado    = feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
             const isDSR        = dsrDias.includes(dia.data);
             const isDiaDescanso = isFeriado || isDSR;
-            const minTrab = calcularHorasTrabalhadas(dia.entrada1, dia.saida1) + calcularHorasTrabalhadas(dia.entrada2, dia.saida2);
-            const minNot  = calcularHorasNoturnas(dia.entrada1, dia.saida1, dia.entrada2, dia.saida2);
+            const minTrab = calcularHorasTrabalhadas(dia.entrada1, dia.saida1)
+                + calcularHorasTrabalhadas(dia.entrada2, dia.saida2)
+                + (state.terceiroTurno ? calcularHorasTrabalhadas(dia.entrada3, dia.saida3) : 0);
+            const minNot  = calcularHorasNoturnas(
+                dia.entrada1, dia.saida1,
+                dia.entrada2, dia.saida2,
+                state.terceiroTurno ? dia.entrada3 : null,
+                state.terceiroTurno ? dia.saida3 : null
+            );
             const minNotConv = Math.round(minNot / 0.875);
             let ex50 = 0, ex100 = 0, dev = 0;
             const flag = flagsFolga[dia.data];
@@ -1929,7 +1961,9 @@ function gerarDiasDoMes(competencia) {
             entrada1: '',
             saida1: '',
             entrada2: '',
-            saida2: ''
+            saida2: '',
+            entrada3: '',
+            saida3: ''
         });
     }
     return dias;
@@ -1971,8 +2005,12 @@ async function gerarModeloExcel() {
 
         empregados.forEach(emp => {
             const nomeSheet = `${emp.codigo_empregado} ${emp.nome_empregado}`.substring(0, 31);
-            const header = ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2'];
-            const rows   = [header, ...diasDoMes.map(d => [d.data, d.diaSemana, '', '', '', ''])];
+            const header = state.terceiroTurno
+                ? ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Entrada 3', 'Saída 3']
+                : ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2'];
+            const rows   = [header, ...diasDoMes.map(d => state.terceiroTurno
+                ? [d.data, d.diaSemana, '', '', '', '', '', '']
+                : [d.data, d.diaSemana, '', '', '', ''])];
             const ws     = XLSX.utils.aoa_to_sheet(rows);
 
             // Forçar coluna Data como texto para evitar auto-conversão do Excel
@@ -1981,11 +2019,9 @@ async function gerarModeloExcel() {
                 ws[addr] = { t: 's', v: rows[r][0] };
             }
 
-            ws['!cols'] = [
-                { wch: 13 }, { wch: 14 },
-                { wch: 12 }, { wch: 12 },
-                { wch: 12 }, { wch: 12 }
-            ];
+            ws['!cols'] = state.terceiroTurno
+                ? [{ wch: 13 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }]
+                : [{ wch: 13 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
 
             XLSX.utils.book_append_sheet(wb, ws, nomeSheet);
         });
@@ -2064,6 +2100,10 @@ async function importarExcel(file) {
                 state.folhas[folhaIdx].dados[diaIdx].saida1   = normalizeHora(row[3]);
                 state.folhas[folhaIdx].dados[diaIdx].entrada2 = normalizeHora(row[4]);
                 state.folhas[folhaIdx].dados[diaIdx].saida2   = normalizeHora(row[5]);
+                if (state.terceiroTurno) {
+                    state.folhas[folhaIdx].dados[diaIdx].entrada3 = normalizeHora(row[6]);
+                    state.folhas[folhaIdx].dados[diaIdx].saida3   = normalizeHora(row[7]);
+                }
             }
             importados++;
         });
