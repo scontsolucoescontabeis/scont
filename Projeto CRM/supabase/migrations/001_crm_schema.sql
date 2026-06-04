@@ -1,18 +1,25 @@
 -- ============================================================
--- SCONT Messenger CRM — Migration 001
+-- SCONT Messenger CRM — Migration 001 (idempotente)
 -- ============================================================
 
--- ENUMs
-CREATE TYPE departamento_enum AS ENUM ('PESSOAL', 'CONTABIL', 'ADMINISTRATIVO', 'TRIBUTARIO');
-CREATE TYPE role_enum          AS ENUM ('ADMIN', 'AGENTE');
-CREATE TYPE status_conversa    AS ENUM ('ABERTA', 'EM_ATENDIMENTO', 'ENCERRADA', 'AGUARDANDO');
-CREATE TYPE origem_mensagem    AS ENUM ('CLIENTE', 'AGENTE', 'SISTEMA', 'BOT');
+-- ENUMs (ignorados se já existirem)
+DO $$ BEGIN CREATE TYPE departamento_enum AS ENUM ('PESSOAL', 'CONTABIL', 'ADMINISTRATIVO', 'TRIBUTARIO');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TYPE role_enum AS ENUM ('ADMIN', 'AGENTE');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TYPE status_conversa AS ENUM ('ABERTA', 'EM_ATENDIMENTO', 'ENCERRADA', 'AGUARDANDO');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TYPE origem_mensagem AS ENUM ('CLIENTE', 'AGENTE', 'SISTEMA', 'BOT');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ============================================================
 -- Tabelas
 -- ============================================================
 
-CREATE TABLE usuarios (
+CREATE TABLE IF NOT EXISTS usuarios (
   id           UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   nome         TEXT NOT NULL,
   email        TEXT NOT NULL UNIQUE,
@@ -22,7 +29,7 @@ CREATE TABLE usuarios (
   criado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE contatos (
+CREATE TABLE IF NOT EXISTS contatos (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   telefone      TEXT NOT NULL UNIQUE,
   nome          TEXT,
@@ -31,7 +38,7 @@ CREATE TABLE contatos (
   atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE conversas (
+CREATE TABLE IF NOT EXISTS conversas (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   contato_id    UUID NOT NULL REFERENCES contatos(id),
   departamento  departamento_enum NOT NULL DEFAULT 'ADMINISTRATIVO',
@@ -43,7 +50,7 @@ CREATE TABLE conversas (
   atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE mensagens (
+CREATE TABLE IF NOT EXISTS mensagens (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversa_id     UUID NOT NULL REFERENCES conversas(id) ON DELETE CASCADE,
   origem          origem_mensagem NOT NULL,
@@ -56,7 +63,7 @@ CREATE TABLE mensagens (
   criado_em       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE transferencias (
+CREATE TABLE IF NOT EXISTS transferencias (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversa_id       UUID NOT NULL REFERENCES conversas(id),
   de_departamento   departamento_enum,
@@ -67,7 +74,7 @@ CREATE TABLE transferencias (
   criado_em         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE anotacoes_internas (
+CREATE TABLE IF NOT EXISTS anotacoes_internas (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   conversa_id UUID NOT NULL REFERENCES conversas(id) ON DELETE CASCADE,
   agente_id   UUID NOT NULL REFERENCES usuarios(id),
@@ -75,13 +82,13 @@ CREATE TABLE anotacoes_internas (
   criado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE tags (
+CREATE TABLE IF NOT EXISTS tags (
   id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   nome TEXT NOT NULL UNIQUE,
   cor  TEXT NOT NULL DEFAULT '#888480'
 );
 
-CREATE TABLE conversa_tags (
+CREATE TABLE IF NOT EXISTS conversa_tags (
   conversa_id UUID NOT NULL REFERENCES conversas(id) ON DELETE CASCADE,
   tag_id      UUID NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
   PRIMARY KEY (conversa_id, tag_id)
@@ -102,6 +109,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_protocolo ON conversas;
 CREATE TRIGGER trigger_protocolo
   BEFORE INSERT ON conversas
   FOR EACH ROW
@@ -115,6 +123,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trigger_atualiza_conversa ON mensagens;
 CREATE TRIGGER trigger_atualiza_conversa
   AFTER INSERT ON mensagens
   FOR EACH ROW
@@ -124,20 +133,28 @@ CREATE TRIGGER trigger_atualiza_conversa
 -- Indices
 -- ============================================================
 
-CREATE INDEX idx_mensagens_conversa     ON mensagens(conversa_id);
-CREATE INDEX idx_conversas_departamento ON conversas(departamento);
-CREATE INDEX idx_conversas_status       ON conversas(status);
-CREATE INDEX idx_conversas_agente       ON conversas(agente_id);
-CREATE INDEX idx_conversas_atualizado   ON conversas(atualizado_em DESC);
-CREATE INDEX idx_contatos_telefone      ON contatos(telefone);
+CREATE INDEX IF NOT EXISTS idx_mensagens_conversa     ON mensagens(conversa_id);
+CREATE INDEX IF NOT EXISTS idx_conversas_departamento ON conversas(departamento);
+CREATE INDEX IF NOT EXISTS idx_conversas_status       ON conversas(status);
+CREATE INDEX IF NOT EXISTS idx_conversas_agente       ON conversas(agente_id);
+CREATE INDEX IF NOT EXISTS idx_conversas_atualizado   ON conversas(atualizado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_contatos_telefone      ON contatos(telefone);
 
 -- ============================================================
 -- Supabase Realtime
 -- ============================================================
 
-ALTER PUBLICATION supabase_realtime ADD TABLE mensagens;
-ALTER PUBLICATION supabase_realtime ADD TABLE conversas;
-ALTER PUBLICATION supabase_realtime ADD TABLE anotacoes_internas;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE mensagens;
+EXCEPTION WHEN others THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE conversas;
+EXCEPTION WHEN others THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE anotacoes_internas;
+EXCEPTION WHEN others THEN NULL; END $$;
 
 -- ============================================================
 -- Row Level Security
@@ -162,16 +179,30 @@ RETURNS departamento_enum AS $$
   SELECT departamento FROM usuarios WHERE id = auth.uid()
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
+-- ============================================================
+-- Policies (drop + recreate para ser idempotente)
+-- ============================================================
+
 -- usuarios
+DROP POLICY IF EXISTS "usuarios_select"     ON usuarios;
+DROP POLICY IF EXISTS "usuarios_update_own" ON usuarios;
 CREATE POLICY "usuarios_select"     ON usuarios FOR SELECT TO authenticated USING (true);
 CREATE POLICY "usuarios_update_own" ON usuarios FOR UPDATE TO authenticated USING (id = auth.uid());
 
 -- contatos
+DROP POLICY IF EXISTS "contatos_select" ON contatos;
+DROP POLICY IF EXISTS "contatos_insert" ON contatos;
+DROP POLICY IF EXISTS "contatos_update" ON contatos;
 CREATE POLICY "contatos_select" ON contatos FOR SELECT TO authenticated USING (true);
 CREATE POLICY "contatos_insert" ON contatos FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "contatos_update" ON contatos FOR UPDATE TO authenticated USING (true);
 
 -- conversas
+DROP POLICY IF EXISTS "conversas_select_admin"  ON conversas;
+DROP POLICY IF EXISTS "conversas_select_agente" ON conversas;
+DROP POLICY IF EXISTS "conversas_insert"        ON conversas;
+DROP POLICY IF EXISTS "conversas_update_admin"  ON conversas;
+DROP POLICY IF EXISTS "conversas_update_agente" ON conversas;
 CREATE POLICY "conversas_select_admin"  ON conversas FOR SELECT TO authenticated
   USING (get_user_role() = 'ADMIN');
 CREATE POLICY "conversas_select_agente" ON conversas FOR SELECT TO authenticated
@@ -183,6 +214,8 @@ CREATE POLICY "conversas_update_agente" ON conversas FOR UPDATE TO authenticated
   USING (get_user_role() = 'AGENTE' AND departamento = get_user_departamento());
 
 -- mensagens
+DROP POLICY IF EXISTS "mensagens_select" ON mensagens;
+DROP POLICY IF EXISTS "mensagens_insert" ON mensagens;
 CREATE POLICY "mensagens_select" ON mensagens FOR SELECT TO authenticated
   USING (EXISTS (
     SELECT 1 FROM conversas c WHERE c.id = conversa_id
@@ -191,6 +224,8 @@ CREATE POLICY "mensagens_select" ON mensagens FOR SELECT TO authenticated
 CREATE POLICY "mensagens_insert" ON mensagens FOR INSERT TO authenticated WITH CHECK (true);
 
 -- transferencias
+DROP POLICY IF EXISTS "transferencias_select" ON transferencias;
+DROP POLICY IF EXISTS "transferencias_insert" ON transferencias;
 CREATE POLICY "transferencias_select" ON transferencias FOR SELECT TO authenticated
   USING (EXISTS (
     SELECT 1 FROM conversas c WHERE c.id = conversa_id
@@ -199,6 +234,8 @@ CREATE POLICY "transferencias_select" ON transferencias FOR SELECT TO authentica
 CREATE POLICY "transferencias_insert" ON transferencias FOR INSERT TO authenticated WITH CHECK (true);
 
 -- anotacoes_internas
+DROP POLICY IF EXISTS "anotacoes_select" ON anotacoes_internas;
+DROP POLICY IF EXISTS "anotacoes_insert" ON anotacoes_internas;
 CREATE POLICY "anotacoes_select" ON anotacoes_internas FOR SELECT TO authenticated
   USING (EXISTS (
     SELECT 1 FROM conversas c WHERE c.id = conversa_id
@@ -207,16 +244,23 @@ CREATE POLICY "anotacoes_select" ON anotacoes_internas FOR SELECT TO authenticat
 CREATE POLICY "anotacoes_insert" ON anotacoes_internas FOR INSERT TO authenticated WITH CHECK (true);
 
 -- tags
+DROP POLICY IF EXISTS "tags_select" ON tags;
+DROP POLICY IF EXISTS "tags_insert" ON tags;
 CREATE POLICY "tags_select" ON tags FOR SELECT TO authenticated USING (true);
 CREATE POLICY "tags_insert" ON tags FOR INSERT TO authenticated WITH CHECK (get_user_role() = 'ADMIN');
 
 -- conversa_tags
+DROP POLICY IF EXISTS "conversa_tags_select" ON conversa_tags;
+DROP POLICY IF EXISTS "conversa_tags_insert" ON conversa_tags;
+DROP POLICY IF EXISTS "conversa_tags_delete" ON conversa_tags;
 CREATE POLICY "conversa_tags_select" ON conversa_tags FOR SELECT TO authenticated USING (true);
 CREATE POLICY "conversa_tags_insert" ON conversa_tags FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "conversa_tags_delete" ON conversa_tags FOR DELETE TO authenticated USING (true);
 
 -- ============================================================
 -- Storage bucket para midias
--- Executar no SQL Editor do Supabase apos rodar esta migration:
--- INSERT INTO storage.buckets (id, name, public) VALUES ('crm-midia', 'crm-midia', true);
+-- Executar separadamente no SQL Editor se ainda nao existir:
+-- INSERT INTO storage.buckets (id, name, public)
+-- VALUES ('crm-midia', 'crm-midia', true)
+-- ON CONFLICT (id) DO NOTHING;
 -- ============================================================
