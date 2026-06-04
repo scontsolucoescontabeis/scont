@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, UserCheck, UserX } from 'lucide-react'
+import { Plus, UserCheck, UserX, Search } from 'lucide-react'
 import { buscarTodosAgentes } from '@/services/crm.service'
 import { supabase } from '@/lib/supabaseClient'
 
@@ -13,9 +13,11 @@ export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
   const [loading, setLoading] = useState(true)
   const [mostrarForm, setMostrarForm] = useState(false)
-  const [form, setForm] = useState({ nome: '', email: '', senha: '', departamento: 'PESSOAL', role: 'AGENTE' })
+  // Formulário: vincula usuário Auth existente ao CRM (sem criar novo Auth)
+  const [form, setForm] = useState({ email: '', nome: '', departamento: 'PESSOAL', role: 'AGENTE' })
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
+  const [sucesso, setSucesso] = useState('')
 
   const carregar = () => {
     setLoading(true)
@@ -27,29 +29,44 @@ export default function UsuariosPage() {
   const handleSalvar = async (e) => {
     e.preventDefault()
     setErro('')
+    setSucesso('')
     setSalvando(true)
+
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.senha,
-        options: { data: { nome: form.nome } },
-      })
-      if (authError) throw authError
+      // Busca o UUID do usuário pelo e-mail na tabela auth.users via RPC pública
+      // Como não temos acesso direto a auth.users pelo anon key, usamos uma abordagem
+      // de tentativa de insert com ON CONFLICT — o admin precisa informar o UUID
+      // OU o usuário faz login uma vez e o sistema detecta automaticamente
 
-      const { error: profileError } = await supabase.from('usuarios').insert({
-        id: authData.user.id,
-        nome: form.nome,
-        email: form.email,
-        departamento: form.departamento,
-        role: form.role,
-      })
-      if (profileError) throw profileError
+      // Estratégia: INSERT via upsert — se o email já existe em usuarios, atualiza
+      const { error } = await supabase
+        .from('usuarios')
+        .upsert(
+          {
+            // id será null aqui — o admin precisa confirmar via SQL se não fizer login
+            nome: form.nome,
+            email: form.email,
+            departamento: form.departamento,
+            role: form.role,
+          },
+          { onConflict: 'email', ignoreDuplicates: false }
+        )
 
+      if (error) throw error
+
+      setSucesso(`Perfil CRM configurado para ${form.email}. O usuário deve fazer login para ativar o acesso.`)
       setMostrarForm(false)
-      setForm({ nome: '', email: '', senha: '', departamento: 'PESSOAL', role: 'AGENTE' })
+      setForm({ email: '', nome: '', departamento: 'PESSOAL', role: 'AGENTE' })
       carregar()
     } catch (err) {
-      setErro(err.message)
+      // Instrução alternativa quando não consegue resolver o UUID automaticamente
+      setErro(
+        'Não foi possível vincular automaticamente. Use o SQL abaixo no Supabase:\n\n' +
+        `INSERT INTO usuarios (id, nome, email, departamento, role)\n` +
+        `SELECT id, '${form.nome}', '${form.email}', '${form.departamento}', '${form.role}'\n` +
+        `FROM auth.users WHERE email = '${form.email}'\n` +
+        `ON CONFLICT (id) DO UPDATE SET departamento='${form.departamento}', role='${form.role}';`
+      )
     } finally {
       setSalvando(false)
     }
@@ -69,12 +86,12 @@ export default function UsuariosPage() {
 
   return (
     <div style={{ padding: 28, overflowY: 'auto', height: '100%' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <h2 style={{ fontFamily: 'Merriweather, serif', fontSize: 18, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>
           Usuários do CRM
         </h2>
         <button
-          onClick={() => setMostrarForm(v => !v)}
+          onClick={() => { setMostrarForm(v => !v); setErro(''); setSucesso('') }}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '8px 16px', borderRadius: 6, border: 'none',
@@ -83,35 +100,38 @@ export default function UsuariosPage() {
           }}
         >
           <Plus size={14} />
-          Novo Usuário
+          Adicionar ao CRM
         </button>
       </div>
 
-      {/* Formulário de novo usuário */}
+      {/* Explicação */}
+      <p style={{ fontSize: 12, color: '#888480', marginBottom: 20, marginTop: 0 }}>
+        Usuários do portal já cadastrados no Supabase Auth. Defina departamento e perfil de acesso ao CRM.
+      </p>
+
+      {/* Formulário */}
       {mostrarForm && (
         <div style={{
           background: '#fff', border: '1px solid #e0dcd8', borderRadius: 10,
           padding: 20, marginBottom: 24,
         }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', marginBottom: 16, marginTop: 0 }}>
-            Novo Usuário
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', marginBottom: 4, marginTop: 0 }}>
+            Vincular usuário do portal ao CRM
           </h3>
+          <p style={{ fontSize: 11, color: '#888480', marginBottom: 14, marginTop: 0 }}>
+            O e-mail deve pertencer a um usuário já cadastrado no Supabase Auth do portal.
+          </p>
           <form onSubmit={handleSalvar}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
               <div>
-                <label style={labelStyle}>Nome</label>
-                <input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
-                  required style={inputStyle} placeholder="Nome completo" />
-              </div>
-              <div>
-                <label style={labelStyle}>E-mail</label>
+                <label style={labelStyle}>E-mail (cadastrado no portal)</label>
                 <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                   required style={inputStyle} placeholder="email@scont.com.br" />
               </div>
               <div>
-                <label style={labelStyle}>Senha inicial</label>
-                <input type="password" value={form.senha} onChange={e => setForm(f => ({ ...f, senha: e.target.value }))}
-                  required minLength={8} style={inputStyle} placeholder="Mínimo 8 caracteres" />
+                <label style={labelStyle}>Nome de exibição</label>
+                <input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
+                  required style={inputStyle} placeholder="Nome completo" />
               </div>
               <div>
                 <label style={labelStyle}>Departamento</label>
@@ -127,7 +147,27 @@ export default function UsuariosPage() {
                 </select>
               </div>
             </div>
-            {erro && <p style={{ fontSize: 12, color: '#b83232', marginBottom: 8 }}>{erro}</p>}
+
+            {/* Instrução SQL alternativa */}
+            {erro && (
+              <div style={{ marginBottom: 10 }}>
+                <p style={{ fontSize: 12, color: '#b83232', marginBottom: 6 }}>
+                  Use o SQL abaixo no Supabase SQL Editor:
+                </p>
+                <pre style={{
+                  fontSize: 11, background: '#f7f6f4', border: '1px solid #e0dcd8',
+                  borderRadius: 6, padding: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                  color: '#1a1a1a', fontFamily: 'DM Mono, monospace',
+                }}>
+                  {`INSERT INTO usuarios (id, nome, email, departamento, role)\nSELECT id, '${form.nome}', '${form.email}', '${form.departamento}', '${form.role}'\nFROM auth.users WHERE email = '${form.email}'\nON CONFLICT (id) DO UPDATE\n  SET departamento = '${form.departamento}',\n      role = '${form.role}';`}
+                </pre>
+              </div>
+            )}
+
+            {sucesso && (
+              <p style={{ fontSize: 12, color: '#2d7a4f', marginBottom: 8 }}>{sucesso}</p>
+            )}
+
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button type="button" onClick={() => setMostrarForm(false)}
                 style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #e0dcd8', background: '#fff', color: '#888480', fontSize: 13, cursor: 'pointer' }}>
@@ -135,14 +175,14 @@ export default function UsuariosPage() {
               </button>
               <button type="submit" disabled={salvando}
                 style={{ padding: '7px 16px', borderRadius: 6, border: 'none', background: salvando ? '#c5c0ba' : '#7a1e1e', color: '#fff', fontSize: 13, fontWeight: 600, cursor: salvando ? 'not-allowed' : 'pointer' }}>
-                {salvando ? 'Salvando...' : 'Criar Usuário'}
+                {salvando ? 'Salvando...' : 'Vincular ao CRM'}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Tabela de usuários */}
+      {/* Tabela */}
       <div style={{ background: '#fff', border: '1px solid #e0dcd8', borderRadius: 10, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -158,7 +198,14 @@ export default function UsuariosPage() {
             {loading ? (
               <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#888480', fontSize: 13 }}>Carregando...</td></tr>
             ) : usuarios.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#888480', fontSize: 13 }}>Nenhum usuário cadastrado</td></tr>
+              <tr>
+                <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#888480', fontSize: 13 }}>
+                  <div style={{ marginBottom: 8 }}>Nenhum usuário vinculado ao CRM ainda.</div>
+                  <code style={{ fontSize: 11, background: '#f7f6f4', padding: '4px 8px', borderRadius: 4, fontFamily: 'DM Mono, monospace' }}>
+                    INSERT INTO usuarios (id, nome, email, departamento, role) SELECT id, email, email, 'ADMINISTRATIVO', 'ADMIN' FROM auth.users WHERE email = 'herbertscont@gmail.com';
+                  </code>
+                </td>
+              </tr>
             ) : usuarios.map(u => (
               <tr key={u.id} style={{ borderBottom: '1px solid #e0dcd8' }}>
                 <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 500, color: '#1a1a1a' }}>{u.nome}</td>
@@ -182,15 +229,10 @@ export default function UsuariosPage() {
                   </span>
                 </td>
                 <td style={{ padding: '10px 14px' }}>
-                  <button
-                    onClick={() => toggleAtivo(u.id, u.ativo)}
+                  <button onClick={() => toggleAtivo(u.id, u.ativo)}
                     title={u.ativo ? 'Desativar' : 'Ativar'}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
-                  >
-                    {u.ativo
-                      ? <UserX size={14} color="#b83232" />
-                      : <UserCheck size={14} color="#2d7a4f" />
-                    }
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                    {u.ativo ? <UserX size={14} color="#b83232" /> : <UserCheck size={14} color="#2d7a4f" />}
                   </button>
                 </td>
               </tr>
