@@ -2077,6 +2077,7 @@ async function importarExcel(file) {
         };
 
         let importados = 0;
+        let detectouTerceiroTurno = false;
         const avisos = [];
 
         wb.SheetNames.forEach(sheetName => {
@@ -2105,6 +2106,11 @@ async function importarExcel(file) {
 
             const linhas = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
 
+            // Detecta 3º turno pelo cabeçalho: coluna 6 presente e não-vazia
+            const cabecalho = linhas[0] || [];
+            const abaTemTerceiroTurno = !!String(cabecalho[6] || '').trim();
+            if (abaTemTerceiroTurno) detectouTerceiroTurno = true;
+
             for (let r = 1; r < linhas.length; r++) {
                 const row = linhas[r];
                 if (!row || !row[0]) continue;
@@ -2118,13 +2124,21 @@ async function importarExcel(file) {
                 state.folhas[folhaIdx].dados[diaIdx].saida1   = normalizeHora(row[3]);
                 state.folhas[folhaIdx].dados[diaIdx].entrada2 = normalizeHora(row[4]);
                 state.folhas[folhaIdx].dados[diaIdx].saida2   = normalizeHora(row[5]);
-                if (state.terceiroTurno) {
+                if (abaTemTerceiroTurno) {
                     state.folhas[folhaIdx].dados[diaIdx].entrada3 = normalizeHora(row[6]);
                     state.folhas[folhaIdx].dados[diaIdx].saida3   = normalizeHora(row[7]);
                 }
             }
             importados++;
         });
+
+        // Ativa flag de 3º turno automaticamente se o arquivo trouxer esse modelo
+        if (detectouTerceiroTurno && !state.terceiroTurno) {
+            state.terceiroTurno = true;
+            localStorage.setItem('rh_terceiro_turno', 'true');
+            const cb = document.getElementById('terceiroTurno');
+            if (cb) cb.checked = true;
+        }
 
         state.abaAtivaIndex = 0;
         renderizarAbas();
