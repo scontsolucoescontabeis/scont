@@ -1,20 +1,23 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Lê credenciais do supabase-config.js do portal (window globals),
+// com fallback para variáveis Vite em .env.local
+const supabaseUrl = window.SUPABASE_URL ?? import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = window.SUPABASE_KEY ?? import.meta.env.VITE_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY são obrigatórias no .env.local')
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    'Credenciais Supabase não encontradas. ' +
+    'Verifique se supabase-config.js está carregado ou se .env.local tem VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.'
+  )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
   },
   realtime: {
-    params: {
-      eventsPerSecond: 10,
-    },
+    params: { eventsPerSecond: 10 },
   },
 })
