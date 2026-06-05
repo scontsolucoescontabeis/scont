@@ -52,11 +52,14 @@
                 </div>
                 
                 <div class="form-group">
-                    <label for="codigoEmpresa">Código da Empresa *</label>
-                    <select id="codigoEmpresa" required>
+                    <label for="codigoEmpresa">Empresa *</label>
+                    <input type="text" id="buscaEmpresa" placeholder="Buscar pelo nome da empresa..." autocomplete="off"
+                        oninput="filtrarEmpresas(this.value)"
+                        style="margin-bottom: 6px;">
+                    <select id="codigoEmpresa" required size="1">
                         <option value="">Carregando empresas...</option>
                     </select>
-                    <small>Selecione a empresa</small>
+                    <small>Digite para filtrar, depois selecione</small>
                 </div>
 
                 <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">▶️ Continuar</button>
