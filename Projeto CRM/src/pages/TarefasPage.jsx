@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { ClipboardList, Clock, CheckCircle2, XCircle, AlertCircle, User, CalendarDays, Plus } from 'lucide-react'
+import { ClipboardList, Clock, CheckCircle2, XCircle, User, CalendarDays, Plus, Building2, Download } from 'lucide-react'
 import { format, isPast, isToday } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useTarefas, atualizarStatusTarefa, criarTarefa } from '@/hooks/useTarefas'
 import { ModalTarefa } from '@/components/ChatPanel/ModalTarefa'
+import { exportarTarefasExcel } from '@/utils/exportarTarefas'
 
 const DEPTOS = ['PESSOAL', 'CONTABIL', 'ADMINISTRATIVO', 'TRIBUTARIO']
 const DEPTO_COLORS = {
@@ -81,6 +82,14 @@ function CardTarefa({ tarefa, onAtualizar }) {
         </span>
       </div>
 
+      {/* Demandante */}
+      {tarefa.demandante && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+          <Building2 size={10} color="#7a1e1e" />
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#7a1e1e' }}>{tarefa.demandante}</span>
+        </div>
+      )}
+
       {/* Linha 2 — metadados */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginBottom: expandido ? 10 : 0 }}>
         <span style={{ fontSize: 10, color: '#888480', display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -142,8 +151,18 @@ function CardTarefa({ tarefa, onAtualizar }) {
 export default function TarefasPage({ perfil }) {
   const [filtroDepto, setFiltroDepto] = useState('')
   const [abrirModal, setAbrirModal]   = useState(false)
+  const [exportando, setExportando]   = useState(false)
 
   const { tarefas, loading, refresh } = useTarefas({ departamento: filtroDepto || null })
+
+  const handleExportar = async () => {
+    setExportando(true)
+    try {
+      exportarTarefasExcel(tarefas, { departamento: filtroDepto || null })
+    } finally {
+      setExportando(false)
+    }
+  }
 
   const porStatus = (status) => tarefas.filter(t => t.status === status)
 
@@ -170,6 +189,22 @@ export default function TarefasPage({ perfil }) {
               <option value="">Todos os departamentos</option>
               {DEPTOS.map(d => <option key={d} value={d}>{d[0] + d.slice(1).toLowerCase()}</option>)}
             </select>
+            <button
+              onClick={handleExportar}
+              disabled={exportando || tarefas.length === 0}
+              title={tarefas.length === 0 ? 'Sem tarefas para exportar' : `Exportar ${tarefas.length} tarefa${tarefas.length !== 1 ? 's' : ''} para Excel`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 6,
+                border: '1px solid #e0dcd8',
+                background: '#fff', color: exportando || tarefas.length === 0 ? '#c5c0ba' : '#1a1a1a',
+                fontSize: 12, fontWeight: 500,
+                cursor: exportando || tarefas.length === 0 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              <Download size={14} />
+              {exportando ? 'Exportando...' : 'Exportar Excel'}
+            </button>
             <button
               onClick={() => setAbrirModal(true)}
               style={{

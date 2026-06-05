@@ -1,0 +1,127 @@
+<h2>Qual estrutura de layout para o dashboard?</h2>
+<p class="subtitle">Todos os layouts têm seletor de período no topo. Escolha a organização que faz mais sentido para a gestão.</p>
+
+<div class="cards" style="grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+
+  <div class="card" data-choice="A" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #f8f7f5;">
+      <!-- Layout A mockup -->
+      <div style="font-size:10px; color:#888; margin-bottom:8px; font-weight:600; text-transform:uppercase; letter-spacing:.05em;">Layout A — KPIs em destaque</div>
+      <!-- Period selector -->
+      <div style="background:#7a1e1e; border-radius:4px; padding:4px 8px; font-size:9px; color:#fff; display:inline-block; margin-bottom:8px;">Hoje ▾</div>
+      <!-- KPI row -->
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; margin-bottom:8px;">
+        <div style="background:#fff; border-radius:4px; padding:8px; border-left:3px solid #7a1e1e; text-align:center;">
+          <div style="font-size:16px; font-weight:700; color:#7a1e1e;">24</div>
+          <div style="font-size:8px; color:#888;">Encerradas</div>
+        </div>
+        <div style="background:#fff; border-radius:4px; padding:8px; border-left:3px solid #2d7a4f; text-align:center;">
+          <div style="font-size:16px; font-weight:700; color:#2d7a4f;">8</div>
+          <div style="font-size:8px; color:#888;">Em atend.</div>
+        </div>
+        <div style="background:#fff; border-radius:4px; padding:8px; border-left:3px solid #b87a00; text-align:center;">
+          <div style="font-size:16px; font-weight:700; color:#b87a00;">3</div>
+          <div style="font-size:8px; color:#888;">Aguardando</div>
+        </div>
+      </div>
+      <!-- Second row KPIs -->
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; margin-bottom:8px;">
+        <div style="background:#fff; border-radius:4px; padding:8px; text-align:center;">
+          <div style="font-size:13px; font-weight:700; color:#1a1a1a;">18m</div>
+          <div style="font-size:8px; color:#888;">TMA</div>
+        </div>
+        <div style="background:#fff; border-radius:4px; padding:8px; text-align:center;">
+          <div style="font-size:13px; font-weight:700; color:#1a1a1a;">4m</div>
+          <div style="font-size:8px; color:#888;">Espera</div>
+        </div>
+        <div style="background:#fff; border-radius:4px; padding:8px; text-align:center;">
+          <div style="font-size:13px; font-weight:700; color:#1a1a1a;">92%</div>
+          <div style="font-size:8px; color:#888;">Resolução</div>
+        </div>
+      </div>
+      <!-- Chart row -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
+        <div style="background:#fff; border-radius:4px; padding:8px; height:48px; display:flex; align-items:center; justify-content:center;">
+          <div style="font-size:8px; color:#aaa;">📊 Volume/depto</div>
+        </div>
+        <div style="background:#fff; border-radius:4px; padding:8px; height:48px; display:flex; align-items:center; justify-content:center;">
+          <div style="font-size:8px; color:#aaa;">🏆 Ranking agentes</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — KPIs no topo, gráficos abaixo</h3>
+      <p>Números grandes e visíveis primeiro. Rolagem para gráficos detalhados. Ideal para leitura rápida da situação atual.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="B" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #f8f7f5;">
+      <div style="font-size:10px; color:#888; margin-bottom:8px; font-weight:600; text-transform:uppercase; letter-spacing:.05em;">Layout B — Abas por dimensão</div>
+      <div style="background:#7a1e1e; border-radius:4px; padding:4px 8px; font-size:9px; color:#fff; display:inline-block; margin-bottom:8px;">Últimos 7 dias ▾</div>
+      <!-- Tab bar -->
+      <div style="display:flex; gap:4px; margin-bottom:8px;">
+        <div style="background:#7a1e1e; color:#fff; border-radius:3px; padding:3px 8px; font-size:8px; font-weight:600;">Geral</div>
+        <div style="background:#fff; border:1px solid #e0dcd8; border-radius:3px; padding:3px 8px; font-size:8px; color:#888;">Equipe</div>
+        <div style="background:#fff; border:1px solid #e0dcd8; border-radius:3px; padding:3px 8px; font-size:8px; color:#888;">Tempo</div>
+        <div style="background:#fff; border:1px solid #e0dcd8; border-radius:3px; padding:3px 8px; font-size:8px; color:#888;">Qualidade</div>
+      </div>
+      <!-- Active tab content -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:8px;">
+        <div style="background:#fff; border-radius:4px; padding:8px; border-left:3px solid #7a1e1e;">
+          <div style="font-size:14px; font-weight:700; color:#7a1e1e;">142</div>
+          <div style="font-size:8px; color:#888;">Total conversas</div>
+        </div>
+        <div style="background:#fff; border-radius:4px; padding:8px; border-left:3px solid #2d7a4f;">
+          <div style="font-size:14px; font-weight:700; color:#2d7a4f;">+12%</div>
+          <div style="font-size:8px; color:#888;">vs semana ant.</div>
+        </div>
+      </div>
+      <div style="background:#fff; border-radius:4px; padding:8px; height:56px; display:flex; align-items:center; justify-content:center;">
+        <div style="font-size:8px; color:#aaa;">📈 Linha de volume diário</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Abas por dimensão</h3>
+      <p>Cada aba foca em uma dimensão: Geral, Equipe, Tempo, Qualidade. Mais organizado, menos scrolling.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="C" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 16px; background: #f8f7f5;">
+      <div style="font-size:10px; color:#888; margin-bottom:8px; font-weight:600; text-transform:uppercase; letter-spacing:.05em;">Layout C — Grid completo</div>
+      <div style="background:#7a1e1e; border-radius:4px; padding:4px 8px; font-size:9px; color:#fff; display:inline-block; margin-bottom:8px;">Mês corrente ▾</div>
+      <!-- KPI strip -->
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:3px; margin-bottom:6px;">
+        <div style="background:#fff; border-radius:3px; padding:5px; text-align:center;">
+          <div style="font-size:12px; font-weight:700; color:#7a1e1e;">312</div>
+          <div style="font-size:7px; color:#888;">Total</div>
+        </div>
+        <div style="background:#fff; border-radius:3px; padding:5px; text-align:center;">
+          <div style="font-size:12px; font-weight:700; color:#2d7a4f;">289</div>
+          <div style="font-size:7px; color:#888;">Resolvidas</div>
+        </div>
+        <div style="background:#fff; border-radius:3px; padding:5px; text-align:center;">
+          <div style="font-size:12px; font-weight:700; color:#b87a00;">22m</div>
+          <div style="font-size:7px; color:#888;">TMA</div>
+        </div>
+        <div style="background:#fff; border-radius:3px; padding:5px; text-align:center;">
+          <div style="font-size:12px; font-weight:700; color:#3B82F6;">93%</div>
+          <div style="font-size:7px; color:#888;">SLA</div>
+        </div>
+      </div>
+      <!-- 2x2 grid de gráficos -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
+        <div style="background:#fff; border-radius:3px; padding:6px; height:36px; display:flex; align-items:center; justify-content:center; font-size:7px; color:#aaa;">📊 Depto</div>
+        <div style="background:#fff; border-radius:3px; padding:6px; height:36px; display:flex; align-items:center; justify-content:center; font-size:7px; color:#aaa;">📈 Tendência</div>
+        <div style="background:#fff; border-radius:3px; padding:6px; height:36px; display:flex; align-items:center; justify-content:center; font-size:7px; color:#aaa;">🏆 Agentes</div>
+        <div style="background:#fff; border-radius:3px; padding:6px; height:36px; display:flex; align-items:center; justify-content:center; font-size:7px; color:#aaa;">⏱ Tempos</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Grid completo (visão executiva)</h3>
+      <p>Tudo visível de uma vez: KPIs + 4 gráficos em grid. Máxima densidade de informação, estilo BI empresarial.</p>
+    </div>
+  </div>
+
+</div>

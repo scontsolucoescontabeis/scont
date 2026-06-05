@@ -16,7 +16,6 @@ export function useConversas({ departamento, status, busca }) {
         usuarios ( id, nome ),
         mensagens ( id, conteudo, origem, criado_em, lida )
       `)
-      .neq('status', 'ENCERRADA')
       .order('atualizado_em', { ascending: false })
 
     if (departamento) query = query.eq('departamento', departamento)

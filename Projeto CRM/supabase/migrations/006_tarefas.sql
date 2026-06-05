@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS tarefas (
   conversa_id   UUID REFERENCES conversas(id) ON DELETE SET NULL,
   titulo        TEXT NOT NULL,
   descricao     TEXT,
+  demandante    TEXT,
   departamento  departamento_enum NOT NULL,
   status        status_tarefa NOT NULL DEFAULT 'ABERTA',
   prioridade    prioridade_tarefa NOT NULL DEFAULT 'NORMAL',
@@ -26,6 +27,8 @@ CREATE TABLE IF NOT EXISTS tarefas (
   concluido_em  TIMESTAMPTZ,
   concluido_por UUID REFERENCES usuarios(id)
 );
+-- Garante coluna demandante em instalações anteriores
+ALTER TABLE tarefas ADD COLUMN IF NOT EXISTS demandante TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_tarefas_status       ON tarefas(status);
 CREATE INDEX IF NOT EXISTS idx_tarefas_departamento ON tarefas(departamento);

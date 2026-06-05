@@ -10,8 +10,9 @@ export function useRealtime({ onNovaMensagem, onConversaAtualizada, onNovaAnotac
   })
 
   useEffect(() => {
+    const name = 'crm-global-' + Math.random().toString(36).slice(2)
     const channel = supabase
-      .channel('crm-global')
+      .channel(name)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensagens' }, (payload) => {
         callbacksRef.current.onNovaMensagem?.(payload.new)
       })

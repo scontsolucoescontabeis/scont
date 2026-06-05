@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
 const SELECT_TAREFAS = `
-  id, titulo, descricao, departamento, status, prioridade,
+  id, titulo, descricao, demandante, departamento, status, prioridade,
   prazo, criado_em, atualizado_em, concluido_em, conversa_id,
   criador:criado_por ( id, nome ),
   responsavel:atribuido_a ( id, nome ),
@@ -30,14 +30,15 @@ export function useTarefas({ departamento = null, status = null, conversaId = nu
   return { tarefas, loading, refresh: fetch }
 }
 
-export async function criarTarefa({ conversaId, titulo, descricao, departamento, prioridade, atribuidoA, prazo }) {
+export async function criarTarefa({ conversaId, titulo, descricao, demandante, departamento, prioridade, atribuidoA, prazo }) {
   const { data: { user } } = await supabase.auth.getUser()
   const { data: u } = await supabase.from('usuarios').select('id').eq('id', user.id).single()
 
   const { data, error } = await supabase.from('tarefas').insert({
     conversa_id:  conversaId ?? null,
     titulo,
-    descricao:    descricao || null,
+    descricao:    descricao  || null,
+    demandante:   demandante || null,
     departamento,
     prioridade:   prioridade ?? 'NORMAL',
     criado_por:   u.id,

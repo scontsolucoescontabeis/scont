@@ -76,6 +76,230 @@ export async function revogarAcessoCRM(usuarioId) {
   if (err1) throw err1
 }
 
+// ─── Helpers de período ────────────────────────────────────────
+export function calcPeriodo(tipo, customInicio, customFim) {
+  const now = new Date()
+  if (tipo === 'hoje') {
+    const inicio = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const fim    = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+    const inicioPrev = new Date(inicio); inicioPrev.setDate(inicioPrev.getDate() - 1)
+    const fimPrev    = new Date(fim);    fimPrev.setDate(fimPrev.getDate() - 1)
+    return { inicio, fim, inicioPrev, fimPrev, label: 'Hoje' }
+  }
+  if (tipo === '7d') {
+    const fim    = new Date(now)
+    const inicio = new Date(now); inicio.setDate(inicio.getDate() - 6); inicio.setHours(0, 0, 0, 0)
+    const fimPrev    = new Date(inicio.getTime() - 1)
+    const inicioPrev = new Date(fimPrev); inicioPrev.setDate(inicioPrev.getDate() - 6); inicioPrev.setHours(0, 0, 0, 0)
+    return { inicio, fim, inicioPrev, fimPrev, label: 'Últimos 7 dias' }
+  }
+  if (tipo === 'mes') {
+    const inicio     = new Date(now.getFullYear(), now.getMonth(), 1)
+    const fim        = new Date(now)
+    const inicioPrev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const fimPrev    = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59)
+    return { inicio, fim, inicioPrev, fimPrev, label: 'Mês corrente' }
+  }
+  if (tipo === 'custom' && customInicio && customFim) {
+    const inicio = new Date(customInicio)
+    const fim    = new Date(customFim); fim.setHours(23, 59, 59, 999)
+    const durMs      = fim - inicio
+    const inicioPrev = new Date(inicio.getTime() - durMs - 1)
+    const fimPrev    = new Date(inicio.getTime() - 1)
+    return { inicio, fim, inicioPrev, fimPrev, label: `${customInicio} → ${customFim}` }
+  }
+  return null
+}
+
+// ─── Métricas em tempo real (sem período) ─────────────────────
+export async function buscarMetricasVivo() {
+  const [aberta, emAtend, aguardando, ativos] = await Promise.all([
+    supabase.from('conversas').select('id', { count: 'exact', head: true }).eq('status', 'ABERTA'),
+    supabase.from('conversas').select('id', { count: 'exact', head: true }).eq('status', 'EM_ATENDIMENTO'),
+    supabase.from('conversas').select('id', { count: 'exact', head: true }).eq('status', 'AGUARDANDO'),
+    supabase.from('conversas').select('agente_id').eq('status', 'EM_ATENDIMENTO').not('agente_id', 'is', null),
+  ])
+  const agentesAtivos = new Set((ativos.data ?? []).map(c => c.agente_id)).size
+  return {
+    aberta:        aberta.count  ?? 0,
+    emAtendimento: emAtend.count ?? 0,
+    aguardando:    aguardando.count ?? 0,
+    agentesAtivos,
+  }
+}
+
+// ─── Aba Geral ─────────────────────────────────────────────────
+export async function buscarMetricasGeral({ inicio, fim, inicioPrev, fimPrev }) {
+  const [atual, prev, pendentes] = await Promise.all([
+    supabase.from('conversas').select('status, departamento, aberto_em')
+      .gte('aberto_em', inicio.toISOString()).lte('aberto_em', fim.toISOString()),
+    supabase.from('conversas').select('status')
+      .gte('aberto_em', inicioPrev.toISOString()).lte('aberto_em', fimPrev.toISOString()),
+    supabase.from('conversas').select('id', { count: 'exact', head: true })
+      .in('status', ['ABERTA', 'EM_ATENDIMENTO', 'AGUARDANDO']),
+  ])
+  const dados     = atual.data ?? []
+  const dadosPrev = prev.data  ?? []
+  const total         = dados.length
+  const encerradas    = dados.filter(c => c.status === 'ENCERRADA').length
+  const totalPrev     = dadosPrev.length
+  const encerradasPrev = dadosPrev.filter(c => c.status === 'ENCERRADA').length
+
+  const porDepto = {}
+  for (const c of dados) if (c.departamento) porDepto[c.departamento] = (porDepto[c.departamento] ?? 0) + 1
+
+  const volMap = {}
+  for (const c of dados) {
+    const d = c.aberto_em?.slice(0, 10)
+    if (d) volMap[d] = (volMap[d] ?? 0) + 1
+  }
+  const volumePorDia = Object.entries(volMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([data, total]) => ({ data: data.slice(5).replace('-', '/'), total }))
+
+  const delta = (a, b) => b > 0 ? Math.round(((a - b) / b) * 100) : null
+  const taxaRes     = total     > 0 ? Math.round((encerradas     / total)     * 100) : 0
+  const taxaResPrev = totalPrev > 0 ? Math.round((encerradasPrev / totalPrev) * 100) : 0
+
+  return {
+    total, encerradas,
+    abertas: pendentes.count ?? 0,
+    taxaResolucao: taxaRes,
+    deltaTotalPct:      delta(total,     totalPrev),
+    deltaEncerradasPct: delta(encerradas, encerradasPrev),
+    deltaTaxaPp: taxaRes - taxaResPrev,
+    porDepto, volumePorDia,
+  }
+}
+
+// ─── Aba Equipe ────────────────────────────────────────────────
+export async function buscarMetricasEquipe({ inicio, fim }) {
+  const [convs, transf, cargaData] = await Promise.all([
+    supabase.from('conversas').select('status, agente_id, usuarios(nome)')
+      .gte('aberto_em', inicio.toISOString()).lte('aberto_em', fim.toISOString()),
+    supabase.from('transferencias').select('id', { count: 'exact', head: true })
+      .gte('criado_em', inicio.toISOString()).lte('criado_em', fim.toISOString()),
+    supabase.from('conversas').select('departamento')
+      .in('status', ['ABERTA', 'EM_ATENDIMENTO', 'AGUARDANDO']),
+  ])
+  const dados     = convs.data ?? []
+  const encerradas = dados.filter(c => c.status === 'ENCERRADA' && c.agente_id)
+
+  const agentMap = {}
+  for (const c of encerradas) {
+    const id = c.agente_id
+    if (!agentMap[id]) agentMap[id] = { nome: c.usuarios?.nome ?? '—', total: 0 }
+    agentMap[id].total++
+  }
+  const ranking = Object.values(agentMap).sort((a, b) => b.total - a.total).slice(0, 8)
+  const max = ranking[0]?.total ?? 1
+
+  const cargaDepto = {}
+  for (const c of (cargaData.data ?? [])) cargaDepto[c.departamento] = (cargaDepto[c.departamento] ?? 0) + 1
+
+  const agentesCount = Object.keys(agentMap).length
+  const total = dados.length
+
+  return {
+    ranking: ranking.map(r => ({ ...r, pct: Math.round((r.total / max) * 100) })),
+    cargaDepto,
+    agentesAtivos:     agentesCount,
+    mediaConvs:        agentesCount > 0 ? (encerradas.length / agentesCount).toFixed(1) : '0',
+    taxaTransferencia: total > 0 ? Math.round(((transf.count ?? 0) / total) * 100) : 0,
+    maiorCarga:        ranking[0]?.total ?? 0,
+  }
+}
+
+// ─── Aba Tempo ─────────────────────────────────────────────────
+export async function buscarMetricasTempo({ inicio, fim }) {
+  const { data } = await supabase.from('conversas')
+    .select('aberto_em, encerrado_em, departamento')
+    .eq('status', 'ENCERRADA')
+    .gte('aberto_em', inicio.toISOString()).lte('aberto_em', fim.toISOString())
+    .not('encerrado_em', 'is', null)
+
+  if (!data || data.length === 0) return { tma: 0, maiorTma: 0, distribuicao: [], tmaPorDepto: {} }
+
+  const duracoes = data.map(c => ({
+    mins: Math.max(0, (new Date(c.encerrado_em) - new Date(c.aberto_em)) / 60000),
+    depto: c.departamento,
+  }))
+  const total    = duracoes.length
+  const tma      = Math.round(duracoes.reduce((s, d) => s + d.mins, 0) / total)
+  const maiorTma = Math.round(Math.max(...duracoes.map(d => d.mins)))
+
+  const deptoMap = {}
+  for (const d of duracoes) {
+    if (!deptoMap[d.depto]) deptoMap[d.depto] = { soma: 0, count: 0 }
+    deptoMap[d.depto].soma  += d.mins
+    deptoMap[d.depto].count += 1
+  }
+  const tmaPorDepto = Object.fromEntries(
+    Object.entries(deptoMap).map(([k, v]) => [k, Math.round(v.soma / v.count)])
+  )
+
+  const ate10    = duracoes.filter(d => d.mins < 10).length
+  const de10a30  = duracoes.filter(d => d.mins >= 10 && d.mins <= 30).length
+  const acima30  = duracoes.filter(d => d.mins > 30).length
+
+  return {
+    tma, maiorTma, tmaPorDepto,
+    distribuicao: [
+      { label: 'Até 10 min',      pct: Math.round((ate10   / total) * 100), cor: '#2d7a4f', sub: 'Atendimentos rápidos'   },
+      { label: '10 a 30 min',     pct: Math.round((de10a30 / total) * 100), cor: '#3B82F6', sub: 'Atendimento padrão'     },
+      { label: 'Acima de 30 min', pct: Math.round((acima30 / total) * 100), cor: '#b87a00', sub: 'Atendimentos complexos' },
+    ],
+  }
+}
+
+// ─── Aba Qualidade ─────────────────────────────────────────────
+export async function buscarMetricasQualidade({ inicio, fim }) {
+  const [convs, transf, msgs] = await Promise.all([
+    supabase.from('conversas').select('status, departamento')
+      .gte('aberto_em', inicio.toISOString()).lte('aberto_em', fim.toISOString()),
+    supabase.from('transferencias').select('motivo, conversa_id')
+      .gte('criado_em', inicio.toISOString()).lte('criado_em', fim.toISOString()),
+    supabase.from('mensagens').select('conversa_id')
+      .gte('criado_em', inicio.toISOString()).lte('criado_em', fim.toISOString()),
+  ])
+  const dados  = convs.data ?? []
+  const total  = dados.length
+  const encerradas = dados.filter(c => c.status === 'ENCERRADA').length
+
+  const deptoTotal = {}, deptoEnc = {}
+  for (const c of dados) {
+    deptoTotal[c.departamento] = (deptoTotal[c.departamento] ?? 0) + 1
+    if (c.status === 'ENCERRADA') deptoEnc[c.departamento] = (deptoEnc[c.departamento] ?? 0) + 1
+  }
+  const resolucaoPorDepto = Object.fromEntries(
+    Object.entries(deptoTotal).map(([k, v]) => [k, v > 0 ? Math.round(((deptoEnc[k] ?? 0) / v) * 100) : 0])
+  )
+
+  const motivoMap = {}
+  for (const t of (transf.data ?? [])) {
+    const m = t.motivo?.trim() || 'Não informado'
+    motivoMap[m] = (motivoMap[m] ?? 0) + 1
+  }
+  const motivosTransferencia = Object.entries(motivoMap)
+    .map(([motivo, count]) => ({ motivo, count }))
+    .sort((a, b) => b.count - a.count).slice(0, 4)
+
+  const msgMap = {}
+  for (const m of (msgs.data ?? [])) msgMap[m.conversa_id] = (msgMap[m.conversa_id] ?? 0) + 1
+  const convIds = Object.keys(msgMap)
+  const mediaMsgs = convIds.length > 0
+    ? (Object.values(msgMap).reduce((a, b) => a + b, 0) / convIds.length).toFixed(1) : '0'
+
+  const convTransf = new Set((transf.data ?? []).map(t => t.conversa_id)).size
+
+  return {
+    taxaResolucao:     total > 0 ? Math.round((encerradas / total) * 100) : 0,
+    taxaTransferencia: total > 0 ? Math.round((convTransf  / total) * 100) : 0,
+    mediaMsgs, resolucaoPorDepto, motivosTransferencia,
+  }
+}
+
+// ─── Métricas legadas (mantidas para compatibilidade) ──────────
 export async function buscarMetricas() {
   const hoje = new Date()
   hoje.setHours(0, 0, 0, 0)

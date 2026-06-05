@@ -229,6 +229,8 @@
 
             <div id="resumoTxt" style="margin-bottom:12px; font-size:13px; color:var(--text-secondary);"></div>
 
+            <div id="resumoConsolidado" style="margin-bottom:16px;"></div>
+
             <div class="txt-preview" id="previaTxt"></div>
 
             <div class="btn-group">
@@ -243,6 +245,85 @@
     <!-- ===== TELA CONFIGURAÇÕES ===== -->
     <div id="telaConfig">
     <div class="container">
+
+        <!-- ── Seção especial: R$ 87,00 Domingo / Feriado ── -->
+        <div class="config-card" style="border-left:4px solid #FFC107;margin-bottom:20px;">
+            <h3 style="margin:0 0 4px;font-size:15px;color:#856404;">⚡ Comissão Domingos / Feriados</h3>
+            <p style="font-size:12px;color:#7F8C8D;margin:0 0 16px;">
+                Todos os valores dessa rubrica exigem classificação como Domingo ou Feriado — cada tipo possui rubrica distinta.
+                <strong>Regra especial:</strong> R$ 87,00 = valor <strong>1</strong> no TXT (inteiro); demais valores lançados em centavos (monetário).
+            </p>
+
+            <div id="statusConfig87" style="display:none;padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:13px;"></div>
+
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;">
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Empresa *</label>
+                    <select id="cfg87Empresa" style="padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;min-width:170px;"></select>
+                </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
+                <div style="background:#FFFDE7;border:1px solid #FFC107;border-radius:8px;padding:10px 14px;">
+                    <div style="font-weight:700;font-size:11px;color:#856404;text-transform:uppercase;margin-bottom:8px;">
+                        R$ 87,00 — inteiro (1 no TXT)
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <div>
+                            <label style="display:block;font-weight:600;font-size:11px;margin-bottom:3px;color:#856404;">☀ Domingo</label>
+                            <input type="text" id="cfg87CodDomingo87" placeholder="Código"
+                                style="width:130px;padding:7px 10px;border:1px solid #FFC107;border-radius:6px;font-size:13px;font-family:monospace;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-weight:600;font-size:11px;margin-bottom:3px;color:#856404;">📅 Feriado</label>
+                            <input type="text" id="cfg87CodFeriado87" placeholder="Código"
+                                style="width:130px;padding:7px 10px;border:1px solid #FFC107;border-radius:6px;font-size:13px;font-family:monospace;">
+                        </div>
+                    </div>
+                </div>
+                <div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:8px;padding:10px 14px;">
+                    <div style="font-weight:700;font-size:11px;color:#1565C0;text-transform:uppercase;margin-bottom:8px;">
+                        Outros valores — monetário (centavos no TXT)
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <div>
+                            <label style="display:block;font-weight:600;font-size:11px;margin-bottom:3px;color:#1565C0;">☀ Domingo</label>
+                            <input type="text" id="cfg87CodDomingoOutros" placeholder="Código"
+                                style="width:130px;padding:7px 10px;border:1px solid #90CAF9;border-radius:6px;font-size:13px;font-family:monospace;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-weight:600;font-size:11px;margin-bottom:3px;color:#1565C0;">📅 Feriado</label>
+                            <input type="text" id="cfg87CodFeriadoOutros" placeholder="Código"
+                                style="width:130px;padding:7px 10px;border:1px solid #90CAF9;border-radius:6px;font-size:13px;font-family:monospace;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-bottom:16px;">
+                <button class="btn btn-primary" onclick="salvar87Config()" style="padding:9px 22px;">
+                    💾 Salvar
+                </button>
+            </div>
+
+            <div class="config-table-wrap">
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Empresa</th>
+                            <th>☀ Dom R$87 (inteiro)</th>
+                            <th>📅 Fer R$87 (inteiro)</th>
+                            <th>☀ Dom outros (monet.)</th>
+                            <th>📅 Fer outros (monet.)</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cfg87TableBody">
+                        <tr><td colspan="6" class="config-empty">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
         <div class="config-card">
             <h2>⚙️ Configurações · Rubricas – Track &amp; Field</h2>
@@ -272,6 +353,7 @@
                         <option value="monetario">Monetário (R$)</option>
                         <option value="minutos">Horas (HH:MM)</option>
                         <option value="dias">Dias</option>
+                        <option value="inteiro">Inteiro</option>
                         <option value="booleano">Booleano</option>
                     </select>
                 </div>

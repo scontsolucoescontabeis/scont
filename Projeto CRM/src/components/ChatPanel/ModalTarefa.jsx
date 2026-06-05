@@ -12,9 +12,10 @@ const PRIORIDADES = [
 ]
 
 export function ModalTarefa({ conversa, perfil, onCriada, onFechar }) {
-  const [titulo, setTitulo]         = useState('')
-  const [descricao, setDescricao]   = useState('')
-  const [departamento, setDepto]    = useState(conversa?.departamento ?? perfil?.departamentos?.[0] ?? 'ADMINISTRATIVO')
+  const [titulo, setTitulo]           = useState('')
+  const [demandante, setDemandante]   = useState(conversa?.contatos?.nome ?? conversa?.contatos?.empresa ?? '')
+  const [descricao, setDescricao]     = useState('')
+  const [departamento, setDepto]      = useState(conversa?.departamento ?? perfil?.departamentos?.[0] ?? 'ADMINISTRATIVO')
   const [prioridade, setPrioridade] = useState('NORMAL')
   const [atribuidoA, setAtribuidoA] = useState('')
   const [prazo, setPrazo]           = useState('')
@@ -33,6 +34,7 @@ export function ModalTarefa({ conversa, perfil, onCriada, onFechar }) {
     const { data, error } = await criarTarefa({
       conversaId:  conversa?.id ?? null,
       titulo:      titulo.trim(),
+      demandante:  demandante.trim() || null,
       descricao:   descricao.trim() || null,
       departamento,
       prioridade,
@@ -91,6 +93,17 @@ export function ModalTarefa({ conversa, perfil, onCriada, onFechar }) {
             <input value={titulo} onChange={e => setTitulo(e.target.value)}
               placeholder="Ex: Processar admissão — João Silva"
               required style={inputStyle} autoFocus />
+          </div>
+
+          {/* Demandante */}
+          <div>
+            <label style={labelStyle}>
+              Demandante
+              <span style={{ fontWeight: 400, color: '#888480', marginLeft: 4 }}>— cliente ou empresa que solicitou</span>
+            </label>
+            <input value={demandante} onChange={e => setDemandante(e.target.value)}
+              placeholder="Ex: João Silva · Empresa ABC Ltda."
+              style={inputStyle} />
           </div>
 
           {/* Descrição */}

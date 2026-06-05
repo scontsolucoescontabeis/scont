@@ -379,6 +379,16 @@ function openModalModelo(id) {
 
   renderVarsPanel();
   document.querySelectorAll('.fonte-cb').forEach(cb => cb.addEventListener('change', renderVarsPanel));
+
+  const cabSelect = document.getElementById('modelo-cabecalho');
+  const nomeInput = document.getElementById('modelo-nome');
+  cabSelect._hdrHandler && cabSelect.removeEventListener('change', cabSelect._hdrHandler);
+  nomeInput._hdrHandler && nomeInput.removeEventListener('input', nomeInput._hdrHandler);
+  cabSelect._hdrHandler = updateEditorHeaderPreview;
+  nomeInput._hdrHandler = updateEditorHeaderPreview;
+  cabSelect.addEventListener('change', updateEditorHeaderPreview);
+  nomeInput.addEventListener('input', updateEditorHeaderPreview);
+  updateEditorHeaderPreview();
 }
 
 function closeModalModelo() {
@@ -973,14 +983,37 @@ function renderPreview() {
   const area    = document.getElementById('preview-area');
   const counter = document.getElementById('preview-counter');
   if (!wizardModeloSelecionado || !wizardRegistros.length) {
-    area.innerHTML = '<span style="color:var(--muted)">Nenhum registro para pré-visualizar.</span>';
+    area.innerHTML = '<div style="padding:20px;color:var(--muted)">Nenhum registro para pré-visualizar.</div>';
     counter.textContent = '0 / 0'; return;
   }
   const total = wizardRegistros.length;
   wizardPreviewIndex = Math.max(0, Math.min(wizardPreviewIndex, total - 1));
   const varMap = wizardRegistros[wizardPreviewIndex];
-  // template é HTML — substitui vars diretamente no HTML
-  area.innerHTML = substituirVars(wizardModeloSelecionado.template, varMap, true);
+  const corpo  = substituirVars(wizardModeloSelecionado.template, varMap, true);
+  const m      = wizardModeloSelecionado;
+
+  const hdrStyle   = 'background:#8B3A3A;color:white;padding:10px 18px;display:flex;align-items:center;gap:12px;';
+  const logoStyle  = 'background:rgba(255,255,255,0.22);border-radius:3px;padding:2px 8px;font-size:11px;font-weight:800;letter-spacing:1.5px;border:1.5px solid rgba(255,255,255,.45);flex-shrink:0';
+  const sepStyle   = 'width:1px;height:28px;background:rgba(255,255,255,0.3);flex-shrink:0';
+  const titleStyle = 'font-size:12px;font-weight:700;color:white;display:block;line-height:1.2';
+  const subStyle   = 'font-size:10px;color:rgba(255,255,255,.75);display:block;margin-top:2px';
+  const bodyStyle  = 'padding:16px 0;font-size:13px;line-height:1.8;background:#fff;';
+
+  const nomeEmp = varMap['empresa.nome_empresa'] || wizardNomeEmpresaExcel || 'Empresa';
+  let hdrHtml = '';
+  if (wizardCabecalho === 'completo') {
+    hdrHtml = `<div style="${hdrStyle}">
+      <span style="${logoStyle}">SCONT</span>
+      <div style="${sepStyle}"></div>
+      <div><strong style="${titleStyle}">${esc(m.nome)}</strong>
+      <span style="${subStyle}">SCONT Soluções Contábeis — Gestão de RH</span></div></div>`;
+  } else if (wizardCabecalho === 'neutro') {
+    hdrHtml = `<div style="${hdrStyle}">
+      <div><strong style="${titleStyle}">${esc(nomeEmp)}</strong>
+      <span style="${subStyle}">${esc(m.nome)}</span></div></div>`;
+  }
+
+  area.innerHTML = hdrHtml + `<div style="${bodyStyle}">${corpo}</div>`;
   counter.textContent = `${wizardPreviewIndex + 1} / ${total}`;
 }
 
@@ -1025,7 +1058,7 @@ async function exportarPDF() {
     sep:   'width:1px;background:rgba(255,255,255,.4);height:30px;flex-shrink:0',
     title: 'font-size:12px;font-weight:700;color:white;display:block;line-height:1.2',
     sub:   'font-size:10px;color:rgba(255,255,255,.8);display:block;margin-top:2px',
-    body:  'padding:16px 18px;font-family:Segoe UI,Arial,sans-serif;font-size:11px;line-height:1.7;color:#2C3E50;',
+    body:  'padding:16px 0;font-family:Segoe UI,Arial,sans-serif;font-size:11px;line-height:1.7;color:#2C3E50;',
   };
 
   const buildHdr = (varMap) => {
@@ -1324,4 +1357,177 @@ function aplicarFonte(family) {
   if (!family) return;
   document.getElementById('modelo-template').focus();
   document.execCommand('fontName', false, family);
+}
+
+// ── Table Picker ──────────────────────────────────────────────
+let _tablePickerOpen = false;
+
+function openTablePicker() {
+  const editor = document.getElementById('modelo-template');
+  const btn    = document.getElementById('tb-btn-tabela');
+  const picker = document.getElementById('tb-table-picker');
+
+  // Salva o range atual
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) {
+    const r = sel.getRangeAt(0);
+    if (editor.contains(r.commonAncestorContainer)) savedEditorRange = r.cloneRange();
+  }
+
+  // Monta o grid apenas uma vez
+  if (!picker.querySelector('.tb-table-grid')) {
+    const label = document.createElement('div');
+    label.className = 'tb-table-label';
+    label.id = 'tb-table-label';
+    label.textContent = 'Selecione o tamanho';
+    picker.appendChild(label);
+
+    const grid = document.createElement('div');
+    grid.className = 'tb-table-grid';
+    for (let row = 1; row <= 6; row++) {
+      for (let col = 1; col <= 8; col++) {
+        const cell = document.createElement('div');
+        cell.className = 'tb-table-cell';
+        cell.dataset.row = row;
+        cell.dataset.col = col;
+        cell.addEventListener('mouseenter', () => highlightTableCells(row, col));
+        cell.addEventListener('mouseleave', () => {});
+        cell.addEventListener('click', () => { insertTable(row, col); closeTablePicker(); });
+        grid.appendChild(cell);
+      }
+    }
+    grid.addEventListener('mouseleave', () => highlightTableCells(0, 0));
+    picker.appendChild(grid);
+  }
+
+  // Posiciona abaixo do botão
+  const rect = btn.getBoundingClientRect();
+  picker.style.top  = (rect.bottom + 4) + 'px';
+  picker.style.left = rect.left + 'px';
+  picker.classList.add('open');
+  _tablePickerOpen = true;
+}
+
+function closeTablePicker() {
+  document.getElementById('tb-table-picker').classList.remove('open');
+  highlightTableCells(0, 0);
+  _tablePickerOpen = false;
+}
+
+function highlightTableCells(rows, cols) {
+  document.querySelectorAll('.tb-table-cell').forEach(cell => {
+    cell.classList.toggle('hl', +cell.dataset.row <= rows && +cell.dataset.col <= cols);
+  });
+  const label = document.getElementById('tb-table-label');
+  if (label) label.textContent = (rows && cols) ? `${rows} × ${cols}` : 'Selecione o tamanho';
+}
+
+function insertTable(rows, cols) {
+  const editor = document.getElementById('modelo-template');
+  editor.focus();
+
+  const sel = window.getSelection();
+  if (savedEditorRange) {
+    sel.removeAllRanges();
+    sel.addRange(savedEditorRange);
+  }
+
+  const thStyle   = 'background:#8B3A3A;color:white;padding:8px 10px;border:1px solid #6B2A2A;font-weight:700;text-align:left;font-size:11px;';
+  const tdOdd     = 'padding:8px 10px;border:1px solid #ddd;background:#fff;font-size:11px;';
+  const tdEven    = 'padding:8px 10px;border:1px solid #ddd;background:#f8f9fa;font-size:11px;';
+
+  let html = '<table style="width:100%;border-collapse:collapse;font-family:inherit;font-size:11px;margin:8px 0"><tbody>';
+
+  // Linha de cabeçalho
+  html += '<tr>' + Array.from({length: cols}, () => `<th style="${thStyle}">&nbsp;</th>`).join('') + '</tr>';
+
+  // Linhas de dados
+  for (let r = 1; r < rows; r++) {
+    const td = r % 2 === 0 ? tdEven : tdOdd;
+    html += '<tr>' + Array.from({length: cols}, () => `<td style="${td}">&nbsp;</td>`).join('') + '</tr>';
+  }
+
+  html += '</tbody></table>';
+
+  const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+  if (range && editor.contains(range.commonAncestorContainer)) {
+    range.deleteContents();
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    const frag = document.createDocumentFragment();
+    let last;
+    while (temp.firstChild) { last = temp.firstChild; frag.appendChild(last); }
+    range.insertNode(frag);
+    if (last) {
+      const newRange = document.createRange();
+      newRange.setStartAfter(last);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedEditorRange = newRange.cloneRange();
+    }
+  } else {
+    editor.insertAdjacentHTML('beforeend', html);
+  }
+}
+
+// Fecha ao clicar fora ou pressionar Esc
+document.addEventListener('mousedown', e => {
+  if (_tablePickerOpen && !e.target.closest('#tb-table-picker') && !e.target.closest('#tb-btn-tabela')) {
+    closeTablePicker();
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && _tablePickerOpen) closeTablePicker();
+});
+
+function updateEditorHeaderPreview() {
+  const tipo = document.getElementById('modelo-cabecalho')?.value || 'completo';
+  const nome = document.getElementById('modelo-nome')?.value.trim() || 'Nome do Modelo';
+  const el = document.getElementById('editor-hdr-preview');
+  if (!el) return;
+
+  if (tipo === 'nenhum') {
+    el.style.display = 'none';
+    return;
+  }
+
+  el.style.display = 'flex';
+  const logoStyle = 'background:rgba(255,255,255,0.22);border-radius:3px;padding:2px 8px;font-size:11px;font-weight:800;letter-spacing:1.5px;border:1.5px solid rgba(255,255,255,.45);flex-shrink:0;color:white';
+  const sepStyle  = 'width:1px;height:28px;background:rgba(255,255,255,0.3);flex-shrink:0';
+  const titleStyle = 'display:block;font-size:12px;font-weight:700;line-height:1.2;color:white';
+  const subStyle   = 'font-size:10px;opacity:0.75;color:white;display:block;margin-top:2px';
+
+  if (tipo === 'completo') {
+    el.innerHTML = `
+      <span style="${logoStyle}">SCONT</span>
+      <div style="${sepStyle}"></div>
+      <div>
+        <strong style="${titleStyle}">${esc(nome)}</strong>
+        <span style="${subStyle}">SCONT Soluções Contábeis — Gestão de RH</span>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <div>
+        <strong style="${titleStyle}">Nome da Empresa</strong>
+        <span style="${subStyle}">${esc(nome)}</span>
+      </div>`;
+  }
+}
+
+function toggleFitZoom() {
+  const editor = document.getElementById('modelo-template');
+  const btn = document.getElementById('tb-fit-zoom');
+  if (editor.style.zoom && editor.style.zoom !== '1') {
+    editor.style.zoom = '';
+    btn.textContent = '⛶ Ajustar';
+    return;
+  }
+  const factor = editor.clientWidth / editor.scrollWidth;
+  if (factor >= 1) {
+    toast('Conteúdo já cabe na janela.', '');
+    return;
+  }
+  editor.style.zoom = factor;
+  btn.textContent = '⛶ 100%';
 }

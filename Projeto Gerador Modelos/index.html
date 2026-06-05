@@ -439,6 +439,8 @@
           </div>
           <!-- Editor -->
           <div class="editor-wrapper">
+            <!-- Pré-visualização do cabeçalho do documento -->
+            <div id="editor-hdr-preview" class="editor-header-preview" style="display:none"></div>
             <!-- Toolbar -->
             <div class="editor-toolbar">
               <button type="button" class="tb-btn" onclick="document.execCommand('bold')" title="Negrito"><b>N</b></button>
@@ -468,6 +470,10 @@
               </select>
               <div class="tb-sep"></div>
               <button type="button" class="tb-btn" onclick="document.execCommand('removeFormat')" title="Limpar formatação">✕ Fmt</button>
+              <div class="tb-sep"></div>
+              <button type="button" class="tb-btn" id="tb-fit-zoom" onclick="toggleFitZoom()" title="Ajustar zoom para caber na janela">⛶ Ajustar</button>
+              <div class="tb-sep"></div>
+              <button type="button" class="tb-btn" id="tb-btn-tabela" onmousedown="event.preventDefault()" onclick="openTablePicker()" title="Inserir tabela">⊞ Tabela</button>
             </div>
             <!-- Área editável -->
             <div id="modelo-template" class="editor-content" contenteditable="true"
@@ -486,6 +492,9 @@
   <div id="print-root"></div>
 
   <div id="toast"></div>
+
+  <!-- ══ TABLE PICKER (global, fora do editor-wrapper) ══ -->
+  <div id="tb-table-picker" class="tb-table-picker"></div>
 
   <!-- ══ MODAL: Nome da Empresa (Excel puro) ══ -->
   <div class="modal-overlay" id="modal-nome-empresa-excel">

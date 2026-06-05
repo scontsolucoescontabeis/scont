@@ -259,8 +259,30 @@ export default function App() {
   const [perfil, setPerfil]         = useState(undefined) // undefined = carregando
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+
+    const init = async () => {
+      // SSO via hash: portal passa tokens ao abrir o CRM em nova aba
+      const hash = window.location.hash
+      if (hash.includes('access_token')) {
+        try {
+          const p = new URLSearchParams(hash.slice(1))
+          const access_token  = p.get('access_token')
+          const refresh_token = p.get('refresh_token')
+          if (access_token && refresh_token) {
+            await supabase.auth.setSession({ access_token, refresh_token })
+            window.history.replaceState(null, '', window.location.pathname)
+            return
+          }
+        } catch (e) {
+          console.warn('SSO via hash falhou, continuando com sessão local:', e)
+        }
+      }
+      const { data } = await supabase.auth.getSession()
+      setSession(data.session)
+    }
+    init()
+
     return () => subscription.unsubscribe()
   }, [])
 
