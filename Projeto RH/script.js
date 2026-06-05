@@ -49,19 +49,51 @@ async function carregarEmpresas() {
             .order('nome_empresa', { ascending: true });
         if (error) throw error;
         state.empresas = data || [];
-        const select = document.getElementById('codigoEmpresa');
-        select.innerHTML = '<option value="">Selecione uma empresa...</option>';
-        state.empresas.forEach(emp => {
-            const option = document.createElement('option');
-            option.value = emp.codigo_empresa;
-            option.textContent = `${emp.codigo_empresa} - ${emp.nome_empresa}`;
-            select.appendChild(option);
-        });
     } catch (erro) {
         console.error('Erro ao carregar empresas:', erro);
         mostrarMensagem('Erro', 'Falha ao carregar a lista de empresas do servidor.');
     }
 }
+
+function filtrarEmpresas(termo) {
+    const box = document.getElementById('buscaEmpresaResultados');
+    const norm = termo.trim().toLowerCase();
+    const lista = norm
+        ? state.empresas.filter(e =>
+            e.nome_empresa.toLowerCase().includes(norm) ||
+            e.codigo_empresa.toLowerCase().includes(norm))
+        : state.empresas;
+
+    if (!lista.length) {
+        box.innerHTML = '<div style="padding:10px 14px;color:#999;font-size:13px;">Nenhuma empresa encontrada</div>';
+        box.style.display = 'block';
+        return;
+    }
+
+    box.innerHTML = lista.map(e => `
+        <div onclick="selecionarEmpresa('${e.codigo_empresa}', '${e.nome_empresa.replace(/'/g, "\\'")}')"
+            style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;transition:background .15s;"
+            onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+            <span style="font-family:monospace;font-weight:600;color:var(--primary-color);margin-right:8px;">${e.codigo_empresa}</span>${e.nome_empresa}
+        </div>`).join('');
+    box.style.display = 'block';
+}
+
+function selecionarEmpresa(codigo, nome) {
+    document.getElementById('codigoEmpresa').value = codigo;
+    document.getElementById('buscaEmpresa').value = `${codigo} - ${nome}`;
+    document.getElementById('buscaEmpresaResultados').style.display = 'none';
+    const label = document.getElementById('empresaSelecionadaLabel');
+    if (label) label.textContent = '';
+}
+
+document.addEventListener('click', e => {
+    const box   = document.getElementById('buscaEmpresaResultados');
+    const input = document.getElementById('buscaEmpresa');
+    if (box && input && !box.contains(e.target) && e.target !== input) {
+        box.style.display = 'none';
+    }
+});
 
 function filtrarEmpresas(termo) {
     const select = document.getElementById('codigoEmpresa');
@@ -109,6 +141,11 @@ function inicializarEventos() {
         const codEmp = document.getElementById('codigoEmpresa').value;
         if (!validarCompetencia(comp)) {
             mostrarMensagem('Erro', 'Competência inválida. Use o formato MM/AAAA.');
+            return;
+        }
+        if (!codEmp) {
+            mostrarMensagem('Erro', 'Selecione uma empresa antes de continuar.');
+            document.getElementById('buscaEmpresa').focus();
             return;
         }
         state.competencia = comp;
