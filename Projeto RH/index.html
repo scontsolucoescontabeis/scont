@@ -53,28 +53,11 @@
                 
                 <div class="form-group">
                     <label for="buscaEmpresa">Empresa *</label>
-                    <div style="position: relative;">
-                        <input type="text" id="buscaEmpresa" placeholder="Digite o nome ou código da empresa..." autocomplete="off"
-                            oninput="filtrarEmpresas(this.value)"
-                            onfocus="filtrarEmpresas(this.value)"
-                            style="width: 100%; box-sizing: border-box;">
-                        <div id="buscaEmpresaResultados" style="
-                            display: none;
-                            position: absolute;
-                            top: 100%;
-                            left: 0; right: 0;
-                            background: #fff;
-                            border: 1px solid #ced4da;
-                            border-top: none;
-                            border-radius: 0 0 6px 6px;
-                            max-height: 220px;
-                            overflow-y: auto;
-                            z-index: 100;
-                            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                        "></div>
-                    </div>
+                    <input type="text" id="buscaEmpresa" placeholder="Digite o nome ou código da empresa..." autocomplete="off"
+                        oninput="filtrarEmpresas(this.value)"
+                        onfocus="filtrarEmpresas(this.value)"
+                        style="width: 100%; box-sizing: border-box;">
                     <input type="hidden" id="codigoEmpresa">
-                    <small id="empresaSelecionadaLabel" style="color: var(--primary-color); font-weight: 600;"></small>
                 </div>
 
                 <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">▶️ Continuar</button>
@@ -525,6 +508,19 @@
             </div>
         </div>
     </div>
+
+    <!-- Dropdown de busca de empresa — fora de qualquer container para evitar clipping -->
+    <div id="buscaEmpresaResultados" style="
+        display: none;
+        position: fixed;
+        background: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        max-height: 240px;
+        overflow-y: auto;
+        z-index: 9000;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    "></div>
 
     <script src="script.js"></script>
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>

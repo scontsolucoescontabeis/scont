@@ -56,7 +56,16 @@ async function carregarEmpresas() {
 }
 
 function filtrarEmpresas(termo) {
-    const box = document.getElementById('buscaEmpresaResultados');
+    const box   = document.getElementById('buscaEmpresaResultados');
+    const input = document.getElementById('buscaEmpresa');
+    if (!box || !input) return;
+
+    // Posiciona o dropdown alinhado ao input
+    const rect = input.getBoundingClientRect();
+    box.style.top    = (rect.bottom + 2) + 'px';
+    box.style.left   = rect.left + 'px';
+    box.style.width  = rect.width + 'px';
+
     const norm = termo.trim().toLowerCase();
     const lista = norm
         ? state.empresas.filter(e =>
@@ -72,7 +81,7 @@ function filtrarEmpresas(termo) {
 
     box.innerHTML = lista.map(e => `
         <div onclick="selecionarEmpresa('${e.codigo_empresa}', '${e.nome_empresa.replace(/'/g, "\\'")}')"
-            style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;transition:background .15s;"
+            style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;"
             onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
             <span style="font-family:monospace;font-weight:600;color:var(--primary-color);margin-right:8px;">${e.codigo_empresa}</span>${e.nome_empresa}
         </div>`).join('');
