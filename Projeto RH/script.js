@@ -104,23 +104,6 @@ document.addEventListener('click', e => {
     }
 });
 
-function filtrarEmpresas(termo) {
-    const select = document.getElementById('codigoEmpresa');
-    const norm = termo.trim().toLowerCase();
-    select.innerHTML = '<option value="">Selecione uma empresa...</option>';
-    const lista = norm
-        ? state.empresas.filter(e =>
-            e.nome_empresa.toLowerCase().includes(norm) ||
-            e.codigo_empresa.toLowerCase().includes(norm))
-        : state.empresas;
-    lista.forEach(emp => {
-        const option = document.createElement('option');
-        option.value = emp.codigo_empresa;
-        option.textContent = `${emp.codigo_empresa} - ${emp.nome_empresa}`;
-        select.appendChild(option);
-    });
-}
-
 async function carregarEmpregados(codigoEmpresa) {
     try {
         const { data, error } = await supabaseClient
