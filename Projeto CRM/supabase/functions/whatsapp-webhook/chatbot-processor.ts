@@ -50,6 +50,12 @@ export interface MenuItem {
   departamento: string
 }
 
+export interface FeriadoEvento {
+  nome: string
+  tipo: 'FERIADO' | 'DATA_PICO'
+  msg_especifica: string | null
+}
+
 export interface ProcessarBotParams {
   msg: Record<string, unknown>
   telefone: string
@@ -175,6 +181,22 @@ function resolverMsgFila(
     .replace(/\{departamento\}/g, vars.departamento)
     .replace(/\{assunto\}/g, vars.assunto)
     .replace(/\{protocolo\}/g, vars.protocolo)
+}
+
+async function buscarEventoHoje(
+  supabase: SupabaseClient,
+  agora?: Date,
+): Promise<FeriadoEvento | null> {
+  const data = (agora ?? new Date()).toISOString().slice(0, 10) // YYYY-MM-DD
+  const { data: row } = await supabase
+    .from('chatbot_feriados')
+    .select('nome, tipo, msg_especifica')
+    .eq('data', data)
+    .eq('ativo', true)
+    .order('tipo') // FERIADO < DATA_PICO alfabeticamente — feriado tem prioridade
+    .limit(1)
+    .single()
+  return row as FeriadoEvento | null
 }
 
 function isUuid(value: string): boolean {
@@ -568,8 +590,19 @@ async function handleNOVO(
   sessao: BotSessao,
   params: ProcessarBotParams,
   config: ChatbotConfig,
+  feriadoHoje: FeriadoEvento | null,
 ): Promise<void> {
   const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
+
+  // Verifica feriado antes de verificar horário
+  if (feriadoHoje?.tipo === 'FERIADO') {
+    const msg = feriadoHoje.msg_especifica
+      ?? `Não haverá atendimento hoje (${feriadoHoje.nome}). Seu contato foi registrado com protocolo *${conversa.protocolo}* e retornaremos no próximo dia útil. 📅`
+    await enviarTexto(telefone, msg, phoneNumberId, accessToken)
+    await inserirMensagemSistema(supabase, conversa.id, `🤖 Cliente contatou em feriado: ${feriadoHoje.nome}`)
+    await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
+    return
+  }
 
   // Verifica horário (sem dept específico ainda)
   if (!dentroDoHorario(config, null)) {
@@ -868,6 +901,7 @@ async function handleAGUARD_CONF(
   params: ProcessarBotParams,
   config: ChatbotConfig,
   input: ReturnType<typeof resolverInputCliente>,
+  feriadoHoje: FeriadoEvento | null,
 ): Promise<void> {
   const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
 
@@ -939,12 +973,17 @@ async function handleAGUARD_CONF(
       })
       .eq('id', conversa.id)
 
-    // 2. Envia mensagem de fila
-    const msgFila = resolverMsgFila(config.msg_fila, {
+    // 2. Envia mensagem de fila (com aviso de data-pico quando aplicável)
+    let msgFila = resolverMsgFila(config.msg_fila, {
       departamento: deptLabel,
       assunto,
       protocolo: conversa.protocolo,
     })
+    if (feriadoHoje?.tipo === 'DATA_PICO') {
+      const aviso = feriadoHoje.msg_especifica
+        ?? `⚠️ Estamos em *${feriadoHoje.nome}*. O prazo de resposta pode ser superior ao habitual.`
+      msgFila = `${msgFila}\n\n${aviso}`
+    }
     await enviarTexto(telefone, msgFila, phoneNumberId, accessToken)
 
     // 3. Insere mensagem SISTEMA de roteamento
@@ -1051,6 +1090,9 @@ export async function processarMensagemBot(params: ProcessarBotParams): Promise<
   // 2. Bot inativo → não interferir
   if (!config || !config.bot_ativo) return false
 
+  // 2b. Busca evento do dia (feriado ou data-pico) — uma query, zero IA
+  const feriadoHoje = await buscarEventoHoje(supabase)
+
   // 3. Extrai input do cliente
   const input = resolverInputCliente(msg)
 
@@ -1112,7 +1154,7 @@ export async function processarMensagemBot(params: ProcessarBotParams): Promise<
   // 10. Roteamento para o handler do estado atual
   switch (sessao.estado) {
     case 'NOVO':
-      await handleNOVO(sessao, params, config)
+      await handleNOVO(sessao, params, config, feriadoHoje)
       break
 
     case 'AGUARD_DEPT':
@@ -1128,7 +1170,7 @@ export async function processarMensagemBot(params: ProcessarBotParams): Promise<
       break
 
     case 'AGUARD_CONF':
-      await handleAGUARD_CONF(sessao, params, config, input)
+      await handleAGUARD_CONF(sessao, params, config, input, feriadoHoje)
       break
 
     default:

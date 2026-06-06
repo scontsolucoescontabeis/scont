@@ -4,6 +4,7 @@ import {
   buscarChatbotDeptConfig, salvarChatbotDeptConfig,
   buscarTodosMenus, criarMenu, atualizarMenu, excluirMenu, reordenarMenus,
   buscarMediaCsat, buscarAvaliacoesCsat,
+  buscarFeriados, criarFeriado, atualizarFeriado, excluirFeriado,
 } from '@/services/crm.service'
 
 // ─── Constantes ────────────────────────────────────────────────
@@ -12,6 +13,7 @@ const ABAS = [
   { id: 'menus',      label: '🌿 Menus' },
   { id: 'horarios',   label: '🕐 Horários' },
   { id: 'avaliacoes', label: '⭐ Avaliações' },
+  { id: 'calendario', label: '📅 Calendário' },
 ]
 
 // ─── Componentes auxiliares genéricos ──────────────────────────
@@ -806,6 +808,280 @@ function AbaAvaliacoes() {
   )
 }
 
+// ─── Aba Calendário ────────────────────────────────────────────
+const ANO_ATUAL = new Date().getFullYear()
+
+const TIPO_BADGE = {
+  FERIADO:   { bg: '#f8d7da', color: '#721c24', label: 'Feriado' },
+  DATA_PICO: { bg: '#fff3cd', color: '#856404', label: 'Data-pico' },
+}
+
+function AbaCalendario() {
+  const [ano, setAno] = useState(ANO_ATUAL)
+  const [filtroTipo, setFiltroTipo] = useState('')
+  const [feriados, setFeriados] = useState([])
+  const [editando, setEditando] = useState(null)
+  const [form, setForm] = useState({ data: '', nome: '', tipo: 'FERIADO', msg_especifica: '' })
+  const [adicionando, setAdicionando] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+
+  const carregar = () =>
+    buscarFeriados({ ano, tipo: filtroTipo || undefined }).then(setFeriados)
+
+  useEffect(() => { carregar() }, [ano, filtroTipo])
+
+  const salvarNovo = async () => {
+    if (!form.data || !form.nome) return
+    setSalvando(true)
+    try {
+      await criarFeriado({
+        data: form.data,
+        nome: form.nome,
+        tipo: form.tipo,
+        msg_especifica: form.msg_especifica || null,
+      })
+      setForm({ data: '', nome: '', tipo: 'FERIADO', msg_especifica: '' })
+      setAdicionando(false)
+      carregar()
+    } finally { setSalvando(false) }
+  }
+
+  const salvarEdicao = async () => {
+    if (!editando) return
+    setSalvando(true)
+    try {
+      await atualizarFeriado(editando.id, {
+        data: editando.data,
+        nome: editando.nome,
+        tipo: editando.tipo,
+        msg_especifica: editando.msg_especifica || null,
+      })
+      setEditando(null)
+      carregar()
+    } finally { setSalvando(false) }
+  }
+
+  const toggleAtivo = async (f) => {
+    await atualizarFeriado(f.id, { ativo: !f.ativo })
+    carregar()
+  }
+
+  const remover = async (f) => {
+    if (!confirm(`Remover "${f.nome}"?`)) return
+    await excluirFeriado(f.id)
+    carregar()
+  }
+
+  const badge = (tipo) => {
+    const b = TIPO_BADGE[tipo] ?? { bg: '#e0dcd8', color: '#555', label: tipo }
+    return (
+      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px',
+        borderRadius: 4, background: b.bg, color: b.color }}>
+        {b.label}
+      </span>
+    )
+  }
+
+  return (
+    <div style={{ maxWidth: 760 }}>
+      {/* Filtros */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
+        <div>
+          <label style={{ fontSize: 11, color: '#555', display: 'block', marginBottom: 3 }}>Ano</label>
+          <select value={ano} onChange={e => setAno(Number(e.target.value))}
+            style={{ border: '1px solid #e0dcd8', borderRadius: 6, padding: '5px 10px', fontSize: 13 }}>
+            {[ANO_ATUAL - 1, ANO_ATUAL, ANO_ATUAL + 1].map(a => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={{ fontSize: 11, color: '#555', display: 'block', marginBottom: 3 }}>Tipo</label>
+          <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}
+            style={{ border: '1px solid #e0dcd8', borderRadius: 6, padding: '5px 10px', fontSize: 13 }}>
+            <option value="">Todos</option>
+            <option value="FERIADO">Feriados</option>
+            <option value="DATA_PICO">Datas-pico</option>
+          </select>
+        </div>
+        <button
+          onClick={() => { setAdicionando(true); setEditando(null) }}
+          style={{ marginTop: 18, padding: '6px 14px', background: '#7a1e1e', color: '#fff',
+            border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          + Adicionar
+        </button>
+      </div>
+
+      {/* Formulário de adição */}
+      {adicionando && (
+        <div style={{ background: '#f7f6f4', border: '1px solid #e0dcd8', borderRadius: 8,
+          padding: '14px 16px', marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10, color: '#1a1a1a' }}>
+            Novo evento
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 130px', gap: 8, marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 3 }}>Data</div>
+              <input type="date" value={form.data} onChange={e => setForm(f => ({ ...f, data: e.target.value }))}
+                style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #e0dcd8',
+                  borderRadius: 6, padding: '5px 8px', fontSize: 13 }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 3 }}>Nome</div>
+              <input value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))}
+                placeholder="Ex: Feriado Municipal"
+                style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #e0dcd8',
+                  borderRadius: 6, padding: '5px 8px', fontSize: 13 }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: '#555', marginBottom: 3 }}>Tipo</div>
+              <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
+                style={{ width: '100%', border: '1px solid #e0dcd8', borderRadius: 6,
+                  padding: '5px 8px', fontSize: 13 }}>
+                <option value="FERIADO">Feriado</option>
+                <option value="DATA_PICO">Data-pico fiscal</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: '#555', marginBottom: 3 }}>
+              Mensagem personalizada <span style={{ color: '#aaa' }}>(opcional — substitui o padrão)</span>
+            </div>
+            <textarea value={form.msg_especifica}
+              onChange={e => setForm(f => ({ ...f, msg_especifica: e.target.value }))}
+              rows={2} placeholder="Deixe em branco para usar a mensagem padrão do sistema"
+              style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #e0dcd8',
+                borderRadius: 6, padding: '6px 8px', fontSize: 12, resize: 'vertical' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={salvarNovo} disabled={salvando}
+              style={{ padding: '6px 16px', background: '#7a1e1e', color: '#fff',
+                border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              {salvando ? 'Salvando…' : 'Salvar'}
+            </button>
+            <button onClick={() => setAdicionando(false)}
+              style={{ padding: '6px 14px', background: '#f0e8e8', color: '#7a1e1e',
+                border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tabela */}
+      <div style={{ border: '1px solid #e0dcd8', borderRadius: 8, overflow: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: '#f7f6f4', borderBottom: '1px solid #e0dcd8' }}>
+              {['Data', 'Nome', 'Tipo', 'Mensagem personalizada', 'Ativo', ''].map(h => (
+                <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 11,
+                  fontWeight: 700, color: '#888480', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {feriados.length === 0 && (
+              <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center', color: '#aaa' }}>
+                Nenhum evento para {ano}
+              </td></tr>
+            )}
+            {feriados.map(f => (
+              <tr key={f.id} style={{ borderBottom: '1px solid #f0ede8',
+                opacity: f.ativo ? 1 : 0.45 }}>
+                {editando?.id === f.id ? (
+                  <>
+                    <td style={{ padding: '6px 12px' }}>
+                      <input type="date" value={editando.data}
+                        onChange={e => setEditando(e2 => ({ ...e2, data: e.target.value }))}
+                        style={{ border: '1px solid #e0dcd8', borderRadius: 4, padding: '3px 6px', fontSize: 12 }} />
+                    </td>
+                    <td style={{ padding: '6px 12px' }}>
+                      <input value={editando.nome}
+                        onChange={e => setEditando(e2 => ({ ...e2, nome: e.target.value }))}
+                        style={{ width: '100%', border: '1px solid #e0dcd8', borderRadius: 4,
+                          padding: '3px 6px', fontSize: 12 }} />
+                    </td>
+                    <td style={{ padding: '6px 12px' }}>
+                      <select value={editando.tipo}
+                        onChange={e => setEditando(e2 => ({ ...e2, tipo: e.target.value }))}
+                        style={{ border: '1px solid #e0dcd8', borderRadius: 4, padding: '3px 6px', fontSize: 12 }}>
+                        <option value="FERIADO">Feriado</option>
+                        <option value="DATA_PICO">Data-pico</option>
+                      </select>
+                    </td>
+                    <td style={{ padding: '6px 12px' }}>
+                      <input value={editando.msg_especifica ?? ''}
+                        onChange={e => setEditando(e2 => ({ ...e2, msg_especifica: e.target.value }))}
+                        placeholder="Mensagem personalizada (opcional)"
+                        style={{ width: '100%', border: '1px solid #e0dcd8', borderRadius: 4,
+                          padding: '3px 6px', fontSize: 12 }} />
+                    </td>
+                    <td />
+                    <td style={{ padding: '6px 12px', whiteSpace: 'nowrap' }}>
+                      <button onClick={salvarEdicao} disabled={salvando}
+                        style={{ marginRight: 4, padding: '3px 10px', background: '#7a1e1e',
+                          color: '#fff', border: 'none', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}>
+                        {salvando ? '…' : 'OK'}
+                      </button>
+                      <button onClick={() => setEditando(null)}
+                        style={{ padding: '3px 8px', background: '#f0e8e8', color: '#7a1e1e',
+                          border: 'none', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}>
+                        ✕
+                      </button>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td style={{ padding: '8px 12px', fontFamily: 'DM Mono, monospace', color: '#555' }}>
+                      {new Date(f.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                    </td>
+                    <td style={{ padding: '8px 12px', fontWeight: 500, color: '#1a1a1a' }}>{f.nome}</td>
+                    <td style={{ padding: '8px 12px' }}>{badge(f.tipo)}</td>
+                    <td style={{ padding: '8px 12px', color: '#888480', maxWidth: 180,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {f.msg_especifica
+                        ? <span title={f.msg_especifica}>{f.msg_especifica}</span>
+                        : <span style={{ color: '#ccc', fontStyle: 'italic' }}>padrão</span>}
+                    </td>
+                    <td style={{ padding: '8px 12px' }}>
+                      <div onClick={() => toggleAtivo(f)}
+                        style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer',
+                          background: f.ativo ? '#27ae60' : '#ccc', position: 'relative' }}>
+                        <div style={{ position: 'absolute', width: 14, height: 14, borderRadius: '50%',
+                          background: '#fff', top: 3,
+                          [f.ativo ? 'right' : 'left']: 3 }} />
+                      </div>
+                    </td>
+                    <td style={{ padding: '8px 12px', whiteSpace: 'nowrap' }}>
+                      <button onClick={() => { setEditando({ ...f }); setAdicionando(false) }}
+                        style={{ marginRight: 4, padding: '3px 8px', background: '#cce5ff',
+                          color: '#004085', border: 'none', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}>
+                        ✏️
+                      </button>
+                      <button onClick={() => remover(f)}
+                        style={{ padding: '3px 8px', background: '#f8d7da', color: '#721c24',
+                          border: 'none', borderRadius: 4, fontSize: 11, cursor: 'pointer' }}>
+                        🗑
+                      </button>
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: 12, fontSize: 11, color: '#888480' }}>
+        <strong>Feriado:</strong> bot responde com mensagem de dia não útil e encerra a sessão. &nbsp;
+        <strong>Data-pico:</strong> atendimento normal, mas a mensagem de fila inclui aviso de alta demanda.
+      </div>
+    </div>
+  )
+}
+
 // ─── Componente principal ──────────────────────────────────────
 export default function ChatbotPage() {
   const [aba, setAba] = useState('geral')
@@ -852,6 +1128,7 @@ export default function ChatbotPage() {
         {aba === 'menus'      && <AbaMenus />}
         {aba === 'horarios'   && <AbaHorarios />}
         {aba === 'avaliacoes' && <AbaAvaliacoes />}
+        {aba === 'calendario' && <AbaCalendario />}
       </div>
     </div>
   )

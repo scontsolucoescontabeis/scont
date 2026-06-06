@@ -454,3 +454,48 @@ export async function buscarMediaCsat({ departamento, inicio, fim } = {}) {
 
   return { media, total, distribuicao }
 }
+
+// ─── Chatbot Feriados / Datas Fiscais ─────────────────────────
+
+export async function buscarFeriados({ ano, tipo } = {}) {
+  let query = supabase
+    .from('chatbot_feriados')
+    .select('*')
+    .order('data')
+
+  if (ano) {
+    query = query
+      .gte('data', `${ano}-01-01`)
+      .lte('data', `${ano}-12-31`)
+  }
+  if (tipo) query = query.eq('tipo', tipo)
+
+  const { data } = await query
+  return data ?? []
+}
+
+export async function criarFeriado({ data, nome, tipo, msg_especifica = null }) {
+  const { data: row, error } = await supabase
+    .from('chatbot_feriados')
+    .insert({ data, nome, tipo, msg_especifica })
+    .select()
+    .single()
+  if (error) throw error
+  return row
+}
+
+export async function atualizarFeriado(id, updates) {
+  const { error } = await supabase
+    .from('chatbot_feriados')
+    .update(updates)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function excluirFeriado(id) {
+  const { error } = await supabase
+    .from('chatbot_feriados')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
