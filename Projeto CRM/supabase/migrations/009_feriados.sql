@@ -55,17 +55,11 @@ DO $$ BEGIN
       ('2026-12-25', 'Natal',                         'FERIADO', NULL),
 
       -- Datas-pico fiscais 2026
-      ('2026-01-31', 'Prazo DIRF',
-        '⚠️ Estamos em período de entrega da DIRF. O prazo de resposta pode ser superior ao habitual.'),
-      ('2026-03-31', 'Prazo DEFIS — Simples Nacional',
-        '⚠️ Estamos em período de entrega do DEFIS. O prazo de resposta pode ser superior ao habitual.'),
-      ('2026-04-30', 'Prazo entrega IRPF',
-        '⚠️ Estamos em período de entrega do Imposto de Renda. Nossa equipe está em alta demanda — o prazo de resposta pode ser superior ao habitual.'),
-      ('2026-05-31', 'Prazo DASN — MEI',
-        '⚠️ Estamos em período de entrega da DASN (MEI). O prazo de resposta pode ser superior ao habitual.'),
-      ('2026-07-31', 'Prazo ECF / IRPJ — Lucro Presumido',
-        '⚠️ Estamos em período de entrega da ECF/IRPJ. O prazo de resposta pode ser superior ao habitual.'),
-      ('2026-12-20', 'Fechamento folha — 13º salário',
-        '⚠️ Estamos em período de fechamento do 13º salário. O prazo de resposta pode ser superior ao habitual.');
+      ('2026-01-31', 'Prazo DIRF',            'DATA_PICO', '⚠️ Estamos em período de entrega da DIRF. O prazo de resposta pode ser superior ao habitual.'),
+      ('2026-03-31', 'Prazo DEFIS — Simples Nacional', 'DATA_PICO', '⚠️ Estamos em período de entrega do DEFIS. O prazo de resposta pode ser superior ao habitual.'),
+      ('2026-04-30', 'Prazo entrega IRPF',     'DATA_PICO', '⚠️ Estamos em período de entrega do Imposto de Renda. Nossa equipe está em alta demanda — o prazo de resposta pode ser superior ao habitual.'),
+      ('2026-05-31', 'Prazo DASN — MEI',       'DATA_PICO', '⚠️ Estamos em período de entrega da DASN (MEI). O prazo de resposta pode ser superior ao habitual.'),
+      ('2026-07-31', 'Prazo ECF / IRPJ — Lucro Presumido', 'DATA_PICO', '⚠️ Estamos em período de entrega da ECF/IRPJ. O prazo de resposta pode ser superior ao habitual.'),
+      ('2026-12-20', 'Fechamento folha — 13º salário', 'DATA_PICO', '⚠️ Estamos em período de fechamento do 13º salário. O prazo de resposta pode ser superior ao habitual.');
   END IF;
 END $$;
