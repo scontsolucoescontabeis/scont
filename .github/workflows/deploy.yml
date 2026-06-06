@@ -42,6 +42,11 @@ jobs:
           cp *.css  _site/ 2>/dev/null || true
           cp *.js   _site/ 2>/dev/null || true
           [ -d assets ] && cp -r assets _site/assets || true
+          # Projetos estáticos — cada subdiretório "Projeto *" (exceto CRM que tem build próprio)
+          for dir in Projeto\ */; do
+            [ "$dir" = "Projeto CRM/" ] && continue
+            cp -r "$dir" "_site/$dir"
+          done
           # CRM — app buildado em /crm
           cp -r "Projeto CRM/dist/." _site/crm/
           # Fallback SPA: GitHub Pages serve 404.html na rota desconhecida;
