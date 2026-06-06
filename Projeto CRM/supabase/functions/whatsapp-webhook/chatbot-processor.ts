@@ -1,0 +1,1125 @@
+import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+// =============================================================================
+// Tipos e interfaces
+// =============================================================================
+
+export type BotEstado =
+  | 'NOVO'
+  | 'AGUARD_DEPT'
+  | 'AGUARD_CAT'
+  | 'AGUARD_SUB'
+  | 'AGUARD_CONF'
+  | 'AGUARD_AVAL'
+  | 'CONCLUIDO'
+
+export interface BotSessao {
+  id: string
+  conversa_id: string
+  estado: BotEstado
+  dept_selecionado: string | null
+  categoria_id: string | null
+  subcategoria_id: string | null
+  tentativas_invalidas: number
+  ultimo_em: string
+}
+
+export interface ChatbotConfig {
+  bot_ativo: boolean
+  horario_inicio: string   // "08:00"
+  horario_fim: string      // "18:00"
+  dias_semana: number[]    // [1,2,3,4,5]
+  timeout_minutos: number
+  max_tentativas: number
+  msg_boas_vindas: string
+  msg_fora_horario: string
+  msg_fila: string         // suporta {departamento}, {assunto}, {protocolo}
+}
+
+export interface DeptConfig {
+  departamento: string
+  ativo: boolean
+  horario_inicio: string | null
+  horario_fim: string | null
+  msg_especifica: string | null
+}
+
+interface MenuItem {
+  id: string
+  titulo: string
+  departamento: string
+}
+
+export interface ProcessarBotParams {
+  msg: Record<string, unknown>
+  telefone: string
+  nomeContato: string
+  conversa: { id: string; protocolo: string; contato_id: string }
+  supabase: SupabaseClient
+  phoneNumberId: string
+  accessToken: string
+}
+
+// =============================================================================
+// Constantes
+// =============================================================================
+
+const DEPT_LABELS: Record<string, string> = {
+  PESSOAL: 'Depto. Pessoal',
+  CONTABIL: 'Contabilidade',
+  TRIBUTARIO: 'Tributário / Fiscal',
+  ADMINISTRATIVO: 'Administrativo',
+}
+
+const DEPT_EMOJIS: Record<string, string> = {
+  PESSOAL: '👥',
+  CONTABIL: '📊',
+  TRIBUTARIO: '🧾',
+  ADMINISTRATIVO: '🏢',
+}
+
+const DEPARTAMENTOS = ['PESSOAL', 'CONTABIL', 'TRIBUTARIO', 'ADMINISTRATIVO']
+
+// =============================================================================
+// Funções utilitárias exportadas (testáveis)
+// =============================================================================
+
+/**
+ * Verifica se o horário atual está dentro do expediente.
+ * O deptConfig, quando presente e com horário definido, sobrescreve o horário global.
+ */
+export function dentroDoHorario(
+  config: ChatbotConfig,
+  deptConfig: DeptConfig | null,
+  agora?: Date,
+): boolean {
+  const now = agora ?? new Date()
+
+  // Dia da semana: JS usa 0=domingo … 6=sábado; dias_semana usa 1=segunda … 7=domingo (ISO)
+  const diaSemanaJS = now.getDay() // 0=dom
+  const diaSemanaISO = diaSemanaJS === 0 ? 7 : diaSemanaJS
+  if (!config.dias_semana.includes(diaSemanaISO)) return false
+
+  const horaAtual = now.getHours() * 60 + now.getMinutes()
+
+  // Usa horário do dept (se definido) ou cai de volta para o global
+  const inicioStr =
+    deptConfig?.horario_inicio ?? config.horario_inicio
+  const fimStr =
+    deptConfig?.horario_fim ?? config.horario_fim
+
+  const [hI, mI] = inicioStr.split(':').map(Number)
+  const [hF, mF] = fimStr.split(':').map(Number)
+  const inicio = hI * 60 + mI
+  const fim = hF * 60 + mF
+
+  return horaAtual >= inicio && horaAtual < fim
+}
+
+/**
+ * Extrai a escolha do cliente da mensagem WhatsApp.
+ * Suporta: list_reply interativo, texto numérico, texto "0" / "atendente".
+ */
+export function resolverInputCliente(msg: Record<string, unknown>): {
+  tipo: 'lista' | 'numero' | 'escape' | 'desconhecido'
+  valor: string
+} {
+  // Mensagem interativa do tipo list_reply
+  if (msg.type === 'interactive') {
+    const interactive = msg.interactive as Record<string, unknown> | undefined
+    if (interactive?.type === 'list_reply') {
+      const reply = interactive.list_reply as Record<string, unknown>
+      return { tipo: 'lista', valor: (reply?.id as string) ?? '' }
+    }
+    if (interactive?.type === 'button_reply') {
+      const reply = interactive.button_reply as Record<string, unknown>
+      return { tipo: 'lista', valor: (reply?.id as string) ?? '' }
+    }
+  }
+
+  // Texto simples
+  if (msg.type === 'text') {
+    const body = ((msg.text as Record<string, unknown>)?.body as string ?? '').trim()
+    const lower = body.toLowerCase()
+
+    // Escape: "0", "atendente", "humano", "cancelar"
+    if (lower === '0' || lower === 'atendente' || lower === 'humano' || lower === 'cancelar') {
+      return { tipo: 'escape', valor: '' }
+    }
+
+    // Numérico
+    if (/^\d+$/.test(body)) {
+      return { tipo: 'numero', valor: body }
+    }
+
+    // Tenta também "SIM" / "NAO" como texto simples (usados em AGUARD_CONF)
+    return { tipo: 'desconhecido', valor: body }
+  }
+
+  return { tipo: 'desconhecido', valor: '' }
+}
+
+// =============================================================================
+// Utilitários internos
+// =============================================================================
+
+function sessaoExpirada(sessao: BotSessao, timeoutMinutos: number): boolean {
+  return (Date.now() - new Date(sessao.ultimo_em).getTime()) / 60000 > timeoutMinutos
+}
+
+function resolverMsgFila(
+  template: string,
+  vars: { departamento: string; assunto: string; protocolo: string },
+): string {
+  return template
+    .replace(/\{departamento\}/g, vars.departamento)
+    .replace(/\{assunto\}/g, vars.assunto)
+    .replace(/\{protocolo\}/g, vars.protocolo)
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
+// =============================================================================
+// Funções de envio WhatsApp
+// =============================================================================
+
+async function enviarTexto(
+  telefone: string,
+  corpo: string,
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<void> {
+  await fetch(`https://graph.facebook.com/v18.0/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      to: telefone,
+      type: 'text',
+      text: { body: corpo },
+    }),
+  })
+}
+
+async function enviarListaInterativa(
+  telefone: string,
+  corpo: string,
+  botaoLabel: string,
+  secaoTitulo: string,
+  opcoes: Array<{ id: string; title: string; description?: string }>,
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<boolean> {
+  // Máximo 10 rows por lista (limitação da Meta API)
+  let rows = opcoes.slice(0, 10)
+  if (opcoes.length > 10) {
+    rows = opcoes.slice(0, 9)
+    rows.push({ id: 'OUTROS', title: 'Outros' })
+  }
+
+  const payload = {
+    messaging_product: 'whatsapp',
+    to: telefone,
+    type: 'interactive',
+    interactive: {
+      type: 'list',
+      body: { text: corpo },
+      action: {
+        button: botaoLabel,
+        sections: [
+          {
+            title: secaoTitulo,
+            rows: rows.map((r) => ({
+              id: r.id,
+              title: r.title,
+              ...(r.description ? { description: r.description } : {}),
+            })),
+          },
+        ],
+      },
+    },
+  }
+
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      },
+    )
+    const json = await res.json() as Record<string, unknown>
+    if (!res.ok || json.error) {
+      console.error('[chatbot] enviarListaInterativa erro:', JSON.stringify(json))
+      return false
+    }
+    return true
+  } catch (err) {
+    console.error('[chatbot] enviarListaInterativa exception:', err)
+    return false
+  }
+}
+
+async function enviarMenuNumerado(
+  telefone: string,
+  titulo: string,
+  opcoes: Array<{ id: string; title: string }>,
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<void> {
+  const linhas = opcoes.map((o, i) => `${i + 1}. ${o.title}`)
+  const corpo = `${titulo}\n\n${linhas.join('\n')}\n\n_Digite o número da opção_`
+  await enviarTexto(telefone, corpo, phoneNumberId, accessToken)
+}
+
+/** Tenta lista interativa; se falhar, envia menu numerado em texto. */
+async function enviarMenu(
+  telefone: string,
+  corpo: string,
+  botaoLabel: string,
+  secaoTitulo: string,
+  opcoes: Array<{ id: string; title: string; description?: string }>,
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<void> {
+  const ok = await enviarListaInterativa(
+    telefone, corpo, botaoLabel, secaoTitulo, opcoes, phoneNumberId, accessToken,
+  )
+  if (!ok) {
+    await enviarMenuNumerado(telefone, corpo, opcoes, phoneNumberId, accessToken)
+  }
+}
+
+// =============================================================================
+// Banco de dados auxiliares
+// =============================================================================
+
+async function atualizarSessao(
+  supabase: SupabaseClient,
+  id: string,
+  updates: Partial<BotSessao>,
+): Promise<void> {
+  await supabase
+    .from('chatbot_sessoes')
+    .update({ ...updates, ultimo_em: new Date().toISOString() })
+    .eq('id', id)
+}
+
+async function inserirMensagemSistema(
+  supabase: SupabaseClient,
+  conversaId: string,
+  texto: string,
+): Promise<void> {
+  await supabase.from('mensagens').insert({
+    conversa_id: conversaId,
+    conteudo: texto,
+    tipo: 'text',
+    origem: 'SISTEMA',
+    lida: true,
+  })
+}
+
+async function aplicarTagsAutomaticas(
+  supabase: SupabaseClient,
+  conversaId: string,
+  deptLabel: string,
+  categoriaTitulo: string,
+): Promise<void> {
+  const tagNames = [
+    deptLabel.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim(),
+    categoriaTitulo.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim(),
+  ].filter(Boolean)
+
+  for (const nome of tagNames) {
+    // Upsert da tag (cria se não existir)
+    await supabase.from('tags').insert({ nome }).onConflict('nome').ignoreDuplicates()
+    const { data: tag } = await supabase
+      .from('tags')
+      .select('id')
+      .eq('nome', nome)
+      .single()
+    if (!tag?.id) continue
+
+    // Associa à conversa
+    await supabase
+      .from('conversa_tags')
+      .insert({ conversa_id: conversaId, tag_id: tag.id })
+      .onConflict(['conversa_id', 'tag_id'])
+      .ignoreDuplicates()
+  }
+}
+
+// =============================================================================
+// Escalar para humano
+// =============================================================================
+
+async function escalarParaHumano(
+  supabase: SupabaseClient,
+  sessao: BotSessao,
+  conversaId: string,
+  telefone: string,
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<void> {
+  await enviarTexto(
+    telefone,
+    'Conectando você a um atendente humano 👤\nAguarde, em breve você será atendido.',
+    phoneNumberId,
+    accessToken,
+  )
+  await inserirMensagemSistema(supabase, conversaId, '🤖 Cliente solicitou atendimento humano')
+  await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
+}
+
+// =============================================================================
+// Menus de departamento / categoria / subcategoria
+// =============================================================================
+
+function montarOpcoesDepts(): Array<{ id: string; title: string }> {
+  const opts = DEPARTAMENTOS.map((d) => ({
+    id: d,
+    title: `${DEPT_EMOJIS[d] ?? ''} ${DEPT_LABELS[d] ?? d}`,
+  }))
+  opts.push({ id: 'HUMANO', title: '👤 Falar com atendente' })
+  return opts
+}
+
+async function enviarMenuDepts(
+  telefone: string,
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<void> {
+  const opcoes = montarOpcoesDepts()
+  await enviarMenu(
+    telefone,
+    'Olá! Selecione o departamento para o qual deseja falar:',
+    'Ver opções',
+    'Departamentos',
+    opcoes,
+    phoneNumberId,
+    accessToken,
+  )
+}
+
+async function enviarCategorias(
+  supabase: SupabaseClient,
+  telefone: string,
+  dept: string,
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<MenuItem[]> {
+  const { data: cats } = await supabase
+    .from('chatbot_menus')
+    .select('id, titulo, departamento')
+    .eq('departamento', dept)
+    .eq('nivel', 1)
+    .eq('ativo', true)
+    .order('ordem')
+
+  const categorias: MenuItem[] = cats ?? []
+
+  if (categorias.length === 0) {
+    await enviarTexto(
+      telefone,
+      'Não há categorias disponíveis para esse departamento. Aguarde um atendente.',
+      phoneNumberId,
+      accessToken,
+    )
+    return categorias
+  }
+
+  const opcoes = categorias.map((c, i) => ({
+    id: c.id,
+    title: `${i + 1}. ${c.titulo}`,
+  }))
+  opcoes.push({ id: 'HUMANO', title: '👤 Falar com atendente' })
+
+  const deptLabel = DEPT_LABELS[dept] ?? dept
+  await enviarMenu(
+    telefone,
+    `*${DEPT_EMOJIS[dept] ?? ''} ${deptLabel}*\nSelecione o assunto:`,
+    'Ver assuntos',
+    'Assuntos',
+    opcoes,
+    phoneNumberId,
+    accessToken,
+  )
+
+  return categorias
+}
+
+async function enviarSubCategorias(
+  supabase: SupabaseClient,
+  telefone: string,
+  categoriaId: string,
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<MenuItem[]> {
+  const { data: subs } = await supabase
+    .from('chatbot_menus')
+    .select('id, titulo, departamento')
+    .eq('parent_id', categoriaId)
+    .eq('nivel', 2)
+    .eq('ativo', true)
+    .order('ordem')
+
+  const subcats: MenuItem[] = subs ?? []
+
+  if (subcats.length === 0) {
+    // Categoria sem subcategorias — vai direto para confirmação
+    return subcats
+  }
+
+  const opcoes = subcats.map((s, i) => ({
+    id: s.id,
+    title: `${i + 1}. ${s.titulo}`,
+  }))
+  opcoes.push({ id: 'HUMANO', title: '👤 Falar com atendente' })
+
+  await enviarMenu(
+    telefone,
+    'Selecione o sub-assunto:',
+    'Ver sub-assuntos',
+    'Sub-assuntos',
+    opcoes,
+    phoneNumberId,
+    accessToken,
+  )
+
+  return subcats
+}
+
+async function enviarConfirmacao(
+  supabase: SupabaseClient,
+  telefone: string,
+  sessao: BotSessao,
+  phoneNumberId: string,
+  accessToken: string,
+): Promise<void> {
+  const deptLabel = DEPT_LABELS[sessao.dept_selecionado ?? ''] ?? sessao.dept_selecionado ?? ''
+
+  let catTitulo = ''
+  let subTitulo = ''
+
+  if (sessao.categoria_id) {
+    const { data: cat } = await supabase
+      .from('chatbot_menus')
+      .select('titulo')
+      .eq('id', sessao.categoria_id)
+      .single()
+    catTitulo = cat?.titulo ?? ''
+  }
+
+  if (sessao.subcategoria_id) {
+    const { data: sub } = await supabase
+      .from('chatbot_menus')
+      .select('titulo')
+      .eq('id', sessao.subcategoria_id)
+      .single()
+    subTitulo = sub?.titulo ?? ''
+  }
+
+  const resumo = subTitulo
+    ? `${deptLabel} › ${catTitulo} › ${subTitulo}`
+    : `${deptLabel} › ${catTitulo}`
+
+  await enviarMenu(
+    telefone,
+    `Confirma o encaminhamento?\n\n*${resumo}*`,
+    'Responder',
+    'Confirmação',
+    [
+      { id: 'CONFIRMAR', title: '✅ Sim, confirmar' },
+      { id: 'CORRIGIR', title: '🔄 Não, corrigir' },
+    ],
+    phoneNumberId,
+    accessToken,
+  )
+}
+
+// =============================================================================
+// Handlers por estado
+// =============================================================================
+
+async function handleNOVO(
+  sessao: BotSessao,
+  params: ProcessarBotParams,
+  config: ChatbotConfig,
+): Promise<void> {
+  const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
+
+  // Verifica horário (sem dept específico ainda)
+  if (!dentroDoHorario(config, null)) {
+    await enviarTexto(telefone, config.msg_fora_horario, phoneNumberId, accessToken)
+    await inserirMensagemSistema(supabase, conversa.id, '🤖 Cliente contatou fora do horário de atendimento')
+    await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
+    return
+  }
+
+  // Verifica cliente recorrente (conversa encerrada nos últimos 30 dias com bot_departamento preenchido)
+  const { data: recorrente } = await supabase
+    .from('conversas')
+    .select('bot_departamento, bot_categoria, bot_categoria_id')
+    .eq('contato_id', conversa.contato_id)
+    .eq('status', 'ENCERRADA')
+    .not('bot_departamento', 'is', null)
+    .gt('encerrado_em', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+    .order('encerrado_em', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (recorrente?.bot_departamento) {
+    const deptAnterior = recorrente.bot_departamento
+    const catAnterior = recorrente.bot_categoria ?? 'assunto anterior'
+    const catIdAnterior = recorrente.bot_categoria_id
+
+    // Guarda dept e categoria anteriores na sessão para uso futuro
+    await atualizarSessao(supabase, sessao.id, {
+      estado: 'AGUARD_DEPT',
+      dept_selecionado: deptAnterior,
+      categoria_id: catIdAnterior ?? null,
+    })
+
+    await enviarMenu(
+      telefone,
+      `Olá! Notei que você já nos contactou sobre *${catAnterior}* (${deptAnterior}).\nDeseja o mesmo assunto?`,
+      'Responder',
+      'Opções',
+      [
+        { id: `RECORRENTE:${deptAnterior}:${catIdAnterior ?? ''}`, title: '✅ Sim, mesmo assunto' },
+        { id: 'NOVO_ASSUNTO', title: '🔄 Não, novo assunto' },
+        { id: 'HUMANO', title: '👤 Falar com atendente' },
+      ],
+      phoneNumberId,
+      accessToken,
+    )
+  } else {
+    // Novo cliente
+    await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_DEPT' })
+
+    await enviarTexto(
+      telefone,
+      config.msg_boas_vindas,
+      phoneNumberId,
+      accessToken,
+    )
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken)
+  }
+}
+
+async function handleAGUARD_DEPT(
+  sessao: BotSessao,
+  params: ProcessarBotParams,
+  config: ChatbotConfig,
+  input: ReturnType<typeof resolverInputCliente>,
+): Promise<void> {
+  const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
+
+  if (input.valor === 'HUMANO') {
+    await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+    return
+  }
+
+  // Opção recorrente: RECORRENTE:{dept}:{cat_id}
+  if (input.valor.startsWith('RECORRENTE:')) {
+    const partes = input.valor.split(':')
+    const dept = partes[1] ?? ''
+    const catId = partes[2] && partes[2].length > 0 ? partes[2] : null
+
+    await atualizarSessao(supabase, sessao.id, {
+      estado: 'AGUARD_SUB',
+      dept_selecionado: dept,
+      categoria_id: catId,
+      tentativas_invalidas: 0,
+    })
+
+    if (catId) {
+      const subs = await enviarSubCategorias(supabase, telefone, catId, phoneNumberId, accessToken)
+      // Se não há subcategorias, vai direto para confirmação
+      if (subs.length === 0) {
+        await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_CONF' })
+        await enviarConfirmacao(supabase, telefone, { ...sessao, dept_selecionado: dept, categoria_id: catId, estado: 'AGUARD_CONF', subcategoria_id: null }, phoneNumberId, accessToken)
+      }
+    } else {
+      // Sem categoria prévia — envia categorias do dept
+      await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_CAT', dept_selecionado: dept, categoria_id: null })
+      await enviarCategorias(supabase, telefone, dept, phoneNumberId, accessToken)
+    }
+    return
+  }
+
+  // Cliente escolheu novo assunto (estava no fluxo recorrente)
+  if (input.valor === 'NOVO_ASSUNTO') {
+    await atualizarSessao(supabase, sessao.id, {
+      dept_selecionado: null,
+      categoria_id: null,
+      tentativas_invalidas: 0,
+    })
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken)
+    return
+  }
+
+  // Departamento direto (ID do departamento)
+  let dept: string | null = null
+  if (DEPARTAMENTOS.includes(input.valor)) {
+    dept = input.valor
+  } else if (input.tipo === 'numero') {
+    const idx = parseInt(input.valor, 10) - 1
+    dept = DEPARTAMENTOS[idx] ?? null
+  }
+
+  if (dept) {
+    await atualizarSessao(supabase, sessao.id, {
+      estado: 'AGUARD_CAT',
+      dept_selecionado: dept,
+      categoria_id: null,
+      tentativas_invalidas: 0,
+    })
+    await enviarCategorias(supabase, telefone, dept, phoneNumberId, accessToken)
+    return
+  }
+
+  // Input inválido
+  const novasTentativas = sessao.tentativas_invalidas + 1
+  if (novasTentativas >= config.max_tentativas) {
+    await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+  } else {
+    await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: novasTentativas })
+    await enviarTexto(
+      telefone,
+      `Opção inválida. Por favor, escolha um número do menu (tentativa ${novasTentativas}/${config.max_tentativas}).`,
+      phoneNumberId,
+      accessToken,
+    )
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken)
+  }
+}
+
+async function handleAGUARD_CAT(
+  sessao: BotSessao,
+  params: ProcessarBotParams,
+  config: ChatbotConfig,
+  input: ReturnType<typeof resolverInputCliente>,
+): Promise<void> {
+  const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
+
+  if (input.valor === 'HUMANO') {
+    await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+    return
+  }
+
+  const dept = sessao.dept_selecionado ?? ''
+
+  // Carrega categorias para validar o input
+  const { data: cats } = await supabase
+    .from('chatbot_menus')
+    .select('id, titulo, departamento')
+    .eq('departamento', dept)
+    .eq('nivel', 1)
+    .eq('ativo', true)
+    .order('ordem')
+
+  const categorias: MenuItem[] = cats ?? []
+
+  let catEscolhida: MenuItem | null = null
+
+  if (input.tipo === 'lista' && isUuid(input.valor)) {
+    catEscolhida = categorias.find((c) => c.id === input.valor) ?? null
+  } else if (input.tipo === 'numero') {
+    const idx = parseInt(input.valor, 10) - 1
+    catEscolhida = categorias[idx] ?? null
+  } else if (input.tipo === 'desconhecido' && isUuid(input.valor)) {
+    catEscolhida = categorias.find((c) => c.id === input.valor) ?? null
+  }
+
+  if (catEscolhida) {
+    await atualizarSessao(supabase, sessao.id, {
+      estado: 'AGUARD_SUB',
+      categoria_id: catEscolhida.id,
+      tentativas_invalidas: 0,
+    })
+
+    const subs = await enviarSubCategorias(supabase, telefone, catEscolhida.id, phoneNumberId, accessToken)
+
+    // Se não há subcategorias, pula direto para confirmação
+    if (subs.length === 0) {
+      await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_CONF', subcategoria_id: null })
+      await enviarConfirmacao(
+        supabase,
+        telefone,
+        { ...sessao, categoria_id: catEscolhida.id, estado: 'AGUARD_CONF', subcategoria_id: null },
+        phoneNumberId,
+        accessToken,
+      )
+    }
+    return
+  }
+
+  // Input inválido
+  const novasTentativas = sessao.tentativas_invalidas + 1
+  if (novasTentativas >= config.max_tentativas) {
+    await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+  } else {
+    await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: novasTentativas })
+    await enviarTexto(
+      telefone,
+      `Opção inválida. Escolha um número do menu (tentativa ${novasTentativas}/${config.max_tentativas}).`,
+      phoneNumberId,
+      accessToken,
+    )
+    await enviarCategorias(supabase, telefone, dept, phoneNumberId, accessToken)
+  }
+}
+
+async function handleAGUARD_SUB(
+  sessao: BotSessao,
+  params: ProcessarBotParams,
+  config: ChatbotConfig,
+  input: ReturnType<typeof resolverInputCliente>,
+): Promise<void> {
+  const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
+
+  if (input.valor === 'HUMANO') {
+    await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+    return
+  }
+
+  const catId = sessao.categoria_id ?? ''
+
+  // Carrega subcategorias para validar o input
+  const { data: subs } = await supabase
+    .from('chatbot_menus')
+    .select('id, titulo, departamento')
+    .eq('parent_id', catId)
+    .eq('nivel', 2)
+    .eq('ativo', true)
+    .order('ordem')
+
+  const subcats: MenuItem[] = subs ?? []
+
+  let subEscolhida: MenuItem | null = null
+
+  if (input.tipo === 'lista' && isUuid(input.valor)) {
+    subEscolhida = subcats.find((s) => s.id === input.valor) ?? null
+  } else if (input.tipo === 'numero') {
+    const idx = parseInt(input.valor, 10) - 1
+    subEscolhida = subcats[idx] ?? null
+  } else if (input.tipo === 'desconhecido' && isUuid(input.valor)) {
+    subEscolhida = subcats.find((s) => s.id === input.valor) ?? null
+  }
+
+  if (subEscolhida) {
+    await atualizarSessao(supabase, sessao.id, {
+      estado: 'AGUARD_CONF',
+      subcategoria_id: subEscolhida.id,
+      tentativas_invalidas: 0,
+    })
+    await enviarConfirmacao(
+      supabase,
+      telefone,
+      { ...sessao, subcategoria_id: subEscolhida.id, estado: 'AGUARD_CONF' },
+      phoneNumberId,
+      accessToken,
+    )
+    return
+  }
+
+  // Input inválido
+  const novasTentativas = sessao.tentativas_invalidas + 1
+  if (novasTentativas >= config.max_tentativas) {
+    await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+  } else {
+    await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: novasTentativas })
+    await enviarTexto(
+      telefone,
+      `Opção inválida. Escolha um número do menu (tentativa ${novasTentativas}/${config.max_tentativas}).`,
+      phoneNumberId,
+      accessToken,
+    )
+    await enviarSubCategorias(supabase, telefone, catId, phoneNumberId, accessToken)
+  }
+}
+
+async function handleAGUARD_CONF(
+  sessao: BotSessao,
+  params: ProcessarBotParams,
+  config: ChatbotConfig,
+  input: ReturnType<typeof resolverInputCliente>,
+): Promise<void> {
+  const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
+
+  const valor = input.valor.toUpperCase()
+  const confirmou =
+    valor === 'CONFIRMAR' ||
+    valor === 'SIM' ||
+    valor === '1' ||
+    input.valor === '1'
+
+  const corrigiu =
+    valor === 'CORRIGIR' ||
+    valor === 'NAO' ||
+    valor === 'NÃO' ||
+    input.valor === '0'
+
+  if (corrigiu) {
+    // Reinicia seleção
+    await atualizarSessao(supabase, sessao.id, {
+      estado: 'AGUARD_DEPT',
+      dept_selecionado: null,
+      categoria_id: null,
+      subcategoria_id: null,
+      tentativas_invalidas: 0,
+    })
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken)
+    return
+  }
+
+  if (confirmou) {
+    const dept = sessao.dept_selecionado ?? ''
+    const deptLabel = DEPT_LABELS[dept] ?? dept
+
+    // Busca títulos para montar mensagens
+    let catTitulo = ''
+    let subTitulo = ''
+
+    if (sessao.categoria_id) {
+      const { data: cat } = await supabase
+        .from('chatbot_menus')
+        .select('titulo')
+        .eq('id', sessao.categoria_id)
+        .single()
+      catTitulo = cat?.titulo ?? ''
+    }
+
+    if (sessao.subcategoria_id) {
+      const { data: sub } = await supabase
+        .from('chatbot_menus')
+        .select('titulo')
+        .eq('id', sessao.subcategoria_id)
+        .single()
+      subTitulo = sub?.titulo ?? ''
+    }
+
+    const assunto = subTitulo
+      ? `${catTitulo} › ${subTitulo}`
+      : catTitulo
+
+    // 1. Atualiza a conversa com departamento e dados do bot
+    await supabase
+      .from('conversas')
+      .update({
+        departamento: dept,
+        bot_departamento: deptLabel,
+        bot_categoria: catTitulo,
+        bot_subcategoria: subTitulo || null,
+        bot_categoria_id: sessao.categoria_id,
+      })
+      .eq('id', conversa.id)
+
+    // 2. Envia mensagem de fila
+    const msgFila = resolverMsgFila(config.msg_fila, {
+      departamento: deptLabel,
+      assunto,
+      protocolo: conversa.protocolo,
+    })
+    await enviarTexto(telefone, msgFila, phoneNumberId, accessToken)
+
+    // 3. Insere mensagem SISTEMA de roteamento
+    const resumo = subTitulo
+      ? `${deptLabel} › ${catTitulo} › ${subTitulo}`
+      : `${deptLabel} › ${catTitulo}`
+    await inserirMensagemSistema(supabase, conversa.id, `🤖 Bot roteou: ${resumo}`)
+
+    // 4. Aplica tags automáticas
+    await aplicarTagsAutomaticas(supabase, conversa.id, deptLabel, catTitulo)
+
+    // 5. Atualiza sessão para CONCLUIDO
+    await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
+    return
+  }
+
+  // Input inválido
+  const novasTentativas = sessao.tentativas_invalidas + 1
+  if (novasTentativas >= config.max_tentativas) {
+    await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+  } else {
+    await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: novasTentativas })
+    await enviarTexto(
+      telefone,
+      `Por favor, confirme com *Sim* ou *Não* (tentativa ${novasTentativas}/${config.max_tentativas}).`,
+      phoneNumberId,
+      accessToken,
+    )
+    await enviarConfirmacao(supabase, telefone, sessao, phoneNumberId, accessToken)
+  }
+}
+
+async function processarCSAT(
+  sessao: BotSessao,
+  params: ProcessarBotParams,
+  input: ReturnType<typeof resolverInputCliente>,
+): Promise<void> {
+  const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
+
+  const notaStr = input.tipo === 'lista' ? input.valor : input.tipo === 'numero' ? input.valor : ''
+  const nota = parseInt(notaStr, 10)
+
+  if (nota >= 1 && nota <= 5) {
+    await supabase
+      .from('chatbot_avaliacoes')
+      .insert({ conversa_id: conversa.id, nota })
+
+    await enviarTexto(
+      telefone,
+      'Obrigado pelo feedback! 🙏 Até a próxima.',
+      phoneNumberId,
+      accessToken,
+    )
+    await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
+    return
+  }
+
+  // Input inválido na avaliação — tenta apenas 1 vez, depois encerra silenciosamente
+  if (sessao.tentativas_invalidas >= 1) {
+    await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
+    return
+  }
+
+  await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: sessao.tentativas_invalidas + 1 })
+
+  await enviarMenu(
+    telefone,
+    'Por favor, avalie nosso atendimento de 1 a 5:',
+    'Avaliar',
+    'Avaliação',
+    [
+      { id: '5', title: '⭐⭐⭐⭐⭐ Excelente' },
+      { id: '4', title: '⭐⭐⭐⭐ Bom' },
+      { id: '3', title: '⭐⭐⭐ Regular' },
+      { id: '2', title: '⭐⭐ Ruim' },
+      { id: '1', title: '⭐ Péssimo' },
+    ],
+    phoneNumberId,
+    accessToken,
+  )
+}
+
+// =============================================================================
+// Função principal exportada
+// =============================================================================
+
+/**
+ * Entry point chamado pelo whatsapp-webhook para cada mensagem.
+ * Retorna true se o bot tratou a mensagem (não deve ser salva como mensagem normal do cliente).
+ * Retorna false se o bot está inativo ou a sessão já está CONCLUIDA.
+ */
+export async function processarMensagemBot(params: ProcessarBotParams): Promise<boolean> {
+  const { msg, telefone, conversa, supabase, phoneNumberId, accessToken } = params
+
+  // 1. Carrega configuração global do chatbot
+  const { data: configRaw } = await supabase
+    .from('chatbot_config')
+    .select('*')
+    .eq('id', 1)
+    .single()
+
+  const config = configRaw as ChatbotConfig | null
+
+  // 2. Bot inativo → não interferir
+  if (!config || !config.bot_ativo) return false
+
+  // 3. Extrai input do cliente
+  const input = resolverInputCliente(msg)
+
+  // 4. Busca sessão existente
+  const { data: sessaoRaw } = await supabase
+    .from('chatbot_sessoes')
+    .select('*')
+    .eq('conversa_id', conversa.id)
+    .single()
+
+  let sessao = sessaoRaw as BotSessao | null
+
+  // 5. Sessão CONCLUIDA → bot não interfere (agente humano atende)
+  if (sessao && sessao.estado === 'CONCLUIDO') return false
+
+  // 6. Sessão AGUARD_AVAL → processa avaliação CSAT
+  if (sessao && sessao.estado === 'AGUARD_AVAL') {
+    await processarCSAT(sessao, params, input)
+    return true
+  }
+
+  // 7. Sessão não existe → cria nova em estado NOVO
+  if (!sessao) {
+    const { data: nova } = await supabase
+      .from('chatbot_sessoes')
+      .insert({
+        conversa_id: conversa.id,
+        estado: 'NOVO',
+        tentativas_invalidas: 0,
+      })
+      .select()
+      .single()
+
+    sessao = nova as BotSessao
+    if (!sessao) {
+      console.error('[chatbot] Falha ao criar sessão para conversa', conversa.id)
+      return false
+    }
+  }
+
+  // 8. Sessão expirada por inatividade
+  if (sessaoExpirada(sessao, config.timeout_minutos)) {
+    await enviarTexto(
+      telefone,
+      'Sua sessão expirou por inatividade. Se precisar de ajuda, envie uma nova mensagem.',
+      phoneNumberId,
+      accessToken,
+    )
+    await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
+    return true
+  }
+
+  // 9. Escape → escalona para humano
+  if (input.tipo === 'escape') {
+    await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+    return true
+  }
+
+  // 10. Roteamento para o handler do estado atual
+  switch (sessao.estado) {
+    case 'NOVO':
+      await handleNOVO(sessao, params, config)
+      break
+
+    case 'AGUARD_DEPT':
+      await handleAGUARD_DEPT(sessao, params, config, input)
+      break
+
+    case 'AGUARD_CAT':
+      await handleAGUARD_CAT(sessao, params, config, input)
+      break
+
+    case 'AGUARD_SUB':
+      await handleAGUARD_SUB(sessao, params, config, input)
+      break
+
+    case 'AGUARD_CONF':
+      await handleAGUARD_CONF(sessao, params, config, input)
+      break
+
+    default:
+      console.warn('[chatbot] Estado desconhecido:', sessao.estado)
+  }
+
+  return true
+}
