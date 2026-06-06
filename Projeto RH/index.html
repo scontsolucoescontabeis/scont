@@ -96,6 +96,14 @@
                         <h4>Jornada de Trabalho</h4>
                         <input type="text" id="jornada" value="08:00" maxlength="5" placeholder="HH:MM">
                         <small>Horas diárias de trabalho</small>
+                        <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="jornadaSabadoAtiva" style="width: 16px; height: 16px; cursor: pointer;" onchange="toggleJornadaSabado(this.checked)">
+                            <label for="jornadaSabadoAtiva" style="font-size: 12px; cursor: pointer; margin: 0;">Jornada diferenciada para o Sábado</label>
+                        </div>
+                        <div id="jornadaSabadoContainer" style="display: none; margin-top: 8px;">
+                            <input type="text" id="jornadaSabado" value="04:00" maxlength="5" placeholder="HH:MM">
+                            <small>Horas no Sábado</small>
+                        </div>
                     </div>
                    <div class="setting-card">
     <h4>Horas Extras</h4>

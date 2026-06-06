@@ -66,6 +66,8 @@ CREATE TABLE IF NOT EXISTS public.rh_saves (
     nome_trabalhador            TEXT NOT NULL,
     competencia                 TEXT NOT NULL,      -- formato MM/AAAA
     jornada                     TEXT,               -- ex: "08:00-12:00 13:00-17:00"
+    jornada_sabado              TEXT,               -- ex: "04:00" (jornada diferenciada do Sábado)
+    jornada_sabado_ativa        BOOLEAN DEFAULT FALSE,
     rule_extra_100_opcional     BOOLEAN DEFAULT FALSE,
 
     -- Campos JSON com os dados da folha

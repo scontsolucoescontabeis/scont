@@ -17,6 +17,8 @@ const state = {
     abaAtivaIndex: 0,
     feriados: [],
     jornada: '08:00',
+    jornadaSabado: '04:00',
+    jornadaSabadoAtiva: false,
     ruleExtra100Optional: false,
     terceiroTurno: false,
     resultados: []
@@ -30,6 +32,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('jornada').addEventListener('input', (e) => {
         e.target.value = formatarHora(e.target.value);
     });
+    document.getElementById('jornadaSabado').addEventListener('input', (e) => {
+        e.target.value = formatarHora(e.target.value);
+    });
     document.getElementById('novaDataFeriado').addEventListener('input', (e) => {
         e.target.value = formatarData(e.target.value);
     });
@@ -39,6 +44,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.terceiroTurno = localStorage.getItem('rh_terceiro_turno') === 'true';
     document.getElementById('terceiroTurno').checked = state.terceiroTurno;
 });
+
+window.toggleJornadaSabado = function(ativa) {
+    document.getElementById('jornadaSabadoContainer').style.display = ativa ? 'block' : 'none';
+};
 
 // --- CARREGAMENTO DE DADOS (SUPABASE) ---
 async function carregarEmpresas() {
@@ -275,8 +284,10 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
         
         if (registrosParaCarregar.length > 0) {
             state.jornada = registrosParaCarregar[0].jornada || '08:00';
+            state.jornadaSabado = registrosParaCarregar[0].jornada_sabado || '04:00';
+            state.jornadaSabadoAtiva = registrosParaCarregar[0].jornada_sabado_ativa || false;
             state.ruleExtra100Optional = registrosParaCarregar[0].rule_extra_100_opcional || false;
-            
+
             if (registrosParaCarregar[0].feriados_json) {
                 try {
                     state.feriados = JSON.parse(registrosParaCarregar[0].feriados_json);
@@ -286,10 +297,13 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
                 }
                 renderizarTabelaFeriados();
             }
-            
+
             document.getElementById('jornada').value = state.jornada;
+            document.getElementById('jornadaSabado').value = state.jornadaSabado;
+            document.getElementById('jornadaSabadoAtiva').checked = state.jornadaSabadoAtiva;
+            document.getElementById('jornadaSabadoContainer').style.display = state.jornadaSabadoAtiva ? 'block' : 'none';
             document.getElementById('ruleExtra100Optional').checked = state.ruleExtra100Optional;
-            
+
             // ✅ Função auxiliar para parse seguro
             const parseJSONSeguro = (jsonString, defaultValue = null) => {
                 if (!jsonString) return defaultValue;
@@ -417,8 +431,10 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
         
         if (registrosParaCarregar.length > 0) {
             state.jornada = registrosParaCarregar[0].jornada || '08:00';
+            state.jornadaSabado = registrosParaCarregar[0].jornada_sabado || '04:00';
+            state.jornadaSabadoAtiva = registrosParaCarregar[0].jornada_sabado_ativa || false;
             state.ruleExtra100Optional = registrosParaCarregar[0].rule_extra_100_opcional || false;
-            
+
             if (registrosParaCarregar[0].feriados_json) {
                 try {
                     state.feriados = JSON.parse(registrosParaCarregar[0].feriados_json);
@@ -428,10 +444,13 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
                 }
                 renderizarTabelaFeriados();
             }
-            
+
             document.getElementById('jornada').value = state.jornada;
+            document.getElementById('jornadaSabado').value = state.jornadaSabado;
+            document.getElementById('jornadaSabadoAtiva').checked = state.jornadaSabadoAtiva;
+            document.getElementById('jornadaSabadoContainer').style.display = state.jornadaSabadoAtiva ? 'block' : 'none';
             document.getElementById('ruleExtra100Optional').checked = state.ruleExtra100Optional;
-            
+
             const parseJSONSeguro = (jsonString, defaultValue = null) => {
                 if (!jsonString) return defaultValue;
                 if (typeof jsonString !== 'string') return defaultValue;
@@ -718,6 +737,7 @@ function renderizarConteudoAba() {
                         <option value="">-</option>
                         ${!temEntrada ? `<option value="folga" ${flagFolga === 'folga' ? 'selected' : ''}>Folga</option>` : ''}
                         ${!temEntrada ? `<option value="falta" ${flagFolga === 'falta' ? 'selected' : ''}>Falta</option>` : ''}
+                        ${!temEntrada ? `<option value="compensacao" ${flagFolga === 'compensacao' ? 'selected' : ''}>Compensação</option>` : ''}
                         <option value="atestado" ${flagFolga === 'atestado' ? 'selected' : ''}>Atestado Médico</option>
                         <option value="atestado_comparecimento" ${flagFolga === 'atestado_comparecimento' ? 'selected' : ''}>Atestado de Comparecimento</option>
                     </select>
@@ -890,9 +910,15 @@ function renderizarTabelaFeriados() {
 // --- ✅ LÓGICA DE ASSINATURA E SALVAMENTO ---
 function iniciarSalvamento() {
     state.jornada = document.getElementById('jornada').value;
+    state.jornadaSabadoAtiva = document.getElementById('jornadaSabadoAtiva').checked;
+    state.jornadaSabado = document.getElementById('jornadaSabado').value;
     state.ruleExtra100Optional = document.getElementById('ruleExtra100Optional').checked;
     if (!validarHora(state.jornada)) {
         mostrarMensagem('Erro', 'Jornada de trabalho inválida.');
+        return;
+    }
+    if (state.jornadaSabadoAtiva && !validarHora(state.jornadaSabado)) {
+        mostrarMensagem('Erro', 'Jornada do Sábado inválida.');
         return;
     }
     let temErroEmpregado = false;
@@ -977,6 +1003,8 @@ async function processarFolhaComSalvamento(nomeResponsavel) {
                 nome_trabalhador: folha.nome,
                 competencia: state.competencia,
                 jornada: state.jornada,
+                jornada_sabado: state.jornadaSabadoAtiva ? state.jornadaSabado : null,
+                jornada_sabado_ativa: state.jornadaSabadoAtiva,
                 rule_extra_100_opcional: state.ruleExtra100Optional,
                 dados_json: JSON.stringify(folha.dados),
                 feriados_json: JSON.stringify(state.feriados),
@@ -1100,9 +1128,13 @@ function simpleHash(str) {
 // --- MOTOR DE CÁLCULO ---
 function calcularFolha(folha) {
     const jornadaMinutos = converterHoraParaMinutos(state.jornada);
+    const jornadaSabadoMinutos = (state.jornadaSabadoAtiva && state.jornadaSabado)
+        ? converterHoraParaMinutos(state.jornadaSabado)
+        : jornadaMinutos;
     let totalTrabalhado = 0, totalExtra50 = 0, totalExtra100 = 0, totalNoturno = 0, totalNoturnoConvertido = 0, totalFaltante = 0, totalFaltas = 0;
-    
+
     const diasCalculados = folha.dados.map(dia => {
+        const jornadaEfetiva = dia.diaSemana === 'Sab' ? jornadaSabadoMinutos : jornadaMinutos;
         const isFeriado = state.feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
         const isDSRCustomizado = folha.dsrDias.includes(dia.data);
         const isDiaDescanso = isFeriado || isDSRCustomizado;
@@ -1120,7 +1152,7 @@ function calcularFolha(folha) {
         
         let extra50 = 0, extra100 = 0, faltante = 0;
         let flagDSR = isDSRCustomizado;
-        let flagFolga = false, flagFalta = false, flagAtestado = false, flagAtestadoComparecimento = false, flagSemRegistro = false;
+        let flagFolga = false, flagFalta = false, flagAtestado = false, flagAtestadoComparecimento = false, flagSemRegistro = false, flagCompensacao = false;
 
         const flagFolgaData = folha.flagsFolga[dia.data];
         const isAtestadoMedico = flagFolgaData === 'atestado';
@@ -1133,7 +1165,7 @@ function calcularFolha(folha) {
             // dia totalmente desconsiderado
         } else if (isAtestadoComp) {
             // isenção de metade da jornada: só conta faltante abaixo de jornada/2
-            const metadeJornada = Math.floor(jornadaMinutos / 2);
+            const metadeJornada = Math.floor(jornadaEfetiva / 2);
             const horasRef = minTrabalhados;
             if (horasRef < metadeJornada) {
                 faltante = metadeJornada - horasRef;
@@ -1148,8 +1180,8 @@ function calcularFolha(folha) {
             } else {
                 const horasReferencia = minTrabalhados;
                 
-                if (horasReferencia > jornadaMinutos) {
-                    let minutosExtras = horasReferencia - jornadaMinutos;
+                if (horasReferencia > jornadaEfetiva) {
+                    let minutosExtras = horasReferencia - jornadaEfetiva;
                     
                     if (state.ruleExtra100Optional) {
                         // ✅ CORRIGIDO: 100% a partir da 3ª hora de 50%
@@ -1166,9 +1198,9 @@ function calcularFolha(folha) {
                         extra50 = minutosExtras;
                         extra100 = 0;
                     }
-                } else if (horasReferencia < jornadaMinutos) {
+                } else if (horasReferencia < jornadaEfetiva) {
                     // ✅ Faltante: Jornada - Horas de Referência
-                    faltante = jornadaMinutos - horasReferencia;
+                    faltante = jornadaEfetiva - horasReferencia;
                     if (faltante < 0) faltante = 0;
                 }
             }
@@ -1179,6 +1211,9 @@ function calcularFolha(folha) {
             } else if (flagFolgaData === 'falta') {
                 flagFalta = true;
                 totalFaltas += 1;
+            } else if (flagFolgaData === 'compensacao') {
+                flagCompensacao = true;
+                faltante = jornadaEfetiva;
             } else if (!isAtestado && !isAtestadoComp) {
                 flagSemRegistro = true;
             }
@@ -1218,7 +1253,8 @@ function calcularFolha(folha) {
             flagFalta: flagFalta,
             flagAtestado: flagAtestado,
             flagAtestadoComparecimento: flagAtestadoComparecimento,
-            flagSemRegistro: flagSemRegistro
+            flagSemRegistro: flagSemRegistro,
+            flagCompensacao: flagCompensacao
         };
     });
     
@@ -1424,6 +1460,9 @@ function renderizarTabelasDiarias() {
             }
             if (dia.flagAtestadoComparecimento) {
                 flags += '<span style="background: #ede9fe; color: #5b21b6; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">AT. COMPARECIMENTO</span>';
+            }
+            if (dia.flagCompensacao) {
+                flags += '<span style="background: #ffedd5; color: #9a3412; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">COMPENSAÇÃO</span>';
             }
             if (dia.flagSemRegistro) {
                 flags += '<span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">SEM REGISTRO</span>';
@@ -1766,12 +1805,16 @@ async function _construirConteudoTXTExportacao() {
         const dsrDias    = JSON.parse(save.dsr_dias    || '[]');
         const flagsFolga = JSON.parse(save.flags_folga || '{}');
         const jornadaMin = converterHoraParaMinutos(save.jornada || '08:00');
+        const jornadaSabadoMin = (save.jornada_sabado_ativa && save.jornada_sabado)
+            ? converterHoraParaMinutos(save.jornada_sabado)
+            : jornadaMin;
         const rule100    = save.rule_extra_100_opcional || false;
         const dados      = JSON.parse(save.dados_json || '[]');
 
         let tTrab = 0, tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0;
         const diasFaltaDetalhes = [];
         dados.forEach(dia => {
+            const jornadaMinEfetiva = dia.diaSemana === 'Sab' ? jornadaSabadoMin : jornadaMin;
             const isFeriado    = feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
             const isDSR        = dsrDias.includes(dia.data);
             const isDiaDescanso = isFeriado || isDSR;
@@ -1793,24 +1836,26 @@ async function _construirConteudoTXTExportacao() {
                 // dia totalmente desconsiderado
             } else if (isAtestadoCompExp) {
                 // isenção de metade da jornada
-                const metade = Math.floor(jornadaMin / 2);
+                const metade = Math.floor(jornadaMinEfetiva / 2);
                 if (minTrab < metade) dev = metade - minTrab;
             } else if (minTrab > 0) {
                 if (isDiaDescanso) {
                     ex100 = minTrab;
                 } else {
-                    if (minTrab > jornadaMin) {
-                        const extra = minTrab - jornadaMin;
+                    if (minTrab > jornadaMinEfetiva) {
+                        const extra = minTrab - jornadaMinEfetiva;
                         if (rule100) { ex50 = Math.min(extra, 120); ex100 = Math.max(0, extra - 120); }
                         else { ex50 = extra; }
                     } else {
-                        dev = jornadaMin - minTrab;
+                        dev = jornadaMinEfetiva - minTrab;
                     }
                 }
             } else if (!isDiaDescanso) {
                 if (flag === 'falta') {
                     tFaltaDias++;
                     diasFaltaDetalhes.push({ data: dia.data, flagDSR: isDSR });
+                } else if (flag === 'compensacao') {
+                    dev = jornadaMinEfetiva;
                 }
                 // folga, atestado e sem registro não geram horas devidas nem faltas
             }
