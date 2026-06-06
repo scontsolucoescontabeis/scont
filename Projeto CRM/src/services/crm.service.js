@@ -62,13 +62,13 @@ export async function configurarAcessoCRM(usuarioId, departamentos, role) {
 export async function revogarAcessoCRM(usuarioId) {
   const { error: err1 } = await supabase
     .from('usuarios')
-    .update({ departamentos: null, departamento: null, role: null })
+    .update({ departamentos: null, departamento: null, ativo: false })
     .eq('id', usuarioId)
 
   if (err1?.message?.includes('departamentos')) {
     const { error: err2 } = await supabase
       .from('usuarios')
-      .update({ departamento: null, role: null })
+      .update({ departamento: null, ativo: false })
       .eq('id', usuarioId)
     if (err2) throw err2
     return

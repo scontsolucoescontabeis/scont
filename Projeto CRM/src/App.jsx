@@ -322,7 +322,7 @@ export default function App() {
   const handleLogout = () => supabase.auth.signOut()
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         <Header perfil={perfil} />
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

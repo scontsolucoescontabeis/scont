@@ -194,10 +194,14 @@ function BotoesAcao({ onEdit, onDelete, onToggle, ativo, onUp, onDown }) {
 // ─── Aba Geral ─────────────────────────────────────────────────
 function AbaGeral() {
   const [config, setConfig] = useState(null)
+  const [erro, setErro] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
-    buscarChatbotConfig().then(setConfig)
+    buscarChatbotConfig().then(data => {
+      if (data) setConfig(data)
+      else setErro(true)
+    }).catch(() => setErro(true))
   }, [])
 
   const salvar = async () => {
@@ -206,6 +210,11 @@ function AbaGeral() {
     finally { setSalvando(false) }
   }
 
+  if (erro) return (
+    <div style={{ padding: 20, background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, color: '#856404' }}>
+      <strong>Tabela não encontrada.</strong> Execute a migration <code>008_chatbot.sql</code> no SQL Editor do Supabase antes de usar esta página.
+    </div>
+  )
   if (!config) return <div style={{ color: '#888' }}>Carregando...</div>
 
   return (
@@ -521,10 +530,14 @@ function AbaHorarios() {
   const [config, setConfig] = useState(null)
   const [deptConfigs, setDeptConfigs] = useState([])
   const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState(false)
 
   useEffect(() => {
     Promise.all([buscarChatbotConfig(), buscarChatbotDeptConfig()])
-      .then(([cfg, depts]) => { setConfig(cfg); setDeptConfigs(depts) })
+      .then(([cfg, depts]) => {
+        if (cfg) { setConfig(cfg); setDeptConfigs(depts) }
+        else setErro(true)
+      }).catch(() => setErro(true))
   }, [])
 
   const salvar = async () => {
@@ -545,6 +558,11 @@ function AbaHorarios() {
     } finally { setSalvando(false) }
   }
 
+  if (erro) return (
+    <div style={{ padding: 20, background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, color: '#856404' }}>
+      <strong>Tabela não encontrada.</strong> Execute a migration <code>008_chatbot.sql</code> no SQL Editor do Supabase antes de usar esta página.
+    </div>
+  )
   if (!config) return <div style={{ color: '#888' }}>Carregando...</div>
 
   return (
