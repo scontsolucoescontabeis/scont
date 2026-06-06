@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { MessageSquare, BarChart2, Users, LogOut, ClipboardList, BookUser } from 'lucide-react'
+import { MessageSquare, BarChart2, Users, LogOut, ClipboardList, BookUser, Bot } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { buscarMeuPerfil } from '@/services/crm.service'
 import CRMPage from '@/pages/CRMPage'
@@ -8,6 +8,7 @@ import MetricasPage from '@/pages/MetricasPage'
 import UsuariosPage from '@/pages/UsuariosPage'
 import TarefasPage from '@/pages/TarefasPage'
 import ContatosPage from '@/pages/ContatosPage'
+import ChatbotPage from '@/pages/ChatbotPage'
 import SemAcessoPage from '@/pages/SemAcessoPage'
 
 // ============================================================
@@ -183,6 +184,10 @@ function Sidebar({ isAdmin, onLogout }) {
             <div style={{ fontSize: 10, fontWeight: 600, color: '#c5c0ba', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '12px 8px 6px' }}>
               Administração
             </div>
+            <NavLink to="/crm/chatbot" style={navLinkStyle}>
+              <Bot size={15} />
+              Chatbot
+            </NavLink>
             <NavLink to="/crm/metricas" style={navLinkStyle}>
               <BarChart2 size={15} />
               Métricas
@@ -328,6 +333,7 @@ export default function App() {
               <Route path="/crm" element={<CRMPage perfil={perfil} />} />
               <Route path="/crm/tarefas" element={<TarefasPage perfil={perfil} />} />
               <Route path="/crm/contatos" element={<ContatosPage />} />
+              {isAdmin && <Route path="/crm/chatbot" element={<ChatbotPage />} />}
               {isAdmin && <Route path="/crm/metricas" element={<MetricasPage />} />}
               {isAdmin && <Route path="/crm/usuarios" element={<UsuariosPage />} />}
               <Route path="*" element={<Navigate to="/crm" replace />} />
