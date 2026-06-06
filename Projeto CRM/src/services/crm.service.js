@@ -426,22 +426,19 @@ export async function reordenarMenus(itens) {
 // ─── Chatbot Avaliações (CSAT) ─────────────────────────────────
 
 export async function buscarAvaliacoesCsat({ departamento, inicio, fim, limit = 50 } = {}) {
+  const join = departamento ? 'conversas!inner(protocolo, departamento, encerrado_em)' : 'conversas(protocolo, departamento, encerrado_em)'
   let query = supabase
     .from('chatbot_avaliacoes')
-    .select('*, conversas(protocolo, departamento, encerrado_em)')
+    .select(`*, ${join}`)
     .order('criado_em', { ascending: false })
     .limit(limit)
 
+  if (departamento) query = query.eq('conversas.departamento', departamento)
   if (inicio) query = query.gte('criado_em', new Date(inicio).toISOString())
   if (fim)    query = query.lte('criado_em', new Date(fim + 'T23:59:59').toISOString())
 
   const { data } = await query
-  const rows = data ?? []
-
-  if (departamento) {
-    return rows.filter(r => r.conversas?.departamento === departamento)
-  }
-  return rows
+  return data ?? []
 }
 
 export async function buscarMediaCsat({ departamento, inicio, fim } = {}) {

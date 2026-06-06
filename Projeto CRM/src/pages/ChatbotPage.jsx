@@ -573,7 +573,8 @@ function AbaHorarios() {
         <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 8 }}>Dias de atendimento</div>
         <div style={{ display: 'flex', gap: 6 }}>
           {DIAS.map((dia, i) => {
-            const ativo = config.dias_semana?.includes(i)
+            const iso = i === 0 ? 7 : i
+            const ativo = config.dias_semana?.includes(iso)
             return (
               <button
                 key={i}
@@ -581,7 +582,7 @@ function AbaHorarios() {
                   const dias = config.dias_semana ?? []
                   setConfig(c => ({
                     ...c,
-                    dias_semana: ativo ? dias.filter(d => d !== i) : [...dias, i].sort(),
+                    dias_semana: ativo ? dias.filter(d => d !== iso) : [...dias, iso].sort(),
                   }))
                 }}
                 style={{
