@@ -96,6 +96,25 @@ export function ConversaCard({ conversa, ativo, onClick }) {
             }}>
               {st.label}
             </span>
+            {/* Badge bot-roteado */}
+            {conversa.bot_departamento && (
+              <span style={{
+                fontSize: 9, fontWeight: 600, padding: '2px 6px',
+                borderRadius: 3, background: '#e8f4fd', color: '#004085',
+              }}>
+                🤖 bot
+              </span>
+            )}
+            {/* Badge de categoria */}
+            {conversa.bot_categoria && (
+              <span style={{
+                fontSize: 9, fontWeight: 500, padding: '2px 6px',
+                borderRadius: 3, background: '#fff3cd', color: '#856404',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80,
+              }}>
+                {conversa.bot_categoria}
+              </span>
+            )}
             <span style={{ fontSize: 9, color: '#c5c0ba', fontFamily: 'DM Mono, monospace', marginLeft: 'auto' }}>
               {conversa.protocolo}
             </span>
