@@ -1,0 +1,63 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'Projeto CRM/package-lock.json'
+
+      - name: Install CRM dependencies
+        working-directory: Projeto CRM
+        run: npm ci
+
+      - name: Build CRM
+        working-directory: Projeto CRM
+        run: npm run build -- --base=/scont/crm/
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site/crm
+          # Portal — arquivos estáticos na raiz
+          cp *.html _site/ 2>/dev/null || true
+          cp *.css  _site/ 2>/dev/null || true
+          cp *.js   _site/ 2>/dev/null || true
+          [ -d assets ] && cp -r assets _site/assets || true
+          # CRM — app buildado em /crm
+          cp -r "Projeto CRM/dist/." _site/crm/
+          # Fallback SPA: GitHub Pages serve 404.html na rota desconhecida;
+          # como o index.html já tem o React Router, ele trata a URL corretamente
+          cp _site/crm/index.html _site/crm/404.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}crm/
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
