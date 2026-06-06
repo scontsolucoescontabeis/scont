@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { processarMensagemBot } from './chatbot-processor.ts'
 
 const VERIFY_TOKEN = Deno.env.get('WHATSAPP_VERIFY_TOKEN')!
 const APP_SECRET   = Deno.env.get('WHATSAPP_APP_SECRET')!
@@ -67,34 +68,34 @@ async function obterOuCriarConversa(contatoId: string, telefone: string) {
   return { conversa: nova, isNova: true }
 }
 
-async function enviarBoasVindas(telefone: string) {
-  const PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')!
-  const ACCESS_TOKEN    = Deno.env.get('WHATSAPP_ACCESS_TOKEN')!
-
-  await fetch(
-    `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: telefone,
-        type: 'text',
-        text: {
-          body: 'Olá! Bem-vindo à SCONT Soluções Contábeis. Em breve um de nossos especialistas irá atendê-lo.',
-        },
-      }),
-    }
-  )
-}
-
-async function processarMensagem(msg: Record<string, unknown>, contato: Record<string, unknown>, conversa: Record<string, unknown>) {
+async function processarMensagem(
+  msg: Record<string, unknown>,
+  contato: Record<string, unknown>,
+  conversa: Record<string, unknown>,
+  nomeContato: string
+) {
   const tipo = (msg.type as string) || 'text'
   let conteudo: string | null = null
   let mediaUrl: string | null = null
+
+  const PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')!
+  const ACCESS_TOKEN    = Deno.env.get('WHATSAPP_ACCESS_TOKEN')!
+
+  const botTratou = await processarMensagemBot({
+    msg,
+    telefone: contato.telefone as string,
+    nomeContato,
+    conversa: {
+      id: (conversa as { id: string }).id,
+      protocolo: (conversa as { protocolo: string }).protocolo,
+      contato_id: (conversa as { contato_id: string }).contato_id,
+    },
+    supabase,
+    phoneNumberId: PHONE_NUMBER_ID,
+    accessToken: ACCESS_TOKEN,
+  })
+
+  if (botTratou) return  // bot processou; não salva como mensagem normal
 
   if (tipo === 'text') {
     conteudo = (msg.text as { body: string })?.body || ''
@@ -104,6 +105,17 @@ async function processarMensagem(msg: Record<string, unknown>, contato: Record<s
     // Download e upload para Supabase Storage
     if (mediaObj?.id) {
       mediaUrl = await baixarEGuardarMidia(mediaObj.id, tipo, (conversa as { id: string }).id)
+    }
+  } else if (tipo === 'interactive') {
+    // resposta de lista interativa — o bot já tratou acima se botTratou=true
+    // se chegou aqui, salvar como mensagem de texto com o título da opção selecionada
+    const interactive = msg.interactive as Record<string, unknown>
+    if (interactive?.type === 'list_reply') {
+      const reply = interactive.list_reply as { id: string; title: string }
+      conteudo = reply?.title || reply?.id || '[seleção]'
+    } else if (interactive?.type === 'button_reply') {
+      const reply = interactive.button_reply as { id: string; title: string }
+      conteudo = reply?.title || reply?.id || '[botão]'
     }
   }
 
@@ -183,16 +195,12 @@ serve(async (req) => {
       const mensagens: Record<string, unknown>[] = value?.messages || []
       for (const msg of mensagens) {
         const telefone = (msg.from as string)
-        const nomeContato = value?.contacts?.[0]?.profile?.name
 
-        const contato = await obterOuCriarContato(telefone, nomeContato)
-        const { conversa, isNova } = await obterOuCriarConversa(contato.id, telefone)
+        const contato = await obterOuCriarContato(telefone, (value?.contacts?.[0]?.profile?.name as string) || undefined)
+        const { conversa } = await obterOuCriarConversa(contato.id, telefone)
 
-        if (isNova) {
-          await enviarBoasVindas(telefone)
-        }
-
-        await processarMensagem(msg, contato, conversa)
+        const nomeContato = (value?.contacts?.[0]?.profile?.name as string) || contato.nome as string || contato.telefone as string
+        await processarMensagem(msg, contato, conversa, nomeContato)
       }
     } catch (err) {
       console.error('Erro ao processar webhook:', err)
