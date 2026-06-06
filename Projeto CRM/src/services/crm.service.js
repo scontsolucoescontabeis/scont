@@ -327,3 +327,133 @@ export async function buscarMetricas() {
     porDepto,
   }
 }
+
+// ─── Chatbot Config ────────────────────────────────────────────
+
+export async function buscarChatbotConfig() {
+  const { data } = await supabase
+    .from('chatbot_config')
+    .select('*')
+    .eq('id', 1)
+    .single()
+  return data
+}
+
+export async function salvarChatbotConfig(updates) {
+  const { error } = await supabase
+    .from('chatbot_config')
+    .update({ ...updates, atualizado_em: new Date().toISOString() })
+    .eq('id', 1)
+  if (error) throw error
+}
+
+// ─── Chatbot Dept Config ────────────────────────────────────────
+
+export async function buscarChatbotDeptConfig() {
+  const { data } = await supabase
+    .from('chatbot_dept_config')
+    .select('*')
+    .order('departamento')
+  return data ?? []
+}
+
+export async function salvarChatbotDeptConfig(departamento, updates) {
+  const { error } = await supabase
+    .from('chatbot_dept_config')
+    .update(updates)
+    .eq('departamento', departamento)
+  if (error) throw error
+}
+
+// ─── Chatbot Menus ────────────────────────────────────────────
+
+export async function buscarMenusPorDept(departamento) {
+  const { data } = await supabase
+    .from('chatbot_menus')
+    .select('*')
+    .eq('departamento', departamento)
+    .order('nivel')
+    .order('ordem')
+  return data ?? []
+}
+
+export async function buscarTodosMenus() {
+  const { data } = await supabase
+    .from('chatbot_menus')
+    .select('*')
+    .order('departamento')
+    .order('nivel')
+    .order('ordem')
+  return data ?? []
+}
+
+export async function criarMenu(menu) {
+  // menu: { departamento, titulo, nivel, ordem, ativo, parent_id? }
+  const { data, error } = await supabase
+    .from('chatbot_menus')
+    .insert(menu)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function atualizarMenu(id, updates) {
+  const { error } = await supabase
+    .from('chatbot_menus')
+    .update(updates)
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function excluirMenu(id) {
+  // Cascade deleta sub-itens via FK ON DELETE CASCADE
+  const { error } = await supabase
+    .from('chatbot_menus')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function reordenarMenus(itens) {
+  // itens: Array<{ id: string, ordem: number }>
+  const updates = itens.map(({ id, ordem }) =>
+    supabase.from('chatbot_menus').update({ ordem }).eq('id', id)
+  )
+  await Promise.all(updates)
+}
+
+// ─── Chatbot Avaliações (CSAT) ─────────────────────────────────
+
+export async function buscarAvaliacoesCsat({ departamento, inicio, fim, limit = 50 } = {}) {
+  let query = supabase
+    .from('chatbot_avaliacoes')
+    .select('*, conversas(protocolo, departamento, encerrado_em)')
+    .order('criado_em', { ascending: false })
+    .limit(limit)
+
+  if (inicio) query = query.gte('criado_em', new Date(inicio).toISOString())
+  if (fim)    query = query.lte('criado_em', new Date(fim + 'T23:59:59').toISOString())
+
+  const { data } = await query
+  const rows = data ?? []
+
+  if (departamento) {
+    return rows.filter(r => r.conversas?.departamento === departamento)
+  }
+  return rows
+}
+
+export async function buscarMediaCsat({ departamento, inicio, fim } = {}) {
+  const rows = await buscarAvaliacoesCsat({ departamento, inicio, fim, limit: 1000 })
+  if (rows.length === 0) return { media: 0, total: 0, distribuicao: {} }
+
+  const total = rows.length
+  const soma = rows.reduce((s, r) => s + r.nota, 0)
+  const media = Math.round((soma / total) * 10) / 10
+
+  const distribuicao = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  for (const r of rows) distribuicao[r.nota] = (distribuicao[r.nota] ?? 0) + 1
+
+  return { media, total, distribuicao }
+}
