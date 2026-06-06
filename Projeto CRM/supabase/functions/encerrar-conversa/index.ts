@@ -95,6 +95,63 @@ serve(async (req) => {
       lida: true,
     })
 
+    // ── CSAT: envia pesquisa de satisfação ──────────────────────────
+    const csatInterativo = {
+      messaging_product: 'whatsapp',
+      to: telefone,
+      type: 'interactive',
+      interactive: {
+        type: 'list',
+        body: { text: 'Como foi o seu atendimento hoje? Sua opinião é muito importante para nós! 😊' },
+        action: {
+          button: 'Avaliar atendimento',
+          sections: [{
+            title: 'Selecione sua nota',
+            rows: [
+              { id: '5', title: '⭐⭐⭐⭐⭐ Excelente' },
+              { id: '4', title: '⭐⭐⭐⭐ Bom' },
+              { id: '3', title: '⭐⭐⭐ Regular' },
+              { id: '2', title: '⭐⭐ Ruim' },
+              { id: '1', title: '⭐ Péssimo' },
+            ],
+          }],
+        },
+      },
+    }
+
+    const csatRes = await fetch(`https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(csatInterativo),
+    })
+
+    if (csatRes.ok) {
+      // Cria ou atualiza sessão bot para capturar a avaliação
+      const { data: sessaoExistente } = await supabaseAdmin
+        .from('chatbot_sessoes')
+        .select('id')
+        .eq('conversa_id', conversa_id)
+        .single()
+
+      if (sessaoExistente) {
+        await supabaseAdmin
+          .from('chatbot_sessoes')
+          .update({ estado: 'AGUARD_AVAL', ultimo_em: new Date().toISOString() })
+          .eq('id', sessaoExistente.id)
+      } else {
+        await supabaseAdmin
+          .from('chatbot_sessoes')
+          .insert({
+            conversa_id,
+            estado: 'AGUARD_AVAL',
+            tentativas_invalidas: 0,
+            iniciado_em: new Date().toISOString(),
+            ultimo_em: new Date().toISOString(),
+          })
+      }
+    }
+    // Falha silenciosa: se o CSAT não enviou, não bloqueia o encerramento
+
     return new Response(JSON.stringify({ success: true }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
