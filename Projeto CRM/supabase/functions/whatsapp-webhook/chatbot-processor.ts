@@ -44,7 +44,7 @@ export interface DeptConfig {
   msg_especifica: string | null
 }
 
-interface MenuItem {
+export interface MenuItem {
   id: string
   titulo: string
   departamento: string
@@ -384,8 +384,12 @@ async function escalarParaHumano(
 // Menus de departamento / categoria / subcategoria
 // =============================================================================
 
-function montarOpcoesDepts(): Array<{ id: string; title: string }> {
-  const opts = DEPARTAMENTOS.map((d) => ({
+function montarOpcoesDepts(deptsAtivos?: Set<string>): Array<{ id: string; title: string }> {
+  let depts = DEPARTAMENTOS
+  if (deptsAtivos) {
+    depts = DEPARTAMENTOS.filter((d) => deptsAtivos.has(d))
+  }
+  const opts = depts.map((d) => ({
     id: d,
     title: `${DEPT_EMOJIS[d] ?? ''} ${DEPT_LABELS[d] ?? d}`,
   }))
@@ -397,8 +401,18 @@ async function enviarMenuDepts(
   telefone: string,
   phoneNumberId: string,
   accessToken: string,
+  supabase?: SupabaseClient,
 ): Promise<void> {
-  const opcoes = montarOpcoesDepts()
+  let deptsAtivos: Set<string> | undefined
+  if (supabase) {
+    const { data: deptsConfig } = await supabase
+      .from('chatbot_dept_config')
+      .select('departamento, ativo')
+    deptsAtivos = new Set(
+      (deptsConfig ?? []).filter((d: Record<string, unknown>) => d.ativo).map((d: Record<string, unknown>) => d.departamento as string),
+    )
+  }
+  const opcoes = montarOpcoesDepts(deptsAtivos)
   await enviarMenu(
     telefone,
     'Olá! Selecione o departamento para o qual deseja falar:',
@@ -612,7 +626,7 @@ async function handleNOVO(
       phoneNumberId,
       accessToken,
     )
-    await enviarMenuDepts(telefone, phoneNumberId, accessToken)
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase)
   }
 }
 
@@ -664,7 +678,7 @@ async function handleAGUARD_DEPT(
       categoria_id: null,
       tentativas_invalidas: 0,
     })
-    await enviarMenuDepts(telefone, phoneNumberId, accessToken)
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase)
     return
   }
 
@@ -700,7 +714,7 @@ async function handleAGUARD_DEPT(
       phoneNumberId,
       accessToken,
     )
-    await enviarMenuDepts(telefone, phoneNumberId, accessToken)
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase)
   }
 }
 
@@ -879,7 +893,7 @@ async function handleAGUARD_CONF(
       subcategoria_id: null,
       tentativas_invalidas: 0,
     })
-    await enviarMenuDepts(telefone, phoneNumberId, accessToken)
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase)
     return
   }
 
