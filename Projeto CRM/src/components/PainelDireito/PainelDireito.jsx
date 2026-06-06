@@ -78,6 +78,33 @@ export function PainelDireito({ conversa }) {
         </div>
       </div>
 
+      {/* Contexto do bot */}
+      {conversa.bot_departamento && (
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #e0dcd8',
+          background: 'linear-gradient(135deg, #e8f4fd 0%, #f0e8ff 100%)' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+            letterSpacing: '0.06em', color: '#004085', marginBottom: 8 }}>
+            🤖 Contexto do bot
+          </div>
+          <div style={{ marginBottom: 5 }}>
+            <div style={{ fontSize: 9, color: '#7a9fc0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Departamento</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a' }}>{conversa.bot_departamento}</div>
+          </div>
+          {conversa.bot_categoria && (
+            <div style={{ marginBottom: 5 }}>
+              <div style={{ fontSize: 9, color: '#7a9fc0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Assunto</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a' }}>{conversa.bot_categoria}</div>
+            </div>
+          )}
+          {conversa.bot_subcategoria && (
+            <div>
+              <div style={{ fontSize: 9, color: '#7a9fc0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Detalhe</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a' }}>{conversa.bot_subcategoria}</div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Dados do contato */}
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #e0dcd8' }}>
         <SectionTitle>Contato</SectionTitle>
