@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Phone, Building2, User, ArrowRightLeft, Clock, ChevronDown, ChevronUp } from 'lucide-react'
+import { Phone, Building2, User, Clock, ChevronDown, ChevronUp } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { supabase } from '@/lib/supabaseClient'
@@ -15,6 +15,10 @@ export function PainelDireito({ conversa }) {
   const [historico, setHistorico] = useState([])
   const [transferencias, setTransferencias] = useState([])
   const [expandHistorico, setExpandHistorico] = useState(false)
+  const [botTranscript, setBotTranscript] = useState([])
+  const [primeiraMsg, setPrimeiraMsg] = useState(null)
+  const [handoffEm, setHandoffEm] = useState(null)
+  const [expandTranscript, setExpandTranscript] = useState(true)
 
   useEffect(() => {
     if (!conversa?.contatos?.id) { setHistorico([]); setTransferencias([]); return }
@@ -35,6 +39,37 @@ export function PainelDireito({ conversa }) {
       .order('criado_em', { ascending: true })
       .then(({ data }) => setTransferencias(data ?? []))
   }, [conversa?.id, conversa?.contatos?.id])
+
+  useEffect(() => {
+    if (!conversa?.id || !conversa?.bot_departamento) {
+      setBotTranscript([])
+      setPrimeiraMsg(null)
+      setHandoffEm(null)
+      return
+    }
+    supabase
+      .from('mensagens')
+      .select('id, conteudo, origem, criado_em')
+      .eq('conversa_id', conversa.id)
+      .order('criado_em', { ascending: true })
+      .then(({ data }) => {
+        const msgs = data ?? []
+        const sistemaIdx = msgs.findIndex(m => m.origem === 'SISTEMA')
+        if (sistemaIdx === -1) {
+          setBotTranscript(msgs.filter(m => m.origem === 'BOT' || m.origem === 'CLIENTE'))
+          setPrimeiraMsg(null)
+          setHandoffEm(null)
+          return
+        }
+        setHandoffEm(msgs[sistemaIdx].criado_em)
+        setBotTranscript(
+          msgs.slice(0, sistemaIdx).filter(m => m.origem === 'BOT' || m.origem === 'CLIENTE')
+        )
+        setPrimeiraMsg(
+          msgs.slice(sistemaIdx + 1).find(m => m.origem === 'CLIENTE') ?? null
+        )
+      })
+  }, [conversa?.id, conversa?.bot_departamento])
 
   if (!conversa) return (
     <div style={{ width: 260, borderLeft: '1px solid #e0dcd8', background: '#f7f6f4' }} />
@@ -82,24 +117,105 @@ export function PainelDireito({ conversa }) {
       {conversa.bot_departamento && (
         <div style={{ padding: '12px 16px', borderBottom: '1px solid #e0dcd8',
           background: 'linear-gradient(135deg, #e8f4fd 0%, #f0e8ff 100%)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
-            letterSpacing: '0.06em', color: '#004085', marginBottom: 8 }}>
-            🤖 Contexto do bot
+
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '0.06em', color: '#004085' }}>
+              🤖 Contexto do bot
+            </div>
+            {handoffEm && (
+              <div style={{ fontSize: 9, color: '#7a9fc0', fontFamily: 'DM Mono, monospace' }}>
+                repasse {format(new Date(handoffEm), 'HH:mm')}
+              </div>
+            )}
           </div>
-          <div style={{ marginBottom: 5 }}>
-            <div style={{ fontSize: 9, color: '#7a9fc0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Departamento</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a' }}>{conversa.bot_departamento}</div>
+
+          {/* Trilha dept › cat › sub */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 3, marginBottom: 10 }}>
+            <span style={{ background: '#004085', color: '#fff', fontSize: 10, fontWeight: 700,
+              padding: '2px 7px', borderRadius: 4 }}>
+              {conversa.bot_departamento}
+            </span>
+            {conversa.bot_categoria && (
+              <>
+                <span style={{ color: '#7a9fc0', fontSize: 13 }}>›</span>
+                <span style={{ background: '#dbeafe', color: '#1e40af', fontSize: 10, fontWeight: 600,
+                  padding: '2px 7px', borderRadius: 4 }}>
+                  {conversa.bot_categoria}
+                </span>
+              </>
+            )}
+            {conversa.bot_subcategoria && (
+              <>
+                <span style={{ color: '#7a9fc0', fontSize: 13 }}>›</span>
+                <span style={{ background: '#ede9fe', color: '#5b21b6', fontSize: 10, fontWeight: 600,
+                  padding: '2px 7px', borderRadius: 4 }}>
+                  {conversa.bot_subcategoria}
+                </span>
+              </>
+            )}
           </div>
-          {conversa.bot_categoria && (
-            <div style={{ marginBottom: 5 }}>
-              <div style={{ fontSize: 9, color: '#7a9fc0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Assunto</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a' }}>{conversa.bot_categoria}</div>
+
+          {/* Primeira mensagem livre do cliente */}
+          {primeiraMsg && (
+            <div style={{
+              marginBottom: 10, padding: '7px 9px',
+              background: '#dcf8c6', borderRadius: 6, fontSize: 11, color: '#1a1a1a',
+              borderLeft: '3px solid #25d366',
+            }}>
+              <div style={{ fontSize: 9, color: '#2d6a2d', fontWeight: 700,
+                textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>
+                Primeira mensagem
+              </div>
+              {primeiraMsg.conteudo}
             </div>
           )}
-          {conversa.bot_subcategoria && (
+
+          {/* Transcript colapsível */}
+          {botTranscript.length > 0 && (
             <div>
-              <div style={{ fontSize: 9, color: '#7a9fc0', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Detalhe</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a1a' }}>{conversa.bot_subcategoria}</div>
+              <button
+                onClick={() => setExpandTranscript(v => !v)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  width: '100%', background: 'rgba(0,64,133,0.08)', border: 'none',
+                  borderRadius: 5, padding: '4px 8px', cursor: 'pointer',
+                  marginBottom: expandTranscript ? 6 : 0,
+                }}
+              >
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#004085' }}>
+                  Transcript ({botTranscript.length} msgs)
+                </span>
+                {expandTranscript
+                  ? <ChevronUp size={12} color="#004085" />
+                  : <ChevronDown size={12} color="#004085" />}
+              </button>
+              {expandTranscript && (
+                <div style={{
+                  maxHeight: 220, overflowY: 'auto',
+                  background: 'rgba(255,255,255,0.75)', borderRadius: 6,
+                  padding: '6px 8px',
+                }}>
+                  {botTranscript.map(m => (
+                    <div key={m.id} style={{
+                      marginBottom: 5,
+                      display: 'flex',
+                      justifyContent: m.origem === 'CLIENTE' ? 'flex-end' : 'flex-start',
+                    }}>
+                      <div style={{
+                        maxWidth: '88%', fontSize: 11, lineHeight: 1.35,
+                        padding: '4px 8px', borderRadius: 6, wordBreak: 'break-word',
+                        background: m.origem === 'CLIENTE' ? '#dcf8c6' : '#fff',
+                        border: m.origem === 'BOT' ? '1px solid #e0dcd8' : 'none',
+                        color: '#1a1a1a',
+                      }}>
+                        {m.conteudo}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
