@@ -1,0 +1,189 @@
+<h2>Design — Seção 3: Fluxo do cliente no WhatsApp</h2>
+<p class="subtitle">Simulação das mensagens trocadas entre o bot e o cliente — do primeiro contato até o agente assumir</p>
+
+<style>
+.wa-container { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 16px; }
+.wa-phone { background: #e5ddd5; border-radius: 12px; padding: 12px; max-width: 320px; }
+.wa-header { background: #075e54; color: #fff; border-radius: 8px 8px 0 0; padding: 10px 14px; font-weight: 700; font-size: 12px; display: flex; align-items: center; gap: 8px; margin: -12px -12px 10px; }
+.wa-avatar { width: 28px; height: 28px; background: #25d366; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.wa-header-info { flex: 1; }
+.wa-header-name { font-size: 12px; font-weight: 700; }
+.wa-header-sub { font-size: 10px; opacity: 0.7; }
+
+.bubble { border-radius: 8px; padding: 8px 11px; margin-bottom: 6px; font-size: 12px; max-width: 88%; line-height: 1.4; position: relative; }
+.bubble.bot { background: #fff; margin-right: auto; border-bottom-left-radius: 2px; }
+.bubble.user { background: #dcf8c6; margin-left: auto; border-bottom-right-radius: 2px; text-align: right; }
+.bubble-time { font-size: 9px; color: #999; margin-top: 3px; text-align: right; }
+.bubble-sender { font-size: 10px; color: #25d366; font-weight: 700; margin-bottom: 3px; }
+
+/* Lista interativa simulada */
+.wa-list-btn { background: #fff; border: 1px solid #25d366; border-radius: 6px; padding: 7px 10px; margin-top: 6px; font-size: 11px; color: #25d366; font-weight: 700; text-align: center; cursor: pointer; }
+.wa-list-modal { background: #fff; border-radius: 8px; padding: 10px; margin-top: 4px; border: 1px solid #e0dcd8; font-size: 11px; }
+.wa-list-title { font-weight: 700; color: #1a1a1a; margin-bottom: 6px; font-size: 12px; }
+.wa-list-item { padding: 6px 8px; border-radius: 4px; color: #1a1a1a; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.wa-list-item:hover { background: #f0f7ff; }
+.wa-list-item.selected { background: #d4edda; color: #155724; font-weight: 700; }
+.wa-list-item::before { content: '○'; color: #ccc; font-size: 10px; }
+.wa-list-item.selected::before { content: '●'; color: #25d366; }
+
+.step-label { font-size: 11px; font-weight: 700; color: #7a1e1e; text-transform: uppercase; letter-spacing: 0.06em; margin: 16px 0 8px; border-top: 1px dashed #e0dcd8; padding-top: 8px; }
+.note { background: #fffbe6; border: 1px solid #ffe066; border-radius: 6px; padding: 6px 10px; font-size: 11px; color: #7a6000; margin: 8px 0; }
+.tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+.tag-bot { background: #cce5ff; color: #004085; }
+.tag-user { background: #d4edda; color: #155724; }
+.tag-sys { background: #f8d7da; color: #721c24; }
+</style>
+
+<div style="display:flex; gap:24px; flex-wrap:wrap;">
+
+<!-- FLUXO FELIZ -->
+<div>
+<div style="font-size:13px; font-weight:700; color:#155724; margin-bottom:8px;">✅ Fluxo principal (caminho feliz)</div>
+<div class="wa-phone" style="max-width:300px;">
+  <div class="wa-header">
+    <div class="wa-avatar">S</div>
+    <div class="wa-header-info">
+      <div class="wa-header-name">SCONT Contábil</div>
+      <div class="wa-header-sub">🤖 Atendimento automático</div>
+    </div>
+  </div>
+
+  <div class="step-label" style="margin-top:0; border-top:none;">1. Boas-vindas + menu dept.</div>
+  <div class="bubble bot">
+    <div class="bubble-sender">🤖 Bot SCONT</div>
+    Olá, João! 👋 Bem-vindo à <strong>SCONT Soluções Contábeis</strong>.<br><br>
+    Para agilizar seu atendimento, selecione o departamento:
+    <div class="wa-list-btn">☰ Ver departamentos</div>
+    <div class="bubble-time">08:32 ✓✓</div>
+  </div>
+
+  <div class="wa-list-modal">
+    <div class="wa-list-title">Selecione o departamento</div>
+    <div class="wa-list-item">👥 Depto. Pessoal</div>
+    <div class="wa-list-item selected">📊 Contabilidade</div>
+    <div class="wa-list-item">🧾 Tributário / Fiscal</div>
+    <div class="wa-list-item">🏢 Administrativo</div>
+    <div class="wa-list-item">👤 Falar com atendente</div>
+  </div>
+
+  <div class="step-label">2. Seleção de categoria</div>
+  <div class="bubble bot">
+    <div class="bubble-sender">🤖 Bot SCONT</div>
+    Ótimo! <strong>Contabilidade</strong> selecionado.<br><br>
+    Sobre qual assunto você precisa de ajuda?
+    <div class="wa-list-btn">☰ Ver opções</div>
+    <div class="bubble-time">08:32 ✓✓</div>
+  </div>
+
+  <div class="step-label">3. Sub-categoria</div>
+  <div class="bubble bot">
+    <div class="bubble-sender">🤖 Bot SCONT</div>
+    Entendido! <strong>Balanço / DRE</strong>.<br><br>
+    Pode detalhar um pouco mais?
+    <div class="wa-list-btn">☰ Ver opções</div>
+    <div class="bubble-time">08:33 ✓✓</div>
+  </div>
+
+  <div class="step-label">4. Confirmação</div>
+  <div class="bubble bot">
+    <div class="bubble-sender">🤖 Bot SCONT</div>
+    Certo! Vou encaminhar assim:<br><br>
+    📋 <strong>Depto:</strong> Contabilidade<br>
+    📌 <strong>Assunto:</strong> Balanço / DRE<br>
+    📎 <strong>Detalhe:</strong> Análise de resultados<br><br>
+    Está correto?
+    <div class="wa-list-btn">☰ Confirmar / Corrigir</div>
+    <div class="bubble-time">08:33 ✓✓</div>
+  </div>
+
+  <div class="step-label">5. Roteamento + protocolo</div>
+  <div class="bubble bot">
+    <div class="bubble-sender">🤖 Bot SCONT</div>
+    ✅ Perfeito! Encaminhando para <strong>Contabilidade</strong>.<br><br>
+    🔖 Protocolo: <strong>SCT-20260605-003847</strong><br><br>
+    Um especialista irá atendê-lo em instantes. Aguarde! 🙏
+    <div class="bubble-time">08:33 ✓✓</div>
+  </div>
+</div>
+</div>
+
+<!-- FLUXOS ALTERNATIVOS -->
+<div style="display:flex; flex-direction:column; gap:16px;">
+
+  <div>
+  <div style="font-size:13px; font-weight:700; color:#004085; margin-bottom:8px;">⏩ Atalho: "Falar com atendente" (digitando "0")</div>
+  <div class="wa-phone" style="max-width:280px;">
+    <div class="wa-header">
+      <div class="wa-avatar">S</div>
+      <div class="wa-header-info"><div class="wa-header-name">SCONT Contábil</div></div>
+    </div>
+    <div class="bubble bot">
+      <div class="bubble-sender">🤖 Bot SCONT</div>
+      Para agilizar seu atendimento, selecione o departamento:
+      <div class="wa-list-btn">☰ Ver departamentos</div>
+    </div>
+    <div class="bubble user">0<div class="bubble-time">09:10</div></div>
+    <div class="bubble bot">
+      <div class="bubble-sender">🤖 Bot SCONT</div>
+      Claro! Transferindo para um atendente humano.<br>Aguarde um momento. 👤
+      <div class="bubble-time">09:10 ✓✓</div>
+    </div>
+  </div>
+  </div>
+
+  <div>
+  <div style="font-size:13px; font-weight:700; color:#856404; margin-bottom:8px;">⚠️ Resposta inválida (3x → humano)</div>
+  <div class="wa-phone" style="max-width:280px;">
+    <div class="wa-header">
+      <div class="wa-avatar">S</div>
+      <div class="wa-header-info"><div class="wa-header-name">SCONT Contábil</div></div>
+    </div>
+    <div class="bubble bot"><div class="bubble-sender">🤖 Bot SCONT</div>Selecione o departamento: <div class="wa-list-btn">☰ Ver departamentos</div></div>
+    <div class="bubble user">quero falar sobre minha empresa<div class="bubble-time">10:01</div></div>
+    <div class="bubble bot"><div class="bubble-sender">🤖 Bot SCONT</div>Por favor, use o menu abaixo. Se preferir falar com um atendente, digite <strong>0</strong>.<div class="wa-list-btn">☰ Ver departamentos</div></div>
+    <div class="bubble user">precisso de ajuda urgente!!<div class="bubble-time">10:02</div></div>
+    <div class="bubble bot"><div class="bubble-sender">🤖 Bot SCONT</div>Entendido! Estou conectando você a um atendente humano agora. 👤</div>
+  </div>
+  </div>
+
+  <div>
+  <div style="font-size:13px; font-weight:700; color:#721c24; margin-bottom:8px;">🌙 Fora do horário de atendimento</div>
+  <div class="wa-phone" style="max-width:280px;">
+    <div class="wa-header">
+      <div class="wa-avatar">S</div>
+      <div class="wa-header-info"><div class="wa-header-name">SCONT Contábil</div></div>
+    </div>
+    <div class="bubble bot">
+      <div class="bubble-sender">🤖 Bot SCONT</div>
+      Olá! 🌙 Nosso atendimento é de <strong>seg–sex, 8h–18h</strong>.<br><br>
+      Sua mensagem foi registrada com protocolo <strong>SCT-20260605-009912</strong>. Retornaremos amanhã! ✉️
+      <div class="bubble-time">22:47 ✓✓</div>
+    </div>
+  </div>
+  </div>
+
+  <div>
+  <div style="font-size:13px; font-weight:700; color:#155724; margin-bottom:8px;">⭐ Avaliação após encerramento</div>
+  <div class="wa-phone" style="max-width:280px;">
+    <div class="wa-header">
+      <div class="wa-avatar">S</div>
+      <div class="wa-header-info"><div class="wa-header-name">SCONT Contábil</div></div>
+    </div>
+    <div class="bubble bot">
+      <div class="bubble-sender">🤖 Bot SCONT</div>
+      Seu atendimento foi encerrado. 😊<br><br>
+      Como foi sua experiência? Avalie de 1 a 5:
+      <div class="wa-list-btn">☰ Avaliar atendimento</div>
+      <div class="bubble-time">11:42 ✓✓</div>
+    </div>
+    <div class="bubble user">⭐⭐⭐⭐⭐<div class="bubble-time">11:43</div></div>
+    <div class="bubble bot"><div class="bubble-sender">🤖 Bot SCONT</div>Obrigado pelo feedback! 🙏 Até a próxima.</div>
+  </div>
+  </div>
+
+</div>
+</div>
+
+<div class="note" style="margin-top:16px;">
+  <strong>Cliente recorrente:</strong> Se o contato já teve atendimento anterior no mesmo departamento (nos últimos 30 dias), o bot pergunta: <em>"Olá de novo! É sobre o mesmo assunto (Folha de Pagamento) ou é algo novo?"</em> — pulando até 2 etapas do fluxo.
+</div>

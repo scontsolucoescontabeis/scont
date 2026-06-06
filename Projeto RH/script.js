@@ -1134,23 +1134,19 @@ function calcularFolha(folha) {
         } else if (isAtestadoComp) {
             // isenção de metade da jornada: só conta faltante abaixo de jornada/2
             const metadeJornada = Math.floor(jornadaMinutos / 2);
-            const horasRef = (minNoturnos > 0) ? minNoturnosConvertidos : minTrabalhados;
+            const horasRef = minTrabalhados;
             if (horasRef < metadeJornada) {
                 faltante = metadeJornada - horasRef;
             }
             totalTrabalhado += minTrabalhados;
         } else if (minTrabalhados > 0) {
             if (isDiaDescanso) {
-                // ✅ DSR/Feriado: 100% sobre HORAS NOTURNAS CONVERTIDAS se houver noturno, senão sobre horas trabalhadas
-                if (minNoturnos > 0) {
-                    extra100 = minNoturnosConvertidos;
-                } else {
-                    extra100 = minTrabalhados;
-                }
+                // DSR/Feriado: todas as horas trabalhadas são 100% extra.
+                // O adicional noturno é acumulado separadamente em totalNoturnoConvertido.
+                extra100 = minTrabalhados;
                 flagDSR = true;
             } else {
-                // ✅ CORRIGIDO: Usar HORAS NOTURNAS CONVERTIDAS para todos os cálculos se houver noturno
-                const horasReferencia = (minNoturnos > 0) ? minNoturnosConvertidos : minTrabalhados;
+                const horasReferencia = minTrabalhados;
                 
                 if (horasReferencia > jornadaMinutos) {
                     let minutosExtras = horasReferencia - jornadaMinutos;
@@ -1210,6 +1206,7 @@ function calcularFolha(folha) {
             entrada3: dia.entrada3 || '',
             saida3: dia.saida3 || '',
             trabalhado: converterMinutosParaHora(minTrabalhados),
+            normais: converterMinutosParaHora(Math.max(0, minTrabalhados - extra50 - extra100)),
             extra50: converterMinutosParaHora(extra50),
             extra100: converterMinutosParaHora(extra100),
             noturno: converterMinutosParaHora(minNoturnos),
@@ -1265,6 +1262,7 @@ function calcularFolha(folha) {
         dias: diasCalculados,
         totais: {
             trabalhado: converterMinutosParaHora(totalTrabalhado),
+            normais: converterMinutosParaHora(Math.max(0, totalTrabalhado - totalExtra50Original - totalExtra100Original)),
             extra50: converterMinutosParaHora(totalExtra50Original),
             extra100: converterMinutosParaHora(totalExtra100Original),
             noturno: converterMinutosParaHora(totalNoturno),
@@ -1346,6 +1344,10 @@ function renderizarConsolidado() {
                         <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Trabalhado</div>
                         <div style="font-size: 24px; font-weight: 800; color: #1f2937; margin-top: 8px;">${res.totais.trabalhado}</div>
                     </div>
+                    <div style="background: #f0fdf4; padding: 20px 15px; text-align: center;">
+                        <div style="font-size: 11px; color: #166534; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Horas Normais</div>
+                        <div style="font-size: 24px; font-weight: 800; color: #166534; margin-top: 8px;">${res.totais.normais}</div>
+                    </div>
                     <div style="background: white; padding: 20px 15px; text-align: center;">
                         <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Adic. Noturno</div>
                         <div style="font-size: 24px; font-weight: 800; color: #1f2937; margin-top: 8px;">${res.totais.noturnoConvertido}</div>
@@ -1386,6 +1388,7 @@ function renderizarTabelasDiarias() {
                                 <th style="padding: 12px 15px; text-align: left; border-bottom: 2px solid #e5e7eb;">Data</th>
                                 <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e5e7eb;">Entradas/Saídas</th>
                                 <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e5e7eb;">Trabalhado</th>
+                                <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e5e7eb;">H. Normais</th>
                                 <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e5e7eb;">Extra 50%</th>
                                 <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e5e7eb;">Extra 100%</th>
                                 <th style="padding: 12px 15px; text-align: center; border-bottom: 2px solid #e5e7eb;">Noturno</th>
@@ -1436,6 +1439,7 @@ function renderizarTabelasDiarias() {
                     </td>
                     <td style="padding: 10px 15px; text-align: center; color: ${isDescanso ? '#991b1b' : '#4b5563'};">${marcacoes}</td>
                     <td style="padding: 10px 15px; text-align: center; font-weight: 600; color: ${isDescanso ? '#991b1b' : '#1f2937'};">${dia.trabalhado !== '00:00' ? dia.trabalhado : '-'}</td>
+                    <td style="padding: 10px 15px; text-align: center; font-weight: 600; color: ${isDescanso ? '#991b1b' : '#166534'};">${dia.normais !== '00:00' ? dia.normais : '-'}</td>
                     <td style="padding: 10px 15px; text-align: center; color: ${isDescanso ? '#991b1b' : '#4b5563'};">${dia.extra50 !== '00:00' ? dia.extra50 : '-'}</td>
                     <td style="padding: 10px 15px; text-align: center; color: ${isDescanso ? '#991b1b' : '#4b5563'};">${dia.extra100 !== '00:00' ? dia.extra100 : '-'}</td>
                     <td style="padding: 10px 15px; text-align: center; color: ${isDescanso ? '#991b1b' : '#4b5563'};">${dia.noturnoConvertido !== '00:00' ? dia.noturnoConvertido : '-'}</td>
@@ -1478,6 +1482,7 @@ state.resultados.forEach(res => {
         'Matrícula': res.empregadoId,
         'Empregado': res.nome,
         'Horas Trabalhadas': res.totais.trabalhado,
+        'Horas Normais': res.totais.normais,
         'Horas Extras 50%': res.totais.extra50,
         'Horas Extras 100%': res.totais.extra100,
         'Adicional Noturno': res.totais.noturnoConvertido,
@@ -1487,9 +1492,9 @@ state.resultados.forEach(res => {
 
     // Preparar dados da aba individual
     const dadosAbaIndividual = [
-        { 'Data': infoCabecalho, 'Dia da Semana': '', 'Entradas/Saídas': '', 'Trabalhado': '', 'Extra 50%': '', 'Extra 100%': '', 'Noturno': '', 'Faltante': '', 'Flags': '' },
-        { 'Data': '', 'Dia da Semana': '', 'Entradas/Saídas': '', 'Trabalhado': '', 'Extra 50%': '', 'Extra 100%': '', 'Noturno': '', 'Faltante': '', 'Flags': '' },
-        { 'Data': 'Data', 'Dia da Semana': 'Dia da Semana', 'Entradas/Saídas': 'Entradas/Saídas', 'Trabalhado': 'Trabalhado', 'Extra 50%': 'Extra 50%', 'Extra 100%': 'Extra 100%', 'Noturno': 'Noturno', 'Faltante': 'Faltante', 'Flags': 'Flags' }
+        { 'Data': infoCabecalho, 'Dia da Semana': '', 'Entradas/Saídas': '', 'Trabalhado': '', 'H. Normais': '', 'Extra 50%': '', 'Extra 100%': '', 'Noturno': '', 'Faltante': '', 'Flags': '' },
+        { 'Data': '', 'Dia da Semana': '', 'Entradas/Saídas': '', 'Trabalhado': '', 'H. Normais': '', 'Extra 50%': '', 'Extra 100%': '', 'Noturno': '', 'Faltante': '', 'Flags': '' },
+        { 'Data': 'Data', 'Dia da Semana': 'Dia da Semana', 'Entradas/Saídas': 'Entradas/Saídas', 'Trabalhado': 'Trabalhado', 'H. Normais': 'H. Normais', 'Extra 50%': 'Extra 50%', 'Extra 100%': 'Extra 100%', 'Noturno': 'Noturno', 'Faltante': 'Faltante', 'Flags': 'Flags' }
     ];
 
     // Adicionar dias
@@ -1512,6 +1517,7 @@ dadosAbaIndividual.push({
     'Dia da Semana': tipoDia,
     'Entradas/Saídas': marcacoes,
     'Trabalhado': dia.trabalhado !== '00:00' ? dia.trabalhado : '-',
+    'H. Normais': dia.normais !== '00:00' ? dia.normais : '-',
     'Extra 50%': dia.extra50 !== '00:00' ? dia.extra50 : '-',
     'Extra 100%': dia.extra100 !== '00:00' ? dia.extra100 : '-',
     'Noturno': dia.noturnoConvertido !== '00:00' ? dia.noturnoConvertido : '-',
@@ -1521,12 +1527,13 @@ dadosAbaIndividual.push({
     });
 
     // Adicionar totais no final da aba individual
-    dadosAbaIndividual.push({ 'Data': '', 'Dia da Semana': '', 'Entradas/Saídas': '', 'Trabalhado': '', 'Extra 50%': '', 'Extra 100%': '', 'Noturno': '', 'Faltante': '', 'Flags': '' });
+    dadosAbaIndividual.push({ 'Data': '', 'Dia da Semana': '', 'Entradas/Saídas': '', 'Trabalhado': '', 'H. Normais': '', 'Extra 50%': '', 'Extra 100%': '', 'Noturno': '', 'Faltante': '', 'Flags': '' });
     dadosAbaIndividual.push({
         'Data': 'TOTAIS',
         'Dia da Semana': '',
         'Entradas/Saídas': '',
         'Trabalhado': res.totais.trabalhado,
+        'H. Normais': res.totais.normais,
         'Extra 50%': res.totais.extra50,
         'Extra 100%': res.totais.extra100,
         'Noturno': res.totais.noturnoConvertido,
@@ -1541,6 +1548,7 @@ dadosAbaIndividual.push({
         { wch: 15 }, // Dia da Semana
         { wch: 25 }, // Entradas/Saídas
         { wch: 12 }, // Trabalhado
+        { wch: 12 }, // H. Normais
         { wch: 12 }, // Extra 50%
         { wch: 12 }, // Extra 100%
         { wch: 12 }, // Noturno
@@ -1587,6 +1595,8 @@ function _carregarConfigNoCampos(prefixo, c) {
     const f = id => document.getElementById(id);
     const setVal = (id, val) => { const el = f(id); if (el) el.value = val || ''; };
     const setOpt = (id, val, def) => { const el = f(id); if (el) el.value = val || def; };
+    setVal(`${prefixo}RubHorasTrab`,  c.rubHorasTrab);
+    setOpt(`${prefixo}TipoHorasTrab`, c.tipoHorasTrab, 'horas');
     setVal(`${prefixo}RubHE50`,    c.rubHE50);
     setOpt(`${prefixo}TipoHE50`,   c.tipoHE50,   'horas');
     setVal(`${prefixo}RubHE100`,   c.rubHE100);
@@ -1602,7 +1612,9 @@ function _carregarConfigNoCampos(prefixo, c) {
 function _lerCamposConfig(prefixo, radioName) {
     const g = id => (document.getElementById(id) || {}).value || '';
     return {
-        tipoProcesso: document.querySelector(`input[name="${radioName}"]:checked`)?.value || '11',
+        tipoProcesso:   document.querySelector(`input[name="${radioName}"]:checked`)?.value || '11',
+        rubHorasTrab:   g(`${prefixo}RubHorasTrab`).trim(),
+        tipoHorasTrab:  g(`${prefixo}TipoHorasTrab`) || 'horas',
         rubHE50:    g(`${prefixo}RubHE50`).trim(),
         tipoHE50:   g(`${prefixo}TipoHE50`)   || 'horas',
         rubHE100:   g(`${prefixo}RubHE100`).trim(),
@@ -1645,7 +1657,7 @@ function _toggleNaoCompensar(prefix) {
     if (label) label.textContent = checked ? 'Horas Faltantes' : 'Atraso';
 }
 
-function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_he50, mins_he100, mins_not, mins_atr, dias_falta) {
+function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta) {
     const tp = String(config.tipoProcesso).padStart(2, '0');
     const empFmt = String(codEmp).padStart(10, '0');
     const empFmt2 = String(codEmpresa).padStart(10, '0');
@@ -1656,11 +1668,12 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_he50, mins_he100, 
         return `${base}${rub(rubrica)}${tp}${String(valorInt).padStart(9,'0')}${empFmt2}\n`;
     };
     return [
-        linha(config.rubHE50,    _encMinutosParaTipo(mins_he50,  config.tipoHE50)),
-        linha(config.rubHE100,   _encMinutosParaTipo(mins_he100, config.tipoHE100)),
-        linha(config.rubNoturno, _encMinutosParaTipo(mins_not,   config.tipoNoturno)),
-        linha(config.rubAtraso,  _encMinutosParaTipo(mins_atr,   config.tipoAtraso)),
-        linha(config.rubFalta,   config.tipoFalta === 'dias' ? _encDias(dias_falta) : _encMinutosParaTipo(dias_falta * 480, config.tipoFalta)),
+        linha(config.rubHorasTrab, _encMinutosParaTipo(mins_trab,  config.tipoHorasTrab)),
+        linha(config.rubHE50,      _encMinutosParaTipo(mins_he50,  config.tipoHE50)),
+        linha(config.rubHE100,     _encMinutosParaTipo(mins_he100, config.tipoHE100)),
+        linha(config.rubNoturno,   _encMinutosParaTipo(mins_not,   config.tipoNoturno)),
+        linha(config.rubAtraso,    _encMinutosParaTipo(mins_atr,   config.tipoAtraso)),
+        linha(config.rubFalta,     config.tipoFalta === 'dias' ? _encDias(dias_falta) : _encMinutosParaTipo(dias_falta * 480, config.tipoFalta)),
     ].join('');
 }
 
@@ -1756,7 +1769,7 @@ async function _construirConteudoTXTExportacao() {
         const rule100    = save.rule_extra_100_opcional || false;
         const dados      = JSON.parse(save.dados_json || '[]');
 
-        let tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0;
+        let tTrab = 0, tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0;
         const diasFaltaDetalhes = [];
         dados.forEach(dia => {
             const isFeriado    = feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
@@ -1781,19 +1794,17 @@ async function _construirConteudoTXTExportacao() {
             } else if (isAtestadoCompExp) {
                 // isenção de metade da jornada
                 const metade = Math.floor(jornadaMin / 2);
-                const ref = minNotConv > 0 ? minNotConv : minTrab;
-                if (ref < metade) dev = metade - ref;
+                if (minTrab < metade) dev = metade - minTrab;
             } else if (minTrab > 0) {
                 if (isDiaDescanso) {
-                    ex100 = minNotConv > 0 ? minNotConv : minTrab;
+                    ex100 = minTrab;
                 } else {
-                    const ref = minNotConv > 0 ? minNotConv : minTrab;
-                    if (ref > jornadaMin) {
-                        const extra = ref - jornadaMin;
+                    if (minTrab > jornadaMin) {
+                        const extra = minTrab - jornadaMin;
                         if (rule100) { ex50 = Math.min(extra, 120); ex100 = Math.max(0, extra - 120); }
                         else { ex50 = extra; }
                     } else {
-                        dev = jornadaMin - ref;
+                        dev = jornadaMin - minTrab;
                     }
                 }
             } else if (!isDiaDescanso) {
@@ -1803,6 +1814,7 @@ async function _construirConteudoTXTExportacao() {
                 }
                 // folga, atestado e sem registro não geram horas devidas nem faltas
             }
+            tTrab  += minTrab;
             tEx50  += ex50;
             tEx100 += ex100;
             tNot   += minNotConv;
@@ -1819,11 +1831,13 @@ async function _construirConteudoTXTExportacao() {
             }
         }
 
+        const tNorm = Math.max(0, tTrab - tEx50 - tEx100);
         conteudoTXT += _linhasTxt(
             config,
             empInfo.codigo_empregado,
             compFmt,
             empCodigo,
+            tNorm,
             tEx50,
             tEx100,
             tNot,
@@ -2222,7 +2236,7 @@ function fecharModalTxtResultados() {
 
 function _construirConteudoTXTResultados(salvar = false) {
     const config = _lerCamposConfig('res', 'resTipoProcesso');
-    if (![config.rubHE50, config.rubHE100, config.rubNoturno, config.rubAtraso, config.rubFalta].some(r => r)) {
+    if (![config.rubHorasTrab, config.rubHE50, config.rubHE100, config.rubNoturno, config.rubAtraso, config.rubFalta].some(r => r)) {
         throw new Error('Preencha ao menos uma rubrica para gerar o TXT.');
     }
     if (salvar) localStorage.setItem(TXT_RUBRICAS_KEY, JSON.stringify(config));
@@ -2246,12 +2260,14 @@ function _construirConteudoTXTResultados(salvar = false) {
             const abate100 = Math.min(he100, devRest); he100 -= abate100;
             minsAtr = converterHoraParaMinutos(res.totais.devidas);
         }
+        const minsNorm = Math.max(0, converterHoraParaMinutos(res.totais.trabalhado) - he50 - he100);
         const diasFaltaRes = res.dias.filter(d => d.flagFalta);
         conteudoTXT += _linhasTxt(
             config,
             res.empregadoId,
             compFmt,
             codEmpresa,
+            minsNorm,
             he50,
             he100,
             converterHoraParaMinutos(res.totais.noturnoConvertido),

@@ -1,0 +1,229 @@
+<h2>Design — Seção 4: Visão do agente no CRM</h2>
+<p class="subtitle">Como o contexto coletado pelo bot aparece para o atendente humano</p>
+
+<style>
+.crm-shell {
+  border: 2px solid #e0dcd8; border-radius: 10px; overflow: hidden;
+  font-family: 'DM Sans', sans-serif; font-size: 12px; max-width: 900px; margin: 16px auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+.crm-topbar { background: #7a1e1e; color: #fff; padding: 8px 16px; display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.crm-body { display: flex; height: 480px; }
+
+/* Lista de conversas */
+.conv-list { width: 220px; border-right: 1px solid #e0dcd8; background: #f7f6f4; overflow-y: auto; }
+.conv-search { padding: 8px; border-bottom: 1px solid #e0dcd8; }
+.conv-search input { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid #e0dcd8; border-radius: 6px; font-size: 11px; background: #fff; }
+.conv-card { padding: 10px 12px; border-bottom: 1px solid #f0ede8; cursor: pointer; }
+.conv-card:hover { background: #f0e8e8; }
+.conv-card.active { background: #f0e8e8; border-left: 3px solid #7a1e1e; }
+.conv-card-name { font-weight: 700; font-size: 12px; color: #1a1a1a; }
+.conv-card-preview { font-size: 11px; color: #888; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.conv-card-meta { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+.badge-bot { background: #cce5ff; color: #004085; }
+.badge-dept { background: #f0e8e8; color: #7a1e1e; }
+.badge-cat { background: #fff3cd; color: #856404; }
+.badge-new { background: #d4edda; color: #155724; }
+
+/* Chat panel */
+.chat-area { flex: 1; display: flex; flex-direction: column; }
+.chat-header { padding: 10px 14px; border-bottom: 1px solid #e0dcd8; display: flex; align-items: center; gap: 10px; background: #fff; }
+.chat-avatar { width: 32px; height: 32px; background: #7a1e1e; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 12px; background: #f7f6f4; display: flex; flex-direction: column; gap: 6px; }
+
+.bubble { border-radius: 8px; padding: 7px 10px; font-size: 12px; max-width: 75%; line-height: 1.4; }
+.bubble.bot { background: #fff; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #e0dcd8; }
+.bubble.bot .sender { font-size: 10px; color: #004085; font-weight: 700; margin-bottom: 3px; }
+.bubble.agent { background: #7a1e1e; color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; }
+.bubble.sistema { background: #fffbe6; border: 1px dashed #ffe066; align-self: center; font-size: 11px; color: #856404; text-align: center; max-width: 90%; }
+.bubble-time { font-size: 9px; color: #bbb; margin-top: 2px; text-align: right; }
+
+/* Painel direito */
+.painel-dir { width: 210px; border-left: 1px solid #e0dcd8; background: #fafafa; overflow-y: auto; }
+.pd-section { padding: 10px 12px; border-bottom: 1px solid #f0ede8; }
+.pd-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #c5c0ba; margin-bottom: 8px; }
+.pd-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; font-size: 11px; }
+.pd-label { color: #888; }
+.pd-val { font-weight: 600; color: #1a1a1a; text-align: right; max-width: 110px; }
+
+/* Destaque BOT CONTEXT */
+.bot-context-card {
+  background: linear-gradient(135deg, #e8f4fd 0%, #f0e8ff 100%);
+  border: 1.5px solid #b3d4f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;
+}
+.bot-context-title { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #004085; letter-spacing: 0.06em; margin-bottom: 7px; display: flex; align-items: center; gap: 4px; }
+.bot-context-row { display: flex; flex-direction: column; margin-bottom: 5px; }
+.bot-context-label { font-size: 9px; color: #7a9fc0; text-transform: uppercase; letter-spacing: 0.06em; }
+.bot-context-value { font-size: 12px; font-weight: 700; color: #1a1a1a; }
+</style>
+
+<div class="crm-shell">
+  <div class="crm-topbar">
+    💬 WhatsApp CRM
+    <span style="opacity:0.6; font-weight:400; font-size:11px;">— Depto. Contabilidade</span>
+    <div style="margin-left:auto; background:#d4edda; color:#155724; font-size:10px; padding:2px 8px; border-radius:4px; font-weight:700;">🤖 Bot ATIVO</div>
+  </div>
+
+  <div class="crm-body">
+
+    <!-- LISTA CONVERSAS -->
+    <div class="conv-list">
+      <div class="conv-search"><input placeholder="Buscar conversa..." /></div>
+
+      <div class="conv-card active">
+        <div class="conv-card-name">João Ferreira</div>
+        <div class="conv-card-preview">🤖 → Balanço / Análise…</div>
+        <div class="conv-card-meta">
+          <span class="badge badge-dept">Contábil</span>
+          <span class="badge badge-cat">Balanço/DRE</span>
+          <span class="badge badge-new">Novo</span>
+        </div>
+      </div>
+
+      <div class="conv-card">
+        <div class="conv-card-name">Maria Santos</div>
+        <div class="conv-card-preview">Bom dia, precisava de…</div>
+        <div class="conv-card-meta">
+          <span class="badge badge-dept">Pessoal</span>
+          <span class="badge badge-cat">Folha</span>
+        </div>
+      </div>
+
+      <div class="conv-card">
+        <div class="conv-card-name">Empresa XYZ Ltda</div>
+        <div class="conv-card-preview">👤 Falar com atendente</div>
+        <div class="conv-card-meta">
+          <span class="badge badge-dept">Tributário</span>
+          <span class="badge" style="background:#f8d7da; color:#721c24;">Direto</span>
+        </div>
+      </div>
+
+      <div class="conv-card">
+        <div class="conv-card-name">Carlos Nunes</div>
+        <div class="conv-card-preview">⭐⭐⭐⭐⭐ obrigado!</div>
+        <div class="conv-card-meta">
+          <span class="badge badge-dept">Admin</span>
+          <span class="badge" style="background:#e0dcd8; color:#555;">Encerrado</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHAT -->
+    <div class="chat-area">
+      <div class="chat-header">
+        <div class="chat-avatar">J</div>
+        <div style="flex:1;">
+          <div style="font-weight:700; font-size:13px;">João Ferreira</div>
+          <div style="font-size:11px; color:#888;">+55 11 99999-0001 · Contabilidade</div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button style="background:#f0e8e8; border:none; border-radius:6px; padding:4px 10px; font-size:11px; color:#7a1e1e; cursor:pointer; font-weight:600;">Transferir</button>
+          <button style="background:#f0e8e8; border:none; border-radius:6px; padding:4px 10px; font-size:11px; color:#7a1e1e; cursor:pointer; font-weight:600;">Encerrar</button>
+        </div>
+      </div>
+
+      <div class="chat-messages">
+        <div class="bubble bot">
+          <div class="sender">🤖 Bot SCONT</div>
+          Olá, João! Bem-vindo à SCONT Soluções Contábeis 👋<br>Selecione o departamento para agilizar:
+          <div class="bubble-time">08:32</div>
+        </div>
+        <div class="bubble bot">
+          <div class="sender">🤖 Bot SCONT</div>
+          Ótimo! <strong>Contabilidade</strong> selecionado. Sobre qual assunto?
+          <div class="bubble-time">08:32</div>
+        </div>
+        <div class="bubble bot">
+          <div class="sender">🤖 Bot SCONT</div>
+          Perfeito! Encaminhando para <strong>Contabilidade › Balanço/DRE › Análise de resultados</strong>.<br>🔖 Protocolo: <strong>SCT-20260605-003847</strong>
+          <div class="bubble-time">08:33</div>
+        </div>
+        <div class="bubble sistema">
+          🤖 Bot encaminhou: <strong>Contabilidade › Balanço/DRE › Análise de resultados</strong> — aguardando agente
+        </div>
+        <div class="bubble bot">
+          <div class="sender" style="color:#888480;">João Ferreira</div>
+          Olá, preciso do balanço do último trimestre para uma reunião hoje à tarde
+          <div class="bubble-time">08:35</div>
+        </div>
+        <div class="bubble agent">
+          Bom dia, João! Já estou verificando aqui para você. Um momento.
+          <div class="bubble-time">08:37</div>
+        </div>
+      </div>
+
+      <div style="padding:8px 12px; border-top:1px solid #e0dcd8; background:#fff; display:flex; gap:8px;">
+        <input style="flex:1; border:1px solid #e0dcd8; border-radius:6px; padding:7px 10px; font-size:12px;" placeholder="Digite sua mensagem..." />
+        <button style="background:#7a1e1e; color:#fff; border:none; border-radius:6px; padding:7px 14px; font-size:12px; font-weight:600; cursor:pointer;">Enviar</button>
+      </div>
+    </div>
+
+    <!-- PAINEL DIREITO -->
+    <div class="painel-dir">
+
+      <!-- DESTAQUE: Contexto do Bot -->
+      <div class="pd-section">
+        <div class="bot-context-card">
+          <div class="bot-context-title">🤖 Contexto do bot</div>
+          <div class="bot-context-row">
+            <div class="bot-context-label">Departamento</div>
+            <div class="bot-context-value">Contabilidade</div>
+          </div>
+          <div class="bot-context-row">
+            <div class="bot-context-label">Assunto</div>
+            <div class="bot-context-value">Balanço / DRE</div>
+          </div>
+          <div class="bot-context-row">
+            <div class="bot-context-label">Detalhe</div>
+            <div class="bot-context-value">Análise de resultados</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Contato -->
+      <div class="pd-section">
+        <div class="pd-title">Contato</div>
+        <div class="pd-row"><span class="pd-label">Nome</span><span class="pd-val">João Ferreira</span></div>
+        <div class="pd-row"><span class="pd-label">Telefone</span><span class="pd-val">11 99999-0001</span></div>
+        <div class="pd-row"><span class="pd-label">Protocolo</span><span class="pd-val" style="color:#7a1e1e;">SCT-20260605-003847</span></div>
+        <div class="pd-row"><span class="pd-label">Início</span><span class="pd-val">08:32</span></div>
+      </div>
+
+      <!-- Histórico -->
+      <div class="pd-section">
+        <div class="pd-title">Histórico</div>
+        <div style="font-size:11px; color:#27ae60; font-weight:600;">🔁 2ª visita</div>
+        <div style="font-size:11px; color:#888; margin-top:3px;">Último atendimento:<br>15/05/2026 · Contábil · Lançamentos</div>
+      </div>
+
+      <!-- Tags automáticas -->
+      <div class="pd-section">
+        <div class="pd-title">Tags</div>
+        <div style="display:flex; flex-wrap:wrap; gap:4px;">
+          <span class="badge badge-bot">🤖 bot-roteado</span>
+          <span class="badge badge-cat">balanço</span>
+          <span class="badge badge-dept">contábil</span>
+          <span class="badge badge-new">2ª-visita</span>
+        </div>
+      </div>
+
+      <!-- Anotações -->
+      <div class="pd-section">
+        <div class="pd-title">Anotação interna</div>
+        <textarea style="width:100%; box-sizing:border-box; border:1px solid #e0dcd8; border-radius:4px; font-size:11px; padding:5px; resize:none; height:52px; font-family:inherit;" placeholder="Nota interna (não visível ao cliente)..."></textarea>
+        <button style="width:100%; margin-top:4px; background:#f0e8e8; border:none; border-radius:4px; padding:4px; font-size:11px; color:#7a1e1e; cursor:pointer; font-weight:600;">Salvar nota</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+  <div style="padding:10px 14px; background:#e8f4fd; border:1px solid #b3d4f0; border-radius:8px; font-size:11px; color:#004085;">
+    <strong>Card na lista de conversas:</strong> O badge de categoria (ex: "Balanço/DRE") aparece diretamente no card — o agente vê o assunto antes mesmo de abrir a conversa. Conversas vindas pelo bot têm badge 🤖.
+  </div>
+  <div style="padding:10px 14px; background:#f0e8ff; border:1px solid #c8a0e8; border-radius:8px; font-size:11px; color:#5a1a8a;">
+    <strong>Mensagem de sistema:</strong> A linha cinza no chat ("Bot encaminhou: Contabilidade › Balanço/DRE…") é visível apenas para o agente — não aparece para o cliente. Origem = <code>SISTEMA</code>.
+  </div>
+</div>

@@ -1,0 +1,60 @@
+<h2>Como o chatbot vai interagir com o cliente?</h2>
+<p class="subtitle">Escolha o modelo de interação das mensagens no WhatsApp</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Menu Numerado (texto)</h3>
+      <p>Bot envia uma mensagem de texto com opções numeradas. Cliente responde com o número da opção.</p>
+      <div style="margin-top:12px; background:#f0f0f0; border-radius:8px; padding:12px; font-size:12px; font-family:monospace;">
+        🤖 Olá! Selecione o departamento:<br><br>
+        1️⃣ Departamento Pessoal<br>
+        2️⃣ Contabilidade<br>
+        3️⃣ Tributário<br>
+        4️⃣ Administrativo<br><br>
+        <em>Digite o número da opção desejada</em>
+      </div>
+      <div style="margin-top:8px;">
+        <span style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">✓ Funciona com qualquer celular</span>
+        <span style="background:#fff3cd; color:#856404; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; margin-left:4px;">Requer digitação</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Botões Interativos (WhatsApp API)</h3>
+      <p>Bot envia mensagem com botões clicáveis. Cliente toca no botão sem precisar digitar.</p>
+      <div style="margin-top:12px; background:#f0f0f0; border-radius:8px; padding:12px; font-size:12px; font-family:monospace;">
+        🤖 Olá! Selecione o departamento:<br><br>
+        <span style="background:#25d366; color:#fff; padding:4px 12px; border-radius:6px; display:inline-block; margin:2px;">Pessoal</span>
+        <span style="background:#25d366; color:#fff; padding:4px 12px; border-radius:6px; display:inline-block; margin:2px;">Contabilidade</span><br>
+        <span style="background:#25d366; color:#fff; padding:4px 12px; border-radius:6px; display:inline-block; margin:2px;">Tributário</span>
+        <span style="background:#25d366; color:#fff; padding:4px 12px; border-radius:6px; display:inline-block; margin:2px;">Administrativo</span>
+      </div>
+      <div style="margin-top:8px;">
+        <span style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">✓ UX superior — clique em vez de digitar</span>
+        <span style="background:#cce5ff; color:#004085; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; margin-left:4px;">Limite: 3 botões por mensagem</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Lista Interativa (WhatsApp API)</h3>
+      <p>Bot envia uma lista rolável com todas as opções. Melhor para menus com muitas opções.</p>
+      <div style="margin-top:12px; background:#f0f0f0; border-radius:8px; padding:12px; font-size:12px; font-family:monospace;">
+        🤖 Olá! Toque em "Ver opções" para selecionar:<br><br>
+        <span style="border:1px solid #25d366; color:#25d366; padding:4px 16px; border-radius:6px; display:inline-block;">☰ Ver departamentos</span><br><br>
+        <em style="color:#888;">→ Abre lista rolável com até 10 opções</em>
+      </div>
+      <div style="margin-top:8px;">
+        <span style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600;">✓ Suporta até 10 opções</span>
+        <span style="background:#d4edda; color:#155724; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; margin-left:4px;">✓ Ideal para sub-menus longos</span>
+      </div>
+    </div>
+  </div>
+</div>

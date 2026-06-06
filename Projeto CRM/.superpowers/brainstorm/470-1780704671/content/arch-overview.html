@@ -1,0 +1,126 @@
+<h2>Design — Seção 1: Arquitetura Geral</h2>
+<p class="subtitle">Fluxo completo de uma mensagem entrante com o chatbot ativo</p>
+
+<style>
+.flow { display: flex; align-items: flex-start; gap: 0; margin: 20px 0; flex-wrap: wrap; }
+.flow-box { background: #fff; border: 2px solid #e0dcd8; border-radius: 8px; padding: 10px 14px; font-size: 12px; font-weight: 600; color: #1a1a1a; text-align: center; min-width: 110px; position: relative; }
+.flow-box.red { background: #7a1e1e; color: #fff; border-color: #7a1e1e; }
+.flow-box.green { background: #d4edda; border-color: #27ae60; color: #155724; }
+.flow-box.blue { background: #cce5ff; border-color: #004085; color: #004085; }
+.flow-box.yellow { background: #fff3cd; border-color: #856404; color: #856404; }
+.flow-box.gray { background: #f7f6f4; border-color: #c5c0ba; color: #666; }
+.arrow { display: flex; align-items: center; padding: 0 6px; color: #888; font-size: 18px; }
+.arrow-down { display: flex; justify-content: center; color: #888; font-size: 18px; margin: 4px 0; }
+.sub-label { font-size: 10px; font-weight: 400; margin-top: 3px; color: inherit; opacity: 0.85; }
+
+.tables { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+.table-card { border: 1.5px solid #e0dcd8; border-radius: 8px; padding: 10px 12px; }
+.table-name { font-weight: 700; font-size: 12px; color: #7a1e1e; margin-bottom: 6px; font-family: monospace; }
+.table-col { font-size: 11px; color: #555; padding: 2px 0; border-bottom: 1px solid #f0ede8; }
+.table-col:last-child { border-bottom: none; }
+.col-pk { color: #7a1e1e; font-weight: 700; }
+.col-fk { color: #004085; }
+.section-title { font-weight: 700; font-size: 13px; color: #1a1a1a; margin: 16px 0 8px; border-bottom: 2px solid #7a1e1e; padding-bottom: 4px; }
+</style>
+
+<div class="section-title">Fluxo de uma mensagem recebida</div>
+
+<div class="flow">
+  <div class="flow-box red">📱 WhatsApp<div class="sub-label">Mensagem do cliente</div></div>
+  <div class="arrow">→</div>
+  <div class="flow-box blue">🔗 whatsapp-webhook<div class="sub-label">Edge Function</div></div>
+  <div class="arrow">→</div>
+  <div class="flow-box yellow">🤖 ChatbotProcessor<div class="sub-label">lógica do bot (inline)</div></div>
+  <div class="arrow">→</div>
+  <div class="flow-box green">✅ Roteado<div class="sub-label">dept + motivo gravados</div></div>
+</div>
+
+<div style="margin:8px 0 8px 124px; font-size:11px; color:#666; padding-left:20px; border-left:2px dashed #ccc;">
+  O <strong>ChatbotProcessor</strong> é um módulo TypeScript dentro do whatsapp-webhook.<br>
+  Consulta as tabelas de config/menus/sessão e envia respostas via Meta API (Lista Interativa).
+</div>
+
+<div style="margin:8px 0 8px 124px; font-size:11px; color:#888; padding-left:20px; border-left:2px dashed #e74c3c;">
+  Se <strong>bot desligado</strong> → mensagem vai direto para fila humana (comportamento atual)
+</div>
+
+<div class="section-title">Máquina de estados do bot (por sessão de conversa)</div>
+
+<div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+  <div class="flow-box gray" style="font-size:11px; min-width:90px;">NOVO<div class="sub-label">boas-vindas + menu dept</div></div>
+  <div class="arrow" style="font-size:14px;">→</div>
+  <div class="flow-box gray" style="font-size:11px; min-width:90px;">DEPT<div class="sub-label">aguarda seleção depto</div></div>
+  <div class="arrow" style="font-size:14px;">→</div>
+  <div class="flow-box gray" style="font-size:11px; min-width:90px;">CATEGORIA<div class="sub-label">aguarda categoria</div></div>
+  <div class="arrow" style="font-size:14px;">→</div>
+  <div class="flow-box gray" style="font-size:11px; min-width:90px;">SUBCATEGORIA<div class="sub-label">aguarda sub-item</div></div>
+  <div class="arrow" style="font-size:14px;">→</div>
+  <div class="flow-box gray" style="font-size:11px; min-width:90px;">CONFIRMAR<div class="sub-label">resumo + confirmação</div></div>
+  <div class="arrow" style="font-size:14px;">→</div>
+  <div class="flow-box green" style="font-size:11px; min-width:90px;">HUMANO<div class="sub-label">agente assume</div></div>
+</div>
+<div style="font-size:11px; color:#888;">+ estado <strong>AVALIACAO</strong> (após encerramento) e saída "0 = falar com atendente" de qualquer estado.</div>
+
+<div class="section-title">Novas tabelas no banco (Migration 008)</div>
+
+<div class="tables">
+  <div class="table-card">
+    <div class="table-name">chatbot_config</div>
+    <div class="table-col col-pk">id (PK)</div>
+    <div class="table-col">bot_ativo BOOLEAN</div>
+    <div class="table-col">horario_inicio TIME</div>
+    <div class="table-col">horario_fim TIME</div>
+    <div class="table-col">timeout_minutos INT</div>
+    <div class="table-col">max_tentativas INT</div>
+    <div class="table-col">msg_boas_vindas TEXT</div>
+    <div class="table-col">msg_fora_horario TEXT</div>
+    <div class="table-col">msg_fila TEXT</div>
+    <div class="table-col">atualizado_em TIMESTAMPTZ</div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-name">chatbot_menus</div>
+    <div class="table-col col-pk">id UUID (PK)</div>
+    <div class="table-col col-fk">parent_id UUID (FK self)</div>
+    <div class="table-col">departamento ENUM</div>
+    <div class="table-col">titulo TEXT</div>
+    <div class="table-col">nivel INT (1=dept,2=cat,3=sub)</div>
+    <div class="table-col">ordem INT</div>
+    <div class="table-col">ativo BOOLEAN</div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-name">chatbot_sessoes</div>
+    <div class="table-col col-pk">id UUID (PK)</div>
+    <div class="table-col col-fk">conversa_id UUID (FK)</div>
+    <div class="table-col">estado TEXT</div>
+    <div class="table-col">dept_selecionado ENUM</div>
+    <div class="table-col">categoria_id UUID</div>
+    <div class="table-col">subcategoria_id UUID</div>
+    <div class="table-col">tentativas_invalidas INT</div>
+    <div class="table-col">iniciado_em TIMESTAMPTZ</div>
+    <div class="table-col">ultimo_em TIMESTAMPTZ</div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-name">chatbot_avaliacoes</div>
+    <div class="table-col col-pk">id UUID (PK)</div>
+    <div class="table-col col-fk">conversa_id UUID (FK)</div>
+    <div class="table-col">nota INT (1–5)</div>
+    <div class="table-col">comentario TEXT</div>
+    <div class="table-col">criado_em TIMESTAMPTZ</div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-name">chatbot_dept_config</div>
+    <div class="table-col col-pk">departamento ENUM (PK)</div>
+    <div class="table-col">ativo BOOLEAN</div>
+    <div class="table-col">horario_inicio TIME</div>
+    <div class="table-col">horario_fim TIME</div>
+    <div class="table-col">msg_especifica TEXT</div>
+  </div>
+</div>
+
+<div style="margin-top:16px; padding:10px 14px; background:#f7eaea; border:1px solid #c08080; border-radius:8px; font-size:11px; color:#7a1e1e;">
+  <strong>Impacto na tabela conversas:</strong> adicionar colunas <code>chatbot_dept</code> (departamento selecionado), <code>chatbot_categoria</code> (texto) e <code>chatbot_subcategoria</code> (texto) — gravadas ao concluir o fluxo do bot para o agente ver no painel direito.
+</div>

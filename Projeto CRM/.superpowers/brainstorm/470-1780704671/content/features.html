@@ -1,0 +1,87 @@
+<h2>Funcionalidades extras do chatbot</h2>
+<p class="subtitle">Selecione todas que deseja incluir (multi-seleção)</p>
+
+<style>
+.feat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.feat { background: #fafafa; border: 1.5px solid #e0dcd8; border-radius: 8px; padding: 12px 14px; cursor: pointer; transition: all 0.15s; }
+.feat:hover { border-color: #7a1e1e; background: #fdf7f7; }
+.feat.selected { border-color: #7a1e1e; background: #f7eaea; }
+.feat-title { font-weight: 700; font-size: 13px; color: #1a1a1a; display: flex; align-items: center; gap: 6px; }
+.feat-icon { font-size: 16px; }
+.feat-desc { font-size: 11px; color: #666; margin-top: 4px; line-height: 1.4; }
+.feat-tag { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: auto; }
+.tag-core { background: #d4edda; color: #155724; }
+.tag-plus { background: #cce5ff; color: #004085; }
+.tag-admin { background: #f8d7da; color: #721c24; }
+</style>
+
+<div class="feat-grid" id="features">
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">🔴</span> Desligar chatbot (atendimento humano) <span class="feat-tag tag-admin">Admin</span></div>
+    <div class="feat-desc">Chave no painel admin para desativar o bot globalmente ou por departamento. Quando desligado, cliente vai direto para fila humana.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">🌙</span> Horário de atendimento <span class="feat-tag tag-core">Essencial</span></div>
+    <div class="feat-desc">Define horário de funcionamento por departamento. Fora do horário, bot avisa e oferece opção de deixar mensagem para retorno.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">👤</span> "Falar com atendente" a qualquer momento <span class="feat-tag tag-core">Essencial</span></div>
+    <div class="feat-desc">Em qualquer etapa do fluxo, cliente pode digitar "0" ou clicar em opção para pular o bot e ir direto para atendimento humano.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">⏱️</span> Timeout de inatividade <span class="feat-tag tag-core">Essencial</span></div>
+    <div class="feat-desc">Se o cliente não responder em X minutos durante o fluxo do bot, a conversa é encerrada automaticamente com mensagem de aviso.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">⭐</span> Avaliação do atendimento (CSAT) <span class="feat-tag tag-plus">Plus</span></div>
+    <div class="feat-desc">Ao encerrar a conversa, o bot envia automaticamente uma pesquisa de satisfação de 1 a 5 estrelas. Resultados aparecem nas métricas.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">🔁</span> Reconhecimento de cliente recorrente <span class="feat-tag tag-plus">Plus</span></div>
+    <div class="feat-desc">Se o cliente já teve atendimento anterior no mesmo departamento, o bot pergunta se é sobre o mesmo assunto ou novo — reduz etapas.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">📋</span> Confirmação antes de rotear <span class="feat-tag tag-core">Essencial</span></div>
+    <div class="feat-desc">Antes de transferir, o bot resume a escolha: "Entendido — Dep. Pessoal › Folha › Recálculo. Confirmado?" Evita roteamentos errados.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">🚫</span> Limite de tentativas inválidas <span class="feat-tag tag-core">Essencial</span></div>
+    <div class="feat-desc">Se o cliente enviar 3 respostas inválidas (fora do menu), o bot transfere automaticamente para um agente humano.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">📝</span> Coleta de protocolo anterior <span class="feat-tag tag-plus">Plus</span></div>
+    <div class="feat-desc">Se o cliente menciona um atendimento anterior, o bot coleta o número do protocolo para o agente já ter o contexto ao assumir.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">🏷️</span> Tag automática via chatbot <span class="feat-tag tag-plus">Plus</span></div>
+    <div class="feat-desc">A conversa é automaticamente tagueada com o departamento e motivo selecionados no bot (ex: "Folha", "Rescisão"), facilitando filtros.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">📣</span> Mensagem de fila de espera <span class="feat-tag tag-core">Essencial</span></div>
+    <div class="feat-desc">Após o roteamento, informa ao cliente sua posição na fila e tempo médio de espera estimado para o departamento.</div>
+  </div>
+
+  <div class="feat" onclick="this.classList.toggle('selected')">
+    <div class="feat-title"><span class="feat-icon">⚙️</span> Editor visual do fluxo (admin) <span class="feat-tag tag-admin">Admin</span></div>
+    <div class="feat-desc">Painel para o admin editar os menus do chatbot (nomes, ordem, adicionar/remover opções) sem precisar de código.</div>
+  </div>
+
+</div>
+
+<div style="margin-top:16px; padding:10px 14px; background:#f0f7ff; border-radius:8px; font-size:11px; color:#004085;">
+  💡 <strong>Legenda:</strong>
+  <span style="background:#d4edda; color:#155724; padding:1px 6px; border-radius:4px; font-weight:700;">Essencial</span> = recomendo incluir sempre &nbsp;
+  <span style="background:#cce5ff; color:#004085; padding:1px 6px; border-radius:4px; font-weight:700;">Plus</span> = agrega muito valor &nbsp;
+  <span style="background:#f8d7da; color:#721c24; padding:1px 6px; border-radius:4px; font-weight:700;">Admin</span> = painel de controle
+</div>

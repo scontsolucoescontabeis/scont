@@ -1,0 +1,163 @@
+<h2>Árvore de departamentos e sub-menus</h2>
+<p class="subtitle">Esta é a estrutura proposta. Aprove ou indique o que ajustar no terminal.</p>
+
+<style>
+.tree { font-family: 'DM Sans', sans-serif; margin-top: 16px; }
+.dept { background: #7a1e1e; color: #fff; border-radius: 8px; padding: 10px 16px; font-weight: 700; font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.dept-icon { font-size: 18px; }
+.sub { margin-left: 28px; margin-bottom: 4px; }
+.sub-item { background: #f7f3f3; border-left: 3px solid #7a1e1e; border-radius: 0 6px 6px 0; padding: 7px 12px; font-size: 13px; font-weight: 600; color: #3a1a1a; margin-bottom: 3px; }
+.sub-sub { margin-left: 20px; }
+.sub-sub-item { background: #fdf8f8; border-left: 2px solid #c08080; border-radius: 0 4px 4px 0; padding: 5px 10px; font-size: 12px; color: #666; margin-bottom: 2px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.tag-new { background: #d4edda; color: #155724; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+.tag-ex { background: #cce5ff; color: #004085; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+</style>
+
+<div class="tree cols">
+
+  <!-- PESSOAL -->
+  <div>
+    <div class="dept"><span class="dept-icon">👥</span> Depto. Pessoal</div>
+    <div class="sub">
+      <div class="sub-item">Admissão</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Documentação necessária</div>
+        <div class="sub-sub-item">Prazo de entrega</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Rescisão</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Cálculo de rescisão</div>
+        <div class="sub-sub-item">Homologação</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Folha de Pagamento</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Recálculo de guias</div>
+        <div class="sub-sub-item">Recálculo da folha</div>
+        <div class="sub-sub-item">Férias / 13º salário</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">e-Social / FGTS</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Envio de eventos</div>
+        <div class="sub-sub-item">Divergências</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Outros Assuntos</div>
+    </div>
+  </div>
+
+  <!-- CONTÁBIL -->
+  <div>
+    <div class="dept"><span class="dept-icon">📊</span> Contabilidade</div>
+    <div class="sub">
+      <div class="sub-item">Balanço / DRE</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Entrega de demonstrativos</div>
+        <div class="sub-sub-item">Análise de resultados</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Lançamentos Contábeis</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Conciliação bancária</div>
+        <div class="sub-sub-item">Correção de lançamento</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Declarações (SPED / ECF)</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Prazo de entrega</div>
+        <div class="sub-sub-item">Retificação</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Certidões / Documentos</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Solicitação de certidão</div>
+        <div class="sub-sub-item">Autenticação</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Outros Assuntos</div>
+    </div>
+  </div>
+
+  <!-- TRIBUTÁRIO -->
+  <div>
+    <div class="dept"><span class="dept-icon">🧾</span> Tributário / Fiscal</div>
+    <div class="sub">
+      <div class="sub-item">Imposto de Renda (IRPF)</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Entrega da declaração</div>
+        <div class="sub-sub-item">Malha fina / Pendências</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Impostos Empresariais</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Simples Nacional / DAS</div>
+        <div class="sub-sub-item">IRPJ / CSLL</div>
+        <div class="sub-sub-item">PIS / COFINS / ISS</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Notas Fiscais</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Emissão / Cancelamento</div>
+        <div class="sub-sub-item">Escrituração</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Planejamento Tributário</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Enquadramento societário</div>
+        <div class="sub-sub-item">Redução de carga fiscal</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Outros Assuntos</div>
+    </div>
+  </div>
+
+  <!-- ADMINISTRATIVO -->
+  <div>
+    <div class="dept"><span class="dept-icon">🏢</span> Administrativo</div>
+    <div class="sub">
+      <div class="sub-item">Abertura / Alteração de Empresa</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Abertura de empresa</div>
+        <div class="sub-sub-item">Alteração contratual</div>
+        <div class="sub-sub-item">Encerramento</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Alvarás e Licenças</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Renovação de alvará</div>
+        <div class="sub-sub-item">Nova licença</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Financeiro / Honorários</div>
+      <div class="sub-sub">
+        <div class="sub-sub-item">Boleto / Fatura em aberto</div>
+        <div class="sub-sub-item">Negociação de valores</div>
+        <div class="sub-sub-item">Outros</div>
+      </div>
+
+      <div class="sub-item">Outros Assuntos</div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:20px; padding:12px 16px; background:#fffbe6; border:1px solid #ffe066; border-radius:8px; font-size:12px; color:#7a6000;">
+  ⚡ <strong>Nota:</strong> Esta estrutura será configurável pelo administrador (adicionar, remover ou renomear itens) diretamente na tela de configurações do chatbot — sem precisar de código.
+</div>
