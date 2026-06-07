@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { Search } from 'lucide-react'
 import { useConversas } from '@/hooks/useConversas'
 import { useRealtime } from '@/hooks/useRealtime'
+import { useSLA } from '@/hooks/useSLA'
 import { ConversaCard } from './ConversaCard'
 
 const WIDTH_KEY  = 'crm_lista_width'
@@ -60,7 +61,7 @@ const ABAS = [
   { status: 'ENCERRADA',     label: 'Encerradas', cor: '#7a1e1e' },
 ]
 
-export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole }) {
+export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole, slaConfig = [] }) {
   const [busca, setBusca]             = useState('')
   const [filtroDepto, setFiltroDepto] = useState('')
   const [abaAtiva, setAbaAtiva]       = useState('')   // '' = todas
@@ -72,6 +73,8 @@ export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole }
     status: null,
     busca,
   })
+
+  const conversasComSLA = useSLA(conversas, slaConfig)
 
   useRealtime({
     onNovaMensagem:     refresh,
@@ -88,8 +91,8 @@ export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole }
 
   // Lista filtrada pela aba ativa
   const lista = abaAtiva === ''
-    ? conversas
-    : conversas.filter(c => c.status === abaAtiva)
+    ? conversasComSLA
+    : conversasComSLA.filter(c => c.status === abaAtiva)
 
   return (
     <div style={{
