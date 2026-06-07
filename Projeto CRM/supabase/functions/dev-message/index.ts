@@ -64,10 +64,12 @@ serve(async (req) => {
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
   const webhookUrl = `${SUPABASE_URL}/functions/v1/whatsapp-webhook`
 
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const res = await fetch(webhookUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
       'X-Dev-Bypass-Token': DEV_BYPASS_TOKEN,
     },
     body: JSON.stringify(payload),
