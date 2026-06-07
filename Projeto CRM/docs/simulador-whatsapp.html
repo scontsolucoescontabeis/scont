@@ -11,7 +11,7 @@
     let supabase = null
     let clientes = []       // { id, phone, name, conversa_id, contato_id, protocolo, unread }
     let clienteAtivo = null // id local do cliente selecionado
-    let realtimeSub = null  // channel ativo
+    let realtimeSubs = []   // channels ativos (mensagens + conversas)
 
     // ── localStorage ───────────────────────────────────────────
     const carregarConfig  = () => { try { return JSON.parse(localStorage.getItem('wpp_sim_config')  || '{}') } catch { return {} } }
@@ -101,7 +101,7 @@
       salvarClientes()
       if (clienteAtivo === id) {
         clienteAtivo = null
-        if (realtimeSub && supabase) { supabase.removeChannel(realtimeSub); realtimeSub = null }
+        if (supabase && realtimeSubs.length) { realtimeSubs.forEach(ch => supabase.removeChannel(ch)); realtimeSubs = [] }
         document.getElementById('chat-area').innerHTML   = '<div class="chat-vazio">Selecione um telefone</div>'
         document.getElementById('chat-header').innerHTML = '<div class="chat-header-vazio">⚡ Simulador WhatsApp — SCONT CRM Dev</div>'
       }
@@ -118,7 +118,7 @@
       renderizarSidebar()
       renderizarHeader(c)
 
-      if (realtimeSub && supabase) { supabase.removeChannel(realtimeSub); realtimeSub = null }
+      if (supabase && realtimeSubs.length) { realtimeSubs.forEach(ch => supabase.removeChannel(ch)); realtimeSubs = [] }
 
       const chatEl = document.getElementById('chat-area')
       chatEl.innerHTML = '<div class="msg-sistema">Carregando...</div>'
@@ -141,7 +141,7 @@
 
     function subscreverRealtime(conversa_id) {
       if (!supabase) return
-      realtimeSub = supabase
+      const chMsgs = supabase
         .channel('sim-msgs-' + conversa_id)
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'mensagens',
@@ -165,13 +165,15 @@
         })
         .subscribe()
 
-      supabase
+      const chConv = supabase
         .channel('sim-conv-' + conversa_id)
         .on('postgres_changes', {
           event: 'UPDATE', schema: 'public', table: 'conversas',
           filter: `id=eq.${conversa_id}`,
         }, () => atualizarStatusConversa(conversa_id))
         .subscribe()
+
+      realtimeSubs = [chMsgs, chConv]
     }
 
     async function atualizarStatusConversa(conversa_id) {
@@ -231,6 +233,7 @@
           chatEl.innerHTML = ''
           if (msgs) msgs.forEach(m => renderizarMensagem(m, false))
           chatEl.scrollTop = chatEl.scrollHeight
+          atualizarStatusConversa(c.conversa_id)
         }
       } catch (e) {
         alert('Erro ao enviar: ' + e.message)
