@@ -179,13 +179,23 @@ serve(async (req) => {
   // POST — mensagens recebidas
   if (req.method === 'POST') {
     const rawBody = await req.text()
-    const signature = req.headers.get('x-hub-signature-256')
 
-    if (!await validarAssinatura(rawBody, signature)) {
-      return new Response('Invalid signature', { status: 401 })
+    // Dev simulator bypass — pula HMAC quando token de dev válido
+    const DEV_BYPASS_TOKEN = Deno.env.get('DEV_BYPASS_TOKEN')
+    const devBypass = !!DEV_BYPASS_TOKEN &&
+      req.headers.get('X-Dev-Bypass-Token') === DEV_BYPASS_TOKEN
+
+    if (!devBypass) {
+      const signature = req.headers.get('x-hub-signature-256')
+      if (!await validarAssinatura(rawBody, signature)) {
+        return new Response('Invalid signature', { status: 401 })
+      }
     }
 
     const payload = JSON.parse(rawBody)
+    let conversa_id: string | null = null
+    let contato_id: string | null = null
+    let protocolo: string | null = null
 
     try {
       const entry = payload?.entry?.[0]
@@ -195,16 +205,25 @@ serve(async (req) => {
       const mensagens: Record<string, unknown>[] = value?.messages || []
       for (const msg of mensagens) {
         const telefone = (msg.from as string)
-
         const contato = await obterOuCriarContato(telefone, (value?.contacts?.[0]?.profile?.name as string) || undefined)
         const { conversa } = await obterOuCriarConversa(contato.id, telefone)
+
+        contato_id = contato.id as string
+        conversa_id = (conversa as { id: string }).id
+        protocolo = (conversa as { protocolo: string }).protocolo
 
         const nomeContato = (value?.contacts?.[0]?.profile?.name as string) || contato.nome as string || contato.telefone as string
         await processarMensagem(msg, contato, conversa, nomeContato)
       }
     } catch (err) {
       console.error('Erro ao processar webhook:', err)
-      // Retorna 200 mesmo em erro para o Meta não reenviar
+    }
+
+    if (devBypass && conversa_id) {
+      return new Response(
+        JSON.stringify({ ok: true, conversa_id, contato_id, protocolo }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
     }
 
     return new Response('OK', { status: 200 })
