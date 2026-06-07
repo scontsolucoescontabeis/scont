@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Simulação — Repasse do Bot ao Atendente · SCONT CRM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: #f0ede8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 64px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #888480;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    /* ── Shell do CRM ── */
+    .crm {
+      width: 100%;
+      max-width: 1060px;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.14);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      background: #7a1e1e;
+      color: #fff;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .topbar-sub { font-size: 11px; font-weight: 400; opacity: .65; }
+    .topbar-badge {
+      margin-left: auto;
+      background: #d4edda;
+      color: #155724;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 4px;
+    }
+
+    .body {
+      display: flex;
+      height: 620px;
+    }
+
+    /* ── Lista de conversas ── */
+    .conv-list {
+      width: 230px;
+      background: #f7f6f4;
+      border-right: 1px solid #e0dcd8;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .conv-search {
+      padding: 10px;
+      border-bottom: 1px solid #e0dcd8;
+    }
+    .conv-search input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #e0dcd8;
+      border-radius: 6px;
+      font-size: 11px;
+      background: #fff;
+      font-family: inherit;
+    }
+    .conv-card {
+      padding: 10px 12px;
+      border-bottom: 1px solid #f0ede8;
+      cursor: pointer;
+    }
+    .conv-card.active {
+      background: #f0e8e8;
+      border-left: 3px solid #7a1e1e;
+    }
+    .conv-card-name { font-size: 12px; font-weight: 700; color: #1a1a1a; }
+    .conv-card-preview {
+      font-size: 11px;
+      color: #888;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .conv-card-meta { display: flex; gap: 4px; margin-top: 5px; flex-wrap: wrap; }
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .badge-bot    { background: #e8f4fd; color: #004085; }
+    .badge-cat    { background: #fff3cd; color: #856404; max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
+    .badge-dept   { background: #f0e8e8; color: #7a1e1e; }
+    .badge-novo   { background: #d4edda; color: #155724; }
+
+    /* ── Chat ── */
+    .chat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+    }
+    .chat-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid #e0dcd8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .chat-avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: #7a1e1e;
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 14px;
+      flex-shrink: 0;
+    }
+    .chat-header-info { flex: 1; }
+    .chat-header-name { font-size: 13px; font-weight: 700; color: #1a1a1a; }
+    .chat-header-sub  { font-size: 11px; color: #888480; }
+    .chat-header-btns { display: flex; gap: 6px; }
+    .btn-sm {
+      background: #f0e8e8;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 11px;
+      color: #7a1e1e;
+      cursor: pointer;
+      font-weight: 600;
+      font-family: inherit;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px;
+      background: #f7f6f4;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .bubble-wrap-bot    { display: flex; justify-content: flex-start; }
+    .bubble-wrap-client { display: flex; justify-content: flex-end; }
+    .bubble-wrap-sistema { display: flex; justify-content: center; margin: 4px 0; }
+    .bubble-wrap-agente { display: flex; justify-content: flex-end; }
+
+    .bubble {
+      max-width: 72%;
+      border-radius: 8px;
+      padding: 8px 11px;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .bubble-bot {
+      background: #fff;
+      border: 1px solid #e0dcd8;
+      border-bottom-left-radius: 2px;
+    }
+    .bubble-bot .sender {
+      font-size: 10px;
+      color: #004085;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .bubble-client {
+      background: #dcf8c6;
+      border-bottom-right-radius: 2px;
+    }
+    .bubble-agente {
+      background: #7a1e1e;
+      color: #fff;
+      border-bottom-right-radius: 2px;
+    }
+    .bubble-sistema {
+      background: #fffbe6;
+      border: 1px dashed #ffe066;
+      color: #856404;
+      font-size: 11px;
+      border-radius: 6px;
+      padding: 6px 12px;
+      max-width: 88%;
+      text-align: center;
+    }
+    .bubble-time {
+      font-size: 9px;
+      color: #bbb;
+      margin-top: 3px;
+      text-align: right;
+    }
+    .bubble-agente .bubble-time { color: rgba(255,255,255,.5); }
+
+    .chat-input {
+      padding: 10px 14px;
+      border-top: 1px solid #e0dcd8;
+      background: #fff;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .chat-input input {
+      flex: 1;
+      border: 1px solid #e0dcd8;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-family: inherit;
+    }
+    .chat-input button {
+      background: #7a1e1e;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    /* ── Painel Direito ── */
+    .painel {
+      width: 264px;
+      border-left: 1px solid #e0dcd8;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .painel-avatar-section {
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid #e0dcd8;
+      text-align: center;
+    }
+    .painel-avatar {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: #f0e8e8;
+      color: #7a1e1e;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 700;
+      margin: 0 auto 10px;
+    }
+    .painel-nome { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+    .painel-empresa { font-size: 11px; color: #888480; margin-top: 3px; }
+    .painel-dept-badge {
+      display: inline-block;
+      margin-top: 6px;
+      background: #5b21b615;
+      color: #5b21b6;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    /* Bloco Bot Context */
+    .bot-ctx {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e0dcd8;
+      background: linear-gradient(135deg, #e8f4fd 0%, #f0e8ff 100%);
+    }
+    .bot-ctx-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .bot-ctx-title {
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #004085;
+    }
+    .bot-ctx-time {
+      font-size: 9px;
+      color: #7a9fc0;
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* Trilha */
+    .trilha {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 3px;
+      margin-bottom: 10px;
+    }
+    .trilha-dept {
+      background: #004085; color: #fff;
+      font-size: 10px; font-weight: 700;
+      padding: 2px 7px; border-radius: 4px;
+    }
+    .trilha-cat {
+      background: #dbeafe; color: #1e40af;
+      font-size: 10px; font-weight: 600;
+      padding: 2px 7px; border-radius: 4px;
+    }
+    .trilha-sub {
+      background: #ede9fe; color: #5b21b6;
+      font-size: 10px; font-weight: 600;
+      padding: 2px 7px; border-radius: 4px;
+    }
+    .trilha-sep { color: #7a9fc0; font-size: 13px; }
+
+    /* Primeira mensagem */
+    .primeira-msg {
+      margin-bottom: 10px;
+      padding: 7px 9px;
+      background: #dcf8c6;
+      border-left: 3px solid #25d366;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #1a1a1a;
+    }
+    .primeira-msg-label {
+      font-size: 9px;
+      color: #2d6a2d;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 3px;
+    }
+
+    /* Transcript */
+    .transcript-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      background: rgba(0,64,133,.08);
+      border: none;
+      border-radius: 5px;
+      padding: 4px 8px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      font-family: inherit;
+    }
+    .transcript-toggle span { font-size: 10px; font-weight: 600; color: #004085; }
+    .transcript-body {
+      max-height: 200px;
+      overflow-y: auto;
+      background: rgba(255,255,255,.75);
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+    .tr-row { margin-bottom: 5px; display: flex; }
+    .tr-row.bot  { justify-content: flex-start; }
+    .tr-row.cli  { justify-content: flex-end; }
+    .tr-bubble {
+      max-width: 88%;
+      font-size: 11px;
+      line-height: 1.35;
+      padding: 4px 8px;
+      border-radius: 6px;
+      word-break: break-word;
+    }
+    .tr-bubble.bot { background: #fff; border: 1px solid #e0dcd8; color: #1a1a1a; }
+    .tr-bubble.cli { background: #dcf8c6; color: #1a1a1a; }
+
+    /* Contato */
+    .painel-section { padding: 12px 16px; border-bottom: 1px solid #e0dcd8; }
+    .section-title {
+      font-size: 10px; font-weight: 700;
+      color: #888480; text-transform: uppercase;
+      letter-spacing: .06em; margin-bottom: 8px;
+    }
+    .info-row { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 6px; }
+    .info-icon { color: #888480; margin-top: 1px; font-size: 11px; }
+    .info-label { font-size: 10px; color: #888480; }
+    .info-val { font-size: 12px; color: #1a1a1a; }
+    .info-val.mono { font-family: 'DM Mono', monospace; font-size: 11px; color: #7a1e1e; }
+
+    /* ── Anotação explicativa ── */
+    .annotation {
+      margin-top: 28px;
+      width: 100%;
+      max-width: 1060px;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+    .ann-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 11px;
+      line-height: 1.5;
+      border-left: 3px solid #7a1e1e;
+    }
+    .ann-card strong { display: block; margin-bottom: 4px; font-size: 12px; color: #1a1a1a; }
+    .ann-card span { color: #555; }
+  </style>
+</head>
+<body>
+
+<h1>Simulação — Vista do agente após repasse do bot</h1>
+
+<div class="crm">
+
+  <!-- Topbar -->
+  <div class="topbar">
+    💬 SCONT CRM — WhatsApp
+    <span class="topbar-sub">Tributário / Fiscal</span>
+    <div class="topbar-badge">🤖 Bot ATIVO</div>
+  </div>
+
+  <div class="body">
+
+    <!-- Lista de conversas -->
+    <div class="conv-list">
+      <div class="conv-search">
+        <input placeholder="Buscar conversa…" />
+      </div>
+
+      <!-- Card ativo — conversa que o bot acabou de repassar -->
+      <div class="conv-card active">
+        <div class="conv-card-name">Maria Aparecida Santos</div>
+        <div class="conv-card-preview">🤖 → Malha fina / Pendências</div>
+        <div class="conv-card-meta">
+          <span class="badge badge-bot">🤖 bot</span>
+          <span class="badge badge-dept">Tributário</span>
+          <span class="badge badge-cat">IRPF</span>
+          <span class="badge badge-novo">Novo</span>
+        </div>
+      </div>
+
+      <div class="conv-card">
+        <div class="conv-card-name">Comercial Pinheiro ME</div>
+        <div class="conv-card-preview">Preciso do DAS de outubro, por fa…</div>
+        <div class="conv-card-meta">
+          <span class="badge badge-bot">🤖 bot</span>
+          <span class="badge badge-dept">Tributário</span>
+          <span class="badge badge-cat">DAS/Simples</span>
+        </div>
+      </div>
+
+      <div class="conv-card">
+        <div class="conv-card-name">Roberto Farias</div>
+        <div class="conv-card-preview">Bom dia, tudo bem?</div>
+        <div class="conv-card-meta">
+          <span class="badge badge-dept">Pessoal</span>
+        </div>
+      </div>
+
+      <div class="conv-card">
+        <div class="conv-card-name">Distribuidora JK Ltda</div>
+        <div class="conv-card-preview">⭐⭐⭐⭐⭐ Ótimo atendimento!</div>
+        <div class="conv-card-meta">
+          <span class="badge badge-dept">Contábil</span>
+          <span class="badge" style="background:#e0dcd8;color:#555;">Encerrado</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat -->
+    <div class="chat">
+      <div class="chat-header">
+        <div class="chat-avatar">M</div>
+        <div class="chat-header-info">
+          <div class="chat-header-name">Maria Aparecida Santos</div>
+          <div class="chat-header-sub">+55 11 98877-6655 · Tributário / Fiscal · Comércio Santos Ltda</div>
+        </div>
+        <div class="chat-header-btns">
+          <button class="btn-sm">Transferir</button>
+          <button class="btn-sm">Encerrar</button>
+        </div>
+      </div>
+
+      <div class="chat-messages">
+
+        <!-- 1. Bot: boas-vindas + menu dept -->
+        <div class="bubble-wrap-bot">
+          <div class="bubble bubble-bot">
+            <div class="sender">🤖 Bot SCONT</div>
+            Olá, Maria! 👋 Bem-vinda à <strong>SCONT Soluções Contábeis</strong>.<br><br>
+            Para agilizar seu atendimento, selecione o departamento:
+            <div style="margin-top:6px; border:1px solid #25d366; border-radius:6px; padding:5px 12px;
+              font-size:11px; color:#25d366; font-weight:700; display:inline-block;">
+              ☰ Ver departamentos
+            </div>
+            <div class="bubble-time">08:47 ✓✓</div>
+          </div>
+        </div>
+
+        <!-- 2. Cliente seleciona Tributário -->
+        <div class="bubble-wrap-client">
+          <div class="bubble bubble-client">
+            🧾 Tributário / Fiscal
+            <div class="bubble-time">08:47</div>
+          </div>
+        </div>
+
+        <!-- 3. Bot: menu categorias -->
+        <div class="bubble-wrap-bot">
+          <div class="bubble bubble-bot">
+            <div class="sender">🤖 Bot SCONT</div>
+            Ótimo! <strong>Tributário / Fiscal</strong> selecionado.<br><br>
+            Sobre qual assunto você precisa de ajuda?
+            <div style="margin-top:6px; border:1px solid #25d366; border-radius:6px; padding:5px 12px;
+              font-size:11px; color:#25d366; font-weight:700; display:inline-block;">
+              ☰ Ver opções
+            </div>
+            <div class="bubble-time">08:47 ✓✓</div>
+          </div>
+        </div>
+
+        <!-- 4. Cliente seleciona IRPF -->
+        <div class="bubble-wrap-client">
+          <div class="bubble bubble-client">
+            Imposto de Renda (IRPF)
+            <div class="bubble-time">08:48</div>
+          </div>
+        </div>
+
+        <!-- 5. Bot: sub-categorias -->
+        <div class="bubble-wrap-bot">
+          <div class="bubble bubble-bot">
+            <div class="sender">🤖 Bot SCONT</div>
+            Entendido! <strong>Imposto de Renda (IRPF)</strong>.<br><br>
+            Pode detalhar um pouco mais?
+            <div style="margin-top:6px; border:1px solid #25d366; border-radius:6px; padding:5px 12px;
+              font-size:11px; color:#25d366; font-weight:700; display:inline-block;">
+              ☰ Ver opções
+            </div>
+            <div class="bubble-time">08:48 ✓✓</div>
+          </div>
+        </div>
+
+        <!-- 6. Cliente seleciona sub-cat -->
+        <div class="bubble-wrap-client">
+          <div class="bubble bubble-client">
+            Malha fina / Pendências
+            <div class="bubble-time">08:48</div>
+          </div>
+        </div>
+
+        <!-- 7. Bot: confirmação -->
+        <div class="bubble-wrap-bot">
+          <div class="bubble bubble-bot">
+            <div class="sender">🤖 Bot SCONT</div>
+            Certo! Vou encaminhar assim:<br><br>
+            📋 <strong>Depto:</strong> Tributário / Fiscal<br>
+            📌 <strong>Assunto:</strong> Imposto de Renda (IRPF)<br>
+            📎 <strong>Detalhe:</strong> Malha fina / Pendências<br><br>
+            Está correto?
+            <div style="margin-top:6px; border:1px solid #25d366; border-radius:6px; padding:5px 12px;
+              font-size:11px; color:#25d366; font-weight:700; display:inline-block;">
+              ☰ Confirmar / Corrigir
+            </div>
+            <div class="bubble-time">08:48 ✓✓</div>
+          </div>
+        </div>
+
+        <!-- 8. Cliente confirma -->
+        <div class="bubble-wrap-client">
+          <div class="bubble bubble-client">
+            ✅ Sim, está correto
+            <div class="bubble-time">08:49</div>
+          </div>
+        </div>
+
+        <!-- 9. Bot: mensagem de fila -->
+        <div class="bubble-wrap-bot">
+          <div class="bubble bubble-bot">
+            <div class="sender">🤖 Bot SCONT</div>
+            ✅ Perfeito! Encaminhando para <strong>Tributário / Fiscal</strong>.<br><br>
+            Um especialista em <strong>Malha fina / Pendências</strong> irá atendê-la em instantes.<br><br>
+            🔖 Protocolo: <strong>SCT-20260606-004521</strong><br><br>
+            Aguarde, por favor. 🙏
+            <div class="bubble-time">08:49 ✓✓</div>
+          </div>
+        </div>
+
+        <!-- 10. SISTEMA — handoff (visível só ao agente) -->
+        <div class="bubble-wrap-sistema">
+          <div class="bubble-sistema">
+            🤖 Bot roteou: <strong>Tributário / Fiscal › Imposto de Renda (IRPF) › Malha fina / Pendências</strong> — aguardando agente
+          </div>
+        </div>
+
+        <!-- 11. Primeira mensagem livre do cliente -->
+        <div class="bubble-wrap-client">
+          <div class="bubble bubble-client">
+            Bom dia! Recebi uma intimação da Receita Federal hoje cedo e não sei o que fazer, estou muito preocupada 😟
+            <div class="bubble-time">08:51</div>
+          </div>
+        </div>
+
+        <!-- 12. Agente responde -->
+        <div class="bubble-wrap-agente">
+          <div class="bubble bubble-agente">
+            Bom dia, Maria! Pode ficar tranquila — vou analisar a intimação com você agora. Pode me informar o número do processo ou enviar uma foto do documento?
+            <div class="bubble-time">08:53 ✓✓</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="chat-input">
+        <input placeholder="Digite sua mensagem…" />
+        <button>Enviar</button>
+      </div>
+    </div>
+
+    <!-- Painel Direito -->
+    <div class="painel">
+
+      <!-- Avatar -->
+      <div class="painel-avatar-section">
+        <div class="painel-avatar">M</div>
+        <div class="painel-nome">Maria Aparecida Santos</div>
+        <div class="painel-empresa">Comércio Santos Ltda</div>
+        <div class="painel-dept-badge">TRIBUTARIO</div>
+      </div>
+
+      <!-- Contexto do bot -->
+      <div class="bot-ctx">
+        <div class="bot-ctx-header">
+          <div class="bot-ctx-title">🤖 Contexto do bot</div>
+          <div class="bot-ctx-time">repasse 08:49</div>
+        </div>
+
+        <!-- Trilha dept › cat › sub -->
+        <div class="trilha">
+          <span class="trilha-dept">Tributário / Fiscal</span>
+          <span class="trilha-sep">›</span>
+          <span class="trilha-cat">IRPF</span>
+          <span class="trilha-sep">›</span>
+          <span class="trilha-sub">Malha fina</span>
+        </div>
+
+        <!-- Primeira mensagem livre -->
+        <div class="primeira-msg">
+          <div class="primeira-msg-label">Primeira mensagem</div>
+          Bom dia! Recebi uma intimação da Receita Federal hoje cedo e não sei o que fazer, estou muito preocupada 😟
+        </div>
+
+        <!-- Transcript colapsível (aberto) -->
+        <button class="transcript-toggle">
+          <span>Transcript (6 msgs)</span>
+          <span style="font-size:12px;color:#004085;">▲</span>
+        </button>
+        <div class="transcript-body">
+          <div class="tr-row bot">
+            <div class="tr-bubble bot">Para agilizar seu atendimento, selecione o departamento: ☰ Ver departamentos</div>
+          </div>
+          <div class="tr-row cli">
+            <div class="tr-bubble cli">🧾 Tributário / Fiscal</div>
+          </div>
+          <div class="tr-row bot">
+            <div class="tr-bubble bot">Sobre qual assunto você precisa de ajuda? ☰ Ver opções</div>
+          </div>
+          <div class="tr-row cli">
+            <div class="tr-bubble cli">Imposto de Renda (IRPF)</div>
+          </div>
+          <div class="tr-row bot">
+            <div class="tr-bubble bot">Pode detalhar um pouco mais? ☰ Ver opções</div>
+          </div>
+          <div class="tr-row cli">
+            <div class="tr-bubble cli">Malha fina / Pendências</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dados do contato -->
+      <div class="painel-section">
+        <div class="section-title">Contato</div>
+        <div class="info-row">
+          <span class="info-icon">📞</span>
+          <div>
+            <div class="info-label">Telefone</div>
+            <div class="info-val">+55 11 98877-6655</div>
+          </div>
+        </div>
+        <div class="info-row">
+          <span class="info-icon">🏢</span>
+          <div>
+            <div class="info-label">Empresa</div>
+            <div class="info-val">Comércio Santos Ltda</div>
+          </div>
+        </div>
+        <div class="info-row">
+          <span class="info-icon">👤</span>
+          <div>
+            <div class="info-label">Agente</div>
+            <div class="info-val">Carlos Tributário</div>
+          </div>
+        </div>
+        <div class="info-row">
+          <span class="info-icon">🔖</span>
+          <div>
+            <div class="info-label">Protocolo</div>
+            <div class="info-val mono">SCT-20260606-004521</div>
+          </div>
+        </div>
+        <div class="info-row">
+          <span class="info-icon">🕐</span>
+          <div>
+            <div class="info-label">Aberto em</div>
+            <div class="info-val">06/06/26 08:47</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Anotações explicativas -->
+<div class="annotation">
+  <div class="ann-card">
+    <strong>🟢 Trilha colorida</strong>
+    <span>
+      O agente vê imediatamente <em>Tributário / Fiscal › IRPF › Malha fina</em> sem precisar ler o chat.
+      Cada nível tem cor própria: azul-escuro (dept), azul-claro (categoria), lilás (sub-categoria).
+    </span>
+  </div>
+  <div class="ann-card">
+    <strong>💬 Primeira mensagem</strong>
+    <span>
+      A primeira mensagem <em>livre</em> do cliente — enviada depois do repasse — aparece em verde
+      no topo do painel. O agente sabe o que vem antes de abrir o chat.
+    </span>
+  </div>
+  <div class="ann-card">
+    <strong>📜 Transcript colapsível</strong>
+    <span>
+      Todo o diálogo bot↔cliente está disponível em bolhas, aberto por padrão.
+      A mensagem amarela tracejada no chat (<em>"Bot roteou…"</em>) é visível só para o agente,
+      nunca chega ao cliente.
+    </span>
+  </div>
+</div>
+
+</body>
+</html>
