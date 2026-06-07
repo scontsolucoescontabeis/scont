@@ -7,7 +7,7 @@
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script>
     // ── Estado global ──────────────────────────────────────────
-    let supabase = null
+    let sbClient = null
     let clientes = []       // { id, phone, name, conversa_id, contato_id, protocolo, unread }
     let clienteAtivo = null // id local do cliente selecionado
     let realtimeSubs = []   // channels ativos (mensagens + conversas)
@@ -33,7 +33,7 @@
       clientes = carregarClientes()
       renderizarSidebar()
       if (cfg.supabase_url && cfg.anon_key) {
-        try { supabase = criarSupabase(cfg.supabase_url, cfg.anon_key) } catch(e) { console.warn(e.message) }
+        try { sbClient = criarSupabase(cfg.supabase_url, cfg.anon_key) } catch(e) { console.warn(e.message) }
       }
     }
 
@@ -45,12 +45,12 @@
         bypass_token:  document.getElementById('cfg-token').value.trim(),
       }
       salvarConfigLocal(cfg)
-      supabase = criarSupabase(cfg.supabase_url, cfg.anon_key)
+      sbClient = criarSupabase(cfg.supabase_url, cfg.anon_key)
       const statusEl = document.getElementById('cfg-status')
       statusEl.textContent = 'Testando...'
       statusEl.className = 'cfg-status testing'
       try {
-        const { error } = await supabase.from('mensagens').select('id').limit(1)
+        const { error } = await sbClient.from('mensagens').select('id').limit(1)
         if (error) throw error
         statusEl.textContent = '✓ Conectado'
         statusEl.className = 'cfg-status ok'
@@ -106,7 +106,7 @@
       salvarClientes()
       if (clienteAtivo === id) {
         clienteAtivo = null
-        if (supabase && realtimeSubs.length) { realtimeSubs.forEach(ch => supabase.removeChannel(ch)); realtimeSubs = [] }
+        if (sbClient && realtimeSubs.length) { realtimeSubs.forEach(ch => sbClient.removeChannel(ch)); realtimeSubs = [] }
         document.getElementById('chat-area').innerHTML   = '<div class="chat-vazio">Selecione um telefone</div>'
         document.getElementById('chat-header').innerHTML = '<div class="chat-header-vazio">⚡ Simulador WhatsApp — SCONT CRM Dev</div>'
       }
@@ -123,13 +123,13 @@
       renderizarSidebar()
       renderizarHeader(c)
 
-      if (supabase && realtimeSubs.length) { realtimeSubs.forEach(ch => supabase.removeChannel(ch)); realtimeSubs = [] }
+      if (sbClient && realtimeSubs.length) { realtimeSubs.forEach(ch => sbClient.removeChannel(ch)); realtimeSubs = [] }
 
       const chatEl = document.getElementById('chat-area')
       chatEl.innerHTML = '<div class="msg-sistema">Carregando...</div>'
 
-      if (c.conversa_id && supabase) {
-        const { data } = await supabase
+      if (c.conversa_id && sbClient) {
+        const { data } = await sbClient
           .from('mensagens')
           .select('id, origem, conteudo, criado_em, agente_id, usuarios(nome)')
           .eq('conversa_id', c.conversa_id)
@@ -145,8 +145,8 @@
     }
 
     function subscreverRealtime(conversa_id) {
-      if (!supabase) return
-      const chMsgs = supabase
+      if (!sbClient) return
+      const chMsgs = sbClient
         .channel('sim-msgs-' + conversa_id)
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'mensagens',
@@ -154,7 +154,7 @@
         }, async (payload) => {
           const msg = payload.new
           if (msg.agente_id) {
-            const { data } = await supabase.from('usuarios').select('nome').eq('id', msg.agente_id).single()
+            const { data } = await sbClient.from('usuarios').select('nome').eq('id', msg.agente_id).single()
             msg['usuarios'] = data
           }
           renderizarMensagem(msg, true)
@@ -170,7 +170,7 @@
         })
         .subscribe()
 
-      const chConv = supabase
+      const chConv = sbClient
         .channel('sim-conv-' + conversa_id)
         .on('postgres_changes', {
           event: 'UPDATE', schema: 'public', table: 'conversas',
@@ -182,8 +182,8 @@
     }
 
     async function atualizarStatusConversa(conversa_id) {
-      if (!supabase) return
-      const { data } = await supabase.from('conversas').select('status').eq('id', conversa_id).single()
+      if (!sbClient) return
+      const { data } = await sbClient.from('conversas').select('status').eq('id', conversa_id).single()
       if (!data) return
       const el = document.getElementById('conv-status')
       if (el) {
@@ -194,7 +194,7 @@
 
     // ── Envio de mensagem ───────────────────────────────────────
     async function enviarMensagem() {
-      if (!supabase) { alert('Configure a conexão com o Supabase primeiro.'); return }
+      if (!sbClient) { alert('Configure a conexão com o Supabase primeiro.'); return }
       const c = clientes.find(x => x.id === clienteAtivo)
       if (!c) { alert('Selecione um telefone.'); return }
       const inputEl = document.getElementById('msg-input')
@@ -229,7 +229,7 @@
           subscreverRealtime(c.conversa_id)
 
           await new Promise(r => setTimeout(r, 600))
-          const { data: msgs } = await supabase
+          const { data: msgs } = await sbClient
             .from('mensagens')
             .select('id, origem, conteudo, criado_em, agente_id, usuarios(nome)')
             .eq('conversa_id', c.conversa_id)
