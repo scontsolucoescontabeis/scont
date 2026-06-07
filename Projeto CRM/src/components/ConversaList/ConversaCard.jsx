@@ -1,6 +1,20 @@
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
+function formatTimer(ms) {
+  if (!ms || ms <= 0) return '00:00'
+  const totalSec = Math.floor(ms / 1_000)
+  const m = Math.floor(totalSec / 60).toString().padStart(2, '0')
+  const s = (totalSec % 60).toString().padStart(2, '0')
+  return `${m}:${s}`
+}
+
+const SLA_BADGE = {
+  AVISO:   { bg: '#f59e0b', color: '#1a1a1a', pulse: false },
+  CRITICO: { bg: '#ef4444', color: '#ffffff', pulse: true  },
+  VENCIDO: { bg: '#6b7280', color: '#ffffff', pulse: false },
+}
+
 const DEPTO_COLORS = {
   PESSOAL:        { bg: '#EFF6FF', text: '#1D4ED8' },
   CONTABIL:       { bg: '#ECFDF5', text: '#065F46' },
@@ -37,6 +51,7 @@ export function ConversaCard({ conversa, ativo, onClick }) {
         cursor: 'pointer',
         transition: 'background 0.1s',
         display: 'block',
+        position: 'relative',
       }}
       onMouseEnter={e => { if (!ativo) e.currentTarget.style.background = '#f7f6f4' }}
       onMouseLeave={e => { if (!ativo) e.currentTarget.style.background = '#fff' }}
@@ -121,6 +136,32 @@ export function ConversaCard({ conversa, ativo, onClick }) {
           </div>
         </div>
       </div>
+
+      {/* Badge SLA */}
+      {SLA_BADGE[conversa.sla_status] && (() => {
+        const badge = SLA_BADGE[conversa.sla_status]
+        return (
+          <div style={{
+            position: 'absolute',
+            top: 8,
+            right: 14,
+            background: badge.bg,
+            color: badge.color,
+            fontSize: 9,
+            fontWeight: 700,
+            padding: '2px 6px',
+            borderRadius: 4,
+            fontFamily: 'DM Mono, monospace',
+            fontVariantNumeric: 'tabular-nums',
+            letterSpacing: '0.03em',
+            animation: badge.pulse ? 'sla-pulse 1s ease-in-out infinite' : 'none',
+          }}>
+            {conversa.sla_status === 'VENCIDO'
+              ? 'VENCIDO'
+              : `⏱ ${formatTimer(conversa.sla_tempo_restante_ms)}`}
+          </div>
+        )
+      })()}
     </button>
   )
 }
