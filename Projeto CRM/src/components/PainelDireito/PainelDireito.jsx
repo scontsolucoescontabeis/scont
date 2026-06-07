@@ -72,7 +72,7 @@ export function PainelDireito({ conversa }) {
   }, [conversa?.id, conversa?.bot_departamento])
 
   if (!conversa) return (
-    <div style={{ width: 260, borderLeft: '1px solid #e0dcd8', background: '#f7f6f4' }} />
+    <div style={{ flex: 1, background: '#f7f6f4', minHeight: 0 }} />
   )
 
   const contato = conversa.contatos
@@ -81,13 +81,12 @@ export function PainelDireito({ conversa }) {
 
   return (
     <div style={{
-      width: 260,
-      borderLeft: '1px solid #e0dcd8',
+      flex: 1,
+      minHeight: 0,
       background: '#fff',
       display: 'flex',
       flexDirection: 'column',
       overflowY: 'auto',
-      flexShrink: 0,
     }}>
       {/* Avatar + nome */}
       <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid #e0dcd8', textAlign: 'center' }}>
