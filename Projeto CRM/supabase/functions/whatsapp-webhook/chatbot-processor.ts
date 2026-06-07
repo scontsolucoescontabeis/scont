@@ -101,12 +101,15 @@ export function dentroDoHorario(
 ): boolean {
   const now = agora ?? new Date()
 
+  // Edge Functions rodam em UTC — converte para horário de Brasília antes de comparar
+  const nowBRT = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+
   // Dia da semana: JS usa 0=domingo … 6=sábado; dias_semana usa 1=segunda … 7=domingo (ISO)
-  const diaSemanaJS = now.getDay() // 0=dom
+  const diaSemanaJS = nowBRT.getDay()
   const diaSemanaISO = diaSemanaJS === 0 ? 7 : diaSemanaJS
   if (!config.dias_semana.includes(diaSemanaISO)) return false
 
-  const horaAtual = now.getHours() * 60 + now.getMinutes()
+  const horaAtual = nowBRT.getHours() * 60 + nowBRT.getMinutes()
 
   // Usa horário do dept (se definido) ou cai de volta para o global
   const inicioStr =
