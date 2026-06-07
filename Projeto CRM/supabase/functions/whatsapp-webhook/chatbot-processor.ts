@@ -350,6 +350,20 @@ async function inserirMensagemSistema(
   })
 }
 
+async function inserirMensagemBot(
+  supabase: SupabaseClient,
+  conversaId: string,
+  texto: string,
+): Promise<void> {
+  await supabase.from('mensagens').insert({
+    conversa_id: conversaId,
+    conteudo: texto,
+    tipo: 'text',
+    origem: 'BOT',
+    lida: true,
+  })
+}
+
 async function aplicarTagsAutomaticas(
   supabase: SupabaseClient,
   conversaId: string,
@@ -392,12 +406,9 @@ async function escalarParaHumano(
   phoneNumberId: string,
   accessToken: string,
 ): Promise<void> {
-  await enviarTexto(
-    telefone,
-    'Conectando você a um atendente humano 👤\nAguarde, em breve você será atendido.',
-    phoneNumberId,
-    accessToken,
-  )
+  const msgHumano = 'Conectando você a um atendente humano 👤\nAguarde, em breve você será atendido.'
+  await enviarTexto(telefone, msgHumano, phoneNumberId, accessToken)
+  await inserirMensagemBot(supabase, conversaId, msgHumano)
   await inserirMensagemSistema(supabase, conversaId, '🤖 Cliente solicitou atendimento humano')
   await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
 }
@@ -424,6 +435,7 @@ async function enviarMenuDepts(
   phoneNumberId: string,
   accessToken: string,
   supabase?: SupabaseClient,
+  conversaId?: string,
 ): Promise<void> {
   let deptsAtivos: Set<string> | undefined
   if (supabase) {
@@ -435,15 +447,19 @@ async function enviarMenuDepts(
     )
   }
   const opcoes = montarOpcoesDepts(deptsAtivos)
+  const corpoDepts = 'Olá! Selecione o departamento para o qual deseja falar:'
   await enviarMenu(
     telefone,
-    'Olá! Selecione o departamento para o qual deseja falar:',
+    corpoDepts,
     'Ver opções',
     'Departamentos',
     opcoes,
     phoneNumberId,
     accessToken,
   )
+  if (supabase && conversaId) {
+    await inserirMensagemBot(supabase, conversaId, corpoDepts)
+  }
 }
 
 async function enviarCategorias(
@@ -599,6 +615,7 @@ async function handleNOVO(
     const msg = feriadoHoje.msg_especifica
       ?? `Não haverá atendimento hoje (${feriadoHoje.nome}). Seu contato foi registrado com protocolo *${conversa.protocolo}* e retornaremos no próximo dia útil. 📅`
     await enviarTexto(telefone, msg, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, msg)
     await inserirMensagemSistema(supabase, conversa.id, `🤖 Cliente contatou em feriado: ${feriadoHoje.nome}`)
     await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
     return
@@ -607,6 +624,7 @@ async function handleNOVO(
   // Verifica horário (sem dept específico ainda)
   if (!dentroDoHorario(config, null)) {
     await enviarTexto(telefone, config.msg_fora_horario, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, config.msg_fora_horario)
     await inserirMensagemSistema(supabase, conversa.id, '🤖 Cliente contatou fora do horário de atendimento')
     await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
     return
@@ -636,9 +654,10 @@ async function handleNOVO(
       categoria_id: catIdAnterior ?? null,
     })
 
+    const msgRecorrente = `Olá! Notei que você já nos contactou sobre *${catAnterior}* (${deptAnterior}).\nDeseja o mesmo assunto?`
     await enviarMenu(
       telefone,
-      `Olá! Notei que você já nos contactou sobre *${catAnterior}* (${deptAnterior}).\nDeseja o mesmo assunto?`,
+      msgRecorrente,
       'Responder',
       'Opções',
       [
@@ -649,6 +668,7 @@ async function handleNOVO(
       phoneNumberId,
       accessToken,
     )
+    await inserirMensagemBot(supabase, conversa.id, msgRecorrente)
   } else {
     // Novo cliente
     await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_DEPT' })
@@ -659,7 +679,8 @@ async function handleNOVO(
       phoneNumberId,
       accessToken,
     )
-    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase)
+    await inserirMensagemBot(supabase, conversa.id, config.msg_boas_vindas)
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase, conversa.id)
   }
 }
 
@@ -711,7 +732,7 @@ async function handleAGUARD_DEPT(
       categoria_id: null,
       tentativas_invalidas: 0,
     })
-    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase)
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase, conversa.id)
     return
   }
 
@@ -741,13 +762,10 @@ async function handleAGUARD_DEPT(
     await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
   } else {
     await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: novasTentativas })
-    await enviarTexto(
-      telefone,
-      `Opção inválida. Por favor, escolha um número do menu (tentativa ${novasTentativas}/${config.max_tentativas}).`,
-      phoneNumberId,
-      accessToken,
-    )
-    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase)
+    const msgInvalida = `Opção inválida. Por favor, escolha um número do menu (tentativa ${novasTentativas}/${config.max_tentativas}).`
+    await enviarTexto(telefone, msgInvalida, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, msgInvalida)
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase, conversa.id)
   }
 }
 
@@ -927,7 +945,7 @@ async function handleAGUARD_CONF(
       subcategoria_id: null,
       tentativas_invalidas: 0,
     })
-    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase)
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase, conversa.id)
     return
   }
 
@@ -985,6 +1003,7 @@ async function handleAGUARD_CONF(
       msgFila = `${msgFila}\n\n${aviso}`
     }
     await enviarTexto(telefone, msgFila, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, msgFila)
 
     // 3. Insere mensagem SISTEMA de roteamento
     const resumo = subTitulo
@@ -1135,12 +1154,9 @@ export async function processarMensagemBot(params: ProcessarBotParams): Promise<
 
   // 8. Sessão expirada por inatividade
   if (sessaoExpirada(sessao, config.timeout_minutos)) {
-    await enviarTexto(
-      telefone,
-      'Sua sessão expirou por inatividade. Se precisar de ajuda, envie uma nova mensagem.',
-      phoneNumberId,
-      accessToken,
-    )
+    const msgExpirada = 'Sua sessão expirou por inatividade. Se precisar de ajuda, envie uma nova mensagem.'
+    await enviarTexto(telefone, msgExpirada, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, msgExpirada)
     await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
     return true
   }
