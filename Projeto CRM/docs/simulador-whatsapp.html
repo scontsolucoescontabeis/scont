@@ -4,15 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador WhatsApp — SCONT CRM Dev</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script>
-    const { createClient } = window.supabase
-
     // ── Estado global ──────────────────────────────────────────
     let supabase = null
     let clientes = []       // { id, phone, name, conversa_id, contato_id, protocolo, unread }
     let clienteAtivo = null // id local do cliente selecionado
     let realtimeSubs = []   // channels ativos (mensagens + conversas)
+
+    function criarSupabase(url, key) {
+      const lib = window.supabase || window.Supabase
+      if (!lib?.createClient) throw new Error('Biblioteca Supabase não carregou. Verifique sua conexão com a internet.')
+      return lib.createClient(url, key)
+    }
 
     // ── localStorage ───────────────────────────────────────────
     const carregarConfig  = () => { try { return JSON.parse(localStorage.getItem('wpp_sim_config')  || '{}') } catch { return {} } }
@@ -29,7 +33,7 @@
       clientes = carregarClientes()
       renderizarSidebar()
       if (cfg.supabase_url && cfg.anon_key) {
-        supabase = createClient(cfg.supabase_url, cfg.anon_key)
+        try { supabase = criarSupabase(cfg.supabase_url, cfg.anon_key) } catch(e) { console.warn(e.message) }
       }
     }
 
@@ -41,7 +45,7 @@
         bypass_token:  document.getElementById('cfg-token').value.trim(),
       }
       salvarConfigLocal(cfg)
-      supabase = createClient(cfg.supabase_url, cfg.anon_key)
+      supabase = criarSupabase(cfg.supabase_url, cfg.anon_key)
       const statusEl = document.getElementById('cfg-status')
       statusEl.textContent = 'Testando...'
       statusEl.className = 'cfg-status testing'
