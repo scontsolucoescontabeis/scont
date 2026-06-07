@@ -461,7 +461,8 @@ async function enviarMenuDepts(
     accessToken,
   )
   if (supabase && conversaId) {
-    await inserirMensagemBot(supabase, conversaId, corpoDepts)
+    const opcoesTexto = opcoes.map((o, i) => `${i + 1}. ${o.title}`).join('\n')
+    await inserirMensagemBot(supabase, conversaId, `${corpoDepts}\n\n${opcoesTexto}`)
   }
 }
 
@@ -471,6 +472,7 @@ async function enviarCategorias(
   dept: string,
   phoneNumberId: string,
   accessToken: string,
+  conversaId?: string,
 ): Promise<MenuItem[]> {
   const { data: cats } = await supabase
     .from('chatbot_menus')
@@ -483,12 +485,9 @@ async function enviarCategorias(
   const categorias: MenuItem[] = cats ?? []
 
   if (categorias.length === 0) {
-    await enviarTexto(
-      telefone,
-      'Não há categorias disponíveis para esse departamento. Aguarde um atendente.',
-      phoneNumberId,
-      accessToken,
-    )
+    const msgSemCat = 'Não há categorias disponíveis para esse departamento. Aguarde um atendente.'
+    await enviarTexto(telefone, msgSemCat, phoneNumberId, accessToken)
+    if (conversaId) await inserirMensagemBot(supabase, conversaId, msgSemCat)
     return categorias
   }
 
@@ -499,15 +498,20 @@ async function enviarCategorias(
   opcoes.push({ id: 'HUMANO', title: '👤 Falar com atendente' })
 
   const deptLabel = DEPT_LABELS[dept] ?? dept
+  const corpoCats = `*${DEPT_EMOJIS[dept] ?? ''} ${deptLabel}*\nSelecione o assunto:`
   await enviarMenu(
     telefone,
-    `*${DEPT_EMOJIS[dept] ?? ''} ${deptLabel}*\nSelecione o assunto:`,
+    corpoCats,
     'Ver assuntos',
     'Assuntos',
     opcoes,
     phoneNumberId,
     accessToken,
   )
+  if (conversaId) {
+    const opcoesTexto = opcoes.map(o => o.title).join('\n')
+    await inserirMensagemBot(supabase, conversaId, `${corpoCats}\n\n${opcoesTexto}`)
+  }
 
   return categorias
 }
@@ -518,6 +522,7 @@ async function enviarSubCategorias(
   categoriaId: string,
   phoneNumberId: string,
   accessToken: string,
+  conversaId?: string,
 ): Promise<MenuItem[]> {
   const { data: subs } = await supabase
     .from('chatbot_menus')
@@ -540,15 +545,20 @@ async function enviarSubCategorias(
   }))
   opcoes.push({ id: 'HUMANO', title: '👤 Falar com atendente' })
 
+  const corpoSub = 'Selecione o sub-assunto:'
   await enviarMenu(
     telefone,
-    'Selecione o sub-assunto:',
+    corpoSub,
     'Ver sub-assuntos',
     'Sub-assuntos',
     opcoes,
     phoneNumberId,
     accessToken,
   )
+  if (conversaId) {
+    const opcoesTexto = opcoes.map(o => o.title).join('\n')
+    await inserirMensagemBot(supabase, conversaId, `${corpoSub}\n\n${opcoesTexto}`)
+  }
 
   return subcats
 }
@@ -559,6 +569,7 @@ async function enviarConfirmacao(
   sessao: BotSessao,
   phoneNumberId: string,
   accessToken: string,
+  conversaId?: string,
 ): Promise<void> {
   const deptLabel = DEPT_LABELS[sessao.dept_selecionado ?? ''] ?? sessao.dept_selecionado ?? ''
 
@@ -587,18 +598,24 @@ async function enviarConfirmacao(
     ? `${deptLabel} › ${catTitulo} › ${subTitulo}`
     : `${deptLabel} › ${catTitulo}`
 
+  const corpoConf = `Confirma o encaminhamento?\n\n*${resumo}*`
+  const opcoesConf = [
+    { id: 'CONFIRMAR', title: '✅ Sim, confirmar' },
+    { id: 'CORRIGIR', title: '🔄 Não, corrigir' },
+  ]
   await enviarMenu(
     telefone,
-    `Confirma o encaminhamento?\n\n*${resumo}*`,
+    corpoConf,
     'Responder',
     'Confirmação',
-    [
-      { id: 'CONFIRMAR', title: '✅ Sim, confirmar' },
-      { id: 'CORRIGIR', title: '🔄 Não, corrigir' },
-    ],
+    opcoesConf,
     phoneNumberId,
     accessToken,
   )
+  if (conversaId) {
+    const opcoesTexto = opcoesConf.map((o, i) => `${i + 1}. ${o.title}`).join('\n')
+    await inserirMensagemBot(supabase, conversaId, `${corpoConf}\n\n${opcoesTexto}`)
+  }
 }
 
 // =============================================================================
@@ -658,20 +675,25 @@ async function handleNOVO(
     })
 
     const msgRecorrente = `Olá! Notei que você já nos contactou sobre *${catAnterior}* (${deptAnterior}).\nDeseja o mesmo assunto?`
+    const opcoesRec = [
+      { id: `RECORRENTE:${deptAnterior}:${catIdAnterior ?? ''}`, title: '✅ Sim, mesmo assunto' },
+      { id: 'NOVO_ASSUNTO', title: '🔄 Não, novo assunto' },
+      { id: 'HUMANO', title: '👤 Falar com atendente' },
+    ]
     await enviarMenu(
       telefone,
       msgRecorrente,
       'Responder',
       'Opções',
-      [
-        { id: `RECORRENTE:${deptAnterior}:${catIdAnterior ?? ''}`, title: '✅ Sim, mesmo assunto' },
-        { id: 'NOVO_ASSUNTO', title: '🔄 Não, novo assunto' },
-        { id: 'HUMANO', title: '👤 Falar com atendente' },
-      ],
+      opcoesRec,
       phoneNumberId,
       accessToken,
     )
-    await inserirMensagemBot(supabase, conversa.id, msgRecorrente)
+    await inserirMensagemBot(
+      supabase,
+      conversa.id,
+      `${msgRecorrente}\n\n${opcoesRec.map((o, i) => `${i + 1}. ${o.title}`).join('\n')}`,
+    )
   } else {
     // Novo cliente
     await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_DEPT' })
@@ -714,16 +736,16 @@ async function handleAGUARD_DEPT(
     })
 
     if (catId) {
-      const subs = await enviarSubCategorias(supabase, telefone, catId, phoneNumberId, accessToken)
+      const subs = await enviarSubCategorias(supabase, telefone, catId, phoneNumberId, accessToken, conversa.id)
       // Se não há subcategorias, vai direto para confirmação
       if (subs.length === 0) {
         await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_CONF' })
-        await enviarConfirmacao(supabase, telefone, { ...sessao, dept_selecionado: dept, categoria_id: catId, estado: 'AGUARD_CONF', subcategoria_id: null }, phoneNumberId, accessToken)
+        await enviarConfirmacao(supabase, telefone, { ...sessao, dept_selecionado: dept, categoria_id: catId, estado: 'AGUARD_CONF', subcategoria_id: null }, phoneNumberId, accessToken, conversa.id)
       }
     } else {
       // Sem categoria prévia — envia categorias do dept
       await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_CAT', dept_selecionado: dept, categoria_id: null })
-      await enviarCategorias(supabase, telefone, dept, phoneNumberId, accessToken)
+      await enviarCategorias(supabase, telefone, dept, phoneNumberId, accessToken, conversa.id)
     }
     return
   }
@@ -755,7 +777,7 @@ async function handleAGUARD_DEPT(
       categoria_id: null,
       tentativas_invalidas: 0,
     })
-    await enviarCategorias(supabase, telefone, dept, phoneNumberId, accessToken)
+    await enviarCategorias(supabase, telefone, dept, phoneNumberId, accessToken, conversa.id)
     return
   }
 
@@ -816,7 +838,7 @@ async function handleAGUARD_CAT(
       tentativas_invalidas: 0,
     })
 
-    const subs = await enviarSubCategorias(supabase, telefone, catEscolhida.id, phoneNumberId, accessToken)
+    const subs = await enviarSubCategorias(supabase, telefone, catEscolhida.id, phoneNumberId, accessToken, conversa.id)
 
     // Se não há subcategorias, pula direto para confirmação
     if (subs.length === 0) {
@@ -827,6 +849,7 @@ async function handleAGUARD_CAT(
         { ...sessao, categoria_id: catEscolhida.id, estado: 'AGUARD_CONF', subcategoria_id: null },
         phoneNumberId,
         accessToken,
+        conversa.id,
       )
     }
     return
@@ -838,13 +861,10 @@ async function handleAGUARD_CAT(
     await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
   } else {
     await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: novasTentativas })
-    await enviarTexto(
-      telefone,
-      `Opção inválida. Escolha um número do menu (tentativa ${novasTentativas}/${config.max_tentativas}).`,
-      phoneNumberId,
-      accessToken,
-    )
-    await enviarCategorias(supabase, telefone, dept, phoneNumberId, accessToken)
+    const msgInvCat = `Opção inválida. Escolha um número do menu (tentativa ${novasTentativas}/${config.max_tentativas}).`
+    await enviarTexto(telefone, msgInvCat, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, msgInvCat)
+    await enviarCategorias(supabase, telefone, dept, phoneNumberId, accessToken, conversa.id)
   }
 }
 
@@ -897,6 +917,7 @@ async function handleAGUARD_SUB(
       { ...sessao, subcategoria_id: subEscolhida.id, estado: 'AGUARD_CONF' },
       phoneNumberId,
       accessToken,
+      conversa.id,
     )
     return
   }
@@ -907,13 +928,10 @@ async function handleAGUARD_SUB(
     await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
   } else {
     await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: novasTentativas })
-    await enviarTexto(
-      telefone,
-      `Opção inválida. Escolha um número do menu (tentativa ${novasTentativas}/${config.max_tentativas}).`,
-      phoneNumberId,
-      accessToken,
-    )
-    await enviarSubCategorias(supabase, telefone, catId, phoneNumberId, accessToken)
+    const msgInvSub = `Opção inválida. Escolha um número do menu (tentativa ${novasTentativas}/${config.max_tentativas}).`
+    await enviarTexto(telefone, msgInvSub, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, msgInvSub)
+    await enviarSubCategorias(supabase, telefone, catId, phoneNumberId, accessToken, conversa.id)
   }
 }
 
@@ -1028,13 +1046,10 @@ async function handleAGUARD_CONF(
     await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
   } else {
     await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: novasTentativas })
-    await enviarTexto(
-      telefone,
-      `Por favor, confirme com *Sim* ou *Não* (tentativa ${novasTentativas}/${config.max_tentativas}).`,
-      phoneNumberId,
-      accessToken,
-    )
-    await enviarConfirmacao(supabase, telefone, sessao, phoneNumberId, accessToken)
+    const msgConf = `Por favor, confirme com *Sim* ou *Não* (tentativa ${novasTentativas}/${config.max_tentativas}).`
+    await enviarTexto(telefone, msgConf, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, msgConf)
+    await enviarConfirmacao(supabase, telefone, sessao, phoneNumberId, accessToken, conversa.id)
   }
 }
 
@@ -1053,12 +1068,9 @@ async function processarCSAT(
       .from('chatbot_avaliacoes')
       .insert({ conversa_id: conversa.id, nota })
 
-    await enviarTexto(
-      telefone,
-      'Obrigado pelo feedback! 🙏 Até a próxima.',
-      phoneNumberId,
-      accessToken,
-    )
+    const msgFeedback = 'Obrigado pelo feedback! 🙏 Até a próxima.'
+    await enviarTexto(telefone, msgFeedback, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, msgFeedback)
     await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
     return
   }
@@ -1071,20 +1083,26 @@ async function processarCSAT(
 
   await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: sessao.tentativas_invalidas + 1 })
 
+  const opcoesCSAT = [
+    { id: '5', title: '⭐⭐⭐⭐⭐ Excelente' },
+    { id: '4', title: '⭐⭐⭐⭐ Bom' },
+    { id: '3', title: '⭐⭐⭐ Regular' },
+    { id: '2', title: '⭐⭐ Ruim' },
+    { id: '1', title: '⭐ Péssimo' },
+  ]
   await enviarMenu(
     telefone,
     'Por favor, avalie nosso atendimento de 1 a 5:',
     'Avaliar',
     'Avaliação',
-    [
-      { id: '5', title: '⭐⭐⭐⭐⭐ Excelente' },
-      { id: '4', title: '⭐⭐⭐⭐ Bom' },
-      { id: '3', title: '⭐⭐⭐ Regular' },
-      { id: '2', title: '⭐⭐ Ruim' },
-      { id: '1', title: '⭐ Péssimo' },
-    ],
+    opcoesCSAT,
     phoneNumberId,
     accessToken,
+  )
+  await inserirMensagemBot(
+    supabase,
+    conversa.id,
+    `Por favor, avalie nosso atendimento de 1 a 5:\n\n${opcoesCSAT.map((o, i) => `${i + 1}. ${o.title}`).join('\n')}`,
   )
 }
 
