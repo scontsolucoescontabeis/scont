@@ -219,7 +219,7 @@ serve(async (req) => {
       console.error('Erro ao processar webhook:', err)
     }
 
-    if (devBypass && conversa_id) {
+    if (devBypass && conversa_id && contato_id) {
       return new Response(
         JSON.stringify({ ok: true, conversa_id, contato_id, protocolo }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
