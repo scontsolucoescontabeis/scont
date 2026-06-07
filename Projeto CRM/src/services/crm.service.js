@@ -499,3 +499,24 @@ export async function excluirFeriado(id) {
     .eq('id', id)
   if (error) throw error
 }
+
+// ─── SLA Config ───────────────────────────────────────────────
+
+export async function buscarSLAConfig() {
+  const { data, error } = await supabase
+    .from('sla_config')
+    .select('*')
+    .order('departamento')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function salvarSLAConfig(rows) {
+  const { error } = await supabase
+    .from('sla_config')
+    .upsert(
+      rows.map(r => ({ ...r, atualizado_em: new Date().toISOString() })),
+      { onConflict: 'departamento' }
+    )
+  if (error) throw error
+}
