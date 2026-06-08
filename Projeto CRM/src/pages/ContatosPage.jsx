@@ -13,7 +13,7 @@ const CAMPOS_FORM = [
 ]
 
 const VAZIO = { nome: '', telefone: '', email: '', cpf_cnpj: '', observacoes: '' }
-const EMPRESA_VAZIA = { empresa: '', cargo: '' }
+const EMPRESA_VAZIA = { empresa: '', cargo: '', cnpj: '' }
 
 // ─── Modal de criar/editar contato ─────────────────────────
 function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
@@ -27,7 +27,7 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
   } : { ...VAZIO })
   const [empresas, setEmpresas] = useState(
     empresasIniciais.length > 0
-      ? empresasIniciais.map(e => ({ empresa: e.empresa, cargo: e.cargo ?? '', _key: crypto.randomUUID() }))
+      ? empresasIniciais.map(e => ({ empresa: e.empresa, cargo: e.cargo ?? '', cnpj: e.cnpj ?? '', _key: crypto.randomUUID() }))
       : [{ ...EMPRESA_VAZIA, _key: crypto.randomUUID() }]
   )
   const [salvando, setSalvando] = useState(false)
@@ -91,6 +91,7 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
           contato_id: contatoId,
           empresa:    item.empresa.trim(),
           cargo:      item.cargo.trim() || null,
+          cnpj:       item.cnpj.trim() || null,
         })
         if (errUp) { setSalvando(false); setErro(errUp.message); return }
       }
@@ -163,27 +164,35 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
               </button>
             </div>
             {empresas.map((item, i) => (
-              <div key={item._key ?? i} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'flex-start' }}>
+              <div key={item._key ?? i} style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 4, alignItems: 'flex-start' }}>
+                  <input
+                    value={item.empresa}
+                    onChange={setEmpresa(i, 'empresa')}
+                    placeholder="Razão social ou nome"
+                    style={{ ...inputStyle, flex: 2 }}
+                  />
+                  <input
+                    value={item.cargo}
+                    onChange={setEmpresa(i, 'cargo')}
+                    placeholder="Cargo / Função"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  {empresas.length > 1 && (
+                    <button type="button" onClick={() => removeEmpresa(i)} style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      padding: '8px 4px', color: '#888480', flexShrink: 0,
+                    }}>
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
                 <input
-                  value={item.empresa}
-                  onChange={setEmpresa(i, 'empresa')}
-                  placeholder="Razão social ou nome"
-                  style={{ ...inputStyle, flex: 2 }}
+                  value={item.cnpj}
+                  onChange={setEmpresa(i, 'cnpj')}
+                  placeholder="CNPJ (opcional)"
+                  style={{ ...inputStyle, fontFamily: 'DM Mono, monospace', fontSize: 12 }}
                 />
-                <input
-                  value={item.cargo}
-                  onChange={setEmpresa(i, 'cargo')}
-                  placeholder="Cargo / Função"
-                  style={{ ...inputStyle, flex: 1 }}
-                />
-                {empresas.length > 1 && (
-                  <button type="button" onClick={() => removeEmpresa(i)} style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    padding: '8px 4px', color: '#888480', flexShrink: 0,
-                  }}>
-                    <X size={14} />
-                  </button>
-                )}
               </div>
             ))}
           </div>
@@ -248,7 +257,7 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
         .limit(10),
       supabase
         .from('contatos_empresas')
-        .select('empresa, cargo')
+        .select('empresa, cargo, cnpj')
         .eq('contato_id', contato.id)
         .order('criado_em', { ascending: true }),
     ])
@@ -345,9 +354,14 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
               {carregandoHist ? null : empresas.length === 0 ? (
                 <span style={{ fontSize: 11, color: '#c5c0ba' }}>Nenhuma empresa</span>
               ) : empresas.map((e, i) => (
-                <div key={i} style={{ marginBottom: 4 }}>
+                <div key={i} style={{ marginBottom: 6 }}>
                   <span style={{ fontSize: 12, color: '#1a1a1a', fontWeight: 500 }}>{e.empresa}</span>
                   {e.cargo && <span style={{ fontSize: 11, color: '#888480' }}> · {e.cargo}</span>}
+                  {e.cnpj && (
+                    <div style={{ fontSize: 10, color: '#888480', fontFamily: 'DM Mono, monospace', marginTop: 1 }}>
+                      CNPJ {e.cnpj}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -437,7 +451,7 @@ export default function ContatosPage() {
     try {
       const { data } = await supabase
         .from('contatos_empresas')
-        .select('empresa, cargo')
+        .select('empresa, cargo, cnpj')
         .eq('contato_id', contato.id)
         .order('criado_em')
       setEmpresasModal(data ?? [])
