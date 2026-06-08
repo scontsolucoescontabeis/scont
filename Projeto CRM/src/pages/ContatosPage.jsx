@@ -5,32 +5,41 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 const CAMPOS_FORM = [
-  { key: 'nome',      label: 'Nome',              placeholder: 'Nome completo',           required: true,  col: 2 },
-  { key: 'telefone',  label: 'Telefone (WhatsApp)', placeholder: '5561999999999',         required: true,  col: 1, mono: true },
-  { key: 'empresa',   label: 'Empresa',            placeholder: 'Razão social ou nome',   required: false, col: 1 },
-  { key: 'cargo',     label: 'Cargo / Função',     placeholder: 'Ex: Sócio, Responsável', required: false, col: 1 },
-  { key: 'email',     label: 'E-mail',             placeholder: 'contato@empresa.com',    required: false, col: 1 },
-  { key: 'cpf_cnpj',  label: 'CPF / CNPJ',         placeholder: '000.000.000-00',         required: false, col: 1 },
+  { key: 'nome',     label: 'Nome',               placeholder: 'Nome completo',  required: true,  col: 2 },
+  { key: 'telefone', label: 'Telefone (WhatsApp)', placeholder: '5561999999999', required: true,  col: 1, mono: true },
+  { key: 'email',    label: 'E-mail',              placeholder: 'contato@empresa.com', required: false, col: 1 },
+  { key: 'cpf_cnpj', label: 'CPF / CNPJ',          placeholder: '000.000.000-00',      required: false, col: 1 },
 ]
 
-const VAZIO = { nome: '', telefone: '', empresa: '', cargo: '', email: '', cpf_cnpj: '', observacoes: '' }
+const VAZIO = { nome: '', telefone: '', email: '', cpf_cnpj: '', observacoes: '' }
+const EMPRESA_VAZIA = { empresa: '', cargo: '' }
 
 // ─── Modal de criar/editar contato ─────────────────────────
-function ModalContato({ contato, onSalvar, onFechar }) {
+function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
   const editando = !!contato?.id
   const [form, setForm] = useState(contato ? {
-    nome:       contato.nome ?? '',
-    telefone:   contato.telefone ?? '',
-    empresa:    contato.empresa ?? '',
-    cargo:      contato.cargo ?? '',
-    email:      contato.email ?? '',
-    cpf_cnpj:   contato.cpf_cnpj ?? '',
+    nome:        contato.nome       ?? '',
+    telefone:    contato.telefone   ?? '',
+    email:       contato.email      ?? '',
+    cpf_cnpj:    contato.cpf_cnpj   ?? '',
     observacoes: contato.observacoes ?? '',
   } : { ...VAZIO })
+  const [empresas, setEmpresas] = useState(
+    empresasIniciais.length > 0
+      ? empresasIniciais.map(e => ({ empresa: e.empresa, cargo: e.cargo ?? '' }))
+      : [{ ...EMPRESA_VAZIA }]
+  )
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  const setEmpresa = (i, k) => (e) =>
+    setEmpresas(prev => prev.map((item, idx) => idx === i ? { ...item, [k]: e.target.value } : item))
+
+  const addEmpresa = () => setEmpresas(prev => [...prev, { ...EMPRESA_VAZIA }])
+
+  const removeEmpresa = (i) => setEmpresas(prev => prev.filter((_, idx) => idx !== i))
 
   const handleSalvar = async (e) => {
     e.preventDefault()
@@ -38,29 +47,59 @@ function ModalContato({ contato, onSalvar, onFechar }) {
     if (!form.telefone.trim()) { setErro('Informe o telefone/WhatsApp.'); return }
     setSalvando(true); setErro('')
 
+    const { data: { user } } = await supabase.auth.getUser()
+    const agora = new Date().toISOString()
+
     const payload = {
-      nome:       form.nome.trim(),
-      telefone:   form.telefone.trim().replace(/\D/g, ''),
-      empresa:    form.empresa.trim() || null,
-      cargo:      form.cargo.trim() || null,
-      email:      form.email.trim() || null,
-      cpf_cnpj:   form.cpf_cnpj.trim() || null,
+      nome:        form.nome.trim(),
+      telefone:    form.telefone.trim().replace(/\D/g, ''),
+      email:       form.email.trim()    || null,
+      cpf_cnpj:    form.cpf_cnpj.trim() || null,
       observacoes: form.observacoes.trim() || null,
-      atualizado_em: new Date().toISOString(),
+      atualizado_por: user.id,
+      atualizado_em:  agora,
     }
 
-    const { data: { user } } = await supabase.auth.getUser()
-    payload.atualizado_por = user.id
-
+    let contatoId = contato?.id
     let error
+
     if (editando) {
-      ;({ error } = await supabase.from('contatos').update(payload).eq('id', contato.id))
+      ;({ error } = await supabase.from('contatos').update(payload).eq('id', contatoId))
     } else {
-      ;({ error } = await supabase.from('contatos').insert(payload))
+      const { data, error: errIns } = await supabase
+        .from('contatos').insert(payload).select('id').single()
+      error = errIns
+      contatoId = data?.id
+    }
+
+    if (error) { setSalvando(false); setErro(error.message); return }
+
+    // Sincronizar contatos_empresas
+    const empresasValidas = empresas.filter(e => e.empresa.trim())
+    if (contatoId) {
+      if (editando && empresasValidas.length > 0) {
+        // Apagar os que não estão mais na lista
+        const nomesAtuais = empresasValidas.map(e => e.empresa.trim())
+        await supabase
+          .from('contatos_empresas')
+          .delete()
+          .eq('contato_id', contatoId)
+          .not('empresa', 'in', `(${nomesAtuais.map(n => `"${n}"`).join(',')})`)
+      } else if (editando && empresasValidas.length === 0) {
+        // Remover todas as empresas
+        await supabase.from('contatos_empresas').delete().eq('contato_id', contatoId)
+      }
+      // Upsert os que estão
+      for (const item of empresasValidas) {
+        await supabase.from('contatos_empresas').upsert({
+          contato_id: contatoId,
+          empresa:    item.empresa.trim(),
+          cargo:      item.cargo.trim() || null,
+        }, { onConflict: 'contato_id,empresa' })
+      }
     }
 
     setSalvando(false)
-    if (error) { setErro(error.message); return }
     onSalvar()
     onFechar()
   }
@@ -79,10 +118,9 @@ function ModalContato({ contato, onSalvar, onFechar }) {
     }}>
       <div style={{
         background: '#fff', borderRadius: 12, padding: 28,
-        width: 520, maxHeight: '90vh', overflowY: 'auto',
+        width: 540, maxHeight: '90vh', overflowY: 'auto',
         boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
       }}>
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 34, height: 34, borderRadius: 8, background: '#f0e8e8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -98,6 +136,7 @@ function ModalContato({ contato, onSalvar, onFechar }) {
         </div>
 
         <form onSubmit={handleSalvar}>
+          {/* Campos principais */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             {CAMPOS_FORM.map(c => (
               <div key={c.key} style={{ gridColumn: c.col === 2 ? 'span 2' : 'span 1' }}>
@@ -115,14 +154,51 @@ function ModalContato({ contato, onSalvar, onFechar }) {
             ))}
           </div>
 
+          {/* Empresas vinculadas */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>Empresas vinculadas</label>
+              <button type="button" onClick={addEmpresa} style={{
+                background: 'none', border: '1px solid #e0dcd8', borderRadius: 5,
+                padding: '3px 10px', fontSize: 11, color: '#7a1e1e', cursor: 'pointer',
+              }}>
+                + Adicionar
+              </button>
+            </div>
+            {empresas.map((item, i) => (
+              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'flex-start' }}>
+                <input
+                  value={item.empresa}
+                  onChange={setEmpresa(i, 'empresa')}
+                  placeholder="Razão social ou nome"
+                  style={{ ...inputStyle, flex: 2 }}
+                />
+                <input
+                  value={item.cargo}
+                  onChange={setEmpresa(i, 'cargo')}
+                  placeholder="Cargo / Função"
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                {empresas.length > 1 && (
+                  <button type="button" onClick={() => removeEmpresa(i)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    padding: '8px 4px', color: '#888480', flexShrink: 0,
+                  }}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
           {/* Observações */}
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Observações</label>
             <textarea
               value={form.observacoes}
               onChange={set('observacoes')}
-              placeholder="Informações relevantes sobre o contato, preferências de atendimento, histórico relevante..."
-              rows={4}
+              placeholder="Informações relevantes sobre o contato..."
+              rows={3}
               style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
             />
           </div>
