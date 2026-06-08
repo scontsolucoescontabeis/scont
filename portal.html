@@ -590,7 +590,8 @@
             const btn = document.createElement('button');
             btn.className = 'btn-acessar';
             btn.textContent = 'Acessar →';
-            const acessar = () => abrirFerramenta(f.url_base);
+            const novaAba = f.url_base ? /\/crm\b/.test(f.url_base) : false;
+            const acessar = () => abrirFerramenta(f.url_base, novaAba);
             card.addEventListener('click', acessar);
             btn.addEventListener('click', (e) => { e.stopPropagation(); acessar(); });
             card.appendChild(icon);
@@ -637,7 +638,7 @@
 
         // ─── ABRIR FERRAMENTA ──────────────────────────────────────
         // Passa tokens de sessão no hash para apps React (Supabase detectSessionInUrl)
-        async function abrirFerramenta(url) {
+        async function abrirFerramenta(url, novaAba = false) {
             if (!url) { alert('URL não configurada para esta ferramenta.'); return; }
             try {
                 let href = new URL(url, window.location.href).href;
@@ -653,8 +654,12 @@
                         });
                         href = href.split('#')[0] + '#' + params.toString();
                     }
+                    window.open(href, '_blank', 'noopener');
+                } else if (novaAba) {
+                    window.open(href, '_blank', 'noopener');
+                } else {
+                    window.location.href = href;
                 }
-                window.open(href, '_blank', 'noopener');
             } catch {
                 alert('URL inválida para esta ferramenta.');
             }
