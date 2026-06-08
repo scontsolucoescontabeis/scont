@@ -653,10 +653,8 @@
                         });
                         href = href.split('#')[0] + '#' + params.toString();
                     }
-                    window.open(href, '_blank', 'noopener');
-                } else {
-                    window.location.href = href;
                 }
+                window.open(href, '_blank', 'noopener');
             } catch {
                 alert('URL inválida para esta ferramenta.');
             }
