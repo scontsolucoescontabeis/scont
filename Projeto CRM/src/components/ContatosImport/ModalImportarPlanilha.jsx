@@ -175,7 +175,7 @@ function StepUpload({ onArquivo }) {
         onDragOver={e => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }}
-        onClick={() => inputRef.current.click()}
+        onClick={() => inputRef.current?.click()}
         style={{
           border: `2px dashed ${dragging ? '#7a1e1e' : '#e0dcd8'}`,
           borderRadius: 10, padding: '40px 24px', textAlign: 'center',
