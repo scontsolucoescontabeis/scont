@@ -790,13 +790,18 @@ async function handleAGUARD_EMPRESA(
     const ceId = partes[1] ?? ''
     const catId = partes[2] && partes[2].length > 0 ? partes[2] : null
 
+    if (!isUuid(ceId)) {
+      await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+      return
+    }
+
     const { data: ce } = await supabase
       .from('contatos_empresas')
       .select('empresa, cnpj')
       .eq('id', ceId)
       .single()
 
-    const empresa = (ce?.empresa as string | undefined) ?? ''
+    const empresa = (ce?.empresa as string | undefined) || null
     const cnpj = (ce?.cnpj as string | null | undefined) ?? null
 
     // Re-consulta recorrente para recuperar dept (label) — consistente com padrão existente
@@ -810,10 +815,10 @@ async function handleAGUARD_EMPRESA(
       .limit(1)
       .single()
 
-    const deptAnterior = (rec?.bot_departamento as string | undefined) ?? ''
+    const deptAnterior = (rec?.bot_departamento as string | undefined) || null
 
     await atualizarSessao(supabase, sessao.id, {
-      empresa_selecionada: empresa || null,
+      empresa_selecionada: empresa,
       cnpj_selecionado: cnpj,
       dept_selecionado: deptAnterior,
       categoria_id: catId,
@@ -856,18 +861,23 @@ async function handleAGUARD_EMPRESA(
   if (input.valor.startsWith('EMPRESA:')) {
     const ceId = input.valor.split(':')[1] ?? ''
 
+    if (!isUuid(ceId)) {
+      await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+      return
+    }
+
     const { data: ce } = await supabase
       .from('contatos_empresas')
       .select('empresa, cnpj')
       .eq('id', ceId)
       .single()
 
-    const empresa = (ce?.empresa as string | undefined) ?? ''
+    const empresa = (ce?.empresa as string | undefined) || null
     const cnpj = (ce?.cnpj as string | null | undefined) ?? null
 
     await atualizarSessao(supabase, sessao.id, {
       estado: 'AGUARD_DEPT',
-      empresa_selecionada: empresa || null,
+      empresa_selecionada: empresa,
       cnpj_selecionado: cnpj,
       tentativas_invalidas: 0,
     })
