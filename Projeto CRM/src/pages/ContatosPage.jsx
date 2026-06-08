@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Users, Plus, Search, X, Edit2, Phone, Building2, Mail, FileText, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
+import { Users, Plus, Search, X, Edit2, Phone, Building2, Mail, FileText, ChevronDown, ChevronUp, MessageSquare, FileSpreadsheet } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
+import ModalImportarPlanilha from '@/components/ContatosImport/ModalImportarPlanilha'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -394,6 +395,8 @@ export default function ContatosPage() {
   const [modal, setModal]         = useState(null)  // null | {} (novo) | {contato}
   const [empresasModal, setEmpresasModal] = useState([])
   const [pagina, setPagina]       = useState(0)
+  const [dropdownAberto, setDropdownAberto] = useState(false)
+  const [modalImportar, setModalImportar]   = useState(false)
   const POR_PAGINA = 20
   const editandoRef = useRef(false)
 
@@ -476,16 +479,71 @@ export default function ContatosPage() {
                 }}
               />
             </div>
-            <button
-              onClick={() => setModal({})}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '7px 14px', borderRadius: 6, border: 'none',
-                background: '#7a1e1e', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              <Plus size={14} /> Novo Contato
-            </button>
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex' }}>
+                <button
+                  onClick={() => setModal({})}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '7px 14px', borderRadius: '6px 0 0 6px', border: 'none',
+                    background: '#7a1e1e', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  <Plus size={14} /> Novo Contato
+                </button>
+                <button
+                  onClick={() => setDropdownAberto(v => !v)}
+                  title="Importar via planilha"
+                  style={{
+                    padding: '7px 8px', borderRadius: '0 6px 6px 0', border: 'none',
+                    borderLeft: '1px solid #5a1616', background: '#7a1e1e', color: '#fff',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center',
+                  }}
+                >
+                  <ChevronDown size={13} />
+                </button>
+              </div>
+
+              {dropdownAberto && (
+                <>
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 90 }}
+                    onClick={() => setDropdownAberto(false)}
+                  />
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', right: 0,
+                    background: '#fff', border: '1px solid #e0dcd8', borderRadius: 8,
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.10)', zIndex: 100,
+                    minWidth: 190, overflow: 'hidden',
+                  }}>
+                    <button
+                      onClick={() => { setDropdownAberto(false); setModal({}) }}
+                      style={{
+                        width: '100%', padding: '10px 14px', border: 'none', background: 'none',
+                        textAlign: 'left', fontSize: 12, color: '#1a1a1a', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f7f6f4'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      <Plus size={13} color="#888480" /> Cadastrar manualmente
+                    </button>
+                    <button
+                      onClick={() => { setDropdownAberto(false); setModalImportar(true) }}
+                      style={{
+                        width: '100%', padding: '10px 14px', border: 'none', background: 'none',
+                        textAlign: 'left', fontSize: 12, color: '#1a1a1a', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 8,
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f7f6f4'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      <FileSpreadsheet size={13} color="#888480" /> Importar via planilha
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -534,6 +592,14 @@ export default function ContatosPage() {
           </>
         )}
       </div>
+
+      {/* Modal Importar Planilha */}
+      {modalImportar && (
+        <ModalImportarPlanilha
+          onFechar={() => setModalImportar(false)}
+          onImportado={carregar}
+        />
+      )}
 
       {/* Modal */}
       {modal !== null && (
