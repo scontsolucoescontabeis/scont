@@ -47,8 +47,8 @@ jobs:
             [ "$dir" = "Projeto CRM/" ] && continue
             cp -r "$dir" "_site/$dir"
           done
-          # CRM — app buildado em /crm
-          cp -r "Projeto CRM/dist/." _site/crm/
+          # CRM — app buildado em crm/ (outDir: '../crm' no vite.config.js)
+          cp -r crm/. _site/crm/
           # Fallback SPA: GitHub Pages serve 404.html na rota desconhecida;
           # como o index.html já tem o React Router, ele trata a URL corretamente
           cp _site/crm/index.html _site/crm/404.html
