@@ -140,6 +140,28 @@ export function PainelDireito({ conversa }) {
             )}
           </div>
 
+          {/* Empresa selecionada pelo bot */}
+          {conversa.bot_empresa && (
+            <div style={{ marginBottom: 10 }}>
+              <span style={{
+                background: '#1e3a5f', color: '#fff',
+                fontSize: 10, fontWeight: 700,
+                padding: '3px 8px', borderRadius: 4,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}>
+                🏢 {conversa.bot_empresa}
+              </span>
+              {conversa.bot_cnpj && (
+                <div style={{
+                  fontSize: 9, color: '#7a9fc0',
+                  fontFamily: 'DM Mono, monospace', marginTop: 3,
+                }}>
+                  CNPJ {conversa.bot_cnpj}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Trilha dept › cat › sub */}
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 3, marginBottom: 10 }}>
             <span style={{ background: '#004085', color: '#fff', fontSize: 10, fontWeight: 700,

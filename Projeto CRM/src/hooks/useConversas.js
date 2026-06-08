@@ -12,7 +12,8 @@ export function useConversas({ departamento, status, busca }) {
       .select(`
         id, protocolo, status, departamento,
         aberto_em, atualizado_em, encerrado_em,
-        contatos ( id, telefone, nome, empresa ),
+        bot_departamento, bot_categoria, bot_subcategoria, bot_empresa, bot_cnpj,
+        contatos ( id, telefone, nome ),
         usuarios ( id, nome ),
         mensagens ( id, conteudo, origem, criado_em, lida )
       `)
