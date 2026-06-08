@@ -224,29 +224,42 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
 
 // ─── Card expandível de contato ────────────────────────────
 function ContatoCard({ contato, onEditar, onAtualizar }) {
-  const [expandido, setExpandido] = useState(false)
-  const [historico, setHistorico] = useState([])
+  const [expandido, setExpandido]         = useState(false)
+  const [historico, setHistorico]         = useState([])
+  const [empresas, setEmpresas]           = useState([])
   const [carregandoHist, setCarregandoHist] = useState(false)
 
-  const carregarHistorico = async () => {
-    if (historico.length) return
+  const carregarDetalhes = async () => {
+    if (historico.length && empresas.length) return
     setCarregandoHist(true)
-    const { data } = await supabase
-      .from('conversas')
-      .select('id, protocolo, status, departamento, aberto_em, encerrado_em')
-      .eq('contato_id', contato.id)
-      .order('aberto_em', { ascending: false })
-      .limit(10)
-    setHistorico(data ?? [])
+
+    const [{ data: hist }, { data: emps }] = await Promise.all([
+      supabase
+        .from('conversas')
+        .select('id, protocolo, status, departamento, aberto_em, encerrado_em')
+        .eq('contato_id', contato.id)
+        .order('aberto_em', { ascending: false })
+        .limit(10),
+      supabase
+        .from('contatos_empresas')
+        .select('empresa, cargo')
+        .eq('contato_id', contato.id)
+        .order('criado_em', { ascending: true }),
+    ])
+
+    setHistorico(hist ?? [])
+    setEmpresas(emps ?? [])
     setCarregandoHist(false)
   }
 
   const handleExpand = () => {
     setExpandido(v => !v)
-    if (!expandido) carregarHistorico()
+    if (!expandido) carregarDetalhes()
   }
 
   const STATUS_COR = { ABERTA: '#888480', EM_ATENDIMENTO: '#2d7a4f', AGUARDANDO: '#b87a00', ENCERRADA: '#c5c0ba' }
+
+  const empresaLabel = contato.contatos_empresas?.[0]?.empresa ?? null
 
   return (
     <div style={{
@@ -255,9 +268,7 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
       boxShadow: expandido ? '0 2px 12px rgba(0,0,0,0.07)' : 'none',
       transition: 'box-shadow 0.2s',
     }}>
-      {/* Linha principal */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
-        {/* Avatar */}
         <div style={{
           width: 40, height: 40, borderRadius: '50%', background: '#f0e8e8',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -266,15 +277,14 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
           {(contato.nome ?? contato.telefone)[0]?.toUpperCase()}
         </div>
 
-        {/* Info */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>
               {contato.nome ?? '—'}
             </span>
-            {contato.empresa && (
+            {empresaLabel && (
               <span style={{ fontSize: 11, color: '#888480', background: '#f7f6f4', padding: '1px 7px', borderRadius: 3 }}>
-                {contato.empresa}
+                {empresaLabel}
               </span>
             )}
           </div>
@@ -287,17 +297,15 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
                 <Mail size={10} /> {contato.email}
               </span>
             )}
-            {contato.cargo && (
-              <span style={{ fontSize: 11, color: '#888480' }}>{contato.cargo}</span>
-            )}
           </div>
         </div>
 
-        {/* Ações */}
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
-          <button onClick={(e) => { e.stopPropagation(); onEditar(contato) }}
+          <button
+            onClick={(e) => { e.stopPropagation(); onEditar(contato) }}
             title="Editar contato"
-            style={{ background: 'none', border: '1px solid #e0dcd8', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#888480' }}>
+            style={{ background: 'none', border: '1px solid #e0dcd8', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#888480' }}
+          >
             <Edit2 size={12} /> Editar
           </button>
           <button onClick={handleExpand}
@@ -307,19 +315,15 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
         </div>
       </div>
 
-      {/* Conteúdo expandido */}
       {expandido && (
         <div style={{ borderTop: '1px solid #e0dcd8', padding: '14px 16px', background: '#fafaf9' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: contato.observacoes ? 14 : 0 }}>
-            {/* Dados adicionais */}
             <div>
               <p style={{ fontSize: 10, fontWeight: 700, color: '#888480', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, marginTop: 0 }}>
                 Dados cadastrais
               </p>
               {[
                 { label: 'CPF/CNPJ', value: contato.cpf_cnpj },
-                { label: 'Empresa',  value: contato.empresa },
-                { label: 'Cargo',    value: contato.cargo },
                 { label: 'E-mail',   value: contato.email },
                 { label: 'Cadastrado em', value: contato.criado_em ? format(new Date(contato.criado_em), "dd/MM/yyyy", { locale: ptBR }) : null },
               ].filter(f => f.value).map(f => (
@@ -328,9 +332,20 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
                   <span style={{ fontSize: 12, color: '#1a1a1a' }}>{f.value}</span>
                 </div>
               ))}
+
+              <p style={{ fontSize: 10, fontWeight: 700, color: '#888480', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, marginTop: 10 }}>
+                Empresas ({carregandoHist ? '…' : empresas.length})
+              </p>
+              {carregandoHist ? null : empresas.length === 0 ? (
+                <span style={{ fontSize: 11, color: '#c5c0ba' }}>Nenhuma empresa</span>
+              ) : empresas.map((e, i) => (
+                <div key={i} style={{ marginBottom: 4 }}>
+                  <span style={{ fontSize: 12, color: '#1a1a1a', fontWeight: 500 }}>{e.empresa}</span>
+                  {e.cargo && <span style={{ fontSize: 11, color: '#888480' }}> · {e.cargo}</span>}
+                </div>
+              ))}
             </div>
 
-            {/* Histórico de conversas */}
             <div>
               <p style={{ fontSize: 10, fontWeight: 700, color: '#888480', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, marginTop: 0 }}>
                 Histórico ({historico.length})
@@ -350,7 +365,6 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
             </div>
           </div>
 
-          {/* Observações */}
           {contato.observacoes && (
             <div style={{ background: '#fffbeb', border: '1px solid #fde047', borderRadius: 6, padding: '10px 14px' }}>
               <p style={{ fontSize: 10, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>
@@ -373,6 +387,7 @@ export default function ContatosPage() {
   const [loading, setLoading]     = useState(true)
   const [busca, setBusca]         = useState('')
   const [modal, setModal]         = useState(null)  // null | {} (novo) | {contato}
+  const [empresasModal, setEmpresasModal] = useState([])
   const [pagina, setPagina]       = useState(0)
   const POR_PAGINA = 20
 
@@ -380,20 +395,42 @@ export default function ContatosPage() {
     setLoading(true)
     let q = supabase
       .from('contatos')
-      .select('*')
+      .select('*, contatos_empresas(empresa, cargo)')
       .order('nome', { ascending: true })
 
     if (busca.trim()) {
       const t = busca.trim()
-      q = q.or(`nome.ilike.%${t}%,telefone.ilike.%${t}%,empresa.ilike.%${t}%,email.ilike.%${t}%`)
+      q = q.or(`nome.ilike.%${t}%,telefone.ilike.%${t}%,email.ilike.%${t}%`)
     }
 
     const { data } = await q
-    setContatos(data ?? [])
+    let resultado = data ?? []
+    if (busca.trim()) {
+      const t = busca.trim().toLowerCase()
+      const matchesEmpresa = (c) =>
+        c.contatos_empresas?.some(e => e.empresa?.toLowerCase().includes(t))
+      resultado = resultado.filter(c =>
+        c.nome?.toLowerCase().includes(t) ||
+        c.telefone?.toLowerCase().includes(t) ||
+        c.email?.toLowerCase().includes(t) ||
+        matchesEmpresa(c)
+      )
+    }
+    setContatos(resultado)
     setLoading(false)
   }, [busca])
 
   useEffect(() => { carregar() }, [carregar])
+
+  const handleEditar = async (contato) => {
+    const { data } = await supabase
+      .from('contatos_empresas')
+      .select('empresa, cargo')
+      .eq('contato_id', contato.id)
+      .order('criado_em')
+    setEmpresasModal(data ?? [])
+    setModal(contato)
+  }
 
   const paginados = contatos.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA)
   const totalPaginas = Math.ceil(contatos.length / POR_PAGINA)
@@ -463,7 +500,7 @@ export default function ContatosPage() {
         ) : (
           <>
             {paginados.map(c => (
-              <ContatoCard key={c.id} contato={c} onEditar={setModal} onAtualizar={carregar} />
+              <ContatoCard key={c.id} contato={c} onEditar={handleEditar} onAtualizar={carregar} />
             ))}
 
             {/* Paginação */}
@@ -490,6 +527,7 @@ export default function ContatosPage() {
       {modal !== null && (
         <ModalContato
           contato={modal?.id ? modal : null}
+          empresasIniciais={modal?.id ? empresasModal : []}
           onSalvar={carregar}
           onFechar={() => setModal(null)}
         />
