@@ -631,7 +631,7 @@ async function handleNOVO(
   config: ChatbotConfig,
   feriadoHoje: FeriadoEvento | null,
 ): Promise<void> {
-  const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
+  const { supabase, telefone, nomeContato, conversa, phoneNumberId, accessToken } = params
 
   // Verifica feriado antes de verificar horário
   if (feriadoHoje?.tipo === 'FERIADO') {
@@ -650,6 +650,65 @@ async function handleNOVO(
     await inserirMensagemBot(supabase, conversa.id, config.msg_fora_horario)
     await inserirMensagemSistema(supabase, conversa.id, '🤖 Cliente contatou fora do horário de atendimento')
     await atualizarSessao(supabase, sessao.id, { estado: 'CONCLUIDO' })
+    return
+  }
+
+  // Verifica empresas vinculadas ao contato
+  const { data: empData } = await supabase
+    .from('contatos_empresas')
+    .select('id, empresa, cnpj')
+    .eq('contato_id', conversa.contato_id)
+    .order('criado_em', { ascending: true })
+
+  const empresas = (empData ?? []) as Array<{ id: string; empresa: string; cnpj: string | null }>
+
+  if (empresas.length > 0) {
+    // Busca histórico recorrente para combinar com a lista de empresas
+    const { data: rec } = await supabase
+      .from('conversas')
+      .select('bot_departamento, bot_categoria, bot_categoria_id')
+      .eq('contato_id', conversa.contato_id)
+      .eq('status', 'ENCERRADA')
+      .not('bot_departamento', 'is', null)
+      .gt('encerrado_em', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .order('encerrado_em', { ascending: false })
+      .limit(1)
+      .single()
+
+    const opcoes: Array<{ id: string; title: string; description?: string }> = []
+
+    // Opção combinada recorrente no topo — se houver histórico recente
+    if (rec?.bot_departamento) {
+      const primeiraEmp = empresas[0]
+      const catAnterior = rec.bot_categoria ?? 'assunto anterior'
+      const catIdAnterior = (rec.bot_categoria_id as string | null) ?? ''
+      opcoes.push({
+        id: `EMPRESA_REC:${primeiraEmp.id}:${catIdAnterior}`,
+        title: `🔄 ${primeiraEmp.empresa} — mesmo assunto`,
+        description: catAnterior,
+      })
+    }
+
+    // Uma opção por empresa
+    for (const emp of empresas) {
+      opcoes.push({
+        id: `EMPRESA:${emp.id}`,
+        title: `🏢 ${emp.empresa}`,
+        description: emp.cnpj ? `CNPJ: ${emp.cnpj}` : undefined,
+      })
+    }
+
+    // Sempre ao final
+    opcoes.push({ id: 'OUTRO_ASSUNTO', title: '💬 Falar de outro assunto' })
+
+    await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_EMPRESA' })
+
+    const saudacao = `Olá, ${nomeContato}! 👋 Sobre qual empresa você gostaria de falar?`
+    await enviarMenu(telefone, saudacao, 'Ver opções', 'Empresas', opcoes, phoneNumberId, accessToken)
+    const opcoesTexto = opcoes
+      .map((o, i) => `${i + 1}. ${o.title}${o.description ? ` — ${o.description}` : ''}`)
+      .join('\n')
+    await inserirMensagemBot(supabase, conversa.id, `${saudacao}\n\n${opcoesTexto}`)
     return
   }
 
