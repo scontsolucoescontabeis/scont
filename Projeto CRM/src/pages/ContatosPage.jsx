@@ -431,14 +431,17 @@ export default function ContatosPage() {
   const handleEditar = async (contato) => {
     if (editandoRef.current) return
     editandoRef.current = true
-    const { data } = await supabase
-      .from('contatos_empresas')
-      .select('empresa, cargo')
-      .eq('contato_id', contato.id)
-      .order('criado_em')
-    setEmpresasModal(data ?? [])
-    setModal(contato)
-    editandoRef.current = false
+    try {
+      const { data } = await supabase
+        .from('contatos_empresas')
+        .select('empresa, cargo')
+        .eq('contato_id', contato.id)
+        .order('criado_em')
+      setEmpresasModal(data ?? [])
+      setModal(contato)
+    } finally {
+      editandoRef.current = false
+    }
   }
 
   const paginados = contatos.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA)
