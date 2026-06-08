@@ -12,12 +12,20 @@ CREATE TABLE IF NOT EXISTS contatos_empresas (
   UNIQUE (contato_id, empresa)
 );
 
--- 2. Migrar dados existentes de contatos.empresa + contatos.cargo
-INSERT INTO contatos_empresas (contato_id, empresa, cargo)
-SELECT id, empresa, cargo
-FROM contatos
-WHERE empresa IS NOT NULL AND empresa <> ''
-ON CONFLICT (contato_id, empresa) DO NOTHING;
+-- 2. Migrar dados existentes de contatos.empresa + contatos.cargo (se as colunas ainda existirem)
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'contatos' AND column_name = 'empresa'
+  ) THEN
+    INSERT INTO contatos_empresas (contato_id, empresa, cargo)
+    SELECT id, empresa, cargo
+    FROM contatos
+    WHERE empresa IS NOT NULL AND empresa <> ''
+    ON CONFLICT (contato_id, empresa) DO NOTHING;
+  END IF;
+END $$;
 
 -- 3. Remover colunas obsoletas de contatos
 ALTER TABLE contatos DROP COLUMN IF EXISTS empresa;
