@@ -1,69 +1,107 @@
-# Importação de Contatos via Planilha Excel
+# Importação de Contatos via Planilha Excel (+ multi-empresa)
 
 **Data:** 2026-06-08  
-**Status:** Aprovado
+**Status:** Aprovado (rev 2 — inclui suporte a múltiplas empresas por número)
 
-## Resumo
+---
 
-Adicionar à tela de Contatos do CRM Messenger a capacidade de importar uma lista de contatos a partir de uma planilha `.xlsx` ou `.xls`, seguindo o modelo da plataforma.
+## Contexto e motivação
 
-## Entrada
+O schema original tem `contatos.telefone TEXT NOT NULL UNIQUE` e `contatos.empresa TEXT` — um número só pode estar em uma empresa. O usuário precisa que o mesmo número WhatsApp possa ser vinculado a múltiplas empresas (ex: contador que atende várias empresas, sócio de múltiplos CNPJs).
 
-O botão "Novo Contato" vira um split-button com seta `▾`. O clique na seta abre um dropdown:
-- `+ Cadastrar manualmente` → `ModalContato` existente (sem alteração)
-- `↑ Importar via planilha` → novo `ModalImportarPlanilha`
+---
 
-## Template da planilha
+## Modelo de dados — mudança de schema
 
-Gerado client-side com a biblioteca `xlsx` (já instalada). Colunas em ordem:
+### Antes
+```
+contatos: id, telefone (UNIQUE), nome, empresa, cargo, email, cpf_cnpj, observacoes
+```
 
-| Coluna | Obrigatório |
-|---|---|
-| nome | sim |
-| telefone | sim |
-| empresa | não |
-| cargo | não |
-| email | não |
-| cpf_cnpj | não |
-| observacoes | não |
+### Depois
+```
+contatos:          id, telefone (UNIQUE), nome, email, cpf_cnpj, observacoes
+contatos_empresas: id, contato_id (FK), empresa (NOT NULL), cargo, criado_em
+                   UNIQUE (contato_id, empresa)
+```
 
-O modal oferece um link "Baixar modelo .xlsx" que gera e faz download do arquivo.
+**Invariante:** telefone continua UNIQUE em `contatos` — uma pessoa física/número = um registro. As empresas associadas a essa pessoa ficam em `contatos_empresas`.
 
-## Fluxo do modal — 2 passos
+### Migration 012
+1. Criar `contatos_empresas` com RLS e índice em `contato_id`
+2. Migrar dados existentes: `INSERT INTO contatos_empresas (contato_id, empresa, cargo) SELECT id, empresa, cargo FROM contatos WHERE empresa IS NOT NULL`
+3. `ALTER TABLE contatos DROP COLUMN empresa, DROP COLUMN cargo`
 
-### Passo 1: Upload
-- Área drag & drop ou clique para selecionar `.xlsx` / `.xls`
-- Link de download do modelo
-- Ao selecionar o arquivo → parsing imediato e avanço automático para o passo 2
+---
 
-### Passo 2: Prévia
-- Parsing client-side com `xlsx`
-- Consulta Supabase para detectar conflitos: busca todos os pares `(telefone, empresa)` presentes na planilha que já existam na tabela `contatos`
-- Exibe tabela com **todas as linhas** (scroll interno)
-- Coluna Status por linha:
-  - `✓ Novo` — par telefone+empresa inexistente na base
-  - Toggle `Atualizar / Ignorar` — par já existe; padrão: Atualizar
-  - `✗ Sem telefone` — campo obrigatório ausente; sempre ignorado
-- Rodapé: contagem `X novos · Y conflitos · Z erros` + botão "Confirmar"
+## Importação de contatos — fluxo revisado
+
+### Entrada
+Botão "Novo Contato" vira split-button com seta `▾`. Dropdown:
+- `+ Cadastrar manualmente` → ModalContato existente (atualizado)
+- `↑ Importar via planilha` → ModalImportarPlanilha
+
+### Template
+Colunas: `nome · telefone · empresa · cargo · email · cpf_cnpj · observacoes`  
+Gerado client-side com `xlsx`. Disponível via link "Baixar modelo .xlsx" no modal.
+
+### Passo 1 — Upload
+Área drag & drop ou seleção de arquivo `.xlsx` / `.xls`.  
+Ao selecionar → parsing imediato e avanço para Passo 2.
+
+### Passo 2 — Prévia (4 estados possíveis por linha)
+
+| Status | Condição | Comportamento |
+|--------|----------|---------------|
+| `✓ Novo contato` | telefone não existe em `contatos` | Cria contato + vincula empresa |
+| `✓ Nova empresa` | telefone existe, empresa não está em `contatos_empresas` | Vincula empresa ao contato existente (automático, sem toggle) |
+| Toggle `Atualizar / Ignorar` | telefone + empresa já existem em `contatos_empresas` | Pergunta ao usuário |
+| `✗ Sem telefone` | campo telefone vazio | Sempre ignorado |
+
+- Exibe todas as linhas com scroll interno
+- Rodapé: `X novos contatos · Y novas empresas · Z conflitos · W erros`
+- Botão "Confirmar N registros" (desabilitado se N = 0)
 
 ### Confirmação
-- Bulk `insert` para linhas novas
-- `update` individual para linhas marcadas como "Atualizar"
-- Fecha modal e recarrega lista de contatos
+- "Novo contato" → `INSERT contatos` + `INSERT contatos_empresas`
+- "Nova empresa" → `INSERT contatos_empresas` (contato já existe, sem update)
+- "Conflito Atualizar" → `UPDATE contatos` (nome/email/cpf_cnpj/obs) + `UPDATE contatos_empresas` (cargo)
+- "Conflito Ignorar" / Erro → skip
 
-## Regra de duplicata
+---
 
-Um contato é considerado duplicata quando o par **telefone + empresa** já existe na base. O mesmo telefone com empresa diferente é tratado como contato novo.
+## Mudanças no CRM Messenger
 
-## Arquitetura
+### ModalContato (ContatosPage)
+- Remover campos `empresa` e `cargo` do formulário principal
+- Adicionar seção "Empresas vinculadas" com lista dinâmica de pares (empresa, cargo):
+  - Botão `+ Adicionar empresa`
+  - Cada item pode ser removido
+- Salvar: primeiro salva/atualiza `contatos`, depois sincroniza `contatos_empresas`
+
+### ContatoCard (ContatosPage)
+- Ao expandir: carregar `contatos_empresas` para esse contato
+- Mostrar lista de chips por empresa (empresa + cargo)
+
+### Busca (ContatosPage)
+- Carregar `*, contatos_empresas(empresa, cargo)` via join
+- Busca por nome, telefone, email: filtro no DB
+- Busca por empresa: filtro client-side nos dados já carregados
+
+### PainelDireito (CRM)
+- Carregar `contatos_empresas` para o contato da conversa
+- Substituir exibição de `contato.empresa` por lista de chips (empresa + cargo)
+
+---
+
+## Arquitetura de código
 
 **Novo arquivo:**
 - `src/components/ContatosImport/ModalImportarPlanilha.jsx`
-  - Componente auto-contido: 2 passos, parsing, detecção de conflitos, operações Supabase
 
-**Arquivo alterado:**
-- `src/pages/ContatosPage.jsx`
-  - Split-button no header (~15 linhas)
-  - Renderização condicional do `ModalImportarPlanilha` (~5 linhas)
+**Arquivos modificados:**
+- `supabase/migrations/012_contatos_multiempresa.sql` (novo)
+- `src/pages/ContatosPage.jsx` — ModalContato, ContatoCard, busca, split-button
+- `src/components/PainelDireito/PainelDireito.jsx` — exibição multi-empresa
 
-**Dependências:** nenhuma nova. `xlsx ^0.18.5` já está em `package.json`.
+**Dependências:** nenhuma nova. `xlsx ^0.18.5` já instalado.
