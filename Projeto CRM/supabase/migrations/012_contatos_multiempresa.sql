@@ -46,4 +46,4 @@ CREATE POLICY "contatos_empresas_delete" ON contatos_empresas
 -- 6. Realtime (opcional, não crítico)
 DO $$ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE contatos_empresas;
-EXCEPTION WHEN others THEN NULL; END $$;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
