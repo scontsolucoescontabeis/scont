@@ -88,6 +88,7 @@ export async function parsearEProcessar(file) {
 
 export async function confirmarImportacao(linhas) {
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return ['Sessão expirada. Faça login novamente.']
   const agora = new Date().toISOString()
   const erros = []
 
