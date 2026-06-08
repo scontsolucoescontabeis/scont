@@ -771,6 +771,167 @@ async function handleNOVO(
   }
 }
 
+async function handleAGUARD_EMPRESA(
+  sessao: BotSessao,
+  params: ProcessarBotParams,
+  config: ChatbotConfig,
+  input: ReturnType<typeof resolverInputCliente>,
+): Promise<void> {
+  const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
+
+  if (input.valor === 'HUMANO') {
+    await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+    return
+  }
+
+  // EMPRESA_REC:{ce_id}:{cat_id} — empresa + recorrente combinados
+  if (input.valor.startsWith('EMPRESA_REC:')) {
+    const partes = input.valor.split(':')
+    const ceId = partes[1] ?? ''
+    const catId = partes[2] && partes[2].length > 0 ? partes[2] : null
+
+    const { data: ce } = await supabase
+      .from('contatos_empresas')
+      .select('empresa, cnpj')
+      .eq('id', ceId)
+      .single()
+
+    const empresa = (ce?.empresa as string | undefined) ?? ''
+    const cnpj = (ce?.cnpj as string | null | undefined) ?? null
+
+    // Re-consulta recorrente para recuperar dept (label) — consistente com padrão existente
+    const { data: rec } = await supabase
+      .from('conversas')
+      .select('bot_departamento, bot_categoria_id')
+      .eq('contato_id', conversa.contato_id)
+      .eq('status', 'ENCERRADA')
+      .not('bot_departamento', 'is', null)
+      .order('encerrado_em', { ascending: false })
+      .limit(1)
+      .single()
+
+    const deptAnterior = (rec?.bot_departamento as string | undefined) ?? ''
+
+    await atualizarSessao(supabase, sessao.id, {
+      empresa_selecionada: empresa || null,
+      cnpj_selecionado: cnpj,
+      dept_selecionado: deptAnterior,
+      categoria_id: catId,
+      tentativas_invalidas: 0,
+    })
+
+    if (empresa) {
+      await supabase
+        .from('conversas')
+        .update({ bot_empresa: empresa, bot_cnpj: cnpj })
+        .eq('id', conversa.id)
+    }
+
+    if (catId) {
+      const subs = await enviarSubCategorias(
+        supabase, telefone, catId, phoneNumberId, accessToken, conversa.id,
+      )
+      if (subs.length === 0) {
+        await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_CONF', subcategoria_id: null })
+        await enviarConfirmacao(
+          supabase,
+          telefone,
+          { ...sessao, empresa_selecionada: empresa || null, cnpj_selecionado: cnpj, dept_selecionado: deptAnterior, categoria_id: catId, estado: 'AGUARD_CONF', subcategoria_id: null },
+          phoneNumberId,
+          accessToken,
+          conversa.id,
+        )
+      } else {
+        await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_SUB' })
+      }
+    } else {
+      // Sem categoria prévia — envia menu de departamentos
+      await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_DEPT', dept_selecionado: null, categoria_id: null })
+      await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase, conversa.id)
+    }
+    return
+  }
+
+  // EMPRESA:{ce_id} — empresa selecionada, novo assunto
+  if (input.valor.startsWith('EMPRESA:')) {
+    const ceId = input.valor.split(':')[1] ?? ''
+
+    const { data: ce } = await supabase
+      .from('contatos_empresas')
+      .select('empresa, cnpj')
+      .eq('id', ceId)
+      .single()
+
+    const empresa = (ce?.empresa as string | undefined) ?? ''
+    const cnpj = (ce?.cnpj as string | null | undefined) ?? null
+
+    await atualizarSessao(supabase, sessao.id, {
+      estado: 'AGUARD_DEPT',
+      empresa_selecionada: empresa || null,
+      cnpj_selecionado: cnpj,
+      tentativas_invalidas: 0,
+    })
+
+    if (empresa) {
+      await supabase
+        .from('conversas')
+        .update({ bot_empresa: empresa, bot_cnpj: cnpj })
+        .eq('id', conversa.id)
+    }
+
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase, conversa.id)
+    return
+  }
+
+  // OUTRO_ASSUNTO — sem contexto de empresa, fluxo normal
+  if (input.valor === 'OUTRO_ASSUNTO') {
+    await atualizarSessao(supabase, sessao.id, {
+      estado: 'AGUARD_DEPT',
+      empresa_selecionada: null,
+      cnpj_selecionado: null,
+      tentativas_invalidas: 0,
+    })
+    await enviarTexto(telefone, config.msg_boas_vindas, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, config.msg_boas_vindas)
+    await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase, conversa.id)
+    return
+  }
+
+  // Input inválido — reexibe lista simplificada (sem opção recorrente)
+  const { data: empData } = await supabase
+    .from('contatos_empresas')
+    .select('id, empresa, cnpj')
+    .eq('contato_id', conversa.contato_id)
+    .order('criado_em', { ascending: true })
+
+  const empresas = (empData ?? []) as Array<{ id: string; empresa: string; cnpj: string | null }>
+  const novasTentativas = sessao.tentativas_invalidas + 1
+
+  if (novasTentativas >= config.max_tentativas) {
+    await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+    return
+  }
+
+  await atualizarSessao(supabase, sessao.id, { tentativas_invalidas: novasTentativas })
+
+  const opcoes = [
+    ...empresas.map(emp => ({
+      id: `EMPRESA:${emp.id}`,
+      title: `🏢 ${emp.empresa}`,
+      description: emp.cnpj ? `CNPJ: ${emp.cnpj}` : undefined,
+    })),
+    { id: 'OUTRO_ASSUNTO', title: '💬 Falar de outro assunto' },
+  ]
+
+  const msgInvalida = `Opção inválida. Escolha uma das empresas (tentativa ${novasTentativas}/${config.max_tentativas}).`
+  await enviarMenu(telefone, msgInvalida, 'Ver opções', 'Empresas', opcoes, phoneNumberId, accessToken)
+  await inserirMensagemBot(
+    supabase,
+    conversa.id,
+    `${msgInvalida}\n\n${opcoes.map((o, i) => `${i + 1}. ${o.title}`).join('\n')}`,
+  )
+}
+
 async function handleAGUARD_DEPT(
   sessao: BotSessao,
   params: ProcessarBotParams,
@@ -1254,6 +1415,10 @@ export async function processarMensagemBot(params: ProcessarBotParams): Promise<
   switch (sessao.estado) {
     case 'NOVO':
       await handleNOVO(sessao, params, config, feriadoHoje)
+      break
+
+    case 'AGUARD_EMPRESA':
+      await handleAGUARD_EMPRESA(sessao, params, config, input)
       break
 
     case 'AGUARD_DEPT':
