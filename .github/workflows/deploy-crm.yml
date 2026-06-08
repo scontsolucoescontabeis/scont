@@ -1,0 +1,45 @@
+name: Deploy CRM
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Projeto CRM/src/**'
+      - 'Projeto CRM/public/**'
+      - 'Projeto CRM/index.html'
+      - 'Projeto CRM/vite.config.js'
+      - 'Projeto CRM/package*.json'
+      - 'Projeto CRM/tailwind.config.*'
+      - 'Projeto CRM/postcss.config.*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'Projeto CRM/package-lock.json'
+
+      - name: Install
+        working-directory: Projeto CRM
+        run: npm ci
+
+      - name: Build
+        working-directory: Projeto CRM
+        run: npm run build
+
+      - name: Commit build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add crm/
+          git diff --staged --quiet && echo "Sem mudanças no build" || (git commit -m "chore: build CRM [skip ci]" && git push)

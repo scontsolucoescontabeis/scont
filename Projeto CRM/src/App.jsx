@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { MessageSquare, BarChart2, Users, LogOut, ClipboardList, BookUser, Bot, Timer } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
@@ -327,7 +327,7 @@ export default function App() {
   const handleLogout = () => supabase.auth.signOut()
 
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <HashRouter>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         <Header perfil={perfil} />
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -347,6 +347,6 @@ export default function App() {
           </main>
         </div>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   )
 }

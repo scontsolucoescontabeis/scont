@@ -4,6 +4,11 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  base: '/scont/crm/',
+  build: {
+    outDir: '../crm',
+    emptyOutDir: true,
+  },
   server: {
     fs: { allow: ['..'] },
   },
