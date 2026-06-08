@@ -6,6 +6,7 @@ import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 export type BotEstado =
   | 'NOVO'
+  | 'AGUARD_EMPRESA'
   | 'AGUARD_DEPT'
   | 'AGUARD_CAT'
   | 'AGUARD_SUB'
@@ -20,6 +21,8 @@ export interface BotSessao {
   dept_selecionado: string | null
   categoria_id: string | null
   subcategoria_id: string | null
+  empresa_selecionada: string | null
+  cnpj_selecionado: string | null
   tentativas_invalidas: number
   ultimo_em: string
 }
