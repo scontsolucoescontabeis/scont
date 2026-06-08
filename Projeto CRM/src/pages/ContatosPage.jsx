@@ -13,7 +13,17 @@ const CAMPOS_FORM = [
 ]
 
 const VAZIO = { nome: '', telefone: '', email: '', cpf_cnpj: '', observacoes: '' }
-const EMPRESA_VAZIA = { empresa: '', cargo: '', cnpj: '' }
+const EMPRESA_VAZIA = { empresa: '', cargo: '', cnpj: '', classificacao: '' }
+
+const TIER_OPTIONS = [
+  { value: '',       label: '— Sem classificação' },
+  { value: 'BRONZE', label: '🥉 Bronze' },
+  { value: 'PRATA',  label: '🥈 Prata' },
+  { value: 'OURO',   label: '🥇 Ouro' },
+]
+const TIER_BG    = { OURO: '#fff8dc', PRATA: '#f0f0f0', BRONZE: '#fdf0e8' }
+const TIER_COLOR = { OURO: '#b8860b', PRATA: '#708090', BRONZE: '#8b4513' }
+const TIER_EMOJI = { OURO: '🥇',      PRATA: '🥈',      BRONZE: '🥉'      }
 
 // ─── Modal de criar/editar contato ─────────────────────────
 function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
@@ -27,7 +37,7 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
   } : { ...VAZIO })
   const [empresas, setEmpresas] = useState(
     empresasIniciais.length > 0
-      ? empresasIniciais.map(e => ({ empresa: e.empresa, cargo: e.cargo ?? '', cnpj: e.cnpj ?? '', _key: crypto.randomUUID() }))
+      ? empresasIniciais.map(e => ({ empresa: e.empresa, cargo: e.cargo ?? '', cnpj: e.cnpj ?? '', classificacao: e.classificacao ?? '', _key: crypto.randomUUID() }))
       : [{ ...EMPRESA_VAZIA, _key: crypto.randomUUID() }]
   )
   const [salvando, setSalvando] = useState(false)
@@ -88,10 +98,11 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
       }
       for (const item of empresasValidas) {
         const { error: errUp } = await supabase.from('contatos_empresas').insert({
-          contato_id: contatoId,
-          empresa:    item.empresa.trim(),
-          cargo:      item.cargo.trim() || null,
-          cnpj:       item.cnpj.trim() || null,
+          contato_id:    contatoId,
+          empresa:       item.empresa.trim(),
+          cargo:         item.cargo.trim() || null,
+          cnpj:          item.cnpj.trim() || null,
+          classificacao: item.classificacao || null,
         })
         if (errUp) { setSalvando(false); setErro(errUp.message); return }
       }
@@ -178,6 +189,15 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
                     placeholder="Cargo / Função"
                     style={{ ...inputStyle, flex: 1 }}
                   />
+                  <select
+                    value={item.classificacao}
+                    onChange={setEmpresa(i, 'classificacao')}
+                    style={{ ...inputStyle, flex: '0 0 140px' }}
+                  >
+                    {TIER_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
                   {empresas.length > 1 && (
                     <button type="button" onClick={() => removeEmpresa(i)} style={{
                       background: 'none', border: 'none', cursor: 'pointer',
@@ -257,7 +277,7 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
         .limit(10),
       supabase
         .from('contatos_empresas')
-        .select('empresa, cargo, cnpj')
+        .select('empresa, cargo, cnpj, classificacao')
         .eq('contato_id', contato.id)
         .order('criado_em', { ascending: true }),
     ])
@@ -355,8 +375,19 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
                 <span style={{ fontSize: 11, color: '#c5c0ba' }}>Nenhuma empresa</span>
               ) : empresas.map((e, i) => (
                 <div key={i} style={{ marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, color: '#1a1a1a', fontWeight: 500 }}>{e.empresa}</span>
-                  {e.cargo && <span style={{ fontSize: 11, color: '#888480' }}> · {e.cargo}</span>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: '#1a1a1a', fontWeight: 500 }}>{e.empresa}</span>
+                    {e.cargo && <span style={{ fontSize: 11, color: '#888480' }}>· {e.cargo}</span>}
+                    {e.classificacao && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 3,
+                        background: TIER_BG[e.classificacao],
+                        color: TIER_COLOR[e.classificacao],
+                      }}>
+                        {TIER_EMOJI[e.classificacao]} {e.classificacao.charAt(0) + e.classificacao.slice(1).toLowerCase()}
+                      </span>
+                    )}
+                  </div>
                   {e.cnpj && (
                     <div style={{ fontSize: 10, color: '#888480', fontFamily: 'DM Mono, monospace', marginTop: 1 }}>
                       CNPJ {e.cnpj}
@@ -451,7 +482,7 @@ export default function ContatosPage() {
     try {
       const { data } = await supabase
         .from('contatos_empresas')
-        .select('empresa, cargo, cnpj')
+        .select('empresa, cargo, cnpj, classificacao')
         .eq('contato_id', contato.id)
         .order('criado_em')
       setEmpresasModal(data ?? [])

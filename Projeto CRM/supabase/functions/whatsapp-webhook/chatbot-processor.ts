@@ -23,6 +23,7 @@ export interface BotSessao {
   subcategoria_id: string | null
   empresa_selecionada: string | null
   cnpj_selecionado: string | null
+  classificacao_empresa: string | null
   tentativas_invalidas: number
   ultimo_em: string
 }
@@ -37,6 +38,9 @@ export interface ChatbotConfig {
   msg_boas_vindas: string
   msg_fora_horario: string
   msg_fila: string         // suporta {departamento}, {assunto}, {protocolo}
+  msg_boas_vindas_bronze: string | null
+  msg_boas_vindas_prata:  string | null
+  msg_boas_vindas_ouro:   string | null
 }
 
 export interface DeptConfig {
@@ -622,6 +626,43 @@ async function enviarConfirmacao(
 }
 
 // =============================================================================
+// Helpers de tier / boas-vindas
+// =============================================================================
+
+const TIER_ORDEM: Record<string, number> = { OURO: 3, PRATA: 2, BRONZE: 1 }
+
+function resolverMensagemBoasVindas(
+  config: ChatbotConfig,
+  empresas: Array<{ classificacao?: string | null }>,
+  nome: string,
+  tierOverride?: string | null,
+): string {
+  const tier = tierOverride !== undefined
+    ? tierOverride
+    : empresas.reduce<string | null>((melhor, e) => {
+        if (!e.classificacao) return melhor
+        if (!melhor) return e.classificacao
+        return (TIER_ORDEM[e.classificacao] ?? 0) > (TIER_ORDEM[melhor] ?? 0)
+          ? e.classificacao
+          : melhor
+      }, null)
+
+  const msgBase =
+    tier === 'OURO'   && config.msg_boas_vindas_ouro   ? config.msg_boas_vindas_ouro   :
+    tier === 'PRATA'  && config.msg_boas_vindas_prata  ? config.msg_boas_vindas_prata  :
+    tier === 'BRONZE' && config.msg_boas_vindas_bronze ? config.msg_boas_vindas_bronze :
+    config.msg_boas_vindas
+
+  const tierLabel = tier
+    ? tier.charAt(0) + tier.slice(1).toLowerCase()
+    : ''
+
+  return msgBase
+    .replace(/\{nome\}/g, nome)
+    .replace(/\{tier\}/g, tierLabel)
+}
+
+// =============================================================================
 // Handlers por estado
 // =============================================================================
 
@@ -656,11 +697,11 @@ async function handleNOVO(
   // Verifica empresas vinculadas ao contato
   const { data: empData } = await supabase
     .from('contatos_empresas')
-    .select('id, empresa, cnpj')
+    .select('id, empresa, cnpj, classificacao')
     .eq('contato_id', conversa.contato_id)
     .order('criado_em', { ascending: true })
 
-  const empresas = (empData ?? []) as Array<{ id: string; empresa: string; cnpj: string | null }>
+  const empresas = (empData ?? []) as Array<{ id: string; empresa: string; cnpj: string | null; classificacao: string | null }>
 
   if (empresas.length > 0) {
     // Busca histórico recorrente para combinar com a lista de empresas
@@ -703,7 +744,7 @@ async function handleNOVO(
 
     await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_EMPRESA' })
 
-    const saudacao = `Olá, ${nomeContato}! 👋 Sobre qual empresa você gostaria de falar?`
+    const saudacao = resolverMensagemBoasVindas(config, empresas, nomeContato)
     await enviarMenu(telefone, saudacao, 'Ver opções', 'Empresas', opcoes, phoneNumberId, accessToken)
     const opcoesTexto = opcoes
       .map((o, i) => `${i + 1}. ${o.title}${o.description ? ` — ${o.description}` : ''}`)
@@ -760,13 +801,9 @@ async function handleNOVO(
     // Novo cliente
     await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_DEPT' })
 
-    await enviarTexto(
-      telefone,
-      config.msg_boas_vindas,
-      phoneNumberId,
-      accessToken,
-    )
-    await inserirMensagemBot(supabase, conversa.id, config.msg_boas_vindas)
+    const msgBV = resolverMensagemBoasVindas(config, [], nomeContato)
+    await enviarTexto(telefone, msgBV, phoneNumberId, accessToken)
+    await inserirMensagemBot(supabase, conversa.id, msgBV)
     await enviarMenuDepts(telefone, phoneNumberId, accessToken, supabase, conversa.id)
   }
 }
@@ -797,12 +834,13 @@ async function handleAGUARD_EMPRESA(
 
     const { data: ce } = await supabase
       .from('contatos_empresas')
-      .select('empresa, cnpj')
+      .select('empresa, cnpj, classificacao')
       .eq('id', ceId)
       .single()
 
-    const empresa = (ce?.empresa as string | undefined) || null
-    const cnpj = (ce?.cnpj as string | null | undefined) ?? null
+    const empresa       = (ce?.empresa       as string | undefined) || null
+    const cnpj          = (ce?.cnpj          as string | null | undefined) ?? null
+    const classificacao = (ce?.classificacao as string | null | undefined) ?? null
 
     // Re-consulta recorrente para recuperar dept (label) — consistente com padrão existente
     const { data: rec } = await supabase
@@ -818,17 +856,18 @@ async function handleAGUARD_EMPRESA(
     const deptAnterior = (rec?.bot_departamento as string | undefined) || null
 
     await atualizarSessao(supabase, sessao.id, {
-      empresa_selecionada: empresa,
-      cnpj_selecionado: cnpj,
-      dept_selecionado: deptAnterior,
-      categoria_id: catId,
+      empresa_selecionada:  empresa,
+      cnpj_selecionado:     cnpj,
+      classificacao_empresa: classificacao,
+      dept_selecionado:     deptAnterior,
+      categoria_id:         catId,
       tentativas_invalidas: 0,
     })
 
     if (empresa) {
       await supabase
         .from('conversas')
-        .update({ bot_empresa: empresa, bot_cnpj: cnpj })
+        .update({ bot_empresa: empresa, bot_cnpj: cnpj, classificacao_empresa: classificacao })
         .eq('id', conversa.id)
     }
 
@@ -868,24 +907,26 @@ async function handleAGUARD_EMPRESA(
 
     const { data: ce } = await supabase
       .from('contatos_empresas')
-      .select('empresa, cnpj')
+      .select('empresa, cnpj, classificacao')
       .eq('id', ceId)
       .single()
 
-    const empresa = (ce?.empresa as string | undefined) || null
-    const cnpj = (ce?.cnpj as string | null | undefined) ?? null
+    const empresa       = (ce?.empresa       as string | undefined) || null
+    const cnpj          = (ce?.cnpj          as string | null | undefined) ?? null
+    const classificacao = (ce?.classificacao as string | null | undefined) ?? null
 
     await atualizarSessao(supabase, sessao.id, {
-      estado: 'AGUARD_DEPT',
-      empresa_selecionada: empresa,
-      cnpj_selecionado: cnpj,
+      estado:               'AGUARD_DEPT',
+      empresa_selecionada:  empresa,
+      cnpj_selecionado:     cnpj,
+      classificacao_empresa: classificacao,
       tentativas_invalidas: 0,
     })
 
     if (empresa) {
       await supabase
         .from('conversas')
-        .update({ bot_empresa: empresa, bot_cnpj: cnpj })
+        .update({ bot_empresa: empresa, bot_cnpj: cnpj, classificacao_empresa: classificacao })
         .eq('id', conversa.id)
     }
 
@@ -910,11 +951,11 @@ async function handleAGUARD_EMPRESA(
   // Input inválido — reexibe lista simplificada (sem opção recorrente)
   const { data: empData } = await supabase
     .from('contatos_empresas')
-    .select('id, empresa, cnpj')
+    .select('id, empresa, cnpj, classificacao')
     .eq('contato_id', conversa.contato_id)
     .order('criado_em', { ascending: true })
 
-  const empresas = (empData ?? []) as Array<{ id: string; empresa: string; cnpj: string | null }>
+  const empresas = (empData ?? []) as Array<{ id: string; empresa: string; cnpj: string | null; classificacao: string | null }>
   const novasTentativas = sessao.tentativas_invalidas + 1
 
   if (novasTentativas >= config.max_tentativas) {

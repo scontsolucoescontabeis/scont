@@ -10,6 +10,9 @@ const DEPTO_COLORS = {
   ADMINISTRATIVO: '#92400E',
   TRIBUTARIO:     '#5B21B6',
 }
+const TIER_BG    = { OURO: '#fff8dc', PRATA: '#f0f0f0', BRONZE: '#fdf0e8' }
+const TIER_COLOR = { OURO: '#b8860b', PRATA: '#708090', BRONZE: '#8b4513' }
+const TIER_EMOJI = { OURO: '🥇',      PRATA: '🥈',      BRONZE: '🥉'      }
 
 export function PainelDireito({ conversa }) {
   const [historico, setHistorico] = useState([])
@@ -42,7 +45,7 @@ export function PainelDireito({ conversa }) {
 
     supabase
       .from('contatos_empresas')
-      .select('empresa, cargo')
+      .select('empresa, cargo, classificacao')
       .eq('contato_id', conversa.contatos.id)
       .order('criado_em', { ascending: true })
       .then(({ data }) => setEmpresasContato(data ?? []))
@@ -143,14 +146,27 @@ export function PainelDireito({ conversa }) {
           {/* Empresa selecionada pelo bot */}
           {conversa.bot_empresa && (
             <div style={{ marginBottom: 10 }}>
-              <span style={{
-                background: '#1e3a5f', color: '#fff',
-                fontSize: 10, fontWeight: 700,
-                padding: '3px 8px', borderRadius: 4,
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-              }}>
-                🏢 {conversa.bot_empresa}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
+                <span style={{
+                  background: '#1e3a5f', color: '#fff',
+                  fontSize: 10, fontWeight: 700,
+                  padding: '3px 8px', borderRadius: 4,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                }}>
+                  🏢 {conversa.bot_empresa}
+                </span>
+                {conversa.classificacao_empresa && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 700,
+                    padding: '2px 7px', borderRadius: 3,
+                    background: TIER_BG[conversa.classificacao_empresa],
+                    color: TIER_COLOR[conversa.classificacao_empresa],
+                  }}>
+                    {TIER_EMOJI[conversa.classificacao_empresa]}{' '}
+                    {conversa.classificacao_empresa.charAt(0) + conversa.classificacao_empresa.slice(1).toLowerCase()}
+                  </span>
+                )}
+              </div>
               {conversa.bot_cnpj && (
                 <div style={{
                   fontSize: 9, color: '#7a9fc0',

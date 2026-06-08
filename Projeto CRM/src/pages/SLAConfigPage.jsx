@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react'
-import { buscarSLAConfig, salvarSLAConfig } from '@/services/crm.service'
+import { buscarSLAConfig, salvarSLAConfig, buscarClassificacaoSLAConfig, salvarClassificacaoSLAConfig } from '@/services/crm.service'
 
 const DEPTOS = [
   { key: 'PESSOAL',        label: 'Pessoal',        color: '#1D4ED8' },
   { key: 'CONTABIL',       label: 'Contábil',       color: '#065F46' },
   { key: 'ADMINISTRATIVO', label: 'Administrativo', color: '#92400E' },
   { key: 'TRIBUTARIO',     label: 'Tributário',     color: '#5B21B6' },
+]
+
+const TIERS = [
+  { key: 'OURO',              label: '🥇 Ouro',           color: '#b8860b' },
+  { key: 'PRATA',             label: '🥈 Prata',          color: '#708090' },
+  { key: 'BRONZE',            label: '🥉 Bronze',         color: '#8b4513' },
+  { key: 'SEM_CLASSIFICACAO', label: 'Sem classificação', color: '#888480' },
 ]
 
 function NumInput({ value, onChange, color }) {
@@ -69,15 +76,18 @@ function Toggle({ value, onChange }) {
 }
 
 export default function SLAConfigPage() {
-  const [config, setConfig]     = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro]         = useState('')
-  const [sucesso, setSucesso]   = useState(false)
+  const [config, setConfig]                         = useState([])
+  const [multConfig, setMultConfig]                 = useState([])
+  const [loading, setLoading]                       = useState(true)
+  const [salvando, setSalvando]                     = useState(false)
+  const [salvandoMult, setSalvandoMult]             = useState(false)
+  const [erro, setErro]                             = useState('')
+  const [sucesso, setSucesso]                       = useState(false)
+  const [sucessoMult, setSucessoMult]               = useState(false)
 
   useEffect(() => {
-    buscarSLAConfig()
-      .then(data => { setConfig(data); setLoading(false) })
+    Promise.all([buscarSLAConfig(), buscarClassificacaoSLAConfig()])
+      .then(([sla, mult]) => { setConfig(sla); setMultConfig(mult); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
@@ -109,6 +119,24 @@ export default function SLAConfigPage() {
       setSalvando(false)
     }
   }
+
+  const handleSalvarMult = async () => {
+    setSalvandoMult(true)
+    setSucessoMult(false)
+    setErro('')
+    try {
+      await salvarClassificacaoSLAConfig(multConfig)
+      setSucessoMult(true)
+      setTimeout(() => setSucessoMult(false), 3_000)
+    } catch (e) {
+      setErro(e.message || 'Erro ao salvar multiplicadores.')
+    } finally {
+      setSalvandoMult(false)
+    }
+  }
+
+  const setMult = (key, valor) =>
+    setMultConfig(prev => prev.map(r => r.classificacao === key ? { ...r, multiplicador: valor } : r))
 
   if (loading) return (
     <div style={{ padding: 40, textAlign: 'center', color: '#888480', fontSize: 13 }}>
@@ -170,6 +198,78 @@ export default function SLAConfigPage() {
             </div>
           )
         })}
+      </div>
+
+      {/* Multiplicadores por classificação */}
+      <div style={{ marginTop: 28 }}>
+        <h2 style={{ fontFamily: 'Merriweather, serif', fontSize: 15, fontWeight: 700, color: '#1a1a1a', marginBottom: 6 }}>
+          ⚡ Multiplicadores de SLA por classificação
+        </h2>
+        <p style={{ fontSize: 12, color: '#888480', margin: '0 0 14px', lineHeight: 1.6 }}>
+          SLA efetivo = tempo máximo do departamento × multiplicador. Quanto menor, mais rápido o atendimento exigido.
+        </p>
+        <div style={{ background: '#fff', border: '1px solid #e0dcd8', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr 1fr', background: '#f7f6f4', borderBottom: '1px solid #e0dcd8' }}>
+            <div style={{ ...thStyle, textAlign: 'left', paddingLeft: 16 }}>Classificação</div>
+            <div style={thStyle}>Multiplicador</div>
+            <div style={thStyle}>Exemplo (maior depto)</div>
+          </div>
+          {TIERS.map((t, i) => {
+            const row = multConfig.find(r => r.classificacao === t.key)
+            if (!row) return null
+            const maiorDepto = config.reduce((max, c) => c.ativo && c.tempo_maximo_min > max ? c.tempo_maximo_min : max, 0)
+            const efetivo = Math.round(maiorDepto * row.multiplicador)
+            const h = Math.floor(efetivo / 60)
+            const m = efetivo % 60
+            return (
+              <div key={t.key} style={{
+                display: 'grid', gridTemplateColumns: '180px 1fr 1fr',
+                alignItems: 'center', padding: '10px 0',
+                borderBottom: i < TIERS.length - 1 ? '1px solid #f0ede9' : 'none',
+                borderLeft: `3px solid ${t.color}`,
+              }}>
+                <div style={{ paddingLeft: 13, fontSize: 12, fontWeight: 700, color: t.color }}>{t.label}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                  <input
+                    type="number" min={0.1} max={5} step={0.05}
+                    value={row.multiplicador}
+                    onChange={e => setMult(t.key, parseFloat(e.target.value) || 1)}
+                    style={{
+                      width: 64, padding: '5px 8px',
+                      border: `1px solid ${t.color}55`, borderRadius: 5,
+                      fontSize: 13, fontFamily: 'DM Mono, monospace',
+                      textAlign: 'center', color: t.color, fontWeight: 600,
+                      outline: 'none', background: `${t.color}08`,
+                    }}
+                  />
+                  <span style={{ fontSize: 11, color: '#888480' }}>×</span>
+                </div>
+                <div style={{ textAlign: 'center', fontSize: 12, color: '#888480', fontFamily: 'DM Mono, monospace' }}>
+                  {maiorDepto > 0 ? `${h}h ${String(m).padStart(2, '0')}min` : '—'}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        {sucessoMult && (
+          <div style={{ marginTop: 10, padding: '8px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, color: '#166534', fontSize: 12 }}>
+            Multiplicadores salvos com sucesso.
+          </div>
+        )}
+        <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            onClick={handleSalvarMult}
+            disabled={salvandoMult}
+            style={{
+              padding: '9px 24px', background: salvandoMult ? '#9b6b6b' : '#7a1e1e',
+              color: '#fff', border: 'none', borderRadius: 6,
+              fontSize: 13, fontWeight: 600, cursor: salvandoMult ? 'not-allowed' : 'pointer',
+              fontFamily: 'DM Sans, sans-serif',
+            }}
+          >
+            {salvandoMult ? 'Salvando...' : 'Salvar multiplicadores'}
+          </button>
+        </div>
       </div>
 
       {/* Legenda */}

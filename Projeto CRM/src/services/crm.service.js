@@ -520,3 +520,21 @@ export async function salvarSLAConfig(rows) {
     )
   if (error) throw error
 }
+
+// ─── Classificação SLA Config ──────────────────────────────────
+
+export async function buscarClassificacaoSLAConfig() {
+  const { data, error } = await supabase
+    .from('classificacao_sla_config')
+    .select('*')
+    .order('classificacao')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function salvarClassificacaoSLAConfig(rows) {
+  const { error } = await supabase
+    .from('classificacao_sla_config')
+    .upsert(rows, { onConflict: 'classificacao' })
+  if (error) throw error
+}

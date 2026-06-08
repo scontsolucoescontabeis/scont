@@ -61,7 +61,7 @@ const ABAS = [
   { status: 'ENCERRADA',     label: 'Encerradas', cor: '#7a1e1e' },
 ]
 
-export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole, slaConfig = [] }) {
+export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole, slaConfig = [], classificacaoSLAConfig = [] }) {
   const [busca, setBusca]             = useState('')
   const [filtroDepto, setFiltroDepto] = useState('')
   const [abaAtiva, setAbaAtiva]       = useState('')   // '' = todas
@@ -74,7 +74,7 @@ export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole, 
     busca,
   })
 
-  const conversasComSLA = useSLA(conversas, slaConfig)
+  const conversasComSLA = useSLA(conversas, slaConfig, classificacaoSLAConfig)
 
   useRealtime({
     onNovaMensagem:     refresh,

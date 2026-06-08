@@ -6,14 +6,16 @@ import { PainelSLA } from '@/components/PainelSLA/PainelSLA'
 import { useConversas } from '@/hooks/useConversas'
 import { useRealtime } from '@/hooks/useRealtime'
 import { useSLA } from '@/hooks/useSLA'
-import { buscarSLAConfig } from '@/services/crm.service'
+import { buscarSLAConfig, buscarClassificacaoSLAConfig } from '@/services/crm.service'
 
 export default function CRMPage({ perfil }) {
   const [conversaAtiva, setConversaAtiva] = useState(null)
-  const [slaConfig, setSlaConfig]         = useState([])
+  const [slaConfig, setSlaConfig]                             = useState([])
+  const [classificacaoSLAConfig, setClassificacaoSLAConfig]   = useState([])
 
   useEffect(() => {
     buscarSLAConfig().then(setSlaConfig).catch(() => {})
+    buscarClassificacaoSLAConfig().then(setClassificacaoSLAConfig).catch(() => {})
   }, [])
 
   // Conversas ABERTA independente de filtros — alimentam o PainelSLA.
@@ -25,7 +27,7 @@ export default function CRMPage({ perfil }) {
   })
   useRealtime({ onNovaMensagem: refreshSLA, onConversaAtualizada: refreshSLA })
 
-  const abertasComSLA = useSLA(abertasParaSLA, slaConfig)
+  const abertasComSLA = useSLA(abertasParaSLA, slaConfig, classificacaoSLAConfig)
   const alertas       = abertasComSLA.filter(c => c.sla_status !== 'OK')
 
   const handleConversaAtualizada = (dadosAtualizados) => {
@@ -41,6 +43,7 @@ export default function CRMPage({ perfil }) {
         onSelecionarConversa={setConversaAtiva}
         perfilRole={perfil?.role}
         slaConfig={slaConfig}
+        classificacaoSLAConfig={classificacaoSLAConfig}
       />
       <ChatPanel
         conversa={conversaAtiva}

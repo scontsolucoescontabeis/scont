@@ -268,11 +268,40 @@ function AbaGeral() {
 
       {/* Mensagens */}
       <CampoTexto
-        label="💬 Mensagem de boas-vindas"
+        label="💬 Mensagem de boas-vindas (padrão)"
         value={config.msg_boas_vindas}
         onChange={v => setConfig(c => ({ ...c, msg_boas_vindas: v }))}
         rows={2}
+        hint="Variáveis: {nome}"
       />
+
+      <div style={{ marginBottom: 16, padding: '12px 14px', background: '#fafaf9', border: '1px solid #e0dcd8', borderRadius: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#555', marginBottom: 10, fontFamily: 'DM Sans, sans-serif' }}>
+          💎 Mensagens por classificação (deixe vazio para usar a mensagem padrão)
+        </div>
+        <div style={{ fontSize: 10, color: '#aaa', marginBottom: 10, fontFamily: 'DM Sans, sans-serif' }}>
+          Variáveis: {'{nome}'} · {'{tier}'}
+        </div>
+        <CampoTexto
+          label="🥉 Bronze"
+          value={config.msg_boas_vindas_bronze ?? ''}
+          onChange={v => setConfig(c => ({ ...c, msg_boas_vindas_bronze: v || null }))}
+          rows={2}
+        />
+        <CampoTexto
+          label="🥈 Prata"
+          value={config.msg_boas_vindas_prata ?? ''}
+          onChange={v => setConfig(c => ({ ...c, msg_boas_vindas_prata: v || null }))}
+          rows={2}
+        />
+        <CampoTexto
+          label="🥇 Ouro"
+          value={config.msg_boas_vindas_ouro ?? ''}
+          onChange={v => setConfig(c => ({ ...c, msg_boas_vindas_ouro: v || null }))}
+          rows={2}
+        />
+      </div>
+
       <CampoTexto
         label="🌙 Mensagem fora do horário"
         value={config.msg_fora_horario}

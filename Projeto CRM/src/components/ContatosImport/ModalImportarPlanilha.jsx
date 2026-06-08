@@ -7,9 +7,9 @@ import { supabase } from '@/lib/supabaseClient'
 
 export function baixarModelo() {
   const ws = XLSX.utils.aoa_to_sheet([
-    ['nome', 'telefone', 'cpf_cnpj', 'empresa', 'cnpj_empresa', 'cargo', 'email', 'observacoes'],
-    ['João Silva (exemplo)', '5561999991111', '000.000.000-00', 'ACME Ltda', '00.000.000/0001-00', 'Sócio', 'joao@acme.com', ''],
-    ['João Silva (exemplo)', '5561999991111', '', 'Outra Empresa Ltda', '11.111.111/0001-11', 'Diretor', '', ''],
+    ['nome', 'telefone', 'cpf_cnpj', 'empresa', 'cnpj_empresa', 'classificacao', 'cargo', 'email', 'observacoes'],
+    ['João Silva (exemplo)', '5561999991111', '000.000.000-00', 'ACME Ltda', '00.000.000/0001-00', 'ouro', 'Sócio', 'joao@acme.com', ''],
+    ['João Silva (exemplo)', '5561999991111', '', 'Outra Empresa Ltda', '11.111.111/0001-11', 'bronze', 'Diretor', '', ''],
   ])
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Contatos')
@@ -23,9 +23,13 @@ export function normalizarLinhas(rawRows) {
       idx,
       nome:         String(row.nome         ?? '').trim(),
       telefone,
-      empresa:      String(row.empresa      ?? '').trim() || null,
-      cnpj_empresa: String(row.cnpj_empresa ?? '').trim() || null,
-      cargo:        String(row.cargo        ?? '').trim() || null,
+      empresa:        String(row.empresa        ?? '').trim() || null,
+      cnpj_empresa:   String(row.cnpj_empresa   ?? '').trim() || null,
+      classificacao:  (() => {
+        const v = String(row.classificacao ?? '').trim().toUpperCase()
+        return ['BRONZE', 'PRATA', 'OURO'].includes(v) ? v : null
+      })(),
+      cargo:          String(row.cargo          ?? '').trim() || null,
       email:        String(row.email        ?? '').trim() || null,
       cpf_cnpj:     String(row.cpf_cnpj     ?? '').trim() || null,
       observacoes:  String(row.observacoes  ?? '').trim() || null,
@@ -117,7 +121,7 @@ export async function confirmarImportacao(linhas) {
       if (l.empresa) {
         const { error: errE } = await supabase
           .from('contatos_empresas')
-          .insert({ contato_id: novoContato.id, empresa: l.empresa, cargo: l.cargo || null, cnpj: l.cnpj_empresa || null })
+          .insert({ contato_id: novoContato.id, empresa: l.empresa, cargo: l.cargo || null, cnpj: l.cnpj_empresa || null, classificacao: l.classificacao || null })
         if (errE) erros.push(errE.message)
       }
       continue
@@ -127,7 +131,7 @@ export async function confirmarImportacao(linhas) {
       if (l.empresa) {
         const { error } = await supabase
           .from('contatos_empresas')
-          .insert({ contato_id: l.contatoId, empresa: l.empresa, cargo: l.cargo || null, cnpj: l.cnpj_empresa || null })
+          .insert({ contato_id: l.contatoId, empresa: l.empresa, cargo: l.cargo || null, cnpj: l.cnpj_empresa || null, classificacao: l.classificacao || null })
         if (error) erros.push(error.message)
       }
       continue
@@ -149,7 +153,7 @@ export async function confirmarImportacao(linhas) {
 
       const { error: errE } = await supabase
         .from('contatos_empresas')
-        .update({ cargo: l.cargo || null, cnpj: l.cnpj_empresa || null })
+        .update({ cargo: l.cargo || null, cnpj: l.cnpj_empresa || null, classificacao: l.classificacao || null })
         .eq('id', l.conflictId)
       if (errE) erros.push(errE.message)
     }
@@ -224,7 +228,7 @@ function StepPrevia({ linhas, onChange }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
           <tr style={{ background: '#f7f6f4' }}>
-            {['Nome', 'Telefone', 'Empresa', 'CNPJ Empresa', 'Cargo', 'Status'].map(col => (
+            {['Nome', 'Telefone', 'Empresa', 'CNPJ Empresa', 'Tier', 'Cargo', 'Status'].map(col => (
               <th key={col} style={{
                 padding: '8px 10px', textAlign: 'left', color: '#888480',
                 fontWeight: 600, borderBottom: '1px solid #e0dcd8', whiteSpace: 'nowrap',
@@ -246,6 +250,7 @@ function StepPrevia({ linhas, onChange }) {
               </td>
               <td style={{ padding: '7px 10px', color: '#888480' }}>{l.empresa || '—'}</td>
               <td style={{ padding: '7px 10px', color: '#888480', fontFamily: 'DM Mono, monospace', fontSize: 11 }}>{l.cnpj_empresa || '—'}</td>
+              <td style={{ padding: '7px 10px', color: '#888480', fontSize: 11 }}>{l.classificacao || '—'}</td>
               <td style={{ padding: '7px 10px', color: '#888480' }}>{l.cargo || '—'}</td>
               <td style={{ padding: '7px 10px' }}>
                 {l.status === 'conflito' ? (
