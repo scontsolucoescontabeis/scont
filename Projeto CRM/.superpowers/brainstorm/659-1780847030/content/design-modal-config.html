@@ -1,0 +1,101 @@
+<h2>Design — Seção 3: Novo Telefone + Configuração</h2>
+<p class="subtitle">Como o desenvolvedor cria clientes simulados e configura a conexão com o Supabase</p>
+
+<div class="split">
+
+  <!-- Modal novo telefone -->
+  <div class="mockup">
+    <div class="mockup-header">Modal — "+ Novo telefone"</div>
+    <div class="mockup-body" style="background:#0b141a;padding:0;display:flex;align-items:center;justify-content:center;min-height:300px">
+      <div style="background:#202c33;border-radius:10px;padding:20px 22px;width:240px;font-family:monospace;font-size:10px">
+        <div style="color:#e9edef;font-size:11px;font-weight:bold;margin-bottom:14px">📱 Novo cliente simulado</div>
+
+        <div style="margin-bottom:10px">
+          <div style="color:#8696a0;font-size:8px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Nome (opcional)</div>
+          <input style="width:100%;background:#2a3942;border:none;border-radius:6px;padding:7px 10px;color:#e9edef;font-size:10px;box-sizing:border-box" placeholder="Ex: Maria Oliveira" value="Maria Oliveira"/>
+        </div>
+
+        <div style="margin-bottom:10px">
+          <div style="color:#8696a0;font-size:8px;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em">Telefone (com DDI)</div>
+          <div style="display:flex;gap:5px">
+            <input style="flex:1;background:#2a3942;border:none;border-radius:6px;padding:7px 10px;color:#e9edef;font-size:10px" placeholder="+55 11 99001-0001" value="+55 11 99001-0001"/>
+          </div>
+          <div style="color:#00a884;font-size:8px;margin-top:4px;cursor:pointer">↻ Gerar aleatório</div>
+        </div>
+
+        <div style="display:flex;gap:6px;margin-top:16px">
+          <div style="flex:1;background:#2a3942;color:#aebac1;font-size:10px;padding:8px;border-radius:6px;text-align:center;cursor:pointer">Cancelar</div>
+          <div style="flex:1;background:#00a884;color:#fff;font-size:10px;font-weight:bold;padding:8px;border-radius:6px;text-align:center;cursor:pointer">Criar</div>
+        </div>
+
+        <div style="color:#8696a0;font-size:8px;margin-top:12px;text-align:center;line-height:1.5">
+          O contato é criado no Supabase<br/>na primeira mensagem enviada.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Painel de configuração -->
+  <div class="mockup">
+    <div class="mockup-header">Painel de configuração (colapsável)</div>
+    <div class="mockup-body" style="background:#111b21;padding:14px;font-family:monospace;font-size:10px;min-height:300px">
+      <div style="color:#8696a0;font-size:8px;font-weight:bold;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px">⚙ Conexão Supabase</div>
+
+      <div style="margin-bottom:8px">
+        <div style="color:#8696a0;font-size:8px;margin-bottom:3px">URL do Supabase</div>
+        <input style="width:100%;background:#2a3942;border:none;border-radius:4px;padding:5px 8px;color:#e9edef;font-size:9px;box-sizing:border-box" value="https://xyzabc.supabase.co"/>
+      </div>
+
+      <div style="margin-bottom:8px">
+        <div style="color:#8696a0;font-size:8px;margin-bottom:3px">Anon Key</div>
+        <input style="width:100%;background:#2a3942;border:none;border-radius:4px;padding:5px 8px;color:#e9edef;font-size:9px;box-sizing:border-box" value="eyJhbGciOiJIUzI1NiIs..."/>
+      </div>
+
+      <div style="margin-bottom:8px">
+        <div style="color:#8696a0;font-size:8px;margin-bottom:3px">Dev Bypass Token</div>
+        <input style="width:100%;background:#2a3942;border:none;border-radius:4px;padding:5px 8px;color:#e9edef;font-size:9px;box-sizing:border-box" value="dev-sim-secret-2026"/>
+        <div style="color:#8696a0;font-size:7px;margin-top:3px">Deve ser igual à variável DEV_BYPASS_TOKEN no Supabase</div>
+      </div>
+
+      <div style="display:flex;gap:6px;margin-top:12px">
+        <div style="flex:1;background:#00a884;color:#fff;font-size:9px;font-weight:bold;padding:7px;border-radius:4px;text-align:center;cursor:pointer">Salvar e testar conexão</div>
+      </div>
+
+      <div style="margin-top:10px;background:#1a3a2a;border:1px solid #25d366;border-radius:4px;padding:6px 8px">
+        <div style="color:#25d366;font-size:8px">✓ Conectado — edge function dev-message OK</div>
+        <div style="color:#8696a0;font-size:7px;margin-top:2px">Realtime: ativo · DB: acessível</div>
+      </div>
+
+      <div style="color:#8696a0;font-size:8px;margin-top:14px;text-align:center;line-height:1.5;border-top:1px solid #2a3942;padding-top:10px">
+        Configs salvas no <code>localStorage</code><br/>do browser — nunca vão para o servidor.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px">
+  <h3>Arquivos que serão criados/modificados</h3>
+  <div style="font-family:monospace;font-size:12px;background:#1e1e1e;color:#d4d4d4;border-radius:6px;padding:14px;line-height:2">
+    <div><span style="color:#4ec9b0">CRIAR</span>  &nbsp;supabase/functions/dev-message/index.ts</div>
+    <div><span style="color:#dcdcaa">MODIFICAR</span>  supabase/functions/whatsapp-webhook/index.ts &nbsp;<span style="color:#6a9955">// +bypass token</span></div>
+    <div><span style="color:#4ec9b0">CRIAR</span>  &nbsp;supabase/migrations/011_dev_simulator.sql &nbsp;&nbsp;<span style="color:#6a9955">// policy SELECT anon</span></div>
+    <div><span style="color:#4ec9b0">CRIAR</span>  &nbsp;docs/simulador-whatsapp.html</div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Fluxo completo de uso</h3>
+  <ol style="font-size:13px;line-height:2.2;color:#374151">
+    <li>Dev abre <code>docs/simulador-whatsapp.html</code> no browser</li>
+    <li>Insere URL, anon key e bypass token no painel de config → clica "Salvar e testar"</li>
+    <li>Abre o CRM Messenger em outra aba (<code>localhost:5173</code>)</li>
+    <li>No simulador: clica "+ Novo telefone" → gera número aleatório ou digita um → "Criar"</li>
+    <li>Digita uma mensagem e envia → <code>dev-message</code> cria o contato + conversa → chatbot responde</li>
+    <li>As respostas do bot aparecem automaticamente no simulador (Realtime)</li>
+    <li>No CRM, o agente vê a conversa na fila → pode assumir e responder</li>
+    <li>A resposta do agente aparece no simulador em tempo real</li>
+    <li>Repete com quantos telefones quiser — cada um é uma conversa independente</li>
+  </ol>
+</div>
+
+<p class="subtitle">Design completo! Esse é o escopo que deve ir para a spec. Alguma coisa faltando ou a ajustar?</p>

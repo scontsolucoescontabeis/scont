@@ -1,0 +1,85 @@
+<h2>Design — Seção 1: Arquitetura</h2>
+<p class="subtitle">Como o simulador se conecta ao CRM Messenger sem quebrar nada de produção</p>
+
+<div class="section">
+  <h3>Visão geral do fluxo</h3>
+  <div class="mockup">
+    <div class="mockup-header">Fluxo de dados</div>
+    <div class="mockup-body" style="font-size:12px;font-family:monospace;padding:20px">
+      <div style="display:flex;align-items:flex-start;gap:0">
+
+        <!-- Coluna Simulador -->
+        <div style="background:#111b21;color:#e9edef;border-radius:8px;padding:14px 16px;min-width:170px;text-align:center">
+          <div style="font-size:11px;font-weight:bold;color:#25d366;margin-bottom:8px">📱 simulador-whatsapp.html</div>
+          <div style="font-size:10px;color:#8696a0;line-height:1.6">
+            HTML standalone<br/>
+            Supabase anon key<br/>
+            Realtime subscription<br/>
+            <br/>
+            localStorage → clientes<br/>
+            (phone, name, conversa_id)
+          </div>
+        </div>
+
+        <!-- Seta 1 -->
+        <div style="display:flex;flex-direction:column;align-items:center;padding:0 10px;margin-top:40px">
+          <div style="font-size:10px;color:#888;white-space:nowrap">mensagem do cliente</div>
+          <div style="font-size:18px;color:#25d366">→</div>
+          <div style="font-size:10px;color:#00a884;white-space:nowrap">POST /dev-message</div>
+        </div>
+
+        <!-- Coluna Edge Functions -->
+        <div style="display:flex;flex-direction:column;gap:6px;min-width:180px">
+          <div style="background:#1e3a2f;border:1px solid #25d366;border-radius:8px;padding:10px 14px;text-align:center">
+            <div style="font-size:10px;font-weight:bold;color:#25d366">⚡ dev-message (nova)</div>
+            <div style="font-size:9px;color:#8696a0;margin-top:4px">Recebe phone + message<br/>Chama whatsapp-webhook<br/>com bypass token</div>
+          </div>
+          <div style="display:flex;justify-content:center;color:#8696a0;font-size:10px">↓ X-Dev-Bypass-Token</div>
+          <div style="background:#1a2634;border:1px solid #3b82f6;border-radius:8px;padding:10px 14px;text-align:center">
+            <div style="font-size:10px;font-weight:bold;color:#60a5fa">⚡ whatsapp-webhook (modificado)</div>
+            <div style="font-size:9px;color:#8696a0;margin-top:4px">Pula HMAC se token válido<br/>Cria contato + conversa<br/>Insere mensagem CLIENTE<br/>Roda chatbot processor</div>
+          </div>
+          <div style="display:flex;justify-content:center;color:#8696a0;font-size:10px">↓ insere mensagens BOT/AGENTE</div>
+          <div style="background:#1a2018;border:1px solid #4ade80;border-radius:8px;padding:8px 14px;text-align:center">
+            <div style="font-size:10px;font-weight:bold;color:#4ade80">🗄️ Supabase DB</div>
+            <div style="font-size:9px;color:#8696a0;margin-top:2px">mensagens, conversas, contatos</div>
+          </div>
+        </div>
+
+        <!-- Seta 2 (Realtime) -->
+        <div style="display:flex;flex-direction:column;align-items:center;padding:0 10px;margin-top:100px">
+          <div style="font-size:10px;color:#f59e0b;white-space:nowrap">Realtime (anon)</div>
+          <div style="font-size:18px;color:#f59e0b">←</div>
+          <div style="font-size:10px;color:#f59e0b;white-space:nowrap">BOT / AGENTE msgs</div>
+        </div>
+
+        <!-- Coluna CRM -->
+        <div style="background:#f7f6f4;border:1px solid #e0dcd8;border-radius:8px;padding:14px 16px;min-width:150px;text-align:center">
+          <div style="font-size:11px;font-weight:bold;color:#7a1e1e;margin-bottom:8px">🖥️ CRM Messenger</div>
+          <div style="font-size:10px;color:#888480;line-height:1.6">
+            Roda normalmente<br/>
+            Agentes veem conversas<br/>
+            Chatbot responde<br/>
+            SLA monitora<br/>
+            <br/>
+            <span style="color:#b83232">Meta API falha<br/>silenciosamente<br/>(fake phone)</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Pontos-chave da arquitetura</h3>
+  <ul style="font-size:13px;line-height:2;color:#374151">
+    <li><strong>Dev bypass token</strong> — variável de ambiente <code>DEV_BYPASS_TOKEN</code> no Supabase. O webhook pula o HMAC da Meta quando recebe o header correto. Removível em produção.</li>
+    <li><strong>Chatbot funciona de verdade</strong> — como a mensagem passa pelo pipeline completo do webhook, o chatbot processor roda normalmente e insere as respostas no banco.</li>
+    <li><strong>Meta API falha silenciosamente</strong> — o webhook tenta enviar a resposta para o número fake, falha, mas a mensagem BOT/AGENTE já está no banco. O simulador lê via Realtime.</li>
+    <li><strong>Realtime com anon key</strong> — nova migração <code>011_dev_simulator.sql</code> adiciona policy SELECT permissiva nas tabelas <code>mensagens</code> e <code>conversas</code> para o role anon.</li>
+    <li><strong>Isolado de produção</strong> — nenhuma mudança de schema em <code>conversas</code> ou <code>mensagens</code>. Contatos com prefixo <code>SIM-</code> nos nomes são facilmente distinguíveis.</li>
+  </ul>
+</div>
+
+<p class="subtitle">Essa seção de arquitetura faz sentido? Pode responder no terminal.</p>

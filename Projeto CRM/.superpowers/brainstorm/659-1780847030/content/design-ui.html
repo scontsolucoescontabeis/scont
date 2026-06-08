@@ -1,0 +1,193 @@
+<h2>Design — Seção 2: Interface do Simulador</h2>
+<p class="subtitle">Múltiplos telefones na sidebar esquerda — cada um é uma conversa independente no CRM</p>
+
+<div class="mockup">
+  <div class="mockup-header">docs/simulador-whatsapp.html — visão completa</div>
+  <div class="mockup-body" style="padding:0;overflow:hidden">
+    <div style="display:flex;height:420px;font-size:11px;font-family:monospace;background:#111b21">
+
+      <!-- ===== SIDEBAR ESQUERDA ===== -->
+      <div style="width:220px;background:#111b21;border-right:1px solid #2a3942;display:flex;flex-direction:column;flex-shrink:0">
+
+        <!-- Header sidebar -->
+        <div style="background:#202c33;padding:10px 12px;border-bottom:1px solid #2a3942">
+          <div style="color:#e9edef;font-size:11px;font-weight:bold">⚡ Simulador WhatsApp</div>
+          <div style="color:#8696a0;font-size:9px;margin-top:2px">SCONT CRM — Ferramenta de Dev</div>
+        </div>
+
+        <!-- Config rápida (colapsada) -->
+        <div style="padding:6px 10px;background:#1a2329;border-bottom:1px solid #2a3942">
+          <div style="color:#8696a0;font-size:8px;font-weight:bold;letter-spacing:0.05em;text-transform:uppercase">Configuração</div>
+          <div style="display:flex;gap:4px;margin-top:4px">
+            <div style="flex:1;background:#2a3942;border-radius:3px;padding:3px 6px;color:#aebac1;font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">https://xxx.supabase.co</div>
+            <div style="background:#00a884;color:#fff;font-size:8px;padding:3px 6px;border-radius:3px;white-space:nowrap">✓ OK</div>
+          </div>
+        </div>
+
+        <!-- Lista de telefones simulados -->
+        <div style="flex:1;overflow-y:auto">
+          <div style="padding:6px 10px 4px;color:#8696a0;font-size:8px;font-weight:bold;text-transform:uppercase;letter-spacing:0.05em">Telefones simulados (4)</div>
+
+          <!-- Tel 1 — selecionado, com mensagem nova -->
+          <div style="padding:8px 12px;background:#2a3942;cursor:pointer;border-left:3px solid #00a884">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div style="color:#e9edef;font-size:10px;font-weight:bold">Maria Oliveira</div>
+                <div style="color:#8696a0;font-size:8px;margin-top:1px">+55 11 99001-0001</div>
+                <div style="color:#00a884;font-size:8px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Bot: Escolha o departamento...</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;margin-left:6px">
+                <div style="background:#00a884;color:#fff;font-size:8px;font-weight:bold;padding:1px 6px;border-radius:8px;margin-bottom:2px">2</div>
+                <div style="color:#8696a0;font-size:7px">10:23</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tel 2 — em atendimento -->
+          <div style="padding:8px 12px;border-bottom:1px solid #2a3942;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div style="color:#e9edef;font-size:10px">João Santos</div>
+                <div style="color:#8696a0;font-size:8px;margin-top:1px">+55 11 99002-0002</div>
+                <div style="color:#8696a0;font-size:8px;margin-top:2px">Agente: Olá João, vou verificar...</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;margin-left:6px">
+                <div style="background:#0b6e4f;color:#25d366;font-size:7px;padding:1px 5px;border-radius:4px;margin-bottom:2px">ATEND.</div>
+                <div style="color:#8696a0;font-size:7px">10:18</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tel 3 — aberta sem resposta -->
+          <div style="padding:8px 12px;border-bottom:1px solid #2a3942;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div style="color:#e9edef;font-size:10px">Pedro Lima</div>
+                <div style="color:#8696a0;font-size:8px;margin-top:1px">+55 47 99003-0003</div>
+                <div style="color:#8696a0;font-size:8px;margin-top:2px">Você: preciso tirar uma dúvida</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;margin-left:6px">
+                <div style="color:#8696a0;font-size:7px">09:55</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tel 4 — encerrada -->
+          <div style="padding:8px 12px;border-bottom:1px solid #2a3942;cursor:pointer;opacity:0.55">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div style="flex:1;min-width:0">
+                <div style="color:#e9edef;font-size:10px">Ana Costa</div>
+                <div style="color:#8696a0;font-size:8px;margin-top:1px">+55 21 99004-0004</div>
+                <div style="color:#8696a0;font-size:8px;margin-top:2px">— conversa encerrada —</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;margin-left:6px">
+                <div style="color:#8696a0;font-size:7px;padding:1px 5px;border:1px solid #2a3942;border-radius:3px">ENCERR.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botão novo telefone -->
+        <div style="padding:10px 12px;border-top:1px solid #2a3942;background:#202c33">
+          <div style="background:#00a884;color:#fff;font-size:10px;font-weight:bold;padding:8px;border-radius:6px;text-align:center;cursor:pointer">
+            + Novo telefone
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== ÁREA DE CHAT DIREITA ===== -->
+      <div style="flex:1;display:flex;flex-direction:column;background:#0b141a">
+
+        <!-- Header do chat -->
+        <div style="background:#202c33;padding:8px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #2a3942">
+          <div style="width:32px;height:32px;background:#00a884;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:bold;flex-shrink:0">M</div>
+          <div style="flex:1">
+            <div style="color:#e9edef;font-size:11px;font-weight:bold">Maria Oliveira</div>
+            <div style="color:#8696a0;font-size:9px">+55 11 99001-0001 · protocolo SCT-20260607-001234</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div style="background:#1a3a2a;border:1px solid #25d366;color:#25d366;font-size:8px;padding:2px 8px;border-radius:4px">ABERTA</div>
+            <div style="color:#8696a0;font-size:9px;cursor:pointer" title="Excluir cliente simulado">🗑</div>
+          </div>
+        </div>
+
+        <!-- Área de mensagens -->
+        <div style="flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:6px;overflow-y:auto">
+
+          <!-- Sistema -->
+          <div style="text-align:center;color:#8696a0;font-size:8px;background:#182229;padding:3px 10px;border-radius:8px;align-self:center">
+            Conversa iniciada em 07/06/2026 às 10:23
+          </div>
+
+          <!-- Cliente (direita, verde) -->
+          <div style="align-self:flex-end;max-width:65%">
+            <div style="background:#005c4b;color:#e9edef;padding:7px 10px;border-radius:8px 8px 0 8px;font-size:10px;line-height:1.5">
+              Olá, preciso de ajuda com minha declaração
+            </div>
+            <div style="color:#8696a0;font-size:7px;text-align:right;margin-top:2px">10:23 ✓✓</div>
+          </div>
+
+          <!-- Bot (esquerda, escuro) -->
+          <div style="align-self:flex-start;max-width:75%">
+            <div style="color:#8696a0;font-size:8px;margin-bottom:2px">🤖 Bot SCONT</div>
+            <div style="background:#202c33;color:#e9edef;padding:7px 10px;border-radius:8px 8px 8px 0;font-size:10px;line-height:1.6">
+              Olá! Sou o assistente virtual da SCONT Soluções Contábeis. 😊<br/>
+              Por favor, escolha o departamento:<br/>
+              <span style="color:#00a884">1 - Pessoal<br/>2 - Contábil<br/>3 - Tributário / Fiscal<br/>4 - Administrativo</span>
+            </div>
+            <div style="color:#8696a0;font-size:7px;margin-top:2px">10:23</div>
+          </div>
+
+          <!-- Cliente responde -->
+          <div style="align-self:flex-end;max-width:65%">
+            <div style="background:#005c4b;color:#e9edef;padding:7px 10px;border-radius:8px 8px 0 8px;font-size:10px">
+              2
+            </div>
+            <div style="color:#8696a0;font-size:7px;text-align:right;margin-top:2px">10:23 ✓✓</div>
+          </div>
+
+          <!-- Bot responde com categorias -->
+          <div style="align-self:flex-start;max-width:75%">
+            <div style="color:#8696a0;font-size:8px;margin-bottom:2px">🤖 Bot SCONT</div>
+            <div style="background:#202c33;color:#e9edef;padding:7px 10px;border-radius:8px 8px 8px 0;font-size:10px;line-height:1.6">
+              Ótimo! Contábil selecionado.<br/>
+              Qual o assunto?<br/>
+              <span style="color:#00a884">1 - Balancete<br/>2 - Declaração IR<br/>3 - Outro</span>
+            </div>
+            <div style="color:#8696a0;font-size:7px;margin-top:2px">10:23</div>
+          </div>
+
+          <!-- Indicador "digitando" -->
+          <div style="align-self:flex-end;max-width:65%">
+            <div style="background:#005c4b;color:#e9edef;padding:7px 10px;border-radius:8px 8px 0 8px;font-size:10px;opacity:0.6">
+              ···
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Input de mensagem -->
+        <div style="background:#202c33;padding:8px 12px;display:flex;align-items:center;gap:8px;border-top:1px solid #2a3942">
+          <div style="flex:1;background:#2a3942;border-radius:24px;padding:8px 16px;color:#8696a0;font-size:10px">
+            Digite uma mensagem...
+          </div>
+          <div style="width:36px;height:36px;background:#00a884;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;cursor:pointer;flex-shrink:0">➤</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px">
+  <h3>Comportamento dos telefones</h3>
+  <ul style="font-size:13px;line-height:2;color:#374151">
+    <li><strong>Novo telefone</strong> — abre um modal pedindo nome e telefone. Pode gerar aleatório (ex: <code>+55 11 9XXXX-XXXX</code>) ou inserir manualmente. Salva no <code>localStorage</code>.</li>
+    <li><strong>Primeira mensagem</strong> — ao enviar, a edge function <code>dev-message</code> cria o contato e a conversa no banco. O simulador salva o <code>conversa_id</code> recebido para aquele telefone.</li>
+    <li><strong>Realtime por cliente</strong> — cada cliente tem sua própria subscription Supabase Realtime filtrada pelo <code>conversa_id</code>. Mensagens de BOT e AGENTE aparecem automaticamente.</li>
+    <li><strong>Badge de não-lidas</strong> — mensagens de BOT/AGENTE que chegam enquanto o cliente não está selecionado mostram o contador verde na sidebar.</li>
+    <li><strong>Status da conversa</strong> — chip no header mostra ABERTA / EM_ATENDIMENTO / ENCERRADA em tempo real.</li>
+    <li><strong>Excluir cliente</strong> — remove do <code>localStorage</code>. A conversa fica no banco (não apaga dados reais).</li>
+  </ul>
+</div>
+
+<p class="subtitle">Essa UI faz sentido? Algo a ajustar antes de ver o modal de novo telefone?</p>
