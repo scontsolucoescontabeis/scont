@@ -19,9 +19,10 @@ export function PainelDireito({ conversa }) {
   const [primeiraMsg, setPrimeiraMsg] = useState(null)
   const [handoffEm, setHandoffEm] = useState(null)
   const [expandTranscript, setExpandTranscript] = useState(true)
+  const [empresasContato, setEmpresasContato] = useState([])
 
   useEffect(() => {
-    if (!conversa?.contatos?.id) { setHistorico([]); setTransferencias([]); return }
+    if (!conversa?.contatos?.id) { setHistorico([]); setTransferencias([]); setEmpresasContato([]); return }
 
     supabase
       .from('conversas')
@@ -38,6 +39,13 @@ export function PainelDireito({ conversa }) {
       .eq('conversa_id', conversa.id)
       .order('criado_em', { ascending: true })
       .then(({ data }) => setTransferencias(data ?? []))
+
+    supabase
+      .from('contatos_empresas')
+      .select('empresa, cargo')
+      .eq('contato_id', conversa.contatos.id)
+      .order('criado_em', { ascending: true })
+      .then(({ data }) => setEmpresasContato(data ?? []))
   }, [conversa?.id, conversa?.contatos?.id])
 
   useEffect(() => {
@@ -99,8 +107,10 @@ export function PainelDireito({ conversa }) {
           {nome[0]?.toUpperCase()}
         </div>
         <div style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>{nome}</div>
-        {contato?.empresa && (
-          <div style={{ fontSize: 11, color: '#888480', marginTop: 3 }}>{contato.empresa}</div>
+        {empresasContato.length > 0 && (
+          <div style={{ fontSize: 11, color: '#888480', marginTop: 3 }}>
+            {empresasContato.map(e => e.empresa).join(' · ')}
+          </div>
         )}
         <div style={{
           display: 'inline-block', marginTop: 6,
@@ -224,7 +234,21 @@ export function PainelDireito({ conversa }) {
       <div style={{ padding: '12px 16px', borderBottom: '1px solid #e0dcd8' }}>
         <SectionTitle>Contato</SectionTitle>
         <InfoRow icon={<Phone size={12} />} label="Telefone" value={contato?.telefone} />
-        {contato?.empresa && <InfoRow icon={<Building2 size={12} />} label="Empresa" value={contato.empresa} />}
+        {empresasContato.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 6 }}>
+            <span style={{ color: '#888480', marginTop: 1 }}><Building2 size={12} /></span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 10, color: '#888480' }}>
+                {empresasContato.length === 1 ? 'Empresa' : 'Empresas'}
+              </div>
+              {empresasContato.map((e, i) => (
+                <div key={i} style={{ fontSize: 12, color: '#1a1a1a' }}>
+                  {e.empresa}{e.cargo ? <span style={{ color: '#888480' }}> · {e.cargo}</span> : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {agente && <InfoRow icon={<User size={12} />} label="Agente" value={agente.nome} />}
         <InfoRow
           icon={<Clock size={12} />}
