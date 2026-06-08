@@ -26,8 +26,8 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
   } : { ...VAZIO })
   const [empresas, setEmpresas] = useState(
     empresasIniciais.length > 0
-      ? empresasIniciais.map(e => ({ empresa: e.empresa, cargo: e.cargo ?? '' }))
-      : [{ ...EMPRESA_VAZIA }]
+      ? empresasIniciais.map(e => ({ empresa: e.empresa, cargo: e.cargo ?? '', _key: crypto.randomUUID() }))
+      : [{ ...EMPRESA_VAZIA, _key: crypto.randomUUID() }]
   )
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
@@ -37,7 +37,7 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
   const setEmpresa = (i, k) => (e) =>
     setEmpresas(prev => prev.map((item, idx) => idx === i ? { ...item, [k]: e.target.value } : item))
 
-  const addEmpresa = () => setEmpresas(prev => [...prev, { ...EMPRESA_VAZIA }])
+  const addEmpresa = () => setEmpresas(prev => [...prev, { ...EMPRESA_VAZIA, _key: crypto.randomUUID() }])
 
   const removeEmpresa = (i) => setEmpresas(prev => prev.filter((_, idx) => idx !== i))
 
@@ -48,6 +48,7 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
     setSalvando(true); setErro('')
 
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSalvando(false); setErro('Sessão expirada. Faça login novamente.'); return }
     const agora = new Date().toISOString()
 
     const payload = {
@@ -77,25 +78,20 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
     // Sincronizar contatos_empresas
     const empresasValidas = empresas.filter(e => e.empresa.trim())
     if (contatoId) {
-      if (editando && empresasValidas.length > 0) {
-        // Apagar os que não estão mais na lista
-        const nomesAtuais = empresasValidas.map(e => e.empresa.trim())
-        await supabase
+      if (editando) {
+        const { error: errDel } = await supabase
           .from('contatos_empresas')
           .delete()
           .eq('contato_id', contatoId)
-          .not('empresa', 'in', `(${nomesAtuais.map(n => `"${n}"`).join(',')})`)
-      } else if (editando && empresasValidas.length === 0) {
-        // Remover todas as empresas
-        await supabase.from('contatos_empresas').delete().eq('contato_id', contatoId)
+        if (errDel) { setSalvando(false); setErro(errDel.message); return }
       }
-      // Upsert os que estão
       for (const item of empresasValidas) {
-        await supabase.from('contatos_empresas').upsert({
+        const { error: errUp } = await supabase.from('contatos_empresas').insert({
           contato_id: contatoId,
           empresa:    item.empresa.trim(),
           cargo:      item.cargo.trim() || null,
-        }, { onConflict: 'contato_id,empresa' })
+        })
+        if (errUp) { setSalvando(false); setErro(errUp.message); return }
       }
     }
 
@@ -166,7 +162,7 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
               </button>
             </div>
             {empresas.map((item, i) => (
-              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'flex-start' }}>
+              <div key={item._key ?? i} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'flex-start' }}>
                 <input
                   value={item.empresa}
                   onChange={setEmpresa(i, 'empresa')}
