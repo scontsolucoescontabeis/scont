@@ -1253,7 +1253,8 @@ async function handleAGUARD_CONF(
     const resumo = subTitulo
       ? `${deptLabel} › ${catTitulo} › ${subTitulo}`
       : `${deptLabel} › ${catTitulo}`
-    await inserirMensagemSistema(supabase, conversa.id, `🤖 Bot roteou: ${resumo}`)
+    const prefixoEmpresa = sessao.empresa_selecionada ? `${sessao.empresa_selecionada} — ` : ''
+    await inserirMensagemSistema(supabase, conversa.id, `🤖 Bot roteou: ${prefixoEmpresa}${resumo}`)
 
     // 4. Aplica tags automáticas
     await aplicarTagsAutomaticas(supabase, conversa.id, deptLabel, catTitulo)
