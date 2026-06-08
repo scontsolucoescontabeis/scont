@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Users, Plus, Search, X, Edit2, Phone, Building2, Mail, FileText, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { format } from 'date-fns'
@@ -229,6 +229,11 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
   const [empresas, setEmpresas]           = useState([])
   const [carregandoHist, setCarregandoHist] = useState(false)
 
+  useEffect(() => {
+    setHistorico([])
+    setEmpresas([])
+  }, [contato.atualizado_em])
+
   const carregarDetalhes = async () => {
     if (historico.length && empresas.length) return
     setCarregandoHist(true)
@@ -390,6 +395,7 @@ export default function ContatosPage() {
   const [empresasModal, setEmpresasModal] = useState([])
   const [pagina, setPagina]       = useState(0)
   const POR_PAGINA = 20
+  const editandoRef = useRef(false)
 
   const carregar = useCallback(async () => {
     setLoading(true)
@@ -423,6 +429,8 @@ export default function ContatosPage() {
   useEffect(() => { carregar() }, [carregar])
 
   const handleEditar = async (contato) => {
+    if (editandoRef.current) return
+    editandoRef.current = true
     const { data } = await supabase
       .from('contatos_empresas')
       .select('empresa, cargo')
@@ -430,6 +438,7 @@ export default function ContatosPage() {
       .order('criado_em')
     setEmpresasModal(data ?? [])
     setModal(contato)
+    editandoRef.current = false
   }
 
   const paginados = contatos.slice(pagina * POR_PAGINA, (pagina + 1) * POR_PAGINA)
