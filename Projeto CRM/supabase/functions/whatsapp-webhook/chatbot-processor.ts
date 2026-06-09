@@ -741,6 +741,7 @@ async function handleNOVO(
 
     // Sempre ao final
     opcoes.push({ id: 'OUTRO_ASSUNTO', title: '💬 Falar de outro assunto' })
+    opcoes.push({ id: 'HUMANO', title: '👤 Falar com atendente' })
 
     await atualizarSessao(supabase, sessao.id, { estado: 'AGUARD_EMPRESA' })
 
@@ -1041,7 +1042,13 @@ async function handleAGUARD_DEPT(
     dept = input.valor
   } else if (input.tipo === 'numero') {
     const idx = parseInt(input.valor, 10) - 1
-    dept = DEPARTAMENTOS[idx] ?? null
+    if (idx >= 0 && idx < DEPARTAMENTOS.length) {
+      dept = DEPARTAMENTOS[idx] ?? null
+    } else {
+      // Número além dos departamentos → última opção é sempre HUMANO
+      await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+      return
+    }
   }
 
   if (dept) {
@@ -1100,7 +1107,13 @@ async function handleAGUARD_CAT(
     catEscolhida = categorias.find((c) => c.id === input.valor) ?? null
   } else if (input.tipo === 'numero') {
     const idx = parseInt(input.valor, 10) - 1
-    catEscolhida = categorias[idx] ?? null
+    if (idx >= 0 && idx < categorias.length) {
+      catEscolhida = categorias[idx] ?? null
+    } else {
+      // Número além das categorias → última opção é sempre HUMANO
+      await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+      return
+    }
   } else if (input.tipo === 'desconhecido' && isUuid(input.valor)) {
     catEscolhida = categorias.find((c) => c.id === input.valor) ?? null
   }
@@ -1174,7 +1187,13 @@ async function handleAGUARD_SUB(
     subEscolhida = subcats.find((s) => s.id === input.valor) ?? null
   } else if (input.tipo === 'numero') {
     const idx = parseInt(input.valor, 10) - 1
-    subEscolhida = subcats[idx] ?? null
+    if (idx >= 0 && idx < subcats.length) {
+      subEscolhida = subcats[idx] ?? null
+    } else {
+      // Número além das subcategorias → última opção é sempre HUMANO
+      await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+      return
+    }
   } else if (input.tipo === 'desconhecido' && isUuid(input.valor)) {
     subEscolhida = subcats.find((s) => s.id === input.valor) ?? null
   }
