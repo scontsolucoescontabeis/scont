@@ -235,9 +235,9 @@ export default function SLAConfigPage() {
                     value={row.multiplicador}
                     onChange={e => setMult(t.key, parseFloat(e.target.value) || 1)}
                     style={{
-                      width: 64, padding: '5px 8px',
+                      width: 100, padding: '7px 10px',
                       border: `1px solid ${t.color}55`, borderRadius: 5,
-                      fontSize: 13, fontFamily: 'DM Mono, monospace',
+                      fontSize: 15, fontFamily: 'DM Mono, monospace',
                       textAlign: 'center', color: t.color, fontWeight: 600,
                       outline: 'none', background: `${t.color}08`,
                     }}
