@@ -552,11 +552,11 @@ export async function buscarMensagensProntas() {
   return data ?? []
 }
 
-export async function criarMensagemPronta({ titulo, conteudo, categoria, compartilhada }) {
+export async function criarMensagemPronta({ titulo, conteudo, categoria, departamento, compartilhada }) {
   const { data: { user } } = await supabase.auth.getUser()
   const { data, error } = await supabase
     .from('mensagens_prontas')
-    .insert({ titulo, conteudo, categoria: categoria || null, compartilhada: !!compartilhada, criado_por: user.id })
+    .insert({ titulo, conteudo, categoria: categoria || null, departamento: departamento || null, compartilhada: !!compartilhada, criado_por: user.id })
     .select()
     .single()
   if (error) throw error
@@ -566,7 +566,7 @@ export async function criarMensagemPronta({ titulo, conteudo, categoria, compart
 export async function atualizarMensagemPronta(id, updates) {
   const { data, error } = await supabase
     .from('mensagens_prontas')
-    .update({ titulo: updates.titulo, conteudo: updates.conteudo, categoria: updates.categoria || null, compartilhada: !!updates.compartilhada })
+    .update({ titulo: updates.titulo, conteudo: updates.conteudo, categoria: updates.categoria || null, departamento: updates.departamento || null, compartilhada: !!updates.compartilhada })
     .eq('id', id)
     .select()
     .single()

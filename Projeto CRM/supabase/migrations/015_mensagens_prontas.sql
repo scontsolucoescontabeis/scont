@@ -7,10 +7,14 @@ CREATE TABLE IF NOT EXISTS mensagens_prontas (
   titulo        TEXT        NOT NULL,
   conteudo      TEXT        NOT NULL,
   categoria     TEXT,
+  departamento  departamento_enum,
   criado_por    UUID        NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
   compartilhada BOOLEAN     NOT NULL DEFAULT false,
   criado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Idempotente: adiciona coluna caso a tabela já exista sem ela
+ALTER TABLE mensagens_prontas ADD COLUMN IF NOT EXISTS departamento departamento_enum;
 
 ALTER TABLE mensagens_prontas ENABLE ROW LEVEL SECURITY;
 
