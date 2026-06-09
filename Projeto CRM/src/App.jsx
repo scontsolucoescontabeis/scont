@@ -1,6 +1,6 @@
 import { HashRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { MessageSquare, BarChart2, Users, LogOut, ClipboardList, BookUser, Bot, Timer } from 'lucide-react'
+import { MessageSquare, BarChart2, Users, LogOut, ClipboardList, BookUser, Bot, Timer, BookOpen } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { buscarMeuPerfil } from '@/services/crm.service'
 import CRMPage from '@/pages/CRMPage'
@@ -10,6 +10,7 @@ import TarefasPage from '@/pages/TarefasPage'
 import ContatosPage from '@/pages/ContatosPage'
 import ChatbotPage from '@/pages/ChatbotPage'
 import SLAConfigPage from '@/pages/SLAConfigPage'
+import MensagensProntasPage from '@/pages/MensagensProntasPage'
 import SemAcessoPage from '@/pages/SemAcessoPage'
 
 // ============================================================
@@ -179,6 +180,10 @@ function Sidebar({ isAdmin, onLogout }) {
           <BookUser size={15} />
           Contatos
         </NavLink>
+        <NavLink to="/crm/mensagens-prontas" style={navLinkStyle}>
+          <BookOpen size={15} />
+          Msgs. Prontas
+        </NavLink>
 
         {isAdmin && (
           <>
@@ -338,6 +343,7 @@ export default function App() {
               <Route path="/crm" element={<CRMPage perfil={perfil} />} />
               <Route path="/crm/tarefas" element={<TarefasPage perfil={perfil} />} />
               <Route path="/crm/contatos" element={<ContatosPage />} />
+              <Route path="/crm/mensagens-prontas" element={<MensagensProntasPage perfil={perfil} />} />
               {isAdmin && <Route path="/crm/chatbot" element={<ChatbotPage />} />}
               {isAdmin && <Route path="/crm/sla" element={<SLAConfigPage />} />}
               {isAdmin && <Route path="/crm/metricas" element={<MetricasPage />} />}

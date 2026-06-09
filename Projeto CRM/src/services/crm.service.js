@@ -538,3 +538,43 @@ export async function salvarClassificacaoSLAConfig(rows) {
     .upsert(rows, { onConflict: 'classificacao' })
   if (error) throw error
 }
+
+// ─── Mensagens Prontas ─────────────────────────────────────────
+
+export async function buscarMensagensProntas() {
+  const { data, error } = await supabase
+    .from('mensagens_prontas')
+    .select('*')
+    .order('compartilhada', { ascending: false })
+    .order('categoria', { nullsFirst: false })
+    .order('titulo')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function criarMensagemPronta({ titulo, conteudo, categoria, compartilhada }) {
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('mensagens_prontas')
+    .insert({ titulo, conteudo, categoria: categoria || null, compartilhada: !!compartilhada, criado_por: user.id })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function atualizarMensagemPronta(id, updates) {
+  const { data, error } = await supabase
+    .from('mensagens_prontas')
+    .update({ titulo: updates.titulo, conteudo: updates.conteudo, categoria: updates.categoria || null, compartilhada: !!updates.compartilhada })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function excluirMensagemPronta(id) {
+  const { error } = await supabase.from('mensagens_prontas').delete().eq('id', id)
+  if (error) throw error
+}
