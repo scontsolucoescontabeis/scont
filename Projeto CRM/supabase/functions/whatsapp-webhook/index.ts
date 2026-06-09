@@ -34,13 +34,19 @@ async function obterOuCriarContato(telefone: string, nome?: string) {
     '+55' + (digits.startsWith('55') ? digits.slice(2) : digits),
   ].filter(Boolean) as string[])]
 
+  // Busca todos os contatos com qualquer variante do telefone
   const { data: existentes } = await supabase
     .from('contatos')
-    .select('*')
+    .select('*, contatos_empresas(id)')
     .in('telefone', variantes)
-    .limit(1)
 
-  if (existentes && existentes.length > 0) return existentes[0]
+  if (existentes && existentes.length > 0) {
+    // Prefere o contato com empresas cadastradas (evita duplicatas sem vínculo)
+    const comEmpresas = existentes.find(
+      (c: Record<string, unknown>) => Array.isArray(c.contatos_empresas) && (c.contatos_empresas as unknown[]).length > 0
+    )
+    return comEmpresas ?? existentes[0]
+  }
 
   const { data: novo } = await supabase
     .from('contatos')
