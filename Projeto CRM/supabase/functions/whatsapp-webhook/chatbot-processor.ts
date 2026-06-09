@@ -817,6 +817,46 @@ async function handleAGUARD_EMPRESA(
 ): Promise<void> {
   const { supabase, telefone, conversa, phoneNumberId, accessToken } = params
 
+  // Resolve número digitado → ID da opção (mesmo quando lista interativa falha)
+  if (input.tipo === 'numero') {
+    const idx = parseInt(input.valor, 10) - 1
+    const { data: emps0 } = await supabase
+      .from('contatos_empresas')
+      .select('id')
+      .eq('contato_id', conversa.contato_id)
+      .order('criado_em', { ascending: true })
+    const empresasIds = (emps0 ?? []) as Array<{ id: string }>
+
+    const { data: rec0 } = await supabase
+      .from('conversas')
+      .select('bot_departamento, bot_categoria_id')
+      .eq('contato_id', conversa.contato_id)
+      .eq('status', 'ENCERRADA')
+      .not('bot_departamento', 'is', null)
+      .gt('encerrado_em', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .order('encerrado_em', { ascending: false })
+      .limit(1)
+      .single()
+
+    const idsOrdem: string[] = []
+    if (rec0?.bot_departamento && empresasIds.length > 0) {
+      const catId0 = (rec0.bot_categoria_id as string | null) ?? ''
+      idsOrdem.push(`EMPRESA_REC:${empresasIds[0].id}:${catId0}`)
+    }
+    for (const e of empresasIds) {
+      idsOrdem.push(`EMPRESA:${e.id}`)
+    }
+    idsOrdem.push('OUTRO_ASSUNTO')
+    idsOrdem.push('HUMANO')
+
+    if (idx >= 0 && idx < idsOrdem.length) {
+      input = { tipo: 'lista', valor: idsOrdem[idx] }
+    } else {
+      await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
+      return
+    }
+  }
+
   if (input.valor === 'HUMANO') {
     await escalarParaHumano(supabase, sessao, conversa.id, telefone, phoneNumberId, accessToken)
     return
