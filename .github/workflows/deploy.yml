@@ -49,6 +49,8 @@ jobs:
           done
           # CRM — app buildado em crm/ (outDir: '../crm' no vite.config.js)
           cp -r crm/. _site/crm/
+          # Ferramentas de dev do CRM (HTML estático, não incluídas no build Vite)
+          [ -d "Projeto CRM/docs" ] && cp -r "Projeto CRM/docs" "_site/crm/docs" || true
           # Fallback SPA: GitHub Pages serve 404.html na rota desconhecida;
           # como o index.html já tem o React Router, ele trata a URL corretamente
           cp _site/crm/index.html _site/crm/404.html
