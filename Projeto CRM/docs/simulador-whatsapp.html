@@ -196,11 +196,15 @@
       inputEl.value = ''
 
       try {
+        // Usa o access_token da sessão do usuário autenticado (mais confiável que a anon key com JWT verification)
+        const { data: { session } } = await sbClient.auth.getSession()
+        const authToken = session?.access_token ?? window.SUPABASE_KEY
+
         const res = await fetch(`${window.SUPABASE_URL}/functions/v1/dev-message`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${window.SUPABASE_KEY}`,
+            'Authorization': `Bearer ${authToken}`,
           },
           body: JSON.stringify({ phone: c.phone, name: c.name, message: texto, bypass_token: cfg.bypass_token }),
         })

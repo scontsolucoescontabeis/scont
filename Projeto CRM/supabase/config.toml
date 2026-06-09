@@ -21,3 +21,6 @@ enable_signup = false
 enable_signup = false
 double_confirm_changes = false
 enable_confirmations = false
+
+[functions.dev-message]
+verify_jwt = false
