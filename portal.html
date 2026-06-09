@@ -627,7 +627,7 @@
                 <div class="ferramenta-desc">Testar fluxo do chatbot com mensagens simuladas</div>
                 <button class="btn-acessar" style="background: #1a7a4a;">Acessar →</button>
             `;
-            const acessar = () => { window.open('crm/docs/simulador-whatsapp.html', '_blank', 'noopener'); };
+            const acessar = () => { window.location.href = 'crm/docs/simulador-whatsapp.html'; };
             card.addEventListener('click', acessar);
             card.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); acessar(); });
             return card;
