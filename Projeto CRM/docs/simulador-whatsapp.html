@@ -205,7 +205,7 @@
           body: JSON.stringify({ phone: c.phone, name: c.name, message: texto, bypass_token: cfg.bypass_token }),
         })
         const data = await res.json()
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+        if (!res.ok) throw new Error(data.error || data.message || JSON.stringify(data) || `HTTP ${res.status}`)
 
         if (!c.conversa_id && data.conversa_id) {
           c.conversa_id = data.conversa_id
