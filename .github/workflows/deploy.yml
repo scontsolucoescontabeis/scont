@@ -32,7 +32,7 @@ jobs:
 
       - name: Build CRM
         working-directory: Projeto CRM
-        run: npm run build -- --base=/scont/crm/
+        run: npm run build
 
       - name: Assemble site
         run: |
