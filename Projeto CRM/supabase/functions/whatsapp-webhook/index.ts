@@ -25,17 +25,26 @@ async function validarAssinatura(body: string, signature: string | null): Promis
 }
 
 async function obterOuCriarContato(telefone: string, nome?: string) {
-  const { data: existente } = await supabase
+  // telefone vem como dígitos puros do Meta / simulador (ex: 5511999999999)
+  const digits = telefone.replace(/\D/g, '')
+  const variantes = [...new Set([
+    digits,
+    '+' + digits,
+    digits.startsWith('55') && digits.length > 11 ? digits.slice(2) : null,
+    '+55' + (digits.startsWith('55') ? digits.slice(2) : digits),
+  ].filter(Boolean) as string[])]
+
+  const { data: existentes } = await supabase
     .from('contatos')
     .select('*')
-    .eq('telefone', telefone)
-    .single()
+    .in('telefone', variantes)
+    .limit(1)
 
-  if (existente) return existente
+  if (existentes && existentes.length > 0) return existentes[0]
 
   const { data: novo } = await supabase
     .from('contatos')
-    .insert({ telefone, nome: nome || telefone })
+    .insert({ telefone: digits, nome: nome || digits })
     .select()
     .single()
 
@@ -81,7 +90,39 @@ async function processarMensagem(
   const PHONE_NUMBER_ID = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')!
   const ACCESS_TOKEN    = Deno.env.get('WHATSAPP_ACCESS_TOKEN')!
 
-  const botTratou = await processarMensagemBot({
+  // Extrai conteúdo da mensagem do cliente
+  if (tipo === 'text') {
+    conteudo = (msg.text as { body: string })?.body || ''
+  } else if (['image', 'audio', 'document', 'video'].includes(tipo)) {
+    const mediaObj = msg[tipo] as { id: string; caption?: string }
+    conteudo = mediaObj?.caption || null
+    if (mediaObj?.id) {
+      mediaUrl = await baixarEGuardarMidia(mediaObj.id, tipo, (conversa as { id: string }).id)
+    }
+  } else if (tipo === 'interactive') {
+    const interactive = msg.interactive as Record<string, unknown>
+    if (interactive?.type === 'list_reply') {
+      const reply = interactive.list_reply as { id: string; title: string }
+      conteudo = reply?.title || reply?.id || '[seleção]'
+    } else if (interactive?.type === 'button_reply') {
+      const reply = interactive.button_reply as { id: string; title: string }
+      conteudo = reply?.title || reply?.id || '[botão]'
+    }
+  }
+
+  // Salva mensagem do cliente SEMPRE — antes do bot responder
+  await supabase.from('mensagens').insert({
+    conversa_id:     (conversa as { id: string }).id,
+    conteudo,
+    tipo,
+    media_url:       mediaUrl,
+    whatsapp_msg_id: msg.id as string,
+    origem:          'CLIENTE',
+    lida:            false,
+  })
+
+  // Processa com o bot (respostas do bot são salvas dentro do chatbot-processor)
+  await processarMensagemBot({
     msg,
     telefone: contato.telefone as string,
     nomeContato,
@@ -93,40 +134,6 @@ async function processarMensagem(
     supabase,
     phoneNumberId: PHONE_NUMBER_ID,
     accessToken: ACCESS_TOKEN,
-  })
-
-  if (botTratou) return  // bot processou; não salva como mensagem normal
-
-  if (tipo === 'text') {
-    conteudo = (msg.text as { body: string })?.body || ''
-  } else if (['image', 'audio', 'document', 'video'].includes(tipo)) {
-    const mediaObj = msg[tipo] as { id: string; caption?: string }
-    conteudo = mediaObj?.caption || null
-    // Download e upload para Supabase Storage
-    if (mediaObj?.id) {
-      mediaUrl = await baixarEGuardarMidia(mediaObj.id, tipo, (conversa as { id: string }).id)
-    }
-  } else if (tipo === 'interactive') {
-    // resposta de lista interativa — o bot já tratou acima se botTratou=true
-    // se chegou aqui, salvar como mensagem de texto com o título da opção selecionada
-    const interactive = msg.interactive as Record<string, unknown>
-    if (interactive?.type === 'list_reply') {
-      const reply = interactive.list_reply as { id: string; title: string }
-      conteudo = reply?.title || reply?.id || '[seleção]'
-    } else if (interactive?.type === 'button_reply') {
-      const reply = interactive.button_reply as { id: string; title: string }
-      conteudo = reply?.title || reply?.id || '[botão]'
-    }
-  }
-
-  await supabase.from('mensagens').insert({
-    conversa_id:     (conversa as { id: string }).id,
-    conteudo,
-    tipo,
-    media_url:       mediaUrl,
-    whatsapp_msg_id: msg.id as string,
-    origem:          'CLIENTE',
-    lida:            false,
   })
 }
 
