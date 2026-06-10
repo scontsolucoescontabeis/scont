@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="styles.css">
   <script src="../supabase-config.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="../portal-auth-guard.js"></script>
 </head>
 <body>
@@ -204,8 +204,8 @@
           <button id="btnAddFeriado" class="btn btn-secondary btn-sm">+ Adicionar feriado</button>
         </div>
         <div id="addFeriadoForm" style="display:none;margin-top:10px" class="form-grid-3">
-          <div class="fg"><label>Data (DD/MM)</label><input id="novaDataFeriado" type="text" placeholder="13/06" maxlength="5"></div>
-          <div class="fg"><label>Descrição</label><input id="novaDescFeriado" type="text" placeholder="Corpus Christi"></div>
+          <div class="fg"><label for="novaDataFeriado">Data (DD/MM)</label><input id="novaDataFeriado" type="text" placeholder="13/06" maxlength="5"></div>
+          <div class="fg"><label for="novaDescFeriado">Descrição</label><input id="novaDescFeriado" type="text" placeholder="Corpus Christi"></div>
           <div class="fg" style="display:flex;align-items:flex-end">
             <button id="btnConfirmarFeriado" class="btn btn-primary btn-sm">Confirmar</button>
           </div>
@@ -240,9 +240,9 @@
           <div id="modoRevezamento" class="card hidden">
             <h3 class="card-title">🔄 Escala de Revezamento</h3>
             <div class="form-grid-3">
-              <div class="fg"><label>Dias trabalhados</label><input id="revTrab" type="number" min="1" value="5"></div>
-              <div class="fg"><label>Dias de folga</label><input id="revFolga" type="number" min="1" value="2"></div>
-              <div class="fg"><label>Início da escala (DD/MM/AAAA)</label><input id="revInicio" type="text" placeholder="01/06/2026" maxlength="10"></div>
+              <div class="fg"><label for="revTrab">Dias trabalhados</label><input id="revTrab" type="number" min="1" value="5"></div>
+              <div class="fg"><label for="revFolga">Dias de folga</label><input id="revFolga" type="number" min="1" value="2"></div>
+              <div class="fg"><label for="revInicio">Início da escala (DD/MM/AAAA)</label><input id="revInicio" type="text" placeholder="01/06/2026" maxlength="10"></div>
             </div>
           </div>
 
