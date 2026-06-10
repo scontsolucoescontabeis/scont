@@ -518,6 +518,23 @@
                     <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid #e0e0e0;border-radius:6px;cursor:pointer;font-size:13px;background:#fafafa;"><input type="radio" name="resTipoProcesso" value="70"> <span><strong>70</strong> — PLR (Participação nos Lucros)</span></label>
                 </div>
 
+                <!-- Lançamentos Adicionais -->
+                <div style="margin-top: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <label style="font-weight: 600; font-size: 13px; color: var(--text-primary);">Lançamentos Adicionais <span style="font-weight: 400; color: var(--text-secondary); font-size: 12px;">(opcional)</span></label>
+                        <button type="button" class="btn btn-secondary btn-small" onclick="_adicionarLancamentoAdicional()" style="font-size: 12px; padding: 4px 12px;">+ Adicionar</button>
+                    </div>
+                    <div id="lancamentosAdicionaisHeader" style="display:none; grid-template-columns:2fr 0.9fr 1.1fr 0.9fr auto; gap:6px; padding:0 10px; margin-bottom:3px;">
+                        <span style="font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;">Empregado</span>
+                        <span style="font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;">Rubrica</span>
+                        <span style="font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;">Tipo</span>
+                        <span style="font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;">Valor</span>
+                        <span></span>
+                    </div>
+                    <div id="lancamentosAdicionaisContainer"></div>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">Adicione lançamentos extras (ex: Vale Transporte, Vale Alimentação) ao final do TXT, vinculados ao empregado e competência.</p>
+                </div>
+
                 <!-- Prévia do TXT -->
                 <div id="resTxtPrevia" style="display:none; margin-top: 18px;">
                     <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px; color: var(--text-primary);">Prévia do Arquivo</label>

@@ -2272,11 +2272,118 @@ function abrirModalTxtResultados() {
     const saved = localStorage.getItem(TXT_RUBRICAS_KEY);
     if (saved) { try { _carregarConfigNoCampos('res', JSON.parse(saved)); } catch(e) {} }
     document.getElementById('resTxtPrevia').style.display = 'none';
+    const _laCont = document.getElementById('lancamentosAdicionaisContainer');
+    if (_laCont) _laCont.innerHTML = '';
+    const _laHdr = document.getElementById('lancamentosAdicionaisHeader');
+    if (_laHdr) _laHdr.style.display = 'none';
     document.getElementById('txtRubricasModal').classList.add('active');
 }
 
 function fecharModalTxtResultados() {
     document.getElementById('txtRubricasModal').classList.remove('active');
+}
+
+// ===== LANÇAMENTOS ADICIONAIS =====
+
+function _adicionarLancamentoAdicional() {
+    const container = document.getElementById('lancamentosAdicionaisContainer');
+    const header = document.getElementById('lancamentosAdicionaisHeader');
+
+    const row = document.createElement('div');
+    row.className = 'lanc-adicional-row';
+    row.style.cssText = 'display:grid;grid-template-columns:2fr 0.9fr 1.1fr 0.9fr auto;gap:6px;align-items:center;background:#f8f9fa;padding:8px 10px;border-radius:6px;border:1px solid #e9ecef;margin-bottom:6px;';
+
+    const sel = document.createElement('select');
+    sel.className = 'lanc-empregado';
+    sel.style.cssText = 'padding:5px 6px;border:1px solid #ced4da;border-radius:4px;font-size:12px;width:100%;';
+    (state.resultados || []).forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.empregadoId;
+        opt.textContent = `${r.nome} (${r.empregadoId})`;
+        sel.appendChild(opt);
+    });
+
+    const rubInput = document.createElement('input');
+    rubInput.type = 'text';
+    rubInput.className = 'lanc-rubrica';
+    rubInput.maxLength = 9;
+    rubInput.placeholder = 'Ex: 000610';
+    rubInput.style.cssText = 'padding:5px 6px;border:1px solid #ced4da;border-radius:4px;font-size:12px;font-family:monospace;width:100%;box-sizing:border-box;';
+
+    const tipoSel = document.createElement('select');
+    tipoSel.className = 'lanc-tipo';
+    tipoSel.style.cssText = 'padding:5px;border:1px solid #ced4da;border-radius:4px;font-size:12px;width:100%;';
+    [['monetario','R$ (inteiro)'],['horas','Horas (HH:MM)'],['dias','Dias']].forEach(([v,t]) => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = t;
+        tipoSel.appendChild(o);
+    });
+
+    const valInput = document.createElement('input');
+    valInput.type = 'text';
+    valInput.className = 'lanc-valor';
+    valInput.maxLength = 9;
+    valInput.placeholder = 'Ex: 500';
+    valInput.style.cssText = 'padding:5px 6px;border:1px solid #ced4da;border-radius:4px;font-size:12px;font-family:monospace;width:100%;box-sizing:border-box;';
+
+    tipoSel.onchange = function() {
+        const placeholders = { monetario: 'Ex: 500', horas: 'Ex: 01:30', dias: 'Ex: 22' };
+        valInput.placeholder = placeholders[this.value] || 'Valor';
+    };
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.innerHTML = '×';
+    removeBtn.title = 'Remover';
+    removeBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:#dc3545;font-size:18px;padding:2px 6px;line-height:1;';
+    removeBtn.onclick = function() {
+        row.remove();
+        if (!container.querySelector('.lanc-adicional-row') && header) header.style.display = 'none';
+    };
+
+    row.appendChild(sel);
+    row.appendChild(rubInput);
+    row.appendChild(tipoSel);
+    row.appendChild(valInput);
+    row.appendChild(removeBtn);
+    container.appendChild(row);
+
+    if (header) header.style.display = 'grid';
+}
+
+function _construirLinhasAdicionais(compFmt, codEmpresa, tipoProcesso) {
+    const container = document.getElementById('lancamentosAdicionaisContainer');
+    if (!container) return '';
+    const rows = container.querySelectorAll('.lanc-adicional-row');
+    if (!rows.length) return '';
+
+    const empFmt2 = String(codEmpresa).padStart(10, '0');
+    const tp = String(tipoProcesso).padStart(2, '0');
+    const rub = r => String(r).replace(/\D/g, '').padStart(9, '0');
+    let linhas = '';
+
+    rows.forEach(row => {
+        const codEmp  = (row.querySelector('.lanc-empregado')?.value || '').trim();
+        const rubrica = (row.querySelector('.lanc-rubrica')?.value  || '').trim();
+        const tipo    = row.querySelector('.lanc-tipo')?.value || 'monetario';
+        const valorStr= (row.querySelector('.lanc-valor')?.value    || '').trim();
+
+        if (!codEmp || !rubrica || !valorStr) return;
+
+        let valorInt = 0;
+        if (tipo === 'horas') {
+            const parts = valorStr.match(/^(\d{1,3}):(\d{2})$/);
+            valorInt = parts ? parseInt(parts[1]) * 100 + parseInt(parts[2]) : (parseInt(valorStr) || 0);
+        } else {
+            valorInt = parseInt(valorStr) || 0;
+        }
+        if (valorInt <= 0) return;
+
+        const empFmt = String(codEmp).padStart(10, '0');
+        linhas += `10${empFmt}${compFmt}${rub(rubrica)}${tp}${String(valorInt).padStart(9, '0')}${empFmt2}\n`;
+    });
+
+    return linhas;
 }
 
 function _construirConteudoTXTResultados(salvar = false) {
@@ -2321,6 +2428,8 @@ function _construirConteudoTXTResultados(salvar = false) {
         );
         conteudoTXT += _linhasFaltas(diasFaltaRes);
     });
+
+    conteudoTXT += _construirLinhasAdicionais(compFmt, codEmpresa, config.tipoProcesso);
 
     return { conteudoTXT, compFmt };
 }
