@@ -20,7 +20,7 @@ const S = {
     revTrab:          5,
     revFolga:         2,
     revInicio:        '',
-    diasManuais:      new Set(),
+    diasFolga:        new Set(),
     feriados:         [],
     feriadosMarcados:   new Set(),
     mesRef:             '',
@@ -302,6 +302,7 @@ function setupEscalasListeners() {
 
   $('escMesRef').addEventListener('change', () => {
     S.escalas.mesRef = $('escMesRef').value;
+    S.escalas.diasFolga.clear();
     renderFeriados();
     calcularEAtualizar();
   });
@@ -470,10 +471,13 @@ function calcRevezamento(dias, feriadosMes) {
 }
 
 function calcManual(feriadosMes) {
+  const todosDias = getDiasMes(S.escalas.mesRef);
   const trabalhados = new Set();
   let feriadosDescontados = 0;
-  S.escalas.diasManuais.forEach(ds => {
+  todosDias.forEach(d => {
+    const ds = toLocalDateStr(d);
     if (isFeriado(ds, feriadosMes)) { feriadosDescontados++; return; }
+    if (S.escalas.diasFolga.has(ds)) return;
     trabalhados.add(ds);
   });
   return { trabalhados, feriadosDescontados };
@@ -530,7 +534,8 @@ function renderCalendario(trabalhados, mesRef) {
         const fDesc = S.escalas.feriados.find(f => f.data === ddMm)?.descricao || 'Feriado';
         el.title = escHtml(fDesc);
       } else {
-        const base = S.escalas.diasManuais.has(dateStr) ? 'work' : (dow === 0 || dow === 6 ? 'weekend' : '');
+        const eFolga = S.escalas.diasFolga.has(dateStr);
+        const base   = eFolga ? (dow === 0 || dow === 6 ? 'weekend' : '') : 'work';
         el.className = `cal-day manual-toggle${base ? ' ' + base : ''}`;
         el.addEventListener('click', () => toggleDiaManual(dateStr));
       }
@@ -548,8 +553,8 @@ function renderCalendario(trabalhados, mesRef) {
 }
 
 function toggleDiaManual(dateStr) {
-  if (S.escalas.diasManuais.has(dateStr)) S.escalas.diasManuais.delete(dateStr);
-  else S.escalas.diasManuais.add(dateStr);
+  if (S.escalas.diasFolga.has(dateStr)) S.escalas.diasFolga.delete(dateStr);
+  else S.escalas.diasFolga.add(dateStr);
   calcularEAtualizar();
 }
 
@@ -577,6 +582,13 @@ function calcularEAtualizar() {
 
   $('btnAplicarEscala').disabled = !S.escalas.mesRef || total === 0;
   $('bannerMesRef').textContent = S.escalas.mesRef || '—';
+
+  const legenda = $('calLegenda');
+  if (legenda) {
+    legenda.innerHTML = S.escalas.modo === 'manual'
+      ? '🟢 Trabalhado &nbsp; ⬜ Folga marcada &nbsp; 🔴 Feriado descontado'
+      : '🟢 Trabalhado &nbsp; ⬜ Fim de semana &nbsp; 🔴 Feriado descontado';
+  }
 }
 
 function aplicarNosLancamentos() {
