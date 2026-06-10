@@ -63,6 +63,14 @@ function showScreen(name) {
   });
 }
 
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 // ── INIT ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   S.sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
@@ -95,7 +103,7 @@ async function loadEmpresas() {
   S.empresas = data || [];
 
   const opts = S.empresas.map(e =>
-    `<option value="${e.codigo_empresa}">${e.codigo_empresa} — ${e.nome_empresa}</option>`
+    `<option value="${escHtml(e.codigo_empresa)}">${escHtml(e.codigo_empresa)} — ${escHtml(e.nome_empresa)}</option>`
   ).join('');
 
   ['lancEmpresa', 'escEmpresa', 'cfgEmpresa'].forEach(id => {
@@ -116,37 +124,43 @@ async function loadEmpregados(empresa) {
 
 async function loadConfig(empresa) {
   if (!empresa) { S.config = null; return; }
-  const { data } = await S.sb
+  const { data, error } = await S.sb
     .from('rh_beneficios_config')
     .select('tipo, codigo_rubrica, tipo_processo, valor_dia')
     .eq('codigo_empresa', empresa);
+  if (error) { showToast('Erro ao carregar config', 'error'); return; }
   const rows = data || [];
   const vt = rows.find(r => r.tipo === 'vt') || {};
   const va = rows.find(r => r.tipo === 'va') || {};
   S.config = {
-    vt: { rubrica: vt.codigo_rubrica || '', tipoProc: vt.tipo_processo || '11', valorDia: parseFloat(vt.valor_dia) || 0 },
-    va: { rubrica: va.codigo_rubrica || '', tipoProc: va.tipo_processo || '11', valorDia: parseFloat(va.valor_dia) || 0 }
+    vt: { rubrica: vt.codigo_rubrica || '', tipoProc: vt.tipo_processo || '11', valorDia: parseDecimal(vt.valor_dia) },
+    va: { rubrica: va.codigo_rubrica || '', tipoProc: va.tipo_processo || '11', valorDia: parseDecimal(va.valor_dia) }
   };
 }
 
 async function loadIndividuais(empresa) {
   if (!empresa) { S.individuais = {}; return; }
-  const { data } = await S.sb
+  const { data, error } = await S.sb
     .from('rh_beneficios_individuais')
     .select('codigo_empregado, vt_valor_dia, va_valor_dia')
     .eq('codigo_empresa', empresa);
+  if (error) { showToast('Erro ao carregar valores individuais', 'error'); return; }
   S.individuais = {};
   (data || []).forEach(r => {
     S.individuais[r.codigo_empregado] = {
-      vt_dia: r.vt_valor_dia != null ? parseFloat(r.vt_valor_dia) : null,
-      va_dia: r.va_valor_dia != null ? parseFloat(r.va_valor_dia) : null
+      vt_dia: r.vt_valor_dia != null ? parseDecimal(r.vt_valor_dia) : null,
+      va_dia: r.va_valor_dia != null ? parseDecimal(r.va_valor_dia) : null
     };
   });
 }
 
 async function loadFeriadosEmpresa(empresa) {
-  if (!empresa) return;
-  const { data } = await S.sb
+  if (!empresa) {
+    S.escalas.feriados = [];
+    S.escalas.feriadosMarcados = new Set();
+    return;
+  }
+  const { data, error } = await S.sb
     .from('rh_saves')
     .select('feriados_json')
     .eq('empresa_codigo', empresa)
@@ -154,6 +168,7 @@ async function loadFeriadosEmpresa(empresa) {
     .order('data_criacao', { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (error) { showToast('Erro ao carregar feriados', 'error'); return; }
   try {
     const raw = data?.feriados_json;
     S.escalas.feriados = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
