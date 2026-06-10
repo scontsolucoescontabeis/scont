@@ -836,3 +836,92 @@ async function salvarLancamento() {
   if (error) { showToast('Erro ao salvar: ' + error.message, 'error'); return; }
   showToast('✅ Lançamento salvo!');
 }
+
+// ============================================================
+// EXCEL IMPORT
+// ============================================================
+
+function importarExcel(file) {
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const workbook = XLSX.read(e.target.result, { type: 'array' });
+    const sheet    = workbook.Sheets[workbook.SheetNames[0]];
+    const rows     = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+    const linhasMap = {};
+    S.lancamento.linhas.forEach(l => { linhasMap[String(l.cod_emp)] = l; });
+
+    const pendentes = [];
+    let processados = 0;
+
+    for (const row of rows) {
+      const codEmp = String(row[1] ?? '').trim();
+      if (!codEmp || codEmp.toLowerCase() === 'cod' || codEmp.toLowerCase() === 'código') continue;
+
+      const vtNovo   = parseDecimal(row[2]);
+      const vaNovo   = parseDecimal(row[3]);
+      const diasNovo = parseInt(row[4]) || 0;
+
+      const linha = linhasMap[codEmp];
+      if (!linha) continue;
+
+      const ind      = S.individuais[codEmp] || {};
+      const vtConfig = ind.vt_dia != null ? ind.vt_dia : (S.config?.vt.valorDia || 0);
+      const vaConfig = ind.va_dia != null ? ind.va_dia : (S.config?.va.valorDia || 0);
+
+      const divergeVt = Math.abs(vtNovo - vtConfig) > 0.001;
+      const divergeVa = Math.abs(vaNovo - vaConfig) > 0.001;
+
+      if (divergeVt || divergeVa) {
+        pendentes.push({ linha, vtNovo, vaNovo, diasNovo, vtConfig, vaConfig, divergeVt, divergeVa });
+      } else {
+        linha.vt_dia = vtNovo;
+        linha.va_dia = vaNovo;
+        linha.dias   = diasNovo;
+        calcTotaisLinha(linha);
+        linha.status = ind.vt_dia != null || ind.va_dia != null ? 'individual' : 'padrao';
+        processados++;
+      }
+    }
+
+    for (const p of pendentes) {
+      const partes = [];
+      if (p.divergeVt) partes.push(`VT: R$ ${fmtMoeda(p.vtNovo)} (configurado: R$ ${fmtMoeda(p.vtConfig)})`);
+      if (p.divergeVa) partes.push(`VA: R$ ${fmtMoeda(p.vaNovo)} (configurado: R$ ${fmtMoeda(p.vaConfig)})`);
+
+      await new Promise(resolve => {
+        $('modalDivergenciaMsg').innerHTML =
+          `Importação de <strong>${escHtml(p.linha.nome)}</strong> com divergência:<br><br>` +
+          partes.map(s => escHtml(s)).join('<br>') +
+          `<br><br>Confirmar os valores importados?`;
+
+        $('modalDivergencia').classList.remove('hidden');
+
+        function cleanup() {
+          $('modalDivergencia').classList.add('hidden');
+          $('btnDivConfirmar').removeEventListener('click', onConfirmar);
+          $('btnDivCancelar').removeEventListener('click',  onCancelar);
+        }
+        function onConfirmar() {
+          p.linha.vt_dia = p.vtNovo;
+          p.linha.va_dia = p.vaNovo;
+          p.linha.dias   = p.diasNovo;
+          calcTotaisLinha(p.linha);
+          p.linha.status = 'divergente';
+          processados++;
+          cleanup();
+          resolve();
+        }
+        function onCancelar() { cleanup(); resolve(); }
+
+        $('btnDivConfirmar').addEventListener('click', onConfirmar);
+        $('btnDivCancelar').addEventListener('click',  onCancelar);
+      });
+    }
+
+    renderGrade();
+    const total = rows.filter(r => String(r[1] ?? '').trim()).length;
+    showToast(`✅ Excel importado — ${processados} linha(s) aplicada(s)`);
+  };
+  reader.readAsArrayBuffer(file);
+}
