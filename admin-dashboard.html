@@ -878,13 +878,14 @@ function collectPermissoes(fId, cbSubClass) {
 }
 
 // ─── MODAL: APROVAR ────────────────────────────────────────
-function abrirModalAprovar(sol) {
+async function abrirModalAprovar(sol) {
     currentSolId       = sol.id;
     currentSolTelefone = sol.telefone || null;
     document.getElementById('apNome').value    = sol.nome;
     document.getElementById('apEmail').value   = sol.email;
     document.getElementById('apEmpresa').value = sol.empresa || '';
     document.getElementById('apCargo').value   = sol.cargo || '';
+    await loadFerramentas(); // garante lista atualizada independente de qual aba foi visitada
     buildFerCheckboxes('apFerramentas', new Set(), {}, 'cb-aprovar', 'cb-sub-aprovar');
     document.getElementById('apIsAdmin').checked    = false;
     document.getElementById('apNotifEmail').checked = true;
@@ -1086,11 +1087,11 @@ async function abrirModalEditar(user) {
     document.getElementById('edNome').value  = user.nome;
     document.getElementById('edEmail').value = user.email;
 
-    // Buscar acessos atuais do usuário (incluindo sub-permissões)
-    const { data: atuais } = await sb
-        .from('usuario_ferramentas')
-        .select('ferramenta_id, permissoes')
-        .eq('usuario_id', user.id);
+    // Buscar acessos atuais do usuário (incluindo sub-permissões) e lista fresca de ferramentas
+    const [{ data: atuais }] = await Promise.all([
+        sb.from('usuario_ferramentas').select('ferramenta_id, permissoes').eq('usuario_id', user.id),
+        loadFerramentas(),
+    ]);
 
     const idsAtuais  = new Set((atuais || []).map(a => a.ferramenta_id));
     const permAtuais = {};

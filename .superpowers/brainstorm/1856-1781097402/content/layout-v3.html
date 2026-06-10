@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layout v3 — Benefícios VA/VT</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #2c3e50; font-size: 13px; }
+  .page-title { text-align:center; padding: 14px; background: #fff; border-bottom: 1px solid #e0e6ed; }
+  .page-title h2 { font-size: 15px; color: #8B3A3A; }
+  .page-title p { font-size: 11px; color: #7f8c8d; margin-top: 2px; }
+  .app-frame { display: flex; height: calc(100vh - 56px); }
+  .sidebar { width: 205px; flex-shrink: 0; background: linear-gradient(160deg, #8B3A3A 0%, #2C3E50 100%); display: flex; flex-direction: column; color: #fff; }
+  .sidebar-brand { padding: 14px 13px 11px; border-bottom: 1px solid rgba(255,255,255,.12); }
+  .sidebar-brand .emoji { font-size: 20px; }
+  .sidebar-brand h3 { font-size: 12px; font-weight: 700; margin-top: 4px; }
+  .sidebar-brand p { font-size: 9px; opacity: .6; margin-top: 1px; }
+  .sidebar-nav { padding: 9px 7px; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; font-size: 12px; cursor: pointer; margin-bottom: 2px; }
+  .nav-item:hover { background: rgba(255,255,255,.1); }
+  .nav-item.active { background: rgba(255,255,255,.22); font-weight: 600; }
+  .main { flex: 1; overflow-y: auto; }
+  .screen { padding: 18px; }
+  .screen-hidden { display: none; }
+  .screen-header { margin-bottom: 14px; }
+  .screen-header h2 { font-size: 16px; font-weight: 700; }
+  .screen-header p { font-size: 11px; color: #7f8c8d; margin-top: 2px; }
+  .card { background: #fff; border-radius: 9px; padding: 15px; box-shadow: 0 2px 6px rgba(0,0,0,.06); margin-bottom: 13px; }
+  .card-title { font-size: 11px; font-weight: 700; color: #8B3A3A; margin-bottom: 11px; display: flex; align-items: center; gap: 5px; text-transform: uppercase; letter-spacing: .03em; }
+  .fg label { display: block; font-size: 10px; font-weight: 700; color: #7f8c8d; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+  .inp { width: 100%; padding: 7px 9px; border: 1.5px solid #e0e6ed; border-radius: 5px; font-size: 12px; background: #fff; color: #2c3e50; font-family: inherit; }
+  .inp.red { border-color: #8B3A3A; background: #fdf8f8; font-weight: 600; }
+  .inp.blue { border-color: #2980b9; background: #eaf4fb; font-weight: 600; }
+  .inp.calc { background: #f0fff4; border-color: #27AE60; color: #1a6b3a; font-weight: 700; }
+  .inp.ro { background: #f8f9fa; color: #7f8c8d; }
+  .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .g5 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .btn { padding: 7px 14px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; border: none; font-family: inherit; }
+  .btn-p { background: #8B3A3A; color: #fff; }
+  .btn-s { background: #f5f5f5; color: #2c3e50; border: 1.5px solid #ddd; }
+  .btn-g { background: #27AE60; color: #fff; }
+  .btn-b { background: #2980b9; color: #fff; }
+  .br { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .tbl th { background: #f8f9fa; padding: 6px 7px; text-align: left; font-size: 10px; color: #7f8c8d; text-transform: uppercase; border-bottom: 2px solid #e0e6ed; white-space: nowrap; }
+  .tbl td { padding: 6px 7px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; }
+  .tbl tr:hover td { background: #fdf8f8; }
+  .badge { display: inline-block; padding: 2px 6px; border-radius: 8px; font-size: 9px; font-weight: 700; }
+  .b-ok { background: #d5f5e3; color: #1e8449; }
+  .b-w { background: #fef9e7; color: #b7950b; }
+  .b-i { background: #eaf4fb; color: #1a5276; }
+  .info { background: #eaf4fb; border: 1px solid #aed6f1; border-radius: 6px; padding: 9px 12px; font-size: 10px; color: #1a5276; margin-bottom: 11px; line-height: 1.5; }
+  .warn { background: #fef9e7; border: 1px solid #f9ca56; border-radius: 6px; padding: 9px 12px; font-size: 10px; color: #7d6608; margin-bottom: 11px; line-height: 1.5; }
+  .period-row { display: flex; align-items: center; gap: 10px; background: #f8f9fa; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; }
+  .pbox { text-align: center; padding: 7px 14px; border-radius: 6px; }
+  .pbox.red { background: #fdf8f8; border: 1.5px solid #8B3A3A; }
+  .pbox.blue { background: #eaf4fb; border: 1.5px solid #2980b9; }
+  .pbox .pl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #7f8c8d; }
+  .pbox .pv { font-size: 13px; font-weight: 700; margin-top: 1px; }
+  .pbox.red .pv { color: #8B3A3A; }
+  .pbox.blue .pv { color: #2980b9; }
+  .arr { color: #7f8c8d; font-size: 10px; text-align: center; flex: 1; line-height: 1.6; }
+  .etabs { display: flex; gap: 4px; margin-bottom: 12px; }
+  .etab { padding: 6px 12px; border-radius: 16px; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .etab.active { background: #8B3A3A; color: #fff; }
+  .etab:not(.active) { background: #f0f2f5; color: #7f8c8d; }
+  .cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; max-width: 290px; }
+  .cdh { text-align: center; font-size: 9px; font-weight: 700; color: #7f8c8d; padding: 3px; }
+  .cd { text-align: center; padding: 5px 2px; border-radius: 3px; font-size: 10px; border: 1.5px solid #e0e6ed; background: #fff; }
+  .cd.work { background: #d5f5e3; border-color: #27AE60; color: #1e8449; font-weight: 700; }
+  .cd.wknd { background: #f8f9fa; color: #ccc; border-color: #f0f0f0; }
+  .cd.hol { background: #fdecea; border-color: #E74C3C; color: #c0392b; font-weight: 700; }
+  .cd.empty { border: none; background: transparent; }
+  .res { background: linear-gradient(135deg, #8B3A3A, #2C3E50); color: #fff; border-radius: 9px; padding: 16px; text-align: center; }
+  .res .rn { font-size: 36px; font-weight: 800; }
+  .res .rl { font-size: 10px; opacity: .8; margin-top: 2px; }
+  .res .rr { font-size: 9px; opacity: .6; margin-top: 1px; }
+  .formula-chip { display: inline-block; background: #f0fff4; border: 1px solid #27AE60; border-radius: 4px; padding: 1px 6px; font-size: 9px; color: #1e8449; font-weight: 700; margin-left: 4px; }
+  .ctabs { display: flex; gap: 4px; margin-bottom: 12px; }
+  .ctab { padding: 6px 12px; border-radius: 16px; font-size: 11px; font-weight: 600; cursor: pointer; }
+  .ctab.active { background: #8B3A3A; color: #fff; }
+  .ctab:not(.active) { background: #f0f2f5; color: #7f8c8d; }
+  .ei-row { display: grid; grid-template-columns: 70px 1fr 120px 120px 32px; gap: 7px; align-items: center; padding: 5px 0; border-bottom: 1px solid #f0f2f5; }
+  .ei-row.hdr { font-size: 10px; font-weight: 700; color: #7f8c8d; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="page-title">
+  <h2>Mockup v3 — Benefícios VA/VT</h2>
+  <p>Feriados integrados · Totais como fórmula automática · Navegue pelo sidebar</p>
+</div>
+<div class="app-frame">
+  <div class="sidebar">
+    <div class="sidebar-brand">
+      <div class="emoji">🎫</div>
+      <h3>Benefícios VA / VT</h3>
+      <p>Portal Scont</p>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" onclick="go('lancamentos',this)">📋 Lançamentos</div>
+      <div class="nav-item" onclick="go('escalas',this)">📅 Escalas</div>
+      <div class="nav-item" onclick="go('config',this)">⚙️ Configurações</div>
+    </div>
+  </div>
+  <div class="main">
+
+    <!-- ══ LANÇAMENTOS ══ -->
+    <div class="screen" id="s-lancamentos">
+      <div class="screen-header"><h2>📋 Lançamentos VA / VT</h2><p>Gere os lançamentos de benefícios para a folha</p></div>
+
+      <div class="period-row">
+        <div class="pbox red"><div class="pl">Competência de Pagamento</div><div class="pv">05/2026</div></div>
+        <div class="arr">← paga benefícios referentes a →<br/><span style="font-size:9px">(mês em que o empregado trabalhará)</span></div>
+        <div class="pbox blue"><div class="pl">Mês de Referência dos Dias</div><div class="pv">06/2026</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🏢 Seleção</div>
+        <div class="g4">
+          <div class="fg"><label>Empresa</label><select class="inp"><option>001 — SCONT CONTABILIDADE</option></select></div>
+          <div class="fg"><label>Competência de Pagamento ①</label><input class="inp red" value="05/2026"/></div>
+          <div class="fg"><label>Mês de Referência ②</label><input class="inp blue" value="06/2026"/></div>
+          <div class="fg"><label>Tipo de Processo</label><select class="inp"><option>11 — Folha Mensal</option></select></div>
+        </div>
+        <div class="fg"><label>Empregados</label><select class="inp"><option>Todos os empregados (32)</option></select></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💰 Valores Padrão</div>
+        <div class="g5">
+          <div class="fg"><label>VT Padrão / Dia (R$)</label><input class="inp red" value="12,50"/></div>
+          <div class="fg"><label>VA Padrão / Dia (R$)</label><input class="inp red" value="30,00"/></div>
+          <div class="fg"><label>Dias a Trabalhar ②</label><input class="inp blue" value="21" placeholder="← Escalas"/></div>
+          <div class="fg">
+            <label>Total VT Padrão <span class="formula-chip">= VT × Dias</span></label>
+            <input class="inp calc" value="R$ 262,50" readonly/>
+          </div>
+          <div class="fg">
+            <label>Total VA Padrão <span class="formula-chip">= VA × Dias</span></label>
+            <input class="inp calc" value="R$ 630,00" readonly/>
+          </div>
+        </div>
+        <div class="br">
+          <span style="font-size:10px;color:#7f8c8d">② Preenchido automaticamente pela tela Escalas</span>
+          <button class="btn btn-s" style="margin-left:auto">🔄 Aplicar Padrão a Todos</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">👥 Grade de Empregados</div>
+        <div class="br" style="margin-bottom:11px">
+          <button class="btn btn-s">📥 Importar Excel</button>
+          <div style="margin-left:auto;display:flex;gap:7px">
+            <button class="btn btn-s">💾 Salvar</button>
+            <button class="btn btn-g">📄 Gerar TXT</button>
+          </div>
+        </div>
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Cód.</th><th>Nome</th><th>VT/Dia</th><th>VA/Dia</th><th>Dias</th>
+              <th>Total VT <span class="formula-chip">auto</span></th>
+              <th>Total VA <span class="formula-chip">auto</span></th>
+              <th>Status</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>001</td><td>Ana Silva</td><td>12,50</td><td>30,00</td><td>21</td><td class="inp calc" style="padding:4px 7px;background:#f0fff4;color:#1a6b3a;font-weight:700">262,50</td><td style="color:#1a6b3a;font-weight:700">630,00</td><td><span class="badge b-ok">Padrão</span></td><td>✏️</td></tr>
+            <tr><td>002</td><td>Bruno Costa</td><td style="color:#2980b9;font-weight:700">18,00</td><td>30,00</td><td>20</td><td style="color:#1a6b3a;font-weight:700">360,00</td><td style="color:#1a6b3a;font-weight:700">600,00</td><td><span class="badge b-i">Individual</span></td><td>✏️</td></tr>
+            <tr><td>003</td><td>Carlos Mendes</td><td>12,50</td><td>30,00</td><td>21</td><td style="color:#1a6b3a;font-weight:700">262,50</td><td style="color:#1a6b3a;font-weight:700">630,00</td><td><span class="badge b-ok">Padrão</span></td><td>✏️</td></tr>
+            <tr><td>004</td><td>Diana Rocha</td><td style="color:#E74C3C;font-weight:700">15,00 ⚠</td><td>30,00</td><td>21</td><td style="color:#1a6b3a;font-weight:700">315,00</td><td style="color:#1a6b3a;font-weight:700">630,00</td><td><span class="badge b-w">Divergente</span></td><td>✏️</td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:8px;font-size:9px;color:#7f8c8d">
+          <span class="badge b-ok">Padrão</span> valor da empresa &nbsp;
+          <span class="badge b-i">Individual</span> valor pré-configurado &nbsp;
+          <span class="badge b-w">Divergente</span> importado ≠ configurado → confirmação exigida
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ESCALAS ══ -->
+    <div class="screen screen-hidden" id="s-escalas">
+      <div class="screen-header"><h2>📅 Escalas — Dias Úteis</h2><p>Calcule os dias do <strong>mês de referência</strong> e envie para Lançamentos</p></div>
+
+      <div class="card">
+        <div class="card-title">📌 Parâmetros</div>
+        <div class="g3">
+          <div class="fg"><label>Empresa</label><select class="inp"><option>001 — SCONT CONTABILIDADE</option></select></div>
+          <div class="fg"><label>Mês de Referência (empregado vai trabalhar)</label><input class="inp blue" value="06/2026"/></div>
+          <div class="fg">
+            <label>Considerar Feriados desta empresa?</label>
+            <select class="inp" onchange="toggleFeriados(this)">
+              <option value="sim">✅ Sim — descontar feriados cadastrados</option>
+              <option value="nao">❌ Não — ignorar feriados</option>
+            </select>
+          </div>
+        </div>
+        <div class="info" style="margin:0">
+          📌 <strong>Mês de referência ≠ competência de pagamento.</strong> Folha de <strong>maio/2026</strong> → benefícios de <strong>junho/2026</strong> (mês futuro de trabalho).
+        </div>
+      </div>
+
+      <!-- Tabela de feriados (visível quando "sim") -->
+      <div id="feriados-box" class="card">
+        <div class="card-title">🗓️ Feriados Cadastrados — Junho 2026 <span style="font-size:10px;font-weight:400;color:#7f8c8d">(mesmos do Controle de Frequência)</span></div>
+        <div class="info" style="margin-bottom:10px">
+          Os feriados abaixo são os mesmos cadastrados na ferramenta <strong>Controle de Frequência</strong> para a empresa selecionada. Desmarque os que não devem ser descontados neste cálculo.
+        </div>
+        <table class="tbl">
+          <thead><tr><th></th><th>Data</th><th>Descrição</th><th>Tipo</th></tr></thead>
+          <tbody>
+            <tr><td><input type="checkbox" checked/></td><td>13/06/2026</td><td>Corpus Christi</td><td><span class="badge b-ok">Nacional</span></td></tr>
+            <tr><td><input type="checkbox" checked/></td><td>24/06/2026</td><td>São João</td><td><span class="badge b-i">Municipal</span></td></tr>
+            <tr><td><input type="checkbox"/></td><td>20/06/2026</td><td>Aniversário da empresa</td><td><span class="badge" style="background:#f3e8ff;color:#6b21a8">Empresa</span></td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:9px;color:#7f8c8d;margin-top:7px">✓ Marcado = será descontado do total de dias úteis</p>
+      </div>
+
+      <div class="etabs">
+        <div class="etab active">📆 Dias da semana</div>
+        <div class="etab">🔄 Revezamento</div>
+        <div class="etab">🖱️ Manual</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 190px;gap:16px;align-items:start">
+        <div>
+          <div class="card">
+            <div class="card-title">📆 Dias trabalhados na semana</div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
+              <div style="padding:5px 11px;background:#d5f5e3;border:1.5px solid #27AE60;border-radius:14px;font-size:11px;cursor:pointer;font-weight:700;color:#1e8449">✓ Seg</div>
+              <div style="padding:5px 11px;background:#d5f5e3;border:1.5px solid #27AE60;border-radius:14px;font-size:11px;cursor:pointer;font-weight:700;color:#1e8449">✓ Ter</div>
+              <div style="padding:5px 11px;background:#d5f5e3;border:1.5px solid #27AE60;border-radius:14px;font-size:11px;cursor:pointer;font-weight:700;color:#1e8449">✓ Qua</div>
+              <div style="padding:5px 11px;background:#d5f5e3;border:1.5px solid #27AE60;border-radius:14px;font-size:11px;cursor:pointer;font-weight:700;color:#1e8449">✓ Qui</div>
+              <div style="padding:5px 11px;background:#d5f5e3;border:1.5px solid #27AE60;border-radius:14px;font-size:11px;cursor:pointer;font-weight:700;color:#1e8449">✓ Sex</div>
+              <div style="padding:5px 11px;background:#f8f9fa;border:1.5px solid #e0e6ed;border-radius:14px;font-size:11px;cursor:pointer;color:#ccc">Sáb</div>
+              <div style="padding:5px 11px;background:#f8f9fa;border:1.5px solid #e0e6ed;border-radius:14px;font-size:11px;cursor:pointer;color:#ccc">Dom</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">🗓️ Junho 2026 — Prévia</div>
+            <div class="cal">
+              <div class="cdh">D</div><div class="cdh">S</div><div class="cdh">T</div><div class="cdh">Q</div><div class="cdh">Q</div><div class="cdh">S</div><div class="cdh">S</div>
+              <div class="cd empty"></div>
+              <div class="cd work">2</div><div class="cd work">3</div><div class="cd work">4</div><div class="cd work">5</div><div class="cd work">6</div><div class="cd wknd">7</div>
+              <div class="cd wknd">8</div><div class="cd work">9</div><div class="cd work">10</div><div class="cd work">11</div><div class="cd work">12</div><div class="cd hol" title="Corpus Christi">13</div><div class="cd wknd">14</div>
+              <div class="cd wknd">15</div><div class="cd work">16</div><div class="cd work">17</div><div class="cd work">18</div><div class="cd work">19</div><div class="cd work">20</div><div class="cd wknd">21</div>
+              <div class="cd wknd">22</div><div class="cd work">23</div><div class="cd hol" title="São João">24</div><div class="cd work">25</div><div class="cd work">26</div><div class="cd work">27</div><div class="cd wknd">28</div>
+              <div class="cd wknd">29</div><div class="cd work">30</div>
+            </div>
+            <p style="font-size:9px;color:#7f8c8d;margin-top:7px">🟢 Trabalhado &nbsp; ⬜ Fim de semana &nbsp; 🔴 Feriado descontado</p>
+          </div>
+        </div>
+        <div>
+          <div class="res" style="margin-bottom:12px">
+            <div style="font-size:9px;opacity:.7;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Mês de Referência</div>
+            <div style="font-size:15px;font-weight:700">Junho / 2026</div>
+            <div class="rn" style="margin-top:6px">21</div>
+            <div class="rl">dias úteis</div>
+            <div class="rr">22 úteis − 2 feriados marcados</div>
+          </div>
+          <button class="btn btn-b" style="width:100%;padding:10px;font-size:11px;margin-bottom:8px">
+            ➜ Aplicar nos Lançamentos<br/>
+            <span style="font-size:9px;opacity:.85;font-weight:400">Define "Dias = 21" para Jun/2026</span>
+          </button>
+          <div class="info" style="margin:0;font-size:10px">
+            Após aplicar, clique em <strong>"Aplicar Padrão a Todos"</strong> na tela de Lançamentos.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ CONFIGURAÇÕES ══ -->
+    <div class="screen screen-hidden" id="s-config">
+      <div class="screen-header"><h2>⚙️ Configurações</h2><p>Rubricas, valores padrão e valores individuais por empregado</p></div>
+
+      <div class="card">
+        <div class="card-title">🏢 Empresa</div>
+        <div class="fg" style="max-width:280px"><label>Selecionar</label><select class="inp"><option>001 — SCONT CONTABILIDADE</option></select></div>
+      </div>
+
+      <div class="ctabs">
+        <div class="ctab active" onclick="showCTab('empresa',this)">🏢 Padrão da Empresa</div>
+        <div class="ctab" onclick="showCTab('ind',this)">👤 Valores Individuais</div>
+      </div>
+
+      <div id="ct-empresa">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <div class="card">
+            <div class="card-title">🚌 Vale Transporte</div>
+            <div class="fg"><label>Código da Rubrica</label><input class="inp" value="0285"/></div>
+            <div class="fg"><label>Tipo de Processo Padrão</label><select class="inp"><option>11 — Folha Mensal</option></select></div>
+            <div class="fg"><label>Valor Padrão / Dia (R$)</label><input class="inp red" value="12,50"/></div>
+          </div>
+          <div class="card">
+            <div class="card-title">🍽️ Vale Alimentação</div>
+            <div class="fg"><label>Código da Rubrica</label><input class="inp" value="0286"/></div>
+            <div class="fg"><label>Tipo de Processo Padrão</label><select class="inp"><option>11 — Folha Mensal</option></select></div>
+            <div class="fg"><label>Valor Padrão / Dia (R$)</label><input class="inp red" value="30,00"/></div>
+          </div>
+        </div>
+        <div class="br" style="justify-content:flex-end"><button class="btn btn-p">💾 Salvar Padrões</button></div>
+      </div>
+
+      <div id="ct-ind" style="display:none">
+        <div class="info">
+          👤 Valores individuais substituem o padrão da empresa para o empregado. Mais comum para VT (custo de transporte varia por trajeto). Campos em branco = usa padrão da empresa.
+        </div>
+        <div class="card">
+          <div class="card-title">👥 Valores por Empregado</div>
+          <div class="ei-row hdr"><span>Código</span><span>Nome</span><span>VT / Dia Individual</span><span>VA / Dia Individual</span><span></span></div>
+          <div class="ei-row"><span style="color:#7f8c8d">001</span><span>Ana Silva</span><input class="inp ro" value="— padrão R$ 12,50" readonly/><input class="inp ro" value="— padrão R$ 30,00" readonly/><span>✏️</span></div>
+          <div class="ei-row"><span style="color:#7f8c8d">002</span><span>Bruno Costa</span><input class="inp blue" value="18,00"/><input class="inp ro" value="— padrão R$ 30,00" readonly/><span>💾</span></div>
+          <div class="ei-row"><span style="color:#7f8c8d">003</span><span>Carlos Mendes</span><input class="inp ro" value="— padrão R$ 12,50" readonly/><input class="inp ro" value="— padrão R$ 30,00" readonly/><span>✏️</span></div>
+          <div class="ei-row"><span style="color:#7f8c8d">004</span><span>Diana Rocha</span><input class="inp blue" value="15,00"/><input class="inp ro" value="— padrão R$ 30,00" readonly/><span>💾</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app-frame -->
+<script>
+function go(name, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('screen-hidden'));
+  document.getElementById('s-' + name).classList.remove('screen-hidden');
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+}
+function showCTab(name, el) {
+  ['empresa','ind'].forEach(t => { const e = document.getElementById('ct-' + t); if(e) e.style.display = 'none'; });
+  const el2 = document.getElementById('ct-' + name); if(el2) el2.style.display = 'block';
+  document.querySelectorAll('.ctab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+}
+function toggleFeriados(sel) {
+  document.getElementById('feriados-box').style.display = sel.value === 'sim' ? 'block' : 'none';
+}
+</script>
+</body>
+</html>

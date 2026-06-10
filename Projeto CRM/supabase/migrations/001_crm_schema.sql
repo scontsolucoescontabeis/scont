@@ -280,3 +280,18 @@ CREATE POLICY "conversa_tags_delete" ON conversa_tags FOR DELETE TO authenticate
 -- VALUES ('crm-midia', 'crm-midia', true)
 -- ON CONFLICT (id) DO NOTHING;
 -- ============================================================
+
+-- ============================================================
+-- Políticas extras: acesso do Simulador WhatsApp
+-- Admins do Portal (is_admin = TRUE) precisam ler conversas e
+-- mensagens sem ter um registro na tabela usuarios do CRM.
+-- ============================================================
+DROP POLICY IF EXISTS "conversas_select_portal_admin" ON conversas;
+CREATE POLICY "conversas_select_portal_admin" ON conversas
+  FOR SELECT TO authenticated
+  USING (public.is_admin());
+
+DROP POLICY IF EXISTS "mensagens_select_portal_admin" ON mensagens;
+CREATE POLICY "mensagens_select_portal_admin" ON mensagens
+  FOR SELECT TO authenticated
+  USING (public.is_admin());

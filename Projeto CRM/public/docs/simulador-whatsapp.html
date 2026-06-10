@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador WhatsApp — SCONT CRM Dev</title>
   <!-- Credenciais centralizadas do portal (nunca no código) -->
-  <script src="../../supabase-config.js"></script>
+  <script src="../../../supabase-config.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <!-- Guarda de autenticação do portal -->
-  <script src="../../portal-auth-guard.js"></script>
+  <script src="../../../portal-auth-guard.js"></script>
   <script>
     // ── Estado global ──────────────────────────────────────────
     let sbClient      = null
@@ -311,7 +311,7 @@
     // ── Bootstrap ───────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', async () => {
       // Verifica autenticação; redireciona para login se não autorizado
-      const auth = await window.PortalAuthGuard.init(2)
+      const auth = await window.PortalAuthGuard.init(3)
       if (!auth) return
 
       // Auth OK — exibe o app

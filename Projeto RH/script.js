@@ -2323,11 +2323,11 @@ function _adicionarLancamentoAdicional() {
     valInput.type = 'text';
     valInput.className = 'lanc-valor';
     valInput.maxLength = 9;
-    valInput.placeholder = 'Ex: 500';
+    valInput.placeholder = 'Ex: 500,00';
     valInput.style.cssText = 'padding:5px 6px;border:1px solid #ced4da;border-radius:4px;font-size:12px;font-family:monospace;width:100%;box-sizing:border-box;';
 
     tipoSel.onchange = function() {
-        const placeholders = { monetario: 'Ex: 500', horas: 'Ex: 01:30', dias: 'Ex: 22' };
+        const placeholders = { monetario: 'Ex: 500,00', horas: 'Ex: 01:30', dias: 'Ex: 22' };
         valInput.placeholder = placeholders[this.value] || 'Valor';
     };
 
@@ -2374,6 +2374,8 @@ function _construirLinhasAdicionais(compFmt, codEmpresa, tipoProcesso) {
         if (tipo === 'horas') {
             const parts = valorStr.match(/^(\d{1,3}):(\d{2})$/);
             valorInt = parts ? parseInt(parts[1]) * 100 + parseInt(parts[2]) : (parseInt(valorStr) || 0);
+        } else if (tipo === 'monetario') {
+            valorInt = parseInt(valorStr.replace(',', '')) || 0;
         } else {
             valorInt = parseInt(valorStr) || 0;
         }

@@ -617,28 +617,11 @@
             return card;
         }
 
-        function criarCardSimulador() {
-            const card = document.createElement('div');
-            card.className = 'ferramenta-card';
-            card.style.cssText = 'border: 2px solid #1a7a4a; background: linear-gradient(135deg, #f0fff8, #fff);';
-            card.innerHTML = `
-                <div class="ferramenta-icon">💬</div>
-                <div class="ferramenta-nome">Simulador WhatsApp</div>
-                <div class="ferramenta-desc">Testar fluxo do chatbot com mensagens simuladas</div>
-                <button class="btn-acessar" style="background: #1a7a4a;">Acessar →</button>
-            `;
-            const acessar = () => { window.location.href = 'crm/docs/simulador-whatsapp.html'; };
-            card.addEventListener('click', acessar);
-            card.querySelector('button').addEventListener('click', (e) => { e.stopPropagation(); acessar(); });
-            return card;
-        }
-
         function renderFerramentas(ferramentas, isAdmin) {
             const grid = document.getElementById('ferramentasGrid');
             grid.innerHTML = '';
             if (isAdmin) {
                 grid.appendChild(criarCardAdmin());
-                grid.appendChild(criarCardSimulador());
             }
             ferramentas.forEach(f => grid.appendChild(criarCardFerramenta(f)));
         }

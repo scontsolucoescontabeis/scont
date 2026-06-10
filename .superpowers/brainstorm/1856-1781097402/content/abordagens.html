@@ -1,0 +1,45 @@
+<h2>Como estruturar a ferramenta?</h2>
+<p class="subtitle">Escolha a abordagem arquitetural antes de detalhar o design</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Arquivo único (index.html + script.js + styles.css)</h3>
+      <p>Mesmo padrão do Controle de Frequência. Sidebar troca seções via JavaScript — sem recarregar a página. Lançamentos, Configurações e Escalas ficam em "telas" dentro do mesmo arquivo.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Prós</h4><ul><li>Consistente com as ferramentas existentes</li><li>Uma única verificação de auth</li><li>Navegação instantânea entre telas</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Arquivo JS pode ficar grande (~1500 linhas)</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Múltiplos arquivos HTML (uma página por tela)</h3>
+      <p>index.html = Lançamentos, configuracoes.html, escalas.html. Cada página tem seu próprio guard de auth. Sidebar linka entre as páginas.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Prós</h4><ul><li>Cada arquivo é menor e mais focado</li><li>Mais fácil de manter isoladamente</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Estado não persiste entre navegações (recarrega)</li><li>3 verificações de auth separadas</li><li>Mais arquivos para gerenciar</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Arquivo único com módulos JS separados por tela</h3>
+      <p>index.html único com sidebar, mas o JS de cada tela fica em arquivos separados (lancamentos.js, configuracoes.js, escalas.js) importados dinamicamente. Melhor organização sem perder a fluidez.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Prós</h4><ul><li>Navegação fluida + código organizado</li><li>Uma auth, estado compartilhado entre telas</li></ul></div>
+        <div class="cons"><h4>Contras</h4><ul><li>Ligeiramente mais complexo de estruturar</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:24px;padding:16px;background:#f0f4ff;border-radius:8px;border-left:4px solid #4a6cf7">
+  <p class="label">Recomendação</p>
+  <p><strong>Opção A</strong> — segue exatamente o padrão do Controle de Frequência que já funciona bem no portal. O JS será dividido em funções bem nomeadas por responsabilidade dentro do script.js, mantendo tudo legível.</p>
+</div>

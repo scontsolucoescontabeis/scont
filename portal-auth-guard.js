@@ -35,6 +35,13 @@ window.PortalAuthGuard = (function () {
         return (segs[segs.length - 2] + '/' + segs[segs.length - 1]).toLowerCase();
     }
 
+    /** Retorna o caminho completo normalizado (todos os segmentos, minúsculo) */
+    function pathCompleto() {
+        return decodeURIComponent(window.location.pathname)
+            .replace(/\\/g, '/')
+            .split('/').filter(Boolean).join('/').toLowerCase();
+    }
+
     /**
      * Verifica autenticação e autorização. Redireciona para login se não autorizado.
      * @param {number} depthToRoot  Níveis de pasta até a raiz do portal (padrão: 1)
@@ -93,10 +100,15 @@ window.PortalAuthGuard = (function () {
             );
 
         const atual = paginaAtual();
+        const fullPath = pathCompleto();
         const pastaAtual = atual.split('/')[0];
 
-        // Acesso permitido se: URL exata autorizada OU qualquer ferramenta da mesma pasta está autorizada
-        const autorizado = urlsAutorizadas.some(u => u === atual || u.startsWith(pastaAtual + '/'));
+        // Acesso permitido se: URL exata (last-2 match), mesma pasta, ou URL completa é sufixo do path atual
+        const autorizado = urlsAutorizadas.some(u =>
+            u === atual ||
+            u.startsWith(pastaAtual + '/') ||
+            fullPath.endsWith(u)
+        );
         if (!autorizado) { redirecionar(depthToRoot, returnTo); return null; }
 
         return auth;

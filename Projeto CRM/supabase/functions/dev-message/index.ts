@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -62,9 +63,9 @@ serve(async (req) => {
   }
 
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const webhookUrl = `${SUPABASE_URL}/functions/v1/whatsapp-webhook`
 
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const res = await fetch(webhookUrl, {
     method: 'POST',
     headers: {
@@ -76,6 +77,18 @@ serve(async (req) => {
   })
 
   const data = await res.json().catch(() => ({ ok: res.ok }))
+
+  // Busca o histórico completo usando service role (bypass RLS)
+  // para que o simulador não precise de permissões de agente CRM
+  if (res.ok && data.conversa_id) {
+    const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    const { data: mensagens } = await sb
+      .from('mensagens')
+      .select('id, origem, conteudo, criado_em, agente_id, usuarios(nome)')
+      .eq('conversa_id', data.conversa_id)
+      .order('criado_em', { ascending: true })
+    data.mensagens = mensagens || []
+  }
 
   return new Response(
     JSON.stringify(data),
