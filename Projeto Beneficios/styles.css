@@ -108,6 +108,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #F0F2F5; colo
 .day-toggles { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
 .day-btn { padding: 6px 12px; border-radius: 16px; border: 1.5px solid #E0E6ED; background: #F8F9FA; color: #BDC3C7; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s; }
 .day-btn.active { background: #D5F5E3; border-color: #27AE60; color: #1E8449; }
+.day-btn:not(.active):hover { background: #F0F2F5; border-color: #BDC3C7; color: #7F8C8D; }
 .escala-label { font-size: 11px; color: #27AE60; font-weight: 600; }
 
 /* ── Calendar ── */
@@ -130,7 +131,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #F0F2F5; colo
 
 /* ── Modal ── */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
-.modal-box { background: #fff; border-radius: 10px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+.modal-box { background: #fff; border-radius: 10px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,.2); max-height: 90vh; overflow-y: auto; }
 .modal-title { font-size: 16px; font-weight: 700; color: #2C3E50; margin-bottom: 14px; }
 
 /* ── Toast ── */
