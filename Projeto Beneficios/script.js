@@ -592,11 +592,15 @@ function aplicarNosLancamentos() {
 function setupLancamentosListeners() {
   $('lancEmpresa').addEventListener('change', async () => {
     const emp = $('lancEmpresa').value;
-    S.lancamento.empresa = emp;
+    S.lancamento.empresa  = emp;
+    S.lancamento.compPgto = '';
+    S.lancamento.linhas   = [];
+    $('lancCompPgto').value         = '';
+    $('bannerCompPgto').textContent = '—';
     await Promise.all([loadConfig(emp), loadEmpregados(emp), loadIndividuais(emp)]);
     preencherConfigNaLancamentos();
     await tryLoadLancamento();
-    buildGrade();
+    if (!S.lancamento.linhas.length) buildGrade();
     renderGrade();
   });
 
