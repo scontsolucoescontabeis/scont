@@ -936,7 +936,7 @@ function importarExcel(file) {
 function gerarTxt() {
   const empresa  = S.lancamento.empresa;
   const compPgto = S.lancamento.compPgto;
-  const tipoProc = document.getElementById('lancTipoProc').value;
+  const tipoProc = $('lancTipoProc').value;
 
   if (!empresa || !compPgto) {
     showToast('Selecione empresa e competência', 'error');
@@ -952,6 +952,7 @@ function gerarTxt() {
   }
 
   const aaaamm    = compToAaaamm(compPgto);
+  if (!aaaamm) { showToast('Formato de competência inválido (use MM/AAAA)', 'error'); return; }
   const codEmpPad = pad(empresa, 10);
   const rubVt     = pad(S.config.vt.rubrica, 9);
   const rubVa     = pad(S.config.va.rubrica, 9);
