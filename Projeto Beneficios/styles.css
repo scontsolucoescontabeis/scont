@@ -140,3 +140,14 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: #F0F2F5; colo
 .toast.error   { background: #E74C3C; }
 .toast.info    { background: #2980B9; }
 @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── Filtro de Empregados ── */
+.filtro-wrap { position: relative; }
+.filtro-btn { width: 100%; padding: 8px 10px; border: 1.5px solid #E0E6ED; border-radius: 6px; font-size: 13px; font-family: inherit; color: #2C3E50; background: #fff; cursor: pointer; text-align: left; transition: border-color .15s; }
+.filtro-btn:hover, .filtro-btn:focus { border-color: #8B3A3A; outline: none; }
+.filtro-painel { position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 260px; background: #fff; border: 1.5px solid #E0E6ED; border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.1); z-index: 100; max-height: 200px; overflow-y: auto; }
+.filtro-item { display: flex; align-items: center; gap: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; user-select: none; }
+.filtro-item:hover { background: #F8F9FA; }
+.filtro-item input[type=checkbox] { flex-shrink: 0; accent-color: #8B3A3A; width: 14px; height: 14px; cursor: pointer; }
+.filtro-todos { font-weight: 600; color: #8B3A3A; position: sticky; top: 0; background: #fff; }
+.filtro-separador { height: 1px; background: #E0E6ED; margin: 2px 0; }

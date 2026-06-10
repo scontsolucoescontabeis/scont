@@ -12,7 +12,8 @@ const S = {
   individuais:  {},
   lancamento: {
     empresa: '', compPgto: '', mesRef: '',
-    tipoProc: '11', linhas: []
+    tipoProc: '11', linhas: [],
+    filtroEmps: new Set()
   },
   escalas: {
     modo:             'semana',
@@ -181,6 +182,88 @@ async function loadFeriadosEmpresa(empresa) {
     S.escalas.feriados = [];
   }
   S.escalas.feriadosMarcados = new Set(S.escalas.feriados.map(f => f.data));
+}
+
+// ── FILTRO DE EMPREGADOS ──────────────────────────────────
+
+function empregadosFiltrados() {
+  if (S.lancamento.filtroEmps.size === 0) return S.empregados;
+  return S.empregados.filter(e => S.lancamento.filtroEmps.has(e.codigo_empregado));
+}
+
+function atualizarBtnFiltro() {
+  const n = S.lancamento.filtroEmps.size;
+  $('btnFiltroEmp').textContent = n === 0
+    ? '👥 Todos os empregados ▾'
+    : `👥 ${n} selecionado(s) ▾`;
+}
+
+function renderFiltroPainel() {
+  const lista = $('filtroLista');
+  if (!lista) return;
+  lista.innerHTML = '';
+  const nenhumFiltro = S.lancamento.filtroEmps.size === 0;
+
+  const todosCheck = $('filtroTodos');
+  todosCheck.checked       = nenhumFiltro;
+  todosCheck.indeterminate = false;
+
+  S.empregados.forEach(emp => {
+    const checked = nenhumFiltro || S.lancamento.filtroEmps.has(emp.codigo_empregado);
+    const label = document.createElement('label');
+    label.className = 'filtro-item';
+    label.innerHTML =
+      `<input type="checkbox" data-cod="${escHtml(emp.codigo_empregado)}" ${checked ? 'checked' : ''}>` +
+      ` <span>${escHtml(emp.codigo_empregado)} — ${escHtml(emp.nome_empregado)}</span>`;
+    lista.appendChild(label);
+  });
+
+  atualizarBtnFiltro();
+}
+
+function setupFiltroPainel() {
+  $('btnFiltroEmp').addEventListener('click', e => {
+    e.stopPropagation();
+    $('filtroPainel').classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', e => {
+    if (!$('filtroPainel').contains(e.target) && e.target !== $('btnFiltroEmp')) {
+      $('filtroPainel').classList.add('hidden');
+    }
+  });
+
+  $('filtroTodos').addEventListener('change', () => {
+    if ($('filtroTodos').checked) {
+      S.lancamento.filtroEmps.clear();
+    } else {
+      S.empregados.forEach(emp => S.lancamento.filtroEmps.add(emp.codigo_empregado));
+    }
+    renderFiltroPainel();
+    buildGrade();
+    renderGrade();
+  });
+
+  $('filtroLista').addEventListener('change', e => {
+    const cb = e.target.closest('input[type=checkbox]');
+    if (!cb) return;
+    const cod = cb.dataset.cod;
+    if (S.lancamento.filtroEmps.size === 0) {
+      S.empregados.forEach(emp => S.lancamento.filtroEmps.add(emp.codigo_empregado));
+    }
+    if (cb.checked) S.lancamento.filtroEmps.add(cod);
+    else            S.lancamento.filtroEmps.delete(cod);
+    if (S.lancamento.filtroEmps.size === S.empregados.length) S.lancamento.filtroEmps.clear();
+
+    const n = S.lancamento.filtroEmps.size;
+    const todosCheck = $('filtroTodos');
+    todosCheck.checked       = n === 0;
+    todosCheck.indeterminate = n > 0 && n < S.empregados.length;
+
+    atualizarBtnFiltro();
+    buildGrade();
+    renderGrade();
+  });
 }
 
 // Stubs — implemented in Tasks 5-7
@@ -614,6 +697,8 @@ function setupLancamentosListeners() {
     $('lancCompPgto').value         = '';
     $('bannerCompPgto').textContent = '—';
     await Promise.all([loadConfig(emp), loadEmpregados(emp), loadIndividuais(emp)]);
+    S.lancamento.filtroEmps.clear();
+    renderFiltroPainel();
     preencherConfigNaLancamentos();
     await tryLoadLancamento();
     if (!S.lancamento.linhas.length) buildGrade();
@@ -652,6 +737,8 @@ function setupLancamentosListeners() {
     }
     e.target.value = '';
   });
+
+  setupFiltroPainel();
 }
 
 function preencherConfigNaLancamentos() {
@@ -701,7 +788,7 @@ function buildGrade() {
   const vaPad = parseDecimal($('lancVaDia').value) || (S.config?.va.valorDia || 0);
   const dias  = parseInt($('lancDias').value) || 0;
 
-  S.lancamento.linhas = S.empregados.map(emp => {
+  S.lancamento.linhas = empregadosFiltrados().map(emp => {
     const ind   = S.individuais[emp.codigo_empregado] || {};
     const vtDia = ind.vt_dia != null ? ind.vt_dia : vtPad;
     const vaDia = ind.va_dia != null ? ind.va_dia : vaPad;

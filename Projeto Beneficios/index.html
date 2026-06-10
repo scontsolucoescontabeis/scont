@@ -88,11 +88,18 @@
             </select>
           </div>
         </div>
-        <div class="fg">
-          <label for="lancEmpregados">Empregados</label>
-          <select id="lancEmpregados">
-            <option value="todos">Todos os empregados</option>
-          </select>
+        <div class="fg" style="position:relative">
+          <label>Empregados</label>
+          <div class="filtro-wrap">
+            <button type="button" id="btnFiltroEmp" class="filtro-btn">👥 Todos os empregados ▾</button>
+            <div id="filtroPainel" class="filtro-painel hidden">
+              <label class="filtro-item filtro-todos">
+                <input type="checkbox" id="filtroTodos" checked> <span>Todos os empregados</span>
+              </label>
+              <div class="filtro-separador"></div>
+              <div id="filtroLista"></div>
+            </div>
+          </div>
         </div>
       </div>
 
