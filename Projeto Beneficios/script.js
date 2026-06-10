@@ -928,3 +928,66 @@ function importarExcel(file) {
   };
   reader.readAsArrayBuffer(file);
 }
+
+// ============================================================
+// TXT GENERATION
+// ============================================================
+
+function gerarTxt() {
+  const empresa  = S.lancamento.empresa;
+  const compPgto = S.lancamento.compPgto;
+  const tipoProc = document.getElementById('lancTipoProc').value;
+
+  if (!empresa || !compPgto) {
+    showToast('Selecione empresa e competência', 'error');
+    return;
+  }
+  if (!S.config?.vt.rubrica || !S.config?.va.rubrica) {
+    showToast('Configure as rubricas de VT e VA em Configurações', 'error');
+    return;
+  }
+  if (!S.lancamento.linhas.length) {
+    showToast('Grade vazia', 'error');
+    return;
+  }
+
+  const aaaamm    = compToAaaamm(compPgto);
+  const codEmpPad = pad(empresa, 10);
+  const rubVt     = pad(S.config.vt.rubrica, 9);
+  const rubVa     = pad(S.config.va.rubrica, 9);
+  const tpPad     = pad(tipoProc, 2);
+  const linhas    = [];
+
+  S.lancamento.linhas.forEach(linha => {
+    const codFolhaPad = pad(linha.cod_emp, 10);
+    const dias        = parseInt(linha.dias) || 0;
+
+    const vtCentavos = Math.round(parseDecimal(linha.vt_dia) * dias * 100);
+    const vaCentavos = Math.round(parseDecimal(linha.va_dia) * dias * 100);
+
+    if (vtCentavos > 0) {
+      linhas.push(`10${codFolhaPad}${aaaamm}${rubVt}${tpPad}${pad(vtCentavos, 9)}${codEmpPad}`);
+    }
+    if (vaCentavos > 0) {
+      linhas.push(`10${codFolhaPad}${aaaamm}${rubVa}${tpPad}${pad(vaCentavos, 9)}${codEmpPad}`);
+    }
+  });
+
+  if (!linhas.length) {
+    showToast('Nenhum lançamento com valor > 0', 'error');
+    return;
+  }
+
+  const conteudo    = linhas.join('\n') + '\n';
+  const blob        = new Blob([conteudo], { type: 'text/plain;charset=utf-8' });
+  const [mm, aaaa]  = compPgto.split('/');
+  const nomeArquivo = `Beneficios_${empresa}_${mm}-${aaaa}.txt`;
+
+  const a = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = nomeArquivo;
+  a.click();
+  URL.revokeObjectURL(a.href);
+
+  showToast(`✅ ${nomeArquivo} gerado com ${linhas.length} linha(s)`);
+}
