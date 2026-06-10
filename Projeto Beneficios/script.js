@@ -22,8 +22,9 @@ const S = {
     revInicio:        '',
     diasManuais:      new Set(),
     feriados:         [],
-    feriadosMarcados: new Set(),
-    mesRef:           ''
+    feriadosMarcados:   new Set(),
+    mesRef:             '',
+    considerarFeriados: 'sim'
   }
 };
 
@@ -302,6 +303,7 @@ function setupEscalasListeners() {
   });
 
   $('escConsiderarFeriados').addEventListener('change', e => {
+    S.escalas.considerarFeriados = e.target.value;
     $('feriadosCard').style.display = e.target.value === 'sim' ? 'block' : 'none';
     calcularEAtualizar();
   });
@@ -402,6 +404,13 @@ function adicionarFeriado() {
   calcularEAtualizar();
 }
 
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function getDiasMes(mesAno) {
   const [mm, aaaa] = (mesAno || '').split('/');
   if (!mm || !aaaa) return [];
@@ -413,7 +422,7 @@ function getDiasMes(mesAno) {
 }
 
 function getFeriadosMarcadosMes(mesAno) {
-  if ($('escConsiderarFeriados').value !== 'sim') return new Set();
+  if (S.escalas.considerarFeriados !== 'sim') return new Set();
   const mm = mesAno ? mesAno.split('/')[0] : null;
   if (!mm) return new Set();
   return new Set(
@@ -431,7 +440,7 @@ function calcDiasSemana(dias, feriadosMes) {
   let feriadosDescontados = 0;
   dias.forEach(d => {
     if (!S.escalas.diasSemana.has(d.getDay())) return;
-    const ds = d.toISOString().split('T')[0];
+    const ds = toLocalDateStr(d);
     if (isFeriado(ds, feriadosMes)) { feriadosDescontados++; return; }
     trabalhados.add(ds);
   });
@@ -449,7 +458,7 @@ function calcRevezamento(dias, feriadosMes) {
     const diff = Math.floor((d - inicio) / 86400000);
     const pos  = ((diff % ciclo) + ciclo) % ciclo;
     if (pos >= S.escalas.revTrab) return;
-    const ds = d.toISOString().split('T')[0];
+    const ds = toLocalDateStr(d);
     if (isFeriado(ds, feriadosMes)) { feriadosDescontados++; return; }
     trabalhados.add(ds);
   });
@@ -502,7 +511,7 @@ function renderCalendario(trabalhados, mesRef) {
   const totalDias = new Date(ano, mes + 1, 0).getDate();
   for (let d = 1; d <= totalDias; d++) {
     const date   = new Date(ano, mes, d);
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = toLocalDateStr(date);
     const ddMm   = `${String(d).padStart(2,'0')}/${mm}`;
     const dow    = date.getDay();
     const eFer   = isFeriado(dateStr, feriadosMes);
@@ -512,9 +521,15 @@ function renderCalendario(trabalhados, mesRef) {
     el.textContent = d;
 
     if (S.escalas.modo === 'manual') {
-      const base = S.escalas.diasManuais.has(dateStr) ? 'work' : (dow === 0 || dow === 6 ? 'weekend' : '');
-      el.className = `cal-day manual-toggle${base ? ' ' + base : ''}`;
-      el.addEventListener('click', () => toggleDiaManual(dateStr));
+      if (eFer) {
+        el.className = 'cal-day holiday';
+        const fDesc = S.escalas.feriados.find(f => f.data === ddMm)?.descricao || 'Feriado';
+        el.title = escHtml(fDesc);
+      } else {
+        const base = S.escalas.diasManuais.has(dateStr) ? 'work' : (dow === 0 || dow === 6 ? 'weekend' : '');
+        el.className = `cal-day manual-toggle${base ? ' ' + base : ''}`;
+        el.addEventListener('click', () => toggleDiaManual(dateStr));
+      }
     } else if (eFer) {
       el.className = 'cal-day holiday';
       const fDesc = S.escalas.feriados.find(f => f.data === ddMm)?.descricao || 'Feriado';
