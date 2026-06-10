@@ -179,6 +179,114 @@ async function loadFeriadosEmpresa(empresa) {
 }
 
 // Stubs — implemented in Tasks 5-7
-function setupConfigListeners()     {}
+function setupConfigListeners() {
+  $('cfgEmpresa').addEventListener('change', async () => {
+    const emp = $('cfgEmpresa').value;
+    await Promise.all([loadConfig(emp), loadEmpregados(emp), loadIndividuais(emp)]);
+    renderConfigPadrao();
+    renderIndividuais();
+  });
+
+  $('cfgTabBar').addEventListener('click', e => {
+    const tab = e.target.closest('.tab-btn')?.dataset.tab;
+    if (!tab) return;
+    $('cfgTabBar').querySelectorAll('.tab-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === tab)
+    );
+    $('cfgTabPadrao').classList.toggle('hidden', tab !== 'padrao');
+    $('cfgTabIndividual').classList.toggle('hidden', tab !== 'individual');
+  });
+
+  $('btnSalvarConfig').addEventListener('click', saveConfigPadrao);
+}
+
+function renderConfigPadrao() {
+  if (!S.config) return;
+  $('cfgVtRubrica').value  = S.config.vt.rubrica;
+  $('cfgVtTipoProc').value = S.config.vt.tipoProc;
+  $('cfgVtValorDia').value = S.config.vt.valorDia || '';
+  $('cfgVaRubrica').value  = S.config.va.rubrica;
+  $('cfgVaTipoProc').value = S.config.va.tipoProc;
+  $('cfgVaValorDia').value = S.config.va.valorDia || '';
+}
+
+async function saveConfigPadrao() {
+  const emp = $('cfgEmpresa').value;
+  if (!emp) { showToast('Selecione uma empresa', 'error'); return; }
+
+  const rows = [
+    { codigo_empresa: emp, tipo: 'vt',
+      codigo_rubrica: $('cfgVtRubrica').value.trim(),
+      tipo_processo:  $('cfgVtTipoProc').value,
+      valor_dia:      parseDecimal($('cfgVtValorDia').value) },
+    { codigo_empresa: emp, tipo: 'va',
+      codigo_rubrica: $('cfgVaRubrica').value.trim(),
+      tipo_processo:  $('cfgVaTipoProc').value,
+      valor_dia:      parseDecimal($('cfgVaValorDia').value) }
+  ];
+
+  const { error } = await S.sb
+    .from('rh_beneficios_config')
+    .upsert(rows, { onConflict: 'codigo_empresa,tipo' });
+
+  if (error) { showToast('Erro ao salvar: ' + error.message, 'error'); return; }
+  await loadConfig(emp);
+  showToast('✅ Configurações salvas!');
+}
+
+function renderIndividuais() {
+  const tbody = $('indTbody');
+  tbody.innerHTML = '';
+  if (!S.empregados.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#7f8c8d;padding:16px">Selecione uma empresa</td></tr>';
+    return;
+  }
+  S.empregados.forEach(emp => {
+    const ind = S.individuais[emp.codigo_empregado] || {};
+    const vtVal = ind.vt_dia != null ? ind.vt_dia : '';
+    const vaVal = ind.va_dia != null ? ind.va_dia : '';
+    const vtPlaceholder = S.config ? `padrão R$ ${fmtMoeda(S.config.vt.valorDia)}` : 'padrão';
+    const vaPlaceholder = S.config ? `padrão R$ ${fmtMoeda(S.config.va.valorDia)}` : 'padrão';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:#7f8c8d">${escHtml(emp.codigo_empregado)}</td>
+      <td>${escHtml(emp.nome_empregado)}</td>
+      <td><input type="number" step="0.01" min="0"
+            class="ind-vt" data-cod="${escHtml(emp.codigo_empregado)}"
+            value="${escHtml(String(vtVal))}" placeholder="${escHtml(vtPlaceholder)}"
+            style="width:120px"></td>
+      <td><input type="number" step="0.01" min="0"
+            class="ind-va" data-cod="${escHtml(emp.codigo_empregado)}"
+            value="${escHtml(String(vaVal))}" placeholder="${escHtml(vaPlaceholder)}"
+            style="width:120px"></td>
+      <td><button type="button" class="btn btn-sm btn-secondary btn-salvar-ind"
+            data-cod="${escHtml(emp.codigo_empregado)}">💾</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.btn-salvar-ind').forEach(btn => {
+    btn.addEventListener('click', () => saveIndividual($('cfgEmpresa').value, btn.dataset.cod));
+  });
+}
+
+async function saveIndividual(empresa, codEmp) {
+  const vtInput = document.querySelector(`.ind-vt[data-cod="${codEmp}"]`);
+  const vaInput = document.querySelector(`.ind-va[data-cod="${codEmp}"]`);
+  const vt = vtInput.value.trim() === '' ? null : parseDecimal(vtInput.value);
+  const va = vaInput.value.trim() === '' ? null : parseDecimal(vaInput.value);
+
+  const { error } = await S.sb
+    .from('rh_beneficios_individuais')
+    .upsert(
+      { codigo_empresa: empresa, codigo_empregado: codEmp, vt_valor_dia: vt, va_valor_dia: va },
+      { onConflict: 'codigo_empresa,codigo_empregado' }
+    );
+
+  if (error) { showToast('Erro: ' + error.message, 'error'); return; }
+  await loadIndividuais(empresa);
+  showToast('✅ Valor individual salvo!');
+}
+
 function setupEscalasListeners()    {}
 function setupLancamentosListeners() {}
