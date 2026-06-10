@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Benefícios VA/VT — Portal Scont</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="../supabase-config.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="../portal-auth-guard.js"></script>
+</head>
+<body>
+
+<!-- Auth overlay -->
+<div id="authOverlay">
+  <div class="auth-spinner"></div>
+  <p class="auth-msg">Verificando acesso…</p>
+</div>
+
+<!-- App (oculto até auth confirmada) -->
+<div id="app" class="app-layout" style="display:none">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">🎫</div>
+      <div class="brand-text">
+        <h2>Benefícios</h2>
+        <p>VA / VT · Portal Scont</p>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-btn active" data-screen="lancamentos">📋 Lançamentos</button>
+      <button class="nav-btn"        data-screen="escalas">📅 Escalas</button>
+      <button class="nav-btn"        data-screen="config">⚙️ Configurações</button>
+    </nav>
+    <div class="sidebar-footer" id="sidebarUser"></div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+
+    <!-- ── LANÇAMENTOS ── -->
+    <section id="screen-lancamentos" class="screen">
+      <div class="screen-header">
+        <h1>📋 Lançamentos VA / VT</h1>
+        <p>Gere os lançamentos de benefícios para a folha</p>
+      </div>
+
+      <!-- Banner de competências -->
+      <div class="period-banner" id="periodBanner">
+        <div class="period-box period-red">
+          <span class="period-label">Competência de Pagamento</span>
+          <span class="period-value" id="bannerCompPgto">—</span>
+        </div>
+        <div class="period-arrow">← paga benefícios referentes a →<br><small>mês que o empregado vai trabalhar</small></div>
+        <div class="period-box period-blue">
+          <span class="period-label">Mês de Referência dos Dias</span>
+          <span class="period-value" id="bannerMesRef">—</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">🏢 Seleção</h3>
+        <div class="form-grid-4">
+          <div class="fg">
+            <label for="lancEmpresa">Empresa</label>
+            <select id="lancEmpresa"><option value="">Selecione…</option></select>
+          </div>
+          <div class="fg">
+            <label for="lancCompPgto">Competência de Pagamento ①</label>
+            <input id="lancCompPgto" type="text" placeholder="MM/AAAA" maxlength="7">
+          </div>
+          <div class="fg">
+            <label for="lancMesRef">Mês de Referência dos Dias ②</label>
+            <input id="lancMesRef" type="text" placeholder="MM/AAAA" maxlength="7" class="input-blue">
+          </div>
+          <div class="fg">
+            <label for="lancTipoProc">Tipo de Processo</label>
+            <select id="lancTipoProc">
+              <option value="11">11 — Folha Mensal</option>
+              <option value="41">41 — Adiantamento Salarial</option>
+              <option value="42">42 — Folha Complementar</option>
+              <option value="51">51 — Adiantamento 13º</option>
+              <option value="52">52 — 13º Salário</option>
+              <option value="70">70 — PLR</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg">
+          <label for="lancEmpregados">Empregados</label>
+          <select id="lancEmpregados">
+            <option value="todos">Todos os empregados</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">💰 Valores Padrão</h3>
+        <div class="form-grid-5">
+          <div class="fg">
+            <label for="lancVtDia">VT Padrão / Dia (R$)</label>
+            <input id="lancVtDia" type="number" step="0.01" min="0" placeholder="0,00" class="input-red">
+          </div>
+          <div class="fg">
+            <label for="lancVaDia">VA Padrão / Dia (R$)</label>
+            <input id="lancVaDia" type="number" step="0.01" min="0" placeholder="0,00" class="input-red">
+          </div>
+          <div class="fg">
+            <label for="lancDias">Dias a Trabalhar ②</label>
+            <input id="lancDias" type="number" min="0" max="31" placeholder="0" class="input-blue">
+          </div>
+          <div class="fg">
+            <label>Total VT Padrão <span class="formula-chip">= VT × Dias</span></label>
+            <input id="lancTotalVt" type="text" readonly class="input-calc">
+          </div>
+          <div class="fg">
+            <label>Total VA Padrão <span class="formula-chip">= VA × Dias</span></label>
+            <input id="lancTotalVa" type="text" readonly class="input-calc">
+          </div>
+        </div>
+        <div class="btn-row">
+          <span class="hint-text">② Preenchido automaticamente pela tela Escalas</span>
+          <button id="btnAplicarPadrao" class="btn btn-secondary">🔄 Aplicar Padrão a Todos</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">👥 Grade de Empregados</h3>
+        <div class="btn-row" style="margin-bottom:12px">
+          <button id="btnImportarExcel" class="btn btn-secondary">📥 Importar Excel</button>
+          <input id="inputExcel" type="file" accept=".xlsx,.xls" style="display:none">
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button id="btnSalvar" class="btn btn-secondary">💾 Salvar</button>
+            <button id="btnGerarTxt" class="btn btn-success">📄 Gerar TXT</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table" id="gradeTable">
+            <thead>
+              <tr>
+                <th>Cód.</th><th>Nome</th>
+                <th>VT/Dia</th><th>VA/Dia</th><th>Dias</th>
+                <th>Total VT <span class="formula-chip">auto</span></th>
+                <th>Total VA <span class="formula-chip">auto</span></th>
+                <th>Status</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="gradeTbody"></tbody>
+          </table>
+        </div>
+        <p class="hint-text" style="margin-top:8px">
+          <span class="badge badge-ok">Padrão</span> valor da empresa &nbsp;
+          <span class="badge badge-ind">Individual</span> valor pré-configurado &nbsp;
+          <span class="badge badge-warn">Divergente</span> difere do configurado → confirmação exigida
+        </p>
+      </div>
+    </section>
+
+    <!-- ── ESCALAS ── -->
+    <section id="screen-escalas" class="screen hidden">
+      <div class="screen-header">
+        <h1>📅 Escalas — Dias Úteis</h1>
+        <p>Calcule os dias do <strong>mês de referência</strong> e envie para Lançamentos</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">📌 Parâmetros</h3>
+        <div class="form-grid-3">
+          <div class="fg">
+            <label for="escEmpresa">Empresa</label>
+            <select id="escEmpresa"><option value="">Selecione…</option></select>
+          </div>
+          <div class="fg">
+            <label for="escMesRef">Mês de Referência (mês de trabalho)</label>
+            <input id="escMesRef" type="text" placeholder="MM/AAAA" maxlength="7" class="input-blue">
+          </div>
+          <div class="fg">
+            <label for="escConsiderarFeriados">Considerar Feriados desta empresa?</label>
+            <select id="escConsiderarFeriados">
+              <option value="sim">✅ Sim — descontar feriados cadastrados</option>
+              <option value="nao">❌ Não — ignorar feriados</option>
+            </select>
+          </div>
+        </div>
+        <div class="info-box">
+          📌 <strong>Mês de referência ≠ competência de pagamento.</strong>
+          Folha de <strong>maio/2026</strong> → benefícios de <strong>junho/2026</strong>.
+        </div>
+      </div>
+
+      <!-- Tabela de feriados (visível quando sim) -->
+      <div class="card" id="feriadosCard" style="display:none">
+        <h3 class="card-title">🗓️ Feriados do Mês <span class="card-subtitle">(mesmos do Controle de Frequência)</span></h3>
+        <div class="info-box" style="margin-bottom:10px">
+          Feriados carregados do histórico da empresa. Marque os que devem ser descontados do total.
+        </div>
+        <table class="data-table" id="feriadosTable">
+          <thead><tr><th style="width:36px"></th><th>Data</th><th>Descrição</th></tr></thead>
+          <tbody id="feriadosTbody"></tbody>
+        </table>
+        <div class="btn-row" style="margin-top:10px">
+          <button id="btnAddFeriado" class="btn btn-secondary btn-sm">+ Adicionar feriado</button>
+        </div>
+        <div id="addFeriadoForm" style="display:none;margin-top:10px" class="form-grid-3">
+          <div class="fg"><label>Data (DD/MM)</label><input id="novaDataFeriado" type="text" placeholder="13/06" maxlength="5"></div>
+          <div class="fg"><label>Descrição</label><input id="novaDescFeriado" type="text" placeholder="Corpus Christi"></div>
+          <div class="fg" style="display:flex;align-items:flex-end">
+            <button id="btnConfirmarFeriado" class="btn btn-primary btn-sm">Confirmar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Abas de modo -->
+      <div class="tab-bar" id="escalaTabBar">
+        <button class="tab-btn active" data-modo="semana">📆 Dias da Semana</button>
+        <button class="tab-btn" data-modo="revezamento">🔄 Revezamento</button>
+        <button class="tab-btn" data-modo="manual">🖱️ Manual</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 200px;gap:16px;align-items:start">
+        <div>
+          <!-- Modo: Dias da semana -->
+          <div id="modoSemana" class="card">
+            <h3 class="card-title">📆 Dias trabalhados na semana</h3>
+            <div class="day-toggles" id="dayToggles">
+              <button class="day-btn" data-dia="0">Dom</button>
+              <button class="day-btn active" data-dia="1">Seg</button>
+              <button class="day-btn active" data-dia="2">Ter</button>
+              <button class="day-btn active" data-dia="3">Qua</button>
+              <button class="day-btn active" data-dia="4">Qui</button>
+              <button class="day-btn active" data-dia="5">Sex</button>
+              <button class="day-btn" data-dia="6">Sáb</button>
+            </div>
+            <p id="escalaLabel" class="escala-label">Escala 5×2 — Seg a Sex</p>
+          </div>
+
+          <!-- Modo: Revezamento -->
+          <div id="modoRevezamento" class="card hidden">
+            <h3 class="card-title">🔄 Escala de Revezamento</h3>
+            <div class="form-grid-3">
+              <div class="fg"><label>Dias trabalhados</label><input id="revTrab" type="number" min="1" value="5"></div>
+              <div class="fg"><label>Dias de folga</label><input id="revFolga" type="number" min="1" value="2"></div>
+              <div class="fg"><label>Início da escala (DD/MM/AAAA)</label><input id="revInicio" type="text" placeholder="01/06/2026" maxlength="10"></div>
+            </div>
+          </div>
+
+          <!-- Modo: Manual -->
+          <div id="modoManual" class="card hidden">
+            <h3 class="card-title">🖱️ Selecione os dias manualmente</h3>
+            <p class="hint-text" style="margin-bottom:10px">Clique nos dias para marcar como trabalhado</p>
+          </div>
+
+          <!-- Calendário (compartilhado entre modos) -->
+          <div class="card" id="calendarioCard">
+            <h3 class="card-title" id="calTitulo">🗓️ —</h3>
+            <div class="calendar" id="calendarGrid"></div>
+            <p class="hint-text" style="margin-top:8px">🟢 Trabalhado &nbsp; ⬜ Fim de semana &nbsp; 🔴 Feriado descontado</p>
+          </div>
+        </div>
+
+        <!-- Resultado -->
+        <div>
+          <div class="result-box" id="resultBox">
+            <div class="result-mes" id="resultMes">—</div>
+            <div class="result-num" id="resultNum">—</div>
+            <div class="result-label">dias úteis</div>
+            <div class="result-detalhe" id="resultDetalhe"></div>
+          </div>
+          <button id="btnAplicarEscala" class="btn btn-info btn-full" style="margin-top:12px">
+            ➜ Aplicar nos Lançamentos
+          </button>
+          <div class="info-box" style="margin-top:10px;font-size:11px">
+            Após aplicar, clique em <strong>"Aplicar Padrão a Todos"</strong> na tela Lançamentos.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CONFIGURAÇÕES ── -->
+    <section id="screen-config" class="screen hidden">
+      <div class="screen-header">
+        <h1>⚙️ Configurações</h1>
+        <p>Rubricas, valores padrão e valores individuais por empregado</p>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">🏢 Empresa</h3>
+        <div class="fg" style="max-width:300px">
+          <label for="cfgEmpresa">Selecionar empresa</label>
+          <select id="cfgEmpresa"><option value="">Selecione…</option></select>
+        </div>
+      </div>
+
+      <div class="tab-bar" id="cfgTabBar">
+        <button class="tab-btn active" data-tab="padrao">🏢 Padrão da Empresa</button>
+        <button class="tab-btn"        data-tab="individual">👤 Valores Individuais</button>
+      </div>
+
+      <!-- Tab: Padrão -->
+      <div id="cfgTabPadrao">
+        <div class="two-col-grid">
+          <div class="card">
+            <h3 class="card-title">🚌 Vale Transporte</h3>
+            <div class="fg"><label for="cfgVtRubrica">Código da Rubrica</label><input id="cfgVtRubrica" type="text" placeholder="0285"></div>
+            <div class="fg"><label for="cfgVtTipoProc">Tipo de Processo Padrão</label>
+              <select id="cfgVtTipoProc">
+                <option value="11">11 — Folha Mensal</option>
+                <option value="41">41 — Adiant. Salarial</option>
+                <option value="42">42 — Folha Complementar</option>
+                <option value="51">51 — Adiant. 13º</option>
+                <option value="52">52 — 13º Salário</option>
+                <option value="70">70 — PLR</option>
+              </select>
+            </div>
+            <div class="fg"><label for="cfgVtValorDia">Valor Padrão / Dia (R$)</label><input id="cfgVtValorDia" type="number" step="0.01" min="0" placeholder="0,00" class="input-red"></div>
+          </div>
+          <div class="card">
+            <h3 class="card-title">🍽️ Vale Alimentação</h3>
+            <div class="fg"><label for="cfgVaRubrica">Código da Rubrica</label><input id="cfgVaRubrica" type="text" placeholder="0286"></div>
+            <div class="fg"><label for="cfgVaTipoProc">Tipo de Processo Padrão</label>
+              <select id="cfgVaTipoProc">
+                <option value="11">11 — Folha Mensal</option>
+                <option value="41">41 — Adiant. Salarial</option>
+                <option value="42">42 — Folha Complementar</option>
+                <option value="51">51 — Adiant. 13º</option>
+                <option value="52">52 — 13º Salário</option>
+                <option value="70">70 — PLR</option>
+              </select>
+            </div>
+            <div class="fg"><label for="cfgVaValorDia">Valor Padrão / Dia (R$)</label><input id="cfgVaValorDia" type="number" step="0.01" min="0" placeholder="0,00" class="input-red"></div>
+          </div>
+        </div>
+        <div class="btn-row" style="justify-content:flex-end">
+          <button id="btnSalvarConfig" class="btn btn-primary">💾 Salvar Padrões</button>
+        </div>
+      </div>
+
+      <!-- Tab: Individual -->
+      <div id="cfgTabIndividual" class="hidden">
+        <div class="info-box">
+          👤 Valores individuais substituem o padrão para o empregado específico. Mais comum para VT (custo de transporte varia por trajeto). Campo vazio = usa padrão da empresa.
+        </div>
+        <div class="card">
+          <h3 class="card-title">👥 Valores por Empregado</h3>
+          <div class="table-wrapper">
+            <table class="data-table" id="indTable">
+              <thead><tr><th>Código</th><th>Nome</th><th>VT / Dia Individual</th><th>VA / Dia Individual</th><th></th></tr></thead>
+              <tbody id="indTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div><!-- /app -->
+
+<!-- Modal: Divergência de valor -->
+<div id="modalDivergencia" class="modal hidden">
+  <div class="modal-box">
+    <h3 class="modal-title">⚠️ Divergência de Valor</h3>
+    <p id="modalDivergenciaMsg" style="margin-bottom:16px;font-size:13px;line-height:1.6"></p>
+    <div class="btn-row" style="justify-content:flex-end">
+      <button id="btnDivCancelar" class="btn btn-secondary">Cancelar</button>
+      <button id="btnDivConfirmar" class="btn btn-warning">Confirmar mesmo assim</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
