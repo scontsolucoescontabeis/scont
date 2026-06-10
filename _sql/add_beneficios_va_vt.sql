@@ -2,6 +2,9 @@
 -- Idempotente
 ALTER TABLE public.ferramentas ADD COLUMN IF NOT EXISTS nova_aba BOOLEAN NOT NULL DEFAULT false;
 
+-- Garante que o CRM continua abrindo em nova aba após a migração
+UPDATE public.ferramentas SET nova_aba = true WHERE url_base LIKE '%crm%';
+
 INSERT INTO public.ferramentas (nome, descricao, icone, url_base, ativa, ordem, nova_aba)
 SELECT
   'Benefícios VA/VT',
