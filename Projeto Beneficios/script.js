@@ -842,6 +842,10 @@ async function salvarLancamento() {
 // ============================================================
 
 function importarExcel(file) {
+  if (!S.lancamento.linhas.length) {
+    showToast('Carregue a grade antes de importar', 'error');
+    return;
+  }
   const reader = new FileReader();
   reader.onload = async e => {
     const workbook = XLSX.read(e.target.result, { type: 'array' });
@@ -892,7 +896,7 @@ function importarExcel(file) {
       await new Promise(resolve => {
         $('modalDivergenciaMsg').innerHTML =
           `Importação de <strong>${escHtml(p.linha.nome)}</strong> com divergência:<br><br>` +
-          partes.map(s => escHtml(s)).join('<br>') +
+          partes.join('<br>') +
           `<br><br>Confirmar os valores importados?`;
 
         $('modalDivergencia').classList.remove('hidden');
@@ -920,7 +924,6 @@ function importarExcel(file) {
     }
 
     renderGrade();
-    const total = rows.filter(r => String(r[1] ?? '').trim()).length;
     showToast(`✅ Excel importado — ${processados} linha(s) aplicada(s)`);
   };
   reader.readAsArrayBuffer(file);
