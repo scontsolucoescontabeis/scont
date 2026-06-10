@@ -589,4 +589,246 @@ function aplicarNosLancamentos() {
   showToast(`✅ ${total} dias aplicados nos Lançamentos`);
 }
 
-function setupLancamentosListeners() {}
+function setupLancamentosListeners() {
+  $('lancEmpresa').addEventListener('change', async () => {
+    const emp = $('lancEmpresa').value;
+    S.lancamento.empresa = emp;
+    await Promise.all([loadConfig(emp), loadEmpregados(emp), loadIndividuais(emp)]);
+    preencherConfigNaLancamentos();
+    await tryLoadLancamento();
+    buildGrade();
+    renderGrade();
+  });
+
+  $('lancCompPgto').addEventListener('change', async () => {
+    S.lancamento.compPgto = $('lancCompPgto').value;
+    $('bannerCompPgto').textContent = S.lancamento.compPgto || '—';
+    await tryLoadLancamento();
+    renderGrade();
+  });
+
+  $('lancMesRef').addEventListener('change', () => {
+    S.lancamento.mesRef = $('lancMesRef').value;
+    $('bannerMesRef').textContent = S.lancamento.mesRef || '—';
+  });
+
+  ['lancVtDia', 'lancVaDia', 'lancDias'].forEach(id => {
+    $(id).addEventListener('input', atualizarTotaisPadrao);
+  });
+
+  $('btnAplicarPadrao').addEventListener('click', aplicarPadraoATodos);
+  $('btnSalvar').addEventListener('click', salvarLancamento);
+  $('btnGerarTxt').addEventListener('click', () => {
+    if (typeof gerarTxt === 'function') gerarTxt();
+    else showToast('TXT não disponível ainda', 'error');
+  });
+
+  $('btnImportarExcel').addEventListener('click', () => $('inputExcel').click());
+  $('inputExcel').addEventListener('change', e => {
+    if (e.target.files[0]) {
+      if (typeof importarExcel === 'function') importarExcel(e.target.files[0]);
+      else showToast('Importação não disponível ainda', 'error');
+    }
+    e.target.value = '';
+  });
+}
+
+function preencherConfigNaLancamentos() {
+  if (!S.config) return;
+  $('lancVtDia').value = S.config.vt.valorDia || '';
+  $('lancVaDia').value = S.config.va.valorDia || '';
+  atualizarTotaisPadrao();
+}
+
+function atualizarTotaisPadrao() {
+  const vt   = parseDecimal($('lancVtDia').value);
+  const va   = parseDecimal($('lancVaDia').value);
+  const dias = parseInt($('lancDias').value) || 0;
+  $('lancTotalVt').value = dias > 0 ? `R$ ${fmtMoeda(vt * dias)}` : '';
+  $('lancTotalVa').value = dias > 0 ? `R$ ${fmtMoeda(va * dias)}` : '';
+}
+
+async function tryLoadLancamento() {
+  const emp  = S.lancamento.empresa;
+  const comp = S.lancamento.compPgto;
+  if (!emp || !comp) return;
+
+  const { data, error } = await S.sb
+    .from('rh_beneficios_lancamentos')
+    .select('*')
+    .eq('codigo_empresa', emp)
+    .eq('competencia_pagamento', comp)
+    .maybeSingle();
+
+  if (error) return;
+
+  if (data) {
+    S.lancamento.mesRef   = data.mes_referencia || '';
+    S.lancamento.tipoProc = data.tipo_processo  || '11';
+    S.lancamento.linhas   = data.linhas_json    || [];
+    $('lancMesRef').value   = S.lancamento.mesRef;
+    $('lancTipoProc').value = S.lancamento.tipoProc;
+    $('bannerMesRef').textContent = S.lancamento.mesRef || '—';
+    showToast('Lançamento anterior carregado', 'info');
+  } else {
+    S.lancamento.linhas = [];
+  }
+}
+
+function buildGrade() {
+  const vtPad = parseDecimal($('lancVtDia').value) || (S.config?.vt.valorDia || 0);
+  const vaPad = parseDecimal($('lancVaDia').value) || (S.config?.va.valorDia || 0);
+  const dias  = parseInt($('lancDias').value) || 0;
+
+  S.lancamento.linhas = S.empregados.map(emp => {
+    const ind   = S.individuais[emp.codigo_empregado] || {};
+    const vtDia = ind.vt_dia != null ? ind.vt_dia : vtPad;
+    const vaDia = ind.va_dia != null ? ind.va_dia : vaPad;
+    const status = ind.vt_dia != null || ind.va_dia != null ? 'individual' : 'padrao';
+    return {
+      cod_emp:  emp.codigo_empregado,
+      nome:     emp.nome_empregado,
+      vt_dia:   vtDia,
+      va_dia:   vaDia,
+      dias,
+      total_vt: vtDia * dias,
+      total_va: vaDia * dias,
+      status
+    };
+  });
+}
+
+function calcTotaisLinha(linha) {
+  linha.total_vt = parseDecimal(linha.vt_dia) * (parseInt(linha.dias) || 0);
+  linha.total_va = parseDecimal(linha.va_dia) * (parseInt(linha.dias) || 0);
+}
+
+function renderGrade() {
+  const tbody = $('gradeTbody');
+  tbody.innerHTML = '';
+  if (!S.lancamento.linhas.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#7f8c8d;padding:16px">Selecione empresa e competência</td></tr>';
+    return;
+  }
+
+  S.lancamento.linhas.forEach((linha, idx) => {
+    const badgeClass = { padrao: 'badge-ok', individual: 'badge-ind', divergente: 'badge-warn' }[linha.status] || 'badge-ok';
+    const badgeLabel = { padrao: 'Padrão', individual: 'Individual', divergente: 'Divergente' }[linha.status] || 'Padrão';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escHtml(linha.cod_emp)}</td>
+      <td>${escHtml(linha.nome)}</td>
+      <td><input type="number" step="0.01" min="0" class="grade-vt" data-idx="${idx}" value="${linha.vt_dia}"></td>
+      <td><input type="number" step="0.01" min="0" class="grade-va" data-idx="${idx}" value="${linha.va_dia}"></td>
+      <td><input type="number" min="0" max="31" class="grade-dias" data-idx="${idx}" value="${linha.dias}"></td>
+      <td class="cell-calc">R$ ${fmtMoeda(linha.total_vt)}</td>
+      <td class="cell-calc">R$ ${fmtMoeda(linha.total_va)}</td>
+      <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+      <td></td>`;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.grade-vt').forEach(inp => {
+    inp.addEventListener('change', () => onGradeChange(parseInt(inp.dataset.idx), 'vt', parseDecimal(inp.value)));
+  });
+  tbody.querySelectorAll('.grade-va').forEach(inp => {
+    inp.addEventListener('change', () => onGradeChange(parseInt(inp.dataset.idx), 'va', parseDecimal(inp.value)));
+  });
+  tbody.querySelectorAll('.grade-dias').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const idx = parseInt(inp.dataset.idx);
+      S.lancamento.linhas[idx].dias = parseInt(inp.value) || 0;
+      calcTotaisLinha(S.lancamento.linhas[idx]);
+      renderGrade();
+    });
+  });
+}
+
+function onGradeChange(idx, tipo, novoValor) {
+  const linha    = S.lancamento.linhas[idx];
+  const ind      = S.individuais[linha.cod_emp] || {};
+  const configVal = tipo === 'vt'
+    ? (ind.vt_dia != null ? ind.vt_dia : (S.config?.vt.valorDia || 0))
+    : (ind.va_dia != null ? ind.va_dia : (S.config?.va.valorDia || 0));
+
+  if (Math.abs(novoValor - configVal) > 0.001) {
+    mostrarModalDivergencia(linha, tipo, novoValor, configVal, confirmado => {
+      if (confirmado) {
+        if (tipo === 'vt') linha.vt_dia = novoValor; else linha.va_dia = novoValor;
+        linha.status = 'divergente';
+        calcTotaisLinha(linha);
+      }
+      renderGrade();
+    });
+  } else {
+    if (tipo === 'vt') linha.vt_dia = novoValor; else linha.va_dia = novoValor;
+    const ind2 = S.individuais[linha.cod_emp] || {};
+    linha.status = ind2.vt_dia != null || ind2.va_dia != null ? 'individual' : 'padrao';
+    calcTotaisLinha(linha);
+    renderGrade();
+  }
+}
+
+function mostrarModalDivergencia(linha, tipo, novoValor, configVal, callback) {
+  const tipoLabel = tipo === 'vt' ? 'Vale Transporte' : 'Vale Alimentação';
+  $('modalDivergenciaMsg').innerHTML =
+    `O valor de <strong>${escHtml(tipoLabel)}</strong> para <strong>${escHtml(linha.nome)}</strong>:<br><br>
+     Novo valor: <strong>R$ ${fmtMoeda(novoValor)}</strong><br>
+     Valor configurado: <strong>R$ ${fmtMoeda(configVal)}</strong><br><br>
+     Deseja confirmar a divergência?`;
+
+  $('modalDivergencia').classList.remove('hidden');
+
+  function cleanup() {
+    $('modalDivergencia').classList.add('hidden');
+    $('btnDivConfirmar').removeEventListener('click', onConfirmar);
+    $('btnDivCancelar').removeEventListener('click',  onCancelar);
+  }
+  function onConfirmar() { cleanup(); callback(true);  }
+  function onCancelar()  { cleanup(); callback(false); }
+
+  $('btnDivConfirmar').addEventListener('click', onConfirmar);
+  $('btnDivCancelar').addEventListener('click',  onCancelar);
+}
+
+function aplicarPadraoATodos() {
+  const vtPad = parseDecimal($('lancVtDia').value);
+  const vaPad = parseDecimal($('lancVaDia').value);
+  const dias  = parseInt($('lancDias').value) || 0;
+
+  S.lancamento.linhas.forEach(linha => {
+    const ind    = S.individuais[linha.cod_emp] || {};
+    linha.vt_dia = ind.vt_dia != null ? ind.vt_dia : vtPad;
+    linha.va_dia = ind.va_dia != null ? ind.va_dia : vaPad;
+    linha.dias   = dias;
+    calcTotaisLinha(linha);
+    linha.status = ind.vt_dia != null || ind.va_dia != null ? 'individual' : 'padrao';
+  });
+  renderGrade();
+  showToast('✅ Padrão aplicado a todos');
+}
+
+async function salvarLancamento() {
+  const emp  = S.lancamento.empresa;
+  const comp = S.lancamento.compPgto;
+  if (!emp || !comp) { showToast('Selecione empresa e competência', 'error'); return; }
+  if (!S.lancamento.linhas.length) { showToast('Grade vazia', 'error'); return; }
+
+  const payload = {
+    codigo_empresa:        emp,
+    competencia_pagamento: comp,
+    mes_referencia:        S.lancamento.mesRef || null,
+    tipo_processo:         $('lancTipoProc').value,
+    linhas_json:           S.lancamento.linhas,
+    usuario_id:            S.auth?.authUserId || null,
+    atualizado_em:         new Date().toISOString()
+  };
+
+  const { error } = await S.sb
+    .from('rh_beneficios_lancamentos')
+    .upsert(payload, { onConflict: 'codigo_empresa,competencia_pagamento' });
+
+  if (error) { showToast('Erro ao salvar: ' + error.message, 'error'); return; }
+  showToast('✅ Lançamento salvo!');
+}
