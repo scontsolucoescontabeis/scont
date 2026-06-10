@@ -68,7 +68,7 @@ export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole, 
   const { width, dragging, onMouseDown } = useResizable(WIDTH_DEF)
 
   // Busca todas sem filtro de status — filtramos client-side para poder mostrar contadores
-  const { conversas, loading, refresh } = useConversas({
+  const { conversas, loading, erro, refresh } = useConversas({
     departamento: filtroDepto || null,
     status: null,
     busca,
@@ -211,6 +211,15 @@ export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole, 
 
       {/* ── Lista de conversas ── */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
+        {erro && (
+          <div style={{
+            margin: '8px 10px', padding: '8px 12px', borderRadius: 6,
+            background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', fontSize: 11,
+          }}>
+            <strong>Erro ao carregar:</strong> {erro}
+            <br/><span style={{ color: '#7a1e1e' }}>Verifique se as migrations 013-016 foram executadas no Supabase.</span>
+          </div>
+        )}
         {loading ? (
           <div style={{ padding: 20, textAlign: 'center', color: '#888480', fontSize: 12 }}>
             Carregando...
