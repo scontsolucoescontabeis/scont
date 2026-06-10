@@ -172,7 +172,11 @@ async function loadFeriadosEmpresa(empresa) {
   if (error) { showToast('Erro ao carregar feriados', 'error'); return; }
   try {
     const raw = data?.feriados_json;
-    S.escalas.feriados = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
+    const rawList = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
+    S.escalas.feriados = rawList.map(f => ({
+      ...f,
+      data: f.data && f.data.length > 5 ? f.data.substring(0, 5) : f.data
+    }));
   } catch {
     S.escalas.feriados = [];
   }
@@ -608,6 +612,7 @@ function setupLancamentosListeners() {
     S.lancamento.compPgto = $('lancCompPgto').value;
     $('bannerCompPgto').textContent = S.lancamento.compPgto || '—';
     await tryLoadLancamento();
+    if (!S.lancamento.linhas.length && S.empregados.length) buildGrade();
     renderGrade();
   });
 
