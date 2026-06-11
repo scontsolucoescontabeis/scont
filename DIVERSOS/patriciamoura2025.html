@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Ponto – Patricia Moura 2025</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+/* ── LAYOUT ── */
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#F0F2F5;color:#2C3E50;font-size:13px;line-height:1.5}
+
+.sidebar{background:linear-gradient(135deg,#8B3A3A 0%,#2C3E50 100%);color:#fff;width:220px;height:100vh;position:fixed;top:0;left:0;display:flex;flex-direction:column;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.18);z-index:1000}
+.sidebar-header{text-align:center;padding:24px 16px 18px;border-bottom:1px solid rgba(255,255,255,.15)}
+.sidebar-header img{max-width:130px;height:auto;display:block;margin:0 auto 10px;filter:brightness(1.1)}
+.sidebar-header p{font-size:11px;opacity:.8;margin-top:2px}
+.sidebar-nav{flex:1;padding:12px 0}
+.sidebar-nav button{display:block;width:100%;padding:9px 20px;background:none;border:none;color:rgba(255,255,255,.85);text-align:left;cursor:pointer;font-size:12.5px;transition:background .18s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar-nav button:hover{background:rgba(255,255,255,.12);color:#fff}
+.sidebar-nav button.active{background:rgba(0,0,0,.22);color:#fff;font-weight:600;border-left:3px solid #fff}
+.sidebar-section{font-size:10px;text-transform:uppercase;letter-spacing:.8px;opacity:.55;padding:14px 20px 4px;font-weight:600}
+
+.main-content{margin-left:220px;padding:28px;min-height:100vh}
+.page-header{margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #E0E6ED}
+.page-header h1{font-size:18px;font-weight:700;color:#8B3A3A}
+.page-header p{font-size:12px;color:#5A6C7D;margin-top:3px}
+
+.hamburger{display:none;position:fixed;top:12px;left:12px;z-index:1100;background:#8B3A3A;color:#fff;border:none;border-radius:6px;padding:8px 10px;cursor:pointer;font-size:16px}
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:999}
+.overlay.show{display:block}
+
+/* ── VIEWS ── */
+.view{display:none}
+.view.active{display:block}
+h2{font-size:15px;margin-bottom:14px;color:#8B3A3A;font-weight:700}
+
+/* ── DASHBOARD TABLE ── */
+.dash-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.dash-table th,.dash-table td{padding:8px 12px;border:1px solid #E0E6ED;text-align:right}
+.dash-table th{background:#8B3A3A;color:#fff;text-align:center;font-size:12px}
+.dash-table td:first-child{text-align:left;font-weight:500;color:#2C3E50}
+.dash-table tr:last-child td{background:#F8F9FA;font-weight:700}
+.dash-table tr:hover td{background:#FDF5F5}
+.pos{color:#27AE60;font-weight:600}.neg{color:#E74C3C;font-weight:600}
+
+/* ── MONTH TABLE ── */
+.month-wrap{overflow-x:auto;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+table.main{border-collapse:collapse;min-width:900px;width:100%}
+table.main th{background:#8B3A3A;color:#fff;padding:7px 8px;border:1px solid #6B2A2A;text-align:center;white-space:nowrap;font-size:11px}
+table.main td{border:1px solid #E0E6ED;padding:3px 5px;text-align:center;white-space:nowrap;background:#fff;color:#2C3E50}
+table.main tr.weekend td{background:#F8F9FA;color:#8B95A5}
+table.main tr.holiday td{background:#FFF3F3}
+table.main tr.event-row td{background:#FFF8E1}
+table.main tr:hover td{background:#FDF5F5!important}
+
+input.time-input{width:52px;background:#F8F9FA;border:1px solid #E0E6ED;color:#2C3E50;padding:2px 4px;border-radius:4px;text-align:center;font-size:12px}
+input.time-input:focus{outline:none;border-color:#8B3A3A;background:#fff}
+select.evt-sel{background:#F8F9FA;border:1px solid #E0E6ED;color:#2C3E50;padding:3px 6px;border-radius:4px;font-size:11px;width:max-content;min-width:60px}
+.ign-fer-wrap{display:flex;justify-content:center;align-items:center}
+input.ign-fer{width:15px;height:15px;accent-color:#8B3A3A;cursor:pointer}
+
+.summary-section{margin-top:16px;display:flex;gap:12px;flex-wrap:wrap}
+.summary-box{background:#fff;border:1px solid #E0E6ED;border-radius:8px;padding:12px 16px;min-width:150px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.summary-box label{display:block;font-size:11px;color:#5A6C7D;margin-bottom:4px}
+.summary-box .val{font-size:16px;font-weight:700;color:#2C3E50}
+
+/* ── FERIADOS ── */
+.fer-header{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.fer-table{width:100%;border-collapse:collapse;max-width:700px;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.fer-table th,.fer-table td{padding:8px 12px;border:1px solid #E0E6ED;text-align:left}
+.fer-table th{background:#8B3A3A;color:#fff;font-size:12px}
+.fer-table tr:hover td{background:#FDF5F5}
+.btn{padding:6px 14px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all .18s}
+.btn-primary{background:#8B3A3A;color:#fff}.btn-primary:hover{background:#6B2A2A}
+.btn-danger{background:#E74C3C;color:#fff;padding:4px 8px}.btn-danger:hover{background:#C0392B}
+.btn-sm{padding:4px 10px;font-size:11px}
+
+.config-section{margin-top:20px;background:#fff;border:1px solid #E0E6ED;border-radius:8px;padding:18px;max-width:400px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+.config-section h3{font-size:13px;color:#8B3A3A;margin-bottom:12px}
+.config-section label{display:block;margin-bottom:5px;color:#5A6C7D;font-size:12px}
+.config-section input{width:100%;background:#F8F9FA;border:1px solid #E0E6ED;color:#2C3E50;padding:7px 10px;border-radius:6px;margin-bottom:12px;font-size:13px}
+.config-section input:focus{outline:none;border-color:#8B3A3A}
+
+/* ── SEMANTIC COLORS ── */
+.col-he50{color:#E67E22;font-weight:600}
+.col-he100{color:#E74C3C;font-weight:600}
+.col-neg{color:#E74C3C;font-weight:600}
+.col-bank{color:#27AE60;font-weight:600}
+.col-acc{color:#8B3A3A;font-weight:600}
+.feriado-badge{font-size:10px;background:#FDECEA;color:#8B3A3A;border:1px solid #f5c6c0;padding:1px 5px;border-radius:4px}
+
+/* ── TOTAL ROW ── */
+table.main tr.total-row td{background:#F0F2F5!important;font-weight:700;border-top:2px solid #8B3A3A}
+
+/* ── YEAR SELECTOR ── */
+.year-pills{display:flex;flex-wrap:wrap;gap:5px;padding:6px 16px 10px}
+.year-pill{padding:4px 10px;border-radius:12px;border:1px solid rgba(255,255,255,.35);background:none;color:rgba(255,255,255,.8);font-size:11px;cursor:pointer;transition:.15s}
+.year-pill:hover{background:rgba(255,255,255,.18);color:#fff}
+.year-pill.active{background:#fff;color:#8B3A3A;font-weight:700;border-color:#fff}
+.year-pill.add{border-style:dashed;color:rgba(255,255,255,.6)}
+.year-pill.add:hover{color:#fff}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  .sidebar{left:-220px;transition:left .3s}
+  .sidebar.open{left:0}
+  .main-content{margin-left:0;padding:16px;padding-top:54px}
+  .hamburger{display:block}
+}
+</style>
+</head>
+<body>
+
+<button class="hamburger" id="hamburger">☰</button>
+<div class="overlay" id="overlay"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+    <p>Controle de Ponto 2025</p>
+  </div>
+  <nav class="sidebar-nav" id="sidebarNav"></nav>
+</aside>
+
+<main class="main-content">
+  <div class="page-header">
+    <h1>Controle de Ponto — Patricia Moura</h1>
+    <p>Ano de referência: 2025</p>
+  </div>
+  <div id="views"></div>
+</main>
+
+<script>
+// ── CONSTANTS ──────────────────────────────────────────────
+const SERIAL_JAN1_2025 = 44196; // 1904 date system, serial 0 = Jan 1 1904
+const STD_H = 8/24, SAT_H = 4/24; // default workday hours as day-fraction
+
+const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+                'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+const EVENTS = ['','FALTA','FOLGA','FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS','ATESTADO MÉDICO'];
+
+// ── DATE HELPERS ───────────────────────────────────────────
+function serialToDate(s){return new Date(Date.UTC(2025,0,1)+(s-SERIAL_JAN1_2025)*86400000)}
+function dateToSerial(d){return SERIAL_JAN1_2025+Math.round((d-Date.UTC(2025,0,1))/86400000)}
+function weekday(d){return d.getUTCDay()+1} // 1=Sun…7=Sat (Excel convention)
+// Todas as durações são armazenadas em minutos inteiros — zero erro de ponto flutuante
+function timeToMin(s){if(!s)return null;const[h,m]=s.split(':').map(Number);return h*60+m}
+function fmtHours(min){
+  if(min===null||min===undefined||min==='')return'';
+  const neg=min<0;const abs=Math.abs(min);
+  return`${neg?'-':''}${Math.floor(abs/60)}h${abs%60>0?String(abs%60).padStart(2,'0')+'m':''}`;
+}
+function daysInMonth(year,month0){return new Date(Date.UTC(year,month0+1,0)).getUTCDate()}
+function normalizeTime(v){
+  const d=v.replace(/\D/g,'');
+  if(!d) return '';
+  if(d.length<=2) return d.padStart(2,'0')+':00';
+  if(d.length===3) return '0'+d[0]+':'+d.slice(1);
+  return d.slice(0,2)+':'+d.slice(2,4);
+}
+
+// ── FORMULA ENGINE — valores em minutos inteiros ───────────
+function calcRow(entry, date, isHoliday, cfg){
+  const {e1,s1,e2,s2,noturno,evento}=entry;
+  const t1=timeToMin(e1),t2=timeToMin(s1),t3=timeToMin(e2),t4=timeToMin(s2);
+  const hasEntries=t1!==null||t2!==null||t3!==null||t4!==null;
+  const wd=weekday(date);
+
+  // G: total minutos trabalhados (suporta overnight)
+  let G=0;
+  if(t1!==null&&t2!==null){G+=Math.max(0,t2<t1?t2+1440-t1:t2-t1)}
+  if(t3!==null&&t4!==null){G+=Math.max(0,t4<t3?t4+1440-t3:t4-t3)}
+
+  // I: HE 100% (minutos)
+  const I=(isHoliday||wd===1)?G:0;
+
+  // K: Banco de horas (minutos)
+  let K;
+  const std=cfg.stdHours*60, sat=cfg.satHours*60;
+  if(evento==='ATESTADO MÉDICO'||evento==='FOLGA'){K=0}
+  else if(!hasEntries&&!evento){K=0}
+  else if(!isHoliday){
+    if(wd>=2&&wd<=6) K=G-std;
+    else if(wd===1) K=0;
+    else K=G-sat;
+  } else {K=G}
+
+  // H: HE 50% / J: Horas negativas (minutos)
+  const H=(I===0&&K>0)?K:0;
+  const J=K<0?K:0;
+  const L=timeToMin(noturno)||0;
+
+  return{G,H,I,J,K,L}; // tudo em minutos inteiros
+}
+
+// ── STORAGE ────────────────────────────────────────────────
+const STORAGE_KEY='pontoPatricia';
+
+function loadState(){
+  try{
+    const s=JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if(s) return s;
+    // migrar formato antigo
+    const old=JSON.parse(localStorage.getItem('ponto2025'));
+    if(old){
+      const m={year:2025,years:{2025:{entries:old.entries||{},holidays:old.holidays}},config:old.config||{}};
+      localStorage.setItem(STORAGE_KEY,JSON.stringify(m));
+      return m;
+    }
+    return{};
+  }catch{return{}}
+}
+function saveState(s){localStorage.setItem(STORAGE_KEY,JSON.stringify(s))}
+
+function yearData(year){
+  if(!STATE.years) STATE.years={};
+  if(!STATE.years[year]) STATE.years[year]={};
+  return STATE.years[year];
+}
+
+function getEntry(STATE,serial){
+  const yd=yearData(STATE.year);
+  return yd.entries&&yd.entries[serial]
+    ?yd.entries[serial]
+    :{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'',ignFer:false};
+}
+
+function getHolidays(STATE){
+  const yd=yearData(STATE.year);
+  return yd.holidays||defaultHolidays(STATE.year);
+}
+
+function getCfg(state){
+  return Object.assign({stdHours:8,satHours:4},state.config||{});
+}
+
+// ── DEFAULT DATA ───────────────────────────────────────────
+function computeEaster(Y){
+  const a=Y%19,b=Math.floor(Y/100),c=Y%100,d=Math.floor(b/4),e=b%4,
+    f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),
+    h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,
+    l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+    month=Math.floor((h+l-7*m+114)/31),day=((h+l-7*m+114)%31)+1;
+  return{month,day};
+}
+
+function defaultHolidays(year){
+  const ser=(m,d)=>dateToSerial(Date.UTC(year,m-1,d));
+  const list=[
+    {serial:ser(1,1),name:'Confraternização Universal'},
+    {serial:ser(4,21),name:'Tiradentes'},
+    {serial:ser(5,1),name:'Dia do Trabalho'},
+    {serial:ser(9,7),name:'Independência do Brasil'},
+    {serial:ser(10,12),name:'Nossa Sra. Aparecida'},
+    {serial:ser(11,2),name:'Finados'},
+    {serial:ser(11,15),name:'Proclamação da República'},
+    {serial:ser(11,20),name:'Consciência Negra'},
+    {serial:ser(12,25),name:'Natal'},
+  ];
+  const{month,day}=computeEaster(year);
+  const easter=ser(month,day);
+  list.push({serial:easter-48,name:'Carnaval'});
+  list.push({serial:easter-47,name:'Carnaval'});
+  list.push({serial:easter-2,name:'Paixão de Cristo'});
+  list.push({serial:easter+60,name:'Corpus Christi'});
+  return list.sort((a,b)=>a.serial-b.serial);
+}
+
+// Pre-populate from Excel data
+const EXCEL_ENTRIES = {
+44196:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44197:{e1:'08:59',s1:'12:00',e2:'12:59',s2:'18:00',noturno:'',evento:''},
+44198:{e1:'08:59',s1:'11:59',e2:'13:02',s2:'18:00',noturno:'',evento:''},
+44199:{e1:'09:00',s1:'13:00',e2:'',s2:'',noturno:'',evento:''},
+44200:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44201:{e1:'08:59',s1:'12:00',e2:'12:45',s2:'18:02',noturno:'',evento:''},
+44202:{e1:'08:50',s1:'11:59',e2:'12:59',s2:'18:00',noturno:'',evento:''},
+44203:{e1:'08:21',s1:'11:58',e2:'13:05',s2:'17:59',noturno:'',evento:''},
+44204:{e1:'07:59',s1:'13:00',e2:'13:59',s2:'17:59',noturno:'',evento:''},
+44205:{e1:'07:59',s1:'11:59',e2:'12:59',s2:'18:09',noturno:'',evento:''},
+44206:{e1:'08:01',s1:'13:00',e2:'',s2:'',noturno:'',evento:''},
+44207:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44208:{e1:'07:59',s1:'11:59',e2:'13:02',s2:'17:59',noturno:'',evento:''},
+44209:{e1:'07:59',s1:'12:00',e2:'12:58',s2:'17:46',noturno:'',evento:''},
+44210:{e1:'08:00',s1:'12:00',e2:'12:51',s2:'18:01',noturno:'',evento:''},
+44211:{e1:'07:59',s1:'12:00',e2:'13:00',s2:'17:58',noturno:'',evento:''},
+44212:{e1:'07:59',s1:'12:04',e2:'13:04',s2:'18:00',noturno:'',evento:''},
+44213:{e1:'07:59',s1:'13:00',e2:'',s2:'',noturno:'',evento:''},
+44214:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44215:{e1:'12:15',s1:'18:33',e2:'',s2:'',noturno:'',evento:''},
+44216:{e1:'07:59',s1:'12:40',e2:'13:35',s2:'18:00',noturno:'',evento:''},
+44217:{e1:'07:59',s1:'12:17',e2:'13:17',s2:'18:00',noturno:'',evento:''},
+44218:{e1:'07:59',s1:'11:59',e2:'12:55',s2:'18:00',noturno:'',evento:''},
+44219:{e1:'07:59',s1:'11:59',e2:'13:01',s2:'18:20',noturno:'',evento:''},
+44220:{e1:'08:00',s1:'12:00',e2:'',s2:'',noturno:'',evento:''},
+44221:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44222:{e1:'07:59',s1:'11:59',e2:'13:00',s2:'18:15',noturno:'',evento:''},
+44223:{e1:'07:59',s1:'12:00',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44224:{e1:'07:59',s1:'11:59',e2:'12:59',s2:'18:05',noturno:'',evento:''},
+44225:{e1:'07:59',s1:'12:03',e2:'12:59',s2:'17:59',noturno:'',evento:''},
+44226:{e1:'08:00',s1:'11:59',e2:'12:59',s2:'17:54',noturno:'',evento:''},
+44227:{e1:'07:59',s1:'13:00',e2:'',s2:'',noturno:'',evento:''},
+44228:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44229:{e1:'08:07',s1:'11:59',e2:'12:57',s2:'18:00',noturno:'',evento:''},
+44230:{e1:'08:00',s1:'12:00',e2:'13:00',s2:'17:00',noturno:'',evento:''},
+44231:{e1:'08:00',s1:'11:59',e2:'13:00',s2:'18:09',noturno:'',evento:''},
+44232:{e1:'07:59',s1:'12:10',e2:'12:58',s2:'17:58',noturno:'',evento:''},
+44233:{e1:'07:59',s1:'11:59',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44234:{e1:'07:59',s1:'13:00',e2:'',s2:'',noturno:'',evento:''},
+44235:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44236:{e1:'08:17',s1:'11:56',e2:'12:55',s2:'18:00',noturno:'',evento:''},
+44237:{e1:'08:05',s1:'12:01',e2:'13:00',s2:'18:04',noturno:'',evento:''},
+44238:{e1:'07:59',s1:'12:14',e2:'13:17',s2:'18:00',noturno:'',evento:''},
+44239:{e1:'07:59',s1:'12:02',e2:'13:01',s2:'18:00',noturno:'',evento:''},
+44240:{e1:'08:00',s1:'12:01',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44241:{e1:'08:00',s1:'14:00',e2:'',s2:'',noturno:'',evento:''},
+44242:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44243:{e1:'07:59',s1:'12:01',e2:'12:59',s2:'18:00',noturno:'',evento:''},
+44244:{e1:'08:05',s1:'12:12',e2:'13:07',s2:'18:22',noturno:'',evento:''},
+44245:{e1:'08:00',s1:'12:05',e2:'',s2:'',noturno:'',evento:''},
+44246:{e1:'07:59',s1:'12:00',e2:'12:59',s2:'18:00',noturno:'',evento:''},
+44247:{e1:'08:00',s1:'14:30',e2:'15:05',s2:'18:53',noturno:'',evento:''},
+44248:{e1:'08:00',s1:'12:17',e2:'',s2:'',noturno:'',evento:''},
+44249:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44250:{e1:'08:12',s1:'12:01',e2:'13:01',s2:'18:00',noturno:'',evento:''},
+44251:{e1:'07:59',s1:'13:53',e2:'14:30',s2:'19:19',noturno:'',evento:''},
+44252:{e1:'08:00',s1:'12:53',e2:'13:50',s2:'18:01',noturno:'',evento:''},
+44253:{e1:'08:04',s1:'12:35',e2:'13:15',s2:'18:00',noturno:'',evento:''},
+44254:{e1:'08:00',s1:'12:00',e2:'12:59',s2:'18:00',noturno:'',evento:''},
+44255:{e1:'08:00',s1:'12:11',e2:'',s2:'',noturno:'',evento:''},
+44256:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44257:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44258:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44259:{e1:'08:00',s1:'12:25',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44260:{e1:'08:08',s1:'11:57',e2:'12:57',s2:'18:25',noturno:'',evento:''},
+44261:{e1:'08:00',s1:'12:04',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44262:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44263:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44264:{e1:'07:59',s1:'11:58',e2:'12:55',s2:'18:00',noturno:'',evento:''},
+44265:{e1:'07:59',s1:'12:20',e2:'13:00',s2:'17:59',noturno:'',evento:''},
+44266:{e1:'08:00',s1:'12:23',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44267:{e1:'08:02',s1:'12:00',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44268:{e1:'08:17',s1:'11:55',e2:'12:55',s2:'18:00',noturno:'',evento:''},
+44269:{e1:'08:00',s1:'14:14',e2:'',s2:'',noturno:'',evento:''},
+44270:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44271:{e1:'07:59',s1:'11:58',e2:'12:55',s2:'18:00',noturno:'',evento:''},
+44272:{e1:'07:59',s1:'12:20',e2:'13:00',s2:'17:59',noturno:'',evento:''},
+44273:{e1:'08:00',s1:'12:23',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44274:{e1:'08:02',s1:'12:00',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44275:{e1:'08:17',s1:'11:55',e2:'12:55',s2:'18:00',noturno:'',evento:''},
+44276:{e1:'08:00',s1:'14:14',e2:'',s2:'',noturno:'',evento:''},
+44277:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44278:{e1:'08:00',s1:'11:52',e2:'12:52',s2:'17:59',noturno:'',evento:''},
+44279:{e1:'07:59',s1:'12:04',e2:'13:12',s2:'18:07',noturno:'',evento:''},
+44280:{e1:'07:59',s1:'12:12',e2:'12:59',s2:'19:31',noturno:'',evento:''},
+44281:{e1:'08:00',s1:'11:59',e2:'12:59',s2:'18:00',noturno:'',evento:''},
+44282:{e1:'07:59',s1:'12:01',e2:'13:00',s2:'18:46',noturno:'',evento:''},
+44283:{e1:'07:59',s1:'12:30',e2:'',s2:'',noturno:'',evento:''},
+44284:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44285:{e1:'08:00',s1:'11:59',e2:'13:00',s2:'17:59',noturno:'',evento:''},
+44286:{e1:'08:00',s1:'12:08',e2:'13:07',s2:'18:00',noturno:'',evento:''},
+44287:{e1:'16:49',s1:'12:25',e2:'13:23',s2:'18:00',noturno:'',evento:''},
+44288:{e1:'08:02',s1:'12:33',e2:'13:39',s2:'17:59',noturno:'',evento:''},
+44289:{e1:'07:59',s1:'12:03',e2:'13:02',s2:'18:15',noturno:'',evento:''},
+44290:{e1:'07:59',s1:'13:03',e2:'',s2:'',noturno:'',evento:''},
+44291:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44292:{e1:'08:03',s1:'12:19',e2:'12:59',s2:'17:59',noturno:'',evento:''},
+44293:{e1:'07:59',s1:'12:20',e2:'13:20',s2:'17:50',noturno:'',evento:''},
+44294:{e1:'08:00',s1:'11:55',e2:'12:55',s2:'18:25',noturno:'',evento:''},
+44295:{e1:'08:00',s1:'13:05',e2:'14:05',s2:'17:59',noturno:'',evento:''},
+44296:{e1:'07:59',s1:'12:20',e2:'13:15',s2:'18:23',noturno:'',evento:''},
+44297:{e1:'07:59',s1:'12:37',e2:'',s2:'',noturno:'',evento:''},
+44298:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44299:{e1:'07:59',s1:'12:50',e2:'13:50',s2:'17:58',noturno:'',evento:''},
+44300:{e1:'08:11',s1:'11:59',e2:'12:59',s2:'18:00',noturno:'',evento:''},
+44301:{e1:'07:59',s1:'12:12',e2:'13:10',s2:'18:00',noturno:'',evento:''},
+44302:{e1:'07:59',s1:'12:32',e2:'13:34',s2:'18:54',noturno:'',evento:''},
+44303:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44304:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44305:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44306:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44307:{e1:'07:59',s1:'11:57',e2:'12:59',s2:'18:31',noturno:'',evento:''},
+44308:{e1:'08:01',s1:'12:00',e2:'13:00',s2:'18:01',noturno:'',evento:''},
+44309:{e1:'08:01',s1:'11:59',e2:'13:01',s2:'17:59',noturno:'',evento:''},
+44310:{e1:'08:00',s1:'13:24',e2:'14:23',s2:'17:55',noturno:'',evento:''},
+44311:{e1:'07:59',s1:'13:20',e2:'',s2:'',noturno:'',evento:''},
+44312:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44313:{e1:'07:59',s1:'12:01',e2:'13:00',s2:'17:58',noturno:'',evento:''},
+44314:{e1:'07:59',s1:'12:08',e2:'13:06',s2:'18:27',noturno:'',evento:''},
+44315:{e1:'07:59',s1:'12:21',e2:'12:55',s2:'20:19',noturno:'',evento:''},
+44316:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44317:{e1:'08:02',s1:'11:56',e2:'12:59',s2:'17:36',noturno:'',evento:''},
+44318:{e1:'07:59',s1:'14:02',e2:'',s2:'',noturno:'',evento:''},
+44319:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44320:{e1:'07:59',s1:'11:43',e2:'12:53',s2:'18:30',noturno:'',evento:''},
+44321:{e1:'07:59',s1:'12:05',e2:'13:05',s2:'18:00',noturno:'',evento:''},
+44322:{e1:'07:59',s1:'12:03',e2:'13:02',s2:'18:14',noturno:'',evento:''},
+44323:{e1:'07:59',s1:'11:57',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44324:{e1:'07:59',s1:'12:30',e2:'13:30',s2:'18:06',noturno:'',evento:''},
+44325:{e1:'08:01',s1:'10:45',e2:'',s2:'',noturno:'',evento:''},
+44326:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44327:{e1:'08:04',s1:'12:00',e2:'13:00',s2:'17:58',noturno:'',evento:''},
+44328:{e1:'07:59',s1:'11:59',e2:'13:00',s2:'17:59',noturno:'',evento:''},
+44329:{e1:'07:59',s1:'12:00',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44330:{e1:'08:00',s1:'12:05',e2:'13:06',s2:'18:05',noturno:'',evento:''},
+44331:{e1:'07:59',s1:'12:30',e2:'13:02',s2:'19:05',noturno:'',evento:''},
+44332:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44333:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44334:{e1:'08:00',s1:'12:00',e2:'12:59',s2:'18:00',noturno:'',evento:''},
+44335:{e1:'08:00',s1:'12:34',e2:'13:31',s2:'18:00',noturno:'',evento:''},
+44336:{e1:'13:00',s1:'19:15',e2:'',s2:'',noturno:'',evento:''},
+44337:{e1:'07:59',s1:'12:27',e2:'12:57',s2:'17:57',noturno:'',evento:''},
+44338:{e1:'08:00',s1:'12:04',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44339:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44340:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44341:{e1:'07:59',s1:'12:00',e2:'13:59',s2:'17:58',noturno:'',evento:''},
+44342:{e1:'08:01',s1:'12:13',e2:'13:11',s2:'18:00',noturno:'',evento:''},
+44343:{e1:'08:00',s1:'12:00',e2:'12:59',s2:'18:00',noturno:'',evento:''},
+44344:{e1:'08:01',s1:'12:00',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44345:{e1:'08:01',s1:'12:00',e2:'12:59',s2:'18:01',noturno:'',evento:''},
+44346:{e1:'08:00',s1:'12:29',e2:'',s2:'',noturno:'',evento:''},
+44347:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44348:{e1:'07:59',s1:'11:59',e2:'12:59',s2:'18:36',noturno:'',evento:''},
+44349:{e1:'08:01',s1:'11:59',e2:'13:00',s2:'18:49',noturno:'',evento:''},
+44350:{e1:'07:59',s1:'12:00',e2:'12:57',s2:'17:50',noturno:'',evento:''},
+44351:{e1:'07:59',s1:'11:59',e2:'12:59',s2:'17:59',noturno:'',evento:''},
+44352:{e1:'07:59',s1:'13:23',e2:'13:53',s2:'18:00',noturno:'',evento:''},
+44353:{e1:'08:02',s1:'14:00',e2:'',s2:'',noturno:'',evento:''},
+44354:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44355:{e1:'07:59',s1:'11:59',e2:'13:00',s2:'17:59',noturno:'',evento:''},
+44356:{e1:'08:07',s1:'11:55',e2:'12:55',s2:'18:00',noturno:'',evento:''},
+44357:{e1:'07:59',s1:'12:00',e2:'13:00',s2:'17:37',noturno:'',evento:''},
+44358:{e1:'07:59',s1:'12:00',e2:'13:00',s2:'18:07',noturno:'',evento:''},
+44359:{e1:'08:00',s1:'11:53',e2:'12:53',s2:'19:00',noturno:'',evento:''},
+44360:{e1:'08:00',s1:'11:00',e2:'',s2:'',noturno:'',evento:''},
+44361:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44362:{e1:'07:59',s1:'12:22',e2:'13:00',s2:'18:32',noturno:'',evento:''},
+44363:{e1:'07:59',s1:'12:00',e2:'13:00',s2:'18:25',noturno:'',evento:''},
+44364:{e1:'07:58',s1:'11:59',e2:'12:58',s2:'18:00',noturno:'',evento:''},
+44365:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44366:{e1:'08:00',s1:'13:02',e2:'14:00',s2:'18:45',noturno:'',evento:''},
+44367:{e1:'07:59',s1:'13:15',e2:'',s2:'',noturno:'',evento:''},
+44368:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44369:{e1:'08:01',s1:'12:13',e2:'12:53',s2:'17:59',noturno:'',evento:''},
+44370:{e1:'07:59',s1:'12:00',e2:'12:59',s2:'18:00',noturno:'',evento:''},
+44371:{e1:'08:02',s1:'11:59',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44372:{e1:'08:02',s1:'12:10',e2:'13:01',s2:'18:01',noturno:'',evento:''},
+44373:{e1:'07:59',s1:'11:59',e2:'12:59',s2:'17:56',noturno:'',evento:''},
+44374:{e1:'08:00',s1:'12:59',e2:'',s2:'',noturno:'',evento:''},
+44375:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44376:{e1:'08:01',s1:'12:32',e2:'13:34',s2:'18:11',noturno:'',evento:''},
+44377:{e1:'08:00',s1:'12:40',e2:'13:28',s2:'18:37',noturno:'',evento:''},
+44378:{e1:'08:01',s1:'12:04',e2:'13:00',s2:'19:35',noturno:'',evento:''},
+44379:{e1:'07:59',s1:'13:38',e2:'14:40',s2:'18:06',noturno:'',evento:''},
+44380:{e1:'07:58',s1:'11:59',e2:'12:59',s2:'18:03',noturno:'',evento:''},
+44381:{e1:'08:02',s1:'12:53',e2:'',s2:'',noturno:'',evento:''},
+44382:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44383:{e1:'07:59',s1:'12:29',e2:'13:09',s2:'17:59',noturno:'',evento:''},
+44384:{e1:'07:59',s1:'12:00',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44385:{e1:'07:09',s1:'12:09',e2:'13:06',s2:'18:03',noturno:'',evento:''},
+44386:{e1:'07:09',s1:'11:53',e2:'12:52',s2:'18:02',noturno:'',evento:''},
+44387:{e1:'08:00',s1:'13:45',e2:'14:20',s2:'18:00',noturno:'',evento:''},
+44388:{e1:'07:59',s1:'12:02',e2:'',s2:'',noturno:'',evento:''},
+44389:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44390:{e1:'08:01',s1:'11:59',e2:'12:51',s2:'18:00',noturno:'',evento:''},
+44391:{e1:'08:03',s1:'12:16',e2:'13:15',s2:'18:11',noturno:'',evento:''},
+44392:{e1:'07:59',s1:'12:00',e2:'13:00',s2:'18:00',noturno:'',evento:''},
+44393:{e1:'07:59',s1:'12:32',e2:'13:31',s2:'18:07',noturno:'',evento:''},
+44394:{e1:'07:59',s1:'12:02',e2:'13:00',s2:'18:38',noturno:'',evento:''},
+44395:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44396:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44397:{e1:'07:59',s1:'11:51',e2:'12:50',s2:'18:00',noturno:'',evento:''},
+44398:{e1:'08:01',s1:'12:58',e2:'13:55',s2:'18:18',noturno:'',evento:''},
+44399:{e1:'07:59',s1:'12:12',e2:'13:10',s2:'18:41',noturno:'',evento:''},
+44400:{e1:'07:59',s1:'12:28',e2:'13:22',s2:'18:54',noturno:'',evento:''},
+44401:{e1:'07:59',s1:'12:07',e2:'13:00',s2:'18:01',noturno:'',evento:''},
+44402:{e1:'08:00',s1:'13:48',e2:'',s2:'',noturno:'',evento:''},
+44403:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44404:{e1:'07:59',s1:'11:59',e2:'13:00',s2:'18:18',noturno:'',evento:''},
+44405:{e1:'07:59',s1:'11:53',e2:'12:53',s2:'17:33',noturno:'',evento:''},
+44406:{e1:'08:00',s1:'12:22',e2:'13:22',s2:'18:50',noturno:'',evento:''},
+44407:{e1:'08:02',s1:'12:00',e2:'13:00',s2:'19:19',noturno:'',evento:''},
+44408:{e1:'07:59',s1:'12:20',e2:'13:20',s2:'18:23',noturno:'',evento:''},
+44409:{e1:'08:00',s1:'12:13',e2:'',s2:'',noturno:'',evento:''},
+44410:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44411:{e1:'07:59',s1:'11:59',e2:'12:55',s2:'18:00',noturno:'',evento:''},
+44412:{e1:'07:59',s1:'12:36',e2:'14:13',s2:'18:07',noturno:'',evento:''},
+44413:{e1:'07:59',s1:'11:59',e2:'13:01',s2:'18:00',noturno:'',evento:''},
+44414:{e1:'07:59',s1:'12:04',e2:'13:06',s2:'18:33',noturno:'',evento:''},
+44415:{e1:'07:59',s1:'12:35',e2:'13:32',s2:'18:05',noturno:'',evento:''},
+44416:{e1:'07:59',s1:'12:04',e2:'',s2:'',noturno:'',evento:''},
+44417:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44418:{e1:'07:59',s1:'12:00',e2:'13:00',s2:'18:42',noturno:'',evento:''},
+44419:{e1:'07:59',s1:'11:59',e2:'13:00',s2:'19:00',noturno:'',evento:''},
+44420:{e1:'07:59',s1:'12:36',e2:'13:36',s2:'18:00',noturno:'',evento:''},
+44421:{e1:'07:59',s1:'12:34',e2:'13:33',s2:'18:00',noturno:'',evento:''},
+44422:{e1:'07:59',s1:'12:35',e2:'13:31',s2:'18:15',noturno:'',evento:''},
+44423:{e1:'07:59',s1:'13:00',e2:'',s2:'',noturno:'',evento:''},
+44424:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44425:{e1:'07:59',s1:'11:50',e2:'12:57',s2:'19:15',noturno:'',evento:''},
+44426:{e1:'07:59',s1:'12:39',e2:'13:40',s2:'18:10',noturno:'',evento:''},
+44427:{e1:'07:59',s1:'11:59',e2:'12:58',s2:'18:47',noturno:'',evento:''},
+44428:{e1:'08:00',s1:'12:00',e2:'13:07',s2:'18:00',noturno:'',evento:''},
+44429:{e1:'08:06',s1:'14:34',e2:'15:03',s2:'18:00',noturno:'',evento:''},
+44430:{e1:'08:02',s1:'12:11',e2:'',s2:'',noturno:'',evento:''},
+44431:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44432:{e1:'08:00',s1:'17:43',e2:'17:57',s2:'19:26',noturno:'',evento:''},
+44433:{e1:'08:01',s1:'12:21',e2:'13:20',s2:'18:45',noturno:'',evento:''},
+44434:{e1:'08:07',s1:'13:00',e2:'14:00',s2:'18:00',noturno:'',evento:''},
+44435:{e1:'08:09',s1:'12:43',e2:'13:40',s2:'18:12',noturno:'',evento:''},
+44436:{e1:'07:59',s1:'13:05',e2:'14:02',s2:'19:05',noturno:'',evento:''},
+44437:{e1:'08:27',s1:'12:30',e2:'',s2:'',noturno:'',evento:''},
+44438:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44439:{e1:'08:05',s1:'12:00',e2:'14:00',s2:'19:20',noturno:'',evento:''},
+44440:{e1:'07:59',s1:'12:28',e2:'13:00',s2:'19:49',noturno:'',evento:''},
+44441:{e1:'07:59',s1:'13:07',e2:'14:02',s2:'18:04',noturno:'',evento:''},
+44442:{e1:'07:59',s1:'12:23',e2:'13:19',s2:'19:45',noturno:'',evento:''},
+44443:{e1:'08:01',s1:'12:19',e2:'13:20',s2:'18:14',noturno:'',evento:''},
+44444:{e1:'08:01',s1:'13:00',e2:'',s2:'',noturno:'',evento:''},
+44445:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44446:{e1:'08:05',s1:'11:51',e2:'13:07',s2:'17:23',noturno:'',evento:''},
+44447:{e1:'08:02',s1:'13:38',e2:'14:38',s2:'19:00',noturno:'',evento:''},
+44448:{e1:'08:00',s1:'11:58',e2:'13:55',s2:'19:45',noturno:'',evento:''},
+44449:{e1:'11:59',s1:'13:40',e2:'14:40',s2:'19:00',noturno:'',evento:''},
+44450:{e1:'07:59',s1:'12:00',e2:'14:00',s2:'19:00',noturno:'',evento:''},
+44451:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44452:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44453:{e1:'08:02',s1:'12:06',e2:'13:45',s2:'18:23',noturno:'',evento:''},
+44454:{e1:'08:00',s1:'11:59',e2:'14:00',s2:'18:36',noturno:'',evento:''},
+44455:{e1:'07:59',s1:'11:59',e2:'13:57',s2:'19:51',noturno:'',evento:''},
+44456:{e1:'08:00',s1:'12:00',e2:'14:00',s2:'19:00',noturno:'',evento:''},
+44457:{e1:'08:01',s1:'12:00',e2:'13:51',s2:'18:33',noturno:'',evento:''},
+44458:{e1:'08:00',s1:'12:59',e2:'',s2:'',noturno:'',evento:''},
+44459:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44460:{e1:'07:59',s1:'12:30',e2:'13:50',s2:'19:00',noturno:'',evento:''},
+44461:{e1:'07:59',s1:'12:15',e2:'14:00',s2:'19:13',noturno:'',evento:''},
+44462:{e1:'08:00',s1:'12:12',e2:'14:00',s2:'18:03',noturno:'',evento:''},
+44463:{e1:'08:07',s1:'12:01',e2:'14:00',s2:'18:15',noturno:'',evento:''},
+44464:{e1:'08:03',s1:'12:41',e2:'14:00',s2:'18:24',noturno:'',evento:''},
+44465:{e1:'08:02',s1:'12:39',e2:'',s2:'',noturno:'',evento:''},
+44466:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44467:{e1:'07:59',s1:'11:47',e2:'13:08',s2:'18:49',noturno:'',evento:''},
+44468:{e1:'08:00',s1:'12:00',e2:'14:00',s2:'19:00',noturno:'',evento:''},
+44469:{e1:'07:59',s1:'12:57',e2:'13:57',s2:'18:31',noturno:'',evento:''},
+44470:{e1:'08:00',s1:'12:04',e2:'13:19',s2:'18:42',noturno:'',evento:''},
+44471:{e1:'08:00',s1:'13:02',e2:'13:57',s2:'20:20',noturno:'',evento:''},
+44472:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44473:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44474:{e1:'07:59',s1:'11:59',e2:'14:01',s2:'19:41',noturno:'',evento:''},
+44475:{e1:'07:59',s1:'12:00',e2:'14:00',s2:'18:30',noturno:'',evento:''},
+44476:{e1:'07:59',s1:'13:08',e2:'14:07',s2:'20:51',noturno:'',evento:''},
+44477:{e1:'07:59',s1:'12:00',e2:'14:00',s2:'18:29',noturno:'',evento:''},
+44478:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44479:{e1:'09:00',s1:'13:57',e2:'',s2:'',noturno:'',evento:''},
+44480:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44481:{e1:'07:51',s1:'12:07',e2:'13:14',s2:'18:30',noturno:'',evento:''},
+44482:{e1:'08:00',s1:'12:37',e2:'14:00',s2:'21:25',noturno:'',evento:''},
+44483:{e1:'08:09',s1:'12:05',e2:'13:05',s2:'20:02',noturno:'',evento:''},
+44484:{e1:'07:59',s1:'12:00',e2:'13:59',s2:'18:15',noturno:'',evento:''},
+44485:{e1:'08:00',s1:'12:00',e2:'13:59',s2:'18:53',noturno:'',evento:''},
+44486:{e1:'07:59',s1:'12:08',e2:'',s2:'',noturno:'',evento:''},
+44487:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44488:{e1:'08:00',s1:'11:51',e2:'12:53',s2:'19:08',noturno:'',evento:''},
+44489:{e1:'07:59',s1:'13:12',e2:'14:06',s2:'18:20',noturno:'',evento:''},
+44490:{e1:'08:04',s1:'13:33',e2:'14:01',s2:'18:02',noturno:'',evento:''},
+44491:{e1:'07:58',s1:'12:24',e2:'14:06',s2:'18:34',noturno:'',evento:''},
+44492:{e1:'08:05',s1:'12:00',e2:'14:00',s2:'18:04',noturno:'',evento:''},
+44493:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44494:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44495:{e1:'08:00',s1:'12:00',e2:'14:00',s2:'18:30',noturno:'',evento:''},
+44496:{e1:'07:59',s1:'11:59',e2:'14:01',s2:'18:30',noturno:'',evento:''},
+44497:{e1:'07:59',s1:'12:26',e2:'13:59',s2:'19:04',noturno:'',evento:''},
+44498:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44499:{e1:'08:01',s1:'14:00',e2:'14:40',s2:'19:50',noturno:'',evento:''},
+44500:{e1:'07:59',s1:'12:50',e2:'',s2:'',noturno:'',evento:''},
+44501:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44502:{e1:'07:59',s1:'20:11',e2:'',s2:'',noturno:'',evento:''},
+44503:{e1:'07:59',s1:'11:55',e2:'13:54',s2:'19:12',noturno:'',evento:''},
+44504:{e1:'07:59',s1:'12:26',e2:'13:59',s2:'19:00',noturno:'',evento:''},
+44505:{e1:'08:04',s1:'11:59',e2:'13:55',s2:'18:48',noturno:'',evento:''},
+44506:{e1:'08:00',s1:'12:30',e2:'14:30',s2:'17:36',noturno:'',evento:''},
+44507:{e1:'08:05',s1:'12:23',e2:'',s2:'',noturno:'',evento:''},
+44508:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44509:{e1:'08:05',s1:'12:02',e2:'14:00',s2:'19:01',noturno:'',evento:''},
+44510:{e1:'08:00',s1:'12:05',e2:'13:05',s2:'19:00',noturno:'',evento:''},
+44511:{e1:'07:59',s1:'12:00',e2:'13:45',s2:'19:12',noturno:'',evento:''},
+44512:{e1:'08:00',s1:'12:19',e2:'14:15',s2:'18:29',noturno:'',evento:''},
+44513:{e1:'07:59',s1:'13:15',e2:'14:38',s2:'18:35',noturno:'',evento:''},
+44514:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44515:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44516:{e1:'07:59',s1:'12:26',e2:'14:26',s2:'19:06',noturno:'',evento:''},
+44517:{e1:'09:23',s1:'12:00',e2:'14:00',s2:'20:12',noturno:'',evento:''},
+44518:{e1:'07:59',s1:'13:01',e2:'14:00',s2:'18:30',noturno:'',evento:''},
+44519:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44520:{e1:'08:00',s1:'12:04',e2:'13:00',s2:'14:00',noturno:'',evento:''},
+44521:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44522:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44523:{e1:'08:01',s1:'12:09',e2:'14:12',s2:'18:49',noturno:'',evento:''},
+44524:{e1:'08:00',s1:'12:07',e2:'14:09',s2:'19:00',noturno:'',evento:''},
+44525:{e1:'07:59',s1:'13:14',e2:'14:17',s2:'20:04',noturno:'',evento:''},
+44526:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'FOLGA COM COMPENSAÇÃO DE BANCO DE HORAS'},
+44527:{e1:'08:00',s1:'12:48',e2:'14:00',s2:'19:02',noturno:'',evento:''},
+44528:{e1:'08:02',s1:'13:01',e2:'',s2:'',noturno:'',evento:''},
+44529:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44530:{e1:'07:59',s1:'12:35',e2:'14:00',s2:'19:31',noturno:'',evento:''},
+44531:{e1:'07:59',s1:'12:35',e2:'14:06',s2:'19:00',noturno:'',evento:''},
+44532:{e1:'07:59',s1:'11:59',e2:'14:01',s2:'18:47',noturno:'',evento:''},
+44533:{e1:'08:00',s1:'12:00',e2:'14:00',s2:'18:46',noturno:'',evento:''},
+44534:{e1:'08:15',s1:'12:00',e2:'13:56',s2:'19:05',noturno:'',evento:''},
+44535:{e1:'08:38',s1:'13:37',e2:'',s2:'',noturno:'',evento:''},
+44536:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44537:{e1:'08:06',s1:'12:36',e2:'14:37',s2:'18:34',noturno:'',evento:''},
+44538:{e1:'07:09',s1:'12:17',e2:'14:14',s2:'19:37',noturno:'',evento:''},
+44539:{e1:'08:49',s1:'12:45',e2:'14:00',s2:'19:21',noturno:'',evento:''},
+44540:{e1:'07:56',s1:'12:00',e2:'13:45',s2:'18:42',noturno:'',evento:''},
+44541:{e1:'08:03',s1:'12:00',e2:'14:02',s2:'17:45',noturno:'',evento:''},
+44542:{e1:'09:22',s1:'12:01',e2:'',s2:'',noturno:'',evento:''},
+44543:{e1:'',s1:'',e2:'',s2:'',noturno:'',evento:''},
+44544:{e1:'07:59',s1:'12:28',e2:'14:11',s2:'19:10',noturno:'',evento:''},
+44545:{e1:'07:59',s1:'12:00',e2:'14:00',s2:'19:00',noturno:'',evento:''},
+44546:{e1:'08:02',s1:'12:13',e2:'14:00',s2:'18:54',noturno:'',evento:''},
+44547:{e1:'07:09',s1:'11:59',e2:'13:54',s2:'18:54',noturno:'',evento:''},
+44548:{e1:'08:00',s1:'12:00',e2:'14:03',s2:'19:46',noturno:'',evento:''},
+44549:{e1:'07:59',s1:'12:30',e2:'',s2:'',noturno:'',evento:''},
+};
+
+const DIAS_PT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+// ── STATE ──────────────────────────────────────────────────
+let STATE = loadState();
+if(!STATE.year) STATE.year=2025;
+if(!STATE.years) STATE.years={};
+// Seed 2025 com dados do Excel
+if(!STATE.years[2025]) STATE.years[2025]={};
+if(!STATE.years[2025].entries){
+  STATE.years[2025].entries={};
+  Object.keys(EXCEL_ENTRIES).forEach(k=>{STATE.years[2025].entries[k]={...EXCEL_ENTRIES[k],ignFer:false};});
+}
+if(!STATE.years[2025].holidays) STATE.years[2025].holidays=defaultHolidays(2025);
+saveState(STATE);
+
+// ── MONTH COMPUTATION ──────────────────────────────────────
+function computeMonth(mi,year){
+  year=year||STATE.year;
+  const holidays = getHolidays(STATE);
+  const cfg = getCfg(STATE);
+  const holidaySet = new Set(holidays.map(h=>h.serial));
+  const holidayName = {};
+  holidays.forEach(h=>{holidayName[h.serial]=h.name;});
+
+  const days=daysInMonth(year,mi);
+  const firstDate = new Date(Date.UTC(year,mi,1));
+  const firstSerial = dateToSerial(firstDate);
+
+  // calcRow já retorna minutos inteiros — soma direta, sem conversão
+  const rows=[];
+  let accumMin=0;
+  for(let d=0;d<days;d++){
+    const serial=firstSerial+d;
+    const date=serialToDate(serial);
+    const wd=weekday(date);
+    const isHol=holidaySet.has(serial);
+    const entry=getEntry(STATE,serial);
+    const effectiveHol=isHol&&!entry.ignFer;
+    const r=calcRow(entry,date,effectiveHol,cfg);
+    accumMin+=r.K;
+    const M=accumMin;       // M em minutos
+    rows.push({serial,date,wd,isHol,effectiveHol,holName:holidayName[serial]||'',entry,r,M});
+  }
+  const sumH=rows.reduce((a,x)=>a+x.r.H,0);
+  const sumI=rows.reduce((a,x)=>a+x.r.I,0);
+  const sumJ=rows.filter(x=>x.r.J<0).reduce((a,x)=>a+x.r.J,0);
+  const sumK=rows.reduce((a,x)=>a+x.r.K,0);
+  const sumL=rows.reduce((a,x)=>a+x.r.L,0);
+  const lastM=rows.length?rows[rows.length-1].M:0;
+  return{rows,sumH,sumI,sumJ,sumK,sumL,lastM};
+}
+
+// ── RENDER HELPERS ─────────────────────────────────────────
+function cls(v,neutral=''){
+  if(v>0) return 'pos';
+  if(v<0) return 'neg';
+  return neutral;
+}
+
+// ── RENDER NAV ─────────────────────────────────────────────
+function renderNav(){
+  const nav=document.getElementById('sidebarNav');
+  const years=Object.keys(STATE.years||{}).map(Number).sort();
+
+  const yearPills=years.map(y=>`<button class="year-pill${y===STATE.year?' active':''}" onclick="switchYear(${y})">${y}</button>`).join('')
+    +`<button class="year-pill add" onclick="promptAddYear()">+ Ano</button>`;
+
+  const tabs=[
+    {id:'dashboard',label:'📊 Dashboard',section:''},
+    ...MONTHS.map((m,i)=>({id:'m'+i,label:m,section:i===0?'Meses':''})),
+    {id:'feriados',label:'⚙ Feriados / Config',section:'Config'}
+  ];
+  let html=`<div class="sidebar-section">Ano</div><div class="year-pills">${yearPills}</div>`;
+  tabs.forEach(t=>{
+    if(t.section) html+=`<div class="sidebar-section">${t.section}</div>`;
+    html+=`<button onclick="showTab('${t.id}')" id="tab-${t.id}">${t.label}</button>`;
+  });
+  nav.innerHTML=html;
+}
+
+function switchYear(year){
+  if(!STATE.years[year]) STATE.years[year]={};
+  if(!STATE.years[year].holidays) STATE.years[year].holidays=defaultHolidays(year);
+  STATE.year=year;
+  saveState(STATE);
+  renderNav();
+  renderAll();
+  showTab('dashboard');
+}
+
+function promptAddYear(){
+  const y=parseInt(prompt('Digite o ano (ex: 2026):'));
+  if(!y||y<2020||y>2100){alert('Ano inválido.');return;}
+  switchYear(y);
+}
+
+// ── RENDER ALL VIEWS ───────────────────────────────────────
+function renderAll(){
+  const cont=document.getElementById('views');
+  let html='';
+  html+=renderDashboard();
+  MONTHS.forEach((_,i)=>html+=renderMonth(i));
+  html+=renderFeriados();
+  cont.innerHTML=html;
+}
+
+// ── DASHBOARD ──────────────────────────────────────────────
+function renderDashboard(){
+  const year=STATE.year;
+  const months=MONTHS.map((_,i)=>computeMonth(i,year));
+  const rows=MONTHS.map((m,i)=>{
+    const mo=months[i];
+    const neg=mo.sumJ;
+    const ext=mo.sumH+mo.sumI;
+    const sal=mo.lastM;
+    return{m,neg,ext,sal};
+  });
+  const totNeg=rows.reduce((a,r)=>a+r.neg,0);
+  const totExt=rows.reduce((a,r)=>a+r.ext,0);
+  const totSal=rows.reduce((a,r)=>a+r.sal,0);
+
+  let html=`<div class="view" id="view-dashboard"><h2>Dashboard de Controle Anual – ${year}</h2>
+<div class="month-wrap"><table class="dash-table">
+<tr><th>Mês</th><th>Horas Negativas</th><th>Horas Extras</th><th>Saldo Banco de Horas</th></tr>`;
+  rows.forEach(r=>{
+    html+=`<tr><td>${r.m}</td>
+<td class="${cls(r.neg)}">${fmtHours(r.neg)||'–'}</td>
+<td class="${cls(r.ext)}">${fmtHours(r.ext)||'–'}</td>
+<td class="${cls(r.sal)}">${fmtHours(r.sal)||'–'}</td></tr>`;
+  });
+  html+=`<tr style="background:#F0F2F5;font-weight:700;border-top:2px solid #8B3A3A"><td>2025 TOTAL</td>
+<td class="${cls(totNeg)}">${fmtHours(totNeg)}</td>
+<td class="${cls(totExt)}">${fmtHours(totExt)}</td>
+<td class="${cls(totSal)}">${fmtHours(totSal)}</td></tr>
+</table></div></div>`;
+  return html;
+}
+
+// ── MONTH VIEW ─────────────────────────────────────────────
+function renderMonth(mi){
+  const mo=computeMonth(mi,STATE.year);
+  const {rows,sumH,sumI,sumJ,sumK,sumL,lastM}=mo;
+
+  let tbl=`<div class="month-wrap"><table class="main">
+<tr>
+<th>Data</th><th>Dia</th>
+<th>Entrada</th><th>Saída</th><th>Entrada</th><th>Saída</th>
+<th>Total H.</th>
+<th class="col-he50">HE 50%</th><th class="col-he100">HE 100%</th>
+<th class="col-neg">H.Neg.</th><th class="col-bank">Banco</th>
+<th>Noturno</th><th class="col-acc">B.Acum.</th>
+<th>Feriado</th><th title="Ignorar feriado: usa regra do evento/dia da semana">Ign.Fer</th><th>Evento</th>
+</tr>`;
+
+  rows.forEach(({serial,date,wd,isHol,effectiveHol,holName,entry,r,M})=>{
+    const isSun=wd===1,isSat=wd===7;
+    let rowCls='';
+    if(effectiveHol) rowCls='holiday';
+    else if(isSun||isSat) rowCls='weekend';
+    if(entry.evento) rowCls='event-row';
+
+    const day=date.getUTCDate();
+    const mon=date.getUTCMonth()+1;
+    const dateStr=`${String(day).padStart(2,'0')}/${String(mon).padStart(2,'0')}`;
+    const dayName=DIAS_PT[wd-1];
+
+    tbl+=`<tr class="${rowCls}" data-serial="${serial}">
+<td>${dateStr}</td>
+<td>${dayName}</td>
+<td><input class="time-input" data-field="e1" data-serial="${serial}" value="${entry.e1}" placeholder="--:--"></td>
+<td><input class="time-input" data-field="s1" data-serial="${serial}" value="${entry.s1}" placeholder="--:--"></td>
+<td><input class="time-input" data-field="e2" data-serial="${serial}" value="${entry.e2}" placeholder="--:--"></td>
+<td><input class="time-input" data-field="s2" data-serial="${serial}" value="${entry.s2}" placeholder="--:--"></td>
+<td>${r.G>0?fmtHours(r.G):''}</td>
+<td class="col-he50">${r.H>0?fmtHours(r.H):''}</td>
+<td class="col-he100">${r.I>0?fmtHours(r.I):''}</td>
+<td class="col-neg">${r.J<0?fmtHours(r.J):''}</td>
+<td class="${cls(r.K)}">${r.K!==0?fmtHours(r.K):''}</td>
+<td><input class="time-input" data-field="noturno" data-serial="${serial}" value="${entry.noturno}" placeholder="--:--"></td>
+<td class="${cls(M)}">${M!==0?fmtHours(M):''}</td>
+<td>${holName?`<span class="feriado-badge">${holName}</span>`:''}</td>
+<td><div class="ign-fer-wrap">${isHol?`<input type="checkbox" class="ign-fer" data-serial="${serial}"${entry.ignFer?' checked':''}>`:''}
+</div></td>
+<td><select class="evt-sel" data-field="evento" data-serial="${serial}">
+${EVENTS.map(e=>`<option value="${e}"${entry.evento===e?' selected':''}>${e||'–'}</option>`).join('')}
+</select></td>
+</tr>`;
+  });
+
+  // Summary
+  tbl+=`<tr class="total-row">
+<td colspan="7">TOTAL</td>
+<td class="col-he50">${fmtHours(sumH)}</td>
+<td class="col-he100">${fmtHours(sumI)}</td>
+<td class="col-neg">${sumJ<0?fmtHours(sumJ):''}</td>
+<td class="${cls(sumK)}">${fmtHours(sumK)}</td>
+<td></td><td class="${cls(lastM)}">${fmtHours(lastM)}</td>
+<td colspan="3"></td></tr></table></div>`;
+
+  const boxes=[
+    {label:'HE 100%',val:sumI,cls:'col-he100'},
+    {label:'H. Negativas',val:sumJ,cls:'col-neg'},
+    {label:'HE 50%',val:sumH,cls:'col-he50'},
+    {label:'Banco do Mês',val:sumH+sumI+sumJ,cls:cls(sumH+sumI+sumJ)},
+  ];
+  const sumBoxes=`<div class="summary-section" id="summary-m${mi}">${boxes.map(b=>`
+<div class="summary-box">
+<label>${b.label}</label>
+<div class="val ${b.cls}">${b.val?fmtHours(b.val):'–'}</div>
+</div>`).join('')}</div>`;
+
+  return`<div class="view" id="view-m${mi}"><h2>${MONTHS[mi]}</h2>${tbl}${sumBoxes}</div>`;
+}
+
+// ── FERIADOS VIEW ──────────────────────────────────────────
+function renderFeriados(){
+  const year=STATE.year;
+  const holidays=getHolidays(STATE);
+  const cfg=getCfg(STATE);
+
+  let rows=holidays.map((h,i)=>{
+    const d=serialToDate(h.serial);
+    const ds=`${String(d.getUTCFullYear())}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+    return`<tr>
+<td><input type="date" class="fer-date" data-idx="${i}" value="${ds}" style="background:#F8F9FA;border:1px solid #E0E6ED;color:#2C3E50;padding:4px;border-radius:4px"></td>
+<td><input type="text" class="fer-name" data-idx="${i}" value="${h.name}" style="background:#F8F9FA;border:1px solid #E0E6ED;color:#2C3E50;padding:4px;border-radius:4px;width:220px"></td>
+<td><button class="btn btn-danger" onclick="deleteFeriado(${i})">✕</button></td>
+</tr>`;
+  }).join('');
+
+  return`<div class="view" id="view-feriados">
+<h2>Feriados / Config — ${year}</h2>
+<div class="fer-header">
+<button class="btn btn-primary" onclick="addFeriado()">+ Adicionar Feriado</button>
+<button class="btn btn-primary" onclick="saveFeriados()" style="background:#276749">💾 Salvar</button>
+</div>
+<table class="fer-table">
+<tr><th>Data</th><th>Nome</th><th></th></tr>
+${rows}
+</table>
+
+<div class="config-section">
+<h3>Jornada de Trabalho</h3>
+<label>Horas por dia (dias úteis)</label>
+<input type="number" id="cfg-std" value="${cfg.stdHours}" min="1" max="24" step="0.5">
+<label>Horas por dia (sábado)</label>
+<input type="number" id="cfg-sat" value="${cfg.satHours}" min="0" max="24" step="0.5">
+<button class="btn btn-primary" onclick="saveCfg()">Salvar Configuração</button>
+</div>
+</div>`;
+}
+
+// ── LISTENERS (delegation — anexado uma única vez no init) ─
+function initListeners(){
+  const views=document.getElementById('views');
+
+  views.addEventListener('change',e=>{
+    const t=e.target;
+    const serial=t.dataset.serial;
+    if(!serial) return;
+    const yd=yearData(STATE.year);
+    if(!yd.entries) yd.entries={};
+    if(!yd.entries[serial]) yd.entries[serial]={e1:'',s1:'',e2:'',s2:'',noturno:'',evento:'',ignFer:false};
+
+    if(t.classList.contains('time-input')){
+      const norm=normalizeTime(t.value);
+      t.value=norm;
+      yd.entries[serial][t.dataset.field]=norm;
+    } else if(t.classList.contains('evt-sel')){
+      yd.entries[serial].evento=t.value;
+    } else if(t.classList.contains('ign-fer')){
+      yd.entries[serial].ignFer=t.checked;
+    } else return;
+
+    saveState(STATE);
+    refreshCurrentMonth();
+  });
+
+  views.addEventListener('blur',e=>{
+    const t=e.target;
+    if(!t.classList.contains('time-input')) return;
+    const norm=normalizeTime(t.value);
+    t.value=norm;
+    t.style.borderColor=(norm&&!/^\d{2}:\d{2}$/.test(norm))?'#E74C3C':'#E0E6ED';
+  },true);
+}
+
+function attachMonthListeners(){} // no-op: listeners são delegados via initListeners
+
+function refreshCurrentMonth(){
+  const active=document.querySelector('.sidebar-nav button.active');
+  if(!active) return;
+  const id=active.id.replace('tab-','');
+  if(!id.startsWith('m')) return;
+  const mi=parseInt(id.slice(1));
+  const mo=computeMonth(mi);
+  const {rows,sumH,sumI,sumJ,lastM}=mo;
+
+  // Atualiza apenas células de fórmula — não toca nos inputs
+  // Índices dos td por linha:
+  // 0:data 1:dia 2:e1 3:s1 4:e2 5:s2 6:TotalH 7:HE50 8:HE100 9:HNeg 10:Banco 11:noturno 12:BAcum 13:Feriado 14:IgnFer 15:Evento
+  rows.forEach(({serial,wd,effectiveHol,entry,r,M})=>{
+    const tr=document.querySelector(`tr[data-serial="${serial}"]`);
+    if(!tr) return;
+    const isSun=wd===1,isSat=wd===7;
+    let rowCls='';
+    if(effectiveHol) rowCls='holiday';
+    else if(isSun||isSat) rowCls='weekend';
+    if(entry.evento) rowCls='event-row';
+    tr.className=rowCls;
+    const td=tr.children;
+    td[6].textContent=r.G>0?fmtHours(r.G):'';
+    td[7].className='col-he50'; td[7].textContent=r.H>0?fmtHours(r.H):'';
+    td[8].className='col-he100'; td[8].textContent=r.I>0?fmtHours(r.I):'';
+    td[9].className='col-neg'; td[9].textContent=r.J<0?fmtHours(r.J):'';
+    td[10].className=cls(r.K); td[10].textContent=r.K!==0?fmtHours(r.K):'';
+    td[12].className=cls(M); td[12].textContent=M!==0?fmtHours(M):'';
+  });
+
+  // Atualiza summary boxes
+  const sumEl=document.getElementById('summary-m'+mi);
+  if(sumEl){
+    const boxes=[
+      {label:'HE 100%',val:sumI,c:'col-he100'},
+      {label:'H. Negativas',val:sumJ,c:'col-neg'},
+      {label:'HE 50%',val:sumH,c:'col-he50'},
+      {label:'Banco do Mês',val:sumH+sumI+sumJ,c:cls(sumH+sumI+sumJ)},
+    ];
+    sumEl.innerHTML=boxes.map(b=>`<div class="summary-box"><label>${b.label}</label><div class="val ${b.c}">${b.val?fmtHours(b.val):'–'}</div></div>`).join('');
+  }
+
+  // Atualiza dashboard (sem inputs, seguro substituir)
+  document.getElementById('view-dashboard').outerHTML=renderDashboard();
+}
+
+// ── FERIADO ACTIONS ────────────────────────────────────────
+function addFeriado(){
+  const h=getHolidays(STATE);
+  h.push({serial:dateToSerial(Date.UTC(STATE.year,0,1)),name:'Novo Feriado'});
+  yearData(STATE.year).holidays=h;
+  saveState(STATE);
+  document.getElementById('view-feriados').outerHTML=renderFeriados();
+}
+
+function deleteFeriado(i){
+  const h=getHolidays(STATE);
+  h.splice(i,1);
+  yearData(STATE.year).holidays=h;
+  saveState(STATE);
+  document.getElementById('view-feriados').outerHTML=renderFeriados();
+}
+
+function saveFeriados(){
+  const dates=document.querySelectorAll('.fer-date');
+  const names=document.querySelectorAll('.fer-name');
+  const h=[];
+  dates.forEach((d,i)=>{
+    const dt=new Date(d.value+'T00:00:00Z');
+    const serial=dateToSerial(dt.getTime());
+    h.push({serial,name:names[i].value});
+  });
+  yearData(STATE.year).holidays=h.sort((a,b)=>a.serial-b.serial);
+  saveState(STATE);
+  // re-render everything
+  renderAll();
+  showTab('feriados');
+  alert('Feriados salvos com sucesso!');
+}
+
+function saveCfg(){
+  STATE.config={
+    stdHours:parseFloat(document.getElementById('cfg-std').value)||8,
+    satHours:parseFloat(document.getElementById('cfg-sat').value)||4,
+  };
+  saveState(STATE);
+  renderAll();
+  showTab('feriados');
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────
+let currentTab='dashboard';
+function showTab(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.sidebar-nav button').forEach(b=>b.classList.remove('active'));
+  const v=document.getElementById('view-'+id);
+  if(v) v.classList.add('active');
+  const b=document.getElementById('tab-'+id);
+  if(b) b.classList.add('active');
+  currentTab=id;
+}
+
+// ── INIT ───────────────────────────────────────────────────
+renderNav();
+renderAll();
+initListeners();
+showTab('dashboard');
+// hamburger mobile
+const _sb=document.getElementById('sidebar');
+const _ov=document.getElementById('overlay');
+document.getElementById('hamburger').addEventListener('click',()=>{_sb.classList.toggle('open');_ov.classList.toggle('show');});
+_ov.addEventListener('click',()=>{_sb.classList.remove('open');_ov.classList.remove('show');});
+</script>
+</body>
+</html>
