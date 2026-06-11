@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Simulador WhatsApp — SCONT CRM Dev</title>
   <!-- Credenciais centralizadas do portal (nunca no código) -->
-  <script src="../../supabase-config.js"></script>
+  <script src="../../../supabase-config.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <!-- Guarda de autenticação do portal -->
-  <script src="../../portal-auth-guard.js"></script>
+  <script src="../../../portal-auth-guard.js"></script>
   <script>
     // ── Estado global ──────────────────────────────────────────
     let sbClient      = null
@@ -196,6 +196,7 @@
       inputEl.value = ''
 
       try {
+        // Usa o access_token da sessão do usuário autenticado (mais confiável que a anon key com JWT verification)
         const { data: { session } } = await sbClient.auth.getSession()
         const authToken = session?.access_token ?? window.SUPABASE_KEY
 
@@ -210,24 +211,24 @@
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || data.message || JSON.stringify(data) || `HTTP ${res.status}`)
 
-        if (data.conversa_id) {
-          const isNovo = !c.conversa_id
+        if (!c.conversa_id && data.conversa_id) {
           c.conversa_id = data.conversa_id
           c.contato_id  = data.contato_id
           c.protocolo   = data.protocolo
           salvarClientes()
           renderizarHeader(c)
+          subscreverRealtime(c.conversa_id)
 
-          if (isNovo) subscreverRealtime(c.conversa_id)
-
-          // Usa as mensagens já buscadas pelo Edge Function com service role
-          // (evita bloqueio de RLS para usuários sem perfil no CRM)
-          if (Array.isArray(data.mensagens)) {
-            const chatEl = document.getElementById('chat-area')
-            chatEl.innerHTML = ''
-            data.mensagens.forEach(m => renderizarMensagem(m, false))
-            chatEl.scrollTop = chatEl.scrollHeight
-          }
+          await new Promise(r => setTimeout(r, 600))
+          const { data: msgs } = await sbClient
+            .from('mensagens')
+            .select('id, origem, conteudo, criado_em, agente_id, usuarios(nome)')
+            .eq('conversa_id', c.conversa_id)
+            .order('criado_em', { ascending: true })
+          const chatEl = document.getElementById('chat-area')
+          chatEl.innerHTML = ''
+          if (msgs) msgs.forEach(m => renderizarMensagem(m, false))
+          chatEl.scrollTop = chatEl.scrollHeight
           atualizarStatusConversa(c.conversa_id)
         }
       } catch (e) {
@@ -310,7 +311,7 @@
     // ── Bootstrap ───────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', async () => {
       // Verifica autenticação; redireciona para login se não autorizado
-      const auth = await window.PortalAuthGuard.init(2)
+      const auth = await window.PortalAuthGuard.init(3)
       if (!auth) return
 
       // Auth OK — exibe o app
