@@ -303,6 +303,7 @@
       <div class="tab-bar" id="cfgTabBar">
         <button class="tab-btn active" data-tab="padrao">🏢 Padrão da Empresa</button>
         <button class="tab-btn"        data-tab="individual">👤 Valores Individuais</button>
+        <button class="tab-btn" data-tab="observacoes">📝 Observações</button>
       </div>
 
       <!-- Tab: Padrão -->
@@ -350,12 +351,31 @@
           👤 Valores individuais substituem o padrão para o empregado específico. Mais comum para VT (custo de transporte varia por trajeto). Campo vazio = usa padrão da empresa.
         </div>
         <div class="card">
-          <h3 class="card-title">👥 Valores por Empregado</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <h3 class="card-title" style="margin:0">👥 Valores por Empregado</h3>
+            <button id="btnSalvarTodosInd" class="btn btn-primary">💾 Salvar Todos</button>
+          </div>
           <div class="table-wrapper">
             <table class="data-table" id="indTable">
               <thead><tr><th>Código</th><th>Nome</th><th>VT / Dia Individual</th><th>VA / Dia Individual</th><th></th></tr></thead>
               <tbody id="indTbody"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Observações -->
+      <div id="cfgTabObservacoes" class="hidden">
+        <div class="info-box">
+          📝 Observações sobre esta empresa serão exibidas como aviso na tela de lançamentos ao selecioná-la.
+        </div>
+        <div class="card">
+          <h3 class="card-title">📝 Observações da Empresa</h3>
+          <textarea id="cfgObs" rows="6"
+            style="width:100%;box-sizing:border-box;padding:10px;font-size:13px;border:1px solid var(--border);border-radius:6px;resize:vertical;font-family:inherit"
+            placeholder="Ex: Empresa utiliza VT apenas para empregados do setor operacional. Conferir escala antes de lançar."></textarea>
+          <div style="margin-top:12px">
+            <button id="btnSalvarObs" class="btn btn-primary">💾 Salvar Observações</button>
           </div>
         </div>
       </div>

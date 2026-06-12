@@ -284,6 +284,12 @@ function setupConfigListeners() {
     await Promise.all([loadConfig(emp), loadEmpregados(emp), loadIndividuais(emp)]);
     renderConfigPadrao();
     renderIndividuais();
+    const obsResult = await S.sb
+      .from('rh_beneficios_empresa_obs')
+      .select('observacoes')
+      .eq('codigo_empresa', $('cfgEmpresa').value)
+      .maybeSingle();
+    $('cfgObs').value = obsResult.data?.observacoes || '';
   });
 
   $('cfgTabBar').addEventListener('click', e => {
@@ -294,10 +300,12 @@ function setupConfigListeners() {
     );
     $('cfgTabPadrao').classList.toggle('hidden', tab !== 'padrao');
     $('cfgTabIndividual').classList.toggle('hidden', tab !== 'individual');
+    $('cfgTabObservacoes').classList.toggle('hidden', tab !== 'observacoes');
   });
 
   $('btnSalvarConfig').addEventListener('click', saveConfigPadrao);
   $('btnSalvarTodosInd').addEventListener('click', saveAllIndividuais);
+  $('btnSalvarObs').addEventListener('click', () => saveObs($('cfgEmpresa').value));
 }
 
 function renderConfigPadrao() {
