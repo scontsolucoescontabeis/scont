@@ -754,6 +754,19 @@ function aplicarNosLancamentos() {
   showToast(`✅ ${total} dias aplicados nos Lançamentos`);
 }
 
+function renderBannerObs() {
+  const banner = $('bannerObsEmpresa');
+  const texto  = S.lancamento.obsEmpresa.trim();
+  if (texto) {
+    $('bannerObsTexto').textContent = texto;
+    banner.classList.remove('hidden');
+    banner.style.display = 'flex';
+  } else {
+    banner.classList.add('hidden');
+    banner.style.display = 'none';
+  }
+}
+
 function setupLancamentosListeners() {
   $('lancEmpresa').addEventListener('change', async () => {
     const emp = $('lancEmpresa').value;
@@ -769,6 +782,8 @@ function setupLancamentosListeners() {
     await tryLoadLancamento();
     if (!S.lancamento.linhas.length) buildGrade();
     renderGrade();
+    await loadObs(emp);
+    renderBannerObs();
   });
 
   $('lancCompPgto').addEventListener('change', async () => {
