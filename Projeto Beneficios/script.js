@@ -13,7 +13,9 @@ const S = {
   lancamento: {
     empresa: '', compPgto: '', mesRef: '',
     tipoProc: '11', linhas: [],
-    filtroEmps: new Set()
+    filtroEmps: new Set(),
+    filtroNenhum: false,
+    obsEmpresa: ''
   },
   escalas: {
     modo:             'semana',
@@ -187,11 +189,16 @@ async function loadFeriadosEmpresa(empresa) {
 // ── FILTRO DE EMPREGADOS ──────────────────────────────────
 
 function empregadosFiltrados() {
+  if (S.lancamento.filtroNenhum) return [];
   if (S.lancamento.filtroEmps.size === 0) return S.empregados;
   return S.empregados.filter(e => S.lancamento.filtroEmps.has(e.codigo_empregado));
 }
 
 function atualizarBtnFiltro() {
+  if (S.lancamento.filtroNenhum) {
+    $('btnFiltroEmp').textContent = '👥 Nenhum selecionado ▾';
+    return;
+  }
   const n = S.lancamento.filtroEmps.size;
   $('btnFiltroEmp').textContent = n === 0
     ? '👥 Todos os empregados ▾'
@@ -202,14 +209,14 @@ function renderFiltroPainel() {
   const lista = $('filtroLista');
   if (!lista) return;
   lista.innerHTML = '';
-  const nenhumFiltro = S.lancamento.filtroEmps.size === 0;
+  const nenhumFiltro = !S.lancamento.filtroNenhum && S.lancamento.filtroEmps.size === 0;
 
   const todosCheck = $('filtroTodos');
   todosCheck.checked       = nenhumFiltro;
   todosCheck.indeterminate = false;
 
   S.empregados.forEach(emp => {
-    const checked = nenhumFiltro || S.lancamento.filtroEmps.has(emp.codigo_empregado);
+    const checked = nenhumFiltro || (!S.lancamento.filtroNenhum && S.lancamento.filtroEmps.has(emp.codigo_empregado));
     const label = document.createElement('label');
     label.className = 'filtro-item';
     label.innerHTML =
@@ -236,8 +243,10 @@ function setupFiltroPainel() {
   $('filtroTodos').addEventListener('change', () => {
     if ($('filtroTodos').checked) {
       S.lancamento.filtroEmps.clear();
+      S.lancamento.filtroNenhum = false;
     } else {
-      S.empregados.forEach(emp => S.lancamento.filtroEmps.add(emp.codigo_empregado));
+      S.lancamento.filtroEmps.clear();
+      S.lancamento.filtroNenhum = true;
     }
     renderFiltroPainel();
     buildGrade();
@@ -248,7 +257,9 @@ function setupFiltroPainel() {
     const cb = e.target.closest('input[type=checkbox]');
     if (!cb) return;
     const cod = cb.dataset.cod;
-    if (S.lancamento.filtroEmps.size === 0) {
+    if (S.lancamento.filtroNenhum) {
+      S.lancamento.filtroNenhum = false;
+    } else if (S.lancamento.filtroEmps.size === 0) {
       S.empregados.forEach(emp => S.lancamento.filtroEmps.add(emp.codigo_empregado));
     }
     if (cb.checked) S.lancamento.filtroEmps.add(cod);
@@ -286,6 +297,7 @@ function setupConfigListeners() {
   });
 
   $('btnSalvarConfig').addEventListener('click', saveConfigPadrao);
+  $('btnSalvarTodosInd').addEventListener('click', saveAllIndividuais);
 }
 
 function renderConfigPadrao() {
@@ -374,6 +386,52 @@ async function saveIndividual(empresa, codEmp) {
   if (error) { showToast('Erro: ' + error.message, 'error'); return; }
   await loadIndividuais(empresa);
   showToast('✅ Valor individual salvo!');
+}
+
+async function saveAllIndividuais() {
+  const empresa = $('cfgEmpresa').value;
+  if (!empresa) return;
+
+  const rows = [];
+  document.querySelectorAll('.btn-salvar-ind').forEach(btn => {
+    const cod = btn.dataset.cod;
+    const vtInput = document.querySelector(`.ind-vt[data-cod="${cod}"]`);
+    const vaInput = document.querySelector(`.ind-va[data-cod="${cod}"]`);
+    const vt = vtInput.value.trim() === '' ? null : parseDecimal(vtInput.value);
+    const va = vaInput.value.trim() === '' ? null : parseDecimal(vaInput.value);
+    rows.push({ codigo_empresa: empresa, codigo_empregado: cod, vt_valor_dia: vt, va_valor_dia: va });
+  });
+
+  if (rows.length === 0) return;
+
+  const { error } = await S.sb
+    .from('rh_beneficios_individuais')
+    .upsert(rows, { onConflict: 'codigo_empresa,codigo_empregado' });
+
+  if (error) { showToast('Erro: ' + error.message, 'error'); return; }
+  await loadIndividuais(empresa);
+  showToast(`✅ ${rows.length} valor(es) individual(is) salvo(s)!`);
+}
+
+async function loadObs(empresa) {
+  if (!empresa) { S.lancamento.obsEmpresa = ''; return; }
+  const { data } = await S.sb
+    .from('rh_beneficios_empresa_obs')
+    .select('observacoes')
+    .eq('codigo_empresa', empresa)
+    .maybeSingle();
+  S.lancamento.obsEmpresa = data?.observacoes || '';
+}
+
+async function saveObs(empresa) {
+  if (!empresa) return;
+  const obs = $('cfgObs').value.trim();
+  const { error } = await S.sb
+    .from('rh_beneficios_empresa_obs')
+    .upsert({ codigo_empresa: empresa, observacoes: obs }, { onConflict: 'codigo_empresa' });
+  if (error) { showToast('Erro ao salvar: ' + error.message, 'error'); return; }
+  S.lancamento.obsEmpresa = obs;
+  showToast('✅ Observações salvas!');
 }
 
 function setupEscalasListeners() {
