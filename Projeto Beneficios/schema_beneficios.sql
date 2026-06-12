@@ -43,13 +43,21 @@ CREATE TABLE IF NOT EXISTS public.rh_beneficios_lancamentos (
 -- RLS — mesmo padrão das outras tabelas rh_*
 -- ============================================================
 
+-- Tabela 4: Observações por empresa
+CREATE TABLE IF NOT EXISTS public.rh_beneficios_empresa_obs (
+    codigo_empresa  TEXT PRIMARY KEY,
+    observacoes     TEXT NOT NULL DEFAULT ''
+);
+
 ALTER TABLE public.rh_beneficios_config       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rh_beneficios_individuais  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rh_beneficios_lancamentos  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_beneficios_empresa_obs  ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "rh_ben_config: autenticado"      ON public.rh_beneficios_config;
 DROP POLICY IF EXISTS "rh_ben_ind: autenticado"         ON public.rh_beneficios_individuais;
 DROP POLICY IF EXISTS "rh_ben_lanc: autenticado"        ON public.rh_beneficios_lancamentos;
+DROP POLICY IF EXISTS "rh_ben_obs: autenticado"         ON public.rh_beneficios_empresa_obs;
 
 CREATE POLICY "rh_ben_config: autenticado"
     ON public.rh_beneficios_config FOR ALL TO authenticated
@@ -61,4 +69,8 @@ CREATE POLICY "rh_ben_ind: autenticado"
 
 CREATE POLICY "rh_ben_lanc: autenticado"
     ON public.rh_beneficios_lancamentos FOR ALL TO authenticated
+    USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY "rh_ben_obs: autenticado"
+    ON public.rh_beneficios_empresa_obs FOR ALL TO authenticated
     USING (TRUE) WITH CHECK (TRUE);
