@@ -39,6 +39,14 @@ CREATE TABLE IF NOT EXISTS public.rh_beneficios_lancamentos (
     CONSTRAINT rh_ben_lanc_empresa_comp_unique UNIQUE (codigo_empresa, competencia_pagamento)
 );
 
+-- Tabela 5: Programação de férias (importada via PDF — substituição total a cada upload)
+CREATE TABLE IF NOT EXISTS public.rh_beneficios_ferias (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    empresa          TEXT NOT NULL,
+    funcionarios_json JSONB NOT NULL DEFAULT '[]',
+    atualizado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ============================================================
 -- RLS — mesmo padrão das outras tabelas rh_*
 -- ============================================================
@@ -53,11 +61,13 @@ ALTER TABLE public.rh_beneficios_config       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rh_beneficios_individuais  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rh_beneficios_lancamentos  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.rh_beneficios_empresa_obs  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rh_beneficios_ferias       ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "rh_ben_config: autenticado"      ON public.rh_beneficios_config;
 DROP POLICY IF EXISTS "rh_ben_ind: autenticado"         ON public.rh_beneficios_individuais;
 DROP POLICY IF EXISTS "rh_ben_lanc: autenticado"        ON public.rh_beneficios_lancamentos;
 DROP POLICY IF EXISTS "rh_ben_obs: autenticado"         ON public.rh_beneficios_empresa_obs;
+DROP POLICY IF EXISTS "rh_ben_ferias: autenticado"      ON public.rh_beneficios_ferias;
 
 CREATE POLICY "rh_ben_config: autenticado"
     ON public.rh_beneficios_config FOR ALL TO authenticated
@@ -73,4 +83,8 @@ CREATE POLICY "rh_ben_lanc: autenticado"
 
 CREATE POLICY "rh_ben_obs: autenticado"
     ON public.rh_beneficios_empresa_obs FOR ALL TO authenticated
+    USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY "rh_ben_ferias: autenticado"
+    ON public.rh_beneficios_ferias FOR ALL TO authenticated
     USING (TRUE) WITH CHECK (TRUE);

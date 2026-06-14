@@ -8,6 +8,7 @@
   <script src="../supabase-config.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="../portal-auth-guard.js"></script>
 </head>
 <body>
@@ -33,6 +34,7 @@
     <nav class="sidebar-nav">
       <button class="nav-btn active" data-screen="lancamentos">📋 Lançamentos</button>
       <button class="nav-btn"        data-screen="escalas">📅 Escalas</button>
+      <button class="nav-btn"        data-screen="ferias">🏖️ Férias</button>
       <button class="nav-btn"        data-screen="config">⚙️ Configurações</button>
     </nav>
     <div class="sidebar-footer" id="sidebarUser"></div>
@@ -101,6 +103,17 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Banner de férias na competência -->
+      <div id="bannerFerias" class="hidden"
+        style="display:none;flex-direction:column;gap:8px;background:#eff6ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#1e40af">
+        <div style="display:flex;align-items:center;gap:8px;font-weight:600">
+          <span style="font-size:16px">🏖️</span>
+          <span id="bannerFeriasTitulo"></span>
+        </div>
+        <div id="bannerFeriasLista" style="display:flex;flex-direction:column;gap:4px;padding-left:24px"></div>
+        <div style="font-size:11px;color:#3b82f6;margin-top:2px">⚠️ Ajuste os dias de cada empregado descontando o período de férias para evitar pagamento indevido.</div>
       </div>
 
       <!-- Banner de observações da empresa -->
@@ -290,6 +303,89 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- ── FÉRIAS ── -->
+    <section id="screen-ferias" class="screen hidden">
+      <div class="screen-header">
+        <h1>🏖️ Programação de Férias</h1>
+        <p>Importe o PDF de programação de férias e identifique quem está de férias na competência</p>
+      </div>
+
+      <!-- Status / Upload -->
+      <div class="card">
+        <h3 class="card-title">📄 Programação de Férias</h3>
+
+        <!-- Estado: dados carregados do Supabase -->
+        <div id="feriaStatusCarregado" class="feria-status-carregado hidden">
+          <div class="feria-status-info">
+            <div class="feria-status-icon">✅</div>
+            <div>
+              <div class="feria-status-titulo">Dados carregados do servidor</div>
+              <div id="feriaStatusStats" class="feria-status-stats"></div>
+              <div id="feriaStatusData" class="feria-status-data"></div>
+            </div>
+          </div>
+          <div class="feria-status-acoes">
+            <button id="feriaBtnNovoUpload" class="btn btn-secondary btn-sm">📤 Novo upload</button>
+            <button id="feriaBtnLimpar" class="btn btn-secondary btn-sm">✕ Remover dados</button>
+          </div>
+        </div>
+
+        <!-- Estado: sem dados — exibe drop zone -->
+        <div id="feriaDropZone" class="feria-drop-zone">
+          <div class="feria-drop-icon">📂</div>
+          <div class="feria-drop-text">Arraste o PDF aqui ou clique para selecionar</div>
+          <div class="feria-drop-sub">Programação de Férias gerada pelo sistema</div>
+          <input id="feriaInputPdf" type="file" accept=".pdf" style="display:none">
+        </div>
+
+        <!-- Estado: substituição de arquivo (após clicar em "Novo upload") -->
+        <div id="feriaNovoUploadZone" class="hidden">
+          <div class="info-box" style="margin-bottom:10px">
+            ⚠️ O novo arquivo <strong>substituirá completamente</strong> os dados atuais.
+          </div>
+          <div id="feriaDropZone2" class="feria-drop-zone">
+            <div class="feria-drop-icon">📂</div>
+            <div class="feria-drop-text">Arraste o novo PDF aqui ou clique para selecionar</div>
+            <div class="feria-drop-sub">Programação de Férias gerada pelo sistema</div>
+            <input id="feriaInputPdf2" type="file" accept=".pdf" style="display:none">
+          </div>
+          <div style="margin-top:8px;text-align:right">
+            <button id="feriaBtnCancelarUpload" class="btn btn-secondary btn-sm">Cancelar</button>
+          </div>
+        </div>
+
+        <div id="feriaProgressBar" class="feria-progress hidden">
+          <div id="feriaProgressFill" class="feria-progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="card" id="feriaFiltrosCard" style="display:none">
+        <h3 class="card-title">🔍 Filtros</h3>
+        <div class="form-grid-3">
+          <div class="fg">
+            <label for="feriaFiltroEmpresa">Empresa</label>
+            <select id="feriaFiltroEmpresa">
+              <option value="">Todas as empresas</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label for="feriaFiltroComp">Competência (MM/AAAA)</label>
+            <input id="feriaFiltroComp" type="text" placeholder="MM/AAAA" maxlength="7">
+          </div>
+          <div class="fg" style="display:flex;align-items:flex-end;gap:8px">
+            <label class="feria-toggle-label">
+              <input type="checkbox" id="feriaOmitirVazias">
+              Ocultar empresas sem férias
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resultados -->
+      <div id="feriaResultados"></div>
     </section>
 
     <!-- ── CONFIGURAÇÕES ── -->

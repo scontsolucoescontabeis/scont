@@ -28,6 +28,14 @@ const S = {
     feriadosMarcados:   new Set(),
     mesRef:             '',
     considerarFeriados: 'sim'
+  },
+  ferias: {
+    empresas:      {},   // { nomeEmpresa: [ rowObj, ... ] }
+    filtroEmpresa: '',
+    filtroMes:     null,
+    filtroAno:     null,
+    omitirVazias:  false,
+    atualizadoEm:  null
   }
 };
 
@@ -95,6 +103,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupLancamentosListeners();
   setupEscalasListeners();
   setupConfigListeners();
+  setupFeriasListeners();
+  await carregarFeriasSupabase();
 });
 
 // ── DATA LOADERS ──────────────────────────────────────────
@@ -754,6 +764,90 @@ function aplicarNosLancamentos() {
   showToast(`✅ ${total} dias aplicados nos Lançamentos`);
 }
 
+// Busca os funcionários de férias na competência mesRef para a empresa selecionada
+function feriasDaEmpresaNaComp() {
+  const mesRef = S.lancamento.mesRef;
+  if (!mesRef || !Object.keys(S.ferias.empresas).length) return [];
+
+  const m = mesRef.match(/^(\d{2})\/(\d{4})$/);
+  if (!m) return [];
+  const mes = +m[1], ano = +m[2];
+
+  // Encontra empresa no PDF: nome do Supabase contido no nome do PDF (case-insensitive)
+  const nomeEmpSupa = (S.empresas.find(e => e.codigo_empresa === S.lancamento.empresa) || {}).nome_empresa || '';
+  const chavesPdf   = Object.keys(S.ferias.empresas);
+  const chavePdf    = chavesPdf.find(k =>
+    k.toLowerCase().includes(nomeEmpSupa.toLowerCase().slice(0, 15)) ||
+    nomeEmpSupa.toLowerCase().includes(k.toLowerCase().slice(0, 15))
+  );
+  if (!chavePdf) return [];
+
+  const rows = S.ferias.empresas[chavePdf] || [];
+  const resultado = [];
+
+  for (const r of rows) {
+    // Tenta match por código (cod_folha do Supabase vs código do PDF)
+    const codPdf = r.codigo.trim();
+    const emp    = S.empregados.find(e => String(e.codigo_empregado).trim() === codPdf);
+    if (!emp) continue;
+
+    // Coleta todos os períodos (principal + extras) que caem no mês
+    const periodos = [];
+    function verificaPeriodo(ini_gozo, dias_str) {
+      const ini = feriasParseDate(ini_gozo);
+      if (!ini) return;
+      const dias = parseFloat((dias_str || '').replace(',', '.'));
+      if (!dias || dias <= 0) return;
+      const primeiro = new Date(ano, mes - 1, 1);
+      const ultimo   = new Date(ano, mes, 0);
+      const fim      = new Date(ini);
+      fim.setDate(fim.getDate() + Math.floor(dias) - 1);
+      if (ini <= ultimo && fim >= primeiro) {
+        periodos.push({ ini, fim, dias: Math.floor(dias) });
+      }
+    }
+    verificaPeriodo(r.ini_gozo, r.dias);
+    for (const ex of (r.extras || [])) verificaPeriodo(ex.ini_gozo, ex.dias);
+
+    if (periodos.length) resultado.push({ emp, periodos, codPdf });
+  }
+
+  return resultado;
+}
+
+function fmtData(d) {
+  return d ? `${pad(d.getDate(),2)}/${pad(d.getMonth()+1,2)}/${d.getFullYear()}` : '—';
+}
+
+function renderBannerFerias() {
+  const banner = $('bannerFerias');
+  if (!S.lancamento.mesRef || !S.lancamento.empresa) {
+    banner.classList.add('hidden');
+    banner.style.display = 'none';
+    return;
+  }
+
+  const lista = feriasDaEmpresaNaComp();
+
+  if (!lista.length) {
+    banner.classList.add('hidden');
+    banner.style.display = 'none';
+    return;
+  }
+
+  $('bannerFeriasTitulo').textContent =
+    `${lista.length} empregado${lista.length > 1 ? 's' : ''} com férias em ${S.lancamento.mesRef} — verifique os dias lançados`;
+
+  const ul = $('bannerFeriasLista');
+  ul.innerHTML = lista.map(({ emp, periodos }) => {
+    const periStr = periodos.map(p => `${fmtData(p.ini)} a ${fmtData(p.fim)} (${p.dias} dias)`).join(', ');
+    return `<div>• <strong>${escHtml(emp.nome_empregado)}</strong> — ${escHtml(periStr)}</div>`;
+  }).join('');
+
+  banner.classList.remove('hidden');
+  banner.style.display = 'flex';
+}
+
 function renderBannerObs() {
   const banner = $('bannerObsEmpresa');
   const texto  = S.lancamento.obsEmpresa.trim();
@@ -781,9 +875,10 @@ function setupLancamentosListeners() {
     preencherConfigNaLancamentos();
     await tryLoadLancamento();
     if (!S.lancamento.linhas.length) buildGrade();
-    renderGrade();
     await loadObs(emp);
     renderBannerObs();
+    renderBannerFerias();
+    renderGrade();
   });
 
   $('lancCompPgto').addEventListener('change', async () => {
@@ -797,6 +892,8 @@ function setupLancamentosListeners() {
   $('lancMesRef').addEventListener('change', () => {
     S.lancamento.mesRef = $('lancMesRef').value;
     $('bannerMesRef').textContent = S.lancamento.mesRef || '—';
+    renderBannerFerias();
+    renderGrade();
   });
 
   ['lancVtDia', 'lancVaDia', 'lancDias'].forEach(id => {
@@ -900,20 +997,36 @@ function renderGrade() {
     return;
   }
 
+  // Mapa de empregados de férias no mês: codEmp -> periodos[]
+  const feriasMap = {};
+  for (const { emp, periodos } of feriasDaEmpresaNaComp()) {
+    feriasMap[String(emp.codigo_empregado).trim()] = periodos;
+  }
+
   S.lancamento.linhas.forEach((linha, idx) => {
     const badgeClass = { padrao: 'badge-ok', individual: 'badge-ind', divergente: 'badge-warn' }[linha.status] || 'badge-ok';
     const badgeLabel = { padrao: 'Padrão', individual: 'Individual', divergente: 'Divergente' }[linha.status] || 'Padrão';
 
+    const periodos    = feriasMap[String(linha.cod_emp).trim()];
+    const deFerias    = !!periodos;
+    const periStr     = deFerias
+      ? periodos.map(p => `${fmtData(p.ini)}→${fmtData(p.fim)} (${p.dias}d)`).join(' | ')
+      : '';
+
     const tr = document.createElement('tr');
+    if (deFerias) tr.style.background = '#eff6ff';
     tr.innerHTML = `
       <td>${escHtml(linha.cod_emp)}</td>
-      <td>${escHtml(linha.nome)}</td>
+      <td>
+        ${escHtml(linha.nome)}
+        ${deFerias ? `<div class="grade-ferias-tag">🏖️ Férias: ${escHtml(periStr)}</div>` : ''}
+      </td>
       <td><input type="number" step="0.01" min="0" class="grade-vt" data-idx="${idx}" value="${linha.vt_dia}"></td>
       <td><input type="number" step="0.01" min="0" class="grade-va" data-idx="${idx}" value="${linha.va_dia}"></td>
       <td><input type="number" min="0" max="31" class="grade-dias" data-idx="${idx}" value="${linha.dias}"></td>
       <td class="cell-calc">R$ ${fmtMoeda(linha.total_vt)}</td>
       <td class="cell-calc">R$ ${fmtMoeda(linha.total_va)}</td>
-      <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+      <td><span class="badge ${badgeClass}">${badgeLabel}</span>${deFerias ? ' <span class="badge badge-ferias">🏖️</span>' : ''}</td>
       <td></td>`;
     tbody.appendChild(tr);
   });
@@ -1176,4 +1289,439 @@ function gerarTxt() {
   URL.revokeObjectURL(a.href);
 
   showToast(`✅ ${nomeArquivo} gerado com ${linhas.length} linha(s)`);
+}
+
+// ============================================================
+// FÉRIAS — Programação de Férias
+// ============================================================
+
+// Bandas de colunas X (calibradas pelo relatório SCONT)
+const FERIAS_COLS = [
+  { key: 'codigo',      x0: 0,   x1: 37  },
+  { key: 'empregado',   x0: 37,  x1: 200 },
+  { key: 'admissao',    x0: 200, x1: 252 },
+  { key: 'vencto',      x0: 252, x1: 303 },
+  { key: 'fer_venc',    x0: 303, x1: 319 },
+  { key: 'fer_pro',     x0: 319, x1: 355 },
+  { key: 'ini_aquis',   x0: 355, x1: 415 },
+  { key: 'fim_aquis',   x0: 415, x1: 472 },
+  { key: 'ini_gozo',    x0: 472, x1: 525 },
+  { key: 'dias',        x0: 525, x1: 553 },
+  { key: 'dir',         x0: 606, x1: 633 },
+  { key: 'goz',         x0: 633, x1: 657 },
+  { key: 'rest',        x0: 657, x1: 676 },
+  { key: 'limite_gozo', x0: 676, x1: 729 },
+];
+
+const FERIAS_SKIP = /CNPJ:|Data base:|PROGRAMA|Empregado|admiss|Observa|Sistema|Total de|C.digo|P.gina|Emiss|Horas|Vencto|In.cio|Limite|Dias\b|Abono|aquisitivo|gozo|afast|faltas|dir\.|goz\.|rest\.|pro\.|venc\.|Fer\.|^Fim$|13/i;
+
+function feriasColText(words, x0, x1) {
+  return words
+    .filter(w => w.x >= x0 && w.x < x1)
+    .map(w => w.t)
+    .join(' ')
+    .trim();
+}
+
+function feriasParseDate(s) {
+  s = (s || '').trim();
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return null;
+  const d = new Date(+m[3], +m[2] - 1, +m[1]);
+  return isNaN(d) ? null : d;
+}
+
+function feriasDentroDoMes(row, ano, mes) {
+  const primeiro = new Date(ano, mes - 1, 1);
+  const ultimo   = new Date(ano, mes, 0);
+
+  function verifica(ini_gozo, dias_str) {
+    const ini = feriasParseDate(ini_gozo);
+    if (!ini) return false;
+    const dias = parseFloat((dias_str || '').replace(',', '.'));
+    if (!dias || dias <= 0) return false;
+    const fim = new Date(ini);
+    fim.setDate(fim.getDate() + Math.floor(dias) - 1);
+    return ini <= ultimo && fim >= primeiro;
+  }
+
+  if (verifica(row.ini_gozo, row.dias)) return true;
+  for (const ex of (row.extras || [])) {
+    if (verifica(ex.ini_gozo, ex.dias)) return true;
+  }
+  return false;
+}
+
+async function parsePdfFerias(file) {
+  // Configura worker do pdf.js
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const empresas = {};
+  let empresaAtual = null;
+
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page    = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const vp      = page.getViewport({ scale: 1 });
+
+    // Extrai palavras com coordenadas X (pdf.js usa sistema Y invertido)
+    const words = content.items.map(item => ({
+      t:   item.str,
+      x:   item.transform[4],
+      y:   Math.round(vp.height - item.transform[5]),
+    })).filter(w => w.t.trim());
+
+    // Agrupa por linha (y arredondado)
+    const linesMap = {};
+    for (const w of words) {
+      const y = Math.round(w.y / 2) * 2; // tolerance 2px
+      (linesMap[y] = linesMap[y] || []).push(w);
+    }
+
+    for (const y of Object.keys(linesMap).map(Number).sort((a, b) => a - b)) {
+      const rw       = linesMap[y];
+      const fullText = rw.map(w => w.t).join(' ');
+
+      // Detecta nome da empresa: linha que tem "Página:" mas não é cabeçalho de coluna
+      if (/P.gina:/i.test(fullText) && !/PROGRAMA|admiss/i.test(fullText)) {
+        const nome = rw
+          .filter(w => w.x < 600)
+          .map(w => w.t)
+          .join(' ')
+          .replace(/[^\x20-\x7EÀ-ɏ]/g, '')
+          .trim();
+        empresaAtual = nome || 'EMPRESA DESCONHECIDA';
+        if (!empresas[empresaAtual]) empresas[empresaAtual] = [];
+        continue;
+      }
+
+      if (FERIAS_SKIP.test(fullText)) continue;
+      if (!empresaAtual) continue;
+
+      const r = {};
+      for (const col of FERIAS_COLS) {
+        r[col.key] = feriasColText(rw, col.x0, col.x1);
+      }
+
+      // Linha secundária (período extra): sem código nem nome, mas com período aquisitivo
+      if (!r.codigo && !r.empregado && r.ini_aquis) {
+        const list = empresas[empresaAtual];
+        if (list.length) {
+          list[list.length - 1].extras = list[list.length - 1].extras || [];
+          list[list.length - 1].extras.push(r);
+        }
+        continue;
+      }
+
+      if (!r.empregado && !r.codigo) continue;
+
+      r.extras = [];
+      empresas[empresaAtual].push(r);
+    }
+  }
+
+  return empresas;
+}
+
+function feriasRenderResultados() {
+  const { empresas, filtroEmpresa, filtroMes, filtroAno, omitirVazias } = S.ferias;
+  const container = $('feriaResultados');
+  const comComp   = filtroMes && filtroAno;
+
+  let html = '';
+
+  for (const [nome, rows] of Object.entries(empresas)) {
+    if (filtroEmpresa && !nome.toLowerCase().includes(filtroEmpresa.toLowerCase())) continue;
+
+    const temFerias = comComp && rows.some(r => feriasDentroDoMes(r, filtroAno, filtroMes));
+    if (omitirVazias && comComp && !temFerias) continue;
+    if (omitirVazias && !rows.length) continue;
+
+    const totalFerias = comComp ? rows.filter(r => feriasDentroDoMes(r, filtroAno, filtroMes)).length : 0;
+
+    html += `<div class="card feria-empresa-card">
+      <div class="feria-empresa-header">
+        <h3 class="card-title" style="margin:0">${escHtml(nome)}</h3>
+        <div class="feria-empresa-stats">
+          <span class="feria-stat">${rows.length} funcionário${rows.length !== 1 ? 's' : ''}</span>
+          ${comComp ? `<span class="feria-stat-ferias ${totalFerias > 0 ? 'has-ferias' : ''}">${totalFerias} de férias em ${pad(filtroMes,2)}/${filtroAno}</span>` : ''}
+        </div>
+      </div>`;
+
+    if (!rows.length) {
+      html += `<p class="hint-text">Nenhum funcionário cadastrado.</p>`;
+    } else {
+      html += `<div class="table-wrapper"><table class="data-table feria-table">
+        <thead><tr>
+          <th>Cód</th><th>Empregado</th><th>Admissão</th><th>Ini Gozo</th><th>Dias</th><th>Limite Gozo</th>
+          ${comComp ? `<th class="feria-col-status">Férias ${pad(filtroMes,2)}/${filtroAno}</th>` : ''}
+        </tr></thead>
+        <tbody>`;
+
+      for (const r of rows) {
+        const deFerias = comComp && feriasDentroDoMes(r, filtroAno, filtroMes);
+        const trClass  = deFerias ? ' class="feria-row-sim"' : '';
+        const badge    = comComp
+          ? `<td class="feria-col-status">${deFerias
+              ? '<span class="badge feria-badge-sim">SIM</span>'
+              : '<span class="badge feria-badge-nao">não</span>'}</td>`
+          : '';
+
+        const iniGozo = r.ini_gozo && !r.ini_gozo.includes('....') ? escHtml(r.ini_gozo) : '—';
+        const limite  = r.limite_gozo && !r.limite_gozo.includes('....') ? escHtml(r.limite_gozo) : '—';
+
+        html += `<tr${trClass}>
+          <td>${escHtml(r.codigo)}</td>
+          <td>${escHtml(r.empregado)}</td>
+          <td>${escHtml(r.admissao || '—')}</td>
+          <td>${iniGozo}</td>
+          <td>${escHtml(r.dias || '—')}</td>
+          <td>${limite}</td>
+          ${badge}
+        </tr>`;
+
+        for (const ex of (r.extras || [])) {
+          const exDeFerias = comComp && feriasDentroDoMes({ ini_gozo: ex.ini_gozo, dias: ex.dias, extras: [] }, filtroAno, filtroMes);
+          const exBadge    = comComp
+            ? `<td class="feria-col-status">${exDeFerias
+                ? '<span class="badge feria-badge-sim">SIM</span>'
+                : '<span class="badge feria-badge-nao">não</span>'}</td>`
+            : '';
+          const exIni  = ex.ini_gozo && !ex.ini_gozo.includes('....') ? escHtml(ex.ini_gozo) : '—';
+          const exLim  = ex.limite_gozo && !ex.limite_gozo.includes('....') ? escHtml(ex.limite_gozo) : '—';
+          html += `<tr class="feria-row-extra${exDeFerias ? ' feria-row-sim' : ''}">
+            <td colspan="2" style="padding-left:28px;color:#666;font-size:12px">↳ período adicional</td>
+            <td></td>
+            <td>${exIni}</td>
+            <td>${escHtml(ex.dias || '—')}</td>
+            <td>${exLim}</td>
+            ${exBadge}
+          </tr>`;
+        }
+      }
+
+      html += `</tbody></table></div>`;
+    }
+
+    html += `</div>`;
+  }
+
+  container.innerHTML = html || '<p class="hint-text" style="padding:16px">Nenhum resultado para os filtros selecionados.</p>';
+}
+
+function feriasAtualizarFiltroEmpresas() {
+  const sel = $('feriaFiltroEmpresa');
+  const val = sel.value;
+  sel.innerHTML = '<option value="">Todas as empresas</option>';
+  for (const nome of Object.keys(S.ferias.empresas)) {
+    const opt = document.createElement('option');
+    opt.value = nome;
+    opt.textContent = nome;
+    if (nome === val) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+function feriasMascaraComp(input) {
+  input.addEventListener('input', () => {
+    let v = input.value.replace(/\D/g, '');
+    if (v.length > 2) v = v.slice(0, 2) + '/' + v.slice(2, 6);
+    input.value = v;
+  });
+}
+
+async function carregarFeriasSupabase() {
+  const { data, error } = await S.sb
+    .from('rh_beneficios_ferias')
+    .select('empresa, funcionarios_json, atualizado_em')
+    .order('empresa');
+  if (error) { console.warn('Férias: erro ao carregar do Supabase', error); return; }
+  if (!data || !data.length) return;
+
+  const empresas = {};
+  let atualizado_em = null;
+  for (const row of data) {
+    empresas[row.empresa] = row.funcionarios_json || [];
+    if (!atualizado_em || row.atualizado_em > atualizado_em) atualizado_em = row.atualizado_em;
+  }
+  S.ferias.empresas    = empresas;
+  S.ferias.atualizadoEm = atualizado_em;
+
+  feriasRenderStatusCarregado();
+}
+
+async function salvarFeriasSupabase(empresas, atualizado_em) {
+  const ts = atualizado_em || new Date().toISOString();
+
+  // 1. Apaga tudo
+  const { error: delErr } = await S.sb
+    .from('rh_beneficios_ferias')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000');
+
+  if (delErr) { showToast('Erro ao limpar férias: ' + delErr.message, 'error'); return false; }
+
+  // 2. Insere uma linha por empresa
+  const rows = Object.entries(empresas).map(([empresa, funcs]) => ({
+    empresa,
+    funcionarios_json: funcs,
+    atualizado_em:     ts
+  }));
+
+  if (!rows.length) return true;
+
+  const { error: insErr } = await S.sb
+    .from('rh_beneficios_ferias')
+    .insert(rows);
+
+  if (insErr) { showToast('Erro ao salvar férias: ' + insErr.message, 'error'); return false; }
+  return true;
+}
+
+function feriasRenderStatusCarregado() {
+  const temDados      = Object.keys(S.ferias.empresas).length > 0;
+  const totalEmpresas = Object.keys(S.ferias.empresas).length;
+  const totalFuncs    = Object.values(S.ferias.empresas).reduce((s, r) => s + r.length, 0);
+
+  // Painel de status (dados existem)
+  $('feriaStatusCarregado').classList.toggle('hidden', !temDados);
+  // Drop zone inicial (sem dados)
+  $('feriaDropZone').style.display        = temDados ? 'none' : '';
+  // Zone de novo upload (esconde sempre ao renderizar status)
+  $('feriaNovoUploadZone').classList.add('hidden');
+
+  if (temDados) {
+    $('feriaStatusStats').textContent = `${totalEmpresas} empresa${totalEmpresas !== 1 ? 's' : ''} · ${totalFuncs} funcionário${totalFuncs !== 1 ? 's' : ''}`;
+
+    if (S.ferias.atualizadoEm) {
+      const d = new Date(S.ferias.atualizadoEm);
+      const fmt = d.toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+      $('feriaStatusData').textContent = `Importado em ${fmt}`;
+    } else {
+      $('feriaStatusData').textContent = '';
+    }
+
+    $('feriaFiltrosCard').style.display = '';
+    feriasAtualizarFiltroEmpresas();
+    feriasRenderResultados();
+  } else {
+    $('feriaFiltrosCard').style.display = 'none';
+    $('feriaResultados').innerHTML = '';
+  }
+}
+
+function setupFeriasListeners() {
+  // ── Drop zone inicial (sem dados) ──
+  function bindDropZone(zone, input) {
+    zone.addEventListener('click', () => input.click());
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) feriaCarregarPdf(file);
+    });
+    input.addEventListener('change', () => {
+      if (input.files[0]) feriaCarregarPdf(input.files[0]);
+      input.value = '';
+    });
+  }
+
+  bindDropZone($('feriaDropZone'),  $('feriaInputPdf'));
+  bindDropZone($('feriaDropZone2'), $('feriaInputPdf2'));
+
+  // ── Novo upload (quando já há dados) ──
+  $('feriaBtnNovoUpload').addEventListener('click', () => {
+    $('feriaNovoUploadZone').classList.remove('hidden');
+    $('feriaStatusCarregado').classList.add('hidden');
+  });
+
+  $('feriaBtnCancelarUpload').addEventListener('click', () => {
+    $('feriaNovoUploadZone').classList.add('hidden');
+    $('feriaStatusCarregado').classList.remove('hidden');
+  });
+
+  // ── Remover dados ──
+  $('feriaBtnLimpar').addEventListener('click', async () => {
+    if (!confirm('Remover todos os dados de férias do servidor?')) return;
+    await S.sb.from('rh_beneficios_ferias').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    S.ferias.empresas     = {};
+    S.ferias.atualizadoEm = null;
+    feriasRenderStatusCarregado();
+    renderBannerFerias();
+    renderGrade();
+    showToast('Programação de férias removida', 'info');
+  });
+
+  // ── Filtros ──
+  $('feriaFiltroEmpresa').addEventListener('change', () => {
+    S.ferias.filtroEmpresa = $('feriaFiltroEmpresa').value;
+    feriasRenderResultados();
+  });
+
+  const inputComp = $('feriaFiltroComp');
+  feriasMascaraComp(inputComp);
+  inputComp.addEventListener('input', () => {
+    const val = inputComp.value;
+    const m   = val.match(/^(\d{2})\/(\d{4})$/);
+    S.ferias.filtroMes = m ? +m[1] : null;
+    S.ferias.filtroAno = m ? +m[2] : null;
+    feriasRenderResultados();
+  });
+
+  $('feriaOmitirVazias').addEventListener('change', e => {
+    S.ferias.omitirVazias = e.target.checked;
+    feriasRenderResultados();
+  });
+}
+
+async function feriaCarregarPdf(file) {
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    showToast('Selecione um arquivo PDF', 'error');
+    return;
+  }
+
+  $('feriaProgressBar').classList.remove('hidden');
+  $('feriaProgressFill').style.width = '10%';
+
+  try {
+    $('feriaProgressFill').style.width = '30%';
+    const empresas = await parsePdfFerias(file);
+    $('feriaProgressFill').style.width = '70%';
+
+    const agora = new Date().toISOString();
+    const ok    = await salvarFeriasSupabase(empresas, agora);
+    $('feriaProgressFill').style.width = '100%';
+    if (!ok) { $('feriaProgressBar').classList.add('hidden'); return; }
+
+    S.ferias.empresas     = empresas;
+    S.ferias.atualizadoEm = agora;
+
+    setTimeout(() => {
+      $('feriaProgressBar').classList.add('hidden');
+      feriasRenderStatusCarregado();
+    }, 400);
+
+    const totalEmpresas = Object.keys(empresas).length;
+    const totalFuncs    = Object.values(empresas).reduce((s, r) => s + r.length, 0);
+    showToast(`✅ PDF importado e salvo: ${totalEmpresas} empresa(s), ${totalFuncs} funcionário(s)`);
+
+    if (S.lancamento.empresa && S.lancamento.mesRef) {
+      renderBannerFerias();
+      renderGrade();
+    }
+  } catch (e) {
+    console.error(e);
+    showToast('Erro ao processar o PDF', 'error');
+    $('feriaProgressBar').classList.add('hidden');
+  }
 }
