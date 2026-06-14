@@ -707,9 +707,15 @@ async function parsearPDF(file) {
         return false;
     };
     const isFooter = (items) => {
-        const txt = items.map(it => it.str).join(' ');
-        return /sistema licenciado|observa[çc][oõ]es|total de empregados/i.test(txt)
-            || /^(p[aá]gina|emiss[aã]o|horas|data\s*base|cnpj)\b/i.test(txt.trim());
+        const txt = items.map(it => it.str).join(' ').trim();
+        if (/sistema licenciado|observa[çc][oõ]es|total de empregados/i.test(txt)) return true;
+        if (/\bp[aá]g(ina)?[\s.:]/i.test(txt)) return true;
+        if (/^(emiss[aã]o|horas|data\s*base|cnpj)\b/i.test(txt)) return true;
+        // Título do arquivo repetido no cabeçalho de cada página
+        if (/programa[çc][aã]o\s+de\s+f[eé]rias/i.test(txt)) return true;
+        // Número de página isolado (ex.: "2", "2 de 5", "Pág. 2 de 5")
+        if (/^\d+(\s+de\s+\d+)?$/.test(txt)) return true;
+        return false;
     };
 
     // Valor placeholder do PDF (ex.: ..../..../......  ou  ....)

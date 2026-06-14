@@ -1278,17 +1278,25 @@ function gerarTxt() {
   }
 
   const conteudo    = linhas.join('\n') + '\n';
-  const blob        = new Blob([conteudo], { type: 'text/plain;charset=utf-8' });
   const [mm, aaaa]  = compPgto.split('/');
   const nomeArquivo = `Beneficios_${empresa}_${mm}-${aaaa}.txt`;
 
-  const a = document.createElement('a');
-  a.href     = URL.createObjectURL(blob);
-  a.download = nomeArquivo;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  $('previaTxtInfo').textContent = `${nomeArquivo} · ${linhas.length} linha(s)`;
+  $('previaTxtConteudo').textContent = conteudo;
+  $('modalPreviaTxt').classList.remove('hidden');
 
-  showToast(`✅ ${nomeArquivo} gerado com ${linhas.length} linha(s)`);
+  $('btnPreviaCancelar').onclick = () => $('modalPreviaTxt').classList.add('hidden');
+
+  $('btnPreviaDownload').onclick = () => {
+    const blob = new Blob([conteudo], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = nomeArquivo;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    $('modalPreviaTxt').classList.add('hidden');
+    showToast(`✅ ${nomeArquivo} gerado com ${linhas.length} linha(s)`);
+  };
 }
 
 // ============================================================
@@ -1307,8 +1315,8 @@ const FERIAS_COLS = [
   { key: 'fim_aquis',   x0: 415, x1: 472 },
   { key: 'ini_gozo',    x0: 472, x1: 525 },
   { key: 'dias',        x0: 525, x1: 553 },
-  { key: 'dir',         x0: 606, x1: 633 },
-  { key: 'goz',         x0: 633, x1: 657 },
+  { key: 'dir',         x0: 606, x1: 628 },
+  { key: 'goz',         x0: 628, x1: 657 },
   { key: 'rest',        x0: 657, x1: 676 },
   { key: 'limite_gozo', x0: 676, x1: 729 },
 ];
