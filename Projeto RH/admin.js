@@ -19,11 +19,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- NAVEGAÇÃO DE ABAS ---
 
-function abrirAba(abaId) {
+function abrirAba(abaId, btn) {
     document.querySelectorAll('.admin-tab-content').forEach(aba => aba.classList.remove('active'));
-    document.querySelectorAll('.admin-tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
     document.getElementById(abaId).classList.add('active');
-    if (event && event.target) event.target.classList.add('active');
+    if (btn) btn.classList.add('active');
 }
 
 // --- EMPRESAS ---
@@ -1008,7 +1008,7 @@ function renderizarTabelaRegras(regras) {
         tbody.innerHTML += `<tr>
             <td style="font-family: monospace; font-size: 12px;">${regra.padrao_de}</td>
             <td style="font-family: monospace; font-size: 12px; color: #8B3A3A;">${regra.padrao_para}</td>
-            <td><button type="button" class="btn-delete" onclick="deletarRegra(${regra.id})">Deletar</button></td>
+            <td><button type="button" class="btn-delete" onclick="deletarRegra('${regra.id}')">Deletar</button></td>
         </tr>`;
     });
 }
@@ -1058,7 +1058,7 @@ function renderizarTabelaMapeamentos(mapeamentos) {
         tbody.innerHTML += `<tr>
             <td>${map.nome_arquivo}</td>
             <td style="color: #8B3A3A; font-weight: bold;">${map.nome_documento}</td>
-            <td><button type="button" class="btn-delete" onclick="deletarMapeamento(${map.id})">Deletar</button></td>
+            <td><button type="button" class="btn-delete" onclick="deletarMapeamento('${map.id}')">Deletar</button></td>
         </tr>`;
     });
 }
