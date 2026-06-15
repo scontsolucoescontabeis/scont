@@ -1321,7 +1321,7 @@ const FERIAS_COLS = [
   { key: 'limite_gozo', x0: 676, x1: 729 },
 ];
 
-const FERIAS_SKIP = /CNPJ:|Data base:|PROGRAMA|Empregado|admiss|Observa|Sistema|Total de|C.digo|P.gina|Emiss|Horas|Vencto|In.cio|Limite|Dias\b|Abono|aquisitivo|gozo|afast|faltas|dir\.|goz\.|rest\.|pro\.|venc\.|Fer\.|^Fim$|13/i;
+const FERIAS_SKIP = /CNPJ:|Data base:|PROGRAMA|Empregado|admiss|Observa|Sistema|Total de|C.digo|P.gina|Emiss|Horas|Vencto|In.cio|Limite|Dias\b|Abono|aquisitivo|gozo|afast|faltas|dir\.|goz\.|rest\.|pro\.|venc\.|Fer\.|^Fim$|13[°º]/i;
 
 function feriasColText(words, x0, x1) {
   return words
