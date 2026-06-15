@@ -97,12 +97,29 @@ function filtrarEmpresas(termo) {
     box.style.display = 'block';
 }
 
-function selecionarEmpresa(codigo, nome) {
+async function selecionarEmpresa(codigo, nome) {
     document.getElementById('codigoEmpresa').value = codigo;
     document.getElementById('buscaEmpresa').value = `${codigo} - ${nome}`;
     document.getElementById('buscaEmpresaResultados').style.display = 'none';
     const label = document.getElementById('empresaSelecionadaLabel');
     if (label) label.textContent = '';
+    const cfg = await _buscarConfigRubricas(codigo);
+    const jDiaria   = document.getElementById('jornada');
+    const jSabAtiva = document.getElementById('jornadaSabadoAtiva');
+    const jSabCont  = document.getElementById('jornadaSabadoContainer');
+    const jSab      = document.getElementById('jornadaSabado');
+    if (cfg && cfg['jornada_diaria']) {
+        if (jDiaria)   jDiaria.value = cfg['jornada_diaria']?.cod || '08:00';
+        const sabAtiva = cfg['jornada_sabado_ativa']?.cod === '1';
+        if (jSabAtiva) { jSabAtiva.checked = sabAtiva; }
+        if (jSabCont)  jSabCont.style.display = sabAtiva ? 'block' : 'none';
+        if (jSab)      jSab.value = cfg['jornada_sabado']?.cod || '04:00';
+    } else {
+        if (jDiaria)   jDiaria.value    = '08:00';
+        if (jSabAtiva) jSabAtiva.checked = false;
+        if (jSabCont)  jSabCont.style.display = 'none';
+        if (jSab)      jSab.value       = '04:00';
+    }
 }
 
 document.addEventListener('click', e => {
@@ -1668,9 +1685,8 @@ async function _buscarConfigRubricas(codigoEmpresa) {
 }
 
 function _aplicarConfigRubricasNoCampos(prefixo, cfg) {
-    if (!cfg) return;
     _CFG_EVENTOS.forEach(def => {
-        const v = cfg[def.ev] || {};
+        const v = cfg ? (cfg[def.ev] || {}) : {};
         const rubEl  = document.getElementById(`${prefixo}Rub${def.sufRub}`);
         const tipoEl = document.getElementById(`${prefixo}Tipo${def.sufRub}`);
         if (rubEl)  rubEl.value  = v.cod  || '';
@@ -1687,6 +1703,15 @@ function _preencherCamposConfigRubricas(cfg) {
         if (rubEl)  rubEl.value  = v.cod  || '';
         if (tipoEl) tipoEl.value = v.tipo || def.defaultTipo;
     });
+    const jDiaria   = document.getElementById('cfgJornada');
+    const jSabAtiva = document.getElementById('cfgJornadaSabadoAtiva');
+    const jSabCont  = document.getElementById('cfgJornadaSabadoContainer');
+    const jSab      = document.getElementById('cfgJornadaSabado');
+    if (jDiaria)   jDiaria.value = cfg['jornada_diaria']?.cod || '08:00';
+    const sabAtiva = cfg['jornada_sabado_ativa']?.cod === '1';
+    if (jSabAtiva) jSabAtiva.checked = sabAtiva;
+    if (jSabCont)  jSabCont.style.display = sabAtiva ? 'flex' : 'none';
+    if (jSab)      jSab.value = cfg['jornada_sabado']?.cod || '04:00';
 }
 
 function _limparCamposConfigRubricas() {
@@ -1696,6 +1721,14 @@ function _limparCamposConfigRubricas() {
         if (rubEl)  rubEl.value  = '';
         if (tipoEl) tipoEl.value = def.defaultTipo;
     });
+    const jDiaria   = document.getElementById('cfgJornada');
+    const jSabAtiva = document.getElementById('cfgJornadaSabadoAtiva');
+    const jSabCont  = document.getElementById('cfgJornadaSabadoContainer');
+    const jSab      = document.getElementById('cfgJornadaSabado');
+    if (jDiaria)   jDiaria.value    = '08:00';
+    if (jSabAtiva) jSabAtiva.checked = false;
+    if (jSabCont)  jSabCont.style.display = 'none';
+    if (jSab)      jSab.value       = '04:00';
 }
 
 function abrirModalConfigRubricas() {
@@ -1762,10 +1795,16 @@ async function salvarConfigRubricas() {
         tipo_valor:     document.getElementById(`cfgTipo_${def.ev}`)?.value || def.defaultTipo,
     }));
 
+    const jornadaRows = [
+        { codigo_empresa: codigoEmpresa, evento: 'jornada_diaria',       codigo_rubrica: (document.getElementById('cfgJornada')?.value || '08:00').trim(),           tipo_valor: 'jornada' },
+        { codigo_empresa: codigoEmpresa, evento: 'jornada_sabado_ativa',  codigo_rubrica: document.getElementById('cfgJornadaSabadoAtiva')?.checked ? '1' : '0',      tipo_valor: 'jornada' },
+        { codigo_empresa: codigoEmpresa, evento: 'jornada_sabado',        codigo_rubrica: (document.getElementById('cfgJornadaSabado')?.value || '04:00').trim(),      tipo_valor: 'jornada' },
+    ];
+
     try {
         const { error } = await supabaseClient
             .from('rh_config_rubricas_txt')
-            .upsert(rows, { onConflict: 'codigo_empresa,evento' });
+            .upsert([...rows, ...jornadaRows], { onConflict: 'codigo_empresa,evento' });
         if (error) throw error;
         delete _cacheConfigRubricas[codigoEmpresa];
         fecharModalConfigRubricas();
@@ -1893,12 +1932,9 @@ async function abrirModalExportacaoTXT() {
     document.getElementById('expTxtPrevia').style.display = 'none';
     document.getElementById('btnGerarTXT').style.display = 'none';
     document.getElementById('btnPreviewTXT').style.display = 'none';
-    const saved = localStorage.getItem(TXT_RUBRICAS_KEY);
-    if (saved) { try { _carregarConfigNoCampos('exp', JSON.parse(saved)); } catch(e) {} }
-    if (state.codigoEmpresa) {
-        const cfg = await _buscarConfigRubricas(state.codigoEmpresa);
-        _aplicarConfigRubricasNoCampos('exp', cfg);
-    }
+    const codEmp = state.empresaSelecionada?.codigo_empresa;
+    const cfg = codEmp ? await _buscarConfigRubricas(codEmp) : null;
+    _aplicarConfigRubricasNoCampos('exp', cfg);
 }
 
 function fecharModalExportacaoTXT() {
@@ -2419,9 +2455,8 @@ async function abrirModalTxtResultados() {
     }
     document.getElementById('resNaoCompensar').checked = false;
     document.getElementById('resLabelAtraso').textContent = 'Atraso';
-    const saved = localStorage.getItem(TXT_RUBRICAS_KEY);
-    if (saved) { try { _carregarConfigNoCampos('res', JSON.parse(saved)); } catch(e) {} }
-    const cfg = await _buscarConfigRubricas(state.codigoEmpresa);
+    const codEmp = state.empresaSelecionada?.codigo_empresa;
+    const cfg = codEmp ? await _buscarConfigRubricas(codEmp) : null;
     _aplicarConfigRubricasNoCampos('res', cfg);
     document.getElementById('resTxtPrevia').style.display = 'none';
     const _laCont = document.getElementById('lancamentosAdicionaisContainer');

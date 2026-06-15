@@ -37,18 +37,8 @@
         <button class="sidebar-item active" onclick="mostrarTela('selectionScreen')">
             <span class="sidebar-item-icon">📋</span> Folha de Ponto
         </button>
-
-        <div class="sidebar-section">Ferramentas</div>
-        <button class="sidebar-item" onclick="abrirModalExportacaoTXT()">
-            <span class="sidebar-item-icon">📄</span> Exportar para TXT
-        </button>
-        <button class="sidebar-item" onclick="perguntarTurnosModelo()">
-            <span class="sidebar-item-icon">📥</span> Baixar Modelo Excel
-        </button>
-
-        <div class="sidebar-section">Configurações</div>
         <button class="sidebar-item" onclick="abrirModalConfigRubricas()">
-            <span class="sidebar-item-icon">⚙️</span> Configurar Rubricas
+            <span class="sidebar-item-icon">⚙️</span> Configurações
         </button>
     </nav>
 
@@ -98,6 +88,15 @@
 
                 <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">▶️ Continuar</button>
             </form>
+
+            <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" class="btn btn-secondary" style="width: 100%;" onclick="abrirModalExportacaoTXT()">
+                    📄 Exportar dados para lançamento na Folha (TXT)
+                </button>
+                <button type="button" class="btn btn-secondary" style="width: 100%;" onclick="perguntarTurnosModelo()">
+                    📥 Baixar Modelo Excel
+                </button>
+            </div>
         </div>
 
         <!-- TELA PRINCIPAL (Preenchimento) -->
@@ -667,6 +666,30 @@
                 <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">
                     Campos vazios = sem pré-preenchimento ao gerar TXT.
                 </p>
+
+                <!-- Jornada de Trabalho -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Jornada de Trabalho</span>
+                    </div>
+                    <div style="padding: 14px 14px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                            <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas diárias</label>
+                            <input type="text" id="cfgJornada" value="08:00" maxlength="5" placeholder="HH:MM"
+                                style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <input type="checkbox" id="cfgJornadaSabadoAtiva" style="width: 16px; height: 16px; cursor: pointer;"
+                                onchange="document.getElementById('cfgJornadaSabadoContainer').style.display = this.checked ? 'flex' : 'none'">
+                            <label for="cfgJornadaSabadoAtiva" style="font-size: 13px; cursor: pointer; margin: 0;">Jornada diferenciada para o Sábado</label>
+                        </div>
+                        <div id="cfgJornadaSabadoContainer" style="display: none; align-items: center; gap: 12px; padding-left: 24px;">
+                            <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas no Sábado</label>
+                            <input type="text" id="cfgJornadaSabado" value="04:00" maxlength="5" placeholder="HH:MM"
+                                style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid #eee;">
                 <button type="button" class="btn btn-danger btn-small" onclick="limparConfigRubricas()" style="font-size: 12px;">🗑 Limpar Empresa</button>
