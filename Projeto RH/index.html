@@ -555,8 +555,117 @@
         </div>
     </div>
 
+    <!-- MODAL: CONFIGURAR RUBRICAS POR EMPRESA -->
+    <div id="configRubricasModal" class="modal">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3 style="color: var(--primary-color); margin: 0;">⚙️ Configurar Rubricas por Empresa</h3>
+                <button type="button" class="modal-close" onclick="fecharModalConfigRubricas()">×</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+
+                <!-- Busca de empresa -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="font-weight: 600; font-size: 13px; color: var(--text-primary);">Empresa</label>
+                    <input type="text" id="cfgBuscaEmpresa"
+                        placeholder="Digite o nome ou código da empresa..."
+                        autocomplete="off"
+                        oninput="filtrarEmpresasConfig(this.value)"
+                        onfocus="filtrarEmpresasConfig(this.value)"
+                        style="width: 100%; box-sizing: border-box; margin-top: 4px;">
+                    <input type="hidden" id="cfgCodigoEmpresa">
+                </div>
+
+                <!-- Tabela de rubricas -->
+                <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Evento</span>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Código da Rubrica</span>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Tipo de Valor</span>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Horas Trabalhadas</span>
+                        <input type="text" id="cfgRub_horasTrab" maxlength="9" placeholder="Ex: 000001" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_horasTrab" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Horas Extras 50%</span>
+                        <input type="text" id="cfgRub_he50" maxlength="9" placeholder="Ex: 000050" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_he50" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Horas Extras 100%</span>
+                        <input type="text" id="cfgRub_he100" maxlength="9" placeholder="Ex: 000100" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_he100" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Adicional Noturno</span>
+                        <input type="text" id="cfgRub_noturno" maxlength="9" placeholder="Ex: 000310" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_noturno" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Atraso</span>
+                        <input type="text" id="cfgRub_atraso" maxlength="9" placeholder="Ex: 000410" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_atraso" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Falta (em dias)</span>
+                        <input type="text" id="cfgRub_falta" maxlength="9" placeholder="Ex: 000510" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_falta" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="dias">Dias</option>
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                        </select>
+                    </div>
+                </div>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">
+                    Campos vazios = sem pré-preenchimento ao gerar TXT.
+                </p>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid #eee;">
+                <button type="button" class="btn btn-danger btn-small" onclick="limparConfigRubricas()" style="font-size: 12px;">🗑 Limpar Empresa</button>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalConfigRubricas()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarConfigRubricas()">💾 Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Dropdown de busca de empresa — fora de qualquer container para evitar clipping -->
     <div id="buscaEmpresaResultados" style="
+        display: none;
+        position: fixed;
+        background: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        max-height: 240px;
+        overflow-y: auto;
+        z-index: 9000;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    "></div>
+
+    <div id="cfgBuscaEmpresaResultados" style="
         display: none;
         position: fixed;
         background: #fff;
