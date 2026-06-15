@@ -241,6 +241,37 @@ CREATE POLICY "rh_mapeamento: escrita autenticado"
 
 
 -- ============================================================
+-- 8. TABELA: rh_config_rubricas_txt
+--    Presets de rubricas TXT por empresa (6 eventos fixos)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.rh_config_rubricas_txt (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo_empresa TEXT NOT NULL,
+    evento         TEXT NOT NULL,
+    codigo_rubrica TEXT NOT NULL DEFAULT '',
+    tipo_valor     TEXT NOT NULL DEFAULT 'horas',
+    CONSTRAINT rh_config_rub_txt_uniq UNIQUE (codigo_empresa, evento)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rh_cfg_rub_txt_empresa
+    ON public.rh_config_rubricas_txt (codigo_empresa);
+
+-- 8. RLS
+ALTER TABLE public.rh_config_rubricas_txt ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "rh_config_rub_txt: leitura autenticado" ON public.rh_config_rubricas_txt;
+DROP POLICY IF EXISTS "rh_config_rub_txt: escrita autenticado"  ON public.rh_config_rubricas_txt;
+
+CREATE POLICY "rh_config_rub_txt: leitura autenticado"
+    ON public.rh_config_rubricas_txt FOR SELECT
+    TO authenticated USING (TRUE);
+
+CREATE POLICY "rh_config_rub_txt: escrita autenticado"
+    ON public.rh_config_rubricas_txt FOR ALL
+    TO authenticated USING (TRUE) WITH CHECK (TRUE);
+
+
+-- ============================================================
 -- RESUMO DAS TABELAS
 -- ============================================================
 --
@@ -252,6 +283,7 @@ CREATE POLICY "rh_mapeamento: escrita autenticado"
 --  rh_saves             folhas de ponto (dados em JSONB)
 --  rh_regras_renomeacao regras do módulo Renomeador
 --  rh_mapeamento_nomes  dicionário nome_arquivo → nome_documento
+--  rh_config_rubricas_txt  presets de rubricas TXT por empresa
 --
 -- MIGRAÇÃO DO PROJETO ANTERIOR (udnikmolgryzczalcbbz):
 --   Se houver dados a migrar, exporte-os do projeto antigo e
