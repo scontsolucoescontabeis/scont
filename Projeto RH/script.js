@@ -111,6 +111,11 @@ document.addEventListener('click', e => {
     if (box && input && !box.contains(e.target) && e.target !== input) {
         box.style.display = 'none';
     }
+    const cfgBox   = document.getElementById('cfgBuscaEmpresaResultados');
+    const cfgInput = document.getElementById('cfgBuscaEmpresa');
+    if (cfgBox && cfgInput && !cfgBox.contains(e.target) && e.target !== cfgInput) {
+        cfgBox.style.display = 'none';
+    }
 });
 
 async function carregarEmpregados(codigoEmpresa) {
@@ -1691,6 +1696,101 @@ function _limparCamposConfigRubricas() {
         if (rubEl)  rubEl.value  = '';
         if (tipoEl) tipoEl.value = def.defaultTipo;
     });
+}
+
+function abrirModalConfigRubricas() {
+    document.getElementById('cfgCodigoEmpresa').value = '';
+    document.getElementById('cfgBuscaEmpresa').value = '';
+    document.getElementById('cfgBuscaEmpresaResultados').style.display = 'none';
+    _limparCamposConfigRubricas();
+    document.getElementById('configRubricasModal').classList.add('active');
+}
+
+function fecharModalConfigRubricas() {
+    document.getElementById('configRubricasModal').classList.remove('active');
+    document.getElementById('cfgBuscaEmpresaResultados').style.display = 'none';
+}
+
+function filtrarEmpresasConfig(termo) {
+    const box   = document.getElementById('cfgBuscaEmpresaResultados');
+    const input = document.getElementById('cfgBuscaEmpresa');
+    if (!box || !input) return;
+
+    const rect = input.getBoundingClientRect();
+    box.style.top   = (rect.bottom + 2) + 'px';
+    box.style.left  = rect.left + 'px';
+    box.style.width = rect.width + 'px';
+
+    const norm = termo.trim().toLowerCase();
+    const lista = norm
+        ? state.empresas.filter(e =>
+            e.nome_empresa.toLowerCase().includes(norm) ||
+            e.codigo_empresa.toLowerCase().includes(norm))
+        : state.empresas;
+
+    if (!lista.length) {
+        box.innerHTML = '<div style="padding:10px 14px;color:#999;font-size:13px;">Nenhuma empresa encontrada</div>';
+        box.style.display = 'block';
+        return;
+    }
+
+    box.innerHTML = lista.map(e => `
+        <div onclick="selecionarEmpresaConfig('${e.codigo_empresa}', '${e.nome_empresa.replace(/'/g, "\\'")}')"
+            style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;"
+            onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+            <span style="font-family:monospace;font-weight:600;color:var(--primary-color);margin-right:8px;">${e.codigo_empresa}</span>${e.nome_empresa}
+        </div>`).join('');
+    box.style.display = 'block';
+}
+
+async function selecionarEmpresaConfig(codigo, nome) {
+    document.getElementById('cfgCodigoEmpresa').value = codigo;
+    document.getElementById('cfgBuscaEmpresa').value = `${codigo} - ${nome}`;
+    document.getElementById('cfgBuscaEmpresaResultados').style.display = 'none';
+    const cfg = await _buscarConfigRubricas(codigo);
+    _preencherCamposConfigRubricas(cfg);
+}
+
+async function salvarConfigRubricas() {
+    const codigoEmpresa = (document.getElementById('cfgCodigoEmpresa')?.value || '').trim();
+    if (!codigoEmpresa) { mostrarMensagem('Aviso', 'Selecione uma empresa antes de salvar.'); return; }
+
+    const rows = _CFG_EVENTOS.map(def => ({
+        codigo_empresa: codigoEmpresa,
+        evento:         def.ev,
+        codigo_rubrica: (document.getElementById(`cfgRub_${def.ev}`)?.value || '').trim(),
+        tipo_valor:     document.getElementById(`cfgTipo_${def.ev}`)?.value || def.defaultTipo,
+    }));
+
+    try {
+        const { error } = await supabaseClient
+            .from('rh_config_rubricas_txt')
+            .upsert(rows, { onConflict: 'codigo_empresa,evento' });
+        if (error) throw error;
+        delete _cacheConfigRubricas[codigoEmpresa];
+        mostrarMensagem('Sucesso', '✅ Configuração de rubricas salva com sucesso!');
+    } catch (e) {
+        mostrarMensagem('Erro', 'Erro ao salvar configuração: ' + e.message);
+    }
+}
+
+async function limparConfigRubricas() {
+    const codigoEmpresa = (document.getElementById('cfgCodigoEmpresa')?.value || '').trim();
+    if (!codigoEmpresa) { mostrarMensagem('Aviso', 'Selecione uma empresa.'); return; }
+    if (!confirm(`Remover todas as configurações de rubricas da empresa ${codigoEmpresa}?`)) return;
+
+    try {
+        const { error } = await supabaseClient
+            .from('rh_config_rubricas_txt')
+            .delete()
+            .eq('codigo_empresa', codigoEmpresa);
+        if (error) throw error;
+        delete _cacheConfigRubricas[codigoEmpresa];
+        _limparCamposConfigRubricas();
+        mostrarMensagem('Sucesso', '✅ Configuração removida com sucesso!');
+    } catch (e) {
+        mostrarMensagem('Erro', 'Erro ao limpar configuração: ' + e.message);
+    }
 }
 
 // --- EXPORTAÇÃO TXT ---
