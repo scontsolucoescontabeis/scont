@@ -1883,7 +1883,7 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, m
     ].join('');
 }
 
-function abrirModalExportacaoTXT() {
+async function abrirModalExportacaoTXT() {
     document.getElementById('expNaoCompensar').checked = false;
     document.getElementById('expLabelAtraso').textContent = 'Atraso';
     document.getElementById('exportTxtModal').classList.add('active');
@@ -1894,6 +1894,10 @@ function abrirModalExportacaoTXT() {
     document.getElementById('btnPreviewTXT').style.display = 'none';
     const saved = localStorage.getItem(TXT_RUBRICAS_KEY);
     if (saved) { try { _carregarConfigNoCampos('exp', JSON.parse(saved)); } catch(e) {} }
+    if (state.codigoEmpresa) {
+        const cfg = await _buscarConfigRubricas(state.codigoEmpresa);
+        _aplicarConfigRubricasNoCampos('exp', cfg);
+    }
 }
 
 function fecharModalExportacaoTXT() {
@@ -2429,7 +2433,7 @@ async function importarExcel(file) {
 
 // ===== GERAÇÃO DE TXT A PARTIR DOS RESULTADOS =====
 
-function abrirModalTxtResultados() {
+async function abrirModalTxtResultados() {
     if (!state.resultados || state.resultados.length === 0) {
         mostrarMensagem('Aviso', 'Não há dados processados para gerar o TXT.');
         return;
@@ -2438,6 +2442,8 @@ function abrirModalTxtResultados() {
     document.getElementById('resLabelAtraso').textContent = 'Atraso';
     const saved = localStorage.getItem(TXT_RUBRICAS_KEY);
     if (saved) { try { _carregarConfigNoCampos('res', JSON.parse(saved)); } catch(e) {} }
+    const cfg = await _buscarConfigRubricas(state.codigoEmpresa);
+    _aplicarConfigRubricasNoCampos('res', cfg);
     document.getElementById('resTxtPrevia').style.display = 'none';
     const _laCont = document.getElementById('lancamentosAdicionaisContainer');
     if (_laCont) _laCont.innerHTML = '';
