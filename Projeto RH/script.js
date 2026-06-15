@@ -2108,35 +2108,13 @@ function mostrarTela(telaId) {
     document.getElementById('mainScreen').style.display = 'none';
     document.getElementById('resultsScreen').style.display = 'none';
     document.getElementById(telaId).style.display = 'block';
-    
-    // ✅ NOVO: Exibir informações da empresa em todas as telas (exceto seleção)
-    if (telaId !== 'selectionScreen' && state.empresaSelecionada) {
-        const headerActions = document.getElementById('headerActions');
-        if (headerActions) {
-            // Remover informação anterior se existir
-            const infoEmpresa = document.getElementById('empresaInfo');
-            if (infoEmpresa) infoEmpresa.remove();
-            
-            // Adicionar nova informação
-            const div = document.createElement('div');
-            div.id = 'empresaInfo';
-            div.style.cssText = `
-                display: flex;
-                align-items: center;
-                gap: 15px;
-                padding: 10px 15px;
-                background: rgba(255,255,255,0.1);
-                border-radius: 6px;
-                color: white;
-                font-size: 13px;
-                font-weight: 500;
-            `;
-            div.innerHTML = `
-                <span>🏢 ${state.empresaSelecionada.codigo_empresa} - ${state.empresaSelecionada.nome_empresa}</span>
-                <span style="opacity: 0.7;">|</span>
-                <span>📅 ${state.competencia}</span>
-            `;
-            headerActions.insertBefore(div, headerActions.firstChild);
+
+    const sub = document.getElementById('pageHeaderSub');
+    if (sub) {
+        if (telaId !== 'selectionScreen' && state.empresaSelecionada) {
+            sub.textContent = `🏢 ${state.empresaSelecionada.codigo_empresa} — ${state.empresaSelecionada.nome_empresa}  ·  📅 ${state.competencia}`;
+        } else {
+            sub.textContent = 'Selecione a competência e empresa para começar';
         }
     }
 }

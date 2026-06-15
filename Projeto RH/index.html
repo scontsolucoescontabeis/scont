@@ -20,19 +20,55 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- HEADER -->
-    <div class="header">
-        <div class="header-container">
-            <img src="https://scontdf.com.br/wp-content/uploads/elementor/thumbs/LogoScont-peic298y16fua1mv1zkur66kgxw0v6rzhu846yyg3k.png" alt="SCONT" class="logo">
-            <div class="header-info">
-                <h1>SCONT</h1>
-                <div class="header-subtitle">Sistema de Gestão de Ponto e Folha de Pagamento</div>
-            </div>
-            <div class="header-actions" id="headerActions">
-                <!-- Botão de voltar ao portal -->
-                <a href="../portal.html" class="btn btn-small" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); text-decoration: none; padding: 8px 15px; border-radius: 6px;">← Voltar ao Portal</a>
-            </div>
+
+<!-- HAMBURGER (mobile) -->
+<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+        <h2>Folha de Ponto</h2>
+        <p>Controle de Frequência</p>
+    </div>
+
+    <nav class="sidebar-nav">
+        <button class="sidebar-item active" onclick="mostrarTela('selectionScreen')">
+            <span class="sidebar-item-icon">📋</span> Folha de Ponto
+        </button>
+
+        <div class="sidebar-section">Ferramentas</div>
+        <button class="sidebar-item" onclick="abrirModalExportacaoTXT()">
+            <span class="sidebar-item-icon">📄</span> Exportar para TXT
+        </button>
+        <button class="sidebar-item" onclick="perguntarTurnosModelo()">
+            <span class="sidebar-item-icon">📥</span> Baixar Modelo Excel
+        </button>
+
+        <div class="sidebar-section">Configurações</div>
+        <button class="sidebar-item" onclick="abrirModalConfigRubricas()">
+            <span class="sidebar-item-icon">⚙️</span> Configurar Rubricas
+        </button>
+    </nav>
+
+    <div class="sidebar-footer">
+        <a href="../portal.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;">
+            <span class="sidebar-item-icon">🏠</span> Voltar ao Portal
+        </a>
+        <div class="sidebar-footer-info">
+            <strong>Folha de Ponto</strong>
+            SCONT · Controle de Frequência
         </div>
+    </div>
+</aside>
+
+<!-- CONTEÚDO PRINCIPAL -->
+<div class="main-content">
+
+    <div class="page-header">
+        <h1>📋 Folha de Ponto</h1>
+        <div class="page-header-sub" id="pageHeaderSub">Selecione a competência e empresa para começar</div>
     </div>
 
     <!-- CONTAINER PRINCIPAL -->
@@ -62,18 +98,6 @@
 
                 <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">▶️ Continuar</button>
             </form>
-            
-            <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; display: flex; flex-direction: column; gap: 8px;">
-                <button type="button" class="btn btn-secondary" onclick="perguntarTurnosModelo()" style="width: 100%; font-size: 13px;">
-                    📥 Baixar Modelo Excel (por empresa)
-                </button>
-                <button type="button" class="btn btn-secondary" onclick="abrirModalExportacaoTXT()" style="width: 100%; font-size: 13px;">
-                    📄 Exportar dados para lançamento na folha (TXT)
-                </button>
-                <button type="button" class="btn btn-secondary" onclick="abrirModalConfigRubricas()" style="width: 100%; font-size: 13px;">
-                    ⚙️ Configurar Rubricas por Empresa
-                </button>
-            </div>
         </div>
 
         <!-- TELA PRINCIPAL (Preenchimento) -->
@@ -158,7 +182,9 @@
 
     </div>
 
-    <!-- ================= MODAIS ================= -->
+</div><!-- /main-content -->
+
+<!-- ================= MODAIS ================= -->
 
     <!-- MODAL: EXPORTAÇÃO TXT (tela inicial) -->
     <div id="exportTxtModal" class="modal">
@@ -680,5 +706,21 @@
     <script src="script.js"></script>
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
     <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+    <script>
+        (function() {
+            const hamburger = document.getElementById('hamburger');
+            const sidebar   = document.getElementById('sidebar');
+            const overlay   = document.getElementById('sidebarOverlay');
+            if (!hamburger) return;
+            hamburger.addEventListener('click', () => {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+            });
+            overlay.addEventListener('click', () => {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('active');
+            });
+        })();
+    </script>
 </body>
 </html>
