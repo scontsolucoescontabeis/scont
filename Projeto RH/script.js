@@ -1626,6 +1626,73 @@ XLSX.utils.book_append_sheet(wb, wsConsolidado, "Consolidado Geral");
     XLSX.writeFile(wb, `Folha_Ponto_${state.empresaSelecionada.codigo_empresa}_${compFormatada}.xlsx`);
 }
 
+// --- CONFIG RUBRICAS POR EMPRESA ---
+
+const _CFG_EVENTOS = [
+    { ev: 'horasTrab', sufRub: 'HorasTrab', defaultTipo: 'horas' },
+    { ev: 'he50',      sufRub: 'HE50',      defaultTipo: 'horas' },
+    { ev: 'he100',     sufRub: 'HE100',     defaultTipo: 'horas' },
+    { ev: 'noturno',   sufRub: 'Noturno',   defaultTipo: 'horas' },
+    { ev: 'atraso',    sufRub: 'Atraso',    defaultTipo: 'horas' },
+    { ev: 'falta',     sufRub: 'Falta',     defaultTipo: 'dias'  },
+];
+
+let _cacheConfigRubricas = {};
+
+async function _buscarConfigRubricas(codigoEmpresa) {
+    if (!codigoEmpresa) return null;
+    if (_cacheConfigRubricas[codigoEmpresa] !== undefined) return _cacheConfigRubricas[codigoEmpresa];
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_config_rubricas_txt')
+            .select('evento, codigo_rubrica, tipo_valor')
+            .eq('codigo_empresa', codigoEmpresa);
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            _cacheConfigRubricas[codigoEmpresa] = null;
+            return null;
+        }
+        const cfg = {};
+        data.forEach(r => { cfg[r.evento] = { cod: r.codigo_rubrica, tipo: r.tipo_valor }; });
+        _cacheConfigRubricas[codigoEmpresa] = cfg;
+        return cfg;
+    } catch (e) {
+        console.error('Erro ao buscar config rubricas:', e);
+        return null;
+    }
+}
+
+function _aplicarConfigRubricasNoCampos(prefixo, cfg) {
+    if (!cfg) return;
+    _CFG_EVENTOS.forEach(def => {
+        const v = cfg[def.ev] || {};
+        const rubEl  = document.getElementById(`${prefixo}Rub${def.sufRub}`);
+        const tipoEl = document.getElementById(`${prefixo}Tipo${def.sufRub}`);
+        if (rubEl)  rubEl.value  = v.cod  || '';
+        if (tipoEl) tipoEl.value = v.tipo || def.defaultTipo;
+    });
+}
+
+function _preencherCamposConfigRubricas(cfg) {
+    if (!cfg) { _limparCamposConfigRubricas(); return; }
+    _CFG_EVENTOS.forEach(def => {
+        const v = cfg[def.ev] || {};
+        const rubEl  = document.getElementById(`cfgRub_${def.ev}`);
+        const tipoEl = document.getElementById(`cfgTipo_${def.ev}`);
+        if (rubEl)  rubEl.value  = v.cod  || '';
+        if (tipoEl) tipoEl.value = v.tipo || def.defaultTipo;
+    });
+}
+
+function _limparCamposConfigRubricas() {
+    _CFG_EVENTOS.forEach(def => {
+        const rubEl  = document.getElementById(`cfgRub_${def.ev}`);
+        const tipoEl = document.getElementById(`cfgTipo_${def.ev}`);
+        if (rubEl)  rubEl.value  = '';
+        if (tipoEl) tipoEl.value = def.defaultTipo;
+    });
+}
+
 // --- EXPORTAÇÃO TXT ---
 
 const TXT_RUBRICAS_KEY = 'rh_txt_rubricas';
