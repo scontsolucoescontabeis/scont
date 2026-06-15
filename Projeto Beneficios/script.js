@@ -1384,11 +1384,13 @@ async function parsePdfFerias(file) {
       y:   Math.round(vp.height - item.transform[5]),
     })).filter(w => w.t.trim());
 
-    // Agrupa por linha (y arredondado)
+    // Agrupa por linha com tolerância real de ±2px
     const linesMap = {};
     for (const w of words) {
-      const y = Math.round(w.y / 2) * 2; // tolerance 2px
-      (linesMap[y] = linesMap[y] || []).push(w);
+      const top = w.y;
+      const keys = Object.keys(linesMap).map(Number);
+      const key = keys.find(k => Math.abs(k - top) <= 2) ?? top;
+      (linesMap[key] = linesMap[key] || []).push(w);
     }
 
     for (const y of Object.keys(linesMap).map(Number).sort((a, b) => a - b)) {
