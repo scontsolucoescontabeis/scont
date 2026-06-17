@@ -169,6 +169,31 @@
             padding: 32px;
         }
 
+        /* ─── DOWNLOADS ─── */
+        .download-list { display: flex; flex-direction: column; gap: 12px; }
+        .download-item {
+            display: flex; align-items: center; gap: 18px;
+            padding: 16px 20px; border-radius: 10px;
+            border: 1px solid var(--border-light);
+            background: linear-gradient(90deg, rgba(139,58,58,0.02) 0%, transparent 100%);
+            transition: var(--transition);
+        }
+        .download-item:hover { border-color: var(--primary); box-shadow: var(--shadow-sm); }
+        .download-icon { font-size: 32px; flex-shrink: 0; }
+        .download-info { flex: 1; }
+        .download-nome { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 4px; }
+        .download-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 6px; }
+        .download-meta { font-size: 11px; color: var(--text-muted, #AAA); font-weight: 600; letter-spacing: 0.3px; }
+        .btn-download {
+            flex-shrink: 0; padding: 10px 20px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light, #A85050));
+            color: white; border: none; border-radius: 8px;
+            font-size: 13px; font-weight: 700; cursor: pointer;
+            text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+            transition: var(--transition); white-space: nowrap;
+        }
+        .btn-download:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(139,58,58,0.3); }
+
         /* ─── GRID DE FERRAMENTAS ─── */
         .ferramentas-grid {
             display: grid;
@@ -482,6 +507,30 @@
                         <div class="empty-state-icon">⏳</div>
                         <p>Carregando ferramentas...</p>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── CARD DE DOWNLOADS ── -->
+        <div class="card">
+            <div class="card-title">⬇️ Downloads</div>
+            <div class="card-body" style="padding: 20px 32px;">
+                <div class="download-list">
+
+                    <div class="download-item">
+                        <div class="download-icon">🖥️</div>
+                        <div class="download-info">
+                            <div class="download-nome">SCONT Renomeador — App Desktop</div>
+                            <div class="download-desc">Renomeia e organiza arquivos em lote salvando diretamente nas pastas de destino. Requer Windows 10 ou superior.</div>
+                            <div class="download-meta">v1.0.0 · Windows x64 · ~73 MB</div>
+                        </div>
+                        <a class="btn-download"
+                           href="https://github.com/scontsolucoescontabeis/scont/releases/download/v1.0.0/SCONT.Renomeador.Setup.1.0.0.exe"
+                           target="_blank">
+                            ⬇️ Baixar
+                        </a>
+                    </div>
+
                 </div>
             </div>
         </div>

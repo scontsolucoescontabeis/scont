@@ -150,6 +150,7 @@ function valorParaTxt(bruto, tipoValor) {
 function formatarValorExibicao(valorTxt, tipoValor) {
     if (valorTxt === 0) return '–';
     switch (tipoValor) {
+        case 'booleano':
         case 'monetario': return 'R$ ' + (valorTxt / 100).toLocaleString('pt-BR', {minimumFractionDigits: 2});
         case 'minutos': {
             const h = Math.floor(valorTxt / 100);
@@ -213,7 +214,7 @@ async function carregarRubricas() {
     // Fonte primária: fechamento_rubricas_config
     const { data: cfgData, error: cfgErr } = await supabaseClient
         .from('fechamento_rubricas_config')
-        .select('coluna_planilha, codigo_rubrica, tipo_processo, tipo_valor, descricao')
+        .select('coluna_planilha, codigo_rubrica, tipo_processo, tipo_valor, descricao, valor_cota')
         .eq('codigo_empresa', CODIGO_EMPRESA)
         .eq('ativo', true);
     if (cfgErr) throw cfgErr;
@@ -238,7 +239,7 @@ function resolverColuna(header) {
         normalizarNome(c.descricao || '') === normH
     );
     if (exato) {
-        return { codigo_rubrica: exato.codigo_rubrica, tipo_valor: exato.tipo_valor, descricao: exato.descricao || header, fonte: 'config' };
+        return { codigo_rubrica: exato.codigo_rubrica, tipo_valor: exato.tipo_valor, descricao: exato.descricao || header, fonte: 'config', valor_cota: exato.valor_cota || null };
     }
 
     // 2. Fuzzy match em fechamento_rubricas_config
@@ -250,7 +251,7 @@ function resolverColuna(header) {
         if (s > melhorScore) { melhorScore = s; melhorCfg = c; }
     }
     if (melhorScore >= 0.80 && melhorCfg) {
-        return { codigo_rubrica: melhorCfg.codigo_rubrica, tipo_valor: melhorCfg.tipo_valor, descricao: melhorCfg.descricao || header, fonte: 'config' };
+        return { codigo_rubrica: melhorCfg.codigo_rubrica, tipo_valor: melhorCfg.tipo_valor, descricao: melhorCfg.descricao || header, fonte: 'config', valor_cota: melhorCfg.valor_cota || null };
     }
 
     // 3. Fuzzy match em rh_rubricas (fallback — tipo_valor desconhecido)
@@ -260,10 +261,10 @@ function resolverColuna(header) {
         if (s > melhorScore) { melhorScore = s; melhorRh = rh; }
     }
     if (melhorScore >= 0.65 && melhorRh) {
-        return { codigo_rubrica: melhorRh.codigo_rubrica, tipo_valor: 'monetario', descricao: header, fonte: 'rh_rubricas' };
+        return { codigo_rubrica: melhorRh.codigo_rubrica, tipo_valor: 'monetario', descricao: header, fonte: 'rh_rubricas', valor_cota: null };
     }
 
-    return { codigo_rubrica: null, tipo_valor: null, descricao: header, fonte: null };
+    return { codigo_rubrica: null, tipo_valor: null, descricao: header, fonte: null, valor_cota: null };
 }
 
 // ──────────────────────────────────────────────
@@ -412,7 +413,15 @@ function construirRelatorio(comp) {
             if (!bruto) return; // célula vazia — ignorar
 
             const tipoValor = resolucao.tipo_valor;
-            const valorInt  = tipoValor && tipoValor !== 'booleano' ? valorParaTxt(bruto, tipoValor) : 0;
+            const valorCota = resolucao.valor_cota;
+            let valorInt;
+            if (tipoValor === 'booleano') {
+                valorInt = String(bruto).trim().toLowerCase() === 'sim' && valorCota
+                    ? Math.round(parseFloat(valorCota) * 100)
+                    : 0;
+            } else {
+                valorInt = tipoValor ? valorParaTxt(bruto, tipoValor) : 0;
+            }
 
             linhasRelatorio.push({
                 nome:          func.nome,
@@ -423,6 +432,7 @@ function construirRelatorio(comp) {
                 codigoRubrica: resolucao.codigo_rubrica,
                 fonteRubrica:  resolucao.fonte,
                 tipoValor,
+                valorCota,
                 bruto,
                 valorInt,
             });
@@ -548,12 +558,16 @@ function renderizarRelatorio(linhas) {
                         <span style="font-weight:600;font-size:12px;color:var(--primary-color);">Cadastrar rubrica para: <em>${l.coluna}</em></span>
                         <input type="text" id="inlineCode-${i}" placeholder="Código da rubrica"
                             style="width:140px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:monospace;">
-                        <select id="inlineTipo-${i}" style="padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <select id="inlineTipo-${i}" onchange="toggleInlineValorCota(${i})" style="padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
                             <option value="monetario">Monetário (R$)</option>
                             <option value="minutos">Horas (HH:MM)</option>
                             <option value="dias">Dias</option>
-                            <option value="booleano">Booleano</option>
+                            <option value="booleano">Booleano (Sim/Não)</option>
                         </select>
+                        <div id="inlineValorCotaWrap-${i}" style="display:none;">
+                            <input type="number" id="inlineValorCota-${i}" placeholder="Valor da cota (R$)" step="0.01" min="0"
+                                style="width:150px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        </div>
                         <button class="btn btn-primary btn-small" onclick="salvarRubricaInline(${i})">💾 Salvar</button>
                         <button class="btn btn-secondary btn-small" onclick="fecharCadastroRubrica(${i})">Cancelar</button>
                         <span id="inlineStatus-${i}" style="font-size:12px;"></span>
@@ -628,9 +642,17 @@ async function salvarRubricaInline(idx) {
     const codigo    = (document.getElementById(`inlineCode-${idx}`).value || '').trim();
     const tipoValor = document.getElementById(`inlineTipo-${idx}`).value;
     const statusEl  = document.getElementById(`inlineStatus-${idx}`);
+    const valorCota = tipoValor === 'booleano'
+        ? (parseFloat(document.getElementById(`inlineValorCota-${idx}`)?.value) || null)
+        : null;
 
     if (!codigo) {
         statusEl.textContent = '⚠ Informe o código.';
+        statusEl.style.color = '#E74C3C';
+        return;
+    }
+    if (tipoValor === 'booleano' && !valorCota) {
+        statusEl.textContent = '⚠ Informe o Valor da Cota para o tipo Booleano.';
         statusEl.style.color = '#E74C3C';
         return;
     }
@@ -648,6 +670,7 @@ async function salvarRubricaInline(idx) {
                 codigo_rubrica:  codigo,
                 tipo_processo:   '11',
                 tipo_valor:      tipoValor,
+                valor_cota:      valorCota,
                 ativo:           true,
             }]);
         if (error) throw error;
@@ -657,8 +680,15 @@ async function salvarRubricaInline(idx) {
             if (l.coluna !== coluna) return;
             l.codigoRubrica = codigo;
             l.tipoValor     = tipoValor;
+            l.valorCota     = valorCota;
             l.fonteRubrica  = 'config';
-            l.valorInt      = tipoValor !== 'booleano' ? valorParaTxt(l.bruto, tipoValor) : 0;
+            if (tipoValor === 'booleano') {
+                l.valorInt = String(l.bruto).trim().toLowerCase() === 'sim' && valorCota
+                    ? Math.round(parseFloat(valorCota) * 100)
+                    : 0;
+            } else {
+                l.valorInt = valorParaTxt(l.bruto, tipoValor);
+            }
         });
 
         // Atualizar resolução para futuro (caso re-renderize)
@@ -708,6 +738,8 @@ async function alterarTipoRubrica(idx, novoTipo) {
     const codigo = linhasRelatorio[idx].codigoRubrica;
 
     try {
+        const _valorCota = novoTipo === 'booleano' ? (linhasRelatorio[idx].valorCota || null) : null;
+
         const { error } = await supabaseClient
             .from('fechamento_rubricas_config')
             .upsert([{
@@ -717,6 +749,7 @@ async function alterarTipoRubrica(idx, novoTipo) {
                 codigo_rubrica:  codigo,
                 tipo_processo:   linhasRelatorio[idx].tipoProcesso || '11',
                 tipo_valor:      novoTipo,
+                valor_cota:      _valorCota,
                 ativo:           true,
             }], { onConflict: 'codigo_empresa,coluna_planilha' });
         if (error) throw error;
@@ -725,7 +758,13 @@ async function alterarTipoRubrica(idx, novoTipo) {
         linhasRelatorio.forEach(l => {
             if (l.coluna !== coluna) return;
             l.tipoValor = novoTipo;
-            l.valorInt  = novoTipo !== 'booleano' ? valorParaTxt(l.bruto, novoTipo) : 0;
+            if (novoTipo === 'booleano') {
+                l.valorInt = String(l.bruto).trim().toLowerCase() === 'sim' && _valorCota
+                    ? Math.round(parseFloat(_valorCota) * 100)
+                    : 0;
+            } else {
+                l.valorInt = valorParaTxt(l.bruto, novoTipo);
+            }
         });
         planilhaData.forEach(f => {
             f.colunasRubrica.forEach(cr => {
@@ -1141,7 +1180,7 @@ async function carregarRubricasConfig() {
     try {
         let q = supabaseClient
             .from('fechamento_rubricas_config')
-            .select('id, codigo_empresa, descricao, codigo_rubrica, tipo_valor, ativo')
+            .select('id, codigo_empresa, descricao, codigo_rubrica, tipo_valor, valor_cota, ativo')
             .order('codigo_empresa')
             .order('descricao');
 
@@ -1159,21 +1198,40 @@ async function carregarRubricasConfig() {
         }
 
         const tipoLabel = { monetario: 'Monetário', minutos: 'Horas', dias: 'Dias', booleano: 'Booleano' };
-        tbody.innerHTML = lista.map(r => `
+        tbody.innerHTML = lista.map(r => {
+            const cotaInfo = r.tipo_valor === 'booleano' && r.valor_cota
+                ? `<br><small style="color:#555;font-size:11px;">Cota: R$ ${parseFloat(r.valor_cota).toLocaleString('pt-BR',{minimumFractionDigits:2})}</small>`
+                : '';
+            return `
             <tr>
                 <td><strong>${r.codigo_empresa}</strong></td>
                 <td>${r.descricao || '–'}</td>
                 <td style="font-family:monospace;font-weight:600;">${r.codigo_rubrica}</td>
-                <td><span class="badge badge-${r.tipo_valor}">${tipoLabel[r.tipo_valor] || r.tipo_valor}</span></td>
+                <td><span class="badge badge-${r.tipo_valor}">${tipoLabel[r.tipo_valor] || r.tipo_valor}</span>${cotaInfo}</td>
                 <td>${r.ativo ? '✅' : '❌'}</td>
                 <td style="white-space:nowrap;">
                     <button class="btn btn-secondary btn-small" onclick="toggleAtivoRubrica('${r.id}',${r.ativo})"
                         style="margin-right:4px;">${r.ativo ? 'Desativar' : 'Ativar'}</button>
+                    ${r.tipo_valor === 'booleano' ? `<button class="btn btn-secondary btn-small" onclick="abrirEditarCota('${r.id}', ${r.valor_cota || 0})"
+                        style="margin-right:4px;">💰 Cota</button>` : ''}
                     <button class="btn btn-secondary btn-small" style="background:#E74C3C;border-color:#E74C3C;color:white;"
                         onclick="deletarRubricaConfig('${r.id}')">Excluir</button>
                 </td>
             </tr>
-        `).join('');
+            ${r.tipo_valor === 'booleano' ? `
+            <tr id="editCotaRow-${r.id}" style="display:none;background:#fafafa;">
+                <td colspan="6">
+                    <div class="inline-register-form">
+                        <span style="font-weight:600;font-size:12px;color:var(--primary-color);">Valor da Cota (R$) para <em>${r.descricao || r.codigo_rubrica}</em></span>
+                        <input type="number" id="editCotaInput-${r.id}" value="${r.valor_cota || ''}" placeholder="Ex: 25.00" step="0.01" min="0"
+                            style="width:160px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <button class="btn btn-primary btn-small" onclick="salvarValorCota('${r.id}')">💾 Salvar</button>
+                        <button class="btn btn-secondary btn-small" onclick="fecharEditarCota('${r.id}')">Cancelar</button>
+                        <span id="editCotaStatus-${r.id}" style="font-size:12px;"></span>
+                    </div>
+                </td>
+            </tr>` : ''}
+        `}).join('');
 
     } catch (err) {
         tbody.innerHTML = `<tr><td colspan="6" class="config-empty" style="color:#E74C3C;">Erro: ${err.message}</td></tr>`;
@@ -1185,9 +1243,16 @@ async function salvarRubricaConfig() {
     const descricao = document.getElementById('cfgDescricao').value.trim();
     const codigo    = document.getElementById('cfgCodigo').value.trim();
     const tipoValor = document.getElementById('cfgTipoValor').value;
+    const valorCota = tipoValor === 'booleano'
+        ? (parseFloat(document.getElementById('cfgValorCota').value) || null)
+        : null;
 
     if (!empresa || !descricao || !codigo) {
         mostrarStatusConfig('Preencha os campos obrigatórios: Empresa, Descrição e Código.', 'error');
+        return;
+    }
+    if (tipoValor === 'booleano' && !valorCota) {
+        mostrarStatusConfig('Para tipo Booleano, informe o Valor da Cota.', 'error');
         return;
     }
 
@@ -1201,12 +1266,15 @@ async function salvarRubricaConfig() {
                 codigo_rubrica:  codigo,
                 tipo_processo:   '11',
                 tipo_valor:      tipoValor,
+                valor_cota:      valorCota,
                 ativo:           true,
             }]);
         if (error) throw error;
 
         document.getElementById('cfgDescricao').value = '';
         document.getElementById('cfgCodigo').value = '';
+        document.getElementById('cfgValorCota').value = '';
+        document.getElementById('cfgValorCotaWrap').style.display = 'none';
         mostrarStatusConfig('✅ Rubrica salva com sucesso!', 'success');
         carregarRubricasConfig();
     } catch (err) {
@@ -1238,6 +1306,54 @@ async function deletarRubricaConfig(id) {
         carregarRubricasConfig();
     } catch (err) {
         mostrarStatusConfig('❌ Erro: ' + err.message, 'error');
+    }
+}
+
+function toggleCfgValorCota() {
+    const tipo = document.getElementById('cfgTipoValor').value;
+    const wrap = document.getElementById('cfgValorCotaWrap');
+    if (wrap) wrap.style.display = tipo === 'booleano' ? '' : 'none';
+}
+
+function toggleInlineValorCota(idx) {
+    const tipo = document.getElementById(`inlineTipo-${idx}`).value;
+    const wrap = document.getElementById(`inlineValorCotaWrap-${idx}`);
+    if (wrap) wrap.style.display = tipo === 'booleano' ? '' : 'none';
+}
+
+function abrirEditarCota(id, valorAtual) {
+    document.getElementById(`editCotaRow-${id}`).style.display = '';
+    const inp = document.getElementById(`editCotaInput-${id}`);
+    if (inp) { inp.value = valorAtual > 0 ? valorAtual : ''; inp.focus(); }
+}
+
+function fecharEditarCota(id) {
+    document.getElementById(`editCotaRow-${id}`).style.display = 'none';
+}
+
+async function salvarValorCota(id) {
+    const inp    = document.getElementById(`editCotaInput-${id}`);
+    const status = document.getElementById(`editCotaStatus-${id}`);
+    const valor  = parseFloat(inp.value);
+
+    if (!valor || valor <= 0) {
+        status.textContent = '⚠ Informe um valor válido.';
+        status.style.color = '#E74C3C';
+        return;
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('fechamento_rubricas_config')
+            .update({ valor_cota: valor })
+            .eq('id', id);
+        if (error) throw error;
+        mostrarStatusConfig('✅ Valor da cota atualizado!', 'success');
+        fecharEditarCota(id);
+        carregarRubricasConfig();
+    } catch (err) {
+        status.textContent = '❌ Erro: ' + err.message;
+        status.style.color = '#E74C3C';
     }
 }
 
@@ -1414,8 +1530,15 @@ async function processarDadosFormulario(envioRow) {
             if (bruto === '' || bruto == null) return;
 
             const tipoValor = resolucao.tipo_valor;
-            const valorInt  = tipoValor && tipoValor !== 'booleano'
-                ? valorParaTxt(String(bruto), tipoValor) : 0;
+            const valorCota = resolucao.valor_cota;
+            let valorInt;
+            if (tipoValor === 'booleano') {
+                valorInt = String(bruto).trim().toLowerCase() === 'sim' && valorCota
+                    ? Math.round(parseFloat(valorCota) * 100)
+                    : 0;
+            } else {
+                valorInt = tipoValor ? valorParaTxt(String(bruto), tipoValor) : 0;
+            }
 
             linhasRelatorio.push({
                 nome:          emp.nome,
@@ -1426,6 +1549,7 @@ async function processarDadosFormulario(envioRow) {
                 codigoRubrica: resolucao.codigo_rubrica,
                 fonteRubrica:  resolucao.fonte,
                 tipoValor,
+                valorCota,
                 bruto,
                 valorInt,
             });

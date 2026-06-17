@@ -56,7 +56,7 @@
 <!-- CONTEÚDO PRINCIPAL -->
 <div class="main-content">
 
-    <div class="page-header">
+    <div class="page-header" id="pageHeader">
         <h1>📋 Folha de Ponto</h1>
         <div class="page-header-sub" id="pageHeaderSub">Selecione a competência e empresa para começar</div>
     </div>
@@ -65,38 +65,61 @@
     <div class="container">
 
         <!-- TELA DE SELEÇÃO (Competência e Empresa) -->
-        <div id="selectionScreen" class="card" style="max-width: 500px; margin-top: 40px;">
-            <div class="card-icon">📋</div>
-            <h2 style="text-align: center; color: var(--primary-color); margin-bottom: 10px;">Folha de Ponto</h2>
-            <p class="card-subtitle" style="text-align: center; margin-bottom: 30px;">Selecione a competência e empresa</p>
-            
-            <form id="selectionForm">
-                <div class="form-group">
-                    <label for="competencia">Competência *</label>
-                    <input type="text" id="competencia" placeholder="MM/AAAA (ex: 02/2026)" maxlength="7" required>
-                    <small>Mês e ano do preenchimento</small>
-                </div>
-                
-                <div class="form-group">
-                    <label for="buscaEmpresa">Empresa *</label>
-                    <input type="text" id="buscaEmpresa" placeholder="Digite o nome ou código da empresa..." autocomplete="off"
-                        oninput="filtrarEmpresas(this.value)"
-                        onfocus="filtrarEmpresas(this.value)"
-                        style="width: 100%; box-sizing: border-box;">
-                    <input type="hidden" id="codigoEmpresa">
-                </div>
+        <div id="selectionScreen">
 
-                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">▶️ Continuar</button>
-            </form>
-
-            <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 10px;">
-                <button type="button" class="btn btn-secondary" style="width: 100%;" onclick="abrirModalExportacaoTXT()">
-                    📄 Exportar dados para lançamento na Folha (TXT)
-                </button>
-                <button type="button" class="btn btn-secondary" style="width: 100%;" onclick="perguntarTurnosModelo()">
-                    📥 Baixar Modelo Excel
-                </button>
+            <!-- Hero banner -->
+            <div class="selection-hero">
+                <div>
+                    <h2 class="selection-hero-title">📋 Folha de Ponto</h2>
+                    <p class="selection-hero-sub">Controle de Frequência · SCONT</p>
+                </div>
+                <div class="selection-hero-badge">
+                    <span class="selection-hero-badge-icon">📅</span>
+                    <span id="heroBadgeMonth"></span>
+                </div>
             </div>
+
+            <!-- Card único -->
+            <div class="selection-card-wrap">
+                <div class="selection-card">
+                    <form id="selectionForm">
+                        <div class="form-group">
+                            <label for="competencia">Competência *</label>
+                            <input type="text" id="competencia" placeholder="MM/AAAA (ex: 02/2026)" maxlength="7" required>
+                            <small>Mês e ano do preenchimento</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="buscaEmpresa">Empresa *</label>
+                            <input type="text" id="buscaEmpresa" placeholder="Digite o nome ou código da empresa..." autocomplete="off"
+                                oninput="filtrarEmpresas(this.value)"
+                                onfocus="filtrarEmpresas(this.value)"
+                                style="width: 100%; box-sizing: border-box;">
+                            <input type="hidden" id="codigoEmpresa">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">▶️ Continuar</button>
+                    </form>
+
+                    <div class="selection-divider">
+                        <span class="selection-divider-line"></span>
+                        <span class="selection-divider-label">Outras ações</span>
+                        <span class="selection-divider-line"></span>
+                    </div>
+
+                    <button type="button" class="btn-ghost-action" onclick="abrirModalExportacaoTXT()">
+                        <span class="ghost-action-icon">📄</span>
+                        <span class="ghost-action-text">Exportar dados para lançamento na Folha (TXT)</span>
+                        <span class="ghost-action-arrow">›</span>
+                    </button>
+                    <button type="button" class="btn-ghost-action" onclick="perguntarTurnosModelo()">
+                        <span class="ghost-action-icon">📥</span>
+                        <span class="ghost-action-text">Baixar Modelo Excel</span>
+                        <span class="ghost-action-arrow">›</span>
+                    </button>
+                </div>
+            </div>
+
         </div>
 
         <!-- TELA PRINCIPAL (Preenchimento) -->

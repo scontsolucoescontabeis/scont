@@ -26,6 +26,14 @@ const state = {
 
 // ===== INICIALIZAÇÃO =====
 document.addEventListener('DOMContentLoaded', async () => {
+    const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const now = new Date();
+    const heroBadge = document.getElementById('heroBadgeMonth');
+    if (heroBadge) heroBadge.textContent = meses[now.getMonth()] + ' / ' + now.getFullYear();
+
+    const pageHeader = document.getElementById('pageHeader');
+    if (pageHeader) pageHeader.style.display = 'none';
+
     document.getElementById('competencia').addEventListener('input', (e) => {
         e.target.value = formatarCompetencia(e.target.value);
     });
@@ -2144,6 +2152,9 @@ function mostrarTela(telaId) {
     document.getElementById('mainScreen').style.display = 'none';
     document.getElementById('resultsScreen').style.display = 'none';
     document.getElementById(telaId).style.display = 'block';
+
+    const pageHeader = document.getElementById('pageHeader');
+    if (pageHeader) pageHeader.style.display = telaId === 'selectionScreen' ? 'none' : 'block';
 
     const sub = document.getElementById('pageHeaderSub');
     if (sub) {

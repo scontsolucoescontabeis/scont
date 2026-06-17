@@ -25,6 +25,10 @@
         .admin-table tbody tr:hover { background: #F5F5F5; }
         .btn-delete { background: #E74C3C; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: all 0.3s ease; }
         .btn-delete:hover { background: #C0392B; }
+        .btn-edit { background: #E67E22; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; transition: all 0.3s ease; }
+        .btn-edit:hover { background: #CA6F1E; }
+        .btn-cancel-edit { background: #95A5A6; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: 600; margin-left: 8px; transition: all 0.3s ease; }
+        .btn-cancel-edit:hover { background: #7F8C8D; }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #2C3E50; font-size: 13px; }
         .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #E0E0E0; border-radius: 6px; font-size: 13px; }
@@ -409,7 +413,8 @@
                         <label for="padraoPara">Padrão PARA (Novo Formato do Arquivo) *</label>
                         <input type="text" id="padraoPara" placeholder="Ex: {NOME_DOCUMENTO}_{NOME_EMPRESA}_{AAAA}_{MM}" required>
                     </div>
-                    <button type="button" class="btn-save" onclick="adicionarRegra()">➕ Salvar Padrão</button>
+                    <button type="button" id="btnSalvarRegra" class="btn-save" onclick="adicionarRegra()">➕ Salvar Padrão</button>
+                    <button type="button" id="btnCancelarRegra" class="btn-cancel-edit" style="display:none;" onclick="cancelarEdicaoRegra()">✕ Cancelar Edição</button>
                     <h4 style="color: #2C3E50; margin-top: 20px; margin-bottom: 10px;">Padrões Cadastrados</h4>
                     <div class="table-container">
                         <table class="admin-table">
@@ -432,7 +437,8 @@
                             <input type="text" id="mapNomeDocumento" placeholder="Ex: Folha de Pagamento" required>
                         </div>
                     </div>
-                    <button type="button" class="btn-save" onclick="adicionarMapeamento()">➕ Salvar Mapeamento</button>
+                    <button type="button" id="btnSalvarMapeamento" class="btn-save" onclick="adicionarMapeamento()">➕ Salvar Mapeamento</button>
+                    <button type="button" id="btnCancelarMapeamento" class="btn-cancel-edit" style="display:none;" onclick="cancelarEdicaoMapeamento()">✕ Cancelar Edição</button>
                     <h4 style="color: #2C3E50; margin-top: 20px; margin-bottom: 10px;">Mapeamentos Cadastrados</h4>
                     <div class="table-container">
                         <table class="admin-table">

@@ -992,11 +992,15 @@ async function deletarRubrica(id) {
 
 // --- REGRAS DE RENOMEAÇÃO ---
 
+let _todasRegras = [];
+let _regraEditandoId = null;
+
 async function carregarRegras() {
     try {
         const { data, error } = await supabaseClient.from('rh_regras_renomeacao').select('*').order('data_criacao', { ascending: false });
         if (error) throw error;
-        renderizarTabelaRegras(data || []);
+        _todasRegras = data || [];
+        renderizarTabelaRegras(_todasRegras);
     } catch (erro) { mostrarMensagem('Erro', 'Erro ao carregar regras de renomeação.'); }
 }
 
@@ -1008,24 +1012,52 @@ function renderizarTabelaRegras(regras) {
         tbody.innerHTML += `<tr>
             <td style="font-family: monospace; font-size: 12px;">${regra.padrao_de}</td>
             <td style="font-family: monospace; font-size: 12px; color: #8B3A3A;">${regra.padrao_para}</td>
-            <td><button type="button" class="btn-delete" onclick="deletarRegra('${regra.id}')">Deletar</button></td>
+            <td style="display:flex;gap:6px;">
+                <button type="button" class="btn-edit" onclick="editarRegra('${regra.id}')">Editar</button>
+                <button type="button" class="btn-delete" onclick="deletarRegra('${regra.id}')">Deletar</button>
+            </td>
         </tr>`;
     });
+}
+
+function editarRegra(id) {
+    const regra = _todasRegras.find(r => String(r.id) === String(id));
+    if (!regra) return;
+    _regraEditandoId = id;
+    document.getElementById('padraoDe').value = regra.padrao_de;
+    document.getElementById('padraoPara').value = regra.padrao_para;
+    document.getElementById('btnSalvarRegra').textContent = '💾 Atualizar Padrão';
+    document.getElementById('btnCancelarRegra').style.display = '';
+    document.getElementById('regrasRenomeacao').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelarEdicaoRegra() {
+    _regraEditandoId = null;
+    document.getElementById('padraoDe').value = '';
+    document.getElementById('padraoPara').value = '';
+    document.getElementById('btnSalvarRegra').textContent = '➕ Salvar Padrão';
+    document.getElementById('btnCancelarRegra').style.display = 'none';
 }
 
 async function adicionarRegra() {
     const padraoDe = document.getElementById('padraoDe').value.trim();
     const padraoPara = document.getElementById('padraoPara').value.trim();
-    
+
     if (!padraoDe || !padraoPara) { mostrarStatus('statusRegras', 'Preencha ambos os padrões.', 'error'); return; }
-    
+
     try {
-        const { error } = await supabaseClient.from('rh_regras_renomeacao').insert([{ padrao_de: padraoDe, padrao_para: padraoPara }]);
-        if (error) throw error;
-        
-        document.getElementById('padraoDe').value = '';
-        document.getElementById('padraoPara').value = '';
-        mostrarStatus('statusRegras', '✅ Regra salva com sucesso!', 'success');
+        if (_regraEditandoId) {
+            const { error } = await supabaseClient.from('rh_regras_renomeacao').update({ padrao_de: padraoDe, padrao_para: padraoPara }).eq('id', _regraEditandoId);
+            if (error) throw error;
+            mostrarStatus('statusRegras', '✅ Regra atualizada com sucesso!', 'success');
+            cancelarEdicaoRegra();
+        } else {
+            const { error } = await supabaseClient.from('rh_regras_renomeacao').insert([{ padrao_de: padraoDe, padrao_para: padraoPara }]);
+            if (error) throw error;
+            document.getElementById('padraoDe').value = '';
+            document.getElementById('padraoPara').value = '';
+            mostrarStatus('statusRegras', '✅ Regra salva com sucesso!', 'success');
+        }
         carregarRegras();
     } catch (erro) { mostrarStatus('statusRegras', 'Erro ao salvar regra: ' + erro.message, 'error'); }
 }
@@ -1035,6 +1067,7 @@ async function deletarRegra(id) {
     try {
         const { error } = await supabaseClient.from('rh_regras_renomeacao').delete().eq('id', id);
         if (error) throw error;
+        if (String(_regraEditandoId) === String(id)) cancelarEdicaoRegra();
         mostrarStatus('statusRegras', '✅ Regra deletada com sucesso!', 'success');
         carregarRegras();
     } catch (erro) { mostrarStatus('statusRegras', 'Erro ao deletar regra: ' + erro.message, 'error'); }
@@ -1042,11 +1075,15 @@ async function deletarRegra(id) {
 
 // --- MAPEAMENTO DE NOMES DE DOCUMENTOS ---
 
+let _todosMapeamentos = [];
+let _mapeamentoEditandoId = null;
+
 async function carregarMapeamentos() {
     try {
         const { data, error } = await supabaseClient.from('rh_mapeamento_nomes').select('*').order('nome_arquivo', { ascending: true });
         if (error) throw error;
-        renderizarTabelaMapeamentos(data || []);
+        _todosMapeamentos = data || [];
+        renderizarTabelaMapeamentos(_todosMapeamentos);
     } catch (erro) { mostrarMensagem('Erro', 'Erro ao carregar mapeamentos.'); }
 }
 
@@ -1058,28 +1095,55 @@ function renderizarTabelaMapeamentos(mapeamentos) {
         tbody.innerHTML += `<tr>
             <td>${map.nome_arquivo}</td>
             <td style="color: #8B3A3A; font-weight: bold;">${map.nome_documento}</td>
-            <td><button type="button" class="btn-delete" onclick="deletarMapeamento('${map.id}')">Deletar</button></td>
+            <td style="display:flex;gap:6px;">
+                <button type="button" class="btn-edit" onclick="editarMapeamento('${map.id}')">Editar</button>
+                <button type="button" class="btn-delete" onclick="deletarMapeamento('${map.id}')">Deletar</button>
+            </td>
         </tr>`;
     });
+}
+
+function editarMapeamento(id) {
+    const map = _todosMapeamentos.find(m => String(m.id) === String(id));
+    if (!map) return;
+    _mapeamentoEditandoId = id;
+    document.getElementById('mapNomeArquivo').value = map.nome_arquivo;
+    document.getElementById('mapNomeDocumento').value = map.nome_documento;
+    document.getElementById('btnSalvarMapeamento').textContent = '💾 Atualizar Mapeamento';
+    document.getElementById('btnCancelarMapeamento').style.display = '';
+    document.getElementById('mapNomeArquivo').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelarEdicaoMapeamento() {
+    _mapeamentoEditandoId = null;
+    document.getElementById('mapNomeArquivo').value = '';
+    document.getElementById('mapNomeDocumento').value = '';
+    document.getElementById('btnSalvarMapeamento').textContent = '➕ Salvar Mapeamento';
+    document.getElementById('btnCancelarMapeamento').style.display = 'none';
 }
 
 async function adicionarMapeamento() {
     const nomeArquivo = document.getElementById('mapNomeArquivo').value.trim();
     const nomeDocumento = document.getElementById('mapNomeDocumento').value.trim();
-    
+
     if (!nomeArquivo || !nomeDocumento) { mostrarStatus('statusRegras', 'Preencha ambos os campos do mapeamento.', 'error'); return; }
-    
+
     try {
-        const { error } = await supabaseClient.from('rh_mapeamento_nomes').upsert([{ 
-            nome_arquivo: nomeArquivo, 
-            nome_documento: nomeDocumento 
-        }], { onConflict: 'nome_arquivo' });
-        
-        if (error) throw error;
-        
-        document.getElementById('mapNomeArquivo').value = '';
-        document.getElementById('mapNomeDocumento').value = '';
-        mostrarStatus('statusRegras', '✅ Mapeamento salvo com sucesso!', 'success');
+        if (_mapeamentoEditandoId) {
+            const { error } = await supabaseClient.from('rh_mapeamento_nomes').update({ nome_arquivo: nomeArquivo, nome_documento: nomeDocumento }).eq('id', _mapeamentoEditandoId);
+            if (error) throw error;
+            mostrarStatus('statusRegras', '✅ Mapeamento atualizado com sucesso!', 'success');
+            cancelarEdicaoMapeamento();
+        } else {
+            const { error } = await supabaseClient.from('rh_mapeamento_nomes').upsert([{
+                nome_arquivo: nomeArquivo,
+                nome_documento: nomeDocumento
+            }], { onConflict: 'nome_arquivo' });
+            if (error) throw error;
+            document.getElementById('mapNomeArquivo').value = '';
+            document.getElementById('mapNomeDocumento').value = '';
+            mostrarStatus('statusRegras', '✅ Mapeamento salvo com sucesso!', 'success');
+        }
         carregarMapeamentos();
     } catch (erro) { mostrarStatus('statusRegras', 'Erro ao salvar mapeamento: ' + erro.message, 'error'); }
 }
@@ -1089,6 +1153,7 @@ async function deletarMapeamento(id) {
     try {
         const { error } = await supabaseClient.from('rh_mapeamento_nomes').delete().eq('id', id);
         if (error) throw error;
+        if (String(_mapeamentoEditandoId) === String(id)) cancelarEdicaoMapeamento();
         mostrarStatus('statusRegras', '✅ Mapeamento deletado com sucesso!', 'success');
         carregarMapeamentos();
     } catch (erro) { mostrarStatus('statusRegras', 'Erro ao deletar mapeamento: ' + erro.message, 'error'); }
