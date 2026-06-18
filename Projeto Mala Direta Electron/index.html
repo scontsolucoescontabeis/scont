@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SCONT — Mala Direta</title>
+  <style>
+    :root {
+      --primary:    #7a1e1e;
+      --primary-d:  #5c1616;
+      --bg:         #F7F8FA;
+      --bg-card:    #FFFFFF;
+      --border:     #E2E5EA;
+      --text:       #1A1D23;
+      --muted:      #6B7280;
+      --success:    #16A34A;
+      --warning:    #D97706;
+      --danger:     #DC2626;
+      --info:       #2563EB;
+      --radius:     10px;
+      --shadow:     0 1px 4px rgba(0,0,0,.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+    /* ── Login ── */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; background: var(--bg);
+    }
+    .login-box {
+      background: var(--bg-card); border-radius: 16px; padding: 40px 36px;
+      width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,.10);
+      text-align: center;
+    }
+    .login-logo {
+      width: 56px; height: 56px; background: var(--primary);
+      border-radius: 14px; margin: 0 auto 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; color: #fff;
+    }
+    .login-box h2 { font-size: 20px; margin-bottom: 4px; }
+    .login-box p  { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+    .login-box input {
+      width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+      border-radius: 8px; font-size: 14px; color: var(--text);
+      margin-bottom: 12px; outline: none; transition: border-color .15s;
+    }
+    .login-box input:focus { border-color: var(--primary); }
+    #login-erro { color: var(--danger); font-size: 12px; margin: -4px 0 12px; min-height: 16px; }
+
+    /* ── App shell ── */
+    #app { display: none; height: 100vh; display: none; flex-direction: column; }
+    .topbar {
+      background: var(--primary); color: #fff; height: 52px;
+      display: flex; align-items: center; padding: 0 20px; gap: 12px;
+      flex-shrink: 0;
+    }
+    .topbar-logo { font-weight: 800; font-size: 16px; letter-spacing: .5px; }
+    .topbar-sep  { opacity: .4; font-size: 18px; }
+    .topbar-title { font-size: 14px; opacity: .9; flex: 1; }
+    .topbar-user  { font-size: 12px; opacity: .7; }
+    .topbar-btn   { background: rgba(255,255,255,.15); border: none; color: #fff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .topbar-btn:hover { background: rgba(255,255,255,.25); }
+
+    .content { flex: 1; overflow: auto; padding: 24px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+    /* ── Cards ── */
+    .section-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+    .camp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px,1fr)); gap: 16px; }
+    .camp-card {
+      background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border);
+      box-shadow: var(--shadow); padding: 18px 20px; cursor: pointer;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .camp-card:hover { border-color: var(--primary); box-shadow: 0 2px 12px rgba(122,30,30,.12); }
+    .camp-card-nome { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+    .camp-card-desc { font-size: 12px; color: var(--muted); margin-bottom: 14px; min-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .camp-stats { display: flex; gap: 10px; margin-bottom: 14px; }
+    .cs { text-align: center; flex: 1; background: var(--bg); border-radius: 7px; padding: 7px 4px; }
+    .cs-val { font-size: 18px; font-weight: 800; }
+    .cs-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .cs.success .cs-val { color: var(--success); }
+    .cs.pending .cs-val { color: var(--warning); }
+    .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+    .tag-html  { background: #EFF6FF; color: #1D4ED8; }
+    .tag-texto { background: #F3F4F6; color: #374151; }
+    .tag-pendente { background: #FEF3C7; color: #92400E; }
+    .tag-ok       { background: #DCFCE7; color: #15803D; }
+
+    /* ── Detalhe campanha ── */
+    .back-btn { display: inline-flex; align-items: center; gap: 6px; color: var(--primary); font-weight: 600; font-size: 13px; cursor: pointer; margin-bottom: 20px; background: none; border: none; padding: 0; }
+    .back-btn:hover { text-decoration: underline; }
+    .det-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+    .det-title   { font-size: 22px; font-weight: 800; }
+    .det-sub     { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Barra de progresso ── */
+    #progress-bar-wrap { display: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 20px; }
+    .pb-label { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .pb-track  { height: 10px; background: var(--border); border-radius: 99px; overflow: hidden; margin-bottom: 10px; }
+    .pb-fill   { height: 100%; background: var(--primary); border-radius: 99px; transition: width .3s ease; width: 0%; }
+    .pb-current { font-size: 12px; color: var(--muted); }
+    .pb-erros  { margin-top: 10px; font-size: 12px; color: var(--danger); max-height: 80px; overflow: auto; }
+
+    /* ── Tabela ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); padding: 10px 14px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+
+    /* ── Botões ── */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: opacity .15s; }
+    .btn:hover { opacity: .88; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-secondary { background: #F3F4F6; color: var(--text); border: 1px solid var(--border); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+      display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+    }
+    .toast-item {
+      background: #1A1D23; color: #fff; padding: 12px 18px; border-radius: 10px;
+      font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.2);
+      animation: toastIn .2s ease; max-width: 360px;
+    }
+    .toast-item.success { background: #15803D; }
+    .toast-item.error   { background: #DC2626; }
+    @keyframes toastIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Empty ── */
+    .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty-icon { font-size: 36px; display: block; margin-bottom: 12px; }
+
+    /* ── Card bloco ── */
+    .card { background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 20px; }
+    .card-title { padding: 16px 20px; font-weight: 700; font-size: 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .card-body  { padding: 16px 20px; }
+
+    /* ── Config delay ── */
+    .cfg-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .cfg-row label { font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .cfg-row input[type=number] { width: 80px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; }
+    .cfg-hint { font-size: 11px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ LOGIN ═══ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">📧</div>
+    <h2>SCONT — Mala Direta</h2>
+    <p>Envio automático via Outlook</p>
+    <input type="email"    id="l-email" placeholder="Email" onkeydown="if(event.key==='Enter')doLogin()">
+    <input type="password" id="l-senha" placeholder="Senha" onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="login-erro"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="doLogin()" id="l-btn">Entrar</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ APP ═════ -->
+<div id="app" style="display:none;flex-direction:column;height:100vh">
+  <div class="topbar">
+    <span class="topbar-logo">SCONT</span>
+    <span class="topbar-sep">|</span>
+    <span class="topbar-title">Mala Direta</span>
+    <span class="topbar-user" id="top-user"></span>
+    <button class="topbar-btn" onclick="doLogout()">Sair</button>
+  </div>
+  <div class="content" id="main-content"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TOAST ═══ -->
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ── Estado ─────────────────────────────────────────────────────────────────────
+let campanhas  = [];
+let envios     = [];
+let campAtual  = null;
+let enviando   = false;
+let errosEnvio = [];
+
+const CONFIRM_BASE = 'https://scontsolucoescontabeis.github.io/scont/Projeto%20Mala%20Direta/confirmacao.html';
+
+// ── Auth ───────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim();
+  const senha = document.getElementById('l-senha').value;
+  const erro  = document.getElementById('login-erro');
+  const btn   = document.getElementById('l-btn');
+  if (!email || !senha) { erro.textContent = 'Preencha email e senha.'; return; }
+  btn.disabled = true; btn.textContent = 'Entrando…';
+  try {
+    const user = await window.electronAPI.login(email, senha);
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('top-user').textContent = user.email;
+    await carregarCampanhas();
+  } catch(e) {
+    erro.textContent = e.message || 'Credenciais inválidas.';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Entrar';
+  }
+}
+
+function doLogout() {
+  window.electronAPI.logout();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('l-senha').value = '';
+  document.getElementById('login-erro').textContent = '';
+}
+
+// ── Campanhas ──────────────────────────────────────────────────────────────────
+async function carregarCampanhas() {
+  showLoading('Carregando campanhas…');
+  try {
+    campanhas = await window.electronAPI.getCampanhas();
+    renderCampanhas();
+  } catch(e) {
+    showErro('Erro ao carregar campanhas: ' + e.message);
+  }
+}
+
+function renderCampanhas() {
+  if (!campanhas.length) {
+    setContent(`<div class="empty"><span class="empty-icon">📭</span><p>Nenhuma campanha encontrada.<br>Crie campanhas na ferramenta web.</p></div>`);
+    return;
+  }
+
+  const cards = campanhas.map(c => {
+    const isHtml  = isHtmlTpl(c.template || '');
+    const tagTipo = isHtml
+      ? `<span class="tag tag-html">HTML</span>`
+      : `<span class="tag tag-texto">Texto</span>`;
+    const dataStr = c.created_at
+      ? new Date(c.created_at).toLocaleDateString('pt-BR') : '';
+    return `
+      <div class="camp-card" onclick="abrirCampanha('${c.id}')">
+        <div class="camp-card-nome">${esc(c.nome)}</div>
+        <div class="camp-card-desc">${esc(c.descricao || '')}&nbsp;</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          ${tagTipo}
+          <span style="font-size:11px;color:var(--muted)">${dataStr}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  setContent(`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div class="section-title">Campanhas</div>
+      <button class="btn btn-secondary btn-sm" onclick="carregarCampanhas()">↻ Atualizar</button>
+    </div>
+    <div class="camp-grid">${cards}</div>
+  `);
+}
+
+// ── Detalhe campanha ───────────────────────────────────────────────────────────
+async function abrirCampanha(id) {
+  showLoading('Carregando destinatários…');
+  try {
+    campAtual = await window.electronAPI.getCampanha(id);
+    envios    = await window.electronAPI.getEnvios(id);
+    renderDetalhe();
+  } catch(e) {
+    showErro('Erro ao carregar campanha: ' + e.message);
+  }
+}
+
+function renderDetalhe() {
+  const camp     = campAtual;
+  const isHtml   = isHtmlTpl(camp.template || '');
+  const comEmail = envios.filter(e => e.email);
+  const pendentes = comEmail.filter(e => e.status_envio !== 'enviado');
+  const enviados  = comEmail.filter(e => e.status_envio === 'enviado');
+  const semEmail  = envios.filter(e => !e.email);
+  const delay     = parseInt(localStorage.getItem('md_el_delay') || '1500');
+
+  const tagTipo = isHtml
+    ? `<span class="tag tag-html">HTML</span>`
+    : `<span class="tag tag-texto">Texto plano</span>`;
+
+  const linhas = envios.map(e => {
+    const status = !e.email
+      ? `<span class="tag" style="background:#F3F4F6;color:#6B7280">Sem email</span>`
+      : e.status_envio === 'enviado'
+        ? `<span class="tag tag-ok">✓ Enviado</span>`
+        : `<span class="tag tag-pendente">Pendente</span>`;
+    return `
+      <tr id="row-${e.id}">
+        <td><strong>${esc(e.nome||'')}</strong><br><span style="font-size:11px;color:var(--muted)">${esc(e.empresa||'')}</span></td>
+        <td style="color:var(--muted)">${esc(e.email||'—')}</td>
+        <td>${status}</td>
+      </tr>`;
+  }).join('');
+
+  setContent(`
+    <button class="back-btn" onclick="carregarCampanhas()">← Voltar às campanhas</button>
+
+    <div class="det-header">
+      <div>
+        <div class="det-title">${esc(camp.nome)}</div>
+        <div class="det-sub">${esc(camp.descricao||'')} ${tagTipo}</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-secondary btn-sm" onclick="abrirCampanha('${camp.id}')">↻ Atualizar</button>
+        ${pendentes.length > 0
+          ? `<button class="btn btn-primary" id="btn-enviar-todos" onclick="enviarTodos()">📧 Enviar ${pendentes.length} pendente${pendentes.length>1?'s':''} automaticamente</button>`
+          : `<button class="btn btn-success" disabled>✓ Todos enviados</button>`
+        }
+      </div>
+    </div>
+
+    <div class="camp-stats" style="max-width:480px;margin-bottom:20px">
+      <div class="cs"><div class="cs-val">${envios.length}</div><div class="cs-lbl">Total</div></div>
+      <div class="cs success"><div class="cs-val">${enviados.length}</div><div class="cs-lbl">Enviados</div></div>
+      <div class="cs pending"><div class="cs-val">${pendentes.length}</div><div class="cs-lbl">Pendentes</div></div>
+      <div class="cs"><div class="cs-val">${semEmail.length}</div><div class="cs-lbl">Sem email</div></div>
+    </div>
+
+    <div id="progress-bar-wrap" class="card" style="display:none">
+      <div class="card-body">
+        <div class="pb-label">
+          <span id="pb-texto">Enviando…</span>
+          <span id="pb-pct">0%</span>
+        </div>
+        <div class="pb-track"><div class="pb-fill" id="pb-fill"></div></div>
+        <div class="pb-current" id="pb-current"></div>
+        <div class="pb-erros"  id="pb-erros"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        Destinatários
+        <div style="font-size:12px;font-weight:400;color:var(--muted)">
+          Intervalo entre emails:
+          <input type="number" id="inp-delay" value="${delay}" min="0" max="10000" style="width:70px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;margin:0 4px"
+            onchange="localStorage.setItem('md_el_delay',this.value)"> ms
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nome / Empresa</th><th>Email</th><th>Status</th></tr></thead>
+          <tbody id="envios-tbody">${linhas}</tbody>
+        </table>
+      </div>
+    </div>
+  `);
+}
+
+// ── Envio automático ───────────────────────────────────────────────────────────
+async function enviarTodos() {
+  if (enviando) return;
+  const camp    = campAtual;
+  const isHtml  = isHtmlTpl(camp.template || '');
+  const assunto = camp.assunto_email || camp.nome || 'Mensagem SCONT';
+  const delay   = parseInt(localStorage.getItem('md_el_delay') || '1500');
+
+  const pendentes = envios.filter(e => e.email && e.status_envio !== 'enviado');
+  if (!pendentes.length) { toast('Nenhum pendente com email.', 'error'); return; }
+
+  enviando   = true;
+  errosEnvio = [];
+  const total = pendentes.length;
+
+  // Mostra barra de progresso
+  document.getElementById('progress-bar-wrap').style.display = '';
+  document.getElementById('btn-enviar-todos').disabled = true;
+  document.getElementById('btn-enviar-todos').textContent = 'Enviando…';
+
+  let ok = 0;
+  for (let i = 0; i < pendentes.length; i++) {
+    const e         = pendentes[i];
+    const pct       = Math.round(((i) / total) * 100);
+    const corpo     = e.mensagem_final || applyTemplate(camp.template || '', e);
+    const assuntoFn = applyTemplate(assunto, e);
+
+    // Monta HTML final com link de confirmação se necessário
+    let htmlFinal = corpo;
+    if (!isHtml) {
+      htmlFinal = `<pre style="font-family:inherit;white-space:pre-wrap">${escHtml(corpo)}</pre>`;
+    }
+    if (camp.tipo_confirmacao && camp.tipo_confirmacao !== 'nenhuma' && e.token) {
+      const url = `${CONFIRM_BASE}?token=${e.token}`;
+      htmlFinal += `<p style="margin-top:20px;font-size:13px">Confirme o recebimento em: <a href="${url}">${url}</a></p>`;
+    }
+
+    setPB(i, total, e);
+
+    try {
+      const res = await window.electronAPI.enviarEmail(e.email, assuntoFn, htmlFinal);
+      if (res.ok) {
+        await window.electronAPI.marcarEnviado(e.id);
+        // Atualiza localmente
+        const idx = envios.findIndex(x => x.id === e.id);
+        if (idx >= 0) {
+          envios[idx].status_envio = 'enviado';
+          envios[idx].data_envio   = new Date().toISOString();
+        }
+        atualizarLinhaStatus(e.id, true);
+        ok++;
+      } else {
+        errosEnvio.push(`${e.nome || e.email}: ${res.erro}`);
+        atualizarLinhaStatus(e.id, false, res.erro);
+        document.getElementById('pb-erros').textContent = errosEnvio.join('\n');
+      }
+    } catch(err) {
+      errosEnvio.push(`${e.nome || e.email}: ${err.message}`);
+      atualizarLinhaStatus(e.id, false, err.message);
+    }
+
+    if (i < pendentes.length - 1 && delay > 0) {
+      await sleep(delay);
+    }
+  }
+
+  setPBFim(ok, total);
+  enviando = false;
+
+  const btnE = document.getElementById('btn-enviar-todos');
+  if (btnE) {
+    if (ok === total) {
+      btnE.textContent = '✓ Todos enviados';
+      btnE.className = 'btn btn-success';
+      btnE.disabled = true;
+    } else {
+      btnE.textContent = `↻ Reenviar ${total - ok} com erro`;
+      btnE.disabled = false;
+    }
+  }
+
+  if (errosEnvio.length === 0) {
+    toast(`✅ ${ok} email(s) enviado(s) com sucesso!`, 'success');
+  } else {
+    toast(`⚠️ ${ok}/${total} enviados. ${errosEnvio.length} erro(s).`, 'error');
+  }
+}
+
+function setPB(i, total, e) {
+  const pct = Math.round((i / total) * 100);
+  document.getElementById('pb-fill').style.width = pct + '%';
+  document.getElementById('pb-pct').textContent  = pct + '%';
+  document.getElementById('pb-texto').textContent = `Enviando ${i+1} de ${total}`;
+  document.getElementById('pb-current').textContent = `→ ${e.nome || ''} <${e.email}>`;
+}
+function setPBFim(ok, total) {
+  document.getElementById('pb-fill').style.width = '100%';
+  document.getElementById('pb-pct').textContent  = '100%';
+  document.getElementById('pb-texto').textContent = `Concluído: ${ok} de ${total} enviados`;
+  document.getElementById('pb-current').textContent = '';
+}
+
+function atualizarLinhaStatus(id, ok, erro) {
+  const row = document.getElementById('row-' + id);
+  if (!row) return;
+  const td = row.querySelectorAll('td')[2];
+  if (!td) return;
+  if (ok) {
+    td.innerHTML = `<span class="tag tag-ok">✓ Enviado</span>`;
+  } else {
+    td.innerHTML = `<span class="tag" style="background:#FEE2E2;color:#991B1B" title="${escHtml(erro||'')}">✗ Erro</span>`;
+  }
+}
+
+// ── Utilitários ────────────────────────────────────────────────────────────────
+function isHtmlTpl(t) {
+  const s = String(t || '').trim().toLowerCase();
+  return s.startsWith('<!doctype') || s.startsWith('<html');
+}
+
+function applyTemplate(tpl, row) {
+  return String(tpl || '').replace(/\{\{(\w+)\}\}/g, (_, k) => {
+    const v = row[k];
+    return (v !== null && v !== undefined) ? String(v) : '';
+  });
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function esc(s) { return escHtml(s); }
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function toast(msg, tipo) {
+  const el = document.createElement('div');
+  el.className = 'toast-item' + (tipo ? ' ' + tipo : '');
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function setContent(html) {
+  document.getElementById('main-content').innerHTML = html;
+}
+
+function showLoading(msg) {
+  setContent(`<div class="empty"><span class="empty-icon">⏳</span><p>${esc(msg)}</p></div>`);
+}
+
+function showErro(msg) {
+  setContent(`<div class="empty"><span class="empty-icon">❌</span><p>${esc(msg)}</p></div>`);
+}
+</script>
+</body>
+</html>

@@ -170,7 +170,8 @@
           <div class="page-header-actions" style="flex-wrap:wrap;gap:8px">
             <button class="btn btn-secondary btn-sm" onclick="openModalCampanha(campanhaAtualId)">Editar</button>
             <button class="btn btn-primary btn-sm" onclick="openModalDestinatarios()">+ Destinatários</button>
-            <button class="btn btn-secondary btn-sm" onclick="abrirEmailLote()">📧 Enviar por Email</button>
+            <button class="btn btn-secondary btn-sm" onclick="abrirEmailLote()">📧 Outlook</button>
+            <button class="btn btn-primary btn-sm" onclick="abrirEnvioBrevo()">🚀 Enviar via Brevo</button>
             <button class="btn btn-success btn-sm" onclick="marcarTodosEnviados()">✓ Todos enviados</button>
             <button class="btn btn-danger btn-sm" onclick="deletarCampanhaAtual()">Excluir</button>
           </div>
@@ -179,7 +180,7 @@
         <div class="card" style="margin-bottom:20px">
           <div class="card-title">Template da Mensagem</div>
           <div class="card-body">
-            <div id="det-template" style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:16px;font-size:13px;color:var(--text-light);white-space:pre-wrap;line-height:1.7"></div>
+            <div id="det-template" style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;overflow:hidden;font-size:13px;color:var(--text-light);white-space:pre-wrap;line-height:1.7"></div>
           </div>
         </div>
 
@@ -348,12 +349,12 @@
         <div class="page-header">
           <div>
             <h1>Configurações</h1>
-            <div class="page-header-sub">Parâmetros de envio em lote via Outlook</div>
+            <div class="page-header-sub">Parâmetros de envio via Outlook e Brevo</div>
           </div>
         </div>
 
-        <div class="card" style="max-width:560px">
-          <div class="card-title">📧 Envio em Lote</div>
+        <div class="card" style="max-width:560px;margin-bottom:20px">
+          <div class="card-title">📧 Envio em Lote — Outlook</div>
           <div class="card-body">
             <div class="form-group">
               <label>Máximo de emails por lote</label>
@@ -375,6 +376,33 @@
             <button class="btn btn-primary" onclick="salvarConfiguracoes()">Salvar Configurações</button>
           </div>
         </div>
+
+        <div class="card" style="max-width:560px">
+          <div class="card-title">🚀 Envio Automático — Brevo</div>
+          <div class="card-body">
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#1E40AF">
+              Com o Brevo os emails são enviados automaticamente — sem abrir Outlook, sem clicar por destinatário. HTML completo preservado. Plano gratuito: 300 emails/dia.
+            </div>
+            <div class="form-group">
+              <label>Chave de API (Brevo)</label>
+              <input type="text" id="cfg-brevo-key" class="form-control" placeholder="xkeysib-…" autocomplete="off">
+              <div class="form-hint">Gerada em brevo.com → SMTP &amp; API → API Keys.</div>
+            </div>
+            <div class="form-group">
+              <label>Nome do remetente</label>
+              <input type="text" id="cfg-brevo-nome" class="form-control" placeholder="SCONT">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label>Email do remetente *</label>
+              <input type="email" id="cfg-brevo-email" class="form-control" placeholder="noreply@scont.com.br">
+              <div class="form-hint">Deve estar verificado na sua conta Brevo.</div>
+            </div>
+          </div>
+          <div style="padding:0 20px 20px;display:flex;align-items:center;gap:12px">
+            <button class="btn btn-primary" onclick="salvarConfiguracoes()">Salvar Configurações</button>
+            <button class="btn btn-secondary" onclick="testarBrevo()">Testar conexão</button>
+          </div>
+        </div>
       </section>
 
       <!-- ═══ ENVIOS RECORRENTES ═══ -->
@@ -382,7 +410,10 @@
         <div class="page-header">
           <div>
             <h1>Envios Recorrentes</h1>
-            <div class="page-header-sub">Regras que geram campanhas automaticamente a cada período</div>
+            <div class="page-header-sub">Disparo automático de campanhas em datas fixas</div>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-primary" onclick="openModalRegraCampanha()">+ Nova Regra</button>
           </div>
         </div>
 
@@ -683,9 +714,20 @@
             oninput="this.dataset.customizado='1'">
           <div class="form-hint">Preenchido automaticamente com o nome da campanha. Suporta variáveis.</div>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="margin-bottom:8px">
           <label>Template da Mensagem *</label>
-          <textarea id="camp-template" class="form-control" rows="7"
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <div style="display:flex;overflow:hidden;border:1px solid var(--border);border-radius:6px">
+              <button type="button" id="btn-tpl-texto" class="btn btn-primary btn-sm"
+                style="border-radius:0;border:none;padding:5px 14px;font-size:12px"
+                onclick="_setTipoTpl('texto')">Texto plano</button>
+              <button type="button" id="btn-tpl-html" class="btn btn-secondary btn-sm"
+                style="border-radius:0;border:none;border-left:1px solid var(--border);padding:5px 14px;font-size:12px"
+                onclick="_setTipoTpl('html')">HTML</button>
+            </div>
+            <span id="camp-tpl-tipo-hint" style="font-size:11px;color:var(--muted)">Cole ou escreva texto com variáveis {{campo}}</span>
+          </div>
+          <textarea id="camp-template" class="form-control" rows="9"
             placeholder="Olá {{Nome Responsavel}},
 
 Segue o detalhamento do contrato de {{Empresa}}:
@@ -693,8 +735,19 @@ Segue o detalhamento do contrato de {{Empresa}}:
 • Vigência: a partir de {{Inicio Vigencia}}
 
 Atenciosamente,
-Equipe SCONT"></textarea>
+Equipe SCONT"
+            oninput="_atualizarPreviewHTML()"></textarea>
           <div class="form-hint" id="camp-template-hint">Variáveis padrão: {{nome}} {{empresa}} {{cargo}} {{email}} {{telefone}}</div>
+          <!-- Preview HTML -->
+          <div id="camp-tpl-html-wrap" style="display:none;margin-top:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Pré-visualização HTML</span>
+              <button type="button" class="btn btn-secondary btn-sm" style="font-size:11px" onclick="_atualizarPreviewHTML()">🔄 Atualizar</button>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff">
+              <iframe id="camp-tpl-iframe" style="width:100%;height:420px;border:none;display:block"></iframe>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-foot">
@@ -846,7 +899,7 @@ Equipe SCONT"></textarea>
       </div>
       <div class="modal-body">
 
-        <div style="background:var(--bg-light);border:1px solid var(--border-light);border-left:4px solid var(--primary);border-radius:8px;padding:16px;margin-bottom:18px;white-space:pre-wrap;font-size:14px;line-height:1.8;color:var(--text)" id="modal-env-msg"></div>
+        <div style="background:var(--bg-light);border:1px solid var(--border-light);border-left:4px solid var(--primary);border-radius:8px;overflow:hidden;margin-bottom:18px;white-space:pre-wrap;font-size:14px;line-height:1.8;color:var(--text)" id="modal-env-msg"></div>
 
         <div id="modal-env-link-wrap" style="margin-bottom:18px">
           <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Link de Confirmação</div>
@@ -890,6 +943,9 @@ Equipe SCONT"></textarea>
             </div>
           </div>
         </div>
+
+        <!-- Toggle modo HTML (injetado dinamicamente) -->
+        <div id="modal-email-modo"></div>
 
         <!-- Conteúdo dinâmico: individual ou lote -->
         <div id="modal-email-corpo"></div>
@@ -1054,6 +1110,201 @@ Equipe SCONT"></textarea>
     </div>
   </div>
 
+  <!-- Modal: Envio via Brevo -->
+  <div id="modal-brevo" class="modal-overlay">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3>🚀 Enviar via Brevo — <span id="brevo-camp-nome"></span></h3>
+        <button class="modal-close" onclick="closeModal('modal-brevo')">×</button>
+      </div>
+      <div class="modal-body">
+        <div id="brevo-cfg-warn" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#92400E">
+          ⚠️ Configure a chave de API e o email remetente em <a href="#" onclick="closeModal('modal-brevo');showSection('configuracoes');return false" style="font-weight:700;color:var(--primary)">Configurações → Brevo</a> antes de enviar.
+        </div>
+
+        <div id="brevo-form-wrap">
+          <div class="form-group" style="margin-bottom:12px">
+            <label>Assunto</label>
+            <input type="text" id="brevo-assunto" class="form-control" placeholder="Assunto (suporta {{variáveis}})">
+          </div>
+
+          <div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">
+            <div style="flex:1;min-width:120px;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:12px 16px;text-align:center">
+              <div style="font-size:22px;font-weight:800" id="brevo-stat-total">0</div>
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase">Total</div>
+            </div>
+            <div style="flex:1;min-width:120px;background:#DCFCE7;border:1px solid #BBF7D0;border-radius:8px;padding:12px 16px;text-align:center">
+              <div style="font-size:22px;font-weight:800;color:#15803D" id="brevo-stat-env">0</div>
+              <div style="font-size:11px;color:#15803D;text-transform:uppercase">Enviados</div>
+            </div>
+            <div style="flex:1;min-width:120px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:12px 16px;text-align:center">
+              <div style="font-size:22px;font-weight:800;color:#D97706" id="brevo-stat-pend">0</div>
+              <div style="font-size:11px;color:#D97706;text-transform:uppercase">Pendentes</div>
+            </div>
+            <div style="flex:1;min-width:120px;background:#F3F4F6;border:1px solid var(--border);border-radius:8px;padding:12px 16px;text-align:center">
+              <div style="font-size:22px;font-weight:800;color:var(--muted)" id="brevo-stat-sem">0</div>
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase">Sem email</div>
+            </div>
+          </div>
+
+          <!-- Barra de progresso (aparece durante envio) -->
+          <div id="brevo-progress" style="display:none;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:14px 16px;margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:8px">
+              <span id="brevo-pb-texto">Enviando…</span>
+              <span id="brevo-pb-pct">0%</span>
+            </div>
+            <div style="height:8px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:8px">
+              <div id="brevo-pb-fill" style="height:100%;background:var(--primary);border-radius:99px;width:0%;transition:width .3s ease"></div>
+            </div>
+            <div id="brevo-pb-current" style="font-size:12px;color:var(--muted)"></div>
+            <div id="brevo-pb-erros"   style="font-size:12px;color:var(--danger);margin-top:6px;max-height:60px;overflow:auto"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modal-brevo')">Fechar</button>
+        <button class="btn btn-primary" id="btn-brevo-enviar" onclick="executarEnvioBrevo()">🚀 Enviar todos os pendentes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Regra de Campanha Recorrente -->
+  <div id="modal-regra-campanha" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3 id="mrc-titulo">Nova Regra de Envio Recorrente</h3>
+        <button class="modal-close" onclick="closeModal('modal-regra-campanha')">×</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="form-group">
+          <label>Nome da Regra *</label>
+          <input type="text" id="mrc-nome" class="form-control" placeholder="Ex: Avisos de vencimento mensais">
+        </div>
+
+        <div class="form-group">
+          <label>Campanha *</label>
+          <select id="mrc-campanha" class="form-control">
+            <option value="">Selecione uma campanha…</option>
+          </select>
+          <div class="form-hint">A campanha já deve ter seus destinatários cadastrados.</div>
+        </div>
+
+        <div class="form-group">
+          <label>Frequência *</label>
+          <select id="mrc-freq" class="form-control" onchange="mrc_onFreqChange()">
+            <option value="semanal">Semanal</option>
+            <option value="mensal">Mensal</option>
+          </select>
+        </div>
+
+        <div id="mrc-dia-sem-wrap" class="form-group">
+          <label>Dia da semana</label>
+          <select id="mrc-dia-sem" class="form-control">
+            <option value="0">Domingo</option>
+            <option value="1">Segunda-feira</option>
+            <option value="2">Terça-feira</option>
+            <option value="3">Quarta-feira</option>
+            <option value="4">Quinta-feira</option>
+            <option value="5">Sexta-feira</option>
+            <option value="6">Sábado</option>
+          </select>
+        </div>
+
+        <div id="mrc-dia-mes-wrap" class="form-group" style="display:none">
+          <label>Dia do mês</label>
+          <select id="mrc-dia-mes" class="form-control">
+            <option value="ultimo">Último dia do mês</option>
+            <option value="1">Dia 1</option><option value="2">Dia 2</option><option value="3">Dia 3</option>
+            <option value="4">Dia 4</option><option value="5">Dia 5</option><option value="6">Dia 6</option>
+            <option value="7">Dia 7</option><option value="8">Dia 8</option><option value="9">Dia 9</option>
+            <option value="10">Dia 10</option><option value="11">Dia 11</option><option value="12">Dia 12</option>
+            <option value="13">Dia 13</option><option value="14">Dia 14</option><option value="15">Dia 15</option>
+            <option value="16">Dia 16</option><option value="17">Dia 17</option><option value="18">Dia 18</option>
+            <option value="19">Dia 19</option><option value="20">Dia 20</option><option value="21">Dia 21</option>
+            <option value="22">Dia 22</option><option value="23">Dia 23</option><option value="24">Dia 24</option>
+            <option value="25">Dia 25</option><option value="26">Dia 26</option><option value="27">Dia 27</option>
+            <option value="28">Dia 28</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Método de envio *</label>
+          <select id="mrc-metodo" class="form-control">
+            <option value="outlook">📧 Outlook — abre janelas para envio manual</option>
+            <option value="brevo">🚀 Brevo — disparo automático (requer configuração)</option>
+          </select>
+        </div>
+
+        <div id="mrc-edit-id" style="display:none"></div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-regra-campanha')">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarRegraCampanha()">Salvar Regra</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Envio Rápido de Email -->
+  <div id="modal-envio-rapido" class="modal-overlay">
+    <div class="modal-box wide">
+      <div class="modal-head">
+        <h3 id="er-titulo">📧 Enviar Emails — <span id="er-camp-nome"></span></h3>
+        <button class="modal-close" onclick="closeModal('modal-envio-rapido')">×</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Configurações do email -->
+        <div style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:14px 16px;margin-bottom:16px">
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">Configurações</div>
+          <div class="form-row" style="margin-bottom:0">
+            <div class="form-group" style="margin-bottom:0">
+              <label>Assunto</label>
+              <input type="text" id="er-assunto" class="form-control" placeholder="Assunto do email">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label>Tipo de Template</label>
+              <div id="er-tipo-badge" style="margin-top:6px;font-size:12px;color:var(--muted)"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toggle modo HTML (aparece só para templates HTML) -->
+        <div id="er-modo-wrap" style="display:none"></div>
+
+        <!-- Estatísticas rápidas -->
+        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <div style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:10px 16px;text-align:center;min-width:90px">
+            <div style="font-size:20px;font-weight:700;color:var(--text)" id="er-total">0</div>
+            <div style="font-size:11px;color:var(--muted)">Destinatários</div>
+          </div>
+          <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 16px;text-align:center;min-width:90px">
+            <div style="font-size:20px;font-weight:700;color:#1E40AF" id="er-com-email">0</div>
+            <div style="font-size:11px;color:#4B72A8">Com email</div>
+          </div>
+          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 16px;text-align:center;min-width:90px">
+            <div style="font-size:20px;font-weight:700;color:#15803D" id="er-enviados">0</div>
+            <div style="font-size:11px;color:#4B7A58">Já enviados</div>
+          </div>
+          <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:10px 16px;text-align:center;min-width:90px">
+            <div style="font-size:20px;font-weight:700;color:#C2410C" id="er-pendentes">0</div>
+            <div style="font-size:11px;color:#92400E">Pendentes</div>
+          </div>
+        </div>
+
+        <!-- Lista de destinatários com email -->
+        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Destinatários com email</div>
+        <div id="er-lista" style="display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto"></div>
+
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModal('modal-envio-rapido')">Fechar</button>
+        <button class="btn btn-primary" id="er-btn-lote" onclick="er_iniciarLote()">⚡ Abrir todos em sequência</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
 
   <!-- ══════════════════════════════════════════════════
@@ -1064,6 +1315,7 @@ Equipe SCONT"></textarea>
   let sb, userId;
   let campanhas = [], contatos = [], envios = [];
   let campanhaAtualId = null, campanhaAtual = null;
+  let _modoEnvioHtml = localStorage.getItem('md_modo_html') || 'texto'; // 'texto' | 'html'
   let grupos = [], grupoContatosAtual = [];
   let grupoAtualId = null, grupoAtual = null;
   let gcMap = {};
@@ -1303,6 +1555,8 @@ Equipe SCONT"></textarea>
           </div>
         </div>
         <div class="md-card-footer" onclick="event.stopPropagation()">
+          <button class="btn btn-primary btn-sm" onclick="abrirEnvioRapido('${c.id}')">📧 Outlook</button>
+          <button class="btn btn-primary btn-sm" style="background:#0EA5E9" onclick="abrirEnvioBrevoRapido('${c.id}')">🚀 Brevo</button>
           <button class="btn btn-secondary btn-sm" onclick="openModalCampanha('${c.id}')">Editar</button>
           <button class="btn btn-danger btn-sm" onclick="confirmarDeletar('${c.id}')">Excluir</button>
         </div>
@@ -1325,7 +1579,7 @@ Equipe SCONT"></textarea>
       `<span class="badge badge-${campanhaAtual.status}">${labelStatus(campanhaAtual.status)}</span>
        &nbsp; ${labelTipoConf(campanhaAtual.tipo_confirmacao)}&nbsp;·&nbsp;Criada em ${formatDate(campanhaAtual.created_at)}
        ${campanhaAtual.data_agendamento ? `&nbsp;·&nbsp;<span style="background:#EEF6FF;color:#1E40AF;padding:1px 8px;border-radius:4px;font-weight:600;font-size:11px">📅 Envio em ${formatDateBR(campanhaAtual.data_agendamento)}${_convDiasRestantes(campanhaAtual.data_agendamento)}</span>` : ''}`;
-    document.getElementById('det-template').textContent = campanhaAtual.template;
+    _renderTemplateEl(document.getElementById('det-template'), campanhaAtual.template);
 
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('overlay').classList.remove('show');
@@ -1398,6 +1652,9 @@ Equipe SCONT"></textarea>
     assuntoEl.value              = c?.assunto_email || c?.nome || '';
     assuntoEl.dataset.customizado = c?.assunto_email ? '1' : '';
 
+    // Set template type toggle
+    _setTipoTpl(isHtmlTemplate(c?.template || '') ? 'html' : 'texto');
+
     // Reset Excel state
     _limparExcelCampanha();
     openModal('modal-campanha');
@@ -1452,7 +1709,7 @@ Equipe SCONT"></textarea>
       if (campanhaAtualId === id) {
         campanhaAtual = campanhas.find(c => c.id === id);
         document.getElementById('det-nome').textContent = campanhaAtual.nome;
-        document.getElementById('det-template').textContent = campanhaAtual.template;
+        _renderTemplateEl(document.getElementById('det-template'), campanhaAtual.template);
       }
       renderCampanhas();
     }
@@ -1559,6 +1816,7 @@ Equipe SCONT"></textarea>
     ['av-nome','av-email','av-telefone','av-empresa','av-cargo'].forEach(i => document.getElementById(i).value = '');
     document.getElementById('av-canal').value = 'ambos';
     document.getElementById('filtro-sel').value = '';
+    _gruposSelecionados = new Set();
     // reset Excel state
     excelEnviosRows = [];
     document.getElementById('excel-envios-file').value = '';
@@ -1592,12 +1850,23 @@ Equipe SCONT"></textarea>
     }).join('');
   }
 
-  function toggleGrupoNoModal(grupoId) {
-    const btn = document.getElementById('btn-mg-' + grupoId);
-    const ativo = btn.classList.contains('btn-primary');
-    btn.classList.toggle('btn-primary', !ativo);
-    btn.classList.toggle('btn-secondary', ativo);
+  let _gruposSelecionados = new Set();
 
+  function toggleGrupoNoModal(grupoId) {
+    const btn   = document.getElementById('btn-mg-' + grupoId);
+    const ativo = _gruposSelecionados.has(grupoId);
+
+    if (ativo) {
+      _gruposSelecionados.delete(grupoId);
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-secondary');
+    } else {
+      _gruposSelecionados.add(grupoId);
+      btn.classList.remove('btn-secondary');
+      btn.classList.add('btn-primary');
+    }
+
+    // Marca/desmarca checkboxes visíveis para feedback visual
     const ids = gcMap[grupoId] || [];
     ids.forEach(cid => {
       const cb = document.querySelector(`input[name="sel-contato"][value="${cid}"]`);
@@ -1629,12 +1898,14 @@ Equipe SCONT"></textarea>
   }
 
   async function adicionarDestinatarios() {
-    const template = campanhaAtual?.template || '';
-    const inserts  = [];
+    const template     = campanhaAtual?.template || '';
+    const inserts      = [];
+    const jaAdicionados = new Set(envios.map(e => e.contato_id).filter(Boolean));
+    const jaNoInsert    = new Set();
 
-    document.querySelectorAll('input[name="sel-contato"]:checked').forEach(inp => {
-      const c = contatos.find(x => x.id === inp.value);
-      if (!c) return;
+    const pushContato = (c) => {
+      if (!c || jaAdicionados.has(c.id) || jaNoInsert.has(c.id)) return;
+      jaNoInsert.add(c.id);
       inserts.push({
         campanha_id: campanhaAtualId, contato_id: c.id,
         nome: c.nome, email: c.email || null, telefone: c.telefone || null,
@@ -1643,6 +1914,18 @@ Equipe SCONT"></textarea>
         token: crypto.randomUUID().replace(/-/g,''),
         canal: c.email && c.telefone ? 'ambos' : c.telefone ? 'whatsapp' : 'email',
       });
+    };
+
+    // Contatos dos grupos selecionados (independente de checkboxes)
+    _gruposSelecionados.forEach(grupoId => {
+      (gcMap[grupoId] || []).forEach(cid => {
+        pushContato(contatos.find(x => x.id === cid));
+      });
+    });
+
+    // Contatos marcados individualmente na lista
+    document.querySelectorAll('input[name="sel-contato"]:checked').forEach(inp => {
+      pushContato(contatos.find(x => x.id === inp.value));
     });
 
     const avNome = document.getElementById('av-nome').value.trim();
@@ -1694,6 +1977,66 @@ Equipe SCONT"></textarea>
     });
   }
 
+  function isHtmlTemplate(t) {
+    const s = String(t || '').trim().toLowerCase();
+    return s.startsWith('<!doctype') || s.startsWith('<html');
+  }
+
+  function _setTipoTpl(tipo) {
+    const isHtml = tipo === 'html';
+    const btnH = document.getElementById('btn-tpl-html');
+    const btnT = document.getElementById('btn-tpl-texto');
+    const wrap = document.getElementById('camp-tpl-html-wrap');
+    const hint = document.getElementById('camp-tpl-tipo-hint');
+    if (!btnH) return;
+    btnH.className = isHtml ? 'btn btn-primary btn-sm'   : 'btn btn-secondary btn-sm';
+    btnT.className = isHtml ? 'btn btn-secondary btn-sm' : 'btn btn-primary btn-sm';
+    btnH.style.cssText = 'border-radius:0;border:none;border-left:1px solid var(--border);padding:5px 14px;font-size:12px';
+    btnT.style.cssText = 'border-radius:0;border:none;padding:5px 14px;font-size:12px';
+    wrap.style.display = isHtml ? '' : 'none';
+    if (hint) hint.textContent = isHtml
+      ? 'Cole o HTML completo do email abaixo. Variáveis {{campo}} são substituídas antes do envio.'
+      : 'Cole ou escreva texto com variáveis {{campo}}';
+    if (isHtml) _atualizarPreviewHTML();
+  }
+
+  function _atualizarPreviewHTML() {
+    const wrap = document.getElementById('camp-tpl-html-wrap');
+    if (!wrap || wrap.style.display === 'none') return;
+    const tpl = document.getElementById('camp-template').value;
+    const iframe = document.getElementById('camp-tpl-iframe');
+    if (!iframe) return;
+    const doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open(); doc.write(tpl || ''); doc.close();
+  }
+
+  function _renderTemplateEl(el, html) {
+    el.querySelectorAll('iframe').forEach(f => f.remove());
+    if (isHtmlTemplate(html)) {
+      el.textContent = '';
+      el.style.whiteSpace = 'normal';
+      el.style.padding = '0';
+      el.style.minHeight = '0';
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'width:100%;height:420px;border:none;display:block;background:#fff';
+      iframe.setAttribute('sandbox', 'allow-same-origin allow-popups');
+      el.appendChild(iframe);
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      doc.open(); doc.write(html || ''); doc.close();
+      iframe.onload = () => {
+        try {
+          const h = iframe.contentDocument.documentElement.scrollHeight;
+          if (h > 80) iframe.style.height = Math.min(h + 20, 620) + 'px';
+        } catch(e) {}
+      };
+    } else {
+      el.style.whiteSpace = '';
+      el.style.padding = '';
+      el.style.minHeight = '';
+      el.textContent = html;
+    }
+  }
+
   // ── PREVIEW DE MENSAGENS ─────────────────────────────────────
   let _previewMDIdx = 0;
 
@@ -1731,11 +2074,20 @@ Equipe SCONT"></textarea>
       Object.assign(rowData, e.variaveis_extras);
     }
 
-    const html = applyTemplateHighlight(campanhaAtual.template, rowData);
-
     document.getElementById('preview-md-nome').textContent = `Destinatário: ${e.nome}${e.empresa ? ' · ' + e.empresa : ''}`;
-    document.getElementById('preview-md-area').innerHTML = html;
     document.getElementById('preview-md-counter').textContent = `${_previewMDIdx + 1} / ${envios.length}`;
+
+    const area = document.getElementById('preview-md-area');
+    if (isHtmlTemplate(campanhaAtual.template)) {
+      const rendered = applyTemplate(campanhaAtual.template, rowData);
+      area.style.whiteSpace = 'normal';
+      area.style.padding = '0';
+      _renderTemplateEl(area, rendered);
+    } else {
+      area.style.whiteSpace = '';
+      area.style.padding = '';
+      area.innerHTML = applyTemplateHighlight(campanhaAtual.template, rowData);
+    }
   }
 
   function previewMDNav(dir) {
@@ -1755,7 +2107,16 @@ Equipe SCONT"></textarea>
     if (!e) return;
 
     document.getElementById('modal-env-nome').textContent = e.nome;
-    document.getElementById('modal-env-msg').textContent  = e.mensagem_final;
+    const envMsgEl = document.getElementById('modal-env-msg');
+    if (isHtmlTemplate(campanhaAtual?.template || '')) {
+      envMsgEl.style.whiteSpace = 'normal';
+      envMsgEl.style.padding = '0';
+      _renderTemplateEl(envMsgEl, e.mensagem_final);
+    } else {
+      envMsgEl.style.whiteSpace = '';
+      envMsgEl.style.padding = '';
+      envMsgEl.textContent = e.mensagem_final;
+    }
 
     const semConfirm = campanhaAtual?.tipo_confirmacao === 'nenhuma';
     document.getElementById('modal-env-link-wrap').style.display = semConfirm ? 'none' : 'block';
@@ -1782,15 +2143,31 @@ Equipe SCONT"></textarea>
     document.getElementById('email-assunto').value =
       applyTemplate(campanhaAtual?.assunto_email || campanhaAtual?.nome || '', e);
 
+    const isHtml = isHtmlTemplate(campanhaAtual?.template || '');
+    const modoEl = document.getElementById('modal-email-modo');
+    modoEl.style.display = isHtml ? '' : 'none';
+    modoEl.innerHTML = isHtml ? _toggleModoHtmlUI() : '';
     document.getElementById('modal-email-corpo').innerHTML = `
       <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Destinatário</div>
       <div style="background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:14px;margin-bottom:16px">
         <div style="font-weight:600;font-size:14px;color:var(--text)">${esc(e.nome)}</div>
         <div style="font-size:12px;color:var(--muted)">${esc(e.email || '(sem email)')}</div>
       </div>
-      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">Mensagem</div>
-      <div style="background:var(--bg-light);border:1px solid var(--border-light);border-left:4px solid var(--primary);border-radius:8px;padding:14px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text);max-height:220px;overflow-y:auto">${esc(e.mensagem_final)}</div>
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">
+        Mensagem ${isHtml ? '<span style="background:#EEF6FF;color:#1E40AF;padding:1px 8px;border-radius:4px;font-size:10px;font-weight:700;margin-left:6px">HTML</span>' : ''}
+      </div>
+      ${isHtml
+        ? `<div id="email-ind-html-preview" style="border:1px solid var(--border-light);border-radius:8px;overflow:hidden;max-height:260px">
+             <iframe style="width:100%;height:240px;border:none;display:block"></iframe>
+           </div>`
+        : `<div style="background:var(--bg-light);border:1px solid var(--border-light);border-left:4px solid var(--primary);border-radius:8px;padding:14px;white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text);max-height:220px;overflow-y:auto">${esc(e.mensagem_final)}</div>`
+      }
     `;
+    if (isHtml) {
+      const iframe = document.querySelector('#email-ind-html-preview iframe');
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      doc.open(); doc.write(e.mensagem_final); doc.close();
+    }
 
     document.getElementById('modal-email-rodape').innerHTML = `
       <button class="btn btn-secondary" onclick="closeModal('modal-email')">Fechar</button>
@@ -1798,6 +2175,144 @@ Equipe SCONT"></textarea>
     `;
 
     openModal('modal-email');
+  }
+
+  async function abrirEnvioBrevoRapido(campanhaId) {
+    campanhaAtualId = campanhaId;
+    campanhaAtual   = campanhas.find(c => c.id === campanhaId);
+    if (!campanhaAtual) return;
+    const { data } = await sb.from('mala_direta_envios').select('*').eq('campanha_id', campanhaId);
+    envios = data || [];
+    abrirEnvioBrevo();
+  }
+
+  // ── ENVIO RÁPIDO (tela de Campanhas) ─────────────────────────
+  let _erEnvios = [];
+
+  async function abrirEnvioRapido(campanhaId) {
+    const camp = campanhas.find(c => c.id === campanhaId);
+    if (!camp) return;
+
+    // Carrega envios da campanha
+    const { data } = await sb.from('mala_direta_envios')
+      .select('*').eq('campanha_id', campanhaId).order('nome');
+    _erEnvios = data || [];
+
+    // Popula modal
+    document.getElementById('er-camp-nome').textContent = camp.nome;
+    document.getElementById('er-assunto').value = camp.assunto_email || camp.nome || '';
+
+    const isHtml = isHtmlTemplate(camp.template || '');
+    document.getElementById('er-tipo-badge').innerHTML = isHtml
+      ? '<span style="background:#EEF6FF;color:#1E40AF;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px">HTML</span>'
+      : '<span style="background:#F3F4F6;color:#374151;padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px">Texto plano</span>';
+    const modoWrap = document.getElementById('er-modo-wrap');
+    modoWrap.style.display = isHtml ? '' : 'none';
+    modoWrap.innerHTML = isHtml ? _toggleModoHtmlUI() : '';
+
+    const comEmail  = _erEnvios.filter(e => e.email && e.canal !== 'whatsapp');
+    const enviados  = comEmail.filter(e => e.status_envio === 'enviado').length;
+    const pendentes = comEmail.filter(e => e.status_envio !== 'enviado').length;
+    document.getElementById('er-total').textContent    = _erEnvios.length;
+    document.getElementById('er-com-email').textContent= comEmail.length;
+    document.getElementById('er-enviados').textContent = enviados;
+    document.getElementById('er-pendentes').textContent= pendentes;
+
+    // Renderiza lista
+    const lista = document.getElementById('er-lista');
+    if (!comEmail.length) {
+      lista.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px">Nenhum destinatário com email cadastrado nesta campanha.</div>';
+      document.getElementById('er-btn-lote').disabled = true;
+    } else {
+      document.getElementById('er-btn-lote').disabled = false;
+      lista.innerHTML = comEmail.map(e => `
+        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:10px 14px;gap:12px">
+          <div style="min-width:0;flex:1">
+            <div style="font-weight:600;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.nome)}</div>
+            <div style="font-size:11px;color:var(--muted)">${esc(e.email)} ${e.empresa ? '· ' + esc(e.empresa) : ''}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+            ${e.status_envio === 'enviado'
+              ? '<span class="badge badge-sent" style="font-size:11px">Enviado</span>'
+              : ''}
+            <button class="btn btn-primary btn-sm" onclick="er_dispararItem('${camp.id}','${e.id}')">📧 Abrir</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Salva campanha no contexto de envio rápido
+    document.getElementById('modal-envio-rapido').dataset.campId = campanhaId;
+    openModal('modal-envio-rapido');
+  }
+
+  async function er_dispararItem(campanhaId, envioId) {
+    const camp = campanhas.find(c => c.id === campanhaId);
+    if (!camp) return;
+
+    // Garante que campanhaAtual está configurado para o email
+    campanhaAtualId = campanhaId;
+    campanhaAtual   = camp;
+
+    const e = _erEnvios.find(x => x.id === envioId);
+    if (!e?.email) { toast('Sem email cadastrado', 'error'); return; }
+
+    const assuntoTpl = document.getElementById('er-assunto').value || camp.assunto_email || camp.nome || '';
+    const assunto    = applyTemplate(assuntoTpl, e);
+
+    if (isHtmlTemplate(camp.template || '') && _modoEnvioHtml === 'html') {
+      await _copiarHtmlEAbrirOutlook(e, e.email, assunto, camp);
+    } else {
+      const corpo = (isHtmlTemplate(camp.template || '')
+        ? _htmlParaTexto(e.mensagem_final)
+        : e.mensagem_final)
+        + (camp.tipo_confirmacao !== 'nenhuma'
+            ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
+      window.open(`mailto:${encodeURIComponent(e.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
+    }
+
+    // Marca como enviado automaticamente
+    await sb.from('mala_direta_envios')
+      .update({ status_envio: 'enviado', data_envio: new Date().toISOString() })
+      .eq('id', envioId);
+    // Atualiza badge na lista
+    const row = document.querySelector(`#er-lista button[onclick*="${envioId}"]`)?.closest('div[style]');
+    if (row) {
+      const badge = row.querySelector('.badge-sent');
+      if (!badge) {
+        const nameDiv = row.querySelector('div[style*="flex:1"]');
+        if (nameDiv) nameDiv.insertAdjacentHTML('afterend', '<span class="badge badge-sent" style="font-size:11px;flex-shrink:0">Enviado</span>');
+      }
+    }
+    const pendEl = document.getElementById('er-pendentes');
+    if (pendEl) pendEl.textContent = Math.max(0, parseInt(pendEl.textContent) - 1);
+    const envEl = document.getElementById('er-enviados');
+    if (envEl) envEl.textContent = parseInt(envEl.textContent) + 1;
+    _erEnvios = _erEnvios.map(x => x.id === envioId ? { ...x, status_envio: 'enviado' } : x);
+  }
+
+  async function er_iniciarLote() {
+    const campId = document.getElementById('modal-envio-rapido').dataset.campId;
+    const camp   = campanhas.find(c => c.id === campId);
+    if (!camp) return;
+    campanhaAtualId = campId;
+    campanhaAtual   = camp;
+
+    const pendentes = _erEnvios.filter(e => e.email && e.canal !== 'whatsapp' && e.status_envio !== 'enviado');
+    if (!pendentes.length) { toast('Todos já foram enviados!', 'success'); return; }
+
+    const assuntoTpl = document.getElementById('er-assunto').value || camp.assunto_email || camp.nome || '';
+    const settings   = getSettings();
+    const delay      = (settings.loteDelay || 2) * 1000;
+
+    toast(`Abrindo ${pendentes.length} email(s) em sequência… Clique Enviar em cada um no Outlook.`, '');
+
+    for (let i = 0; i < pendentes.length; i++) {
+      const e = pendentes[i];
+      await new Promise(r => setTimeout(r, i === 0 ? 0 : delay));
+      await er_dispararItem(campId, e.id);
+    }
+    toast(`✅ ${pendentes.length} email(s) aberto(s)!`, 'success');
   }
 
   function abrirEmailLote() {
@@ -1810,6 +2325,11 @@ Equipe SCONT"></textarea>
 
     document.getElementById('email-assunto').value =
       campanhaAtual?.assunto_email || campanhaAtual?.nome || '';
+
+    const _isHtmlLote = isHtmlTemplate(campanhaAtual?.template || '');
+    const modoElLote  = document.getElementById('modal-email-modo');
+    modoElLote.style.display = _isHtmlLote ? '' : 'none';
+    modoElLote.innerHTML     = _isHtmlLote ? _toggleModoHtmlUI() : '';
 
     const settings  = getSettings();
     const numLotes  = Math.ceil(comEmail.length / settings.loteMax);
@@ -1864,10 +2384,89 @@ Equipe SCONT"></textarea>
 
     const assuntoTpl = document.getElementById('email-assunto').value || campanhaAtual?.nome || '';
     const assunto    = applyTemplate(assuntoTpl, e);
-    const corpo      = e.mensagem_final + (campanhaAtual?.tipo_confirmacao !== 'nenhuma'
-      ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
 
-    window.open(`mailto:${encodeURIComponent(dest)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
+    if (isHtmlTemplate(campanhaAtual?.template || '') && _modoEnvioHtml === 'html') {
+      _copiarHtmlEAbrirOutlook(e, dest, assunto, campanhaAtual);
+    } else {
+      const corpo = (isHtmlTemplate(campanhaAtual?.template || '')
+        ? _htmlParaTexto(e.mensagem_final)
+        : e.mensagem_final)
+        + (campanhaAtual?.tipo_confirmacao !== 'nenhuma'
+            ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
+      window.open(`mailto:${encodeURIComponent(dest)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
+    }
+  }
+
+  function _htmlParaTexto(html) {
+    const div = document.createElement('div');
+    div.innerHTML = html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<\/li>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '• ')
+      .replace(/<\/tr>/gi, '\n')
+      .replace(/<\/td>/gi, '\t');
+    return (div.innerText || div.textContent || '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function _setModoEnvioHtml(modo) {
+    _modoEnvioHtml = modo;
+    localStorage.setItem('md_modo_html', modo);
+    document.querySelectorAll('[data-modo-html]').forEach(btn => {
+      const ativo = btn.dataset.modoHtml === modo;
+      btn.className = (ativo ? 'btn btn-primary' : 'btn btn-secondary') + ' btn-sm';
+      btn.style.cssText = 'border-radius:0;border:none;padding:4px 14px;font-size:12px;'
+        + (btn.dataset.modoHtml === 'html' ? 'border-left:1px solid var(--border)' : '');
+    });
+    document.querySelectorAll('[data-modo-html-hint]').forEach(el => {
+      el.textContent = modo === 'html'
+        ? 'Outlook abre + email formatado é copiado → cole Ctrl+V no corpo'
+        : 'Outlook abre com o conteúdo como texto direto no corpo';
+    });
+  }
+
+  function _toggleModoHtmlUI() {
+    const textoAtivo = _modoEnvioHtml === 'texto';
+    return `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg-light);border:1px solid var(--border-light);border-radius:8px;padding:10px 14px;margin-bottom:14px">
+        <span style="font-size:12px;font-weight:600;color:var(--text)">Formato do corpo:</span>
+        <div style="display:flex;overflow:hidden;border:1px solid var(--border);border-radius:6px">
+          <button type="button" data-modo-html="texto"
+            class="btn ${textoAtivo ? 'btn-primary' : 'btn-secondary'} btn-sm"
+            style="border-radius:0;border:none;padding:4px 14px;font-size:12px"
+            onclick="_setModoEnvioHtml('texto')">📄 Texto plano</button>
+          <button type="button" data-modo-html="html"
+            class="btn ${textoAtivo ? 'btn-secondary' : 'btn-primary'} btn-sm"
+            style="border-radius:0;border:none;border-left:1px solid var(--border);padding:4px 14px;font-size:12px"
+            onclick="_setModoEnvioHtml('html')">🎨 HTML formatado</button>
+        </div>
+        <span data-modo-html-hint style="font-size:11px;color:var(--muted)">
+          ${textoAtivo
+            ? 'Outlook abre com o conteúdo como texto direto no corpo'
+            : 'Outlook abre + email formatado é copiado → cole Ctrl+V no corpo'}
+        </span>
+      </div>`;
+  }
+
+  async function _copiarHtmlEAbrirOutlook(e, dest, assunto, campanha) {
+    const confirmLink = campanha?.tipo_confirmacao !== 'nenhuma'
+      ? `<p style="font-size:12px;color:#666;margin-top:16px">Confirme o recebimento em: <a href="${getConfirmUrl(e.token)}">${getConfirmUrl(e.token)}</a></p>` : '';
+    const htmlContent = e.mensagem_final + confirmLink;
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html':  new Blob([htmlContent], { type: 'text/html' }),
+          'text/plain': new Blob([_htmlParaTexto(htmlContent)], { type: 'text/plain' }),
+        })
+      ]);
+      toast('✅ Email HTML copiado! Cole Ctrl+V no corpo do Outlook.', 'success');
+    } catch(err) {
+      toast('Outlook aberto. Cole o conteúdo manualmente.', '');
+    }
+    window.open(`mailto:${encodeURIComponent(dest)}?subject=${encodeURIComponent(assunto)}`);
   }
 
   function copiarLink() {
@@ -1878,10 +2477,17 @@ Equipe SCONT"></textarea>
   function enviarEmail(id) {
     const e = envios.find(x => x.id === id);
     if (!e?.email) return;
-    const assunto = campanhaAtual?.nome || 'Mensagem SCONT';
-    const corpo   = e.mensagem_final + (campanhaAtual?.tipo_confirmacao !== 'nenhuma'
-      ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
-    window.open(`mailto:${encodeURIComponent(e.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
+    const assunto = applyTemplate(campanhaAtual?.assunto_email || campanhaAtual?.nome || 'Mensagem SCONT', e);
+    if (isHtmlTemplate(campanhaAtual?.template || '') && _modoEnvioHtml === 'html') {
+      _copiarHtmlEAbrirOutlook(e, e.email, assunto, campanhaAtual);
+    } else {
+      const corpo = (isHtmlTemplate(campanhaAtual?.template || '')
+        ? _htmlParaTexto(e.mensagem_final)
+        : e.mensagem_final)
+        + (campanhaAtual?.tipo_confirmacao !== 'nenhuma'
+            ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
+      window.open(`mailto:${encodeURIComponent(e.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
+    }
   }
 
   function enviarWhatsApp(id) {
@@ -3703,12 +4309,17 @@ Equipe SCONT`,
     if (!container) return;
 
     if (!_regras.length) {
-      container.innerHTML = '<div class="empty"><span class="empty-icon">⏰</span><p>Nenhuma regra recorrente. Crie uma no Conversor PDF → Configurar Envio.</p></div>';
+      container.innerHTML = '<div class="empty"><span class="empty-icon">⏰</span><p>Nenhuma regra recorrente ainda.<br>Clique em <strong>+ Nova Regra</strong> para configurar uma campanha recorrente.</p></div>';
       return;
     }
 
     const DIAS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    container.innerHTML = _regras.map(r => {
+
+    // Agrupa por tipo
+    const campRules = _regras.filter(r => r.tipo === 'campanha');
+    const pdfRules  = _regras.filter(r => !r.tipo || r.tipo === 'pdf');
+
+    const renderCard = (r) => {
       const freqDesc = r.frequencia === 'semanal'
         ? `Toda ${DIAS[r.dia_envio] ?? '?'}`
         : r.frequencia === 'mensal'
@@ -3721,23 +4332,72 @@ Equipe SCONT`,
         ? '<span style="background:#D1FAE5;color:#065F46;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">Ativa</span>'
         : '<span style="background:#F3F4F6;color:#6B7280;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">Inativa</span>';
 
+      const isCamp = r.tipo === 'campanha';
+      const campNome = isCamp
+        ? (campanhas.find(c => c.id === r.campanha_id)?.nome || 'Campanha não encontrada')
+        : null;
+      const tipoBadge = isCamp
+        ? '<span style="background:#EEF6FF;color:#1E40AF;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">Campanha</span>'
+        : '<span style="background:#FDF4FF;color:#6B21A8;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">PDF</span>';
+
+      const metodoBadge = isCamp
+        ? (r.metodo_envio === 'brevo'
+            ? '<span style="background:#E0F2FE;color:#0369A1;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">🚀 Brevo</span>'
+            : '<span style="background:#F3F4F6;color:#374151;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700">📧 Outlook</span>')
+        : '';
+
+      const btnEnviar = isCamp && r.ativa
+        ? (r.metodo_envio === 'brevo'
+            ? `<button class="btn btn-primary btn-sm" style="background:#0EA5E9" onclick="regra_irParaCampanha('${r.id}')">🚀 Enviar via Brevo</button>`
+            : `<button class="btn btn-primary btn-sm" onclick="regra_irParaCampanha('${r.id}')">📧 Enviar via Outlook</button>`)
+        : '';
+
+      const botoes = isCamp ? `
+        ${btnEnviar}
+        <button class="btn btn-secondary btn-sm" onclick="openModalRegraCampanha('${r.id}')">Editar</button>
+        ${r.ativa
+          ? `<button class="btn btn-secondary btn-sm" onclick="regra_desativar('${r.id}')">Desativar</button>`
+          : `<button class="btn btn-secondary btn-sm" onclick="regra_ativar('${r.id}')">Ativar</button>`}
+        <button class="btn btn-danger btn-sm" onclick="regra_excluir('${r.id}')">Excluir</button>
+      ` : `
+        ${r.ativa ? `<button class="btn btn-primary btn-sm" onclick="regra_executarAgora('${r.id}')">▶ Executar Agora</button>` : ''}
+        ${r.ativa
+          ? `<button class="btn btn-secondary btn-sm" onclick="regra_desativar('${r.id}')">Desativar</button>`
+          : `<button class="btn btn-secondary btn-sm" onclick="regra_ativar('${r.id}')">Ativar</button>`}
+      `;
+
       return `
       <div class="card" style="margin-bottom:12px;border-left:4px solid ${r.ativa ? 'var(--primary)' : 'var(--border)'}">
         <div style="display:flex;align-items:flex-start;gap:16px;padding:16px 18px;flex-wrap:wrap">
           <div style="flex:1;min-width:200px">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">${badge}
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+              ${badge}${tipoBadge}${metodoBadge}
               <span style="font-weight:700;font-size:14px;color:var(--text)">${esc(r.nome)}</span>
             </div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:4px">${freqDesc} · ${esc((r.tipos || []).join(', '))}</div>
+            ${isCamp ? `<div style="font-size:12px;color:var(--text);margin-bottom:3px">📋 ${esc(campNome)}</div>` : ''}
+            <div style="font-size:12px;color:var(--muted);margin-bottom:3px">
+              ${freqDesc}${!isCamp && r.tipos?.length ? ' · ' + esc(r.tipos.join(', ')) : ''}
+            </div>
             <div style="font-size:11px;color:var(--muted)">${ultimaExec}</div>
           </div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${r.ativa ? `<button class="btn btn-primary btn-sm" onclick="regra_executarAgora('${r.id}')">▶ Executar Agora</button>` : ''}
-            ${r.ativa ? `<button class="btn btn-secondary btn-sm" onclick="regra_desativar('${r.id}')">Desativar</button>` : ''}
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+            ${botoes}
           </div>
         </div>
       </div>`;
-    }).join('');
+    };
+
+    let html = '';
+    if (campRules.length) {
+      html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:10px">Campanhas Recorrentes</div>`;
+      html += campRules.map(renderCard).join('');
+    }
+    if (pdfRules.length) {
+      if (campRules.length) html += `<div style="margin-top:20px;margin-bottom:10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)">Regras do Conversor PDF</div>`;
+      html += pdfRules.map(renderCard).join('');
+    }
+
+    container.innerHTML = html;
   }
 
   async function regra_executarAgora(id) {
@@ -3826,6 +4486,147 @@ Equipe SCONT`,
     }
   }
 
+  async function regra_ativar(id) {
+    try {
+      const { error } = await sb.from('mala_direta_regras').update({ ativa: true }).eq('id', id);
+      if (error) throw error;
+      await loadRegras();
+      renderRegras();
+      toast('Regra ativada.', 'success');
+    } catch(e) {
+      toast('Erro: ' + e.message, 'error');
+    }
+  }
+
+  async function regra_excluir(id) {
+    if (!confirm('Excluir esta regra permanentemente?')) return;
+    try {
+      const { error } = await sb.from('mala_direta_regras').delete().eq('id', id);
+      if (error) throw error;
+      await loadRegras();
+      renderRegras();
+      toast('Regra excluída.', 'success');
+    } catch(e) {
+      toast('Erro: ' + e.message, 'error');
+    }
+  }
+
+  // ── REGRAS DE CAMPANHA ─────────────────────────────────────────
+
+  function openModalRegraCampanha(id) {
+    const sel = document.getElementById('mrc-campanha');
+
+    // Preenche select de campanhas
+    sel.innerHTML = '<option value="">Selecione uma campanha…</option>'
+      + campanhas.map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+
+    const editId = document.getElementById('mrc-edit-id');
+
+    if (id) {
+      // Edição
+      const r = _regras.find(x => x.id === id);
+      if (!r) return;
+      document.getElementById('mrc-titulo').textContent = 'Editar Regra';
+      document.getElementById('mrc-nome').value   = r.nome || '';
+      sel.value = r.campanha_id || '';
+      document.getElementById('mrc-freq').value   = r.frequencia || 'mensal';
+      document.getElementById('mrc-metodo').value = r.metodo_envio || 'outlook';
+      if (r.frequencia === 'semanal') {
+        document.getElementById('mrc-dia-sem').value = r.dia_envio ?? 1;
+      } else {
+        document.getElementById('mrc-dia-mes').value = r.dia_envio_tipo === 'ultimo' ? 'ultimo' : (r.dia_envio ?? 1);
+      }
+      editId.textContent = id;
+      mrc_onFreqChange();
+    } else {
+      document.getElementById('mrc-titulo').textContent = 'Nova Regra de Envio Recorrente';
+      document.getElementById('mrc-nome').value   = '';
+      sel.value = '';
+      document.getElementById('mrc-freq').value   = 'mensal';
+      document.getElementById('mrc-dia-mes').value = 1;
+      editId.textContent = '';
+      mrc_onFreqChange();
+    }
+
+    openModal('modal-regra-campanha');
+  }
+
+  function mrc_onFreqChange() {
+    const freq = document.getElementById('mrc-freq').value;
+    document.getElementById('mrc-dia-sem-wrap').style.display = freq === 'semanal' ? '' : 'none';
+    document.getElementById('mrc-dia-mes-wrap').style.display = freq === 'mensal'  ? '' : 'none';
+  }
+
+  async function salvarRegraCampanha() {
+    const nome      = document.getElementById('mrc-nome').value.trim();
+    const campId    = document.getElementById('mrc-campanha').value;
+    const freq      = document.getElementById('mrc-freq').value;
+    const editId    = document.getElementById('mrc-edit-id').textContent.trim();
+
+    if (!nome)   { toast('Informe o nome da regra.', 'error'); return; }
+    if (!campId) { toast('Selecione uma campanha.', 'error'); return; }
+
+    let diaEnvio     = null;
+    let diaEnvioTipo = null;
+
+    if (freq === 'semanal') {
+      diaEnvio = parseInt(document.getElementById('mrc-dia-sem').value);
+    } else {
+      const v = document.getElementById('mrc-dia-mes').value;
+      if (v === 'ultimo') { diaEnvioTipo = 'ultimo'; diaEnvio = null; }
+      else                { diaEnvio = parseInt(v); }
+    }
+
+    const metodo = document.getElementById('mrc-metodo').value;
+
+    const payload = {
+      nome,
+      tipo:            'campanha',
+      campanha_id:     campId,
+      frequencia:      freq,
+      dia_envio:       diaEnvio,
+      dia_envio_tipo:  diaEnvioTipo,
+      metodo_envio:    metodo,
+      ativa:           true,
+      tipos:           [],
+      template:        '',
+      assunto_email:   nome,
+      agrupar_empresa: false,
+      criado_por:      userId,
+    };
+
+    try {
+      if (editId) {
+        const { error } = await sb.from('mala_direta_regras').update(payload).eq('id', editId);
+        if (error) throw error;
+        toast('Regra atualizada!', 'success');
+      } else {
+        const { error } = await sb.from('mala_direta_regras').insert(payload);
+        if (error) throw error;
+        toast('Regra criada!', 'success');
+      }
+      closeModal('modal-regra-campanha');
+      await loadRegras();
+      renderRegras();
+    } catch(e) {
+      toast('Erro: ' + e.message, 'error');
+    }
+  }
+
+  async function regra_irParaCampanha(regraId) {
+    const regra = _regras.find(r => r.id === regraId);
+    if (!regra) return;
+    const campId = regra.campanha_id;
+    const camp   = campanhas.find(c => c.id === campId);
+    if (!camp) { toast('Campanha não encontrada.', 'error'); return; }
+
+    if (regra.metodo_envio === 'brevo') {
+      await abrirEnvioBrevoRapido(campId);
+    } else {
+      await abrirEnvioRapido(campId);
+    }
+  }
+
   function regras_verificarDue() {
     const hoje     = new Date();
     const diaSem   = hoje.getDay();
@@ -3849,12 +4650,15 @@ Equipe SCONT`,
     const alertEl = document.getElementById('regras-alert');
     if (!alertEl) return;
     alertEl.style.display = '';
-    alertEl.innerHTML = `
-      ⏰ <strong>${due.length} regra(s)</strong> programada(s) para hoje:
-      ${due.map(r => `<strong>${esc(r.nome)}</strong>`).join(', ')}<br>
-      <a href="#" onclick="showSection('conversor');return false" style="font-weight:700;color:var(--primary)">
-        → Importe o PDF e execute as regras na seção Conversor PDF
-      </a>`;
+
+    const dueCamp = due.filter(r => r.tipo === 'campanha');
+    const duePdf  = due.filter(r => !r.tipo || r.tipo === 'pdf');
+
+    let msg = `⏰ <strong>${due.length} regra(s)</strong> programada(s) para hoje: ${due.map(r => `<strong>${esc(r.nome)}</strong>`).join(', ')}<br>`;
+    if (dueCamp.length) msg += `<span style="display:block;margin-top:6px">📧 ${dueCamp.map(r => `<a href="#" onclick="regra_irParaCampanha('${r.id}');return false" style="font-weight:700;color:var(--primary)">${esc(r.nome)}</a>`).join(', ')} → clique para enviar</span>`;
+    if (duePdf.length)  msg += `<span style="display:block;margin-top:4px"><a href="#" onclick="showSection('conversor');return false" style="font-weight:700;color:var(--primary)">→ Importe o PDF e execute as regras na seção Conversor PDF</a></span>`;
+
+    alertEl.innerHTML = msg;
   }
 
   // ── CONFIGURAÇÕES ─────────────────────────────────────────────
@@ -3871,6 +4675,9 @@ Equipe SCONT`,
     document.getElementById('cfg-lote-max').value       = s.loteMax;
     document.getElementById('cfg-lote-intervalo').value = s.loteIntervalo;
     document.getElementById('cfg-lote-delay').value     = s.loteDelay;
+    document.getElementById('cfg-brevo-key').value      = localStorage.getItem('md_brevo_key')   || '';
+    document.getElementById('cfg-brevo-nome').value     = localStorage.getItem('md_brevo_nome')  || 'SCONT';
+    document.getElementById('cfg-brevo-email').value    = localStorage.getItem('md_brevo_email') || '';
   }
 
   function salvarConfiguracoes() {
@@ -3883,7 +4690,154 @@ Equipe SCONT`,
     localStorage.setItem('md_lote_max',       max);
     localStorage.setItem('md_lote_intervalo', inv);
     localStorage.setItem('md_lote_delay',     del);
+    const bKey   = document.getElementById('cfg-brevo-key').value.trim();
+    const bNome  = document.getElementById('cfg-brevo-nome').value.trim();
+    const bEmail = document.getElementById('cfg-brevo-email').value.trim();
+    if (bKey)   localStorage.setItem('md_brevo_key',   bKey);
+    if (bNome)  localStorage.setItem('md_brevo_nome',  bNome);
+    if (bEmail) localStorage.setItem('md_brevo_email', bEmail);
     toast('Configurações salvas!', 'success');
+  }
+
+  function getBrevoConfig() {
+    return {
+      key:   localStorage.getItem('md_brevo_key')   || '',
+      nome:  localStorage.getItem('md_brevo_nome')  || 'SCONT',
+      email: localStorage.getItem('md_brevo_email') || '',
+    };
+  }
+
+  async function testarBrevo() {
+    const cfg = getBrevoConfig();
+    if (!cfg.key || !cfg.email) { toast('Configure a chave e o email remetente primeiro.', 'error'); return; }
+    try {
+      const r = await fetch('https://api.brevo.com/v3/account', {
+        headers: { 'api-key': cfg.key, 'accept': 'application/json' }
+      });
+      if (!r.ok) throw new Error('Chave inválida ou sem permissão.');
+      const d = await r.json();
+      toast(`✅ Conectado! Conta: ${d.email || d.companyName || 'OK'}`, 'success');
+    } catch(e) {
+      toast('Erro: ' + e.message, 'error');
+    }
+  }
+
+  // ── ENVIO VIA BREVO ───────────────────────────────────────────────────────
+
+  function abrirEnvioBrevo() {
+    const cfg = getBrevoConfig();
+    document.getElementById('brevo-camp-nome').textContent = campanhaAtual?.nome || '';
+    document.getElementById('brevo-assunto').value = campanhaAtual?.assunto_email || campanhaAtual?.nome || '';
+
+    const comEmail = envios.filter(e => e.email && e.canal !== 'whatsapp');
+    const enviados = comEmail.filter(e => e.status_envio === 'enviado');
+    const pendentes = comEmail.filter(e => e.status_envio !== 'enviado');
+    const semEmail  = envios.filter(e => !e.email || e.canal === 'whatsapp');
+
+    document.getElementById('brevo-stat-total').textContent = comEmail.length;
+    document.getElementById('brevo-stat-env').textContent   = enviados.length;
+    document.getElementById('brevo-stat-pend').textContent  = pendentes.length;
+    document.getElementById('brevo-stat-sem').textContent   = semEmail.length;
+
+    const semCfg = !cfg.key || !cfg.email;
+    document.getElementById('brevo-cfg-warn').style.display  = semCfg ? '' : 'none';
+    document.getElementById('brevo-form-wrap').style.display = '';
+    document.getElementById('brevo-progress').style.display  = 'none';
+    document.getElementById('btn-brevo-enviar').disabled     = semCfg || !pendentes.length;
+    document.getElementById('btn-brevo-enviar').textContent  = pendentes.length
+      ? `🚀 Enviar ${pendentes.length} pendente${pendentes.length > 1 ? 's' : ''} via Brevo`
+      : '✓ Todos já enviados';
+
+    openModal('modal-brevo');
+  }
+
+  async function executarEnvioBrevo() {
+    const cfg      = getBrevoConfig();
+    const assunto  = document.getElementById('brevo-assunto').value.trim() || campanhaAtual?.nome || '';
+    const pendentes = envios.filter(e => e.email && e.canal !== 'whatsapp' && e.status_envio !== 'enviado');
+
+    if (!cfg.key || !cfg.email) { toast('Configure o Brevo em Configurações.', 'error'); return; }
+    if (!pendentes.length)      { toast('Nenhum pendente.', 'error'); return; }
+
+    document.getElementById('btn-brevo-enviar').disabled = true;
+    document.getElementById('brevo-progress').style.display = '';
+
+    const total  = pendentes.length;
+    let ok = 0, erros = [];
+
+    for (let i = 0; i < pendentes.length; i++) {
+      const e         = pendentes[i];
+      const assuntoFn = applyTemplate(assunto, e);
+      const corpo     = e.mensagem_final || applyTemplate(campanhaAtual?.template || '', e);
+      let   htmlFinal = isHtmlTemplate(campanhaAtual?.template || '') ? corpo
+                      : `<div style="font-family:inherit;white-space:pre-wrap">${corpo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+
+      if (campanhaAtual?.tipo_confirmacao !== 'nenhuma' && e.token) {
+        const base = window.location.href.split('?')[0];
+        const dir  = base.substring(0, base.lastIndexOf('/') + 1);
+        const url  = dir + 'confirmacao.html?token=' + e.token;
+        htmlFinal += `<p style="margin-top:20px;font-size:13px">Confirme o recebimento em: <a href="${url}">${url}</a></p>`;
+      }
+
+      // Atualiza barra
+      const pct = Math.round((i / total) * 100);
+      document.getElementById('brevo-pb-fill').style.width   = pct + '%';
+      document.getElementById('brevo-pb-pct').textContent    = pct + '%';
+      document.getElementById('brevo-pb-texto').textContent  = `Enviando ${i + 1} de ${total}`;
+      document.getElementById('brevo-pb-current').textContent = `→ ${e.nome || ''} <${e.email}>`;
+
+      try {
+        const emailDest = (e.email || '').trim().toLowerCase();
+        if (!emailDest || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDest)) {
+          throw new Error(`Email inválido: "${e.email}"`);
+        }
+        const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'api-key': cfg.key },
+          body: JSON.stringify({
+            sender:      { name: cfg.nome, email: cfg.email.trim() },
+            to:          [{ email: emailDest, name: (e.nome || '').trim() }],
+            subject:     assuntoFn,
+            htmlContent: htmlFinal,
+            textContent: _htmlParaTexto(htmlFinal),
+          }),
+        });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.message || `HTTP ${resp.status}`);
+        }
+
+        await sb.from('mala_direta_envios')
+          .update({ status_envio: 'enviado', data_envio: new Date().toISOString() })
+          .eq('id', e.id);
+
+        const idx = envios.findIndex(x => x.id === e.id);
+        if (idx >= 0) envios[idx].status_envio = 'enviado';
+        ok++;
+      } catch(err) {
+        erros.push(`${e.nome || e.email}: ${err.message}`);
+        document.getElementById('brevo-pb-erros').textContent = erros.join('\n');
+      }
+
+      if (i < pendentes.length - 1) await new Promise(r => setTimeout(r, 300));
+    }
+
+    document.getElementById('brevo-pb-fill').style.width  = '100%';
+    document.getElementById('brevo-pb-pct').textContent   = '100%';
+    document.getElementById('brevo-pb-texto').textContent = `Concluído: ${ok} de ${total} enviados`;
+    document.getElementById('brevo-pb-current').textContent = '';
+
+    // Atualiza contadores no modal
+    document.getElementById('brevo-stat-env').textContent  = envios.filter(e => e.status_envio === 'enviado').length;
+    document.getElementById('brevo-stat-pend').textContent = envios.filter(e => e.email && e.status_envio !== 'enviado').length;
+    document.getElementById('btn-brevo-enviar').textContent = erros.length ? `↻ Reenviar ${erros.length} com erro` : '✓ Todos enviados';
+    document.getElementById('btn-brevo-enviar').disabled = !erros.length;
+
+    renderEnvios();
+    atualizarDetalhes();
+
+    if (!erros.length) toast(`✅ ${ok} email(s) enviado(s) via Brevo!`, 'success');
+    else               toast(`⚠️ ${ok}/${total} enviados. ${erros.length} erro(s).`, 'error');
   }
 
   // ── ENVIO EM LOTE ─────────────────────────────────────────────

@@ -1,0 +1,26 @@
+{
+  "name": "scont-mala-direta",
+  "version": "1.0.0",
+  "description": "SCONT - Mala Direta com Envio Automático via Outlook",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "br.com.scont.maladireta",
+    "productName": "SCONT Mala Direta",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
