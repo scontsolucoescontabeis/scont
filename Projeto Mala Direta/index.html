@@ -2401,19 +2401,34 @@ Equipe SCONT"
     if (!campanha || campanha.tipo_confirmacao === 'nenhuma' || !token) return '';
     const base = window.location.href.split('?')[0];
     const dir  = base.substring(0, base.lastIndexOf('/') + 1);
-    const url  = dir + 'confirmacao.html?token=' + token;
-    const tipo = campanha.tipo_confirmacao || 'leitura';
-    const label = tipo === 'interesse' ? '📋 Ver mensagem e confirmar interesse' : '✓ Confirmar Leitura';
-    return `
-<div style="text-align:center;margin:28px 0 8px">
-  <a href="${url}"
-     style="display:inline-block;background:#7a1e1e;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;letter-spacing:0.3px;mso-padding-alt:0">
-    ${label}
+    const urlBase = dir + 'confirmacao.html?token=' + token;
+    const tipo    = campanha.tipo_confirmacao || 'leitura';
+
+    if (tipo === 'interesse') {
+      const urlSim = urlBase + '&acao=confirmado';
+      const urlNao = urlBase + '&acao=recusado';
+      return `
+<div style="text-align:center;margin:32px 0 12px;font-family:Arial,Helvetica,sans-serif">
+  <a href="${urlSim}"
+     style="display:inline-block;background:#16A34A;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:0.3px;margin:4px 6px">
+    ✓ Tenho Interesse
   </a>
-</div>
-<p style="text-align:center;font-size:11px;color:#999;font-family:Arial,sans-serif;margin-top:6px">
-  Ou acesse: <a href="${url}" style="color:#7a1e1e">${url}</a>
-</p>`;
+  <a href="${urlNao}"
+     style="display:inline-block;background:#DC2626;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:0.3px;margin:4px 6px">
+    ✗ Não Tenho Interesse
+  </a>
+</div>`;
+    }
+
+    // leitura
+    const urlLido = urlBase + '&acao=lido';
+    return `
+<div style="text-align:center;margin:32px 0 12px;font-family:Arial,Helvetica,sans-serif">
+  <a href="${urlLido}"
+     style="display:inline-block;background:#7a1e1e;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:0.3px">
+    ✓ Confirmar Leitura
+  </a>
+</div>`;
   }
 
   function _htmlParaTexto(html) {

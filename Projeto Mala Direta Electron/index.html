@@ -392,19 +392,29 @@ async function enviarTodos() {
       htmlFinal = `<pre style="font-family:inherit;white-space:pre-wrap">${escHtml(corpo)}</pre>`;
     }
     if (camp.tipo_confirmacao && camp.tipo_confirmacao !== 'nenhuma' && e.token) {
-      const url   = `${CONFIRM_BASE}?token=${e.token}`;
-      const tipo  = camp.tipo_confirmacao;
-      const label = tipo === 'interesse' ? '📋 Ver mensagem e confirmar interesse' : '✓ Confirmar Leitura';
-      htmlFinal += `
-<div style="text-align:center;margin:28px 0 8px">
-  <a href="${url}"
-     style="display:inline-block;background:#7a1e1e;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;letter-spacing:0.3px">
-    ${label}
+      const urlBase = `${CONFIRM_BASE}?token=${e.token}`;
+      const tipo    = camp.tipo_confirmacao;
+      if (tipo === 'interesse') {
+        htmlFinal += `
+<div style="text-align:center;margin:32px 0 12px;font-family:Arial,Helvetica,sans-serif">
+  <a href="${urlBase}&acao=confirmado"
+     style="display:inline-block;background:#16A34A;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:0.3px;margin:4px 6px">
+    ✓ Tenho Interesse
   </a>
-</div>
-<p style="text-align:center;font-size:11px;color:#999;font-family:Arial,sans-serif;margin-top:6px">
-  Ou acesse: <a href="${url}" style="color:#7a1e1e">${url}</a>
-</p>`;
+  <a href="${urlBase}&acao=recusado"
+     style="display:inline-block;background:#DC2626;color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:0.3px;margin:4px 6px">
+    ✗ Não Tenho Interesse
+  </a>
+</div>`;
+      } else {
+        htmlFinal += `
+<div style="text-align:center;margin:32px 0 12px;font-family:Arial,Helvetica,sans-serif">
+  <a href="${urlBase}&acao=lido"
+     style="display:inline-block;background:#7a1e1e;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-size:15px;font-weight:700;letter-spacing:0.3px">
+    ✓ Confirmar Leitura
+  </a>
+</div>`;
+      }
     }
 
     setPB(i, total, e);

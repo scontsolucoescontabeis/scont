@@ -140,16 +140,19 @@
   </div>
 
   <script>
-  const TOKEN = new URLSearchParams(window.location.search).get('token');
+  const _params = new URLSearchParams(window.location.search);
+  const TOKEN   = _params.get('token');
+  const ACAO    = _params.get('acao'); // lido | confirmado | recusado (vindo do botão do email)
   let envio = null, campanha = null;
+  let _sb = null;
 
   async function init() {
     if (!TOKEN) { renderErro('Link inválido. Token não encontrado.'); return; }
 
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // Buscar envio pelo token
-    const { data: env, error: envErr } = await sb
+    const { data: env, error: envErr } = await _sb
       .from('mala_direta_envios')
       .select('*')
       .eq('token', TOKEN)
@@ -159,7 +162,7 @@
     envio = env;
 
     // Buscar campanha para obter tipo_confirmacao
-    const { data: camp } = await sb
+    const { data: camp } = await _sb
       .from('mala_direta_campanhas')
       .select('nome, tipo_confirmacao')
       .eq('id', env.campanha_id)
@@ -179,6 +182,13 @@
     // Se não foi enviado ainda (segurança)
     if (env.status_envio !== 'enviado') {
       renderErro('Este link ainda não está disponível.');
+      return;
+    }
+
+    // Se veio com ação direta no link (botão do email), confirma automaticamente
+    const acoesValidas = ['lido', 'confirmado', 'recusado'];
+    if (ACAO && acoesValidas.includes(ACAO)) {
+      await confirmar(ACAO);
       return;
     }
 
@@ -240,8 +250,8 @@
   async function confirmar(status) {
     document.querySelectorAll('.btn').forEach(b => b.disabled = true);
 
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    const { error } = await sb
+    if (!_sb) _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const { error } = await _sb
       .from('mala_direta_envios')
       .update({
         status_confirmacao: status,
