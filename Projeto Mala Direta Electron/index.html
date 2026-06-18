@@ -392,8 +392,19 @@ async function enviarTodos() {
       htmlFinal = `<pre style="font-family:inherit;white-space:pre-wrap">${escHtml(corpo)}</pre>`;
     }
     if (camp.tipo_confirmacao && camp.tipo_confirmacao !== 'nenhuma' && e.token) {
-      const url = `${CONFIRM_BASE}?token=${e.token}`;
-      htmlFinal += `<p style="margin-top:20px;font-size:13px">Confirme o recebimento em: <a href="${url}">${url}</a></p>`;
+      const url   = `${CONFIRM_BASE}?token=${e.token}`;
+      const tipo  = camp.tipo_confirmacao;
+      const label = tipo === 'interesse' ? '📋 Ver mensagem e confirmar interesse' : '✓ Confirmar Leitura';
+      htmlFinal += `
+<div style="text-align:center;margin:28px 0 8px">
+  <a href="${url}"
+     style="display:inline-block;background:#7a1e1e;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;letter-spacing:0.3px">
+    ${label}
+  </a>
+</div>
+<p style="text-align:center;font-size:11px;color:#999;font-family:Arial,sans-serif;margin-top:6px">
+  Ou acesse: <a href="${url}" style="color:#7a1e1e">${url}</a>
+</p>`;
     }
 
     setPB(i, total, e);

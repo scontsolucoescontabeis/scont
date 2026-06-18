@@ -1355,7 +1355,7 @@ Equipe SCONT"
       overlay.classList.remove('show');
     });
 
-    await Promise.all([loadCampanhas(), loadContatos(), loadGrupos(), loadRegras()]);
+    await Promise.all([loadCampanhas(), loadContatos(), loadGrupos(), loadRegras(), loadBrevoConfig()]);
     renderDashboard();
     regras_verificarDue();
   });
@@ -2397,6 +2397,25 @@ Equipe SCONT"
     }
   }
 
+  function _buildConfirmButton(campanha, token) {
+    if (!campanha || campanha.tipo_confirmacao === 'nenhuma' || !token) return '';
+    const base = window.location.href.split('?')[0];
+    const dir  = base.substring(0, base.lastIndexOf('/') + 1);
+    const url  = dir + 'confirmacao.html?token=' + token;
+    const tipo = campanha.tipo_confirmacao || 'leitura';
+    const label = tipo === 'interesse' ? '📋 Ver mensagem e confirmar interesse' : '✓ Confirmar Leitura';
+    return `
+<div style="text-align:center;margin:28px 0 8px">
+  <a href="${url}"
+     style="display:inline-block;background:#7a1e1e;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;letter-spacing:0.3px;mso-padding-alt:0">
+    ${label}
+  </a>
+</div>
+<p style="text-align:center;font-size:11px;color:#999;font-family:Arial,sans-serif;margin-top:6px">
+  Ou acesse: <a href="${url}" style="color:#7a1e1e">${url}</a>
+</p>`;
+  }
+
   function _htmlParaTexto(html) {
     const div = document.createElement('div');
     div.innerHTML = html
@@ -2452,9 +2471,7 @@ Equipe SCONT"
   }
 
   async function _copiarHtmlEAbrirOutlook(e, dest, assunto, campanha) {
-    const confirmLink = campanha?.tipo_confirmacao !== 'nenhuma'
-      ? `<p style="font-size:12px;color:#666;margin-top:16px">Confirme o recebimento em: <a href="${getConfirmUrl(e.token)}">${getConfirmUrl(e.token)}</a></p>` : '';
-    const htmlContent = e.mensagem_final + confirmLink;
+    const htmlContent = e.mensagem_final + _buildConfirmButton(campanha, e.token);
     try {
       await navigator.clipboard.write([
         new ClipboardItem({
@@ -4675,36 +4692,60 @@ Equipe SCONT`,
     document.getElementById('cfg-lote-max').value       = s.loteMax;
     document.getElementById('cfg-lote-intervalo').value = s.loteIntervalo;
     document.getElementById('cfg-lote-delay').value     = s.loteDelay;
-    document.getElementById('cfg-brevo-key').value      = localStorage.getItem('md_brevo_key')   || '';
-    document.getElementById('cfg-brevo-nome').value     = localStorage.getItem('md_brevo_nome')  || 'SCONT';
-    document.getElementById('cfg-brevo-email').value    = localStorage.getItem('md_brevo_email') || '';
+    document.getElementById('cfg-brevo-key').value      = _brevoConfig.key;
+    document.getElementById('cfg-brevo-nome').value     = _brevoConfig.nome  || 'SCONT';
+    document.getElementById('cfg-brevo-email').value    = _brevoConfig.email;
   }
 
-  function salvarConfiguracoes() {
+  async function salvarConfiguracoes() {
     const max = parseInt(document.getElementById('cfg-lote-max').value);
     const inv = parseInt(document.getElementById('cfg-lote-intervalo').value);
     const del = parseInt(document.getElementById('cfg-lote-delay').value);
-    if (!max || max < 1)  { toast('Máximo por lote inválido', 'error'); return; }
-    if (!inv || inv < 1)  { toast('Intervalo inválido', 'error'); return; }
+    if (!max || max < 1)       { toast('Máximo por lote inválido', 'error'); return; }
+    if (!inv || inv < 1)       { toast('Intervalo inválido', 'error'); return; }
     if (isNaN(del) || del < 0) { toast('Delay inválido', 'error'); return; }
     localStorage.setItem('md_lote_max',       max);
     localStorage.setItem('md_lote_intervalo', inv);
     localStorage.setItem('md_lote_delay',     del);
+
     const bKey   = document.getElementById('cfg-brevo-key').value.trim();
-    const bNome  = document.getElementById('cfg-brevo-nome').value.trim();
+    const bNome  = document.getElementById('cfg-brevo-nome').value.trim() || 'SCONT';
     const bEmail = document.getElementById('cfg-brevo-email').value.trim();
-    if (bKey)   localStorage.setItem('md_brevo_key',   bKey);
-    if (bNome)  localStorage.setItem('md_brevo_nome',  bNome);
-    if (bEmail) localStorage.setItem('md_brevo_email', bEmail);
-    toast('Configurações salvas!', 'success');
+
+    try {
+      const upserts = [
+        { chave: 'brevo_key',   valor: bKey,   atualizado_em: new Date().toISOString() },
+        { chave: 'brevo_nome',  valor: bNome,  atualizado_em: new Date().toISOString() },
+        { chave: 'brevo_email', valor: bEmail, atualizado_em: new Date().toISOString() },
+      ];
+      const { error } = await sb.from('mala_direta_config')
+        .upsert(upserts, { onConflict: 'chave' });
+      if (error) throw error;
+
+      _brevoConfig = { key: bKey, nome: bNome, email: bEmail };
+      toast('Configurações salvas!', 'success');
+    } catch(e) {
+      toast('Erro ao salvar: ' + e.message, 'error');
+    }
+  }
+
+  let _brevoConfig = { key: '', nome: 'SCONT', email: '' };
+
+  async function loadBrevoConfig() {
+    try {
+      const { data } = await sb.from('mala_direta_config')
+        .select('chave,valor')
+        .in('chave', ['brevo_key', 'brevo_nome', 'brevo_email']);
+      (data || []).forEach(r => {
+        if (r.chave === 'brevo_key')   _brevoConfig.key   = r.valor || '';
+        if (r.chave === 'brevo_nome')  _brevoConfig.nome  = r.valor || 'SCONT';
+        if (r.chave === 'brevo_email') _brevoConfig.email = r.valor || '';
+      });
+    } catch(_) {}
   }
 
   function getBrevoConfig() {
-    return {
-      key:   localStorage.getItem('md_brevo_key')   || '',
-      nome:  localStorage.getItem('md_brevo_nome')  || 'SCONT',
-      email: localStorage.getItem('md_brevo_email') || '',
-    };
+    return { ..._brevoConfig };
   }
 
   async function testarBrevo() {
@@ -4772,12 +4813,7 @@ Equipe SCONT`,
       let   htmlFinal = isHtmlTemplate(campanhaAtual?.template || '') ? corpo
                       : `<div style="font-family:inherit;white-space:pre-wrap">${corpo.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
 
-      if (campanhaAtual?.tipo_confirmacao !== 'nenhuma' && e.token) {
-        const base = window.location.href.split('?')[0];
-        const dir  = base.substring(0, base.lastIndexOf('/') + 1);
-        const url  = dir + 'confirmacao.html?token=' + e.token;
-        htmlFinal += `<p style="margin-top:20px;font-size:13px">Confirme o recebimento em: <a href="${url}">${url}</a></p>`;
-      }
+      htmlFinal += _buildConfirmButton(campanhaAtual, e.token);
 
       // Atualiza barra
       const pct = Math.round((i / total) * 100);

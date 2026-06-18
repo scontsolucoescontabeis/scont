@@ -67,6 +67,16 @@
       color: #2C3E50;
       white-space: pre-wrap;
     }
+    .msg-iframe {
+      width: 100%;
+      border: 1px solid #E0E6ED;
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      margin-bottom: 24px;
+      min-height: 180px;
+      display: block;
+      background: #fff;
+    }
 
     /* Action buttons */
     .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
@@ -176,6 +186,11 @@
     renderFormulario(env.mensagem_final, tipo);
   }
 
+  function isHtmlContent(s) {
+    const t = String(s || '').trim().toLowerCase();
+    return t.startsWith('<!doctype') || t.startsWith('<html');
+  }
+
   function renderFormulario(mensagem, tipo) {
     let botoes = '';
     if (tipo === 'leitura') {
@@ -186,10 +201,13 @@
         <button class="btn btn-refuse"  onclick="confirmar('recusado')">✗ Sem Interesse</button>
       `;
     }
-    // tipo 'nenhuma': não deve chegar aqui (sem link de confirmação), mas renderiza só leitura
+
+    const msgHtml = isHtmlContent(mensagem)
+      ? `<iframe id="msg-iframe" class="msg-iframe" sandbox="allow-same-origin allow-popups"></iframe>`
+      : `<div class="msg-box">${escHTML(mensagem)}</div>`;
 
     document.getElementById('conteudo').innerHTML = `
-      <div class="msg-box">${escHTML(mensagem)}</div>
+      ${msgHtml}
       ${botoes ? `
         <p style="font-size:13px;color:#8B95A5;margin-bottom:14px;text-align:center">
           ${tipo === 'leitura' ? 'Confirme que recebeu e leu esta mensagem.' : 'Indique seu interesse na proposta acima.'}
@@ -197,6 +215,26 @@
         <div class="actions">${botoes}</div>
       ` : ''}
     `;
+
+    // Renderiza HTML no iframe após inserção no DOM
+    if (isHtmlContent(mensagem)) {
+      const iframe = document.getElementById('msg-iframe');
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      doc.open(); doc.write(mensagem); doc.close();
+      iframe.onload = () => {
+        try {
+          const h = iframe.contentDocument.documentElement.scrollHeight;
+          if (h > 80) iframe.style.height = Math.min(h + 20, 640) + 'px';
+        } catch(_) {}
+      };
+      // Fallback para resize imediato
+      setTimeout(() => {
+        try {
+          const h = iframe.contentDocument.documentElement.scrollHeight;
+          if (h > 80) iframe.style.height = Math.min(h + 20, 640) + 'px';
+        } catch(_) {}
+      }, 300);
+    }
   }
 
   async function confirmar(status) {
