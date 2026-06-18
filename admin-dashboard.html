@@ -338,13 +338,13 @@
 
         <!-- SELETOR DE PROVEDOR -->
         <div style="display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap;">
-          <label class="provedor-opt" id="optResend">
-            <input type="radio" name="emailProvedor" value="resend" id="radioResend">
+          <label class="provedor-opt" id="optBrevo">
+            <input type="radio" name="emailProvedor" value="brevo" id="radioBrevo">
             <span class="provedor-label">
               <span class="provedor-icon">🚀</span>
               <span>
-                <strong>Resend</strong>
-                <small>3.000 e-mails/mês grátis</small>
+                <strong>Brevo</strong>
+                <small>300 e-mails/dia grátis</small>
               </span>
             </span>
           </label>
@@ -372,12 +372,15 @@
           </div>
         </div>
 
-        <!-- CAMPOS RESEND -->
-        <div id="painelResend">
+        <!-- CAMPOS BREVO -->
+        <div id="painelBrevo">
+          <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#1E40AF">
+            Emails enviados automaticamente — sem abrir Outlook, sem clicar por destinatário. HTML completo preservado. Plano gratuito: 300 emails/dia.
+          </div>
           <div class="form-group">
-            <label>Resend — API Key</label>
-            <input type="password" id="cfgResendApiKey" placeholder="re_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
-            <span class="cfg-hint"><a href="https://resend.com" target="_blank">resend.com</a> → API Keys → Create API Key. Teste com remetente <code>onboarding@resend.dev</code> antes de verificar seu domínio.</span>
+            <label>Brevo — Chave de API</label>
+            <input type="password" id="cfgBrevoApiKey" placeholder="xkeysib-…" autocomplete="off">
+            <span class="cfg-hint">Gerada em <a href="https://brevo.com" target="_blank">brevo.com</a> → SMTP &amp; API → API Keys. O e-mail remetente deve estar verificado na conta Brevo.</span>
           </div>
         </div>
 
@@ -1274,7 +1277,7 @@ async function deletarFerramenta(id, nome) {
 const _CFG_MAP = {
     email_remetente: 'cfgEmailRemetente',
     nome_remetente:  'cfgNomeRemetente',
-    resend_api_key:  'cfgResendApiKey',
+    brevo_api_key:   'cfgBrevoApiKey',
     smtp_host:       'cfgSmtpHost',
     smtp_porta:      'cfgSmtpPorta',
     smtp_seguranca:  'cfgSmtpSeguranca',
@@ -1285,10 +1288,10 @@ const _CFG_MAP = {
 
 function _aplicarProvedor(provedor) {
     const isSmtp = provedor === 'smtp';
-    document.getElementById('radioResend').checked = !isSmtp;
-    document.getElementById('radioSmtp').checked   =  isSmtp;
-    document.getElementById('painelResend').style.display = isSmtp ? 'none' : 'block';
-    document.getElementById('painelSmtp').style.display   = isSmtp ? 'block' : 'none';
+    document.getElementById('radioBrevo').checked = !isSmtp;
+    document.getElementById('radioSmtp').checked  =  isSmtp;
+    document.getElementById('painelBrevo').style.display = isSmtp ? 'none' : 'block';
+    document.getElementById('painelSmtp').style.display  = isSmtp ? 'block' : 'none';
 }
 
 async function loadConfiguracoes() {
@@ -1306,7 +1309,7 @@ async function loadConfiguracoes() {
         if (el) el.value = map[chave] || '';
     });
 
-    _aplicarProvedor(map.email_provedor || 'resend');
+    _aplicarProvedor(map.email_provedor || 'brevo');
 }
 
 // Toggle de provedor
@@ -1334,12 +1337,12 @@ async function _salvarChaves(chaves, statusElId, msg) {
 }
 
 document.getElementById('btnSalvarEmail').addEventListener('click', async () => {
-    const provedor = document.querySelector('input[name="emailProvedor"]:checked')?.value || 'resend';
+    const provedor = document.querySelector('input[name="emailProvedor"]:checked')?.value || 'brevo';
     const auth = JSON.parse(sessionStorage.getItem('adminAuth') || '{}');
     const statusEl = document.getElementById('cfgEmailStatus');
 
     // Salvar provedor selecionado + todos os campos de e-mail
-    const chaves = ['email_remetente','nome_remetente','resend_api_key',
+    const chaves = ['email_remetente','nome_remetente','brevo_api_key',
                     'smtp_host','smtp_porta','smtp_seguranca','smtp_usuario','smtp_senha'];
 
     const upserts = [
@@ -1363,24 +1366,51 @@ document.getElementById('btnSalvarWhatsApp').addEventListener('click', () =>
 );
 
 document.getElementById('btnTestarEmail').addEventListener('click', async () => {
-    const to        = document.getElementById('cfgEmailRemetente').value.trim();
-    const apiKey    = document.getElementById('cfgResendApiKey').value.trim();
-    const statusEl  = document.getElementById('cfgEmailStatus');
+    const provedor = document.querySelector('input[name="emailProvedor"]:checked')?.value || 'brevo';
+    const statusEl = document.getElementById('cfgEmailStatus');
 
-    if (!to || !apiKey) {
-        statusEl.className = 'cfg-status err';
-        statusEl.textContent = '✕ Salve o e-mail remetente e a API Key antes de testar.';
-        setTimeout(() => { statusEl.className = 'cfg-status'; }, 5000);
+    if (provedor === 'brevo') {
+        const apiKey = document.getElementById('cfgBrevoApiKey').value.trim();
+        if (!apiKey) {
+            statusEl.className = 'cfg-status err';
+            statusEl.textContent = '✕ Informe a chave de API do Brevo antes de testar.';
+            setTimeout(() => { statusEl.className = 'cfg-status'; }, 5000);
+            return;
+        }
+        statusEl.className = 'cfg-status ok';
+        statusEl.textContent = '⏳ Verificando conexão com o Brevo…';
+        try {
+            const resp = await fetch('https://api.brevo.com/v3/account', {
+                headers: { 'api-key': apiKey, 'accept': 'application/json' }
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || `HTTP ${resp.status}`);
+            }
+            const acc = await resp.json();
+            statusEl.className = 'cfg-status ok';
+            statusEl.textContent = `✓ Conexão OK — conta: ${acc.email || acc.companyName || 'Brevo'}`;
+        } catch (err) {
+            statusEl.className = 'cfg-status err';
+            statusEl.textContent = '✕ Falha: ' + (err.message || String(err));
+        }
+        setTimeout(() => { statusEl.className = 'cfg-status'; }, 6000);
         return;
     }
 
-    const provedor = document.querySelector('input[name="emailProvedor"]:checked')?.value || 'resend';
+    // SMTP — dispara via edge function
+    const to = document.getElementById('cfgEmailRemetente').value.trim();
+    if (!to) {
+        statusEl.className = 'cfg-status err';
+        statusEl.textContent = '✕ Informe o e-mail remetente antes de testar.';
+        setTimeout(() => { statusEl.className = 'cfg-status'; }, 5000);
+        return;
+    }
     statusEl.className = 'cfg-status ok';
-    statusEl.textContent = `⏳ Enviando teste via ${provedor === 'smtp' ? 'SMTP' : 'Resend'}...`;
-
+    statusEl.textContent = '⏳ Enviando teste via SMTP…';
     try {
-        // Salvar config antes de testar (garante que o servidor use os valores atuais)
-        await _salvarChaves(['email_remetente','nome_remetente','resend_api_key'], 'cfgEmailStatus', '');
+        await _salvarChaves(['email_remetente','nome_remetente',
+                             'smtp_host','smtp_porta','smtp_seguranca','smtp_usuario','smtp_senha'], 'cfgEmailStatus', '');
 
         const { data: { session } } = await sb.auth.getSession();
         if (!session) throw new Error('Sessão expirada. Faça login novamente.');
@@ -1403,12 +1433,10 @@ document.getElementById('btnTestarEmail').addEventListener('click', async () => 
                 },
             }),
         });
-
         const json = await resp.json();
         if (!json.ok) throw new Error(json.error);
-
         statusEl.className = 'cfg-status ok';
-        statusEl.textContent = `✓ E-mail de teste enviado para ${to} via ${provedor === 'smtp' ? 'SMTP' : 'Resend'}`;
+        statusEl.textContent = `✓ E-mail de teste enviado para ${to} via SMTP`;
     } catch (err) {
         statusEl.className = 'cfg-status err';
         statusEl.textContent = '✕ Falha: ' + (err.message || String(err));
