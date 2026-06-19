@@ -448,14 +448,74 @@ window.renderizarMapeamento = function() {
             .join('');
         return `<div class="mapa-item">
             <label>${CAMPOS_LABEL[campo]}</label>
-            <select onchange="state.mapping['${campo}']=this.value==='(não usar)'?'':this.value">
+            <select onchange="state.mapping['${campo}']=this.value==='(não usar)'?'':this.value;atualizarBotaoGerar()">
                 ${opcoesComSel}
             </select>
         </div>`;
     }).join('');
+    if (typeof atualizarBotaoGerar === 'function') atualizarBotaoGerar();
 };
 
 window.toggleTerceiroTurno = function(checked) {
     state.terceiroTurno = checked;
     renderizarMapeamento();
+    atualizarBotaoGerar();
+};
+
+// ===== ETAPA 4 — EMPREGADO =====
+window.renderizarBuscaEmpregado = function() {
+    ocultarMsg('msgEmpregado');
+    document.getElementById('buscaEmpregado').value =
+        state.empregado ? state.empregado.nome_empregado : '';
+    document.getElementById('codigoEmpregadoOut').value =
+        state.empregado ? (state.empregado.codigo_empregado || '') : (state.codigoManual || '');
+    atualizarBotaoGerar();
+    document.addEventListener('click', e => {
+        if (!e.target.closest('#buscaEmpregado') && !e.target.closest('#listaEmpregados'))
+            document.getElementById('listaEmpregados').style.display = 'none';
+    }, { once: false });
+};
+
+window.filtrarEmpregados = function(termo) {
+    const lista = document.getElementById('listaEmpregados');
+    const norm = termo.trim().toLowerCase();
+    const filtrados = norm
+        ? state.empregados.filter(e =>
+            e.nome_empregado.toLowerCase().includes(norm) ||
+            (e.codigo_empregado || '').toLowerCase().includes(norm))
+        : state.empregados.slice(0, 20);
+    if (!filtrados.length) { lista.style.display = 'none'; return; }
+    lista.innerHTML = filtrados.map(e =>
+        `<div class="autocomplete-item"
+              onclick="selecionarEmpregado('${e.codigo_empregado}','${e.nome_empregado.replace(/'/g,"\\'")}')">
+            ${e.codigo_empregado ? '<strong>' + e.codigo_empregado + '</strong> — ' : ''}${e.nome_empregado}
+         </div>`
+    ).join('');
+    lista.style.display = 'block';
+};
+
+window.selecionarEmpregado = function(codigo, nome) {
+    state.empregado = { codigo_empregado: codigo, nome_empregado: nome };
+    state.codigoManual = codigo;
+    document.getElementById('buscaEmpregado').value = nome;
+    document.getElementById('codigoEmpregadoOut').value = codigo;
+    document.getElementById('listaEmpregados').style.display = 'none';
+    ocultarMsg('msgEmpregado');
+    if (!codigo) {
+        mostrarMsg('msgEmpregado', 'aviso',
+            'Este empregado não tem código cadastrado. O Controle de Frequência pode não reconhecê-lo na importação automática.');
+    }
+    atualizarBotaoGerar();
+};
+
+window.atualizarCodigoManual = function(valor) {
+    state.codigoManual = valor;
+};
+
+window.atualizarBotaoGerar = function() {
+    const btn = document.getElementById('btnGerar');
+    if (!btn) return;
+    const temEmpregado = !!(state.empregado && state.empregado.nome_empregado);
+    const temMapeamento = !!(state.mapping.data && state.mapping.entrada1 && state.mapping.saida1);
+    btn.disabled = !(temEmpregado && temMapeamento);
 };
