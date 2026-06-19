@@ -181,7 +181,54 @@ function ocultarProgresso() {
     if (wrap) wrap.style.display = 'none';
 }
 
-// Stubs — substituídos nas Tasks 4, 5, 6
-async function extrairExcel(file) { return { headers: [], rows: [] }; }
+// Stubs — substituídos nas Tasks 5, 6
 async function extrairPdf(file)   { return { headers: [], rows: [] }; }
 async function extrairImagem(file){ return { headers: [], rows: [] }; }
+
+// ===== EXTRATOR EXCEL/CSV =====
+function normalizarCelula(header, valor) {
+    if (valor === null || valor === undefined || valor === '') return '';
+    // Detecta se é um serial de tempo do Excel (fração de 24h, < 1)
+    if (typeof valor === 'number' && valor < 1 && valor >= 0) {
+        const total = Math.round(valor * 24 * 60);
+        const h = Math.floor(total / 60) % 24;
+        const m = total % 60;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    }
+    // Serial de data do Excel (inteiro >= 1)
+    if (typeof valor === 'number' && valor >= 1) {
+        try {
+            const parsed = XLSX.SSF.parse_date_code(valor);
+            const d = String(parsed.d).padStart(2,'0');
+            const mo = String(parsed.m).padStart(2,'0');
+            return `${d}/${mo}/${parsed.y}`;
+        } catch { return String(valor); }
+    }
+    const s = String(valor).trim();
+    // Normaliza hora HH:MM
+    const mHora = s.match(/^(\d{1,2}):(\d{2})/);
+    if (mHora) return `${mHora[1].padStart(2,'0')}:${mHora[2]}`;
+    return s;
+}
+
+async function extrairExcel(file) {
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    // Encontra a linha de cabeçalho (primeira linha não-vazia)
+    let headerIdx = 0;
+    for (let i = 0; i < Math.min(raw.length, 10); i++) {
+        if (raw[i].some(c => String(c).trim())) { headerIdx = i; break; }
+    }
+
+    const headers = raw[headerIdx].map((h, i) => String(h).trim() || ('Col' + i));
+    const dataRows = raw.slice(headerIdx + 1).filter(r => r.some(c => String(c).trim()));
+
+    const rows = dataRows.map(r =>
+        Object.fromEntries(headers.map((h, i) => [h, normalizarCelula(h, r[i])]))
+    );
+
+    return { headers, rows };
+}
