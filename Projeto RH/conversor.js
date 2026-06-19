@@ -273,6 +273,73 @@ function parsearTextoPDF(texto) {
     return { headers, rows: rows.filter(r => r['Data'] || r['H1']) };
 }
 
+// ===== ETAPA 3 — TABELA EDITÁVEL =====
+window.renderizarTabela = function renderizarTabela() {
+    const thead = document.getElementById('editThead');
+    const tbody = document.getElementById('editTbody');
+    if (!thead || !tbody) return;
+
+    thead.innerHTML = '<tr>' +
+        '<th style="width:30px;"></th>' +
+        state.headers.map(h => `<th>${h}</th>`).join('') +
+        '</tr>';
+
+    tbody.innerHTML = '';
+    state.rawRows.forEach((row, ri) => {
+        tbody.appendChild(criarLinhaTabela(row, ri));
+    });
+};
+
+function criarLinhaTabela(row, ri) {
+    const tr = document.createElement('tr');
+    const tdDel = document.createElement('td');
+    const btnDel = document.createElement('button');
+    btnDel.className = 'btn-del-row';
+    btnDel.textContent = '✕';
+    btnDel.onclick = () => removerLinha(ri);
+    tdDel.appendChild(btnDel);
+    tr.appendChild(tdDel);
+
+    state.headers.forEach(h => {
+        const td = document.createElement('td');
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = row[h] || '';
+        inp.dataset.row = ri;
+        inp.dataset.col = h;
+        inp.oninput = function() {
+            state.rawRows[this.dataset.row][this.dataset.col] = this.value;
+        };
+        td.appendChild(inp);
+        tr.appendChild(td);
+    });
+
+    return tr;
+}
+
+function removerLinha(ri) {
+    state.rawRows.splice(ri, 1);
+    renderizarTabela();
+}
+
+window.adicionarLinha = function() {
+    const linhaVazia = Object.fromEntries(state.headers.map(h => [h, '']));
+    state.rawRows.push(linhaVazia);
+    renderizarTabela();
+    const tbody = document.getElementById('editTbody');
+    const ultimaLinha = tbody.lastElementChild;
+    if (ultimaLinha) {
+        const primeiro = ultimaLinha.querySelector('input');
+        if (primeiro) primeiro.focus();
+    }
+};
+
+window.prepararEtapa4 = function() {
+    mostrarEtapa(4);
+    if (typeof renderizarMapeamento === 'function') renderizarMapeamento();
+    if (typeof renderizarBuscaEmpregado === 'function') renderizarBuscaEmpregado();
+};
+
 // ===== EXTRATOR EXCEL/CSV =====
 function normalizarCelula(header, valor) {
     if (valor === null || valor === undefined || valor === '') return '';
