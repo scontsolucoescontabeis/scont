@@ -244,7 +244,7 @@ async function extrairPdf(file) {
     }
 
     const charsPerPage = textoTotal.replace(/\s/g, '').length / pdf.numPages;
-    if (charsPerPage < 30) {
+    if (charsPerPage < 50) {
         mostrarProgresso(70, 'PDF escaneado — iniciando OCR...');
         return extrairPdfOCR(buffer);
     }
@@ -556,6 +556,7 @@ window.destacarCelulasInvalidas = function(erros) {
         if (tr) tr.querySelectorAll('input').forEach(i => i.classList.add('invalido'));
     });
     mostrarEtapa(3);
+    mostrarMsg('msgStep3', 'erro', `${erros.length} linha(s) com dados inválidos. Corrija as células destacadas em vermelho.`);
 };
 
 window.gerarExcel = function() {
@@ -576,6 +577,9 @@ window.gerarExcel = function() {
         return;
     }
     const codigoEmp = state.empregado?.codigo_empregado || state.codigoManual || '';
+    if (!codigoEmp) {
+        mostrarMsg('msgStep4', 'aviso', 'Empregado sem código: a aba será nomeada só com o nome. O Controle de Frequência pode não reconhecer o empregado na importação automática.');
+    }
 
     // 3. Montar linhas validadas
     const camposDestino = state.terceiroTurno
@@ -604,7 +608,6 @@ window.gerarExcel = function() {
     });
 
     if (erros.length) {
-        mostrarMsg('msgEmpregado', 'erro', 'Corrija os erros na tabela antes de exportar:\n• ' + erros.slice(0, 5).join('\n• '));
         window.destacarCelulasInvalidas(erros);
         return;
     }

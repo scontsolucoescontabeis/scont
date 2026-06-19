@@ -46,6 +46,8 @@
         .form-input:focus{outline:none;border-color:#8B3A3A;box-shadow:0 0 0 3px rgba(139,58,58,0.1);}
         .section-box{background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:20px;margin-bottom:20px;}
         .section-box h3{color:#2C3E50;font-size:15px;margin:0 0 16px;}
+        .btn-del-row{background:none;border:none;color:#c0392b;font-size:1rem;cursor:pointer;padding:0 4px;line-height:1;}
+        .btn-del-row:hover{color:#922b21;}
     </style>
 </head>
 <body>
@@ -184,6 +186,7 @@
                 <div class="msg-box" id="msgEmpregado"></div>
             </div>
 
+            <div class="msg-box" id="msgStep4"></div>
             <div class="wizard-nav">
                 <button class="btn-voltar" onclick="mostrarEtapa(3)">← Voltar</button>
                 <button class="btn-gerar" id="btnGerar" onclick="gerarExcel()">⬇️ Gerar Excel</button>
