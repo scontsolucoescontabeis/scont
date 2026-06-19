@@ -116,3 +116,72 @@ function atualizarBotaoProximo1() {
 window.avancarEtapa2 = function() {
     mostrarEtapa(2);
 };
+
+// ===== ETAPA 2 — UPLOAD + ROTEAMENTO =====
+window.handleArquivo = async function(file) {
+    if (!file) return;
+    ocultarMsg('msgStep2');
+    mostrarProgresso(5, 'Detectando tipo do arquivo...');
+
+    try {
+        const tipo = detectarTipo(file);
+        let resultado;
+
+        if (tipo === 'excel') {
+            mostrarProgresso(30, 'Lendo planilha...');
+            resultado = await extrairExcel(file);
+        } else if (tipo === 'pdf') {
+            mostrarProgresso(20, 'Lendo PDF...');
+            resultado = await extrairPdf(file);
+        } else if (tipo === 'imagem') {
+            mostrarProgresso(20, 'Iniciando OCR (pode levar alguns segundos)...');
+            resultado = await extrairImagem(file);
+        } else {
+            throw new Error('Formato não suportado: ' + file.name);
+        }
+
+        state.headers = resultado.headers;
+        state.rawRows = resultado.rows;
+
+        if (!state.rawRows.length) {
+            ocultarProgresso();
+            mostrarMsg('msgStep2', 'aviso', 'Nenhum dado detectado no arquivo. Verifique se o arquivo está correto.');
+            return;
+        }
+
+        ocultarProgresso();
+        mostrarEtapa(3);
+        renderizarTabela();
+    } catch (e) {
+        ocultarProgresso();
+        mostrarMsg('msgStep2', 'erro', 'Erro ao processar arquivo: ' + e.message);
+        console.error(e);
+    }
+};
+
+function detectarTipo(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (['xlsx', 'xls', 'csv'].includes(ext)) return 'excel';
+    if (ext === 'pdf') return 'pdf';
+    if (['png', 'jpg', 'jpeg', 'webp'].includes(ext)) return 'imagem';
+    return 'desconhecido';
+}
+
+function mostrarProgresso(pct, label) {
+    const wrap = document.getElementById('progressWrap');
+    if (wrap) wrap.style.display = 'block';
+    const fill = document.getElementById('progressFill');
+    if (fill) fill.style.width = pct + '%';
+    const lbl = document.getElementById('progressLabel');
+    if (lbl) lbl.textContent = label || 'Processando...';
+}
+
+function ocultarProgresso() {
+    const wrap = document.getElementById('progressWrap');
+    if (wrap) wrap.style.display = 'none';
+}
+
+// Stubs — substituídos nas Tasks 4, 5, 6
+async function extrairExcel(file) { return { headers: [], rows: [] }; }
+async function extrairPdf(file)   { return { headers: [], rows: [] }; }
+async function extrairImagem(file){ return { headers: [], rows: [] }; }
