@@ -387,3 +387,75 @@ async function extrairExcel(file) {
 
     return { headers, rows };
 }
+
+// ===== ETAPA 4 — MAPEAMENTO DE COLUNAS =====
+const FUZZY_VARS = {
+    data:     ['data','dt','dia','date'],
+    entrada1: ['entrada1','entrada','e1','in1','batida1','batidaentrada','horariodeentrada'],
+    saida1:   ['saida1','saida','s1','out1','batida2','batidasaida','horariodesaida'],
+    entrada2: ['entrada2','e2','in2','batida3','h1'],
+    saida2:   ['saida2','s2','out2','batida4','h2'],
+    entrada3: ['entrada3','e3','in3','batida5','h3'],
+    saida3:   ['saida3','s3','out3','batida6','h4']
+};
+
+function normFuzzy(s) {
+    return String(s).toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/\s+/g, '').replace(/[^a-z0-9]/g, '');
+}
+
+function detectarMapeamento(headers) {
+    const mapping = { data:'', entrada1:'', saida1:'', entrada2:'', saida2:'', entrada3:'', saida3:'' };
+    const usados = new Set();
+    for (const [campo, vars] of Object.entries(FUZZY_VARS)) {
+        for (const h of headers) {
+            if (usados.has(h)) continue;
+            const hn = normFuzzy(h);
+            if (vars.some(v => hn.includes(v))) {
+                mapping[campo] = h;
+                usados.add(h);
+                break;
+            }
+        }
+    }
+    return mapping;
+}
+
+const CAMPOS_LABEL = {
+    data:     'Data *',
+    entrada1: 'Entrada 1 *',
+    saida1:   'Saída 1 *',
+    entrada2: 'Entrada 2',
+    saida2:   'Saída 2',
+    entrada3: 'Entrada 3',
+    saida3:   'Saída 3'
+};
+
+window.renderizarMapeamento = function() {
+    state.mapping = detectarMapeamento(state.headers);
+    const grid = document.getElementById('mapaGrid');
+    if (!grid) return;
+
+    const campos = state.terceiroTurno
+        ? ['data','entrada1','saida1','entrada2','saida2','entrada3','saida3']
+        : ['data','entrada1','saida1','entrada2','saida2'];
+
+    grid.innerHTML = campos.map(campo => {
+        const selecionado = state.mapping[campo] || '(não usar)';
+        const opcoesComSel = ['(não usar)', ...state.headers]
+            .map(h => `<option value="${h}" ${h === selecionado ? 'selected' : ''}>${h}</option>`)
+            .join('');
+        return `<div class="mapa-item">
+            <label>${CAMPOS_LABEL[campo]}</label>
+            <select onchange="state.mapping['${campo}']=this.value==='(não usar)'?'':this.value">
+                ${opcoesComSel}
+            </select>
+        </div>`;
+    }).join('');
+};
+
+window.toggleTerceiroTurno = function(checked) {
+    state.terceiroTurno = checked;
+    renderizarMapeamento();
+};
