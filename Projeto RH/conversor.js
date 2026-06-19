@@ -527,7 +527,7 @@ window.atualizarBotaoGerar = function() {
 };
 
 // ===== GERAÇÃO EXCEL =====
-const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
 function calcularDiaSemana(dataStr) {
     const partes = dataStr.split('/');
@@ -637,10 +637,13 @@ window.gerarExcel = function() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-    // Forçar coluna Data (col 0) como texto — previne auto-conversão do Excel
+    // Forçar todas as células de dados como texto — previne auto-conversão do Excel
+    const numCols = aoa[0].length;
     for (let r = 1; r < aoa.length; r++) {
-        const addr = XLSX.utils.encode_cell({ r, c: 0 });
-        ws[addr] = { t: 's', v: aoa[r][0] };
+        for (let c = 0; c < numCols; c++) {
+            const addr = XLSX.utils.encode_cell({ r, c });
+            ws[addr] = { t: 's', v: String(aoa[r][c] ?? '') };
+        }
     }
 
     const larguras = state.terceiroTurno
