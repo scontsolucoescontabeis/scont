@@ -525,3 +525,139 @@ window.atualizarBotaoGerar = function() {
     const temMapeamento = !!(state.mapping.data && state.mapping.entrada1 && state.mapping.saida1);
     btn.disabled = !(temEmpregado && temMapeamento);
 };
+
+// ===== GERAÇÃO EXCEL =====
+const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+
+function calcularDiaSemana(dataStr) {
+    const partes = dataStr.split('/');
+    if (partes.length !== 3) return '';
+    const [d, m, y] = partes.map(Number);
+    if (!d || !m || !y) return '';
+    return DIAS_SEMANA[new Date(y, m - 1, d).getDay()] || '';
+}
+
+function validarHora(v) {
+    return !v || /^([01]\d|2[0-3]):([0-5]\d)$/.test(v);
+}
+
+function validarData(v) {
+    return !v || /^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/.test(v);
+}
+
+window.destacarCelulasInvalidas = function(erros) {
+    // Remove marcações anteriores
+    document.querySelectorAll('#editTbody input').forEach(inp => inp.classList.remove('invalido'));
+    erros.forEach(msg => {
+        const m = msg.match(/Linha (\d+)/);
+        if (!m) return;
+        const ri = parseInt(m[1]) - 1;
+        const tr = document.querySelectorAll('#editTbody tr')[ri];
+        if (tr) tr.querySelectorAll('input').forEach(i => i.classList.add('invalido'));
+    });
+    mostrarEtapa(3);
+};
+
+window.gerarExcel = function() {
+    // 1. Validar mapeamento mínimo
+    if (!state.mapping.data) {
+        mostrarMsg('msgEmpregado', 'erro', 'Mapeie a coluna "Data" antes de gerar o Excel.');
+        return;
+    }
+    if (!state.mapping.entrada1 || !state.mapping.saida1) {
+        mostrarMsg('msgEmpregado', 'erro', 'Mapeie pelo menos "Entrada 1" e "Saída 1".');
+        return;
+    }
+
+    // 2. Validar empregado
+    const nomeEmp = state.empregado?.nome_empregado || document.getElementById('buscaEmpregado').value.trim();
+    if (!nomeEmp) {
+        mostrarMsg('msgEmpregado', 'erro', 'Informe o nome do empregado.');
+        return;
+    }
+    const codigoEmp = state.empregado?.codigo_empregado || state.codigoManual || '';
+
+    // 3. Montar linhas validadas
+    const camposDestino = state.terceiroTurno
+        ? ['data','entrada1','saida1','entrada2','saida2','entrada3','saida3']
+        : ['data','entrada1','saida1','entrada2','saida2'];
+
+    const erros = [];
+    const linhasValidas = [];
+
+    state.rawRows.forEach((row, ri) => {
+        const dataVal = row[state.mapping.data] || '';
+        if (!dataVal) return; // pula linhas sem data
+
+        const obj = { data: dataVal };
+        camposDestino.slice(1).forEach(c => {
+            obj[c] = state.mapping[c] ? (row[state.mapping[c]] || '') : '';
+        });
+
+        if (!validarData(obj.data)) erros.push(`Linha ${ri + 1}: data inválida "${obj.data}"`);
+        ['entrada1','saida1','entrada2','saida2','entrada3','saida3'].forEach(c => {
+            if (obj[c] && !validarHora(obj[c]))
+                erros.push(`Linha ${ri + 1}: horário inválido em ${c} "${obj[c]}"`);
+        });
+
+        linhasValidas.push(obj);
+    });
+
+    if (erros.length) {
+        mostrarMsg('msgEmpregado', 'erro', 'Corrija os erros na tabela antes de exportar:\n• ' + erros.slice(0, 5).join('\n• '));
+        window.destacarCelulasInvalidas(erros);
+        return;
+    }
+
+    if (!linhasValidas.length) {
+        mostrarMsg('msgEmpregado', 'erro', 'Nenhuma linha com data válida encontrada.');
+        return;
+    }
+
+    // 4. Construir cabeçalho do Excel de saída
+    const header = state.terceiroTurno
+        ? ['Data','Dia da Semana','Entrada 1','Saída 1','Entrada 2','Saída 2','Entrada 3','Saída 3']
+        : ['Data','Dia da Semana','Entrada 1','Saída 1','Entrada 2','Saída 2'];
+
+    // 5. Construir linhas de dados
+    const aoa = [header, ...linhasValidas.map(obj => {
+        const base = [
+            obj.data,
+            calcularDiaSemana(obj.data),
+            obj.entrada1 || '',
+            obj.saida1   || '',
+            obj.entrada2 || '',
+            obj.saida2   || ''
+        ];
+        if (state.terceiroTurno) { base.push(obj.entrada3 || ''); base.push(obj.saida3 || ''); }
+        return base;
+    })];
+
+    // 6. Criar workbook SheetJS
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // Forçar coluna Data (col 0) como texto — previne auto-conversão do Excel
+    for (let r = 1; r < aoa.length; r++) {
+        const addr = XLSX.utils.encode_cell({ r, c: 0 });
+        ws[addr] = { t: 's', v: aoa[r][0] };
+    }
+
+    const larguras = state.terceiroTurno
+        ? [{wch:13},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12},{wch:12}]
+        : [{wch:13},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12}];
+    ws['!cols'] = larguras;
+
+    // Nome da aba: "{codigo} {nome}" ou "{nome}" — máx 31 chars (limite Excel)
+    const nomeAba = (codigoEmp ? codigoEmp + ' ' + nomeEmp : nomeEmp).substring(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, nomeAba);
+
+    // 7. Gerar nome do arquivo e disparar download
+    const [mm, aaaa] = state.competencia.split('/');
+    const nomeArq = codigoEmp
+        ? `FolhaPonto_${codigoEmp}_${nomeEmp.replace(/\s+/g,'_')}_${mm}-${aaaa}.xlsx`
+        : `FolhaPonto_${nomeEmp.replace(/\s+/g,'_')}_${mm}-${aaaa}.xlsx`;
+    XLSX.writeFile(wb, nomeArq);
+
+    mostrarMsg('msgEmpregado', 'ok', `✓ "${nomeArq}" gerado com ${linhasValidas.length} linha(s). Importe no Controle de Frequência usando "Acrescentar".`);
+};
