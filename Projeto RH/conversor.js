@@ -181,8 +181,44 @@ function ocultarProgresso() {
     if (wrap) wrap.style.display = 'none';
 }
 
-// Stub — substituído na Task 6
-async function extrairImagem(file){ return { headers: [], rows: [] }; }
+// ===== EXTRATOR IMAGEM (OCR) =====
+async function extrairImagem(file) {
+    mostrarProgresso(20, 'Reconhecendo texto (OCR)...');
+    const texto = await rodarOCR(file);
+    return parsearTextoPDF(texto);
+}
+
+async function extrairPdfOCR(arrayBuffer) {
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+    let textoTotal = '';
+
+    for (let p = 1; p <= pdf.numPages; p++) {
+        mostrarProgresso(20 + Math.round((p / pdf.numPages) * 60), `OCR página ${p}/${pdf.numPages}...`);
+        const page = await pdf.getPage(p);
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        textoTotal += await rodarOCR(canvas) + '\n';
+    }
+
+    return parsearTextoPDF(textoTotal);
+}
+
+async function rodarOCR(fonte) {
+    const { data: { text } } = await Tesseract.recognize(fonte, 'por', {
+        logger: m => {
+            if (m.status === 'recognizing text') {
+                mostrarProgresso(
+                    20 + Math.round(m.progress * 70),
+                    `OCR: ${Math.round(m.progress * 100)}%`
+                );
+            }
+        }
+    });
+    return text;
+}
 
 // ===== EXTRATOR PDF DIGITAL =====
 async function extrairPdf(file) {
