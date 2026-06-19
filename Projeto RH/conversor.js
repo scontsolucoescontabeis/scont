@@ -181,9 +181,61 @@ function ocultarProgresso() {
     if (wrap) wrap.style.display = 'none';
 }
 
-// Stubs — substituídos nas Tasks 5, 6
-async function extrairPdf(file)   { return { headers: [], rows: [] }; }
+// Stub — substituído na Task 6
 async function extrairImagem(file){ return { headers: [], rows: [] }; }
+
+// ===== EXTRATOR PDF DIGITAL =====
+async function extrairPdf(file) {
+    const buffer = await file.arrayBuffer();
+    mostrarProgresso(30, 'Extraindo texto do PDF...');
+
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+    let textoTotal = '';
+    for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        const linhaPorY = {};
+        content.items.forEach(item => {
+            const y = Math.round(item.transform[5]);
+            linhaPorY[y] = (linhaPorY[y] || []);
+            linhaPorY[y].push({ x: item.transform[4], str: item.str });
+        });
+        const linhasOrdenadas = Object.keys(linhaPorY)
+            .sort((a, b) => b - a)
+            .map(y => linhaPorY[y].sort((a, b) => a.x - b.x).map(i => i.str).join(' '));
+        textoTotal += linhasOrdenadas.join('\n') + '\n';
+        mostrarProgresso(30 + Math.round((p / pdf.numPages) * 40), `Lendo página ${p}/${pdf.numPages}...`);
+    }
+
+    const charsPerPage = textoTotal.replace(/\s/g, '').length / pdf.numPages;
+    if (charsPerPage < 30) {
+        mostrarProgresso(70, 'PDF escaneado — iniciando OCR...');
+        return extrairPdfOCR(buffer);
+    }
+
+    return parsearTextoPDF(textoTotal);
+}
+
+function parsearTextoPDF(texto) {
+    const DATA_RE = /\b(\d{2}\/\d{2}\/\d{4})\b/;
+    const HORA_RE = /\b(\d{1,2}:\d{2})\b/g;
+    const linhas = texto.split('\n').map(l => l.trim()).filter(l => l);
+    const rows = [];
+
+    for (const linha of linhas) {
+        const dataMatch = linha.match(DATA_RE);
+        const horas = [...linha.matchAll(HORA_RE)].map(m =>
+            m[1].padStart(5, '0').replace(/^(\d):/, '0$1:')
+        );
+        if (!dataMatch && !horas.length) continue;
+        const row = { 'Data': dataMatch ? dataMatch[1] : '' };
+        ['H1','H2','H3','H4','H5','H6'].forEach((k, i) => { row[k] = horas[i] || ''; });
+        rows.push(row);
+    }
+
+    const headers = ['Data', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'];
+    return { headers, rows: rows.filter(r => r['Data'] || r['H1']) };
+}
 
 // ===== EXTRATOR EXCEL/CSV =====
 function normalizarCelula(header, valor) {
