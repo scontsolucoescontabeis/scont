@@ -463,6 +463,8 @@ window.toggleTerceiroTurno = function(checked) {
 };
 
 // ===== ETAPA 4 — EMPREGADO =====
+let _clickFechaEmpregado = null;
+
 window.renderizarBuscaEmpregado = function() {
     ocultarMsg('msgEmpregado');
     document.getElementById('buscaEmpregado').value =
@@ -470,10 +472,12 @@ window.renderizarBuscaEmpregado = function() {
     document.getElementById('codigoEmpregadoOut').value =
         state.empregado ? (state.empregado.codigo_empregado || '') : (state.codigoManual || '');
     atualizarBotaoGerar();
-    document.addEventListener('click', e => {
+    if (_clickFechaEmpregado) document.removeEventListener('click', _clickFechaEmpregado);
+    _clickFechaEmpregado = e => {
         if (!e.target.closest('#buscaEmpregado') && !e.target.closest('#listaEmpregados'))
             document.getElementById('listaEmpregados').style.display = 'none';
-    }, { once: false });
+    };
+    document.addEventListener('click', _clickFechaEmpregado);
 };
 
 window.filtrarEmpregados = function(termo) {
@@ -487,7 +491,9 @@ window.filtrarEmpregados = function(termo) {
     if (!filtrados.length) { lista.style.display = 'none'; return; }
     lista.innerHTML = filtrados.map(e =>
         `<div class="autocomplete-item"
-              onclick="selecionarEmpregado('${e.codigo_empregado}','${e.nome_empregado.replace(/'/g,"\\'")}')">
+              data-codigo="${(e.codigo_empregado || '').replace(/"/g, '&quot;')}"
+              data-nome="${(e.nome_empregado || '').replace(/"/g, '&quot;')}"
+              onclick="selecionarEmpregado(this.dataset.codigo, this.dataset.nome)">
             ${e.codigo_empregado ? '<strong>' + e.codigo_empregado + '</strong> — ' : ''}${e.nome_empregado}
          </div>`
     ).join('');
