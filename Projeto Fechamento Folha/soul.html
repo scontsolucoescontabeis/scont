@@ -3,13 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quadrante – Fechamento Folha – SCONT</title>
+    <title>SOUL TELECOM – Fechamento Folha – SCONT</title>
     <link rel="stylesheet" href="styles.css">
     <script src="../supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../portal-auth-guard.js"></script>
     <!-- SheetJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #1B4F8A;
+            --primary-dark: #143A6B;
+            --background-color: #EEF4FB;
+        }
+    </style>
 </head>
 <body>
 
@@ -22,7 +29,7 @@
     <div class="sidebar-brand">
         <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
         <h2>Fechamento Folha</h2>
-        <p>Quadrante Etiquetas · 453</p>
+        <p>SOUL TELECOM · 114</p>
     </div>
 
     <nav class="sidebar-nav">
@@ -81,8 +88,8 @@
 
     <div class="sidebar-footer">
         <div class="sidebar-footer-info">
-            <strong>Código 453</strong>
-            Quadrante Etiquetas
+            <strong>114</strong>
+            SOUL TELECOM
         </div>
     </div>
 </aside>
@@ -93,8 +100,8 @@
     <!-- PAGE HEADER -->
     <div class="page-header">
         <div>
-            <h1>Fechamento Folha · Quadrante Etiquetas</h1>
-            <div class="page-header-sub" id="headerSubtitle">Código 453 · Upload e processamento da planilha</div>
+            <h1>Fechamento Folha · SOUL TELECOM</h1>
+            <div class="page-header-sub" id="headerSubtitle">SOUL TELECOM · 114 · Upload e processamento da planilha</div>
         </div>
     </div>
 
@@ -102,13 +109,12 @@
     <div id="telaProcessamento">
     <div class="container">
 
-        <!-- PAINEL: ENVIOS DO FORMULÁRIO -->
-        <div class="step-card" id="painelEnvios" style="border-left-color:#27AE60;">
-            <div class="step-title" style="color:#27AE60;">
+        <!-- PAINEL: ENVIOS -->
+        <div class="step-card" id="painelEnvios" style="border-left-color:#1B4F8A;">
+            <div class="step-title" style="color:#1B4F8A;">
                 <span style="font-size:18px;">📋</span>
                 Processamentos
                 <button onclick="carregarEnvios()" style="margin-left:auto;font-size:12px;padding:5px 12px;border:1px solid var(--border-color);border-radius:6px;background:#fff;cursor:pointer;color:var(--text-primary);">↻ Atualizar</button>
-                <a href="formulario_quadrante.html" class="btn btn-primary btn-small" style="text-decoration:none;margin-left:8px;">✏ Abrir Formulário</a>
             </div>
             <div id="listaEnvios">
                 <div style="color:var(--text-secondary);font-size:13px;padding:10px 0;">Carregando envios...</div>
@@ -137,7 +143,7 @@
                     Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
                 </div>
                 <div class="upload-text" style="font-size:11px; margin-top:4px;">
-                    Formato: .xlsx – Padrão Quadrante (Folha de Pgto Etiquetas)
+                    Formato: .xlsx / .xls – Padrão SOUL TELECOM (Planilha de Apontamento)
                 </div>
                 <div class="upload-filename" id="filenameFolha"></div>
                 <input type="file" id="inputFolha" accept=".xlsx,.xls">
@@ -193,7 +199,6 @@
             <div class="btn-group">
                 <button class="btn btn-secondary" onclick="voltarStep(1)">← Voltar</button>
                 <button class="btn btn-primary" onclick="irStep3()">▶ Gerar TXT</button>
-                <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
             </div>
         </div>
 
@@ -216,75 +221,6 @@
             <div class="btn-group">
                 <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar</button>
                 <button class="btn btn-success" onclick="baixarTXT()">⬇ Baixar TXT</button>
-                <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
-            </div>
-        </div>
-
-        <!-- STEP 4: UPLOAD FÉRIAS -->
-        <div class="step-card" id="step4" style="display:none;">
-            <div class="step-title">
-                <div class="step-number">4</div>
-                Programação de Férias – Upload
-            </div>
-
-            <div class="alert alert-info">
-                Faça o upload da planilha de programação de férias. A ferramenta ordenará os registros pela data de início do gozo.
-            </div>
-
-            <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">
-                Planilha de Férias (Excel) *
-            </label>
-            <div class="upload-area" id="uploadAreaFerias" onclick="document.getElementById('inputFerias').click()">
-                <div class="upload-icon">🏖️</div>
-                <div class="upload-text">
-                    Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
-                </div>
-                <div class="upload-filename" id="filenameFerias"></div>
-                <input type="file" id="inputFerias" accept=".xlsx,.xls">
-            </div>
-
-            <div style="margin-top:16px;">
-                <label style="font-weight:600; font-size:13px; display:block; margin-bottom:5px;">
-                    Coluna de ordenação (data de gozo)
-                </label>
-                <select id="colunaOrdenacao" style="padding:9px; border:1px solid var(--border-color); border-radius:6px; font-size:13px; min-width:250px;">
-                    <option value="">— Detectar automaticamente —</option>
-                </select>
-                <small style="color:var(--text-secondary); font-size:12px; display:block; margin-top:4px;">
-                    Após selecionar o arquivo, as colunas disponíveis serão listadas aqui.
-                </small>
-            </div>
-
-            <div class="btn-group">
-                <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar ao Relatório</button>
-                <button class="btn btn-primary" onclick="processarFerias()">▶ Gerar Relatório de Férias</button>
-            </div>
-        </div>
-
-        <!-- STEP 5: RELATÓRIO FÉRIAS -->
-        <div class="step-card" id="step5" style="display:none;">
-            <div class="step-title">
-                <div class="step-number">5</div>
-                Programação de Férias – Ordenado por Data de Gozo
-            </div>
-
-            <div class="ferias-stats" id="feriasStats"></div>
-
-            <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
-                <input type="text" id="buscaFerias" placeholder="Filtrar por funcionário..."
-                       oninput="filtrarFerias()" style="flex:1; min-width:220px; padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:13px;">
-            </div>
-
-            <div class="table-wrapper">
-                <table id="tabelaFerias">
-                    <thead id="headFerias"></thead>
-                    <tbody id="bodyFerias"></tbody>
-                </table>
-            </div>
-
-            <div class="btn-group">
-                <button class="btn btn-secondary" onclick="voltarStep(4)">← Voltar</button>
-                <button class="btn btn-primary" onclick="imprimirFerias()">🖨️ Imprimir / Salvar PDF</button>
             </div>
         </div>
 
@@ -310,7 +246,7 @@
                 </div>
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Descrição da Rubrica *</label>
-                    <input type="text" id="cfgDescricao" placeholder="Ex: Vale Transporte"
+                    <input type="text" id="cfgDescricao" placeholder="Ex: Horas Extras 50%"
                         style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
                 </div>
                 <div>
@@ -320,17 +256,12 @@
                 </div>
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Tipo de Valor *</label>
-                    <select id="cfgTipoValor" onchange="toggleCfgValorCota()" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                    <select id="cfgTipoValor" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
                         <option value="monetario">Monetário (R$)</option>
                         <option value="minutos">Horas (HH:MM)</option>
                         <option value="dias">Dias</option>
-                        <option value="booleano">Booleano (Sim/Não)</option>
+                        <option value="booleano">Booleano</option>
                     </select>
-                    <div id="cfgValorCotaWrap" style="display:none;margin-top:6px;">
-                        <label style="display:block;font-weight:600;font-size:11px;margin-bottom:3px;color:#2C3E50;">Valor da Cota (R$) *</label>
-                        <input type="number" id="cfgValorCota" placeholder="Ex: 25.00" step="0.01" min="0"
-                            style="width:100%;padding:7px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
-                    </div>
                 </div>
                 <div style="display:flex;align-items:flex-end;">
                     <button class="btn btn-primary" onclick="salvarRubricaConfig()" style="white-space:nowrap;padding:9px 18px;">
@@ -434,6 +365,6 @@
     </div>
 </div>
 
-<script src="quadrante.js"></script>
+<script src="soul.js"></script>
 </body>
 </html>
