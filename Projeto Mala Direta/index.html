@@ -974,6 +974,31 @@ Equipe SCONT"
           <label>Descrição</label>
           <input type="text" id="grupo-descricao" class="form-control" placeholder="Opcional">
         </div>
+
+        <!-- Importar Contatos via Planilha -->
+        <div style="margin-top:20px;border-top:1px solid var(--border-light);padding-top:18px">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">
+            📥 Importar Contatos via Planilha
+          </div>
+          <div style="font-size:12px;color:var(--text-light);margin-bottom:10px">
+            Colunas: <strong>nome</strong> (obrigatório), <code>email</code>, <code>telefone</code>, <code>empresa</code>, <code>cargo</code>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+            <input type="file" id="grupo-excel-file" accept=".xlsx,.xls" class="form-control" style="flex:1"
+              onchange="previewExcelGrupo(this.files[0])">
+            <button type="button" class="btn btn-secondary btn-sm" style="flex-shrink:0;white-space:nowrap"
+              onclick="baixarModeloExcel('contatos')">⬇ Modelo</button>
+          </div>
+          <div id="grupo-excel-preview" style="margin-bottom:10px"></div>
+          <div id="grupo-import-hint" style="display:none;font-size:12px;color:#92400E;background:#FFF7ED;border:1px solid #FED7AA;border-radius:6px;padding:8px 12px;margin-bottom:10px">
+            ⓘ Salve o grupo antes de importar contatos.
+          </div>
+          <div id="grupo-import-resultado" style="margin-bottom:10px"></div>
+          <button type="button" id="btn-import-grupo" class="btn btn-primary btn-sm"
+            onclick="importarContatosParaGrupo()" disabled>
+            📥 Importar Contatos para o Grupo
+          </button>
+        </div>
       </div>
       <div class="modal-foot">
         <button class="btn btn-secondary" onclick="closeModal('modal-grupo')">Cancelar</button>
@@ -1320,7 +1345,7 @@ Equipe SCONT"
   let grupoAtualId = null, grupoAtual = null;
   let gcMap = {};
   let emailBatchJob = null;
-  let excelEnviosRows = [], excelContatosRows = [];
+  let excelEnviosRows = [], excelContatosRows = [], excelGrupoRows = [];
   let excelCampanhaRows = [], excelCampanhaColunas = [];
 
   // ── BOOT ─────────────────────────────────────────────────────
@@ -2657,6 +2682,15 @@ Equipe SCONT"
     document.getElementById('modal-grupo-titulo').textContent = g ? 'Editar Grupo' : 'Novo Grupo';
     document.getElementById('grupo-nome').value       = g?.nome || '';
     document.getElementById('grupo-descricao').value  = g?.descricao || '';
+    // reset import section
+    excelGrupoRows = [];
+    document.getElementById('grupo-excel-file').value        = '';
+    document.getElementById('grupo-excel-preview').innerHTML  = '';
+    document.getElementById('grupo-import-resultado').innerHTML = '';
+    const btn  = document.getElementById('btn-import-grupo');
+    const hint = document.getElementById('grupo-import-hint');
+    btn.disabled       = !id;
+    hint.style.display = id ? 'none' : 'block';
     openModal('modal-grupo');
   }
 
@@ -2670,16 +2704,23 @@ Equipe SCONT"
       descricao: document.getElementById('grupo-descricao').value.trim() || null,
     };
 
-    let error;
     if (id) {
-      ({ error } = await sb.from('mala_direta_grupos').update(payload).eq('id', id));
+      const { error } = await sb.from('mala_direta_grupos').update(payload).eq('id', id);
+      if (error) { toast('Erro: ' + error.message, 'error'); return; }
+      toast('Grupo atualizado!', 'success');
+      closeModal('modal-grupo');
     } else {
-      ({ error } = await sb.from('mala_direta_grupos').insert(payload));
+      const { data: novo, error } = await sb.from('mala_direta_grupos')
+        .insert(payload).select('id').single();
+      if (error) { toast('Erro: ' + error.message, 'error'); return; }
+      // Mantém modal aberto para importação de contatos via planilha
+      document.getElementById('grupo-id').value = novo.id;
+      document.getElementById('modal-grupo-titulo').textContent = 'Editar Grupo';
+      document.getElementById('btn-import-grupo').disabled = false;
+      document.getElementById('grupo-import-hint').style.display = 'none';
+      toast('Grupo criado! Agora você pode importar contatos via planilha.', 'success');
     }
-    if (error) { toast('Erro: ' + error.message, 'error'); return; }
 
-    toast(id ? 'Grupo atualizado!' : 'Grupo criado!', 'success');
-    closeModal('modal-grupo');
     await loadGrupos();
     if (grupoAtualId === id) {
       grupoAtual = grupos.find(g => g.id === id);
@@ -3061,6 +3102,114 @@ Equipe SCONT"
     closeModal('modal-importar-contatos');
     await loadContatos();
     renderContatos();
+  }
+
+  // ── IMPORT PLANILHA → GRUPO ────────────────────────────────────
+  async function previewExcelGrupo(file) {
+    if (!file) return;
+    const prev = document.getElementById('grupo-excel-preview');
+    prev.innerHTML = '<div style="color:var(--muted);font-size:13px">Lendo planilha…</div>';
+    excelGrupoRows = [];
+    document.getElementById('grupo-import-resultado').innerHTML = '';
+    try {
+      const rows = await _parseExcelFile(file);
+      if (!rows.length) {
+        prev.innerHTML = '<div style="color:var(--danger);font-size:13px">Nenhuma linha válida. Verifique se a coluna <strong>nome</strong> existe.</div>';
+        return;
+      }
+      excelGrupoRows = rows;
+      prev.innerHTML = _renderPreviewExcel(rows);
+    } catch(e) {
+      prev.innerHTML = `<div style="color:var(--danger);font-size:13px">Erro ao ler o arquivo: ${esc(e.message)}</div>`;
+    }
+  }
+
+  async function importarContatosParaGrupo() {
+    const grupoId = document.getElementById('grupo-id').value;
+    if (!grupoId) { toast('Salve o grupo antes de importar.', 'error'); return; }
+    if (!excelGrupoRows.length) { toast('Selecione uma planilha primeiro.', 'error'); return; }
+
+    const btn = document.getElementById('btn-import-grupo');
+    btn.disabled    = true;
+    btn.textContent = 'Importando…';
+    document.getElementById('grupo-import-resultado').innerHTML = '';
+
+    try {
+      // 1. Contatos já no grupo
+      const { data: gcRows } = await sb.from('mala_direta_grupo_contatos')
+        .select('contato_id').eq('grupo_id', grupoId);
+      const jaNoGrupoSet = new Set((gcRows || []).map(r => r.contato_id));
+
+      // 2. Lookup em lote por email (case-insensitive via lowercase)
+      const emailsUnicos = [...new Set(
+        excelGrupoRows.filter(r => r.email?.trim()).map(r => r.email.trim().toLowerCase())
+      )];
+      let emailToId = {};
+      if (emailsUnicos.length) {
+        const { data: found } = await sb.from('mala_direta_contatos')
+          .select('id,email').in('email', emailsUnicos);
+        (found || []).forEach(c => { emailToId[c.email.toLowerCase()] = c.id; });
+      }
+
+      // 3. Resolver ou inserir cada contato individualmente
+      const contactIds = [];
+      let novos = 0, existentes = 0;
+      for (const row of excelGrupoRows) {
+        const emailKey = row.email?.trim().toLowerCase();
+        if (emailKey && emailToId[emailKey]) {
+          contactIds.push(emailToId[emailKey]);
+          existentes++;
+        } else {
+          const { data: ins, error: eIns } = await sb.from('mala_direta_contatos')
+            .insert({ nome: row.nome, email: row.email?.trim() || null,
+                      telefone: row.telefone || null, empresa: row.empresa || null,
+                      cargo: row.cargo || null, ativo: true })
+            .select('id').single();
+          if (eIns) throw eIns;
+          contactIds.push(ins.id);
+          if (emailKey) emailToId[emailKey] = ins.id; // evita re-inserir mesmo email
+          novos++;
+        }
+      }
+
+      // 4. Vincular ao grupo somente os não presentes
+      let jaNoGrupoCount = 0;
+      const toLink = [...new Set(contactIds)].filter(id => {
+        if (jaNoGrupoSet.has(id)) { jaNoGrupoCount++; return false; }
+        return true;
+      });
+      if (toLink.length) {
+        const { error: eLnk } = await sb.from('mala_direta_grupo_contatos')
+          .insert(toLink.map(cid => ({ grupo_id: grupoId, contato_id: cid })));
+        if (eLnk) throw eLnk;
+      }
+
+      // 5. Sumário
+      const adicionados = toLink.length;
+      const linhas = [
+        novos         > 0 ? `• ${novos} contato(s) novo(s) criado(s) na base` : '',
+        existentes    > 0 ? `• ${existentes} contato(s) já existentes reutilizados` : '',
+        jaNoGrupoCount > 0 ? `• ${jaNoGrupoCount} já estavam no grupo (ignorados)` : '',
+        `• <strong>${adicionados} contato(s) adicionado(s) ao grupo</strong>`,
+      ].filter(Boolean).join('<br>');
+      document.getElementById('grupo-import-resultado').innerHTML = `
+        <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px 14px;font-size:12px;line-height:1.9;color:#15803D">
+          <strong>✅ Importação concluída</strong><br>${linhas}
+        </div>`;
+
+      // 6. Limpar seleção e recarregar dados
+      excelGrupoRows = [];
+      document.getElementById('grupo-excel-file').value        = '';
+      document.getElementById('grupo-excel-preview').innerHTML  = '';
+      await loadContatos();
+      if (grupoAtualId === grupoId) await loadGrupoContatosAtual();
+
+    } catch(e) {
+      toast('Erro ao importar: ' + (e.message || 'erro desconhecido'), 'error');
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = '📥 Importar Contatos para o Grupo';
+    }
   }
 
   // ── CONVERSOR PDF ─────────────────────────────────────────────
