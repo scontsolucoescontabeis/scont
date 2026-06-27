@@ -773,7 +773,8 @@ Equipe SCONT"
         <div class="form-row">
           <div class="form-group">
             <label>Email</label>
-            <input type="email" id="cont-email" class="form-control" placeholder="email@exemplo.com">
+            <input type="text" id="cont-email" class="form-control" placeholder="email@exemplo.com">
+            <div class="form-hint">Separe múltiplos emails com vírgula</div>
           </div>
           <div class="form-group">
             <label>WhatsApp</label>
@@ -1779,7 +1780,7 @@ Equipe SCONT"
 
     const payload = {
       nome,
-      email:    document.getElementById('cont-email').value.trim() || null,
+      email:    _normalizeEmails(document.getElementById('cont-email').value) || null,
       telefone: document.getElementById('cont-telefone').value.trim() || null,
       empresa:  document.getElementById('cont-empresa').value.trim() || null,
       cargo:    document.getElementById('cont-cargo').value.trim() || null,
@@ -1823,7 +1824,7 @@ Equipe SCONT"
         <td><strong style="color:var(--primary)">${esc(c.nome)}</strong></td>
         <td>${esc(c.empresa||'—')}</td>
         <td>${esc(c.cargo||'—')}</td>
-        <td>${c.email ? `<a href="mailto:${esc(c.email)}" style="color:var(--primary)">${esc(c.email)}</a>` : '—'}</td>
+        <td>${_renderEmails(c.email)}</td>
         <td>${c.telefone ? esc(c.telefone) : '—'}</td>
         <td>
           <div style="display:flex;gap:6px">
@@ -2293,7 +2294,7 @@ Equipe SCONT"
         : e.mensagem_final)
         + (camp.tipo_confirmacao !== 'nenhuma'
             ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
-      window.open(`mailto:${encodeURIComponent(e.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
+      window.open(`mailto:${_mailtoEmails(e.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
     }
 
     // Marca como enviado automaticamente
@@ -2418,7 +2419,7 @@ Equipe SCONT"
         : e.mensagem_final)
         + (campanhaAtual?.tipo_confirmacao !== 'nenhuma'
             ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
-      window.open(`mailto:${encodeURIComponent(dest)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
+      window.open(`mailto:${_mailtoEmails(dest)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
     }
   }
 
@@ -2523,7 +2524,7 @@ Equipe SCONT"
     } catch(err) {
       toast('Outlook aberto. Cole o conteúdo manualmente.', '');
     }
-    window.open(`mailto:${encodeURIComponent(dest)}?subject=${encodeURIComponent(assunto)}`);
+    window.open(`mailto:${_mailtoEmails(dest)}?subject=${encodeURIComponent(assunto)}`);
   }
 
   function copiarLink() {
@@ -2543,7 +2544,7 @@ Equipe SCONT"
         : e.mensagem_final)
         + (campanhaAtual?.tipo_confirmacao !== 'nenhuma'
             ? '\n\nConfirme o recebimento em: ' + getConfirmUrl(e.token) : '');
-      window.open(`mailto:${encodeURIComponent(e.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
+      window.open(`mailto:${_mailtoEmails(e.email)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`);
     }
   }
 
@@ -2661,7 +2662,7 @@ Equipe SCONT"
       <tr>
         <td><strong style="color:var(--primary)">${esc(c.nome)}</strong></td>
         <td>${esc(c.empresa||'—')}</td>
-        <td>${c.email ? `<a href="mailto:${esc(c.email)}" style="color:var(--primary)">${esc(c.email)}</a>` : '—'}</td>
+        <td>${_renderEmails(c.email)}</td>
         <td>${c.telefone || '—'}</td>
         <td>
           <button class="btn btn-danger btn-sm" onclick="removerContatoDoGrupo('${c.id}')">Remover</button>
@@ -3082,7 +3083,7 @@ Equipe SCONT"
 
     const inserts = excelContatosRows.map(r => ({
       nome:     r.nome,
-      email:    r.email    || null,
+      email:    _normalizeEmails(r.email) || null,
       telefone: r.telefone || null,
       empresa:  r.empresa  || null,
       cargo:    r.cargo    || null,
@@ -3140,34 +3141,35 @@ Equipe SCONT"
         .select('contato_id').eq('grupo_id', grupoId);
       const jaNoGrupoSet = new Set((gcRows || []).map(r => r.contato_id));
 
-      // 2. Lookup em lote por email (case-insensitive via lowercase)
-      const emailsUnicos = [...new Set(
-        excelGrupoRows.filter(r => r.email?.trim()).map(r => r.email.trim().toLowerCase())
-      )];
-      let emailToId = {};
-      if (emailsUnicos.length) {
-        const { data: found } = await sb.from('mala_direta_contatos')
-          .select('id,email').in('email', emailsUnicos);
-        (found || []).forEach(c => { emailToId[c.email.toLowerCase()] = c.id; });
+      // 2. Mapa email→id client-side (suporta múltiplos emails por contato)
+      const emailToId = {};
+      for (const c of contatos) {
+        if (!c.email) continue;
+        for (const em of c.email.split(',')) {
+          const key = em.trim().toLowerCase();
+          if (key) emailToId[key] = c.id;
+        }
       }
 
       // 3. Resolver ou inserir cada contato individualmente
       const contactIds = [];
       let novos = 0, existentes = 0;
       for (const row of excelGrupoRows) {
-        const emailKey = row.email?.trim().toLowerCase();
-        if (emailKey && emailToId[emailKey]) {
-          contactIds.push(emailToId[emailKey]);
+        const rowEmails = (row.email || '').split(',').map(em => em.trim().toLowerCase()).filter(Boolean);
+        const foundId   = rowEmails.map(em => emailToId[em]).find(Boolean) || null;
+        if (foundId) {
+          contactIds.push(foundId);
           existentes++;
         } else {
+          const emailNorm = _normalizeEmails(row.email) || null;
           const { data: ins, error: eIns } = await sb.from('mala_direta_contatos')
-            .insert({ nome: row.nome, email: row.email?.trim() || null,
+            .insert({ nome: row.nome, email: emailNorm,
                       telefone: row.telefone || null, empresa: row.empresa || null,
                       cargo: row.cargo || null, ativo: true })
             .select('id').single();
           if (eIns) throw eIns;
           contactIds.push(ins.id);
-          if (emailKey) emailToId[emailKey] = ins.id; // evita re-inserir mesmo email
+          rowEmails.forEach(em => { emailToId[em] = ins.id; }); // evita re-inserir mesmos emails
           novos++;
         }
       }
@@ -4984,19 +4986,19 @@ Equipe SCONT`,
       document.getElementById('brevo-pb-fill').style.width   = pct + '%';
       document.getElementById('brevo-pb-pct').textContent    = pct + '%';
       document.getElementById('brevo-pb-texto').textContent  = `Enviando ${i + 1} de ${total}`;
-      document.getElementById('brevo-pb-current').textContent = `→ ${e.nome || ''} <${e.email}>`;
+      const emailsList = (e.email || '').split(',')
+        .map(em => em.trim().toLowerCase())
+        .filter(em => em && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em));
+      document.getElementById('brevo-pb-current').textContent = `→ ${e.nome || ''} <${emailsList.join(', ')}>`;
 
       try {
-        const emailDest = (e.email || '').trim().toLowerCase();
-        if (!emailDest || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailDest)) {
-          throw new Error(`Email inválido: "${e.email}"`);
-        }
+        if (!emailsList.length) throw new Error(`Email inválido: "${e.email}"`);
         const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'api-key': cfg.key },
           body: JSON.stringify({
             sender:      { name: cfg.nome, email: cfg.email.trim() },
-            to:          [{ email: emailDest, name: (e.nome || '').trim() }],
+            to:          emailsList.map(em => ({ email: em, name: (e.nome || '').trim() })),
             subject:     assuntoFn,
             htmlContent: htmlFinal,
             textContent: _htmlParaTexto(htmlFinal),
@@ -5140,7 +5142,7 @@ Equipe SCONT`,
 
   function _openMailto(dest, assunto, corpo) {
     const a = document.createElement('a');
-    a.href = `mailto:${encodeURIComponent(dest)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
+    a.href = `mailto:${_mailtoEmails(dest)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(corpo)}`;
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
@@ -5233,6 +5235,20 @@ Equipe SCONT`,
 
   // ── HELPERS ───────────────────────────────────────────────────
   function esc(s) { const d = document.createElement('div'); d.textContent = String(s||''); return d.innerHTML; }
+  function _normalizeEmails(str) {
+    if (!str) return null;
+    const parts = String(str).split(',').map(e => e.trim()).filter(Boolean);
+    return parts.length ? parts.join(', ') : null;
+  }
+  function _mailtoEmails(str) {
+    return (str || '').split(',').map(e => encodeURIComponent(e.trim())).filter(Boolean).join(',');
+  }
+  function _renderEmails(emailStr) {
+    if (!emailStr) return '—';
+    return String(emailStr).split(',').map(e => e.trim()).filter(Boolean)
+      .map(em => `<a href="mailto:${encodeURIComponent(em)}" style="color:var(--primary)">${esc(em)}</a>`)
+      .join('<br>');
+  }
   function formatDate(iso) { return iso ? new Date(iso).toLocaleDateString('pt-BR') : ''; }
   function formatDateBR(d) { if (!d) return ''; const [y,m,dy] = d.split('-'); return `${dy}/${m}/${y}`; }
   function formatDateTime(d) { if (!d) return ''; const dt = d instanceof Date ? d : new Date(d); return dt.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}); }
