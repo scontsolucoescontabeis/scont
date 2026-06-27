@@ -259,6 +259,7 @@
           </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary" onclick="abrirImportarContatos()">📥 Importar Excel</button>
+            <button id="btn-excluir-contatos" class="btn btn-danger" style="display:none" onclick="excluirContatosSelecionados()">🗑 Excluir selecionados (<span id="count-cont-sel">0</span>)</button>
             <button class="btn btn-primary" onclick="openModalContato()">+ Novo Contato</button>
           </div>
         </div>
@@ -272,6 +273,7 @@
             <table>
               <thead>
                 <tr>
+                  <th style="width:36px"><input type="checkbox" id="chk-all-cont" onchange="toggleTodosContatos(this.checked)" title="Selecionar todos"></th>
                   <th>Nome</th>
                   <th>Empresa</th>
                   <th>Cargo</th>
@@ -281,7 +283,7 @@
                 </tr>
               </thead>
               <tbody id="contatos-tbody">
-                <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Carregando…</td></tr>
+                <tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">Carregando…</td></tr>
               </tbody>
             </table>
           </div>
@@ -318,6 +320,7 @@
           </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary btn-sm" onclick="openModalGrupo(grupoAtualId)">Editar</button>
+            <button id="btn-remover-gc" class="btn btn-danger btn-sm" style="display:none" onclick="excluirGcSelecionados()">🗑 Remover selecionados (<span id="count-gc-sel">0</span>)</button>
             <button class="btn btn-primary btn-sm" onclick="openModalAddGrupoContatos()">+ Adicionar Contatos</button>
             <button class="btn btn-danger btn-sm" onclick="deletarGrupoAtual()">Excluir Grupo</button>
           </div>
@@ -329,6 +332,7 @@
             <table>
               <thead>
                 <tr>
+                  <th style="width:36px"><input type="checkbox" id="chk-all-gc" onchange="toggleTodosGc(this.checked)" title="Selecionar todos"></th>
                   <th>Nome</th>
                   <th>Empresa</th>
                   <th>Email</th>
@@ -337,7 +341,7 @@
                 </tr>
               </thead>
               <tbody id="grupo-contatos-tbody">
-                <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Carregando…</td></tr>
+                <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Carregando…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1347,6 +1351,8 @@ Equipe SCONT"
   let gcMap = {};
   let emailBatchJob = null;
   let excelEnviosRows = [], excelContatosRows = [], excelGrupoRows = [];
+  let _contatosSelecionados = new Set();
+  let _gcSelecionados       = new Set();
   let excelCampanhaRows = [], excelCampanhaColunas = [];
 
   // ── BOOT ─────────────────────────────────────────────────────
@@ -1816,11 +1822,13 @@ Equipe SCONT"
     const tbody = document.getElementById('contatos-tbody');
 
     if (!lista.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:36px;color:var(--muted)">Nenhum contato cadastrado</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--muted)">Nenhum contato cadastrado</td></tr>';
+      _atualizarBtnExcluirContatos();
       return;
     }
     tbody.innerHTML = lista.map(c => `
       <tr>
+        <td><input type="checkbox" name="sel-cont" value="${c.id}" onchange="onSelContato()" ${_contatosSelecionados.has(c.id) ? 'checked' : ''}></td>
         <td><strong style="color:var(--primary)">${esc(c.nome)}</strong></td>
         <td>${esc(c.empresa||'—')}</td>
         <td>${esc(c.cargo||'—')}</td>
@@ -1834,6 +1842,50 @@ Equipe SCONT"
         </td>
       </tr>
     `).join('');
+    const visiveisIds = lista.map(c => c.id);
+    const todosSelecionados = visiveisIds.length > 0 && visiveisIds.every(id => _contatosSelecionados.has(id));
+    const chkAll = document.getElementById('chk-all-cont');
+    if (chkAll) chkAll.checked = todosSelecionados;
+    _atualizarBtnExcluirContatos();
+  }
+
+  function toggleTodosContatos(checked) {
+    document.querySelectorAll('input[name="sel-cont"]').forEach(cb => {
+      cb.checked = checked;
+      if (checked) _contatosSelecionados.add(cb.value);
+      else _contatosSelecionados.delete(cb.value);
+    });
+    _atualizarBtnExcluirContatos();
+  }
+
+  function onSelContato() {
+    _contatosSelecionados = new Set(
+      [...document.querySelectorAll('input[name="sel-cont"]:checked')].map(cb => cb.value)
+    );
+    const total = document.querySelectorAll('input[name="sel-cont"]').length;
+    const chkAll = document.getElementById('chk-all-cont');
+    if (chkAll) chkAll.checked = total > 0 && _contatosSelecionados.size === total;
+    _atualizarBtnExcluirContatos();
+  }
+
+  function _atualizarBtnExcluirContatos() {
+    const n = _contatosSelecionados.size;
+    const btn = document.getElementById('btn-excluir-contatos');
+    const cnt = document.getElementById('count-cont-sel');
+    if (btn) btn.style.display = n > 0 ? '' : 'none';
+    if (cnt) cnt.textContent = n;
+  }
+
+  async function excluirContatosSelecionados() {
+    const ids = [..._contatosSelecionados];
+    if (!ids.length) return;
+    if (!confirm(`Desativar ${ids.length} contato(s)? Eles não aparecerão mais na lista.`)) return;
+    const { error } = await sb.from('mala_direta_contatos').update({ ativo: false }).in('id', ids);
+    if (error) { toast('Erro ao excluir: ' + error.message, 'error'); return; }
+    toast(`✅ ${ids.length} contato(s) removido(s)`, 'success');
+    _contatosSelecionados.clear();
+    await loadContatos();
+    renderContatos();
   }
 
   // ── DESTINATÁRIOS ─────────────────────────────────────────────
@@ -2655,11 +2707,13 @@ Equipe SCONT"
     document.getElementById('gdet-card-title').textContent = `Contatos do Grupo (${total})`;
     const tbody = document.getElementById('grupo-contatos-tbody');
     if (!grupoContatosAtual.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Nenhum contato neste grupo. Clique em "+ Adicionar Contatos".</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Nenhum contato neste grupo. Clique em "+ Adicionar Contatos".</td></tr>';
+      _atualizarBtnRemoverGc();
       return;
     }
     tbody.innerHTML = grupoContatosAtual.map(c => `
       <tr>
+        <td><input type="checkbox" name="sel-gc" value="${c.id}" onchange="onSelGc()" ${_gcSelecionados.has(c.id) ? 'checked' : ''}></td>
         <td><strong style="color:var(--primary)">${esc(c.nome)}</strong></td>
         <td>${esc(c.empresa||'—')}</td>
         <td>${_renderEmails(c.email)}</td>
@@ -2669,10 +2723,54 @@ Equipe SCONT"
         </td>
       </tr>
     `).join('');
+    const todosSelecionados = grupoContatosAtual.length > 0 && grupoContatosAtual.every(c => _gcSelecionados.has(c.id));
+    const chkAll = document.getElementById('chk-all-gc');
+    if (chkAll) chkAll.checked = todosSelecionados;
+    _atualizarBtnRemoverGc();
+  }
+
+  function toggleTodosGc(checked) {
+    document.querySelectorAll('input[name="sel-gc"]').forEach(cb => {
+      cb.checked = checked;
+      if (checked) _gcSelecionados.add(cb.value);
+      else _gcSelecionados.delete(cb.value);
+    });
+    _atualizarBtnRemoverGc();
+  }
+
+  function onSelGc() {
+    _gcSelecionados = new Set(
+      [...document.querySelectorAll('input[name="sel-gc"]:checked')].map(cb => cb.value)
+    );
+    const total = document.querySelectorAll('input[name="sel-gc"]').length;
+    const chkAll = document.getElementById('chk-all-gc');
+    if (chkAll) chkAll.checked = total > 0 && _gcSelecionados.size === total;
+    _atualizarBtnRemoverGc();
+  }
+
+  function _atualizarBtnRemoverGc() {
+    const n = _gcSelecionados.size;
+    const btn = document.getElementById('btn-remover-gc');
+    const cnt = document.getElementById('count-gc-sel');
+    if (btn) btn.style.display = n > 0 ? '' : 'none';
+    if (cnt) cnt.textContent = n;
+  }
+
+  async function excluirGcSelecionados() {
+    const ids = [..._gcSelecionados];
+    if (!ids.length) return;
+    if (!confirm(`Remover ${ids.length} contato(s) do grupo?`)) return;
+    const { error } = await sb.from('mala_direta_grupo_contatos')
+      .delete().eq('grupo_id', grupoAtualId).in('contato_id', ids);
+    if (error) { toast('Erro ao remover: ' + error.message, 'error'); return; }
+    toast(`✅ ${ids.length} contato(s) removido(s) do grupo`, 'success');
+    _gcSelecionados.clear();
+    await loadGrupoContatosAtual();
   }
 
   function voltarGrupos() {
     grupoAtualId = null; grupoAtual = null; grupoContatosAtual = [];
+    _gcSelecionados.clear();
     showSection('grupos');
   }
 
