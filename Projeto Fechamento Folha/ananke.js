@@ -26,6 +26,7 @@ let feriasHeaders     = []; // cabeçalhos da planilha de férias
 let feriasSorted      = []; // dados ordenados
 let empregadosConfig  = {}; // nome_normalizado → codigo_empregado (config desta ferramenta)
 let rubricasIgnoradas = new Set(); // normalizarNome(coluna_planilha) → excluir do TXT
+let faltaDatasMap     = {}; // `${codEmpregado}::${normColuna}` → string raw de datas inseridas
 
 // ──────────────────────────────────────────────
 // UTILITÁRIOS
@@ -50,6 +51,14 @@ function mostrarStep(n) {
 }
 
 function voltarStep(n) { mostrarStep(n); }
+
+function isColunaFalta(coluna) {
+    return normalizarNome(coluna).includes('falta');
+}
+
+function registrarFaltaDatas(key, valor) {
+    faltaDatasMap[key] = valor;
+}
 
 function normalizarNome(s) {
     return (s || '').trim().toLowerCase()
@@ -449,6 +458,7 @@ function construirRelatorio(comp) {
 
     linhasTxt = [];
     linhasRelatorio = [];
+    faltaDatasMap = {};
     let temSemMatch = false;
 
     // colunasRubrica vem do primeiro funcionário (todas têm o mesmo layout)
@@ -612,6 +622,34 @@ function renderizarRelatorio(linhas) {
                 </td>
             `;
             tbody.appendChild(trForm);
+        }
+
+        // Input de datas para rubricas de falta
+        if (!semRubrica && !ignorada && isColunaFalta(l.coluna) && l.codEmpregado) {
+            const _tipo     = normalizarNome(l.coluna).includes('dsr') ? '2' : '1';
+            const _faltaKey = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
+            const _valAtual = (faltaDatasMap[_faltaKey] || '').replace(/"/g, '&quot;');
+            const _tipoLabel = _tipo === '2' ? 'DSR' : 'Normal';
+
+            const trFaltaDatas = document.createElement('tr');
+            trFaltaDatas.style.background = '#EFF6FF';
+            trFaltaDatas.innerHTML = `
+                <td colspan="10">
+                    <div style="padding:5px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-size:11px;font-weight:600;color:#1D4ED8;white-space:nowrap;">
+                            📅 Datas falta ${_tipoLabel} — ${l.nome}:
+                        </span>
+                        <input type="text"
+                            data-falta-key="${_faltaKey.replace(/"/g, '&quot;')}"
+                            oninput="registrarFaltaDatas(this.dataset.faltaKey, this.value)"
+                            placeholder="DD/MM/AAAA, DD/MM/AAAA, ..."
+                            value="${_valAtual}"
+                            style="flex:1;min-width:240px;padding:4px 8px;border:1px solid #93C5FD;border-radius:4px;font-size:12px;font-family:monospace;">
+                        <span style="font-size:11px;color:#6B7280;">separadas por vírgula</span>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(trFaltaDatas);
         }
     });
 
@@ -858,14 +896,36 @@ function confirmarTipoProcesso() {
     const tipoProcesso = selecionado.value;
     const comp = document.getElementById('competencia').value.trim();
 
-    // Regenerar TXT com o tipo de processo selecionado
+    // Regenerar TXT com o tipo de processo selecionado — agrupa por empregado para inserir registros de falta por data
     linhasTxt = [];
+    const _ordCods = [];
+    const _empData = {};
+
     linhasRelatorio.forEach(l => {
-        if (l.codEmpregado && l.valorInt > 0 && !rubricasIgnoradas.has(normalizarNome(l.coluna))) {
-            linhasTxt.push(
+        if (!l.codEmpregado) return;
+        if (!_empData[l.codEmpregado]) {
+            _empData[l.codEmpregado] = { rubricas: [], faltas: [] };
+            _ordCods.push(l.codEmpregado);
+        }
+        const _ign = rubricasIgnoradas.has(normalizarNome(l.coluna));
+        if (!_ign && l.valorInt > 0) {
+            _empData[l.codEmpregado].rubricas.push(
                 gerarLinhaTxt(l.codEmpregado, comp, l.codigoRubrica, tipoProcesso, l.valorInt, CODIGO_EMPRESA)
             );
         }
+        if (!_ign && isColunaFalta(l.coluna)) {
+            const _tipo = normalizarNome(l.coluna).includes('dsr') ? '2' : '1';
+            const _key  = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
+            (faltaDatasMap[_key] || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean).forEach(d => {
+                const _m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                if (_m) _empData[l.codEmpregado].faltas.push(`11${_m[3]}${_m[2]}${_m[1]}${_tipo}`);
+            });
+        }
+    });
+
+    _ordCods.forEach(cod => {
+        linhasTxt.push(..._empData[cod].rubricas);
+        linhasTxt.push(..._empData[cod].faltas);
     });
 
     const nomeProcesso = {
@@ -1447,6 +1507,7 @@ async function processarDadosFormulario(envioRow) {
     // Montar linhasRelatorio — estrutura idêntica ao construirRelatorio()
     linhasRelatorio = [];
     linhasTxt       = [];
+    faltaDatasMap   = {};
     let temSemMatch = false;
 
     (d.employees || []).forEach(emp => {
