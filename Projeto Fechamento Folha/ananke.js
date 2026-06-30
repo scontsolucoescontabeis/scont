@@ -904,7 +904,7 @@ function confirmarTipoProcesso() {
     linhasRelatorio.forEach(l => {
         if (!l.codEmpregado) return;
         if (!_empData[l.codEmpregado]) {
-            _empData[l.codEmpregado] = { rubricas: [], faltas: [] };
+            _empData[l.codEmpregado] = { rubricas: [] };
             _ordCods.push(l.codEmpregado);
         }
         const _ign = rubricasIgnoradas.has(normalizarNome(l.coluna));
@@ -918,14 +918,13 @@ function confirmarTipoProcesso() {
             const _key  = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
             (faltaDatasMap[_key] || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean).forEach(d => {
                 const _m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-                if (_m) _empData[l.codEmpregado].faltas.push(`11${_m[3]}${_m[2]}${_m[1]}${_tipo}`);
+                if (_m) _empData[l.codEmpregado].rubricas.push(`11${_m[3]}${_m[2]}${_m[1]}${_tipo}`);
             });
         }
     });
 
     _ordCods.forEach(cod => {
         linhasTxt.push(..._empData[cod].rubricas);
-        linhasTxt.push(..._empData[cod].faltas);
     });
 
     const nomeProcesso = {

@@ -1105,7 +1105,31 @@ function gerarTxt(tipoProcesso) {
         }
     });
 
+    // Mapear codigoRubrica → tipo de falta ('1'=faltas, '2'=DSR) por empregado
+    const _rubricaFaltaTipo = {}; // `${codEmpregado}|${codigoRubrica}` → '1' ou '2'
+    linhasRelatorio.forEach(l => {
+        if (!l.codEmpregado || !l.codigoRubrica) return;
+        if (!isColunaFalta(l.coluna)) return;
+        const _tipo = normalizarNome(l.coluna).includes('dsr') ? '2' : '1';
+        _rubricaFaltaTipo[`${l.codEmpregado}|${l.codigoRubrica}`] = _tipo;
+    });
+
+    // Coletar datas de falta por empregado, separadas por tipo
+    const _faltaDatasEmp = {}; // codEmpregado → { '1': [...], '2': [...] }
+    linhasRelatorio.forEach(l => {
+        if (!l.codEmpregado || rubricasIgnoradas.has(normalizarNome(l.coluna))) return;
+        if (!isColunaFalta(l.coluna)) return;
+        const _tipo = normalizarNome(l.coluna).includes('dsr') ? '2' : '1';
+        const _key  = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
+        if (!_faltaDatasEmp[l.codEmpregado]) _faltaDatasEmp[l.codEmpregado] = { '1': [], '2': [] };
+        (faltaDatasMap[_key] || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean).forEach(d => {
+            const _m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (_m) _faltaDatasEmp[l.codEmpregado][_tipo].push(`11${_m[3]}${_m[2]}${_m[1]}${_tipo}`);
+        });
+    });
+
     // Agrupar linhas de rubrica por empregado preservando ordem de aparição
+    // Cada item: { linha: string, codigoRubrica: string }
     const _ordCods = [];
     const _rubPorEmp = {};
     mapa.forEach(e => {
@@ -1118,30 +1142,22 @@ function gerarTxt(tipoProcesso) {
             _rubPorEmp[e.codEmpregado] = [];
             _ordCods.push(e.codEmpregado);
         }
-        _rubPorEmp[e.codEmpregado].push(gerarLinhaTxt(e.codEmpregado, comp, e.codigoRubrica, e.tp, valorFinal, e.codEmpresa));
-    });
-
-    // Coletar datas de falta por empregado
-    const _faltaPorEmp = {};
-    linhasRelatorio.forEach(l => {
-        if (!l.codEmpregado || rubricasIgnoradas.has(normalizarNome(l.coluna))) return;
-        if (!isColunaFalta(l.coluna)) return;
-        const _tipo = normalizarNome(l.coluna).includes('dsr') ? '2' : '1';
-        const _key  = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
-        if (!_faltaPorEmp[l.codEmpregado]) {
-            _faltaPorEmp[l.codEmpregado] = [];
-            if (!_ordCods.includes(l.codEmpregado)) _ordCods.push(l.codEmpregado);
-        }
-        (faltaDatasMap[_key] || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean).forEach(d => {
-            const _m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-            if (_m) _faltaPorEmp[l.codEmpregado].push(`11${_m[3]}${_m[2]}${_m[1]}${_tipo}`);
+        _rubPorEmp[e.codEmpregado].push({
+            linha: gerarLinhaTxt(e.codEmpregado, comp, e.codigoRubrica, e.tp, valorFinal, e.codEmpresa),
+            codigoRubrica: e.codigoRubrica,
+            codEmpregado: e.codEmpregado,
         });
     });
 
-    // Montar TXT: rubricas + datas de falta por empregado
+    // Montar TXT: após cada rubrica de falta/DSR, inserir imediatamente as datas correspondentes
     _ordCods.forEach(cod => {
-        (_rubPorEmp[cod] || []).forEach(l => linhasTxt.push(l));
-        (_faltaPorEmp[cod] || []).forEach(l => linhasTxt.push(l));
+        (_rubPorEmp[cod] || []).forEach(item => {
+            linhasTxt.push(item.linha);
+            const tipoFalta = _rubricaFaltaTipo[`${cod}|${item.codigoRubrica}`];
+            if (tipoFalta && _faltaDatasEmp[cod]) {
+                (_faltaDatasEmp[cod][tipoFalta] || []).forEach(l => linhasTxt.push(l));
+            }
+        });
     });
 
     // Resumo consolidado
