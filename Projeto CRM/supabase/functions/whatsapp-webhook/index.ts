@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { processarMensagemBot } from './chatbot-processor.ts'
+import { obterOuCriarContato, obterOuCriarConversa, salvarMensagemRecebida } from '../_shared/mensagens.ts'
 
 const VERIFY_TOKEN = Deno.env.get('WHATSAPP_VERIFY_TOKEN')!
 const APP_SECRET   = Deno.env.get('WHATSAPP_APP_SECRET')!
@@ -22,65 +23,6 @@ async function validarAssinatura(body: string, signature: string | null): Promis
   const mac = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(body))
   const hex = 'sha256=' + Array.from(new Uint8Array(mac)).map(b => b.toString(16).padStart(2, '0')).join('')
   return hex === signature
-}
-
-async function obterOuCriarContato(telefone: string, nome?: string) {
-  // telefone vem como dígitos puros do Meta / simulador (ex: 5511999999999)
-  const digits = telefone.replace(/\D/g, '')
-  const variantes = [...new Set([
-    digits,
-    '+' + digits,
-    digits.startsWith('55') && digits.length > 11 ? digits.slice(2) : null,
-    '+55' + (digits.startsWith('55') ? digits.slice(2) : digits),
-  ].filter(Boolean) as string[])]
-
-  // Busca todos os contatos com qualquer variante do telefone
-  const { data: existentes } = await supabase
-    .from('contatos')
-    .select('*, contatos_empresas(id)')
-    .in('telefone', variantes)
-
-  if (existentes && existentes.length > 0) {
-    // Prefere o contato com empresas cadastradas (evita duplicatas sem vínculo)
-    const comEmpresas = existentes.find(
-      (c: Record<string, unknown>) => Array.isArray(c.contatos_empresas) && (c.contatos_empresas as unknown[]).length > 0
-    )
-    return comEmpresas ?? existentes[0]
-  }
-
-  const { data: novo } = await supabase
-    .from('contatos')
-    .insert({ telefone: digits, nome: nome || digits })
-    .select()
-    .single()
-
-  return novo
-}
-
-async function obterOuCriarConversa(contatoId: string, telefone: string) {
-  // Busca conversa ABERTA ou EM_ATENDIMENTO ou AGUARDANDO para esse contato
-  const { data: existente } = await supabase
-    .from('conversas')
-    .select('*')
-    .eq('contato_id', contatoId)
-    .in('status', ['ABERTA', 'EM_ATENDIMENTO', 'AGUARDANDO'])
-    .order('aberto_em', { ascending: false })
-    .limit(1)
-    .single()
-
-  if (existente) return { conversa: existente, isNova: false }
-
-  const { data: nova } = await supabase
-    .from('conversas')
-    .insert({
-      contato_id: contatoId,
-      departamento: 'PESSOAL',
-      status: 'ABERTA',
-    })
-    .select()
-    .single()
-
-  return { conversa: nova, isNova: true }
 }
 
 async function processarMensagem(
@@ -117,14 +59,12 @@ async function processarMensagem(
   }
 
   // Salva mensagem do cliente SEMPRE — antes do bot responder
-  await supabase.from('mensagens').insert({
-    conversa_id:     (conversa as { id: string }).id,
+  await salvarMensagemRecebida(supabase, {
+    conversaId: (conversa as { id: string }).id,
     conteudo,
     tipo,
-    media_url:       mediaUrl,
-    whatsapp_msg_id: msg.id as string,
-    origem:          'CLIENTE',
-    lida:            false,
+    mediaUrl,
+    whatsappMsgId: msg.id as string,
   })
 
   // Processa com o bot (respostas do bot são salvas dentro do chatbot-processor)
@@ -218,8 +158,8 @@ serve(async (req) => {
       const mensagens: Record<string, unknown>[] = value?.messages || []
       for (const msg of mensagens) {
         const telefone = (msg.from as string)
-        const contato = await obterOuCriarContato(telefone, (value?.contacts?.[0]?.profile?.name as string) || undefined)
-        const { conversa } = await obterOuCriarConversa(contato.id, telefone)
+        const contato = await obterOuCriarContato(supabase, telefone, (value?.contacts?.[0]?.profile?.name as string) || undefined)
+        const { conversa } = await obterOuCriarConversa(supabase, contato.id)
 
         contato_id = contato.id as string
         conversa_id = (conversa as { id: string }).id
