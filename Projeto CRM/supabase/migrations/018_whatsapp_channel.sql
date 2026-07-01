@@ -1,6 +1,9 @@
 -- supabase/migrations/018_whatsapp_channel.sql
-CREATE TYPE canal_whatsapp_enum AS ENUM ('QR_CODE', 'API_OFICIAL');
-CREATE TYPE status_conexao_whatsapp_enum AS ENUM ('DESCONECTADO', 'CONECTANDO', 'CONECTADO');
+DO $$ BEGIN CREATE TYPE canal_whatsapp_enum AS ENUM ('QR_CODE', 'API_OFICIAL');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN CREATE TYPE status_conexao_whatsapp_enum AS ENUM ('DESCONECTADO', 'CONECTANDO', 'CONECTADO');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS whatsapp_config (
   id             INT PRIMARY KEY DEFAULT 1,
