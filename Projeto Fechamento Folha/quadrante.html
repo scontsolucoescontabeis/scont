@@ -232,6 +232,13 @@
 
             <!-- Painel: Upload -->
             <div id="painelUploadLiquido">
+                <div class="form-group" style="max-width:320px;">
+                    <label for="selectEmpresaLiquido">Empresa *</label>
+                    <select id="selectEmpresaLiquido" onchange="onEmpresaLiquidoAlterada()">
+                        <option value="">Selecione a empresa...</option>
+                    </select>
+                </div>
+
                 <div class="alert alert-info">
                     Faça o upload da planilha com a aba "Líquido" (obrigatória). A aba "Informações bancárias" é opcional — se não vier na planilha, o relatório usa os dados bancários já salvos de importações anteriores. Quando presente, os dados bancários são atualizados e reaproveitados nas competências seguintes.
                 </div>

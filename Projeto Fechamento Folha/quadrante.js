@@ -26,6 +26,8 @@ let linhasLiquido      = [];                // [{codigo_empregado, cpf, nome, va
 let gruposLiquido      = [];                // [{bancoCodigo, bancoNome, linhas:[...], totalInt}]
 let pendenciasLiquido  = [];                // linhas de linhasLiquido sem dados bancários
 let excluidosDoRelatorio = new Set();       // codigo_empregado excluídos manualmente do relatório do mês
+let empresaLiquido     = null;              // registro completo de rh_empresas da empresa selecionada no Step 6
+let _empresasLiquido   = [];                // cache da lista completa (codigo_empresa, nome_empresa, cnpj, inscricao_estadual, endereco, cep, cidade)
 
 // ──────────────────────────────────────────────
 // UTILITÁRIOS
@@ -1586,7 +1588,7 @@ async function carregarDadosBancariosDB() {
     const { data, error } = await supabaseClient
         .from('fechamento_dados_bancarios')
         .select('*')
-        .eq('codigo_empresa', CODIGO_EMPRESA);
+        .eq('codigo_empresa', empresaLiquido.codigo_empresa);
     if (error) throw error;
     dadosBancariosDB = {};
     (data || []).forEach(r => { dadosBancariosDB[r.codigo_empregado] = r; });
@@ -1600,7 +1602,7 @@ async function sincronizarDadosBancarios(linhasPlanilha) {
     const upsertRows = linhasPlanilha.map(l => {
         const existente = dadosBancariosDB[l.codigo_empregado];
         return {
-            codigo_empresa:   CODIGO_EMPRESA,
+            codigo_empresa:   empresaLiquido.codigo_empresa,
             codigo_empregado: l.codigo_empregado,
             cpf:              l.cpf,
             nome_empregado:   l.nome_empregado,
@@ -1627,6 +1629,10 @@ async function processarLiquido() {
     const comp = document.getElementById('competencia').value.trim();
     if (!/^\d{2}\/\d{4}$/.test(comp)) {
         mostrarMensagem('Atenção', 'Preencha a Competência no Step 1 (formato MM/AAAA) antes de gerar o Relatório Líquido.');
+        return;
+    }
+    if (!empresaLiquido) {
+        mostrarMensagem('Atenção', 'Selecione a empresa antes de processar a planilha.');
         return;
     }
     if (!arquivoLiquido) {
@@ -1805,7 +1811,7 @@ async function salvarTipoConta(selectEl) {
     const { error } = await supabaseClient
         .from('fechamento_dados_bancarios')
         .update({ tipo_conta: tipo, atualizado_em: new Date().toISOString() })
-        .eq('codigo_empresa', CODIGO_EMPRESA)
+        .eq('codigo_empresa', empresaLiquido.codigo_empresa)
         .eq('codigo_empregado', codigo);
 
     if (error) { mostrarMensagem('Erro', 'Falha ao salvar tipo de conta: ' + error.message); return; }
@@ -1846,7 +1852,7 @@ async function salvarDadosBancariosManual(codigo) {
 
     const linha = linhasLiquido.find(l => l.codigo_empregado === codigo);
     const registro = {
-        codigo_empresa:   CODIGO_EMPRESA,
+        codigo_empresa:   empresaLiquido.codigo_empresa,
         codigo_empregado: codigo,
         cpf:              linha ? linha.cpf : '',
         nome_empregado:   linha ? linha.nome : '',
@@ -1876,13 +1882,50 @@ function mostrarPainelLiquido(nome) {
 
 function voltarParaUploadLiquido() { mostrarPainelLiquido('upload'); }
 
-function irStep6() {
+async function carregarEmpresasLiquido() {
+    if (_empresasLiquido.length) return;
+    const { data, error } = await supabaseClient
+        .from('rh_empresas')
+        .select('codigo_empresa, nome_empresa, cnpj, inscricao_estadual, endereco, cep, cidade')
+        .order('nome_empresa');
+    if (error) { console.error('Erro ao carregar empresas (Relatório Líquido):', error); return; }
+    _empresasLiquido = data || [];
+
+    const sel = document.getElementById('selectEmpresaLiquido');
+    sel.innerHTML = '<option value="">Selecione a empresa...</option>' +
+        _empresasLiquido.map(e => `<option value="${e.codigo_empresa}">${e.codigo_empresa} — ${e.nome_empresa || ''}</option>`).join('');
+
+    const padrao = _empresasLiquido.find(e => e.codigo_empresa === CODIGO_EMPRESA);
+    if (padrao) {
+        sel.value = padrao.codigo_empresa;
+        empresaLiquido = padrao;
+    }
+}
+
+function onEmpresaLiquidoAlterada() {
+    const codigo = document.getElementById('selectEmpresaLiquido').value;
+    empresaLiquido = _empresasLiquido.find(e => e.codigo_empresa === codigo) || null;
+
+    // Troca de empresa invalida qualquer importação em memória
+    arquivoLiquido    = null;
+    dadosBancariosDB  = {};
+    linhasLiquido     = [];
+    gruposLiquido     = [];
+    pendenciasLiquido = [];
+    excluidosDoRelatorio.clear();
+    document.getElementById('filenameLiquido').style.display = 'none';
+    document.getElementById('inputLiquido').value = '';
+    mostrarPainelLiquido('upload');
+}
+
+async function irStep6() {
     const comp = document.getElementById('competencia').value.trim();
     if (!/^\d{2}\/\d{4}$/.test(comp)) {
         mostrarMensagem('Atenção', 'Preencha a Competência no Step 1 (formato MM/AAAA) antes de acessar o Relatório Líquido.');
         return;
     }
     document.getElementById('labelCompetencia6').textContent = 'Competência: ' + comp;
+    await carregarEmpresasLiquido();
     mostrarPainelLiquido('upload');
     mostrarStep(6);
 }
