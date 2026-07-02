@@ -1930,16 +1930,19 @@ async function irStep6() {
     mostrarStep(6);
 }
 
-const QUADRANTE_RAZAO_SOCIAL = 'QUADRANTE ETIQUETAS INDÚSTRIA E COMÉRCIO';
-const QUADRANTE_CNPJ         = '24.862.830/0001-96';
-const QUADRANTE_INSCRICAO    = '140866668111';
-const QUADRANTE_ENDERECO     = 'Rua Soldado Antônio Aparecido, Nº 296 - GALPAO, Parque Novo, São Paulo - SP';
-
 // "04/2026" → "01/04/2026 a 30/04/2026"
 function periodoCompetencia(comp) {
     const [mm, aaaa] = comp.split('/');
     const ultimoDia  = new Date(parseInt(aaaa, 10), parseInt(mm, 10), 0).getDate();
     return `01/${mm}/${aaaa} a ${String(ultimoDia).padStart(2, '0')}/${mm}/${aaaa}`;
+}
+
+function formatarEnderecoEmpresa(empresa) {
+    if (!empresa.endereco) return '';
+    let end = empresa.endereco;
+    if (empresa.cidade) end += ', ' + empresa.cidade;
+    if (empresa.cep) end += ' - CEP ' + empresa.cep;
+    return end;
 }
 
 function gerarPDFLiquido() {
@@ -1958,16 +1961,30 @@ function gerarPDFLiquido() {
     const MARGEM = 10;
     const pageW  = doc.internal.pageSize.getWidth();
 
-    // Cabeçalho — identidade SCONT
+    // Cabeçalho — identidade SCONT, montado dinamicamente a partir da empresa selecionada
+    const linhasCabecalho = [];
+    linhasCabecalho.push({ texto: empresaLiquido.nome_empresa || empresaLiquido.codigo_empresa, tamanho: 11, negrito: true });
+
+    const cnpjInsc = [];
+    if (empresaLiquido.cnpj) cnpjInsc.push('CNPJ: ' + empresaLiquido.cnpj);
+    if (empresaLiquido.inscricao_estadual) cnpjInsc.push('Inscrição: ' + empresaLiquido.inscricao_estadual);
+    if (cnpjInsc.length) linhasCabecalho.push({ texto: cnpjInsc.join('   '), tamanho: 7, negrito: false });
+
+    const endereco = formatarEnderecoEmpresa(empresaLiquido);
+    if (endereco) linhasCabecalho.push({ texto: endereco, tamanho: 7, negrito: false });
+
+    linhasCabecalho.push({ texto: `Período de: ${periodoCompetencia(comp)}`, tamanho: 7, negrito: false });
+
+    const alturaBarra = 6 + linhasCabecalho.length * 5;
+
     doc.setFillColor(139, 58, 58); // --primary-color
-    doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, 24, 2, 2, 'F');
+    doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, alturaBarra, 2, 2, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
-    doc.text(QUADRANTE_RAZAO_SOCIAL, MARGEM + 4, MARGEM + 6);
-    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-    doc.text(`CNPJ: ${QUADRANTE_CNPJ}   Inscrição: ${QUADRANTE_INSCRICAO}`, MARGEM + 4, MARGEM + 11);
-    doc.text(QUADRANTE_ENDERECO, MARGEM + 4, MARGEM + 16);
-    doc.text(`Período de: ${periodoCompetencia(comp)}`, MARGEM + 4, MARGEM + 21);
+    linhasCabecalho.forEach((linha, i) => {
+        doc.setFontSize(linha.tamanho);
+        doc.setFont('helvetica', linha.negrito ? 'bold' : 'normal');
+        doc.text(linha.texto, MARGEM + 4, MARGEM + 6 + i * 5);
+    });
 
     doc.setFontSize(10); doc.setFont('helvetica', 'bold');
     doc.text('Relação de Lançamentos Bancários', pageW - MARGEM - 4, MARGEM + 8, { align: 'right' });
@@ -1996,12 +2013,14 @@ function gerarPDFLiquido() {
     doc.autoTable({
         head: [['Código', 'Funcionário', 'CPF', 'Agência / Conta / Tipo Conta', 'Valor Líquido']],
         body,
-        startY: MARGEM + 28,
+        startY: MARGEM + alturaBarra + 4,
         margin: { left: MARGEM, right: MARGEM },
         styles: { fontSize: 7.5, cellPadding: 1.8, valign: 'middle' },
         headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
         alternateRowStyles: { fillColor: [249, 250, 251] },
     });
 
-    doc.save(`Relacao_Bancaria_Quadrante_${comp.replace('/', '-')}.pdf`);
+    const nomeArquivoSeguro = (empresaLiquido.nome_empresa || empresaLiquido.codigo_empresa)
+        .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    doc.save(`Relacao_Bancaria_${nomeArquivoSeguro}_${comp.replace('/', '-')}.pdf`);
 }
