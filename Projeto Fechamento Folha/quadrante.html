@@ -10,6 +10,9 @@
     <script src="../portal-auth-guard.js"></script>
     <!-- SheetJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- jsPDF + AutoTable (Relatório Líquido) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
@@ -214,6 +217,7 @@
                 <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar</button>
                 <button class="btn btn-success" onclick="baixarTXT()">⬇ Baixar TXT</button>
                 <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
+                <button class="btn btn-info" onclick="irStep6()">🏷️ Etiquetas Bancárias</button>
             </div>
         </div>
 
@@ -282,6 +286,74 @@
             <div class="btn-group">
                 <button class="btn btn-secondary" onclick="voltarStep(4)">← Voltar</button>
                 <button class="btn btn-primary" onclick="imprimirFerias()">🖨️ Imprimir / Salvar PDF</button>
+            </div>
+        </div>
+
+        <!-- STEP 6: RELATÓRIO LÍQUIDO -->
+        <div class="step-card" id="step6" style="display:none;">
+            <div class="step-title">
+                <div class="step-number">6</div>
+                Relatório Líquido — Etiquetas Bancárias
+                <span id="labelCompetencia6" style="font-size:12px; font-weight:400; color:var(--text-secondary); margin-left:10px;"></span>
+            </div>
+
+            <!-- Painel: Upload -->
+            <div id="painelUploadLiquido">
+                <div class="alert alert-info">
+                    Faça o upload da planilha com as abas "Informações bancárias" e "Líquido". Os dados bancários ficam salvos e são reaproveitados nas competências seguintes — só a aba "Líquido" é específica deste mês.
+                </div>
+
+                <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">
+                    Planilha de Informações Bancárias / Líquido (Excel) *
+                </label>
+                <div class="upload-area" id="uploadAreaLiquido" onclick="document.getElementById('inputLiquido').click()">
+                    <div class="upload-icon">🏷️</div>
+                    <div class="upload-text">
+                        Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
+                    </div>
+                    <div class="upload-text" style="font-size:11px; margin-top:4px;">
+                        Abas esperadas: "Informações bancárias" e "Líquido"
+                    </div>
+                    <div class="upload-filename" id="filenameLiquido"></div>
+                    <input type="file" id="inputLiquido" accept=".xlsx,.xls">
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="voltarStep(3)">← Voltar</button>
+                    <button class="btn btn-primary" onclick="processarLiquido()">▶ Processar Planilha</button>
+                </div>
+            </div>
+
+            <!-- Painel: Revisão -->
+            <div id="painelRevisaoLiquido" style="display:none;">
+                <div class="table-wrapper">
+                    <table id="tabelaLiquido">
+                        <thead>
+                            <tr>
+                                <th>Código</th><th>Funcionário</th><th>CPF</th>
+                                <th>Agência / Conta</th><th>Tipo de Conta</th><th>Valor Líquido</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bodyLiquido"></tbody>
+                    </table>
+                </div>
+
+                <div id="blocoPendenciasLiquido" style="display:none; margin-top:20px;">
+                    <div class="alert alert-warning">
+                        ⚠️ Empregados da aba Líquido sem dados bancários cadastrados. Complete os dados abaixo ou marque para excluir deste relatório — o botão de gerar PDF fica bloqueado até resolver todos.
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="tabelaPendenciasLiquido">
+                            <thead><tr><th>Empregados pendentes</th></tr></thead>
+                            <tbody id="bodyPendenciasLiquido"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="voltarParaUploadLiquido()">← Nova Importação</button>
+                    <button class="btn btn-primary" id="btnGerarPdfLiquido" onclick="gerarPDFLiquido()">📄 Gerar PDF</button>
+                </div>
             </div>
         </div>
 

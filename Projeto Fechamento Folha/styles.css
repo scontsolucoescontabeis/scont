@@ -333,6 +333,14 @@ tbody tr.total-row { background: var(--background-color); font-weight: 700; colo
 .badge-dias      { background: #e3f2fd; color: #1565c0; }
 .badge-booleano  { background: #f3e5f5; color: #6a1b9a; }
 
+/* Linha de agrupamento por banco — Relatório Líquido */
+tbody tr.banco-row td {
+    background: var(--text-primary);
+    color: white;
+    font-weight: 700;
+    padding: 8px 12px;
+}
+
 /* TXT PREVIEW */
 .txt-preview {
     background: #1E1E1E; color: #00FF00;
