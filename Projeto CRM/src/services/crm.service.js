@@ -578,3 +578,23 @@ export async function excluirMensagemPronta(id) {
   const { error } = await supabase.from('mensagens_prontas').delete().eq('id', id)
   if (error) throw error
 }
+
+// ─── Conexão WhatsApp ──────────────────────────────────────────
+
+export async function buscarWhatsAppConfig() {
+  const { data, error } = await supabase
+    .from('whatsapp_config')
+    .select('*')
+    .eq('id', 1)
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function salvarCanalWhatsApp(canal) {
+  const { error } = await supabase
+    .from('whatsapp_config')
+    .update({ canal_ativo: canal, atualizado_em: new Date().toISOString() })
+    .eq('id', 1)
+  if (error) throw error
+}

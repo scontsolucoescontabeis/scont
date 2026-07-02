@@ -71,36 +71,75 @@ serve(async (req) => {
       })
     }
 
-    // Envia via Meta Cloud API
-    const metaRes = await fetch(
-      `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          recipient_type: 'individual',
-          to: telefone,
-          type: tipo,
-          text: tipo === 'text' ? { body: conteudo } : undefined,
-        }),
+    // Decide o canal de envio (QR Code via Evolution API ou API Oficial da Meta)
+    const { data: whatsappConfig } = await supabaseAdmin
+      .from('whatsapp_config')
+      .select('canal_ativo')
+      .eq('id', 1)
+      .single()
+    const canal = whatsappConfig?.canal_ativo || 'API_OFICIAL'
+
+    let whatsappMsgId: string | undefined
+
+    if (canal === 'QR_CODE') {
+      const EVOLUTION_API_URL       = Deno.env.get('EVOLUTION_API_URL')
+      const EVOLUTION_API_KEY       = Deno.env.get('EVOLUTION_API_KEY')
+      const EVOLUTION_INSTANCE_NAME = Deno.env.get('EVOLUTION_INSTANCE_NAME')
+
+      if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY || !EVOLUTION_INSTANCE_NAME) {
+        return new Response(JSON.stringify({ error: 'Evolution API não configurada' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
-    )
 
-    const metaData = await metaRes.json()
-
-    if (!metaRes.ok) {
-      console.error('Erro Meta API:', metaData)
-      return new Response(JSON.stringify({ error: 'Falha ao enviar para WhatsApp', detail: metaData }), {
-        status: 502,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      const evoRes = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE_NAME}`, {
+        method: 'POST',
+        headers: { apikey: EVOLUTION_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ number: telefone, text: conteudo }),
       })
-    }
+      const evoData = await evoRes.json()
 
-    const whatsappMsgId = metaData?.messages?.[0]?.id
+      if (!evoRes.ok) {
+        console.error('Erro Evolution API:', evoData)
+        return new Response(JSON.stringify({ error: 'Falha ao enviar via QR Code', detail: evoData }), {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      whatsappMsgId = evoData?.key?.id
+    } else {
+      // Envia via Meta Cloud API
+      const metaRes = await fetch(
+        `https://graph.facebook.com/v18.0/${PHONE_NUMBER_ID}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${ACCESS_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            recipient_type: 'individual',
+            to: telefone,
+            type: tipo,
+            text: tipo === 'text' ? { body: conteudo } : undefined,
+          }),
+        }
+      )
+
+      const metaData = await metaRes.json()
+
+      if (!metaRes.ok) {
+        console.error('Erro Meta API:', metaData)
+        return new Response(JSON.stringify({ error: 'Falha ao enviar para WhatsApp', detail: metaData }), {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      whatsappMsgId = metaData?.messages?.[0]?.id
+    }
 
     // Salva mensagem no banco
     const { data: mensagem, error: insertError } = await supabaseAdmin
