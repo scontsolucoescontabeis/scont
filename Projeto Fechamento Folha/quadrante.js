@@ -1899,7 +1899,7 @@ function montarGruposLiquido() {
             };
         }
         porBanco[banco.banco_codigo].linhas.push({
-            codigo_empregado: linha.codigo_empregado,
+            codigo_empregado: banco.codigo_empregado,
             nome:             banco.nome_empregado || linha.nome,
             cpf:              banco.cpf || linha.cpf,
             agencia:          banco.agencia,
