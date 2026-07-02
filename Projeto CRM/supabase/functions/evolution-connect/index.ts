@@ -99,7 +99,11 @@ serve(async (req) => {
       const createData = await createRes.json()
       if (!createRes.ok) {
         console.error('Erro Evolution API (create):', createData)
-        return new Response(JSON.stringify({ error: 'Falha ao criar instância na Evolution API', detail: createData }), {
+        await supabaseAdmin
+          .from('whatsapp_config')
+          .update({ status_conexao: 'DESCONECTADO', atualizado_em: new Date().toISOString() })
+          .eq('id', 1)
+        return new Response(JSON.stringify({ error: 'Falha ao criar instância na Evolution API' }), {
           status: 502,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -108,6 +112,10 @@ serve(async (req) => {
     }
 
     if (!qrBase64) {
+      await supabaseAdmin
+        .from('whatsapp_config')
+        .update({ status_conexao: 'DESCONECTADO', atualizado_em: new Date().toISOString() })
+        .eq('id', 1)
       return new Response(JSON.stringify({ error: 'Evolution API não retornou QR Code' }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
