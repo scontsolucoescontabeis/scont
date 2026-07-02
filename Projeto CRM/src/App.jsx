@@ -1,6 +1,6 @@
 import { HashRouter, Routes, Route, Navigate, NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { MessageSquare, BarChart2, Users, LogOut, ClipboardList, BookUser, Bot, Timer, BookOpen } from 'lucide-react'
+import { MessageSquare, BarChart2, Users, LogOut, ClipboardList, BookUser, Bot, Timer, BookOpen, QrCode } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { buscarMeuPerfil } from '@/services/crm.service'
 import CRMPage from '@/pages/CRMPage'
@@ -12,6 +12,7 @@ import ChatbotPage from '@/pages/ChatbotPage'
 import SLAConfigPage from '@/pages/SLAConfigPage'
 import MensagensProntasPage from '@/pages/MensagensProntasPage'
 import SemAcessoPage from '@/pages/SemAcessoPage'
+import ConexaoWhatsAppPage from '@/pages/ConexaoWhatsAppPage'
 
 // ============================================================
 // Tela de Login
@@ -194,6 +195,10 @@ function Sidebar({ isAdmin, onLogout }) {
               <Bot size={15} />
               Chatbot
             </NavLink>
+            <NavLink to="/crm/conexao" style={navLinkStyle}>
+              <QrCode size={15} />
+              Conexão WhatsApp
+            </NavLink>
             <NavLink to="/crm/sla" style={navLinkStyle}>
               <Timer size={15} />
               SLA
@@ -345,6 +350,7 @@ export default function App() {
               <Route path="/crm/contatos" element={<ContatosPage />} />
               <Route path="/crm/mensagens-prontas" element={<MensagensProntasPage perfil={perfil} />} />
               {isAdmin && <Route path="/crm/chatbot" element={<ChatbotPage />} />}
+              {isAdmin && <Route path="/crm/conexao" element={<ConexaoWhatsAppPage />} />}
               {isAdmin && <Route path="/crm/sla" element={<SLAConfigPage />} />}
               {isAdmin && <Route path="/crm/metricas" element={<MetricasPage />} />}
               {isAdmin && <Route path="/crm/usuarios" element={<UsuariosPage />} />}
