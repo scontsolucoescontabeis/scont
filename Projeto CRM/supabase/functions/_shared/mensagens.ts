@@ -72,6 +72,9 @@ export async function salvarMensagemRecebida(supabase: SupabaseClient, opts: {
     origem:          'CLIENTE',
     lida:            false,
   }).select().single()
-  if (error) throw error
+  if (error) {
+    console.error('Erro ao salvar mensagem recebida:', error)
+    return null
+  }
   return data
 }
