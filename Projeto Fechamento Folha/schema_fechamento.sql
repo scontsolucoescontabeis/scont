@@ -91,3 +91,42 @@ CREATE POLICY "rascunho: leitura autenticado"
 CREATE POLICY "rascunho: escrita autenticado"
     ON public.quadrante_folha_rascunho FOR ALL
     TO authenticated USING (TRUE) WITH CHECK (TRUE);
+
+
+-- ============================================================
+-- DADOS BANCÁRIOS — Relatório Líquido / Etiquetas Bancárias
+-- Persiste a aba "Informações bancárias" entre competências.
+-- tipo_conta é gerenciado manualmente na tela de revisão e
+-- NUNCA é sobrescrito por uma nova importação.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.fechamento_dados_bancarios (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo_empresa   TEXT NOT NULL,
+    codigo_empregado TEXT NOT NULL,
+    cpf              TEXT,
+    nome_empregado   TEXT,
+    cargo            TEXT,
+    centro_custo     TEXT,
+    banco_codigo     TEXT,
+    agencia          TEXT,
+    conta            TEXT,
+    tipo_conta       TEXT NOT NULL DEFAULT 'C.Corrente',
+    atualizado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT fechamento_dados_bancarios_unique UNIQUE (codigo_empresa, codigo_empregado)
+);
+
+CREATE INDEX IF NOT EXISTS idx_fech_dados_bancarios_empresa
+    ON public.fechamento_dados_bancarios (codigo_empresa);
+
+ALTER TABLE public.fechamento_dados_bancarios ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "fechamento_dados_bancarios: leitura autenticado" ON public.fechamento_dados_bancarios;
+DROP POLICY IF EXISTS "fechamento_dados_bancarios: escrita autenticado"  ON public.fechamento_dados_bancarios;
+
+CREATE POLICY "fechamento_dados_bancarios: leitura autenticado"
+    ON public.fechamento_dados_bancarios FOR SELECT TO authenticated USING (TRUE);
+
+CREATE POLICY "fechamento_dados_bancarios: escrita autenticado"
+    ON public.fechamento_dados_bancarios FOR ALL TO authenticated USING (TRUE) WITH CHECK (TRUE);
