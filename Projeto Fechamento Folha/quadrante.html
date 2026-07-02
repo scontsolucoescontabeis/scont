@@ -194,6 +194,7 @@
                 <button class="btn btn-secondary" onclick="voltarStep(1)">← Voltar</button>
                 <button class="btn btn-primary" onclick="irStep3()">▶ Gerar TXT</button>
                 <button class="btn btn-info" onclick="window.location.href='ferias.html'">📅 Programação de Férias</button>
+                <button class="btn btn-info" onclick="irStep6()">🏷️ Etiquetas Bancárias</button>
             </div>
         </div>
 
@@ -232,11 +233,11 @@
             <!-- Painel: Upload -->
             <div id="painelUploadLiquido">
                 <div class="alert alert-info">
-                    Faça o upload da planilha com as abas "Informações bancárias" e "Líquido". Os dados bancários ficam salvos e são reaproveitados nas competências seguintes — só a aba "Líquido" é específica deste mês.
+                    Faça o upload da planilha com a aba "Líquido" (obrigatória). A aba "Informações bancárias" é opcional — se não vier na planilha, o relatório usa os dados bancários já salvos de importações anteriores. Quando presente, os dados bancários são atualizados e reaproveitados nas competências seguintes.
                 </div>
 
                 <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">
-                    Planilha de Informações Bancárias / Líquido (Excel) *
+                    Planilha de Líquido, com Informações Bancárias opcional (Excel) *
                 </label>
                 <div class="upload-area" id="uploadAreaLiquido" onclick="document.getElementById('inputLiquido').click()">
                     <div class="upload-icon">🏷️</div>
@@ -244,7 +245,7 @@
                         Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
                     </div>
                     <div class="upload-text" style="font-size:11px; margin-top:4px;">
-                        Abas esperadas: "Informações bancárias" e "Líquido"
+                        Aba obrigatória: "Líquido" · Aba opcional: "Informações bancárias"
                     </div>
                     <div class="upload-filename" id="filenameLiquido"></div>
                     <input type="file" id="inputLiquido" accept=".xlsx,.xls">

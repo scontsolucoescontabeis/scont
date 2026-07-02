@@ -1641,12 +1641,16 @@ async function processarLiquido() {
         const sheetBancaria = encontrarAba(workbook, ['informacoes bancarias']);
         const sheetLiquido  = encontrarAba(workbook, ['liquido']);
 
-        if (!sheetBancaria || !sheetLiquido) {
-            mostrarMensagem('Erro', 'A planilha precisa conter as abas "Informações bancárias" e "Líquido".');
+        if (!sheetLiquido) {
+            mostrarMensagem('Erro', 'A planilha precisa conter a aba "Líquido".');
             return;
         }
 
-        const linhasBancariaPlanilha = dedupeBancaria(lerAbaComoObjetos(sheetBancaria, MAPA_BANCARIA));
+        // A aba "Informações bancárias" é opcional: se ausente, usa os dados já
+        // persistidos no Supabase de importações anteriores (ver sincronizarDadosBancarios).
+        const linhasBancariaPlanilha = sheetBancaria
+            ? dedupeBancaria(lerAbaComoObjetos(sheetBancaria, MAPA_BANCARIA))
+            : [];
         const linhasLiquidoPlanilha  = lerAbaComoObjetos(sheetLiquido, MAPA_LIQUIDO);
 
         await sincronizarDadosBancarios(linhasBancariaPlanilha);
