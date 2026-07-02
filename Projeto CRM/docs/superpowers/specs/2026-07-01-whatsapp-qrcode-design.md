@@ -42,7 +42,7 @@ Nova tabela singleton `whatsapp_config`:
 | `qrcode_base64` | text (nullable) | QR Code atual, limpo quando conectado |
 | `atualizado_em` | timestamptz | Última atualização |
 
-**RLS:** leitura liberada para qualquer usuário autenticado (para exibir status/badge); escrita restrita a `ADMIN`.
+**RLS:** leitura e escrita restritas a `ADMIN` (o `qrcode_base64` permite conectar um novo aparelho ao WhatsApp, por isso não é liberado a agentes comuns).
 
 ---
 
@@ -61,10 +61,6 @@ Nova tabela singleton `whatsapp_config`:
 - Chama a Evolution API para criar/conectar a instância configurada (`EVOLUTION_INSTANCE_NAME`) e obter o QR Code.
 - Grava `status_conexao = CONECTANDO` e `qrcode_base64` em `whatsapp_config`.
 - Se a Evolution API estiver inacessível/mal configurada, retorna erro claro (não derruba o restante do CRM).
-
-**`evolution-toggle-canal`**
-- Admin-only.
-- Recebe `{ canal: 'QR_CODE' | 'API_OFICIAL' }` e atualiza `whatsapp_config.canal_ativo`.
 
 **`_shared/mensagens.ts`**
 - Extrai a lógica de upsert de contato → conversa → mensagem (incluindo upload de mídia) que hoje vive dentro de `whatsapp-webhook/index.ts`, para ser reaproveitada tanto por `whatsapp-webhook` quanto por `evolution-webhook`. Refatoração pontual — sem mudar comportamento existente.
@@ -86,7 +82,7 @@ Nova tabela singleton `whatsapp_config`:
 
 **Nova página:** `src/pages/ConexaoWhatsAppPage.jsx`, rota `/crm/conexao`, visível só para `ADMIN`, ao lado de Métricas e Usuários no menu admin.
 
-**Novo hook:** `src/hooks/useWhatsAppConexao.js` — assina `whatsapp_config` via Supabase Realtime (mesmo padrão de `useRealtime`) e expõe: gerar QR Code (chama `evolution-connect`), trocar canal (chama `evolution-toggle-canal`).
+**Novo hook:** `src/hooks/useWhatsAppConexao.js` — assina `whatsapp_config` via Supabase Realtime (mesmo padrão de `useRealtime`) e expõe: gerar QR Code (chama `evolution-connect`), trocar canal (escrita direta em `whatsapp_config`, protegida por RLS admin-only — mesmo padrão de `sla_config`).
 
 **UI da página:**
 - Card "Canal Ativo": mostra o canal atual (QR Code / API Oficial) com opção de trocar.

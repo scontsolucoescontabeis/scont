@@ -101,7 +101,7 @@ serve(async (req) => {
         console.error('Erro Evolution API (create):', createData)
         await supabaseAdmin
           .from('whatsapp_config')
-          .update({ status_conexao: 'DESCONECTADO', atualizado_em: new Date().toISOString() })
+          .update({ status_conexao: 'DESCONECTADO', qrcode_base64: null, atualizado_em: new Date().toISOString() })
           .eq('id', 1)
         return new Response(JSON.stringify({ error: 'Falha ao criar instância na Evolution API' }), {
           status: 502,
@@ -114,7 +114,7 @@ serve(async (req) => {
     if (!qrBase64) {
       await supabaseAdmin
         .from('whatsapp_config')
-        .update({ status_conexao: 'DESCONECTADO', atualizado_em: new Date().toISOString() })
+        .update({ status_conexao: 'DESCONECTADO', qrcode_base64: null, atualizado_em: new Date().toISOString() })
         .eq('id', 1)
       return new Response(JSON.stringify({ error: 'Evolution API não retornou QR Code' }), {
         status: 502,

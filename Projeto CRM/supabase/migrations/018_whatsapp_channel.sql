@@ -20,7 +20,9 @@ DROP POLICY IF EXISTS "whatsapp_config_read"  ON whatsapp_config;
 DROP POLICY IF EXISTS "whatsapp_config_write" ON whatsapp_config;
 
 CREATE POLICY "whatsapp_config_read" ON whatsapp_config
-  FOR SELECT USING (auth.uid() IS NOT NULL);
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM usuarios WHERE id = auth.uid() AND role = 'ADMIN')
+  );
 
 CREATE POLICY "whatsapp_config_write" ON whatsapp_config
   FOR ALL
@@ -35,4 +37,6 @@ INSERT INTO whatsapp_config (id, canal_ativo, status_conexao)
 VALUES (1, 'QR_CODE', 'DESCONECTADO')
 ON CONFLICT (id) DO NOTHING;
 
-ALTER PUBLICATION supabase_realtime ADD TABLE whatsapp_config;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE whatsapp_config;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
