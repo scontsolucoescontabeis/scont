@@ -1868,3 +1868,208 @@ async function processarLiquido() {
         mostrarMensagem('Erro', 'Falha ao processar a planilha: ' + e.message);
     }
 }
+
+function buscarDadosBancarios(linha) {
+    if (dadosBancariosDB[linha.codigo_empregado]) return dadosBancariosDB[linha.codigo_empregado];
+    if (linha.cpf) {
+        return Object.values(dadosBancariosDB).find(d => d.cpf === linha.cpf) || null;
+    }
+    return null;
+}
+
+function montarGruposLiquido() {
+    const porBanco = {};
+    pendenciasLiquido = [];
+
+    linhasLiquido.forEach(linha => {
+        if (excluidosDoRelatorio.has(linha.codigo_empregado)) return;
+
+        const banco = buscarDadosBancarios(linha);
+        if (!banco || !banco.banco_codigo) {
+            pendenciasLiquido.push(linha);
+            return;
+        }
+
+        if (!porBanco[banco.banco_codigo]) {
+            porBanco[banco.banco_codigo] = {
+                bancoCodigo: banco.banco_codigo,
+                bancoNome:   nomeBanco(banco.banco_codigo),
+                linhas:      [],
+                totalInt:    0,
+            };
+        }
+        porBanco[banco.banco_codigo].linhas.push({
+            codigo_empregado: linha.codigo_empregado,
+            nome:             banco.nome_empregado || linha.nome,
+            cpf:              banco.cpf || linha.cpf,
+            agencia:          banco.agencia,
+            conta:            banco.conta,
+            tipoConta:        banco.tipo_conta,
+            valorInt:         linha.valorInt,
+        });
+        porBanco[banco.banco_codigo].totalInt += linha.valorInt;
+    });
+
+    gruposLiquido = Object.values(porBanco).sort((a, b) => a.bancoNome.localeCompare(b.bancoNome, 'pt-BR'));
+    atualizarBotaoPdfLiquido();
+}
+
+function atualizarBotaoPdfLiquido() {
+    const btn = document.getElementById('btnGerarPdfLiquido');
+    if (!btn) return;
+    btn.disabled = pendenciasLiquido.length > 0;
+    btn.title = pendenciasLiquido.length > 0
+        ? 'Complete ou exclua os empregados sem dados bancários antes de gerar o PDF'
+        : '';
+}
+
+function renderizarRevisaoLiquido() {
+    const tbody = document.getElementById('bodyLiquido');
+
+    if (!gruposLiquido.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:16px;">Nenhum lançamento com dados bancários completos.</td></tr>';
+    } else {
+        tbody.innerHTML = gruposLiquido.map(g => {
+            const linhasHtml = g.linhas.map(l => `
+                <tr>
+                    <td>${l.codigo_empregado}</td>
+                    <td>${escHtml(l.nome)}</td>
+                    <td>${formatarCpf(l.cpf)}</td>
+                    <td>${escHtml(l.agencia)} / ${escHtml(l.conta)}</td>
+                    <td>
+                        <select class="tipo-select" data-codigo="${l.codigo_empregado}" onchange="salvarTipoConta(this)">
+                            <option value="C.Corrente" ${l.tipoConta === 'C.Corrente' ? 'selected' : ''}>C.Corrente</option>
+                            <option value="C.Salário" ${l.tipoConta === 'C.Salário' ? 'selected' : ''}>C.Salário</option>
+                            <option value="Poupança" ${l.tipoConta === 'Poupança' ? 'selected' : ''}>Poupança</option>
+                        </select>
+                    </td>
+                    <td>R$ ${(l.valorInt / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                </tr>`).join('');
+
+            return `
+                <tr class="banco-row"><td colspan="6">🏦 Banco: ${escHtml(g.bancoNome)}</td></tr>
+                ${linhasHtml}
+                <tr class="total-row">
+                    <td colspan="5">Total ${escHtml(g.bancoNome)}</td>
+                    <td>R$ ${(g.totalInt / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                </tr>`;
+        }).join('');
+    }
+
+    const bloco     = document.getElementById('blocoPendenciasLiquido');
+    const tbodyPend = document.getElementById('bodyPendenciasLiquido');
+
+    if (!pendenciasLiquido.length) {
+        bloco.style.display = 'none';
+        tbodyPend.innerHTML = '';
+    } else {
+        bloco.style.display = 'block';
+        tbodyPend.innerHTML = pendenciasLiquido.map(l => `
+            <tr>
+                <td>
+                    <div class="inline-register-form">
+                        <span style="font-weight:600;font-size:12px;color:var(--primary-color);">
+                            ${l.codigo_empregado} — ${escHtml(l.nome)} — sem dados bancários:
+                        </span>
+                        <input type="text" class="pend-banco" data-codigo="${l.codigo_empregado}" placeholder="Cód. Banco (ex: 341)"
+                            style="width:130px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" class="pend-agencia" data-codigo="${l.codigo_empregado}" placeholder="Agência"
+                            style="width:90px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" class="pend-conta" data-codigo="${l.codigo_empregado}" placeholder="Conta"
+                            style="width:110px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <select class="pend-tipo tipo-select" data-codigo="${l.codigo_empregado}">
+                            <option value="C.Corrente">C.Corrente</option>
+                            <option value="C.Salário">C.Salário</option>
+                            <option value="Poupança">Poupança</option>
+                        </select>
+                        <button class="btn btn-primary btn-small" onclick="salvarDadosBancariosManual('${l.codigo_empregado}')">💾 Salvar</button>
+                        <label style="font-size:12px;display:flex;align-items:center;gap:4px;">
+                            <input type="checkbox" onchange="marcarExcluido('${l.codigo_empregado}', this.checked)"> Excluir deste relatório
+                        </label>
+                    </div>
+                </td>
+            </tr>`).join('');
+    }
+}
+
+async function salvarTipoConta(selectEl) {
+    const codigo = selectEl.dataset.codigo;
+    const tipo   = selectEl.value;
+
+    const { error } = await supabaseClient
+        .from('fechamento_dados_bancarios')
+        .update({ tipo_conta: tipo, atualizado_em: new Date().toISOString() })
+        .eq('codigo_empresa', CODIGO_EMPRESA)
+        .eq('codigo_empregado', codigo);
+
+    if (error) { mostrarMensagem('Erro', 'Falha ao salvar tipo de conta: ' + error.message); return; }
+
+    if (dadosBancariosDB[codigo]) dadosBancariosDB[codigo].tipo_conta = tipo;
+    gruposLiquido.forEach(g => g.linhas.forEach(l => { if (l.codigo_empregado === codigo) l.tipoConta = tipo; }));
+}
+
+function marcarExcluido(codigo, excluir) {
+    if (excluir) excluidosDoRelatorio.add(codigo);
+    else excluidosDoRelatorio.delete(codigo);
+    montarGruposLiquido();
+    renderizarRevisaoLiquido();
+}
+
+async function salvarDadosBancariosManual(codigo) {
+    const bancoInput   = document.querySelector(`.pend-banco[data-codigo="${codigo}"]`);
+    const agenciaInput = document.querySelector(`.pend-agencia[data-codigo="${codigo}"]`);
+    const contaInput   = document.querySelector(`.pend-conta[data-codigo="${codigo}"]`);
+    const tipoSelect   = document.querySelector(`.pend-tipo[data-codigo="${codigo}"]`);
+
+    const bancoCodigo = String(bancoInput.value || '').replace(/\D/g, '').padStart(3, '0');
+    const agencia      = agenciaInput.value.trim();
+    const conta        = contaInput.value.trim();
+    const tipoConta     = tipoSelect.value;
+
+    if (!bancoCodigo || bancoCodigo === '000' || !agencia || !conta) {
+        mostrarMensagem('Atenção', 'Preencha Banco, Agência e Conta antes de salvar.');
+        return;
+    }
+
+    const linha = linhasLiquido.find(l => l.codigo_empregado === codigo);
+    const registro = {
+        codigo_empresa:   CODIGO_EMPRESA,
+        codigo_empregado: codigo,
+        cpf:              linha ? linha.cpf : '',
+        nome_empregado:   linha ? linha.nome : '',
+        cargo:            '',
+        centro_custo:     '',
+        banco_codigo:     bancoCodigo,
+        agencia,
+        conta,
+        tipo_conta:       tipoConta,
+    };
+
+    const { error } = await supabaseClient
+        .from('fechamento_dados_bancarios')
+        .upsert(registro, { onConflict: 'codigo_empresa,codigo_empregado' });
+
+    if (error) { mostrarMensagem('Erro', 'Falha ao salvar dados bancários: ' + error.message); return; }
+
+    dadosBancariosDB[codigo] = registro;
+    montarGruposLiquido();
+    renderizarRevisaoLiquido();
+}
+
+function mostrarPainelLiquido(nome) {
+    document.getElementById('painelUploadLiquido').style.display  = nome === 'upload'  ? 'block' : 'none';
+    document.getElementById('painelRevisaoLiquido').style.display = nome === 'revisao' ? 'block' : 'none';
+}
+
+function voltarParaUploadLiquido() { mostrarPainelLiquido('upload'); }
+
+function irStep6() {
+    const comp = document.getElementById('competencia').value.trim();
+    if (!/^\d{2}\/\d{4}$/.test(comp)) {
+        mostrarMensagem('Atenção', 'Preencha a Competência no Step 1 (formato MM/AAAA) antes de acessar o Relatório Líquido.');
+        return;
+    }
+    document.getElementById('labelCompetencia6').textContent = 'Competência: ' + comp;
+    mostrarPainelLiquido('upload');
+    mostrarStep(6);
+}
