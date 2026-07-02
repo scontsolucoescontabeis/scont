@@ -2073,3 +2073,79 @@ function irStep6() {
     mostrarPainelLiquido('upload');
     mostrarStep(6);
 }
+
+const QUADRANTE_RAZAO_SOCIAL = 'QUADRANTE ETIQUETAS INDÚSTRIA E COMÉRCIO';
+const QUADRANTE_CNPJ         = '24.862.830/0001-96';
+const QUADRANTE_INSCRICAO    = '140866668111';
+const QUADRANTE_ENDERECO     = 'Rua Soldado Antônio Aparecido, Nº 296 - GALPAO, Parque Novo, São Paulo - SP';
+
+// "04/2026" → "01/04/2026 a 30/04/2026"
+function periodoCompetencia(comp) {
+    const [mm, aaaa] = comp.split('/');
+    const ultimoDia  = new Date(parseInt(aaaa, 10), parseInt(mm, 10), 0).getDate();
+    return `01/${mm}/${aaaa} a ${String(ultimoDia).padStart(2, '0')}/${mm}/${aaaa}`;
+}
+
+function gerarPDFLiquido() {
+    if (pendenciasLiquido.length > 0) {
+        mostrarMensagem('Atenção', 'Complete ou exclua os empregados sem dados bancários antes de gerar o PDF.');
+        return;
+    }
+    if (!gruposLiquido.length) {
+        mostrarMensagem('Atenção', 'Nenhum lançamento para gerar o relatório.');
+        return;
+    }
+
+    const comp   = document.getElementById('competencia').value.trim();
+    const { jsPDF } = window.jspdf;
+    const doc    = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const MARGEM = 10;
+    const pageW  = doc.internal.pageSize.getWidth();
+
+    // Cabeçalho — identidade SCONT
+    doc.setFillColor(139, 58, 58); // --primary-color
+    doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, 24, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+    doc.text(QUADRANTE_RAZAO_SOCIAL, MARGEM + 4, MARGEM + 6);
+    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+    doc.text(`CNPJ: ${QUADRANTE_CNPJ}   Inscrição: ${QUADRANTE_INSCRICAO}`, MARGEM + 4, MARGEM + 11);
+    doc.text(QUADRANTE_ENDERECO, MARGEM + 4, MARGEM + 16);
+    doc.text(`Período de: ${periodoCompetencia(comp)}`, MARGEM + 4, MARGEM + 21);
+
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+    doc.text('Relação de Lançamentos Bancários', pageW - MARGEM - 4, MARGEM + 8, { align: 'right' });
+    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+    doc.text('Gerado em ' + new Date().toLocaleDateString('pt-BR'), pageW - MARGEM - 4, MARGEM + 13, { align: 'right' });
+
+    // Corpo — uma "seção" por banco (linha de destaque + linhas de empregados + linha de total)
+    const body = [];
+    gruposLiquido.forEach(g => {
+        body.push([{ content: 'Banco: ' + g.bancoNome, colSpan: 5, styles: { fontStyle: 'bold', fillColor: [44, 62, 80], textColor: 255 } }]);
+        g.linhas.forEach(l => {
+            body.push([
+                l.codigo_empregado,
+                l.nome,
+                formatarCpf(l.cpf),
+                `${l.agencia} / ${l.conta} / ${l.tipoConta}`,
+                'R$ ' + (l.valorInt / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+            ]);
+        });
+        body.push([
+            { content: 'Total:', colSpan: 4, styles: { fontStyle: 'bold', halign: 'right' } },
+            { content: 'R$ ' + (g.totalInt / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }), styles: { fontStyle: 'bold' } },
+        ]);
+    });
+
+    doc.autoTable({
+        head: [['Código', 'Funcionário', 'CPF', 'Agência / Conta / Tipo Conta', 'Valor Líquido']],
+        body,
+        startY: MARGEM + 28,
+        margin: { left: MARGEM, right: MARGEM },
+        styles: { fontSize: 7.5, cellPadding: 1.8, valign: 'middle' },
+        headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+    });
+
+    doc.save(`Relacao_Bancaria_Quadrante_${comp.replace('/', '-')}.pdf`);
+}
