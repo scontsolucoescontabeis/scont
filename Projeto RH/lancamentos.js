@@ -13,6 +13,13 @@ let parametrizacoesAcumuladas = [];
 // ✅ NOVO: Referência aos empregados selecionados (mantém entre ciclos)
 let empregadosSelecionadosAtual = [];
 
+// ✅ NOVO: Nome de exibição de cada empregado selecionado, para uso na grade e nos detalhes
+let empregadosInfoAtual = {};
+
+// ✅ NOVO: Grade Empregado x Rubrica (Passo 3)
+let rubricasGrid = [];   // [{ id, codigo, tipoValor }]
+let valoresGrid = {};    // valoresGrid[rubricaId][empregadoKey] = "valor digitado"
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Formatação do campo de competência
     document.getElementById('lanCompetencia').addEventListener('input', (e) => {
@@ -228,6 +235,18 @@ function avancarParaParametros() {
     // ✅ NOVO: Armazenar empregados selecionados para uso posterior
     empregadosSelecionadosAtual = Array.from(checkboxesEmpregados).map(cb => cb.value);
 
+    // ✅ NOVO: Guardar o nome de exibição de cada empregado (usado na grade e nos detalhes)
+    empregadosInfoAtual = {};
+    checkboxesEmpregados.forEach(cb => {
+        const label = document.querySelector(`label[for="${cb.id}"]`);
+        empregadosInfoAtual[cb.value] = label ? label.textContent.trim().replace(/\s+/g, ' ') : cb.value;
+    });
+
+    // ✅ NOVO: Reinicia a grade empregado x rubrica para esta leva
+    rubricasGrid = [];
+    valoresGrid = {};
+    renderGrade();
+
     // ✅ CORRIGIDO: Usar ativarStep em vez de apenas adicionar classe
     ativarStep('step3');
 }
@@ -251,62 +270,62 @@ function encodeValorParaTipo(valor, tipoValor) {
     return parseInt(String(valor).replace(/\D/g, '') || '0', 10);
 }
 
-function atualizarPlaceholderValor() {
-    const tipo = document.getElementById('lanTipoValor').value;
-    const input = document.getElementById('lanValor');
-    const dica = document.getElementById('lanValorDica');
+function infoTipoValor(tipo) {
     if (tipo === 'horas') {
-        input.placeholder = 'Ex: 01:30';
-        dica.textContent = 'Formato HH:MM (ex: 01:30 = 1 hora e 30 minutos)';
-    } else if (tipo === 'monetario') {
-        input.placeholder = 'Ex: 150,50';
-        dica.textContent = 'Valor em reais com centavos (ex: 150,50)';
-    } else {
-        input.placeholder = 'Ex: 3';
-        dica.textContent = 'Número inteiro de dias';
+        return { placeholder: 'Ex: 01:30', dica: 'Formato HH:MM (ex: 01:30 = 1 hora e 30 minutos)' };
     }
+    if (tipo === 'monetario') {
+        return { placeholder: 'Ex: 150,50', dica: 'Valor em reais com centavos (ex: 150,50)' };
+    }
+    return { placeholder: 'Ex: 3', dica: 'Número inteiro de dias' };
 }
 
-function gerarConteudoTXT(comp, tipoProcesso, rubrica, valor, tipoValor, empregados) {
+function atualizarPlaceholderValorPadrao() {
+    const tipo = document.getElementById('gradeRubricaTipoValor').value;
+    const input = document.getElementById('gradeRubricaValorPadrao');
+    const dica = document.getElementById('gradeRubricaValorPadraoDica');
+    const info = infoTipoValor(tipo);
+    input.placeholder = info.placeholder;
+    dica.textContent = info.dica;
+}
+
+function validarFormatoValor(valor, tipoValor) {
+    const v = String(valor).trim();
+    if (!v) return false;
+    if (tipoValor === 'horas') {
+        return /^\d{1,2}:\d{2}$/.test(v);
+    }
+    // monetário e dias: precisa ter ao menos um dígito
+    return /\d/.test(v);
+}
+
+function gerarConteudoTXT(comp, tipoProcesso, rubrica, tipoValor, itens) {
     const fixo = "10";
     const compParts = comp.split('/');
     const compFormatada = compParts[1] + compParts[0]; // AAAA + MM
     const tipoProcFormatado = String(tipoProcesso).padStart(2, '0');
     const rubFormatada = String(rubrica).padStart(9, '0');
-    const valorInt = encodeValorParaTipo(valor, tipoValor);
-    const valFormatado = String(valorInt).padStart(9, '0');
 
     let conteudo = '';
-    empregados.forEach(empData => {
-        const [codEmpresa, codEmpregado] = empData.split('|');
+    itens.forEach(item => {
+        const [codEmpresa, codEmpregado] = item.empregado.split('|');
         const codEmpregadoFormatado = String(codEmpregado).padStart(10, '0');
         const codEmpresaFormatada = String(codEmpresa).padStart(10, '0');
+        const valorInt = encodeValorParaTipo(item.valor, tipoValor);
+        const valFormatado = String(valorInt).padStart(9, '0');
         conteudo += `${fixo}${codEmpregadoFormatado}${compFormatada}${rubFormatada}${tipoProcFormatado}${valFormatado}${codEmpresaFormatada}\n`;
     });
 
     return conteudo;
 }
 
-function gerarPrevia() {
-    const comp = document.getElementById('lanCompetencia').value;
-    const tipoProcesso = document.getElementById('lanTipoProcesso').value;
-    const rubrica = document.getElementById('lanRubrica').value.trim();
-    const valor = document.getElementById('lanValor').value.trim();
-    const tipoValor = document.getElementById('lanTipoValor').value;
+function adicionarRubricaGrade() {
+    const codigo = document.getElementById('gradeRubricaCodigo').value.trim();
+    const tipoValor = document.getElementById('gradeRubricaTipoValor').value;
+    const valorPadrao = document.getElementById('gradeRubricaValorPadrao').value.trim();
 
-    // Validações
-    if (!tipoProcesso) {
-        mostrarMensagem('Atenção', 'Selecione o Tipo do Processo.');
-        return;
-    }
-
-    if (!rubrica || !/^\d+$/.test(rubrica)) {
+    if (!codigo || !/^\d+$/.test(codigo)) {
         mostrarMensagem('Atenção', 'Informe um Código de Rubrica válido (apenas números).');
-        return;
-    }
-
-    if (!valor) {
-        mostrarMensagem('Atenção', 'Informe um Valor.');
         return;
     }
 
@@ -315,31 +334,171 @@ function gerarPrevia() {
         return;
     }
 
-    // ✅ NOVO: Gerar TXT para esta parametrização
-    const conteudoTXT = gerarConteudoTXT(comp, tipoProcesso, rubrica, valor, tipoValor, empregadosSelecionadosAtual);
+    const id = Date.now();
+    rubricasGrid.push({ id, codigo, tipoValor });
+    valoresGrid[id] = {};
 
-    // ✅ NOVO: Armazenar parametrização
-    const parametrizacao = {
-        id: Date.now(),
-        competencia: comp,
-        tipoProcesso: tipoProcesso,
-        rubrica: rubrica,
-        valor: valor,
-        tipoValor: tipoValor,
-        empregados: empregadosSelecionadosAtual,
-        conteudoTXT: conteudoTXT,
-        dataHora: new Date().toLocaleString('pt-BR')
-    };
+    if (valorPadrao) {
+        empregadosSelecionadosAtual.forEach(empKey => {
+            valoresGrid[id][empKey] = valorPadrao;
+        });
+    }
 
-    parametrizacoesAcumuladas.push(parametrizacao);
+    document.getElementById('gradeRubricaCodigo').value = '';
+    document.getElementById('gradeRubricaValorPadrao').value = '';
 
-    // ✅ NOVO: Mostrar prévia e opções
-    document.getElementById('previaTxt').textContent = conteudoTXT;
+    renderGrade();
+}
+
+function removerRubricaGrade(id) {
+    const rubrica = rubricasGrid.find(r => r.id === id);
+    if (!rubrica) return;
+
+    const temValores = valoresGrid[id] && Object.values(valoresGrid[id]).some(v => v && v.trim());
+    if (temValores && !confirm(`A rubrica ${rubrica.codigo} já tem valores preenchidos. Remover mesmo assim?`)) {
+        return;
+    }
+
+    rubricasGrid = rubricasGrid.filter(r => r.id !== id);
+    delete valoresGrid[id];
+    renderGrade();
+}
+
+function atualizarValorCelula(rubricaId, empKey, valor) {
+    if (!valoresGrid[rubricaId]) valoresGrid[rubricaId] = {};
+    valoresGrid[rubricaId][empKey] = valor;
+}
+
+function renderGrade() {
+    const chipsContainer = document.getElementById('chipsRubricas');
+    const gradeContainer = document.getElementById('gradeContainer');
+    if (!chipsContainer || !gradeContainer) return;
+
+    // Chips das rubricas adicionadas
+    chipsContainer.innerHTML = rubricasGrid.map(r => `
+        <span class="chip-rubrica">
+            Rubrica ${r.codigo} (${r.tipoValor})
+            <span class="chip-remove" onclick="removerRubricaGrade(${r.id})">×</span>
+        </span>
+    `).join('');
+
+    if (rubricasGrid.length === 0 || empregadosSelecionadosAtual.length === 0) {
+        gradeContainer.innerHTML = '<div class="grade-empty-msg">Adicione ao menos uma rubrica acima para montar a grade.</div>';
+        return;
+    }
+
+    let html = '<table class="grade-table"><thead><tr><th class="grade-emp-col">Empregado</th>';
+    rubricasGrid.forEach(r => {
+        html += `<th>Rubrica ${r.codigo}<br><small>${infoTipoValor(r.tipoValor).placeholder}</small></th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    empregadosSelecionadosAtual.forEach(empKey => {
+        const nome = empregadosInfoAtual[empKey] || empKey;
+        const buscaAttr = nome.toLowerCase().replace(/"/g, '');
+        html += `<tr data-emp-busca="${buscaAttr}"><td class="grade-emp-col">${nome}</td>`;
+        rubricasGrid.forEach(r => {
+            const valorAtual = (valoresGrid[r.id] && valoresGrid[r.id][empKey]) || '';
+            html += `<td><input type="text" class="grade-input" placeholder="${infoTipoValor(r.tipoValor).placeholder}" value="${valorAtual}" onchange="atualizarValorCelula(${r.id}, '${empKey}', this.value)"></td>`;
+        });
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    gradeContainer.innerHTML = html;
+}
+
+function filtrarGrade() {
+    const termo = document.getElementById('buscaEmpregadoGrade').value.toLowerCase();
+    document.querySelectorAll('#gradeContainer tbody tr').forEach(row => {
+        const alvo = row.getAttribute('data-emp-busca') || '';
+        row.style.display = alvo.includes(termo) ? '' : 'none';
+    });
+}
+
+function gerarParametrizacoes() {
+    const comp = document.getElementById('lanCompetencia').value;
+    const tipoProcesso = document.getElementById('lanTipoProcesso').value;
+
+    if (!tipoProcesso) {
+        mostrarMensagem('Atenção', 'Selecione o Tipo do Processo.');
+        return;
+    }
+
+    if (rubricasGrid.length === 0) {
+        mostrarMensagem('Atenção', 'Adicione ao menos uma rubrica à grade.');
+        return;
+    }
+
+    if (empregadosSelecionadosAtual.length === 0) {
+        mostrarMensagem('Atenção', 'Nenhum empregado selecionado. Volte ao passo 2.');
+        return;
+    }
+
+    const novasParametrizacoes = [];
+    const rubricasIgnoradas = [];
+
+    for (const r of rubricasGrid) {
+        const valoresColuna = valoresGrid[r.id] || {};
+        const itens = [];
+
+        for (const empKey of Object.keys(valoresColuna)) {
+            const valor = valoresColuna[empKey];
+            if (!valor || !valor.trim()) continue;
+
+            if (!validarFormatoValor(valor, r.tipoValor)) {
+                const nomeEmp = empregadosInfoAtual[empKey] || empKey;
+                mostrarMensagem('Atenção', `Valor inválido para "${nomeEmp}" na rubrica ${r.codigo}: "${valor}". Corrija antes de gerar.`);
+                return;
+            }
+
+            itens.push({
+                empregado: empKey,
+                valor: valor.trim(),
+                nomeEmpregado: empregadosInfoAtual[empKey] || empKey
+            });
+        }
+
+        if (itens.length === 0) {
+            rubricasIgnoradas.push(r.codigo);
+            continue;
+        }
+
+        const conteudoTXT = gerarConteudoTXT(comp, tipoProcesso, r.codigo, r.tipoValor, itens);
+
+        novasParametrizacoes.push({
+            id: Date.now() + Math.random(),
+            competencia: comp,
+            tipoProcesso: tipoProcesso,
+            rubrica: r.codigo,
+            tipoValor: r.tipoValor,
+            itens: itens,
+            conteudoTXT: conteudoTXT,
+            dataHora: new Date().toLocaleString('pt-BR')
+        });
+    }
+
+    if (novasParametrizacoes.length === 0) {
+        mostrarMensagem('Atenção', 'Nenhuma rubrica da grade tem valores preenchidos.');
+        return;
+    }
+
+    parametrizacoesAcumuladas.push(...novasParametrizacoes);
+
+    // ✅ Reinicia a grade para a próxima leva de rubricas
+    rubricasGrid = [];
+    valoresGrid = {};
+    renderGrade();
+
+    document.getElementById('previaTxt').textContent = novasParametrizacoes[novasParametrizacoes.length - 1].conteudoTXT;
     ativarStep('step3-5');
     atualizarListaParametrizacoes();
 
-    // Feedback visual
-    mostrarMensagem('Sucesso', `Parametrização adicionada! Total: ${parametrizacoesAcumuladas.length}`);
+    let msg = `${novasParametrizacoes.length} parametrização(ões) adicionada(s)! Total: ${parametrizacoesAcumuladas.length}`;
+    if (rubricasIgnoradas.length > 0) {
+        msg += `\nRubricas ignoradas (sem valores): ${rubricasIgnoradas.join(', ')}`;
+    }
+    mostrarMensagem('Sucesso', msg);
 }
 
 function atualizarListaParametrizacoes() {
@@ -360,8 +519,7 @@ function atualizarListaParametrizacoes() {
                     <div class="parametrizacao-counter">${index + 1}</div>
                     <div>
                         <span class="parametrizacao-badge rubrica">Rubrica: ${param.rubrica}</span>
-                        <span class="parametrizacao-badge valor">R$ ${param.valor}</span>
-                        <span class="parametrizacao-badge empregados">${param.empregados.length} empr.</span>
+                        <span class="parametrizacao-badge empregados">${param.itens.length} empr. com valor individual</span>
                     </div>
                 </div>
                 <button type="button" class="btn-remove" onclick="removerParametrizacao(${param.id})">
@@ -371,19 +529,48 @@ function atualizarListaParametrizacoes() {
             <div class="parametrizacao-info">
                 ${param.dataHora} | Competência: <strong>${param.competencia}</strong> | Tipo: <strong>${param.tipoProcesso}</strong>
             </div>
+            <div class="detalhes-toggle" onclick="alternarDetalhesParametrizacao(${param.id})">Ver detalhes ▾</div>
+            <div id="detalhes_${param.id}" style="display: none;"></div>
         </div>
     `).join('');
+}
+
+function alternarDetalhesParametrizacao(id) {
+    const container = document.getElementById(`detalhes_${id}`);
+    if (!container) return;
+
+    if (container.style.display === 'none') {
+        const param = parametrizacoesAcumuladas.find(p => p.id === id);
+        if (!param) return;
+
+        container.innerHTML = `
+            <table class="detalhes-table">
+                <thead><tr><th>Empregado</th><th>Valor</th></tr></thead>
+                <tbody>
+                    ${param.itens.map(item => `
+                        <tr>
+                            <td>${item.nomeEmpregado}</td>
+                            <td>${item.valor}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+    }
 }
 
 function novaParametrizacao() {
     // Limpar formulário
     document.getElementById('lanTipoProcesso').value = '';
-    document.getElementById('lanRubrica').value = '';
-    document.getElementById('lanValor').value = '';
-    document.getElementById('lanTipoValor').value = 'horas';
-    atualizarPlaceholderValor();
+    document.getElementById('gradeRubricaCodigo').value = '';
+    document.getElementById('gradeRubricaValorPadrao').value = '';
+    document.getElementById('gradeRubricaTipoValor').value = 'horas';
+    atualizarPlaceholderValorPadrao();
 
-    // Voltar ao Step 3 para nova parametrização
+    // Voltar ao Step 1 para nova leva (nova seleção de empresas/empregados)
     ativarStep('step1');
 }
 
@@ -435,17 +622,21 @@ function baixarTXT() {
     // ✅ NOVO: Limpar após exportação e reiniciar
     parametrizacoesAcumuladas = [];
     empregadosSelecionadosAtual = [];
+    empregadosInfoAtual = {};
+    rubricasGrid = [];
+    valoresGrid = {};
     mostrarMensagem('Sucesso', 'Arquivo TXT baixado com sucesso! Sessão reiniciada.');
-    
+
     // Limpar formulários
     document.getElementById('lanCompetencia').value = '';
     document.getElementById('lanTipoProcesso').value = '';
-    document.getElementById('lanRubrica').value = '';
-    document.getElementById('lanValor').value = '';
-    document.getElementById('lanTipoValor').value = 'horas';
+    document.getElementById('gradeRubricaCodigo').value = '';
+    document.getElementById('gradeRubricaValorPadrao').value = '';
+    document.getElementById('gradeRubricaTipoValor').value = 'horas';
     document.getElementById('buscaEmpresa').value = '';
     document.getElementById('buscaEmpregado').value = '';
-    atualizarPlaceholderValor();
-    
+    atualizarPlaceholderValorPadrao();
+    renderGrade();
+
     ativarStep('step1');
 }
