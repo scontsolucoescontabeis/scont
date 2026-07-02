@@ -193,7 +193,7 @@
             <div class="btn-group">
                 <button class="btn btn-secondary" onclick="voltarStep(1)">← Voltar</button>
                 <button class="btn btn-primary" onclick="irStep3()">▶ Gerar TXT</button>
-                <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
+                <button class="btn btn-info" onclick="window.location.href='ferias.html'">📅 Programação de Férias</button>
             </div>
         </div>
 
@@ -216,76 +216,8 @@
             <div class="btn-group">
                 <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar</button>
                 <button class="btn btn-success" onclick="baixarTXT()">⬇ Baixar TXT</button>
-                <button class="btn btn-info" onclick="irStep4()">📅 Programação de Férias</button>
+                <button class="btn btn-info" onclick="window.location.href='ferias.html'">📅 Programação de Férias</button>
                 <button class="btn btn-info" onclick="irStep6()">🏷️ Etiquetas Bancárias</button>
-            </div>
-        </div>
-
-        <!-- STEP 4: UPLOAD FÉRIAS -->
-        <div class="step-card" id="step4" style="display:none;">
-            <div class="step-title">
-                <div class="step-number">4</div>
-                Programação de Férias – Upload
-            </div>
-
-            <div class="alert alert-info">
-                Faça o upload da planilha de programação de férias. A ferramenta ordenará os registros pela data de início do gozo.
-            </div>
-
-            <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">
-                Planilha de Férias (Excel) *
-            </label>
-            <div class="upload-area" id="uploadAreaFerias" onclick="document.getElementById('inputFerias').click()">
-                <div class="upload-icon">🏖️</div>
-                <div class="upload-text">
-                    Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
-                </div>
-                <div class="upload-filename" id="filenameFerias"></div>
-                <input type="file" id="inputFerias" accept=".xlsx,.xls">
-            </div>
-
-            <div style="margin-top:16px;">
-                <label style="font-weight:600; font-size:13px; display:block; margin-bottom:5px;">
-                    Coluna de ordenação (data de gozo)
-                </label>
-                <select id="colunaOrdenacao" style="padding:9px; border:1px solid var(--border-color); border-radius:6px; font-size:13px; min-width:250px;">
-                    <option value="">— Detectar automaticamente —</option>
-                </select>
-                <small style="color:var(--text-secondary); font-size:12px; display:block; margin-top:4px;">
-                    Após selecionar o arquivo, as colunas disponíveis serão listadas aqui.
-                </small>
-            </div>
-
-            <div class="btn-group">
-                <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar ao Relatório</button>
-                <button class="btn btn-primary" onclick="processarFerias()">▶ Gerar Relatório de Férias</button>
-            </div>
-        </div>
-
-        <!-- STEP 5: RELATÓRIO FÉRIAS -->
-        <div class="step-card" id="step5" style="display:none;">
-            <div class="step-title">
-                <div class="step-number">5</div>
-                Programação de Férias – Ordenado por Data de Gozo
-            </div>
-
-            <div class="ferias-stats" id="feriasStats"></div>
-
-            <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap;">
-                <input type="text" id="buscaFerias" placeholder="Filtrar por funcionário..."
-                       oninput="filtrarFerias()" style="flex:1; min-width:220px; padding:8px 12px; border:1px solid var(--border-color); border-radius:6px; font-size:13px;">
-            </div>
-
-            <div class="table-wrapper">
-                <table id="tabelaFerias">
-                    <thead id="headFerias"></thead>
-                    <tbody id="bodyFerias"></tbody>
-                </table>
-            </div>
-
-            <div class="btn-group">
-                <button class="btn btn-secondary" onclick="voltarStep(4)">← Voltar</button>
-                <button class="btn btn-primary" onclick="imprimirFerias()">🖨️ Imprimir / Salvar PDF</button>
             </div>
         </div>
 

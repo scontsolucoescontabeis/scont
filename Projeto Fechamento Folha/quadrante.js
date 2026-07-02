@@ -16,9 +16,6 @@ let rubricasConfig    = []; // [{coluna_planilha, codigo_rubrica, tipo_processo,
 let rhRubricasData    = []; // [{descricao_rubrica, codigo_rubrica}] — fallback de resolução
 let linhasTxt         = []; // linhas válidas para o TXT
 let tipoFolhaAtual    = '11'; // tipo_folha pré-selecionado no modal de TXT
-let feriasData        = []; // dados brutos da planilha de férias
-let feriasHeaders     = []; // cabeçalhos da planilha de férias
-let feriasSorted      = []; // dados ordenados
 let empregadosConfig  = {}; // nome_normalizado → codigo_empregado (config desta ferramenta)
 let rubricasIgnoradas = new Set(); // normalizarNome(coluna_planilha) → excluir do TXT
 let faltaDatasMap     = {}; // `${codEmpregado}::${normColuna}` → string raw de datas inseridas
@@ -45,7 +42,7 @@ function fecharModal() {
 }
 
 function mostrarStep(n) {
-    [1,2,3,4,5,6].forEach(i => {
+    [1,2,3,6].forEach(i => {
         const el = document.getElementById('step' + i);
         if (el) el.style.display = (i === n) ? 'block' : 'none';
     });
@@ -300,8 +297,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Upload área – drag and drop folha
     configurarUploadArea('uploadAreaFolha', 'inputFolha', 'filenameFolha', onFolhaSelecionada);
-    // Upload área – férias
-    configurarUploadArea('uploadAreaFerias', 'inputFerias', 'filenameFerias', onFeriasSelecionada);
+
     // Upload área – relatório líquido (etiquetas bancárias)
     configurarUploadArea('uploadAreaLiquido', 'inputLiquido', 'filenameLiquido', onLiquidoSelecionado);
 
@@ -952,203 +948,6 @@ function baixarTXT() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-}
-
-// ──────────────────────────────────────────────
-// STEP 4 – UPLOAD FÉRIAS
-// ──────────────────────────────────────────────
-
-let arquivoFerias = null;
-
-function irStep4() { mostrarStep(4); }
-
-function onFeriasSelecionada(file, filenameId) {
-    arquivoFerias = file;
-    const el = document.getElementById(filenameId);
-    el.textContent = '✔ ' + file.name;
-    el.style.display = 'block';
-    preCarregarColunas(file);
-}
-
-function detectarCabecalhoFerias(rows) {
-    // Procura a linha que contém "Código" ou "Empregado" (linha de dados do cabeçalho)
-    for (let r = 0; r < Math.min(15, rows.length); r++) {
-        if (!rows[r]) continue;
-        const textos = rows[r].map(c => String(c).trim());
-        if (textos.some(t => /^c[oó]digo$/i.test(t) || /^empregado/i.test(t))) {
-            // Combinar com a linha anterior (sub-cabeçalho) se existir
-            const cabMerge = textos.map((t, i) => {
-                if (t) return t;
-                const anterior = rows[r - 1] ? String(rows[r - 1][i] || '').trim() : '';
-                return anterior;
-            });
-            return { cabIdx: r, headers: cabMerge };
-        }
-    }
-    // Fallback: primeira linha com 3+ células não-vazias
-    for (let r = 0; r < Math.min(15, rows.length); r++) {
-        if (!rows[r]) continue;
-        if (rows[r].filter(c => String(c).trim() !== '').length >= 3) {
-            return { cabIdx: r, headers: rows[r].map(c => String(c).trim()) };
-        }
-    }
-    return null;
-}
-
-async function preCarregarColunas(file) {
-    try {
-        const buffer   = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
-        const sheet    = workbook.Sheets[workbook.SheetNames[0]];
-        const rows     = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
-        const resultado = detectarCabecalhoFerias(rows);
-        if (!resultado) return;
-        feriasHeaders = resultado.headers;
-
-        const sel = document.getElementById('colunaOrdenacao');
-        sel.innerHTML = '<option value="">— Detectar automaticamente —</option>';
-        feriasHeaders.forEach((h, i) => {
-            if (!h) return;
-            const opt = document.createElement('option');
-            opt.value = i;
-            opt.textContent = h;
-            if (/gozo|in[ií]cio.*gozo|gozo.*fer/i.test(h)) opt.selected = true;
-            sel.appendChild(opt);
-        });
-    } catch (err) {
-        console.error('Pré-carga colunas férias:', err);
-    }
-}
-
-async function processarFerias() {
-    if (!arquivoFerias) {
-        mostrarMensagem('Atenção', 'Selecione a planilha de programação de férias.');
-        return;
-    }
-
-    try {
-        const buffer   = await arquivoFerias.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-        const sheet    = workbook.Sheets[workbook.SheetNames[0]];
-        const rows     = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
-        // Detectar cabeçalho
-        const deteccao = detectarCabecalhoFerias(rows);
-        if (!deteccao) {
-            mostrarMensagem('Atenção', 'Não foi possível detectar o cabeçalho da planilha de férias. Verifique o arquivo.');
-            return;
-        }
-        const { cabIdx } = deteccao;
-        feriasHeaders = deteccao.headers;
-
-        // Dados: linhas após o cabeçalho, ignorar linhas totalmente vazias e placeholders
-        feriasData = rows.slice(cabIdx + 1).filter(r =>
-            Array.isArray(r) && r.some(c => {
-                const s = String(c).trim();
-                return s !== '' && !/^\.+$/.test(s); // ignora "...." e "..../..../......"
-            })
-        );
-
-        // Coluna de ordenação: preferir "Início gozo férias" (col 22, índice base-0)
-        let colOrd = parseInt(document.getElementById('colunaOrdenacao').value, 10);
-        if (isNaN(colOrd)) {
-            colOrd = feriasHeaders.findIndex(h => /gozo/i.test(h));
-            if (colOrd < 0) colOrd = feriasHeaders.findIndex(h => /in[ií]cio/i.test(h));
-            if (colOrd < 0) colOrd = 0;
-        }
-
-        // Ordenar
-        feriasSorted = [...feriasData].sort((a, b) => {
-            const va = parseDataFerias(a[colOrd]);
-            const vb = parseDataFerias(b[colOrd]);
-            return va - vb;
-        });
-
-        renderizarFerias();
-        mostrarStep(5);
-
-    } catch (err) {
-        console.error(err);
-        mostrarMensagem('Erro', 'Falha ao processar férias: ' + err.message);
-    }
-}
-
-function parseDataFerias(val) {
-    if (!val) return new Date(9999, 0);
-    if (val instanceof Date) return isNaN(val.getTime()) ? new Date(9999, 0) : val;
-    const s = String(val).trim();
-    if (!s || /^[.\/ ]+$/.test(s)) return new Date(9999, 0); // placeholder ..../..../......
-    // DD/MM/AAAA
-    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
-    // Número serial do Excel
-    const n = parseFloat(s);
-    if (!isNaN(n) && n > 1000) return new Date(Math.round((n - 25569) * 86400 * 1000));
-    return new Date(9999, 0);
-}
-
-function formatarDataFerias(val) {
-    const d = parseDataFerias(val);
-    if (!d || isNaN(d.getTime()) || d.getFullYear() > 9000) return String(val || '–');
-    return d.toLocaleDateString('pt-BR');
-}
-
-function renderizarFerias() {
-    // Header
-    const thead = document.getElementById('headFerias');
-    thead.innerHTML = '<tr>' + feriasHeaders.map(h => `<th>${h}</th>`).join('') + '</tr>';
-
-    // Detectar índices de colunas de data para formatar
-    const colOrd = parseInt(document.getElementById('colunaOrdenacao').value, 10);
-    const idxDatas = new Set();
-    feriasHeaders.forEach((h, i) => {
-        if (/data|gozo|in[ií]cio|fim|per[ií]odo/i.test(h)) idxDatas.add(i);
-    });
-    if (!isNaN(colOrd)) idxDatas.add(colOrd);
-
-    renderizarBodyFerias(feriasSorted, idxDatas);
-
-    // Stats
-    const total = feriasSorted.length;
-    const anos  = new Set(feriasSorted.map(r => parseDataFerias(r[isNaN(colOrd) ? 0 : colOrd]).getFullYear())).size;
-    document.getElementById('feriasStats').innerHTML = `
-        <div class="stat-card">
-            <div class="stat-value">${total}</div>
-            <div class="stat-label">Programações</div>
-        </div>`;
-}
-
-function renderizarBodyFerias(dados, idxDatas) {
-    const tbody = document.getElementById('bodyFerias');
-    tbody.innerHTML = '';
-    dados.forEach(row => {
-        const td = feriasHeaders.map((_, i) => {
-            const val = row[i];
-            const txt = idxDatas.has(i) ? formatarDataFerias(val) : (val !== undefined ? val : '–');
-            return `<td>${txt}</td>`;
-        }).join('');
-        tbody.innerHTML += `<tr>${td}</tr>`;
-    });
-}
-
-function filtrarFerias() {
-    const termo = normalizarNome(document.getElementById('buscaFerias').value);
-    const colOrd = parseInt(document.getElementById('colunaOrdenacao').value, 10);
-    const idxDatas = new Set(feriasHeaders.reduce((acc, h, i) => {
-        if (/data|gozo|in[ií]cio|fim|per[ií]odo/i.test(h)) acc.push(i);
-        return acc;
-    }, []));
-    if (!isNaN(colOrd)) idxDatas.add(colOrd);
-
-    const filtrados = termo
-        ? feriasSorted.filter(r => r.some(c => normalizarNome(String(c)).includes(termo)))
-        : feriasSorted;
-    renderizarBodyFerias(filtrados, idxDatas);
-}
-
-function imprimirFerias() {
-    window.print();
 }
 
 // ──────────────────────────────────────────────
