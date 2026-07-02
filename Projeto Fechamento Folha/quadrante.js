@@ -1772,3 +1772,99 @@ function dedupeBancaria(linhas) {
     });
     return Object.values(map);
 }
+
+function onLiquidoSelecionado(file, filenameId) {
+    arquivoLiquido = file;
+    const el = document.getElementById(filenameId);
+    el.textContent = '✔ ' + file.name;
+    el.style.display = 'block';
+}
+
+async function carregarDadosBancariosDB() {
+    const { data, error } = await supabaseClient
+        .from('fechamento_dados_bancarios')
+        .select('*')
+        .eq('codigo_empresa', CODIGO_EMPRESA);
+    if (error) throw error;
+    dadosBancariosDB = {};
+    (data || []).forEach(r => { dadosBancariosDB[r.codigo_empregado] = r; });
+}
+
+// Faz upsert dos dados bancários da planilha preservando o tipo_conta já
+// salvo (nunca sobrescrito pela importação), e recarrega o estado local.
+async function sincronizarDadosBancarios(linhasPlanilha) {
+    await carregarDadosBancariosDB();
+
+    const upsertRows = linhasPlanilha.map(l => {
+        const existente = dadosBancariosDB[l.codigo_empregado];
+        return {
+            codigo_empresa:   CODIGO_EMPRESA,
+            codigo_empregado: l.codigo_empregado,
+            cpf:              l.cpf,
+            nome_empregado:   l.nome_empregado,
+            cargo:            l.cargo,
+            centro_custo:     l.centro_custo,
+            banco_codigo:     l.banco_codigo,
+            agencia:          l.agencia,
+            conta:            l.conta,
+            tipo_conta:       existente ? existente.tipo_conta : 'C.Corrente',
+        };
+    });
+
+    if (upsertRows.length) {
+        const { error } = await supabaseClient
+            .from('fechamento_dados_bancarios')
+            .upsert(upsertRows, { onConflict: 'codigo_empresa,codigo_empregado' });
+        if (error) throw error;
+    }
+
+    await carregarDadosBancariosDB();
+}
+
+async function processarLiquido() {
+    const comp = document.getElementById('competencia').value.trim();
+    if (!/^\d{2}\/\d{4}$/.test(comp)) {
+        mostrarMensagem('Atenção', 'Preencha a Competência no Step 1 (formato MM/AAAA) antes de gerar o Relatório Líquido.');
+        return;
+    }
+    if (!arquivoLiquido) {
+        mostrarMensagem('Atenção', 'Selecione a planilha de Informações Bancárias / Líquido.');
+        return;
+    }
+
+    try {
+        const buffer   = await arquivoLiquido.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'array' });
+
+        const sheetBancaria = encontrarAba(workbook, ['informacoes bancarias']);
+        const sheetLiquido  = encontrarAba(workbook, ['liquido']);
+
+        if (!sheetBancaria || !sheetLiquido) {
+            mostrarMensagem('Erro', 'A planilha precisa conter as abas "Informações bancárias" e "Líquido".');
+            return;
+        }
+
+        const linhasBancariaPlanilha = dedupeBancaria(lerAbaComoObjetos(sheetBancaria, MAPA_BANCARIA));
+        const linhasLiquidoPlanilha  = lerAbaComoObjetos(sheetLiquido, MAPA_LIQUIDO);
+
+        await sincronizarDadosBancarios(linhasBancariaPlanilha);
+
+        linhasLiquido = linhasLiquidoPlanilha
+            .map(l => ({
+                codigo_empregado: normalizarCodigo(l.codigo),
+                cpf:              String(l.cpf || '').replace(/\D/g, ''),
+                nome:             String(l.nome || '').trim(),
+                valorInt:         parseMoney(l.valor),
+            }))
+            .filter(l => l.codigo_empregado && l.valorInt > 0);
+
+        excluidosDoRelatorio.clear();
+        montarGruposLiquido();
+        renderizarRevisaoLiquido();
+        document.getElementById('labelCompetencia6').textContent = 'Competência: ' + comp;
+        mostrarPainelLiquido('revisao');
+    } catch (e) {
+        console.error('Erro ao processar planilha do Relatório Líquido:', e);
+        mostrarMensagem('Erro', 'Falha ao processar a planilha: ' + e.message);
+    }
+}
