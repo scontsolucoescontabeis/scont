@@ -96,6 +96,55 @@ supabase functions deploy transferir-conversa
 
 ---
 
+## 6b. Conexão via QR Code (Evolution API) — canal alternativo
+
+Enquanto as credenciais da Meta Cloud API não são aprovadas, o CRM pode operar via QR Code
+(conexão não-oficial, usando a Evolution API — https://github.com/EvolutionAPI/evolution-api).
+Isso é temporário: assim que a API oficial estiver disponível, o admin troca o canal em
+`/crm/conexao` sem precisar reimplantar nada.
+
+### Hospedar a Evolution API
+
+Rode a Evolution API em Docker, em qualquer host (VPS próprio, Railway, Fly.io etc.):
+
+```bash
+docker run -d --name evolution-api \
+  -p 8080:8080 \
+  -e AUTHENTICATION_API_KEY=sua_api_key_secreta \
+  atendai/evolution-api:latest
+```
+
+Anote a URL pública do serviço (`EVOLUTION_API_URL`) e a `AUTHENTICATION_API_KEY` (`EVOLUTION_API_KEY`).
+
+### Secrets do Supabase
+
+```bash
+supabase secrets set EVOLUTION_API_URL=https://sua-evolution-api.exemplo.com
+supabase secrets set EVOLUTION_API_KEY=sua_api_key_secreta
+supabase secrets set EVOLUTION_INSTANCE_NAME=scont-crm
+supabase secrets set EVOLUTION_WEBHOOK_TOKEN=token_aleatorio_seguro
+```
+
+### Deploy das Edge Functions
+
+```bash
+supabase functions deploy evolution-webhook
+supabase functions deploy evolution-connect
+```
+
+O webhook da instância é configurado automaticamente pela função `evolution-connect` na primeira
+conexão — não é necessário configurar nada manualmente no painel da Evolution API.
+
+### Uso
+
+1. Faça login como ADMIN e acesse **Conexão WhatsApp** no menu.
+2. Confirme que o canal ativo é "QR Code" e clique em **Gerar QR Code**.
+3. No celular: WhatsApp → Aparelhos conectados → Conectar um aparelho → escaneie o código.
+4. Quando a API oficial da Meta estiver aprovada (seções 4-6 acima), volte em **Conexão WhatsApp**
+   e troque o canal ativo para "API Oficial".
+
+---
+
 ## 7. Criar bucket de Storage
 
 No Supabase Dashboard → Storage → **New bucket**:
