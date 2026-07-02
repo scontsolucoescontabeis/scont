@@ -23,6 +23,13 @@ let empregadosConfig  = {}; // nome_normalizado → codigo_empregado (config des
 let rubricasIgnoradas = new Set(); // normalizarNome(coluna_planilha) → excluir do TXT
 let faltaDatasMap     = {}; // `${codEmpregado}::${normColuna}` → string raw de datas inseridas
 
+let arquivoLiquido     = null;              // File selecionado no Step 6
+let dadosBancariosDB   = {};                // codigo_empregado → registro de fechamento_dados_bancarios
+let linhasLiquido      = [];                // [{codigo_empregado, cpf, nome, valorInt}] da aba Líquido do mês
+let gruposLiquido      = [];                // [{bancoCodigo, bancoNome, linhas:[...], totalInt}]
+let pendenciasLiquido  = [];                // linhas de linhasLiquido sem dados bancários
+let excluidosDoRelatorio = new Set();       // codigo_empregado excluídos manualmente do relatório do mês
+
 // ──────────────────────────────────────────────
 // UTILITÁRIOS
 // ──────────────────────────────────────────────
@@ -38,7 +45,7 @@ function fecharModal() {
 }
 
 function mostrarStep(n) {
-    [1,2,3,4,5].forEach(i => {
+    [1,2,3,4,5,6].forEach(i => {
         const el = document.getElementById('step' + i);
         if (el) el.style.display = (i === n) ? 'block' : 'none';
     });
@@ -295,6 +302,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     configurarUploadArea('uploadAreaFolha', 'inputFolha', 'filenameFolha', onFolhaSelecionada);
     // Upload área – férias
     configurarUploadArea('uploadAreaFerias', 'inputFerias', 'filenameFerias', onFeriasSelecionada);
+    // Upload área – relatório líquido (etiquetas bancárias)
+    configurarUploadArea('uploadAreaLiquido', 'inputLiquido', 'filenameLiquido', onLiquidoSelecionado);
 
     // Painel de envios do formulário
     carregarEnvios();
@@ -1657,3 +1666,109 @@ async function processarDadosFormulario(envioRow) {
 }
 
 // carregarEnvios é chamado no DOMContentLoaded existente (linha ~239)
+
+// ══════════════════════════════════════════════
+// RELATÓRIO LÍQUIDO — ETIQUETAS BANCÁRIAS (STEP 6)
+// ══════════════════════════════════════════════
+
+// ── Mapa de bancos FEBRABAN ──────────────────────────────
+const BANCOS_FEBRABAN = {
+    '001': 'BANCO DO BRASIL', '033': 'BANCO SANTANDER', '077': 'BANCO INTER',
+    '104': 'CAIXA ECONÔMICA FEDERAL', '208': 'BANCO BTG PACTUAL', '212': 'BANCO ORIGINAL',
+    '237': 'BANCO BRADESCO', '260': 'NU PAGAMENTOS (NUBANK)', '318': 'BANCO BMG',
+    '336': 'BANCO C6', '341': 'BANCO ITAÚ', '399': 'HSBC', '422': 'BANCO SAFRA',
+    '623': 'BANCO PAN', '655': 'BANCO VOTORANTIM', '748': 'SICREDI', '756': 'SICOOB',
+};
+
+function nomeBanco(codigo) {
+    const c = String(codigo || '').replace(/\D/g, '').padStart(3, '0');
+    return BANCOS_FEBRABAN[c] || ('BANCO ' + c);
+}
+
+// ── Utilitários de texto/planilha ────────────────────────
+function escHtml(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Normaliza cabeçalho de coluna para comparação robusta (remove pontuação, °/º etc.)
+function chaveColuna(h) {
+    return normalizarNome(h).replace(/[^a-z0-9 ]/g, '');
+}
+
+// "32.0" ou 32 (número do Excel) → "32"
+function normalizarCodigo(v) {
+    if (v === '' || v === null || v === undefined) return '';
+    const n = Number(v);
+    return isNaN(n) ? String(v).trim() : String(Math.trunc(n));
+}
+
+function formatarCpf(digits) {
+    const d = String(digits || '').replace(/\D/g, '');
+    if (d.length !== 11) return digits || '';
+    return `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9,11)}`;
+}
+
+// Encontra a aba do workbook cujo nome normalizado bate com um dos candidatos
+function encontrarAba(workbook, candidatosNormalizados) {
+    const nomeEncontrado = workbook.SheetNames.find(n => candidatosNormalizados.includes(normalizarNome(n)));
+    return nomeEncontrado ? workbook.Sheets[nomeEncontrado] : null;
+}
+
+// Lê uma aba usando a primeira linha como cabeçalho, mapeando colunas por nome normalizado.
+// mapaColunas: { chaveDestino: [candidatosNormalizadosViaChaveColuna] }
+function lerAbaComoObjetos(sheet, mapaColunas) {
+    const rows    = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    const headers = (rows[0] || []).map(chaveColuna);
+    const idx = {};
+    Object.entries(mapaColunas).forEach(([chave, candidatos]) => {
+        idx[chave] = headers.findIndex(h => candidatos.includes(h));
+    });
+
+    const out = [];
+    for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        if (!row || row.every(c => c === '')) continue;
+        const obj = {};
+        Object.entries(idx).forEach(([chave, i]) => { obj[chave] = i >= 0 ? row[i] : ''; });
+        out.push(obj);
+    }
+    return out;
+}
+
+const MAPA_BANCARIA = {
+    codigo:      ['codigo'],
+    nome:        ['nome do empregado'],
+    cargo:       ['cargo'],
+    centroCusto: ['ccusto', 'centro de custo'],
+    cpf:         ['cpf'],
+    banco:       ['banco'],
+    agencia:     ['agencia'],
+    conta:       ['n conta', 'no conta'],
+};
+
+const MAPA_LIQUIDO = {
+    codigo: ['codigo'],
+    nome:   ['nome do empregado'],
+    cpf:    ['cpf'],
+    valor:  ['valor'],
+};
+
+// Deduplica linhas da aba bancária por código do empregado (última ocorrência vence)
+function dedupeBancaria(linhas) {
+    const map = {};
+    linhas.forEach(l => {
+        const cod = normalizarCodigo(l.codigo);
+        if (!cod) return;
+        map[cod] = {
+            codigo_empregado: cod,
+            cpf:              String(l.cpf || '').replace(/\D/g, ''),
+            nome_empregado:   String(l.nome || '').trim(),
+            cargo:            String(l.cargo || '').trim(),
+            centro_custo:     String(l.centroCusto || '').trim(),
+            banco_codigo:     l.banco === '' ? '' : String(Math.trunc(Number(l.banco))).padStart(3, '0'),
+            agencia:          String(l.agencia || '').trim(),
+            conta:            String(l.conta || '').trim(),
+        };
+    });
+    return Object.values(map);
+}
