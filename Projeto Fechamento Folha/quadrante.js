@@ -1765,7 +1765,10 @@ function dedupeBancaria(linhas) {
             nome_empregado:   String(l.nome || '').trim(),
             cargo:            String(l.cargo || '').trim(),
             centro_custo:     String(l.centroCusto || '').trim(),
-            banco_codigo:     l.banco === '' ? '' : String(Math.trunc(Number(l.banco))).padStart(3, '0'),
+            banco_codigo:     (() => {
+                const n = Number(l.banco);
+                return (l.banco === '' || isNaN(n) || n <= 0) ? '' : String(Math.trunc(n)).padStart(3, '0');
+            })(),
             agencia:          String(l.agencia || '').trim(),
             conta:            String(l.conta || '').trim(),
         };
@@ -1932,12 +1935,12 @@ function renderizarRevisaoLiquido() {
         tbody.innerHTML = gruposLiquido.map(g => {
             const linhasHtml = g.linhas.map(l => `
                 <tr>
-                    <td>${l.codigo_empregado}</td>
+                    <td>${escHtml(l.codigo_empregado)}</td>
                     <td>${escHtml(l.nome)}</td>
                     <td>${formatarCpf(l.cpf)}</td>
                     <td>${escHtml(l.agencia)} / ${escHtml(l.conta)}</td>
                     <td>
-                        <select class="tipo-select" data-codigo="${l.codigo_empregado}" onchange="salvarTipoConta(this)">
+                        <select class="tipo-select" data-codigo="${escHtml(l.codigo_empregado)}" onchange="salvarTipoConta(this)">
                             <option value="C.Corrente" ${l.tipoConta === 'C.Corrente' ? 'selected' : ''}>C.Corrente</option>
                             <option value="C.Salário" ${l.tipoConta === 'C.Salário' ? 'selected' : ''}>C.Salário</option>
                             <option value="Poupança" ${l.tipoConta === 'Poupança' ? 'selected' : ''}>Poupança</option>
@@ -1969,22 +1972,22 @@ function renderizarRevisaoLiquido() {
                 <td>
                     <div class="inline-register-form">
                         <span style="font-weight:600;font-size:12px;color:var(--primary-color);">
-                            ${l.codigo_empregado} — ${escHtml(l.nome)} — sem dados bancários:
+                            ${escHtml(l.codigo_empregado)} — ${escHtml(l.nome)} — sem dados bancários:
                         </span>
-                        <input type="text" class="pend-banco" data-codigo="${l.codigo_empregado}" placeholder="Cód. Banco (ex: 341)"
+                        <input type="text" class="pend-banco" data-codigo="${escHtml(l.codigo_empregado)}" placeholder="Cód. Banco (ex: 341)"
                             style="width:130px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
-                        <input type="text" class="pend-agencia" data-codigo="${l.codigo_empregado}" placeholder="Agência"
+                        <input type="text" class="pend-agencia" data-codigo="${escHtml(l.codigo_empregado)}" placeholder="Agência"
                             style="width:90px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
-                        <input type="text" class="pend-conta" data-codigo="${l.codigo_empregado}" placeholder="Conta"
+                        <input type="text" class="pend-conta" data-codigo="${escHtml(l.codigo_empregado)}" placeholder="Conta"
                             style="width:110px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
-                        <select class="pend-tipo tipo-select" data-codigo="${l.codigo_empregado}">
+                        <select class="pend-tipo tipo-select" data-codigo="${escHtml(l.codigo_empregado)}">
                             <option value="C.Corrente">C.Corrente</option>
                             <option value="C.Salário">C.Salário</option>
                             <option value="Poupança">Poupança</option>
                         </select>
-                        <button class="btn btn-primary btn-small" onclick="salvarDadosBancariosManual('${l.codigo_empregado}')">💾 Salvar</button>
+                        <button class="btn btn-primary btn-small" onclick="salvarDadosBancariosManual('${escHtml(l.codigo_empregado)}')">💾 Salvar</button>
                         <label style="font-size:12px;display:flex;align-items:center;gap:4px;">
-                            <input type="checkbox" onchange="marcarExcluido('${l.codigo_empregado}', this.checked)"> Excluir deste relatório
+                            <input type="checkbox" onchange="marcarExcluido('${escHtml(l.codigo_empregado)}', this.checked)"> Excluir deste relatório
                         </label>
                     </div>
                 </td>
@@ -2021,12 +2024,19 @@ async function salvarDadosBancariosManual(codigo) {
     const contaInput   = document.querySelector(`.pend-conta[data-codigo="${codigo}"]`);
     const tipoSelect   = document.querySelector(`.pend-tipo[data-codigo="${codigo}"]`);
 
-    const bancoCodigo = String(bancoInput.value || '').replace(/\D/g, '').padStart(3, '0');
+    const bancoDigitos = String(bancoInput.value || '').replace(/\D/g, '');
     const agencia      = agenciaInput.value.trim();
     const conta        = contaInput.value.trim();
     const tipoConta     = tipoSelect.value;
 
-    if (!bancoCodigo || bancoCodigo === '000' || !agencia || !conta) {
+    if (!bancoDigitos || bancoDigitos.length > 3 || !agencia || !conta) {
+        mostrarMensagem('Atenção', 'Preencha Banco, Agência e Conta antes de salvar.');
+        return;
+    }
+
+    const bancoCodigo = bancoDigitos.padStart(3, '0');
+
+    if (bancoCodigo === '000') {
         mostrarMensagem('Atenção', 'Preencha Banco, Agência e Conta antes de salvar.');
         return;
     }
