@@ -167,7 +167,7 @@ async function selecionarEmpresa(codigo, nome) {
     const observacoes = cfg?.['observacoes']?.cod?.trim() || '';
     if (obsBanner && obsTexto) {
         obsTexto.textContent = observacoes;
-        obsBanner.style.display = observacoes ? 'flex' : 'none';
+        obsBanner.dataset.temObservacao = observacoes ? '1' : '0';
     }
 }
 
@@ -2311,6 +2311,13 @@ function mostrarTela(telaId) {
         } else {
             sub.textContent = 'Selecione a competência e empresa para começar';
         }
+    }
+
+    const obsBanner = document.getElementById('empresaObservacoesBanner');
+    if (obsBanner) {
+        obsBanner.style.display = (telaId !== 'selectionScreen' && obsBanner.dataset.temObservacao === '1')
+            ? 'flex'
+            : 'none';
     }
 }
 
