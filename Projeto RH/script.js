@@ -133,6 +133,9 @@ async function selecionarEmpresa(codigo, nome) {
     if (label) label.textContent = '';
     const cfg = await _buscarConfigRubricas(codigo);
     const jDiaria       = document.getElementById('jornada');
+    const jSexAtiva     = document.getElementById('jornadaSextaAtiva');
+    const jSexCont      = document.getElementById('jornadaSextaContainer');
+    const jSex          = document.getElementById('jornadaSexta');
     const jSabAtiva     = document.getElementById('jornadaSabadoAtiva');
     const jSabCont      = document.getElementById('jornadaSabadoContainer');
     const jSab          = document.getElementById('jornadaSabado');
@@ -141,6 +144,10 @@ async function selecionarEmpresa(codigo, nome) {
     const obsTexto      = document.getElementById('empresaObservacoesTexto');
     if (cfg && cfg['jornada_diaria']) {
         if (jDiaria)   jDiaria.value = cfg['jornada_diaria']?.cod || '08:00';
+        const sexAtiva = cfg['jornada_sexta_ativa']?.cod === '1';
+        if (jSexAtiva) jSexAtiva.checked = sexAtiva;
+        if (jSexCont)  jSexCont.style.display = sexAtiva ? 'block' : 'none';
+        if (jSex)      jSex.value = cfg['jornada_sexta']?.cod || '04:00';
         const sempreExtra = cfg['sabado_sempre_extra']?.cod === '1';
         const sabAtiva = !sempreExtra && cfg['jornada_sabado_ativa']?.cod === '1';
         if (jSabAtiva) { jSabAtiva.checked = sabAtiva; }
@@ -149,6 +156,9 @@ async function selecionarEmpresa(codigo, nome) {
         if (jSabSempreExt) jSabSempreExt.checked = sempreExtra;
     } else {
         if (jDiaria)   jDiaria.value    = '08:00';
+        if (jSexAtiva) jSexAtiva.checked = false;
+        if (jSexCont)  jSexCont.style.display = 'none';
+        if (jSex)      jSex.value       = '04:00';
         if (jSabAtiva) jSabAtiva.checked = false;
         if (jSabCont)  jSabCont.style.display = 'none';
         if (jSab)      jSab.value       = '04:00';
