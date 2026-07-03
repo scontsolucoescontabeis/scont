@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS public.rh_saves (
     jornada_sabado              TEXT,               -- ex: "04:00" (jornada diferenciada do Sábado)
     jornada_sabado_ativa        BOOLEAN DEFAULT FALSE,
     sabado_sempre_extra         BOOLEAN DEFAULT FALSE, -- todas as horas do sábado contam como extra (exclusivo com jornada_sabado_ativa)
+    jornada_sexta               TEXT,               -- ex: "04:00" (jornada diferenciada da Sexta-feira)
+    jornada_sexta_ativa         BOOLEAN DEFAULT FALSE,
     rule_extra_100_opcional     BOOLEAN DEFAULT FALSE,
 
     -- Campos JSON com os dados da folha
