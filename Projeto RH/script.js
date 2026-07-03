@@ -327,6 +327,7 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
             state.jornada = registrosParaCarregar[0].jornada || '08:00';
             state.jornadaSabado = registrosParaCarregar[0].jornada_sabado || '04:00';
             state.jornadaSabadoAtiva = registrosParaCarregar[0].jornada_sabado_ativa || false;
+            state.sabadoSempreExtra = registrosParaCarregar[0].sabado_sempre_extra || false;
             state.ruleExtra100Optional = registrosParaCarregar[0].rule_extra_100_opcional || false;
 
             if (registrosParaCarregar[0].feriados_json) {
@@ -343,6 +344,7 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
             document.getElementById('jornadaSabado').value = state.jornadaSabado;
             document.getElementById('jornadaSabadoAtiva').checked = state.jornadaSabadoAtiva;
             document.getElementById('jornadaSabadoContainer').style.display = state.jornadaSabadoAtiva ? 'block' : 'none';
+            document.getElementById('sabadoSempreExtra').checked = state.sabadoSempreExtra;
             document.getElementById('ruleExtra100Optional').checked = state.ruleExtra100Optional;
 
             // ✅ Função auxiliar para parse seguro
@@ -474,6 +476,7 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
             state.jornada = registrosParaCarregar[0].jornada || '08:00';
             state.jornadaSabado = registrosParaCarregar[0].jornada_sabado || '04:00';
             state.jornadaSabadoAtiva = registrosParaCarregar[0].jornada_sabado_ativa || false;
+            state.sabadoSempreExtra = registrosParaCarregar[0].sabado_sempre_extra || false;
             state.ruleExtra100Optional = registrosParaCarregar[0].rule_extra_100_opcional || false;
 
             if (registrosParaCarregar[0].feriados_json) {
@@ -490,6 +493,7 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
             document.getElementById('jornadaSabado').value = state.jornadaSabado;
             document.getElementById('jornadaSabadoAtiva').checked = state.jornadaSabadoAtiva;
             document.getElementById('jornadaSabadoContainer').style.display = state.jornadaSabadoAtiva ? 'block' : 'none';
+            document.getElementById('sabadoSempreExtra').checked = state.sabadoSempreExtra;
             document.getElementById('ruleExtra100Optional').checked = state.ruleExtra100Optional;
 
             const parseJSONSeguro = (jsonString, defaultValue = null) => {
@@ -1048,6 +1052,7 @@ async function processarFolhaComSalvamento(nomeResponsavel) {
                 jornada: state.jornada,
                 jornada_sabado: state.jornadaSabadoAtiva ? state.jornadaSabado : null,
                 jornada_sabado_ativa: state.jornadaSabadoAtiva,
+                sabado_sempre_extra: state.sabadoSempreExtra,
                 rule_extra_100_opcional: state.ruleExtra100Optional,
                 dados_json: JSON.stringify(folha.dados),
                 feriados_json: JSON.stringify(state.feriados),
