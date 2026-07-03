@@ -1776,6 +1776,7 @@ function _preencherCamposConfigRubricas(cfg) {
     const jSabCont      = document.getElementById('cfgJornadaSabadoContainer');
     const jSab          = document.getElementById('cfgJornadaSabado');
     const jSabSempreExt = document.getElementById('cfgSabadoSempreExtra');
+    const jObservacoes  = document.getElementById('cfgObservacoes');
     if (jDiaria)   jDiaria.value = cfg['jornada_diaria']?.cod || '08:00';
     const sempreExtra = cfg['sabado_sempre_extra']?.cod === '1';
     const sabAtiva = !sempreExtra && cfg['jornada_sabado_ativa']?.cod === '1';
@@ -1783,6 +1784,7 @@ function _preencherCamposConfigRubricas(cfg) {
     if (jSabCont)  jSabCont.style.display = sabAtiva ? 'flex' : 'none';
     if (jSab)      jSab.value = cfg['jornada_sabado']?.cod || '04:00';
     if (jSabSempreExt) jSabSempreExt.checked = sempreExtra;
+    if (jObservacoes) jObservacoes.value = cfg['observacoes']?.cod || '';
 }
 
 function _limparCamposConfigRubricas() {
@@ -1797,11 +1799,13 @@ function _limparCamposConfigRubricas() {
     const jSabCont      = document.getElementById('cfgJornadaSabadoContainer');
     const jSab          = document.getElementById('cfgJornadaSabado');
     const jSabSempreExt = document.getElementById('cfgSabadoSempreExtra');
+    const jObservacoes  = document.getElementById('cfgObservacoes');
     if (jDiaria)   jDiaria.value    = '08:00';
     if (jSabAtiva) jSabAtiva.checked = false;
     if (jSabCont)  jSabCont.style.display = 'none';
     if (jSab)      jSab.value       = '04:00';
     if (jSabSempreExt) jSabSempreExt.checked = false;
+    if (jObservacoes) jObservacoes.value = '';
 }
 
 function abrirModalConfigRubricas() {
@@ -1873,6 +1877,7 @@ async function salvarConfigRubricas() {
         { codigo_empresa: codigoEmpresa, evento: 'jornada_sabado_ativa',  codigo_rubrica: document.getElementById('cfgJornadaSabadoAtiva')?.checked ? '1' : '0',      tipo_valor: 'jornada' },
         { codigo_empresa: codigoEmpresa, evento: 'jornada_sabado',        codigo_rubrica: (document.getElementById('cfgJornadaSabado')?.value || '04:00').trim(),      tipo_valor: 'jornada' },
         { codigo_empresa: codigoEmpresa, evento: 'sabado_sempre_extra',   codigo_rubrica: document.getElementById('cfgSabadoSempreExtra')?.checked ? '1' : '0',       tipo_valor: 'jornada' },
+        { codigo_empresa: codigoEmpresa, evento: 'observacoes',           codigo_rubrica: (document.getElementById('cfgObservacoes')?.value || '').trim(),            tipo_valor: 'texto' },
     ];
 
     try {
