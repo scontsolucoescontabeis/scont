@@ -17,6 +17,8 @@ const state = {
     abaAtivaIndex: 0,
     feriados: [],
     jornada: '08:00',
+    jornadaSexta: '04:00',
+    jornadaSextaAtiva: false,
     jornadaSabado: '04:00',
     jornadaSabadoAtiva: false,
     sabadoSempreExtra: false,
@@ -41,6 +43,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('jornada').addEventListener('input', (e) => {
         e.target.value = formatarHora(e.target.value);
     });
+    document.getElementById('jornadaSexta').addEventListener('input', (e) => {
+        e.target.value = formatarHora(e.target.value);
+    });
     document.getElementById('jornadaSabado').addEventListener('input', (e) => {
         e.target.value = formatarHora(e.target.value);
     });
@@ -53,6 +58,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.terceiroTurno = localStorage.getItem('rh_terceiro_turno') === 'true';
     document.getElementById('terceiroTurno').checked = state.terceiroTurno;
 });
+
+window.toggleJornadaSexta = function(ativa) {
+    document.getElementById('jornadaSextaContainer').style.display = ativa ? 'block' : 'none';
+};
 
 window.toggleJornadaSabado = function(ativa) {
     document.getElementById('jornadaSabadoContainer').style.display = ativa ? 'block' : 'none';
@@ -1187,6 +1196,9 @@ function simpleHash(str) {
 // --- MOTOR DE CÁLCULO ---
 function calcularFolha(folha) {
     const jornadaMinutos = converterHoraParaMinutos(state.jornada);
+    const jornadaSextaMinutos = (state.jornadaSextaAtiva && state.jornadaSexta)
+        ? converterHoraParaMinutos(state.jornadaSexta)
+        : jornadaMinutos;
     const jornadaSabadoMinutos = (state.jornadaSabadoAtiva && state.jornadaSabado)
         ? converterHoraParaMinutos(state.jornadaSabado)
         : jornadaMinutos;
@@ -1195,7 +1207,9 @@ function calcularFolha(folha) {
     const diasCalculados = folha.dados.map(dia => {
         const jornadaEfetiva = dia.diaSemana === 'Sab'
             ? (state.sabadoSempreExtra ? 0 : jornadaSabadoMinutos)
-            : jornadaMinutos;
+            : dia.diaSemana === 'Sex'
+                ? jornadaSextaMinutos
+                : jornadaMinutos;
         const isFeriado = state.feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
         const isDSRCustomizado = folha.dsrDias.includes(dia.data);
         const isDiaDescanso = isFeriado || isDSRCustomizado;

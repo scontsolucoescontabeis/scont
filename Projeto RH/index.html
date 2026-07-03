@@ -155,6 +155,14 @@
                         <input type="text" id="jornada" value="08:00" maxlength="5" placeholder="HH:MM">
                         <small>Horas diárias de trabalho</small>
                         <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="jornadaSextaAtiva" style="width: 16px; height: 16px; cursor: pointer;" onchange="toggleJornadaSexta(this.checked)">
+                            <label for="jornadaSextaAtiva" style="font-size: 12px; cursor: pointer; margin: 0;">Jornada diferenciada para a Sexta</label>
+                        </div>
+                        <div id="jornadaSextaContainer" style="display: none; margin-top: 8px;">
+                            <input type="text" id="jornadaSexta" value="04:00" maxlength="5" placeholder="HH:MM">
+                            <small>Horas na Sexta</small>
+                        </div>
+                        <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
                             <input type="checkbox" id="jornadaSabadoAtiva" style="width: 16px; height: 16px; cursor: pointer;" onchange="toggleJornadaSabado(this.checked)">
                             <label for="jornadaSabadoAtiva" style="font-size: 12px; cursor: pointer; margin: 0;">Jornada diferenciada para o Sábado</label>
                         </div>
