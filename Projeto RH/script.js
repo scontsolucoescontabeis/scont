@@ -123,21 +123,25 @@ async function selecionarEmpresa(codigo, nome) {
     const label = document.getElementById('empresaSelecionadaLabel');
     if (label) label.textContent = '';
     const cfg = await _buscarConfigRubricas(codigo);
-    const jDiaria   = document.getElementById('jornada');
-    const jSabAtiva = document.getElementById('jornadaSabadoAtiva');
-    const jSabCont  = document.getElementById('jornadaSabadoContainer');
-    const jSab      = document.getElementById('jornadaSabado');
+    const jDiaria       = document.getElementById('jornada');
+    const jSabAtiva     = document.getElementById('jornadaSabadoAtiva');
+    const jSabCont      = document.getElementById('jornadaSabadoContainer');
+    const jSab          = document.getElementById('jornadaSabado');
+    const jSabSempreExt = document.getElementById('sabadoSempreExtra');
     if (cfg && cfg['jornada_diaria']) {
         if (jDiaria)   jDiaria.value = cfg['jornada_diaria']?.cod || '08:00';
-        const sabAtiva = cfg['jornada_sabado_ativa']?.cod === '1';
+        const sempreExtra = cfg['sabado_sempre_extra']?.cod === '1';
+        const sabAtiva = !sempreExtra && cfg['jornada_sabado_ativa']?.cod === '1';
         if (jSabAtiva) { jSabAtiva.checked = sabAtiva; }
         if (jSabCont)  jSabCont.style.display = sabAtiva ? 'block' : 'none';
         if (jSab)      jSab.value = cfg['jornada_sabado']?.cod || '04:00';
+        if (jSabSempreExt) jSabSempreExt.checked = sempreExtra;
     } else {
         if (jDiaria)   jDiaria.value    = '08:00';
         if (jSabAtiva) jSabAtiva.checked = false;
         if (jSabCont)  jSabCont.style.display = 'none';
         if (jSab)      jSab.value       = '04:00';
+        if (jSabSempreExt) jSabSempreExt.checked = false;
     }
 }
 
@@ -2056,13 +2060,16 @@ async function _construirConteudoTXTExportacao() {
         const jornadaSabadoMin = (save.jornada_sabado_ativa && save.jornada_sabado)
             ? converterHoraParaMinutos(save.jornada_sabado)
             : jornadaMin;
+        const sabadoSempreExtra = !!save.sabado_sempre_extra;
         const rule100    = save.rule_extra_100_opcional || false;
         const dados      = JSON.parse(save.dados_json || '[]');
 
         let tTrab = 0, tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0;
         const diasFaltaDetalhes = [];
         dados.forEach(dia => {
-            const jornadaMinEfetiva = dia.diaSemana === 'Sab' ? jornadaSabadoMin : jornadaMin;
+            const jornadaMinEfetiva = dia.diaSemana === 'Sab'
+                ? (sabadoSempreExtra ? 0 : jornadaSabadoMin)
+                : jornadaMin;
             const isFeriado    = feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
             const isDSR        = dsrDias.includes(dia.data);
             const isDiaDescanso = isFeriado || isDSR;
