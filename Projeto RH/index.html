@@ -723,6 +723,16 @@
                                 style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <input type="checkbox" id="cfgJornadaSextaAtiva" style="width: 16px; height: 16px; cursor: pointer;"
+                                onchange="document.getElementById('cfgJornadaSextaContainer').style.display = this.checked ? 'flex' : 'none';">
+                            <label for="cfgJornadaSextaAtiva" style="font-size: 13px; cursor: pointer; margin: 0;">Jornada diferenciada para a Sexta</label>
+                        </div>
+                        <div id="cfgJornadaSextaContainer" style="display: none; align-items: center; gap: 12px; padding-left: 24px;">
+                            <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas na Sexta</label>
+                            <input type="text" id="cfgJornadaSexta" value="04:00" maxlength="5" placeholder="HH:MM"
+                                style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; margin-top: 8px;">
                             <input type="checkbox" id="cfgJornadaSabadoAtiva" style="width: 16px; height: 16px; cursor: pointer;"
                                 onchange="document.getElementById('cfgJornadaSabadoContainer').style.display = this.checked ? 'flex' : 'none'; if (this.checked) { document.getElementById('cfgSabadoSempreExtra').checked = false; }">
                             <label for="cfgJornadaSabadoAtiva" style="font-size: 13px; cursor: pointer; margin: 0;">Jornada diferenciada para o Sábado</label>
