@@ -1748,11 +1748,12 @@ function _preencherCamposConfigRubricas(cfg) {
     const jSab          = document.getElementById('cfgJornadaSabado');
     const jSabSempreExt = document.getElementById('cfgSabadoSempreExtra');
     if (jDiaria)   jDiaria.value = cfg['jornada_diaria']?.cod || '08:00';
-    const sabAtiva = cfg['jornada_sabado_ativa']?.cod === '1';
+    const sempreExtra = cfg['sabado_sempre_extra']?.cod === '1';
+    const sabAtiva = !sempreExtra && cfg['jornada_sabado_ativa']?.cod === '1';
     if (jSabAtiva) jSabAtiva.checked = sabAtiva;
     if (jSabCont)  jSabCont.style.display = sabAtiva ? 'flex' : 'none';
     if (jSab)      jSab.value = cfg['jornada_sabado']?.cod || '04:00';
-    if (jSabSempreExt) jSabSempreExt.checked = cfg['sabado_sempre_extra']?.cod === '1';
+    if (jSabSempreExt) jSabSempreExt.checked = sempreExtra;
 }
 
 function _limparCamposConfigRubricas() {
