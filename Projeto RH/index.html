@@ -710,13 +710,18 @@
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                             <input type="checkbox" id="cfgJornadaSabadoAtiva" style="width: 16px; height: 16px; cursor: pointer;"
-                                onchange="document.getElementById('cfgJornadaSabadoContainer').style.display = this.checked ? 'flex' : 'none'">
+                                onchange="document.getElementById('cfgJornadaSabadoContainer').style.display = this.checked ? 'flex' : 'none'; if (this.checked) { document.getElementById('cfgSabadoSempreExtra').checked = false; }">
                             <label for="cfgJornadaSabadoAtiva" style="font-size: 13px; cursor: pointer; margin: 0;">Jornada diferenciada para o Sábado</label>
                         </div>
                         <div id="cfgJornadaSabadoContainer" style="display: none; align-items: center; gap: 12px; padding-left: 24px;">
                             <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas no Sábado</label>
                             <input type="text" id="cfgJornadaSabado" value="04:00" maxlength="5" placeholder="HH:MM"
                                 style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <input type="checkbox" id="cfgSabadoSempreExtra" style="width: 16px; height: 16px; cursor: pointer;"
+                                onchange="if (this.checked) { document.getElementById('cfgJornadaSabadoAtiva').checked = false; document.getElementById('cfgJornadaSabadoContainer').style.display = 'none'; }">
+                            <label for="cfgSabadoSempreExtra" style="font-size: 13px; cursor: pointer; margin: 0;">Sábado sempre extra</label>
                         </div>
                     </div>
                 </div>
