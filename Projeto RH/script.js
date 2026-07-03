@@ -342,9 +342,11 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
         });
         
         const registrosParaCarregar = Object.values(ultimasVersoes);
-        
+
         if (registrosParaCarregar.length > 0) {
             state.jornada = registrosParaCarregar[0].jornada || '08:00';
+            state.jornadaSexta = registrosParaCarregar[0].jornada_sexta || '04:00';
+            state.jornadaSextaAtiva = registrosParaCarregar[0].jornada_sexta_ativa || false;
             state.jornadaSabado = registrosParaCarregar[0].jornada_sabado || '04:00';
             state.jornadaSabadoAtiva = registrosParaCarregar[0].jornada_sabado_ativa || false;
             state.sabadoSempreExtra = registrosParaCarregar[0].sabado_sempre_extra || false;
@@ -361,6 +363,9 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
             }
 
             document.getElementById('jornada').value = state.jornada;
+            document.getElementById('jornadaSexta').value = state.jornadaSexta;
+            document.getElementById('jornadaSextaAtiva').checked = state.jornadaSextaAtiva;
+            document.getElementById('jornadaSextaContainer').style.display = state.jornadaSextaAtiva ? 'block' : 'none';
             document.getElementById('jornadaSabado').value = state.jornadaSabado;
             document.getElementById('jornadaSabadoAtiva').checked = state.jornadaSabadoAtiva;
             document.getElementById('jornadaSabadoContainer').style.display = state.jornadaSabadoAtiva ? 'block' : 'none';
@@ -467,7 +472,7 @@ function fecharModalPreenchimentos() {
 async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
     fecharModalPreenchimentos();
     mostrarMensagem('Carregando', 'Recuperando dados salvos...');
-    
+
     try {
         const { data, error } = await supabaseClient
             .from('rh_saves')
@@ -476,24 +481,26 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
             .eq('competencia', competencia)
             .lte('data_criacao', timestamp)
             .order('data_criacao', { ascending: false });
-        
+
         if (error) throw error;
-        
+
         if (!data || data.length === 0) {
             throw new Error("Nenhum dado encontrado para esta empresa e competência.");
         }
-        
+
         const ultimasVersoes = {};
         data.forEach(reg => {
             if (!ultimasVersoes[reg.nome_trabalhador]) {
                 ultimasVersoes[reg.nome_trabalhador] = reg;
             }
         });
-        
+
         const registrosParaCarregar = Object.values(ultimasVersoes);
-        
+
         if (registrosParaCarregar.length > 0) {
             state.jornada = registrosParaCarregar[0].jornada || '08:00';
+            state.jornadaSexta = registrosParaCarregar[0].jornada_sexta || '04:00';
+            state.jornadaSextaAtiva = registrosParaCarregar[0].jornada_sexta_ativa || false;
             state.jornadaSabado = registrosParaCarregar[0].jornada_sabado || '04:00';
             state.jornadaSabadoAtiva = registrosParaCarregar[0].jornada_sabado_ativa || false;
             state.sabadoSempreExtra = registrosParaCarregar[0].sabado_sempre_extra || false;
@@ -510,6 +517,9 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
             }
 
             document.getElementById('jornada').value = state.jornada;
+            document.getElementById('jornadaSexta').value = state.jornadaSexta;
+            document.getElementById('jornadaSextaAtiva').checked = state.jornadaSextaAtiva;
+            document.getElementById('jornadaSextaContainer').style.display = state.jornadaSextaAtiva ? 'block' : 'none';
             document.getElementById('jornadaSabado').value = state.jornadaSabado;
             document.getElementById('jornadaSabadoAtiva').checked = state.jornadaSabadoAtiva;
             document.getElementById('jornadaSabadoContainer').style.display = state.jornadaSabadoAtiva ? 'block' : 'none';
@@ -1076,6 +1086,8 @@ async function processarFolhaComSalvamento(nomeResponsavel) {
                 nome_trabalhador: folha.nome,
                 competencia: state.competencia,
                 jornada: state.jornada,
+                jornada_sexta: state.jornadaSextaAtiva ? state.jornadaSexta : null,
+                jornada_sexta_ativa: state.jornadaSextaAtiva,
                 jornada_sabado: state.jornadaSabadoAtiva ? state.jornadaSabado : null,
                 jornada_sabado_ativa: state.jornadaSabadoAtiva,
                 sabado_sempre_extra: state.sabadoSempreExtra,
