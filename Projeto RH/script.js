@@ -128,6 +128,8 @@ async function selecionarEmpresa(codigo, nome) {
     const jSabCont      = document.getElementById('jornadaSabadoContainer');
     const jSab          = document.getElementById('jornadaSabado');
     const jSabSempreExt = document.getElementById('sabadoSempreExtra');
+    const obsBanner     = document.getElementById('empresaObservacoesBanner');
+    const obsTexto      = document.getElementById('empresaObservacoesTexto');
     if (cfg && cfg['jornada_diaria']) {
         if (jDiaria)   jDiaria.value = cfg['jornada_diaria']?.cod || '08:00';
         const sempreExtra = cfg['sabado_sempre_extra']?.cod === '1';
@@ -142,6 +144,11 @@ async function selecionarEmpresa(codigo, nome) {
         if (jSabCont)  jSabCont.style.display = 'none';
         if (jSab)      jSab.value       = '04:00';
         if (jSabSempreExt) jSabSempreExt.checked = false;
+    }
+    const observacoes = cfg?.['observacoes']?.cod?.trim() || '';
+    if (obsBanner && obsTexto) {
+        obsTexto.textContent = observacoes;
+        obsBanner.style.display = observacoes ? 'flex' : 'none';
     }
 }
 
