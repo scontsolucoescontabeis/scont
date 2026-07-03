@@ -976,12 +976,18 @@ function renderizarTabelaFeriados() {
 // --- ✅ LÓGICA DE ASSINATURA E SALVAMENTO ---
 function iniciarSalvamento() {
     state.jornada = document.getElementById('jornada').value;
+    state.jornadaSextaAtiva = document.getElementById('jornadaSextaAtiva').checked;
+    state.jornadaSexta = document.getElementById('jornadaSexta').value;
     state.jornadaSabadoAtiva = document.getElementById('jornadaSabadoAtiva').checked;
     state.sabadoSempreExtra = document.getElementById('sabadoSempreExtra').checked;
     state.jornadaSabado = document.getElementById('jornadaSabado').value;
     state.ruleExtra100Optional = document.getElementById('ruleExtra100Optional').checked;
     if (!validarHora(state.jornada)) {
         mostrarMensagem('Erro', 'Jornada de trabalho inválida.');
+        return;
+    }
+    if (state.jornadaSextaAtiva && !validarHora(state.jornadaSexta)) {
+        mostrarMensagem('Erro', 'Jornada da Sexta inválida.');
         return;
     }
     if (state.jornadaSabadoAtiva && !validarHora(state.jornadaSabado)) {
