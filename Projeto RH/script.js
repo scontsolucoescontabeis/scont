@@ -2056,9 +2056,10 @@ async function _construirConteudoTXTExportacao() {
             const flag = flagsFolga[dia.data];
             const isAtestadoMedicoExp = flag === 'atestado';
             const isAtestadoCompExp   = flag === 'atestado_comparecimento';
+            const isLiberacaoMeioExpedienteExp = flag === 'liberacao_meio_expediente';
             if (isAtestadoMedicoExp) {
                 // dia totalmente desconsiderado
-            } else if (isAtestadoCompExp) {
+            } else if (isAtestadoCompExp || isLiberacaoMeioExpedienteExp) {
                 // isenção de metade da jornada
                 const metade = Math.floor(jornadaMinEfetiva / 2);
                 if (minTrab < metade) dev = metade - minTrab;
@@ -2081,7 +2082,7 @@ async function _construirConteudoTXTExportacao() {
                 } else if (flag === 'compensacao') {
                     dev = jornadaMinEfetiva;
                 }
-                // folga, atestado e sem registro não geram horas devidas nem faltas
+                // folga, atestado, liberação meio expediente e sem registro não geram horas devidas nem faltas
             }
             tTrab  += minTrab;
             tEx50  += ex50;
