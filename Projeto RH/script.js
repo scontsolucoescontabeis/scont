@@ -1193,14 +1193,18 @@ function calcularFolha(folha) {
         const isDSRCustomizado = folha.dsrDias.includes(dia.data);
         const isDiaDescanso = isFeriado || isDSRCustomizado;
         
-        const minTrabalhados = calcularHorasTrabalhadas(dia.entrada1, dia.saida1)
-            + calcularHorasTrabalhadas(dia.entrada2, dia.saida2)
-            + (state.terceiroTurno ? calcularHorasTrabalhadas(dia.entrada3, dia.saida3) : 0);
+        const [[e1n, s1n], [e2n, s2n], [e3n, s3n]] = normalizarEntradasSaidas(
+            dia.entrada1, dia.saida1, dia.entrada2, dia.saida2,
+            dia.entrada3, dia.saida3, state.terceiroTurno
+        );
+        const minTrabalhados = calcularHorasTrabalhadas(e1n, s1n)
+            + calcularHorasTrabalhadas(e2n, s2n)
+            + (state.terceiroTurno ? calcularHorasTrabalhadas(e3n, s3n) : 0);
         const minNoturnos = calcularHorasNoturnas(
-            dia.entrada1, dia.saida1,
-            dia.entrada2, dia.saida2,
-            state.terceiroTurno ? dia.entrada3 : null,
-            state.terceiroTurno ? dia.saida3 : null
+            e1n, s1n,
+            e2n, s2n,
+            state.terceiroTurno ? e3n : null,
+            state.terceiroTurno ? s3n : null
         );
         const minNoturnosConvertidos = Math.round(minNoturnos / 0.875);
         
@@ -1396,6 +1400,31 @@ function calcularHorasNoturnas(e1, s1, e2, s2, e3, s3) {
     minNoturnos += calcularNoturnoIntervalo(e2, s2);
     minNoturnos += calcularNoturnoIntervalo(e3, s3);
     return minNoturnos;
+}
+
+// ✅ Quando a saída de um turno e a entrada do turno seguinte estão ambas em
+// branco (mas o turno atual tem entrada e o seguinte tem saída), o empregado
+// trabalhou de forma ininterrupta entre os dois — sem isso, calcularHorasTrabalhadas
+// e calcularHorasNoturnas descartavam o intervalo inteiro por faltar a metade de cada par.
+function normalizarEntradasSaidas(entrada1, saida1, entrada2, saida2, entrada3, saida3, terceiroTurno) {
+    const pares = [[entrada1 || '', saida1 || ''], [entrada2 || '', saida2 || '']];
+    if (terceiroTurno) pares.push([entrada3 || '', saida3 || '']);
+
+    const normalizados = [];
+    let i = 0;
+    while (i < pares.length) {
+        const [entrada, saida] = pares[i];
+        const proximo = pares[i + 1];
+        if (entrada && !saida && proximo && !proximo[0] && proximo[1]) {
+            normalizados.push([entrada, proximo[1]]);
+            i += 2;
+        } else {
+            normalizados.push([entrada, saida]);
+            i += 1;
+        }
+    }
+    while (normalizados.length < 3) normalizados.push(['', '']);
+    return normalizados;
 }
 
 // --- RENDERIZAÇÃO DE RESULTADOS ---
@@ -2074,14 +2103,18 @@ async function _construirConteudoTXTExportacao() {
             const isFeriado    = feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
             const isDSR        = dsrDias.includes(dia.data);
             const isDiaDescanso = isFeriado || isDSR;
-            const minTrab = calcularHorasTrabalhadas(dia.entrada1, dia.saida1)
-                + calcularHorasTrabalhadas(dia.entrada2, dia.saida2)
-                + (state.terceiroTurno ? calcularHorasTrabalhadas(dia.entrada3, dia.saida3) : 0);
+            const [[e1n, s1n], [e2n, s2n], [e3n, s3n]] = normalizarEntradasSaidas(
+                dia.entrada1, dia.saida1, dia.entrada2, dia.saida2,
+                dia.entrada3, dia.saida3, state.terceiroTurno
+            );
+            const minTrab = calcularHorasTrabalhadas(e1n, s1n)
+                + calcularHorasTrabalhadas(e2n, s2n)
+                + (state.terceiroTurno ? calcularHorasTrabalhadas(e3n, s3n) : 0);
             const minNot  = calcularHorasNoturnas(
-                dia.entrada1, dia.saida1,
-                dia.entrada2, dia.saida2,
-                state.terceiroTurno ? dia.entrada3 : null,
-                state.terceiroTurno ? dia.saida3 : null
+                e1n, s1n,
+                e2n, s2n,
+                state.terceiroTurno ? e3n : null,
+                state.terceiroTurno ? s3n : null
             );
             const minNotConv = Math.round(minNot / 0.875);
             let ex50 = 0, ex100 = 0, dev = 0;
