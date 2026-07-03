@@ -2131,6 +2131,9 @@ async function _construirConteudoTXTExportacao() {
         const dsrDias    = JSON.parse(save.dsr_dias    || '[]');
         const flagsFolga = JSON.parse(save.flags_folga || '{}');
         const jornadaMin = converterHoraParaMinutos(save.jornada || '08:00');
+        const jornadaSextaMin = (save.jornada_sexta_ativa && save.jornada_sexta)
+            ? converterHoraParaMinutos(save.jornada_sexta)
+            : jornadaMin;
         const jornadaSabadoMin = (save.jornada_sabado_ativa && save.jornada_sabado)
             ? converterHoraParaMinutos(save.jornada_sabado)
             : jornadaMin;
@@ -2143,7 +2146,9 @@ async function _construirConteudoTXTExportacao() {
         dados.forEach(dia => {
             const jornadaMinEfetiva = dia.diaSemana === 'Sab'
                 ? (sabadoSempreExtra ? 0 : jornadaSabadoMin)
-                : jornadaMin;
+                : dia.diaSemana === 'Sex'
+                    ? jornadaSextaMin
+                    : jornadaMin;
             const isFeriado    = feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
             const isDSR        = dsrDias.includes(dia.data);
             const isDiaDescanso = isFeriado || isDSR;
