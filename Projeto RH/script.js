@@ -953,6 +953,7 @@ function renderizarTabelaFeriados() {
 function iniciarSalvamento() {
     state.jornada = document.getElementById('jornada').value;
     state.jornadaSabadoAtiva = document.getElementById('jornadaSabadoAtiva').checked;
+    state.sabadoSempreExtra = document.getElementById('sabadoSempreExtra').checked;
     state.jornadaSabado = document.getElementById('jornadaSabado').value;
     state.ruleExtra100Optional = document.getElementById('ruleExtra100Optional').checked;
     if (!validarHora(state.jornada)) {
