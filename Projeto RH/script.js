@@ -770,6 +770,7 @@ function renderizarConteudoAba() {
                         ${!temEntrada ? `<option value="compensacao" ${flagFolga === 'compensacao' ? 'selected' : ''}>Compensação</option>` : ''}
                         <option value="atestado" ${flagFolga === 'atestado' ? 'selected' : ''}>Atestado Médico</option>
                         <option value="atestado_comparecimento" ${flagFolga === 'atestado_comparecimento' ? 'selected' : ''}>Atestado de Comparecimento</option>
+                        <option value="liberacao_meio_expediente" ${flagFolga === 'liberacao_meio_expediente' ? 'selected' : ''}>Liberação Meio Expediente</option>
                     </select>
                 </td>
                 <td><button type="button" class="btn-icon" onclick="limparLinha(${state.abaAtivaIndex}, ${diaIndex})" title="Limpar linha">🗑️</button></td>
@@ -1182,18 +1183,20 @@ function calcularFolha(folha) {
         
         let extra50 = 0, extra100 = 0, faltante = 0;
         let flagDSR = isDSRCustomizado;
-        let flagFolga = false, flagFalta = false, flagAtestado = false, flagAtestadoComparecimento = false, flagSemRegistro = false, flagCompensacao = false;
+        let flagFolga = false, flagFalta = false, flagAtestado = false, flagAtestadoComparecimento = false, flagLiberacaoMeioExpediente = false, flagSemRegistro = false, flagCompensacao = false;
 
         const flagFolgaData = folha.flagsFolga[dia.data];
         const isAtestadoMedico = flagFolgaData === 'atestado';
         const isAtestadoComp   = flagFolgaData === 'atestado_comparecimento';
-        const isAtestado = isAtestadoMedico || isAtestadoComp;
+        const isLiberacaoMeioExpediente = flagFolgaData === 'liberacao_meio_expediente';
+        const isAtestado = isAtestadoMedico || isAtestadoComp || isLiberacaoMeioExpediente;
         if (isAtestadoMedico) flagAtestado = true;
         if (isAtestadoComp)   flagAtestadoComparecimento = true;
+        if (isLiberacaoMeioExpediente) flagLiberacaoMeioExpediente = true;
 
         if (isAtestadoMedico) {
             // dia totalmente desconsiderado
-        } else if (isAtestadoComp) {
+        } else if (isAtestadoComp || isLiberacaoMeioExpediente) {
             // isenção de metade da jornada: só conta faltante abaixo de jornada/2
             const metadeJornada = Math.floor(jornadaEfetiva / 2);
             const horasRef = minTrabalhados;
@@ -1235,7 +1238,7 @@ function calcularFolha(folha) {
                 }
             }
         } else if (!isDiaDescanso) {
-            // atestados já tratados acima; aqui só dias sem horas e sem atestado
+            // atestados e liberação já tratados acima; aqui só dias sem horas e sem atestado
             if (flagFolgaData === 'folga') {
                 flagFolga = true;
             } else if (flagFolgaData === 'falta') {
@@ -1244,7 +1247,7 @@ function calcularFolha(folha) {
             } else if (flagFolgaData === 'compensacao') {
                 flagCompensacao = true;
                 faltante = jornadaEfetiva;
-            } else if (!isAtestado && !isAtestadoComp) {
+            } else if (!isAtestado) {
                 flagSemRegistro = true;
             }
         }
@@ -1283,6 +1286,7 @@ function calcularFolha(folha) {
             flagFalta: flagFalta,
             flagAtestado: flagAtestado,
             flagAtestadoComparecimento: flagAtestadoComparecimento,
+            flagLiberacaoMeioExpediente: flagLiberacaoMeioExpediente,
             flagSemRegistro: flagSemRegistro,
             flagCompensacao: flagCompensacao
         };
@@ -1491,6 +1495,9 @@ function renderizarTabelasDiarias() {
             if (dia.flagAtestadoComparecimento) {
                 flags += '<span style="background: #ede9fe; color: #5b21b6; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">AT. COMPARECIMENTO</span>';
             }
+            if (dia.flagLiberacaoMeioExpediente) {
+                flags += '<span style="background: #fce7f3; color: #9d174d; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">LIB. MEIO EXPEDIENTE</span>';
+            }
             if (dia.flagCompensacao) {
                 flags += '<span style="background: #ffedd5; color: #9a3412; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">COMPENSAÇÃO</span>';
             }
@@ -1578,6 +1585,7 @@ state.resultados.forEach(res => {
         if (dia.flagFalta) flagsStr += 'FALTA ';
         if (dia.flagAtestado) flagsStr += 'ATESTADO MÉDICO ';
         if (dia.flagAtestadoComparecimento) flagsStr += 'ATESTADO DE COMPARECIMENTO ';
+        if (dia.flagLiberacaoMeioExpediente) flagsStr += 'LIBERAÇÃO MEIO EXPEDIENTE ';
         if (dia.flagSemRegistro) flagsStr += 'SEM REGISTRO ';
         if (isFeriado) flagsStr += 'FERIADO ';
 
