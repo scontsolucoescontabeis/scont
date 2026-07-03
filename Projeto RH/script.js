@@ -19,6 +19,7 @@ const state = {
     jornada: '08:00',
     jornadaSabado: '04:00',
     jornadaSabadoAtiva: false,
+    sabadoSempreExtra: false,
     ruleExtra100Optional: false,
     terceiroTurno: false,
     resultados: []
@@ -55,6 +56,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 window.toggleJornadaSabado = function(ativa) {
     document.getElementById('jornadaSabadoContainer').style.display = ativa ? 'block' : 'none';
+    if (ativa) {
+        document.getElementById('sabadoSempreExtra').checked = false;
+    }
+};
+
+window.toggleSabadoSempreExtra = function(ativa) {
+    if (ativa) {
+        document.getElementById('jornadaSabadoAtiva').checked = false;
+        document.getElementById('jornadaSabadoContainer').style.display = 'none';
+    }
 };
 
 // --- CARREGAMENTO DE DADOS (SUPABASE) ---
@@ -1165,7 +1176,9 @@ function calcularFolha(folha) {
     let totalTrabalhado = 0, totalExtra50 = 0, totalExtra100 = 0, totalNoturno = 0, totalNoturnoConvertido = 0, totalFaltante = 0, totalFaltas = 0;
 
     const diasCalculados = folha.dados.map(dia => {
-        const jornadaEfetiva = dia.diaSemana === 'Sab' ? jornadaSabadoMinutos : jornadaMinutos;
+        const jornadaEfetiva = dia.diaSemana === 'Sab'
+            ? (state.sabadoSempreExtra ? 0 : jornadaSabadoMinutos)
+            : jornadaMinutos;
         const isFeriado = state.feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
         const isDSRCustomizado = folha.dsrDias.includes(dia.data);
         const isDiaDescanso = isFeriado || isDSRCustomizado;
