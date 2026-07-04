@@ -992,10 +992,35 @@ async function adicionarFeriado() {
     }
 }
 
-window.removerFeriado = function(data) {
-    state.feriados = state.feriados.filter(f => f.data !== data);
-    renderizarTabelaFeriados();
-    renderizarConteudoAba();
+window.removerFeriado = function(id, data) {
+    // Feriados carregados de um snapshot antigo (feriados_json de uma folha já salva
+    // antes desta funcionalidade existir) podem não ter id — nesse caso, remove só
+    // localmente, sem tentar apagar nada do calendário global.
+    if (!id) {
+        state.feriados = state.feriados.filter(f => f.data !== data);
+        renderizarTabelaFeriados();
+        renderizarConteudoAba();
+        return;
+    }
+    mostrarConfirmacao(
+        'Remover Feriado',
+        'Tem certeza que deseja remover este feriado? Ele será removido do calendário global, afetando todas as empresas.',
+        async () => {
+            try {
+                const { error } = await supabaseClient
+                    .from('rh_feriados')
+                    .delete()
+                    .eq('id', id);
+                if (error) throw error;
+                state.feriados = state.feriados.filter(f => f.id !== id);
+                renderizarTabelaFeriados();
+                renderizarConteudoAba();
+            } catch (e) {
+                console.error('Erro ao remover feriado:', e);
+                mostrarMensagem('Erro', 'Não foi possível remover o feriado.');
+            }
+        }
+    );
 };
 
 function renderizarTabelaFeriados() {
@@ -1011,7 +1036,7 @@ function renderizarTabelaFeriados() {
                 <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${f.data}</td>
                 <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${f.descricao}</td>
                 <td style="padding: 8px; border-bottom: 1px solid var(--border-color); text-align: center;">
-                    <button type="button" class="btn-icon" onclick="removerFeriado('${f.data}')" style="color: var(--danger-color);">🗑️</button>
+                    <button type="button" class="btn-icon" onclick="removerFeriado('${f.id || ''}', '${f.data}')" style="color: var(--danger-color);">🗑️</button>
                 </td>
             </tr>
         `;
