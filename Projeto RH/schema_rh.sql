@@ -275,6 +275,19 @@ CREATE POLICY "rh_config_rub_txt: escrita autenticado"
 
 
 -- ============================================================
+-- 9. TABELA: rh_feriados
+--    Calendário de feriados global, compartilhado por todas as empresas.
+--    Ver migração: schema_rh_feriados_globais.sql
+-- ============================================================
+-- CREATE TABLE public.rh_feriados (
+--     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     data        TEXT NOT NULL,       -- "DD/MM" ou "DD/MM/AAAA"
+--     descricao   TEXT NOT NULL,
+--     criado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- );
+
+
+-- ============================================================
 -- RESUMO DAS TABELAS
 -- ============================================================
 --
