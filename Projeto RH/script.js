@@ -169,6 +169,7 @@ async function selecionarEmpresa(codigo, nome) {
         obsTexto.textContent = observacoes;
         obsBanner.dataset.temObservacao = observacoes ? '1' : '0';
     }
+    atualizarBannerObservacoes();
 }
 
 document.addEventListener('click', e => {
@@ -2345,6 +2346,13 @@ async function gerarArquivoTXT() {
 }
 
 // --- NAVEGAÇÃO E UTILITÁRIOS ---
+function atualizarBannerObservacoes() {
+    const obsBanner = document.getElementById('empresaObservacoesBanner');
+    if (obsBanner) {
+        obsBanner.style.display = obsBanner.dataset.temObservacao === '1' ? 'flex' : 'none';
+    }
+}
+
 function mostrarTela(telaId) {
     document.getElementById('selectionScreen').style.display = 'none';
     document.getElementById('mainScreen').style.display = 'none';
@@ -2363,12 +2371,7 @@ function mostrarTela(telaId) {
         }
     }
 
-    const obsBanner = document.getElementById('empresaObservacoesBanner');
-    if (obsBanner) {
-        obsBanner.style.display = (telaId !== 'selectionScreen' && obsBanner.dataset.temObservacao === '1')
-            ? 'flex'
-            : 'none';
-    }
+    atualizarBannerObservacoes();
 }
 
 function voltarParaEdicao() {
