@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.target.value = formatarData(e.target.value);
     });
     await carregarEmpresas();
-    carregarFeriadosPadrao();
+    await carregarFeriadosGlobais();
     inicializarEventos();
     state.terceiroTurno = localStorage.getItem('rh_terceiro_turno') === 'true';
     document.getElementById('terceiroTurno').checked = state.terceiroTurno;
@@ -927,18 +927,29 @@ window.limparLinha = function(folhaIndex, diaIndex) {
 };
 
 // --- GERENCIAMENTO DE FERIADOS ---
-function carregarFeriadosPadrao() {
-    const feriadosFixos = [
-        { dia: '01/01', desc: 'Confraternização Universal' },
-        { dia: '21/04', desc: 'Tiradentes' },
-        { dia: '01/05', desc: 'Dia do Trabalho' },
-        { dia: '07/09', desc: 'Independência do Brasil' },
-        { dia: '12/10', desc: 'Nossa Senhora Aparecida' },
-        { dia: '02/11', desc: 'Finados' },
-        { dia: '20/11', desc: 'Consciência Negra' },
-        { dia: '25/12', desc: 'Natal' }
-    ];
-    state.feriados = feriadosFixos.map(f => ({ data: f.dia, descricao: f.desc }));
+async function carregarFeriadosGlobais() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_feriados')
+            .select('id, data, descricao')
+            .order('data', { ascending: true });
+        if (error) throw error;
+        state.feriados = (data || []).map(f => ({ id: f.id, data: f.data, descricao: f.descricao }));
+    } catch (e) {
+        console.warn('Erro ao carregar rh_feriados (a tabela existe? rode a migração schema_rh_feriados_globais.sql):', e);
+        // Fallback: mesma lista fixa de antes, sem id (não editável até a migração rodar)
+        const feriadosFixos = [
+            { dia: '01/01', desc: 'Confraternização Universal' },
+            { dia: '21/04', desc: 'Tiradentes' },
+            { dia: '01/05', desc: 'Dia do Trabalho' },
+            { dia: '07/09', desc: 'Independência do Brasil' },
+            { dia: '12/10', desc: 'Nossa Senhora Aparecida' },
+            { dia: '02/11', desc: 'Finados' },
+            { dia: '20/11', desc: 'Consciência Negra' },
+            { dia: '25/12', desc: 'Natal' }
+        ];
+        state.feriados = feriadosFixos.map(f => ({ data: f.dia, descricao: f.desc }));
+    }
     renderizarTabelaFeriados();
 }
 
