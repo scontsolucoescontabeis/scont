@@ -953,7 +953,7 @@ async function carregarFeriadosGlobais() {
     renderizarTabelaFeriados();
 }
 
-function adicionarFeriado() {
+async function adicionarFeriado() {
     const data = document.getElementById('novaDataFeriado').value;
     const desc = document.getElementById('novaDescricaoFeriado').value;
     if (!validarData(data)) {
@@ -964,8 +964,19 @@ function adicionarFeriado() {
         mostrarMensagem('Erro', 'Informe uma descrição para o feriado.');
         return;
     }
-    if (!state.feriados.some(f => f.data === data)) {
-        state.feriados.push({ data, descricao: desc });
+    if (state.feriados.some(f => f.data === data)) {
+        document.getElementById('novaDataFeriado').value = '';
+        document.getElementById('novaDescricaoFeriado').value = '';
+        return;
+    }
+    try {
+        const { data: inserido, error } = await supabaseClient
+            .from('rh_feriados')
+            .insert({ data, descricao: desc })
+            .select('id, data, descricao')
+            .single();
+        if (error) throw error;
+        state.feriados.push({ id: inserido.id, data: inserido.data, descricao: inserido.descricao });
         state.feriados.sort((a, b) => {
             const [d1, m1, a1] = a.data.split('/');
             const [d2, m2, a2] = b.data.split('/');
@@ -973,9 +984,12 @@ function adicionarFeriado() {
         });
         renderizarTabelaFeriados();
         renderizarConteudoAba();
+        document.getElementById('novaDataFeriado').value = '';
+        document.getElementById('novaDescricaoFeriado').value = '';
+    } catch (e) {
+        console.error('Erro ao adicionar feriado:', e);
+        mostrarMensagem('Erro', 'Não foi possível salvar o feriado. Verifique se a migração schema_rh_feriados_globais.sql já foi executada no Supabase.');
     }
-    document.getElementById('novaDataFeriado').value = '';
-    document.getElementById('novaDescricaoFeriado').value = '';
 }
 
 window.removerFeriado = function(data) {
