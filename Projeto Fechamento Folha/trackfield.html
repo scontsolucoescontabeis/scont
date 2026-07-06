@@ -325,6 +325,52 @@
             </div>
         </div>
 
+        <div class="config-card" style="border-left:4px solid #26A69A;margin-bottom:20px;">
+            <h3 style="margin:0 0 4px;font-size:15px;color:#00695C;">🎫 Desconto Vale Transporte / Vale Alimentação (Faltas/Atestados)</h3>
+            <p style="font-size:12px;color:#7F8C8D;margin:0 0 16px;">
+                Rubricas usadas quando, ao gerar o TXT, houver desconto de VT e/ou VA decorrente de faltas ou atestados.
+                Cadastre aqui o código de cada rubrica por empresa.
+            </p>
+
+            <div id="statusConfigDesconto" style="display:none;padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:13px;"></div>
+
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px;">
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Empresa *</label>
+                    <select id="cfgDescEmpresa" style="padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;min-width:170px;"></select>
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Cód. Rubrica Vale Transporte</label>
+                    <input type="text" id="cfgDescCodVT" placeholder="Código"
+                        style="width:150px;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:monospace;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Cód. Rubrica Vale Alimentação</label>
+                    <input type="text" id="cfgDescCodVA" placeholder="Código"
+                        style="width:150px;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:monospace;">
+                </div>
+                <div>
+                    <button class="btn btn-primary" onclick="salvarDescontoConfig()" style="padding:9px 22px;">💾 Salvar</button>
+                </div>
+            </div>
+
+            <div class="config-table-wrap">
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Empresa</th>
+                            <th>Cód. Vale Transporte</th>
+                            <th>Cód. Vale Alimentação</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cfgDescTableBody">
+                        <tr><td colspan="4" class="config-empty">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div class="config-card">
             <h2>⚙️ Configurações · Rubricas – Track &amp; Field</h2>
 
@@ -437,6 +483,86 @@
         <div class="modal-footer">
             <button class="btn btn-secondary btn-small" onclick="fecharModalTipoProcesso()">Cancelar</button>
             <button class="btn btn-primary btn-small" onclick="confirmarTipoProcesso()">▶ Gerar TXT</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL PERGUNTA DESCONTO VT/VA -->
+<div class="modal" id="modalDescontoPergunta">
+    <div class="modal-content" style="max-width:460px;">
+        <div class="modal-header">
+            <h3>Desconto de VT/VA</h3>
+            <button class="modal-close" onclick="fecharModalDescontoPergunta()">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:14px;color:var(--text-secondary);">
+                Há desconto de vale transporte e/ou vale alimentação decorrente de faltas ou atestados nesta competência?
+            </p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary btn-small" onclick="descontoNaoInformar()">Não</button>
+            <button class="btn btn-primary btn-small" onclick="descontoAbrirForm()">Sim</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL LANÇAMENTO DESCONTO VT/VA -->
+<div class="modal" id="modalDescontoForm">
+    <div class="modal-content" style="max-width:640px;">
+        <div class="modal-header">
+            <h3>Lançar Desconto de VT/VA</h3>
+            <button class="modal-close" onclick="fecharModalDescontoForm()">×</button>
+        </div>
+        <div class="modal-body">
+            <div id="descStatus" style="display:none;padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:13px;"></div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Empresa *</label>
+                    <select id="descEmpresa" onchange="popularSelectDescontoEmpregado()"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;"></select>
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Empregado *</label>
+                    <select id="descEmpregado" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;"></select>
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:flex-end;margin-bottom:14px;">
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Valor desconto Vale Transporte (R$)</label>
+                    <input type="text" id="descValorVT" placeholder="0,00"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Valor desconto Vale Alimentação (R$)</label>
+                    <input type="text" id="descValorVA" placeholder="0,00"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <button class="btn btn-primary btn-small" onclick="adicionarDescontoLinha()">➕ Adicionar</button>
+                </div>
+            </div>
+
+            <div class="config-table-wrap">
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Empresa</th>
+                            <th>Empregado</th>
+                            <th style="text-align:right;">Vale Transporte</th>
+                            <th style="text-align:right;">Vale Alimentação</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="descontoPendentesBody">
+                        <tr><td colspan="5" class="config-empty">Nenhum lançamento adicionado.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary btn-small" onclick="fecharModalDescontoForm()">Cancelar</button>
+            <button class="btn btn-primary btn-small" onclick="confirmarDescontosEGerarTxt()">▶ Concluir e Gerar TXT</button>
         </div>
     </div>
 </div>

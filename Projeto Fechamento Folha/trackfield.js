@@ -20,6 +20,9 @@ const COL_87_FERIADO  = 'COMISSÃO DOMINGOS/FERIADOS - FERIADO - R87';
 // Demais valores → tipo monetário, valor em centavos no TXT
 const COL_DOM         = 'COMISSÃO DOMINGOS/FERIADOS - DOMINGO';
 const COL_FER         = 'COMISSÃO DOMINGOS/FERIADOS - FERIADO';
+// Desconto manual de VT/VA por faltas/atestados (lançado ao gerar o TXT, não vem da planilha)
+const COL_DESCONTO_VT = 'DESCONTO VALE TRANSPORTE (MANUAL)';
+const COL_DESCONTO_VA = 'DESCONTO VALE ALIMENTAÇÃO (MANUAL)';
 
 // Mapeamento loja → { codTxt: código numérico para o TXT, codDB: código no rh_empregados }
 const LOJAS_TF = {
@@ -70,6 +73,8 @@ let envioAtualId    = null; // id do registro em quadrante_folha_envios para per
 let empregadosConfig  = {}; // codEmpresaDB → { nome_normalizado → codigo_empregado }
 let rubricasIgnoradas = new Set(); // normalizarNome(coluna_planilha) → excluir do TXT
 let faltaDatasMap     = {}; // `${codEmpregado}::${normColuna}` → string raw de datas inseridas
+let descontoPendentes    = []; // lançamentos manuais de desconto VT/VA antes de gerar o TXT
+let tipoProcessoPendente = '11'; // tipo escolhido no modal, aguardando decisão de desconto VT/VA
 
 // ──────────────────────────────────────────────
 // UTILITÁRIOS
@@ -1074,7 +1079,177 @@ function confirmarTipoProcesso() {
     const tipo = sel ? sel.value : '11';
     fecharModalTipoProcesso();
     tipoFolhaAtual = tipo;
+    tipoProcessoPendente = tipo;
+    document.getElementById('modalDescontoPergunta').classList.add('active');
+}
+
+// ──────────────────────────────────────────────
+// DESCONTO MANUAL DE VT/VA (FALTAS/ATESTADOS)
+// ──────────────────────────────────────────────
+
+function construirDescontoConfigMap() {
+    const mapa = {};
+    rubricasConfig.forEach(c => {
+        if (c.coluna_planilha !== COL_DESCONTO_VT && c.coluna_planilha !== COL_DESCONTO_VA) return;
+        if (!mapa[c.codigo_empresa]) mapa[c.codigo_empresa] = { vt: null, va: null };
+        if (c.coluna_planilha === COL_DESCONTO_VT) mapa[c.codigo_empresa].vt = c.codigo_rubrica;
+        else mapa[c.codigo_empresa].va = c.codigo_rubrica;
+    });
+    return mapa;
+}
+
+function fecharModalDescontoPergunta() {
+    document.getElementById('modalDescontoPergunta').classList.remove('active');
+}
+
+function descontoNaoInformar() {
+    fecharModalDescontoPergunta();
+    gerarTxt(tipoProcessoPendente);
+    mostrarStep(3);
+}
+
+function descontoAbrirForm() {
+    fecharModalDescontoPergunta();
+    descontoPendentes = [];
+    renderizarDescontoPendentes();
+    popularSelectDescontoEmpresa();
+    document.getElementById('descValorVT').value = '';
+    document.getElementById('descValorVA').value = '';
+    document.getElementById('descStatus').style.display = 'none';
+    document.getElementById('modalDescontoForm').classList.add('active');
+}
+
+function fecharModalDescontoForm() {
+    document.getElementById('modalDescontoForm').classList.remove('active');
+}
+
+function popularSelectDescontoEmpresa() {
+    const codigosPresentes = [...new Set(planilhaData.map(f => codigoEmpresaPorLoja(f.loja)))]
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const sel = document.getElementById('descEmpresa');
+    sel.innerHTML = '<option value="">Selecione...</option>' + codigosPresentes.map(cod => {
+        const label = _assocEmpresas.find(e => e.codigo_empresa === cod)?.nome_empresa || '';
+        return `<option value="${cod}">${cod} – ${label}</option>`;
+    }).join('');
+    popularSelectDescontoEmpregado();
+}
+
+function popularSelectDescontoEmpregado() {
+    const cod = document.getElementById('descEmpresa').value;
+    const sel = document.getElementById('descEmpregado');
+    if (!cod) { sel.innerHTML = '<option value="">Selecione a empresa primeiro</option>'; return; }
+    const empregados = planilhaData
+        .filter(f => codigoEmpresaPorLoja(f.loja) === cod)
+        .map(f => ({ nome: f.nome, codigo: buscarCodigoEmpregado(f.nome, codigoEmpresaDBPorLoja(f.loja)) }))
+        .filter((e, i, arr) => arr.findIndex(x => x.nome === e.nome) === i)
+        .sort((a, b) => a.nome.localeCompare(b.nome));
+    sel.innerHTML = empregados.map(e =>
+        `<option value="${e.codigo || ''}" data-nome="${e.nome}">${e.nome}${e.codigo ? '' : ' (sem código cadastrado)'}</option>`
+    ).join('');
+}
+
+function mostrarStatusDesconto(msg, tipo) {
+    const el = document.getElementById('descStatus');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = tipo === 'success' ? '#D4EDDA' : '#F8D7DA';
+    el.style.color       = tipo === 'success' ? '#155724' : '#721C24';
+    el.style.border      = '1px solid ' + (tipo === 'success' ? '#C3E6CB' : '#F5C6CB');
+}
+
+function adicionarDescontoLinha() {
+    const selEmpresa    = document.getElementById('descEmpresa');
+    const selEmpregado  = document.getElementById('descEmpregado');
+    const codEmpresa    = selEmpresa.value;
+    const codEmpregado  = selEmpregado.value;
+    const nomeEmpregado = selEmpregado.selectedOptions[0]?.dataset.nome || '';
+    const valorVT = parseFloat((document.getElementById('descValorVT').value || '').replace(',', '.')) || 0;
+    const valorVA = parseFloat((document.getElementById('descValorVA').value || '').replace(',', '.')) || 0;
+
+    if (!codEmpresa) { mostrarStatusDesconto('⚠ Selecione a empresa.', 'error'); return; }
+    if (!codEmpregado) { mostrarStatusDesconto('⚠ Selecione um empregado com código cadastrado.', 'error'); return; }
+    if (valorVT <= 0 && valorVA <= 0) { mostrarStatusDesconto('⚠ Informe ao menos um valor de desconto (VT ou VA).', 'error'); return; }
+
+    const cfg = construirDescontoConfigMap()[codEmpresa] || {};
+    if (valorVT > 0 && !cfg.vt) {
+        mostrarStatusDesconto(`⚠ Cadastre o código da rubrica de Vale Transporte para a empresa ${codEmpresa} em Configurações antes de lançar este desconto.`, 'error');
+        return;
+    }
+    if (valorVA > 0 && !cfg.va) {
+        mostrarStatusDesconto(`⚠ Cadastre o código da rubrica de Vale Alimentação para a empresa ${codEmpresa} em Configurações antes de lançar este desconto.`, 'error');
+        return;
+    }
+
+    descontoPendentes.push({ codEmpresa, codEmpregado, nomeEmpregado, valorVT, valorVA });
+    renderizarDescontoPendentes();
+
+    document.getElementById('descValorVT').value = '';
+    document.getElementById('descValorVA').value = '';
+    document.getElementById('descStatus').style.display = 'none';
+}
+
+function removerDescontoLinha(i) {
+    descontoPendentes.splice(i, 1);
+    renderizarDescontoPendentes();
+}
+
+function renderizarDescontoPendentes() {
+    const tbody = document.getElementById('descontoPendentesBody');
+    if (!tbody) return;
+    if (!descontoPendentes.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="config-empty">Nenhum lançamento adicionado.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = descontoPendentes.map((d, i) => `
+        <tr>
+            <td><strong>${d.codEmpresa}</strong></td>
+            <td>${d.nomeEmpregado}<span style="font-family:monospace;color:#999;font-size:11px;margin-left:6px;">${d.codEmpregado}</span></td>
+            <td style="text-align:right;">${d.valorVT > 0 ? 'R$ ' + d.valorVT.toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—'}</td>
+            <td style="text-align:right;">${d.valorVA > 0 ? 'R$ ' + d.valorVA.toLocaleString('pt-BR', {minimumFractionDigits:2}) : '—'}</td>
+            <td><button class="btn btn-secondary btn-small" style="background:#E74C3C;border-color:#E74C3C;color:#fff;" onclick="removerDescontoLinha(${i})">✕</button></td>
+        </tr>
+    `).join('');
+}
+
+function confirmarDescontosEGerarTxt() {
+    if (!descontoPendentes.length) {
+        mostrarStatusDesconto('⚠ Adicione ao menos um lançamento antes de continuar.', 'error');
+        return;
+    }
+    const tipo = tipoProcessoPendente;
+    const cfgMap = construirDescontoConfigMap();
+    const originalLen = linhasRelatorio.length;
+
+    descontoPendentes.forEach(d => {
+        const cfg = cfgMap[d.codEmpresa] || {};
+        if (d.valorVT > 0 && cfg.vt) {
+            linhasRelatorio.push({
+                nome: d.nomeEmpregado, loja: '', cargo: '',
+                codEmpresa: d.codEmpresa, codEmpregado: d.codEmpregado,
+                coluna: COL_DESCONTO_VT, descricao: 'Desconto Vale Transporte',
+                codigoRubrica: cfg.vt, fonteRubrica: 'manual',
+                tipoProcesso: tipo, tipoValor: 'monetario',
+                bruto: d.valorVT, valorInt: Math.round(d.valorVT * 100),
+            });
+        }
+        if (d.valorVA > 0 && cfg.va) {
+            linhasRelatorio.push({
+                nome: d.nomeEmpregado, loja: '', cargo: '',
+                codEmpresa: d.codEmpresa, codEmpregado: d.codEmpregado,
+                coluna: COL_DESCONTO_VA, descricao: 'Desconto Vale Alimentação',
+                codigoRubrica: cfg.va, fonteRubrica: 'manual',
+                tipoProcesso: tipo, tipoValor: 'monetario',
+                bruto: d.valorVA, valorInt: Math.round(d.valorVA * 100),
+            });
+        }
+    });
+
     gerarTxt(tipo);
+    linhasRelatorio.length = originalLen;
+
+    fecharModalDescontoForm();
+    descontoPendentes = [];
     mostrarStep(3);
 }
 
@@ -1509,7 +1684,7 @@ let _assocEmpresas = [];
 
 async function iniciarConfig() {
     await carregarEmpresasConfig();
-    await Promise.all([carregarRubricasConfig(), carregar87Config()]);
+    await Promise.all([carregarRubricasConfig(), carregar87Config(), carregarDescontoConfig()]);
 }
 
 async function carregarEmpresasConfig() {
@@ -1539,11 +1714,14 @@ async function carregarEmpresasConfig() {
     };
     populaSelect('cfgEmpresa', false);
     populaSelect('cfg87Empresa', false);
+    populaSelect('cfgDescEmpresa', false);
     populaSelect('cfgFiltroEmpresa', true);
     const sel = document.getElementById('cfgEmpresa');
     if (sel && codigos.length) sel.value = codigos[0];
     const sel87 = document.getElementById('cfg87Empresa');
     if (sel87 && codigos.length) sel87.value = codigos[0];
+    const selDesc = document.getElementById('cfgDescEmpresa');
+    if (selDesc && codigos.length) selDesc.value = codigos[0];
 }
 
 async function carregarRubricasConfig() {
@@ -1787,6 +1965,125 @@ function preencherEditar87(empresa, codDom87, codFer87, codDomOutros, codFerOutr
 
 function mostrarStatusConfig87(msg, tipo) {
     const el = document.getElementById('statusConfig87');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = tipo === 'success' ? '#D4EDDA' : '#F8D7DA';
+    el.style.color       = tipo === 'success' ? '#155724' : '#721C24';
+    el.style.border      = '1px solid ' + (tipo === 'success' ? '#C3E6CB' : '#F5C6CB');
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ──────────────────────────────────────────────
+// CONFIGURAÇÕES – DESCONTO VT/VA (FALTAS/ATESTADOS)
+// ──────────────────────────────────────────────
+
+async function carregarDescontoConfig() {
+    const codigos = [...new Set(Object.values(LOJAS_TF).map(l => l.codTxt))];
+    const tbody = document.getElementById('cfgDescTableBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="config-empty">Carregando...</td></tr>';
+
+    const { data, error } = await supabaseClient
+        .from('fechamento_rubricas_config')
+        .select('id, codigo_empresa, coluna_planilha, codigo_rubrica')
+        .in('codigo_empresa', codigos)
+        .in('coluna_planilha', [COL_DESCONTO_VT, COL_DESCONTO_VA]);
+
+    if (error) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="config-empty" style="color:#E74C3C;">Erro: ${error.message}</td></tr>`;
+        return;
+    }
+
+    const mapa = {};
+    codigos.forEach(cod => { mapa[cod] = { vt: null, va: null }; });
+    (data || []).forEach(r => {
+        if      (r.coluna_planilha === COL_DESCONTO_VT) mapa[r.codigo_empresa].vt = r;
+        else if (r.coluna_planilha === COL_DESCONTO_VA) mapa[r.codigo_empresa].va = r;
+    });
+
+    const cell = (reg) => reg
+        ? `<span style="font-family:monospace;font-weight:600;">${reg.codigo_rubrica}</span>
+           <button class="btn btn-secondary btn-small" style="background:#E74C3C;border-color:#E74C3C;color:#fff;margin-left:4px;"
+               onclick="deletarDescontoConfig('${reg.id}')">✕</button>`
+        : '<em style="color:#bbb;font-size:12px;">—</em>';
+
+    if (tbody) {
+        tbody.innerHTML = codigos.map(cod => {
+            const m = mapa[cod];
+            const lojaLabel = (_assocEmpresas.find(e => e.codigo_empresa === cod)?.nome_empresa || '');
+            return `<tr>
+                <td><strong>${cod}</strong> <span style="color:#7F8C8D;font-size:12px;">${lojaLabel}</span></td>
+                <td>${cell(m.vt)}</td>
+                <td>${cell(m.va)}</td>
+                <td>
+                    <button class="btn btn-secondary btn-small"
+                        onclick="preencherEditarDesconto('${cod}','${m.vt?.codigo_rubrica||''}','${m.va?.codigo_rubrica||''}')">
+                        ✏ Editar
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+}
+
+async function salvarDescontoConfig() {
+    const empresa = document.getElementById('cfgDescEmpresa').value;
+    const codVT   = document.getElementById('cfgDescCodVT').value.trim();
+    const codVA   = document.getElementById('cfgDescCodVA').value.trim();
+
+    if (!empresa) { mostrarStatusConfigDesconto('⚠ Selecione a empresa.', 'error'); return; }
+    if (!codVT && !codVA) { mostrarStatusConfigDesconto('⚠ Informe ao menos um código.', 'error'); return; }
+
+    const reg = (col, cod) => ({
+        codigo_empresa: empresa, coluna_planilha: col,
+        descricao: col, codigo_rubrica: cod,
+        tipo_processo: '11', tipo_valor: 'monetario', ativo: true,
+    });
+
+    const registros = [
+        codVT && reg(COL_DESCONTO_VT, codVT),
+        codVA && reg(COL_DESCONTO_VA, codVA),
+    ].filter(Boolean);
+
+    try {
+        const { error } = await supabaseClient
+            .from('fechamento_rubricas_config')
+            .upsert(registros, { onConflict: 'codigo_empresa,coluna_planilha' });
+        if (error) throw error;
+
+        document.getElementById('cfgDescCodVT').value = '';
+        document.getElementById('cfgDescCodVA').value = '';
+        mostrarStatusConfigDesconto('✅ Salvo com sucesso!', 'success');
+        carregarDescontoConfig();
+        carregarRubricasConfig();
+    } catch(err) {
+        mostrarStatusConfigDesconto('❌ Erro: ' + err.message, 'error');
+    }
+}
+
+async function deletarDescontoConfig(id) {
+    if (!confirm('Remover esta rubrica?')) return;
+    try {
+        const { error } = await supabaseClient
+            .from('fechamento_rubricas_config')
+            .delete().eq('id', id);
+        if (error) throw error;
+        carregarDescontoConfig();
+        carregarRubricasConfig();
+    } catch(err) {
+        mostrarStatusConfigDesconto('❌ Erro ao excluir: ' + err.message, 'error');
+    }
+}
+
+function preencherEditarDesconto(empresa, codVT, codVA) {
+    document.getElementById('cfgDescEmpresa').value = empresa;
+    document.getElementById('cfgDescCodVT').value    = codVT;
+    document.getElementById('cfgDescCodVA').value    = codVA;
+    document.getElementById('cfgDescCodVT').focus();
+}
+
+function mostrarStatusConfigDesconto(msg, tipo) {
+    const el = document.getElementById('statusConfigDesconto');
     if (!el) return;
     el.textContent = msg;
     el.style.display = 'block';
