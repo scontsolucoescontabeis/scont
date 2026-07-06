@@ -243,9 +243,12 @@
                     Faça o upload da planilha com a aba "Líquido" (obrigatória). A aba "Informações bancárias" é opcional — se não vier na planilha, o relatório usa os dados bancários já salvos de importações anteriores. Quando presente, os dados bancários são atualizados e reaproveitados nas competências seguintes.
                 </div>
 
-                <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">
-                    Planilha de Líquido, com Informações Bancárias opcional (Excel) *
-                </label>
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+                    <label style="font-weight:600; font-size:13px;">
+                        Planilha de Líquido, com Informações Bancárias opcional (Excel) *
+                    </label>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="baixarModeloLiquido()">📥 Baixar modelo</button>
+                </div>
                 <div class="upload-area" id="uploadAreaLiquido" onclick="document.getElementById('inputLiquido').click()">
                     <div class="upload-icon">🏷️</div>
                     <div class="upload-text">
@@ -372,6 +375,110 @@
                     </thead>
                     <tbody id="cfgTableBody">
                         <tr><td colspan="6" class="config-empty">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="config-card">
+            <h2>💳 Configurações · Informações Bancárias</h2>
+
+            <div id="statusConfigBancario" style="display:none;padding:10px 14px;border-radius:6px;margin-bottom:14px;font-size:13px;"></div>
+
+            <!-- Formulário de adição -->
+            <div class="config-form-row" style="grid-template-columns:1fr 1fr 1.4fr 1fr;">
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Empresa *</label>
+                    <select id="bancEmpresa" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Código do Empregado *</label>
+                    <input type="text" id="bancCodigo" placeholder="Ex: 000123"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:monospace;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Nome *</label>
+                    <input type="text" id="bancNome" placeholder="Nome do empregado"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">CPF</label>
+                    <input type="text" id="bancCpf" placeholder="Somente números"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+            </div>
+            <div class="config-form-row" style="grid-template-columns:1fr 1fr 0.8fr 0.8fr 1fr 1fr auto;margin-top:10px;">
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Cargo</label>
+                    <input type="text" id="bancCargo" placeholder="Cargo"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Centro de Custo</label>
+                    <input type="text" id="bancCentroCusto" placeholder="Centro de custo"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Banco *</label>
+                    <input type="text" id="bancBanco" placeholder="Ex: 341"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:monospace;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Agência *</label>
+                    <input type="text" id="bancAgencia" placeholder="Agência"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Conta *</label>
+                    <input type="text" id="bancConta" placeholder="Conta"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Tipo de Conta</label>
+                    <select id="bancTipoConta" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <option value="C.Corrente">C.Corrente</option>
+                        <option value="C.Salário">C.Salário</option>
+                        <option value="Poupança">Poupança</option>
+                    </select>
+                </div>
+                <div style="display:flex;align-items:flex-end;">
+                    <button class="btn btn-primary" onclick="salvarBancarioConfig()" style="white-space:nowrap;padding:9px 18px;">
+                        ➕ Adicionar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtro empresa para tabela -->
+            <div style="display:flex;gap:10px;align-items:center;margin:14px 0 10px;flex-wrap:wrap;">
+                <label style="font-weight:600;font-size:12px;color:#2C3E50;">Filtrar tabela:</label>
+                <select id="bancFiltroEmpresa" onchange="carregarBancariosConfig()" style="padding:7px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                    <option value="">Todas as empresas</option>
+                </select>
+                <span id="bancTotal" style="font-size:12px;color:#7F8C8D;margin-left:auto;"></span>
+            </div>
+
+            <!-- Tabela -->
+            <div class="config-table-wrap">
+                <table class="config-table">
+                    <thead>
+                        <tr>
+                            <th>Empresa</th>
+                            <th>Código</th>
+                            <th>Nome</th>
+                            <th>CPF</th>
+                            <th>Cargo</th>
+                            <th>C.Custo</th>
+                            <th>Banco</th>
+                            <th>Agência</th>
+                            <th>Conta</th>
+                            <th>Tipo de Conta</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bancTableBody">
+                        <tr><td colspan="11" class="config-empty">Carregando...</td></tr>
                     </tbody>
                 </table>
             </div>

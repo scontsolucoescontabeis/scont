@@ -1006,7 +1006,7 @@ let _assocEmpresas = []; // [{codigo_empresa, nome_empresa}]
 
 async function iniciarConfig() {
     await carregarEmpresasConfig();
-    await carregarRubricasConfig();
+    await Promise.all([carregarRubricasConfig(), carregarBancariosConfig()]);
 }
 
 async function carregarEmpresasConfig() {
@@ -1022,7 +1022,7 @@ async function carregarEmpresasConfig() {
             const sel = document.getElementById(id);
             if (!sel) return;
             const atual = sel.value;
-            const prefix = id === 'cfgFiltroEmpresa' ? '<option value="">Todas as empresas</option>' : '<option value="">Selecione...</option>';
+            const prefix = (id === 'cfgFiltroEmpresa' || id === 'bancFiltroEmpresa') ? '<option value="">Todas as empresas</option>' : '<option value="">Selecione...</option>';
             sel.innerHTML = prefix + _assocEmpresas.map(e =>
                 `<option value="${e.codigo_empresa}">${e.codigo_empresa} – ${e.nome_empresa || ''}</option>`
             ).join('');
@@ -1031,8 +1031,11 @@ async function carregarEmpresasConfig() {
 
         populaSelect('cfgEmpresa');
         populaSelect('cfgFiltroEmpresa');
+        populaSelect('bancEmpresa');
+        populaSelect('bancFiltroEmpresa');
 
         document.getElementById('cfgEmpresa').value = CODIGO_EMPRESA;
+        document.getElementById('bancEmpresa').value = CODIGO_EMPRESA;
 
     } catch (err) {
         console.error('Erro ao carregar empresas config:', err);
@@ -1228,6 +1231,202 @@ async function salvarValorCota(id) {
 
 function mostrarStatusConfig(msg, tipo) {
     const el = document.getElementById('statusConfig');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = tipo === 'success' ? '#D4EDDA' : '#F8D7DA';
+    el.style.color       = tipo === 'success' ? '#155724' : '#721C24';
+    el.style.border      = '1px solid ' + (tipo === 'success' ? '#C3E6CB' : '#F5C6CB');
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ──────────────────────────────────────────────
+// CONFIGURAÇÕES – INFORMAÇÕES BANCÁRIAS
+// ──────────────────────────────────────────────
+
+async function carregarBancariosConfig() {
+    const tbody = document.getElementById('bancTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="11" class="config-empty">Carregando...</td></tr>';
+
+    const filtroEmp = document.getElementById('bancFiltroEmpresa')?.value || '';
+
+    try {
+        let q = supabaseClient
+            .from('fechamento_dados_bancarios')
+            .select('id, codigo_empresa, codigo_empregado, nome_empregado, cpf, cargo, centro_custo, banco_codigo, agencia, conta, tipo_conta')
+            .order('codigo_empresa').order('nome_empregado');
+        if (filtroEmp) q = q.eq('codigo_empresa', filtroEmp);
+
+        const { data, error } = await q;
+        if (error) throw error;
+
+        const lista = data || [];
+        document.getElementById('bancTotal').textContent = lista.length + ' registro(s)';
+
+        if (!lista.length) {
+            tbody.innerHTML = '<tr><td colspan="11" class="config-empty">Nenhum registro cadastrado.</td></tr>';
+            return;
+        }
+
+        const tipoOpts = ['C.Corrente', 'C.Salário', 'Poupança'];
+        tbody.innerHTML = lista.map(r => `
+            <tr>
+                <td><strong>${escHtml(r.codigo_empresa)}</strong></td>
+                <td>${escHtml(r.codigo_empregado)}</td>
+                <td>${escHtml(r.nome_empregado || '–')}</td>
+                <td>${escHtml(formatarCpf(r.cpf) || '–')}</td>
+                <td>${escHtml(r.cargo || '–')}</td>
+                <td>${escHtml(r.centro_custo || '–')}</td>
+                <td style="font-family:monospace;">${escHtml(r.banco_codigo || '–')}</td>
+                <td>${escHtml(r.agencia || '–')}</td>
+                <td>${escHtml(r.conta || '–')}</td>
+                <td>${escHtml(r.tipo_conta || '–')}</td>
+                <td style="white-space:nowrap;">
+                    <button class="btn btn-secondary btn-small" onclick="abrirEditarBancario('${r.id}')" style="margin-right:4px;">✏ Editar</button>
+                    <button class="btn btn-secondary btn-small" style="background:#E74C3C;border-color:#E74C3C;color:white;"
+                        onclick="deletarBancarioConfig('${r.id}')">Excluir</button>
+                </td>
+            </tr>
+            <tr id="editBancRow-${r.id}" style="display:none;background:#fafafa;">
+                <td colspan="11">
+                    <div class="inline-register-form" style="flex-wrap:wrap;">
+                        <input type="text" id="editBancNome-${r.id}" value="${escHtml(r.nome_empregado || '')}" placeholder="Nome"
+                            style="width:180px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" id="editBancCpf-${r.id}" value="${escHtml(r.cpf || '')}" placeholder="CPF"
+                            style="width:120px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" id="editBancCargo-${r.id}" value="${escHtml(r.cargo || '')}" placeholder="Cargo"
+                            style="width:130px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" id="editBancCentroCusto-${r.id}" value="${escHtml(r.centro_custo || '')}" placeholder="Centro de Custo"
+                            style="width:130px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" id="editBancBanco-${r.id}" value="${escHtml(r.banco_codigo || '')}" placeholder="Banco"
+                            style="width:90px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:monospace;">
+                        <input type="text" id="editBancAgencia-${r.id}" value="${escHtml(r.agencia || '')}" placeholder="Agência"
+                            style="width:90px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" id="editBancConta-${r.id}" value="${escHtml(r.conta || '')}" placeholder="Conta"
+                            style="width:110px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <select id="editBancTipo-${r.id}" class="tipo-select">
+                            ${tipoOpts.map(t => `<option value="${t}" ${r.tipo_conta === t ? 'selected' : ''}>${t}</option>`).join('')}
+                        </select>
+                        <button class="btn btn-primary btn-small" onclick="salvarEdicaoBancario('${r.id}')">💾 Salvar</button>
+                        <button class="btn btn-secondary btn-small" onclick="fecharEditarBancario('${r.id}')">Cancelar</button>
+                        <span id="editBancStatus-${r.id}" style="font-size:12px;"></span>
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="11" class="config-empty" style="color:#E74C3C;">Erro: ${err.message}</td></tr>`;
+    }
+}
+
+async function salvarBancarioConfig() {
+    const empresa     = document.getElementById('bancEmpresa').value.trim();
+    const codigo      = normalizarCodigo(document.getElementById('bancCodigo').value.trim());
+    const nome        = document.getElementById('bancNome').value.trim();
+    const cpf         = document.getElementById('bancCpf').value.replace(/\D/g, '');
+    const cargo       = document.getElementById('bancCargo').value.trim();
+    const centroCusto = document.getElementById('bancCentroCusto').value.trim();
+    const bancoCodigo = document.getElementById('bancBanco').value.replace(/\D/g, '').padStart(3, '0');
+    const agencia     = document.getElementById('bancAgencia').value.trim();
+    const conta       = document.getElementById('bancConta').value.trim();
+    const tipoConta   = document.getElementById('bancTipoConta').value;
+
+    if (!empresa || !codigo || !nome || !agencia || !conta || bancoCodigo === '000') {
+        mostrarStatusBancario('⚠ Preencha os campos obrigatórios: Empresa, Código, Nome, Banco, Agência e Conta.', 'error');
+        return;
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('fechamento_dados_bancarios')
+            .upsert([{
+                codigo_empresa:   empresa,
+                codigo_empregado: codigo,
+                nome_empregado:   nome,
+                cpf,
+                cargo,
+                centro_custo:     centroCusto,
+                banco_codigo:     bancoCodigo,
+                agencia,
+                conta,
+                tipo_conta:       tipoConta,
+                atualizado_em:    new Date().toISOString(),
+            }], { onConflict: 'codigo_empresa,codigo_empregado' });
+        if (error) throw error;
+
+        ['bancCodigo','bancNome','bancCpf','bancCargo','bancCentroCusto','bancBanco','bancAgencia','bancConta']
+            .forEach(id => { document.getElementById(id).value = ''; });
+        document.getElementById('bancTipoConta').value = 'C.Corrente';
+        mostrarStatusBancario('✅ Registro salvo com sucesso!', 'success');
+        carregarBancariosConfig();
+    } catch (err) {
+        mostrarStatusBancario('❌ Erro: ' + err.message, 'error');
+    }
+}
+
+function abrirEditarBancario(id) {
+    const row = document.getElementById(`editBancRow-${id}`);
+    if (row) row.style.display = '';
+}
+
+function fecharEditarBancario(id) {
+    const row = document.getElementById(`editBancRow-${id}`);
+    if (row) row.style.display = 'none';
+}
+
+async function salvarEdicaoBancario(id) {
+    const status = document.getElementById(`editBancStatus-${id}`);
+    const nome        = document.getElementById(`editBancNome-${id}`).value.trim();
+    const cpf         = document.getElementById(`editBancCpf-${id}`).value.replace(/\D/g, '');
+    const cargo       = document.getElementById(`editBancCargo-${id}`).value.trim();
+    const centroCusto = document.getElementById(`editBancCentroCusto-${id}`).value.trim();
+    const bancoCodigo = document.getElementById(`editBancBanco-${id}`).value.replace(/\D/g, '').padStart(3, '0');
+    const agencia     = document.getElementById(`editBancAgencia-${id}`).value.trim();
+    const conta       = document.getElementById(`editBancConta-${id}`).value.trim();
+    const tipoConta   = document.getElementById(`editBancTipo-${id}`).value;
+
+    if (!nome || !agencia || !conta || bancoCodigo === '000') {
+        status.textContent = '⚠ Preencha Nome, Banco, Agência e Conta.';
+        status.style.color = '#E74C3C';
+        return;
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('fechamento_dados_bancarios')
+            .update({
+                nome_empregado: nome, cpf, cargo, centro_custo: centroCusto,
+                banco_codigo: bancoCodigo, agencia, conta, tipo_conta: tipoConta,
+                atualizado_em: new Date().toISOString(),
+            })
+            .eq('id', id);
+        if (error) throw error;
+        mostrarStatusBancario('✅ Registro atualizado!', 'success');
+        fecharEditarBancario(id);
+        carregarBancariosConfig();
+    } catch (err) {
+        status.textContent = '❌ Erro: ' + err.message;
+        status.style.color = '#E74C3C';
+    }
+}
+
+async function deletarBancarioConfig(id) {
+    if (!confirm('Excluir este registro bancário?')) return;
+    try {
+        const { error } = await supabaseClient
+            .from('fechamento_dados_bancarios')
+            .delete().eq('id', id);
+        if (error) throw error;
+        mostrarStatusBancario('✅ Registro excluído.', 'success');
+        carregarBancariosConfig();
+    } catch (err) {
+        mostrarStatusBancario('❌ Erro: ' + err.message, 'error');
+    }
+}
+
+function mostrarStatusBancario(msg, tipo) {
+    const el = document.getElementById('statusConfigBancario');
     if (!el) return;
     el.textContent = msg;
     el.style.display = 'block';
@@ -1553,6 +1752,24 @@ const MAPA_LIQUIDO = {
     cpf:    ['cpf'],
     valor:  ['valor'],
 };
+
+// Gera e baixa um .xlsx de exemplo no formato aceito por processarLiquido()
+// (mesmas abas/cabeçalhos de MAPA_BANCARIA e MAPA_LIQUIDO).
+function baixarModeloLiquido() {
+    const abaBancaria = XLSX.utils.aoa_to_sheet([
+        ['Código', 'Nome do Empregado', 'Cargo', 'Ccusto', 'CPF', 'Banco', 'Agência', 'Nº Conta'],
+        ['000123', 'João da Silva (exemplo)', 'Vendedor', '01', '12345678900', '341', '1234', '56789-0'],
+    ]);
+    const abaLiquido = XLSX.utils.aoa_to_sheet([
+        ['Código', 'Nome do Empregado', 'CPF', 'Valor'],
+        ['000123', 'João da Silva (exemplo)', '12345678900', 1500],
+    ]);
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, abaBancaria, 'Informações Bancárias');
+    XLSX.utils.book_append_sheet(wb, abaLiquido, 'Líquido');
+    XLSX.writeFile(wb, 'Modelo_Liquido_Bancarios.xlsx');
+}
 
 // Deduplica linhas da aba bancária por código do empregado (última ocorrência vence)
 function dedupeBancaria(linhas) {
