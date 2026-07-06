@@ -1179,6 +1179,14 @@ function fecharSidebar() {
     document.getElementById('sidebarOverlay').classList.remove('active');
 }
 
+// Permite abrir direto na tela de Configurações via ?tela=config (ex: link do index.html)
+(function() {
+    document.addEventListener('DOMContentLoaded', () => {
+        const tela = new URLSearchParams(location.search).get('tela');
+        if (tela === 'config') navegarPara(tela);
+    });
+})();
+
 function navegarPara(modo) {
     _modoAtual = modo;
     fecharSidebar();

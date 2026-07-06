@@ -24,33 +24,55 @@
     </div>
 
     <nav class="sidebar-nav">
-        <button class="sidebar-item active" id="navEmpresas">
-            <span class="sidebar-item-icon">🏠</span> Visão Geral
+        <div class="sidebar-section">Empresas</div>
+
+        <button class="sidebar-item sidebar-group-toggle" id="grupoBtn-quadrante" onclick="toggleEmpresaGroup('quadrante')">
+            <span class="sidebar-item-icon">🏭</span> Quadrante Etiquetas
+            <span class="sidebar-group-chevron">▸</span>
         </button>
+        <div class="sidebar-subgroup" id="grupo-quadrante">
+            <a href="quadrante.html" class="sidebar-item sidebar-subitem">
+                <span class="sidebar-item-icon">📊</span> Planilha
+            </a>
+            <a href="formulario_quadrante.html" class="sidebar-item sidebar-subitem">
+                <span class="sidebar-item-icon">📄</span> Formulário
+            </a>
+            <a href="quadrante.html?tela=config-rubricas" class="sidebar-item sidebar-subitem">
+                <span class="sidebar-item-icon">⚙️</span> Configurações
+            </a>
+        </div>
 
-        <div class="sidebar-section">Quadrante Etiquetas</div>
-        <a href="quadrante.html" class="sidebar-item sidebar-subitem">
-            <span class="sidebar-item-icon">📊</span> Planilha
-        </a>
-        <a href="formulario_quadrante.html" class="sidebar-item sidebar-subitem">
-            <span class="sidebar-item-icon">📄</span> Formulário
-        </a>
+        <button class="sidebar-item sidebar-group-toggle" id="grupoBtn-trackfield" onclick="toggleEmpresaGroup('trackfield')">
+            <span class="sidebar-item-icon">🏃</span> Track &amp; Field
+            <span class="sidebar-group-chevron">▸</span>
+        </button>
+        <div class="sidebar-subgroup" id="grupo-trackfield">
+            <a href="trackfield.html" class="sidebar-item sidebar-subitem">
+                <span class="sidebar-item-icon">📊</span> Planilha
+            </a>
+            <a href="formulario_trackfield.html" class="sidebar-item sidebar-subitem">
+                <span class="sidebar-item-icon">📄</span> Formulário
+            </a>
+            <a href="trackfield.html?tela=config" class="sidebar-item sidebar-subitem">
+                <span class="sidebar-item-icon">⚙️</span> Configurações
+            </a>
+        </div>
 
-        <div class="sidebar-section">Track &amp; Field</div>
-        <a href="trackfield.html" class="sidebar-item sidebar-subitem">
-            <span class="sidebar-item-icon">📊</span> Planilha
-        </a>
-        <a href="formulario_trackfield.html" class="sidebar-item sidebar-subitem">
-            <span class="sidebar-item-icon">📄</span> Formulário
-        </a>
-
-        <div class="sidebar-section">Anankê</div>
-        <a href="ananke.html" class="sidebar-item sidebar-subitem">
-            <span class="sidebar-item-icon">📊</span> Planilha
-        </a>
-        <a href="formulario_ananke.html" class="sidebar-item sidebar-subitem">
-            <span class="sidebar-item-icon">📄</span> Formulário
-        </a>
+        <button class="sidebar-item sidebar-group-toggle" id="grupoBtn-ananke" onclick="toggleEmpresaGroup('ananke')">
+            <span class="sidebar-item-icon">🏥</span> Anankê
+            <span class="sidebar-group-chevron">▸</span>
+        </button>
+        <div class="sidebar-subgroup" id="grupo-ananke">
+            <a href="ananke.html" class="sidebar-item sidebar-subitem">
+                <span class="sidebar-item-icon">📊</span> Planilha
+            </a>
+            <a href="formulario_ananke.html" class="sidebar-item sidebar-subitem">
+                <span class="sidebar-item-icon">📄</span> Formulário
+            </a>
+            <a href="ananke.html?tela=config" class="sidebar-item sidebar-subitem">
+                <span class="sidebar-item-icon">⚙️</span> Configurações
+            </a>
+        </div>
 
         <div class="sidebar-divider"></div>
 
@@ -159,6 +181,12 @@ overlay.addEventListener('click', () => {
     sidebar.classList.remove('open');
     overlay.classList.remove('active');
 });
+
+// ── Empresas expansíveis no sidebar ──
+function toggleEmpresaGroup(nome) {
+    document.getElementById('grupoBtn-' + nome).classList.toggle('open');
+    document.getElementById('grupo-' + nome).classList.toggle('open');
+}
 </script>
 
 </body>

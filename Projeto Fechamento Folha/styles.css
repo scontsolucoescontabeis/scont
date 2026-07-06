@@ -138,6 +138,17 @@ input, select, textarea, button, optgroup {
     font-size: 13px;
 }
 
+.sidebar-group-chevron {
+    margin-left: auto;
+    font-size: 10px;
+    opacity: 0.6;
+    transition: transform 0.2s;
+}
+.sidebar-group-toggle.open .sidebar-group-chevron { transform: rotate(90deg); }
+
+.sidebar-subgroup { display: none; }
+.sidebar-subgroup.open { display: block; }
+
 .sidebar-divider {
     height: 1px;
     background: rgba(255,255,255,0.1);

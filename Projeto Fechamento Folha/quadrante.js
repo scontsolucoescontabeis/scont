@@ -978,6 +978,14 @@ function fecharSidebar() {
     document.getElementById('sidebarOverlay').classList.remove('active');
 }
 
+// Permite abrir direto numa subtela via ?tela=config-rubricas|config-bancario (ex: link do index.html)
+(function() {
+    document.addEventListener('DOMContentLoaded', () => {
+        const tela = new URLSearchParams(location.search).get('tela');
+        if (tela === 'config-rubricas' || tela === 'config-bancario') navegarPara(tela);
+    });
+})();
+
 function navegarPara(modo) {
     _modoAtual = modo;
     fecharSidebar();
