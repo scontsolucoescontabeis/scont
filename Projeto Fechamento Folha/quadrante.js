@@ -956,7 +956,7 @@ function baixarTXT() {
 // SIDEBAR + NAVEGAÇÃO
 // ──────────────────────────────────────────────
 
-let _modoAtual = 'processamento'; // 'processamento' | 'config'
+let _modoAtual = 'processamento'; // 'processamento' | 'config-rubricas' | 'config-bancario'
 
 // Hamburger para mobile
 (function() {
@@ -983,18 +983,22 @@ function navegarPara(modo) {
     fecharSidebar();
 
     document.getElementById('navProcessamento').classList.toggle('active', modo === 'processamento');
-    document.getElementById('navConfig').classList.toggle('active', modo === 'config');
+    document.getElementById('navConfigRubricas').classList.toggle('active', modo === 'config-rubricas');
+    document.getElementById('navConfigBancario').classList.toggle('active', modo === 'config-bancario');
 
-    const telaProc   = document.getElementById('telaProcessamento');
-    const telaConfig = document.getElementById('telaConfig');
+    const telaProc    = document.getElementById('telaProcessamento');
+    const telaCfgRub  = document.getElementById('telaConfigRubricas');
+    const telaCfgBanc = document.getElementById('telaConfigBancario');
 
-    if (modo === 'config') {
-        if (telaProc) telaProc.style.display = 'none';
-        telaConfig.classList.add('active');
-        iniciarConfig();
-    } else {
+    telaCfgRub.classList.toggle('active', modo === 'config-rubricas');
+    telaCfgBanc.classList.toggle('active', modo === 'config-bancario');
+
+    if (modo === 'processamento') {
         if (telaProc) telaProc.style.display = '';
-        telaConfig.classList.remove('active');
+    } else {
+        if (telaProc) telaProc.style.display = 'none';
+        if (modo === 'config-rubricas') iniciarConfigRubricas();
+        if (modo === 'config-bancario') iniciarConfigBancario();
     }
 }
 
@@ -1004,9 +1008,14 @@ function navegarPara(modo) {
 
 let _assocEmpresas = []; // [{codigo_empresa, nome_empresa}]
 
-async function iniciarConfig() {
+async function iniciarConfigRubricas() {
     await carregarEmpresasConfig();
-    await Promise.all([carregarRubricasConfig(), carregarBancariosConfig()]);
+    await carregarRubricasConfig();
+}
+
+async function iniciarConfigBancario() {
+    await carregarEmpresasConfig();
+    await carregarBancariosConfig();
 }
 
 async function carregarEmpresasConfig() {

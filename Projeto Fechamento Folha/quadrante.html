@@ -34,8 +34,12 @@
         <button class="sidebar-item active" id="navProcessamento" onclick="navegarPara('processamento')">
             <span class="sidebar-item-icon">📊</span> Processamento
         </button>
-        <button class="sidebar-item" id="navConfig" onclick="navegarPara('config')">
-            <span class="sidebar-item-icon">⚙️</span> Configurações
+        <div class="sidebar-section" style="padding-top:10px;">Configurações</div>
+        <button class="sidebar-item sidebar-subitem" id="navConfigRubricas" onclick="navegarPara('config-rubricas')">
+            <span class="sidebar-item-icon">📋</span> Rubricas
+        </button>
+        <button class="sidebar-item sidebar-subitem" id="navConfigBancario" onclick="navegarPara('config-bancario')">
+            <span class="sidebar-item-icon">💳</span> Informações Bancárias
         </button>
 
         <div class="sidebar-divider"></div>
@@ -303,8 +307,8 @@
     </div>
     </div><!-- /telaProcessamento -->
 
-    <!-- ===== TELA CONFIGURAÇÕES ===== -->
-    <div id="telaConfig">
+    <!-- ===== TELA CONFIGURAÇÕES · RUBRICAS ===== -->
+    <div id="telaConfigRubricas">
     <div class="container">
 
         <div class="config-card">
@@ -379,6 +383,13 @@
                 </table>
             </div>
         </div>
+
+    </div>
+    </div><!-- /telaConfigRubricas -->
+
+    <!-- ===== TELA CONFIGURAÇÕES · INFORMAÇÕES BANCÁRIAS ===== -->
+    <div id="telaConfigBancario">
+    <div class="container">
 
         <div class="config-card">
             <h2>💳 Configurações · Informações Bancárias</h2>
@@ -485,7 +496,7 @@
         </div>
 
     </div>
-    </div><!-- /telaConfig -->
+    </div><!-- /telaConfigBancario -->
 
 </div><!-- /main-content -->
 
