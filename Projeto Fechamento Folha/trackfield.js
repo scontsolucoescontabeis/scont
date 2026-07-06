@@ -246,10 +246,10 @@ function isDomingoFeriado(header) {
 }
 
 // Determina tipo e valor para qualquer entry de COMISSÃO DOMINGOS/FERIADOS:
-// R$ 87,00 = 1 inteiro; demais valores = centavos monetário
+// R$ 87,00 = 100 inteiro (layout remove a vírgula: "1,00" → "100"); demais valores = centavos monetário
 function _tipoValorDomFer(bruto) {
     const centavos = parseMoney(String(bruto));
-    if (centavos === 8700) return { tipoValor: 'inteiro', valorInt: 1 };
+    if (centavos === 8700) return { tipoValor: 'inteiro', valorInt: 100 };
     return { tipoValor: 'monetario', valorInt: centavos };
 }
 
@@ -868,7 +868,7 @@ function classificar87(idx, tipo) {
     l.fonteRubrica  = cfg ? 'config' : null;
     l.descricao     = cfg?.descricao || novaColuna;
     l.tipoProcesso  = cfg?.tipo_processo || '11';
-    // tipoValor e valorInt preservados conforme _tipoValorDomFer (87,00→inteiro/1; outros→monetario/centavos)
+    // tipoValor e valorInt preservados conforme _tipoValorDomFer (87,00→inteiro/100; outros→monetario/centavos)
 
     renderizarRelatorio(linhasRelatorio);
     persistirLinhas();
