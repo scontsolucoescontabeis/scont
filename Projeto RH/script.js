@@ -2877,6 +2877,35 @@ function gerarPreviewTXTResultados() {
 }
 
 function gerarTXTResultados() {
+    const listaDesconto = _calcularDiasDescontoVAVT(state.resultados);
+    if (listaDesconto.length > 0) {
+        _abrirModalAvisoDescontos(listaDesconto);
+        return;
+    }
+    _efetivarDownloadTXTResultados();
+}
+
+function _abrirModalAvisoDescontos(lista) {
+    const tbody = document.getElementById('avisoDescontosTbody');
+    tbody.innerHTML = lista.map(item => `
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.nome}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.dias}</td>
+        </tr>
+    `).join('');
+    document.getElementById('avisoDescontosModal').classList.add('active');
+}
+
+function _fecharModalAvisoDescontos() {
+    document.getElementById('avisoDescontosModal').classList.remove('active');
+}
+
+function _continuarDownloadAposAviso() {
+    document.getElementById('avisoDescontosModal').classList.remove('active');
+    _efetivarDownloadTXTResultados();
+}
+
+function _efetivarDownloadTXTResultados() {
     try {
         const { conteudoTXT } = _construirConteudoTXTResultados(true);
         if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor positivo encontrado para as rubricas configuradas.'); return; }
