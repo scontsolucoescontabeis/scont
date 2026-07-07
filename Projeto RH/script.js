@@ -2794,6 +2794,15 @@ function _construirLinhasAdicionais(compFmt, codEmpresa, tipoProcesso) {
     return linhas;
 }
 
+function _calcularDiasDescontoVAVT(resultados) {
+    return (resultados || [])
+        .map(res => {
+            const dias = (res.dias || []).filter(d => d.flagFalta || d.flagAtestado).length;
+            return { nome: res.nome, empregadoId: res.empregadoId, dias };
+        })
+        .filter(item => item.dias > 0);
+}
+
 function _construirConteudoTXTResultados(salvar = false) {
     const config = _lerCamposConfig('res', 'resTipoProcesso');
     if (![config.rubHorasTrab, config.rubHE50, config.rubHE100, config.rubNoturno, config.rubAtraso, config.rubFalta].some(r => r)) {
