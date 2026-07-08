@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendário da Folha — SCONT</title>
+  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico" />
+  <link rel="stylesheet" href="../shared.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="../supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../portal-auth-guard.js"></script>
+</head>
+<body>
+
+  <!-- Auth overlay -->
+  <div id="authOverlay" class="auth-overlay">
+    <div class="auth-spinner"></div>
+    <p class="auth-msg">Verificando acesso…</p>
+  </div>
+
+  <!-- App -->
+  <div id="app" style="display:none">
+
+    <!-- ── Header ── -->
+    <header class="app-header">
+      <span class="header-brand">📅</span>
+      <div class="header-title">
+        <h1>Calendário da Folha</h1>
+        <p>Cronograma e controle das atividades da folha de pagamento</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-icon" onclick="exportarICS()" title="Exportar .ics (Outlook / Google Agenda)">📤</button>
+        <button class="btn-icon" onclick="recarregar()" title="Atualizar">🔄</button>
+        <button class="btn-icon" onclick="location.href='../portal.html'" title="Voltar ao Portal">🏠</button>
+      </div>
+    </header>
+
+    <div class="container">
+
+      <!-- ── Stats ── -->
+      <div class="stats-bar">
+        <button class="stat-chip chip-hoje" onclick="filtroRapido('hoje')">
+          <span class="chip-icon">📌</span>
+          <span><span class="chip-count" id="statHoje">—</span><br /><span class="chip-label">Para hoje</span></span>
+        </button>
+        <button class="stat-chip chip-atrasados" onclick="filtroRapido('atrasados')">
+          <span class="chip-icon">⏰</span>
+          <span><span class="chip-count" id="statAtrasados">—</span><br /><span class="chip-label">Atrasados</span></span>
+        </button>
+        <button class="stat-chip chip-semana" onclick="filtroRapido('semana')">
+          <span class="chip-icon">🗓️</span>
+          <span><span class="chip-count" id="statSemana">—</span><br /><span class="chip-label">Próximos 7 dias</span></span>
+        </button>
+        <button class="stat-chip chip-concluidos" onclick="filtroRapido('concluidos')">
+          <span class="chip-icon">✅</span>
+          <span><span class="chip-count" id="statConcluidos">—</span><br /><span class="chip-label">Concluídos no mês</span></span>
+        </button>
+      </div>
+
+      <!-- ── Alertas de atraso ── -->
+      <div class="alert-strip" id="alertStrip">
+        <h4>⚠️ Pendências em atraso</h4>
+        <div class="alert-strip-list" id="alertStripList"></div>
+      </div>
+
+      <!-- ── Toolbar ── -->
+      <div class="toolbar">
+        <div class="month-nav">
+          <button class="nav-btn" onclick="mudarMes(-1)" title="Mês anterior">‹</button>
+          <span class="month-label" id="monthLabel">—</span>
+          <button class="nav-btn" onclick="mudarMes(1)" title="Próximo mês">›</button>
+          <button class="btn-hoje" onclick="irParaHoje()">Hoje</button>
+        </div>
+
+        <div class="view-switch" id="viewSwitch">
+          <button data-view="mes" class="active" onclick="setView('mes')">Mês</button>
+          <button data-view="agenda" onclick="setView('agenda')">Agenda</button>
+          <button data-view="empresas" onclick="setView('empresas')">Empresas</button>
+        </div>
+
+        <select id="filtroEmpresa" onchange="aplicarFiltros()">
+          <option value="">Todas as empresas</option>
+        </select>
+        <select id="filtroTipo" onchange="aplicarFiltros()">
+          <option value="">Todos os tipos</option>
+        </select>
+        <select id="filtroStatus" onchange="aplicarFiltros()">
+          <option value="">Todos os status</option>
+          <option value="pendente">Pendente</option>
+          <option value="em_andamento">Em andamento</option>
+          <option value="concluido">Concluído</option>
+          <option value="atrasado">Atrasado</option>
+        </select>
+
+        <div class="spacer"></div>
+
+        <button class="btn-secondary" onclick="abrirCronograma()">⚙️ Cronograma</button>
+        <button class="btn-secondary" onclick="abrirGerarCompetencia()">⚡ Gerar competência</button>
+        <button class="btn-primary" onclick="abrirNovoEvento()">＋ Novo evento</button>
+      </div>
+
+      <!-- ── Visão Mês ── -->
+      <div id="viewMes" class="calendar-card">
+        <div class="cal-weekdays">
+          <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="legend" id="calLegend"></div>
+      </div>
+
+      <!-- ── Visão Agenda ── -->
+      <div id="viewAgenda" style="display:none"></div>
+
+      <!-- ── Visão Empresas ── -->
+      <div id="viewEmpresas" class="empresa-board" style="display:none"></div>
+
+    </div>
+  </div><!-- /#app -->
+
+  <!-- ── Modal: evento (novo/editar) ── -->
+  <div class="modal-overlay" id="modalEvento">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="modalEventoTitulo">Novo evento</h3>
+        <button class="modal-close" onclick="fecharModal('modalEvento')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Título *</label>
+            <input type="text" id="evTitulo" maxlength="140" placeholder="Ex.: Enviar folha para conferência do cliente" />
+          </div>
+          <div class="form-group">
+            <label>Data *</label>
+            <input type="date" id="evData" />
+          </div>
+          <div class="form-group">
+            <label>Empresa</label>
+            <select id="evEmpresa"><option value="">Geral (todas)</option></select>
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select id="evTipo"></select>
+          </div>
+          <div class="form-group">
+            <label>Prioridade</label>
+            <select id="evPrioridade">
+              <option value="critico">🔴 Crítico</option>
+              <option value="urgente">🟠 Urgente</option>
+              <option value="atencao" selected>🟡 Atenção</option>
+              <option value="info">🔵 Informativo</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Responsável</label>
+            <input type="text" id="evResponsavel" maxlength="80" placeholder="Quem executa" />
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="evStatus">
+              <option value="pendente">Pendente</option>
+              <option value="em_andamento">Em andamento</option>
+              <option value="concluido">Concluído</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label>Descrição / Observações</label>
+            <textarea id="evDescricao" maxlength="2000" placeholder="Detalhes, instruções, particularidades da empresa…"></textarea>
+          </div>
+        </div>
+        <p class="form-hint" id="evOrigemHint" style="display:none"></p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-danger left" id="btnExcluirEvento" style="display:none" onclick="excluirEvento()">🗑️ Excluir</button>
+        <button class="btn-secondary" onclick="fecharModal('modalEvento')">Cancelar</button>
+        <button class="btn-primary" onclick="salvarEvento()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: dia ── -->
+  <div class="modal-overlay" id="modalDia">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="modalDiaTitulo">Dia</h3>
+        <button class="modal-close" onclick="fecharModal('modalDia')">✕</button>
+      </div>
+      <div class="modal-body" id="modalDiaBody"></div>
+      <div class="modal-foot">
+        <button class="btn-secondary" onclick="fecharModal('modalDia')">Fechar</button>
+        <button class="btn-primary" id="btnNovoNoDia">＋ Novo evento neste dia</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: cronograma (templates) ── -->
+  <div class="modal-overlay" id="modalCronograma">
+    <div class="modal modal-lg">
+      <div class="modal-head">
+        <h3>⚙️ Cronograma recorrente da folha</h3>
+        <button class="modal-close" onclick="fecharModal('modalCronograma')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="form-hint" style="margin-bottom:12px">
+          Atividades que se repetem todo mês. Ao <strong>gerar uma competência</strong>, cada modelo vira um evento
+          por empresa, com a data calculada pela regra e ajustada automaticamente por fins de semana e feriados
+          (cadastrados no módulo RH).
+        </p>
+        <div class="table-scroll">
+          <table class="tpl-table">
+            <thead>
+              <tr>
+                <th>Atividade</th><th>Empresa</th><th>Tipo</th><th>Regra</th>
+                <th>Prazo</th><th>Prioridade</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="tplTbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-secondary" onclick="fecharModal('modalCronograma')">Fechar</button>
+        <button class="btn-primary" onclick="abrirNovoTemplate()">＋ Nova atividade recorrente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: template (novo/editar) ── -->
+  <div class="modal-overlay" id="modalTemplate">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="modalTemplateTitulo">Nova atividade recorrente</h3>
+        <button class="modal-close" onclick="fecharModal('modalTemplate')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Título *</label>
+            <input type="text" id="tpTitulo" maxlength="140" />
+          </div>
+          <div class="form-group">
+            <label>Empresa</label>
+            <select id="tpEmpresa"><option value="">Todas as empresas</option></select>
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select id="tpTipo"></select>
+          </div>
+          <div class="form-group">
+            <label>Regra de data</label>
+            <select id="tpRegra" onchange="atualizarHintRegra()">
+              <option value="dia_fixo">Dia fixo do mês</option>
+              <option value="dia_util">N-ésimo dia útil</option>
+              <option value="ultimo_dia_util">Último dia útil</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label id="tpDiaLabel">Dia</label>
+            <input type="number" id="tpDia" min="1" max="31" value="1" />
+          </div>
+          <div class="form-group">
+            <label>Mês do evento</label>
+            <select id="tpOffset">
+              <option value="0">Mesmo mês da competência</option>
+              <option value="1">Mês seguinte à competência</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Se cair em dia não útil</label>
+            <select id="tpAjuste">
+              <option value="antecipa">Antecipar p/ dia útil anterior</option>
+              <option value="posterga">Postergar p/ dia útil seguinte</option>
+              <option value="mantem">Manter a data</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Prioridade</label>
+            <select id="tpPrioridade">
+              <option value="critico">🔴 Crítico</option>
+              <option value="urgente">🟠 Urgente</option>
+              <option value="atencao" selected>🟡 Atenção</option>
+              <option value="info">🔵 Informativo</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Somente na competência (mês)</label>
+            <select id="tpMesEspecifico">
+              <option value="">Todo mês</option>
+              <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+              <option value="3">Março</option><option value="4">Abril</option>
+              <option value="5">Maio</option><option value="6">Junho</option>
+              <option value="7">Julho</option><option value="8">Agosto</option>
+              <option value="9">Setembro</option><option value="10">Outubro</option>
+              <option value="11">Novembro</option><option value="12">Dezembro</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label>Descrição</label>
+            <textarea id="tpDescricao" maxlength="1000"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-danger left" id="btnExcluirTemplate" style="display:none" onclick="excluirTemplate()">🗑️ Excluir</button>
+        <button class="btn-secondary" onclick="fecharModal('modalTemplate')">Cancelar</button>
+        <button class="btn-primary" onclick="salvarTemplate()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Modal: gerar competência ── -->
+  <div class="modal-overlay" id="modalGerar">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>⚡ Gerar eventos da competência</h3>
+        <button class="modal-close" onclick="fecharModal('modalGerar')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="form-hint" style="margin-bottom:14px">
+          Cria os eventos do cronograma recorrente para a competência escolhida — um por empresa —
+          com as datas ajustadas por fins de semana e feriados. Eventos já gerados não são duplicados
+          nem têm o status sobrescrito.
+        </p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Competência *</label>
+            <input type="month" id="gerarCompetencia" />
+          </div>
+          <div class="form-group">
+            <label>Empresa</label>
+            <select id="gerarEmpresa"><option value="">Todas as empresas</option></select>
+          </div>
+        </div>
+        <div id="gerarResultado" class="form-hint" style="margin-top:12px"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-secondary" onclick="fecharModal('modalGerar')">Cancelar</button>
+        <button class="btn-primary" id="btnGerar" onclick="gerarCompetencia()">Gerar eventos</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer"></div>
+
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+      if (!auth) return;
+      document.getElementById('authOverlay').remove();
+      document.getElementById('app').style.display = 'block';
+      initApp(auth);
+    });
+  </script>
+</body>
+</html>
