@@ -1825,6 +1825,8 @@ const _CFG_EVENTOS = [
     { ev: 'noturno',   sufRub: 'Noturno',   defaultTipo: 'horas' },
     { ev: 'atraso',    sufRub: 'Atraso',    defaultTipo: 'horas' },
     { ev: 'falta',     sufRub: 'Falta',     defaultTipo: 'dias'  },
+    { ev: 'descontoVT', sufRub: 'DescontoVT', defaultTipo: 'dias' },
+    { ev: 'descontoVA', sufRub: 'DescontoVA', defaultTipo: 'dias' },
 ];
 
 let _cacheConfigRubricas = {};
@@ -1849,6 +1851,27 @@ async function _buscarConfigRubricas(codigoEmpresa) {
     } catch (e) {
         console.error('Erro ao buscar config rubricas:', e);
         return null;
+    }
+}
+
+let _cacheValoresVaVt = {};
+
+async function _buscarValoresVaVtEmpresa(codigoEmpresa) {
+    if (!codigoEmpresa) return {};
+    if (_cacheValoresVaVt[codigoEmpresa] !== undefined) return _cacheValoresVaVt[codigoEmpresa];
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_valores_va_vt')
+            .select('codigo_empregado, valor_vt, valor_va')
+            .eq('codigo_empresa', codigoEmpresa);
+        if (error) throw error;
+        const mapa = {};
+        (data || []).forEach(r => { mapa[r.codigo_empregado] = { vt: Number(r.valor_vt) || 0, va: Number(r.valor_va) || 0 }; });
+        _cacheValoresVaVt[codigoEmpresa] = mapa;
+        return mapa;
+    } catch (e) {
+        console.error('Erro ao buscar valores de VT/VA:', e);
+        return {};
     }
 }
 
@@ -2027,6 +2050,137 @@ async function limparConfigRubricas() {
     }
 }
 
+// --- VALORES DE VT/VA POR EMPREGADO ---
+
+function abrirModalValoresVaVt() {
+    document.getElementById('vvCodigoEmpresa').value = '';
+    document.getElementById('vvBuscaEmpresa').value = '';
+    document.getElementById('vvBuscaEmpresaResultados').style.display = 'none';
+    document.getElementById('vvConteudo').style.display = 'none';
+    document.getElementById('vvSemEmpresa').style.display = 'block';
+    document.getElementById('vvBtnSalvar').style.display = 'none';
+    document.getElementById('valoresVaVtModal').classList.add('active');
+}
+
+function fecharModalValoresVaVt() {
+    document.getElementById('valoresVaVtModal').classList.remove('active');
+    document.getElementById('vvBuscaEmpresaResultados').style.display = 'none';
+}
+
+function filtrarEmpresasValoresVaVt(termo) {
+    const box   = document.getElementById('vvBuscaEmpresaResultados');
+    const input = document.getElementById('vvBuscaEmpresa');
+    if (!box || !input) return;
+
+    const rect = input.getBoundingClientRect();
+    box.style.top   = (rect.bottom + 2) + 'px';
+    box.style.left  = rect.left + 'px';
+    box.style.width = rect.width + 'px';
+
+    const norm = termo.trim().toLowerCase();
+    const lista = norm
+        ? state.empresas.filter(e =>
+            e.nome_empresa.toLowerCase().includes(norm) ||
+            e.codigo_empresa.toLowerCase().includes(norm))
+        : state.empresas;
+
+    if (!lista.length) {
+        box.innerHTML = '<div style="padding:10px 14px;color:#999;font-size:13px;">Nenhuma empresa encontrada</div>';
+        box.style.display = 'block';
+        return;
+    }
+
+    box.innerHTML = lista.map(e => `
+        <div onclick="selecionarEmpresaValoresVaVt('${e.codigo_empresa}', '${e.nome_empresa.replace(/'/g, "\\'")}')"
+            style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;"
+            onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+            <span style="font-family:monospace;font-weight:600;color:var(--primary-color);margin-right:8px;">${e.codigo_empresa}</span>${e.nome_empresa}
+        </div>`).join('');
+    box.style.display = 'block';
+}
+
+async function selecionarEmpresaValoresVaVt(codigo, nome) {
+    document.getElementById('vvCodigoEmpresa').value = codigo;
+    document.getElementById('vvBuscaEmpresa').value = `${codigo} - ${nome}`;
+    document.getElementById('vvBuscaEmpresaResultados').style.display = 'none';
+    await _carregarTabelaValoresVaVt(codigo);
+}
+
+async function _carregarTabelaValoresVaVt(codigoEmpresa) {
+    document.getElementById('vvSemEmpresa').style.display = 'none';
+    document.getElementById('vvConteudo').style.display = 'block';
+    document.getElementById('vvBtnSalvar').style.display = 'none';
+    const tabela = document.getElementById('vvTabelaEmpregados');
+    tabela.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-secondary);font-size:13px;">Carregando...</div>';
+
+    try {
+        const [{ data: empregados, error: errEmp }, { data: valores, error: errVal }] = await Promise.all([
+            supabaseClient.from('rh_empregados')
+                .select('codigo_empregado, nome_empregado')
+                .eq('codigo_empresa', codigoEmpresa)
+                .order('nome_empregado', { ascending: true }),
+            supabaseClient.from('rh_valores_va_vt')
+                .select('codigo_empregado, valor_vt, valor_va')
+                .eq('codigo_empresa', codigoEmpresa),
+        ]);
+        if (errEmp) throw errEmp;
+        if (errVal) throw errVal;
+
+        if (!empregados || empregados.length === 0) {
+            tabela.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-secondary);font-size:13px;">Esta empresa não possui empregados cadastrados.</div>';
+            return;
+        }
+
+        const mapaValores = {};
+        (valores || []).forEach(v => { mapaValores[v.codigo_empregado] = v; });
+
+        tabela.innerHTML = empregados.map(emp => {
+            const v = mapaValores[emp.codigo_empregado] || {};
+            return `
+                <div style="padding: 8px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; align-items: center;">
+                    <span style="font-size: 13px;">${emp.codigo_empregado} - ${emp.nome_empregado}</span>
+                    <input type="number" step="0.01" min="0" data-codigo-empregado="${emp.codigo_empregado}" class="vv-input-vt" value="${v.valor_vt ?? ''}" placeholder="0,00" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;">
+                    <input type="number" step="0.01" min="0" data-codigo-empregado="${emp.codigo_empregado}" class="vv-input-va" value="${v.valor_va ?? ''}" placeholder="0,00" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;">
+                </div>
+            `;
+        }).join('');
+        document.getElementById('vvBtnSalvar').style.display = 'inline-flex';
+    } catch (e) {
+        console.error('Erro ao carregar valores de VT/VA:', e);
+        tabela.innerHTML = '<div style="padding:14px;text-align:center;color:var(--danger-color);font-size:13px;">Erro ao carregar dados.</div>';
+    }
+}
+
+async function salvarValoresVaVt() {
+    const codigoEmpresa = (document.getElementById('vvCodigoEmpresa')?.value || '').trim();
+    if (!codigoEmpresa) { mostrarMensagem('Aviso', 'Selecione uma empresa antes de salvar.'); return; }
+
+    const rows = Array.from(document.querySelectorAll('.vv-input-vt')).map(inputVT => {
+        const codigoEmpregado = inputVT.dataset.codigoEmpregado;
+        const inputVA = document.querySelector(`.vv-input-va[data-codigo-empregado="${codigoEmpregado}"]`);
+        return {
+            codigo_empresa: codigoEmpresa,
+            codigo_empregado: codigoEmpregado,
+            valor_vt: parseFloat(inputVT.value) || 0,
+            valor_va: parseFloat(inputVA?.value) || 0,
+            data_atualizacao: new Date().toISOString(),
+        };
+    });
+
+    if (rows.length === 0) { mostrarMensagem('Aviso', 'Não há empregados para salvar.'); return; }
+
+    try {
+        const { error } = await supabaseClient
+            .from('rh_valores_va_vt')
+            .upsert(rows, { onConflict: 'codigo_empresa,codigo_empregado' });
+        if (error) throw error;
+        delete _cacheValoresVaVt[codigoEmpresa];
+        mostrarMensagem('Sucesso', '✅ Valores de VT/VA salvos com sucesso!');
+    } catch (e) {
+        mostrarMensagem('Erro', 'Erro ao salvar valores de VT/VA: ' + e.message);
+    }
+}
+
 // --- EXPORTAÇÃO TXT ---
 
 const TXT_RUBRICAS_KEY = 'rh_txt_rubricas';
@@ -2047,6 +2201,10 @@ function _carregarConfigNoCampos(prefixo, c) {
     setOpt(`${prefixo}TipoAtraso`, c.tipoAtraso, 'horas');
     setVal(`${prefixo}RubFalta`,   c.rubFalta);
     setOpt(`${prefixo}TipoFalta`,  c.tipoFalta,  'dias');
+    setVal(`${prefixo}RubDescontoVT`,  c.rubDescontoVT);
+    setOpt(`${prefixo}TipoDescontoVT`, c.tipoDescontoVT, 'dias');
+    setVal(`${prefixo}RubDescontoVA`,  c.rubDescontoVA);
+    setOpt(`${prefixo}TipoDescontoVA`, c.tipoDescontoVA, 'dias');
 }
 
 function _lerCamposConfig(prefixo, radioName) {
@@ -2065,6 +2223,10 @@ function _lerCamposConfig(prefixo, radioName) {
         tipoAtraso: g(`${prefixo}TipoAtraso`) || 'horas',
         rubFalta:   g(`${prefixo}RubFalta`).trim(),
         tipoFalta:  g(`${prefixo}TipoFalta`)  || 'dias',
+        rubDescontoVT:  g(`${prefixo}RubDescontoVT`).trim(),
+        tipoDescontoVT: g(`${prefixo}TipoDescontoVT`) || 'dias',
+        rubDescontoVA:  g(`${prefixo}RubDescontoVA`).trim(),
+        tipoDescontoVA: g(`${prefixo}TipoDescontoVA`) || 'dias',
     };
 }
 
@@ -2097,7 +2259,7 @@ function _toggleNaoCompensar(prefix) {
     if (label) label.textContent = checked ? 'Horas Faltantes' : 'Atraso';
 }
 
-function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta) {
+function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null) {
     const tp = String(config.tipoProcesso).padStart(2, '0');
     const empFmt = String(codEmp).padStart(10, '0');
     const empFmt2 = String(codEmpresa).padStart(10, '0');
@@ -2107,13 +2269,22 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, m
         if (!rubrica || valorInt <= 0) return '';
         return `${base}${rub(rubrica)}${tp}${String(valorInt).padStart(9,'0')}${empFmt2}\n`;
     };
+    const encDiasOuHoras = (tipo, dias) => tipo === 'dias' ? _encDias(dias) : _encMinutosParaTipo(dias * 480, tipo);
+    const encDescontoVaVt = (tipo, valorDiario) => {
+        if (tipo === 'monetario') return Math.round(dias_desconto_vavt * (valorDiario || 0) * 100);
+        return encDiasOuHoras(tipo, dias_desconto_vavt);
+    };
+    const valoresVT = valoresVaVtEmpregado?.vt || 0;
+    const valoresVA = valoresVaVtEmpregado?.va || 0;
     return [
         linha(config.rubHorasTrab, _encMinutosParaTipo(mins_trab,  config.tipoHorasTrab)),
         linha(config.rubHE50,      _encMinutosParaTipo(mins_he50,  config.tipoHE50)),
         linha(config.rubHE100,     _encMinutosParaTipo(mins_he100, config.tipoHE100)),
         linha(config.rubNoturno,   _encMinutosParaTipo(mins_not,   config.tipoNoturno)),
         linha(config.rubAtraso,    _encMinutosParaTipo(mins_atr,   config.tipoAtraso)),
-        linha(config.rubFalta,     config.tipoFalta === 'dias' ? _encDias(dias_falta) : _encMinutosParaTipo(dias_falta * 480, config.tipoFalta)),
+        linha(config.rubFalta,     encDiasOuHoras(config.tipoFalta, dias_falta)),
+        linha(config.rubDescontoVT, encDescontoVaVt(config.tipoDescontoVT, valoresVT)),
+        linha(config.rubDescontoVA, encDescontoVaVt(config.tipoDescontoVA, valoresVA)),
     ].join('');
 }
 
@@ -2192,6 +2363,15 @@ async function _construirConteudoTXTExportacao() {
         .in('codigo_empresa', empresasSelecionadas);
     if (errEmpregados) throw errEmpregados;
 
+    const { data: valoresVaVtData, error: errValoresVaVt } = await supabaseClient
+        .from('rh_valores_va_vt').select('codigo_empresa, codigo_empregado, valor_vt, valor_va')
+        .in('codigo_empresa', empresasSelecionadas);
+    if (errValoresVaVt) throw errValoresVaVt;
+    const valoresVaVtMapa = {};
+    (valoresVaVtData || []).forEach(v => {
+        valoresVaVtMapa[`${v.codigo_empresa}_${v.codigo_empregado}`] = { vt: Number(v.valor_vt) || 0, va: Number(v.valor_va) || 0 };
+    });
+
     const compParts = comp.split('/');
     const compFmt = compParts[1] + compParts[0]; // AAAAMM
     let conteudoTXT = '';
@@ -2217,7 +2397,7 @@ async function _construirConteudoTXTExportacao() {
         const rule100    = save.rule_extra_100_opcional || false;
         const dados      = JSON.parse(save.dados_json || '[]');
 
-        let tTrab = 0, tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0;
+        let tTrab = 0, tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0, tDiasDescontoVAVT = 0;
         const diasFaltaDetalhes = [];
         dados.forEach(dia => {
             const jornadaMinEfetiva = dia.diaSemana === 'Sab'
@@ -2248,6 +2428,7 @@ async function _construirConteudoTXTExportacao() {
             const isAtestadoCompExp   = flag === 'atestado_comparecimento';
             const isLiberacaoMeioExpedienteExp = flag === 'liberacao_meio_expediente';
             if (isAtestadoMedicoExp) {
+                tDiasDescontoVAVT++;
                 // dia totalmente desconsiderado
             } else if (isAtestadoCompExp || isLiberacaoMeioExpedienteExp) {
                 // isenção de metade da jornada
@@ -2268,6 +2449,7 @@ async function _construirConteudoTXTExportacao() {
             } else if (!isDiaDescanso) {
                 if (flag === 'falta') {
                     tFaltaDias++;
+                    tDiasDescontoVAVT++;
                     diasFaltaDetalhes.push({ data: dia.data, flagDSR: isDSR });
                 } else if (flag === 'compensacao') {
                     dev = jornadaMinEfetiva;
@@ -2302,7 +2484,9 @@ async function _construirConteudoTXTExportacao() {
             tEx100,
             tNot,
             tDev,
-            tFaltaDias
+            tFaltaDias,
+            tDiasDescontoVAVT,
+            valoresVaVtMapa[`${empCodigo}_${empInfo.codigo_empregado}`]
         );
         conteudoTXT += _linhasFaltas(diasFaltaDetalhes);
     });
@@ -2794,16 +2978,31 @@ function _construirLinhasAdicionais(compFmt, codEmpresa, tipoProcesso) {
     return linhas;
 }
 
-function _calcularDiasDescontoVAVT(resultados) {
+function _calcularDiasDescontoVAVT(resultados, valoresVaVtMapa = {}) {
     return (resultados || [])
         .map(res => {
             const dias = (res.dias || []).filter(d => d.flagFalta || d.flagAtestado).length;
-            return { nome: res.nome, empregadoId: res.empregadoId, dias };
+            const valores = valoresVaVtMapa[res.empregadoId] || {};
+            const valorVT = valores.vt || 0;
+            const valorVA = valores.va || 0;
+            return {
+                nome: res.nome,
+                empregadoId: res.empregadoId,
+                dias,
+                valorVT,
+                valorVA,
+                totalVT: dias * valorVT,
+                totalVA: dias * valorVA,
+            };
         })
         .filter(item => item.dias > 0);
 }
 
-function _construirConteudoTXTResultados(salvar = false) {
+function _formatarMoeda(valor) {
+    return (Number(valor) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+async function _construirConteudoTXTResultados(salvar = false) {
     const config = _lerCamposConfig('res', 'resTipoProcesso');
     if (![config.rubHorasTrab, config.rubHE50, config.rubHE100, config.rubNoturno, config.rubAtraso, config.rubFalta].some(r => r)) {
         throw new Error('Preencha ao menos uma rubrica para gerar o TXT.');
@@ -2816,6 +3015,7 @@ function _construirConteudoTXTResultados(salvar = false) {
     let conteudoTXT = '';
 
     const naoCompensar = document.getElementById('resNaoCompensar')?.checked ?? false;
+    const valoresVaVtMapa = await _buscarValoresVaVtEmpresa(codEmpresa);
 
     state.resultados.forEach(res => {
         let he50 = converterHoraParaMinutos(res.totais.extra50);
@@ -2831,6 +3031,7 @@ function _construirConteudoTXTResultados(salvar = false) {
         }
         const minsNorm = Math.max(0, converterHoraParaMinutos(res.totais.trabalhado) - he50 - he100);
         const diasFaltaRes = res.dias.filter(d => d.flagFalta);
+        const diasDescontoVAVT = res.dias.filter(d => d.flagFalta || d.flagAtestado).length;
         conteudoTXT += _linhasTxt(
             config,
             res.empregadoId,
@@ -2841,7 +3042,9 @@ function _construirConteudoTXTResultados(salvar = false) {
             he100,
             converterHoraParaMinutos(res.totais.noturnoConvertido),
             minsAtr,
-            diasFaltaRes.length
+            diasFaltaRes.length,
+            diasDescontoVAVT,
+            valoresVaVtMapa[res.empregadoId]
         );
         conteudoTXT += _linhasFaltas(diasFaltaRes);
     });
@@ -2867,17 +3070,19 @@ function _mostrarPrevia(previaId, previaConteudoId, previaInfoId, modalBodySelec
     if (modalBody) setTimeout(() => { modalBody.scrollTop = modalBody.scrollHeight; }, 50);
 }
 
-function gerarPreviewTXTResultados() {
+async function gerarPreviewTXTResultados() {
     try {
-        const { conteudoTXT } = _construirConteudoTXTResultados(false);
+        const { conteudoTXT } = await _construirConteudoTXTResultados(false);
         _mostrarPrevia('resTxtPrevia', 'resTxtPreviaConteudo', 'resTxtPreviaInfo', '#txtRubricasModal', conteudoTXT);
     } catch (erro) {
         mostrarMensagem('Aviso', erro.message);
     }
 }
 
-function gerarTXTResultados() {
-    const listaDesconto = _calcularDiasDescontoVAVT(state.resultados);
+async function gerarTXTResultados() {
+    const codEmpresa = state.empresaSelecionada?.codigo_empresa;
+    const valoresVaVtMapa = await _buscarValoresVaVtEmpresa(codEmpresa);
+    const listaDesconto = _calcularDiasDescontoVAVT(state.resultados, valoresVaVtMapa);
     if (listaDesconto.length > 0) {
         _abrirModalAvisoDescontos(listaDesconto);
         return;
@@ -2891,6 +3096,10 @@ function _abrirModalAvisoDescontos(lista) {
         <tr>
             <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.nome}</td>
             <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.dias}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(item.valorVT)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(item.totalVT)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(item.valorVA)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(item.totalVA)}</td>
         </tr>
     `).join('');
     document.getElementById('avisoDescontosModal').classList.add('active');
@@ -2905,9 +3114,9 @@ function _continuarDownloadAposAviso() {
     _efetivarDownloadTXTResultados();
 }
 
-function _efetivarDownloadTXTResultados() {
+async function _efetivarDownloadTXTResultados() {
     try {
-        const { conteudoTXT } = _construirConteudoTXTResultados(true);
+        const { conteudoTXT } = await _construirConteudoTXTResultados(true);
         if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor positivo encontrado para as rubricas configuradas.'); return; }
         const [mm, aaaa] = state.competencia.split('/');
         const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });

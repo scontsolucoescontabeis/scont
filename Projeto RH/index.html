@@ -40,6 +40,9 @@
         <button class="sidebar-item" onclick="abrirModalConfigRubricas()">
             <span class="sidebar-item-icon">⚙️</span> Configurações
         </button>
+        <button class="sidebar-item" onclick="abrirModalValoresVaVt()">
+            <span class="sidebar-item-icon">💰</span> Valores VT/VA
+        </button>
         <a class="sidebar-item" href="conversor.html" style="text-decoration:none;">
             <span class="sidebar-item-icon">📄</span> Conversor de Folha
         </a>
@@ -316,6 +319,24 @@
                                 <option value="monetario">Monetário (R$)</option>
                             </select>
                         </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Desconto de VT (em dias)</span>
+                            <input type="text" id="expRubDescontoVT" maxlength="9" placeholder="Ex: 000520" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="expTipoDescontoVT" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="dias">Dias</option>
+                                <option value="horas">Horas (HHMM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                            </select>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Desconto de VA (em dias)</span>
+                            <input type="text" id="expRubDescontoVA" maxlength="9" placeholder="Ex: 000530" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="expTipoDescontoVA" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="dias">Dias</option>
+                                <option value="horas">Horas (HHMM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                            </select>
+                        </div>
                     </div>
                     <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">Rubricas com valor zero não serão incluídas. Configurações salvas automaticamente.</p>
                 </div>
@@ -575,6 +596,24 @@
                                 <option value="monetario">Monetário (R$)</option>
                             </select>
                         </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Desconto de VT (em dias)</span>
+                            <input type="text" id="resRubDescontoVT" maxlength="9" placeholder="Ex: 000520" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="resTipoDescontoVT" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="dias">Dias</option>
+                                <option value="horas">Horas (HHMM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                            </select>
+                        </div>
+                        <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                            <span style="font-size: 13px; font-weight: 500;">Desconto de VA (em dias)</span>
+                            <input type="text" id="resRubDescontoVA" maxlength="9" placeholder="Ex: 000530" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                            <select id="resTipoDescontoVA" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                                <option value="dias">Dias</option>
+                                <option value="horas">Horas (HHMM)</option>
+                                <option value="monetario">Monetário (R$)</option>
+                            </select>
+                        </div>
                     </div>
                     <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">Rubricas com valor zero não serão incluídas. Configurações salvas automaticamente.</p>
                 </div>
@@ -626,22 +665,31 @@
 
     <!-- MODAL: AVISO DE DESCONTOS VA/VT -->
     <div id="avisoDescontosModal" class="modal">
-        <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-content" style="max-width: 760px;">
             <div class="modal-header">
                 <h3 style="margin: 0;">⚠️ Descontos de VA/VT</h3>
                 <button type="button" class="modal-close" onclick="_fecharModalAvisoDescontos()">×</button>
             </div>
             <div class="modal-body" style="padding: 20px;">
                 <p style="margin-bottom: 12px; font-size: 14px; color: var(--text-primary);">Devem ser feitos os descontos de VA e VT para os empregados abaixo:</p>
-                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                    <thead>
-                        <tr style="background: #f8f9fa; color: var(--text-primary); text-align: left;">
-                            <th style="padding: 8px; border-bottom: 2px solid #dee2e6; font-weight: 700;">Empregado</th>
-                            <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center; font-weight: 700;">Dias a Descontar</th>
-                        </tr>
-                    </thead>
-                    <tbody id="avisoDescontosTbody"></tbody>
-                </table>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead>
+                            <tr style="background: #f8f9fa; color: var(--text-primary); text-align: left;">
+                                <th style="padding: 8px; border-bottom: 2px solid #dee2e6; font-weight: 700;">Empregado</th>
+                                <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center; font-weight: 700;">Dias</th>
+                                <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 700;">VT / dia</th>
+                                <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 700;">Total VT</th>
+                                <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 700;">VA / dia</th>
+                                <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 700;">Total VA</th>
+                            </tr>
+                        </thead>
+                        <tbody id="avisoDescontosTbody"></tbody>
+                    </table>
+                </div>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; margin-bottom: 0;">
+                    Valores diários cadastrados em "Valores VT/VA". Empregados sem valor cadastrado aparecem com R$ 0,00.
+                </p>
             </div>
             <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 15px 20px; border-top: 1px solid #eee;">
                 <button type="button" class="btn btn-secondary" onclick="_fecharModalAvisoDescontos()">Cancelar</button>
@@ -732,9 +780,27 @@
                             <option value="monetario">Monetário (R$)</option>
                         </select>
                     </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Desconto de VT (em dias)</span>
+                        <input type="text" id="cfgRub_descontoVT" maxlength="9" placeholder="Ex: 000520" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_descontoVT" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="dias">Dias</option>
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Desconto de VA (em dias)</span>
+                        <input type="text" id="cfgRub_descontoVA" maxlength="9" placeholder="Ex: 000530" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_descontoVA" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="dias">Dias</option>
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                        </select>
+                    </div>
                 </div>
                 <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">
-                    Campos vazios = sem pré-preenchimento ao gerar TXT.
+                    Campos vazios = sem pré-preenchimento ao gerar TXT. Desconto de VT/VA é lançado automaticamente quando o empregado tiver falta ou atestado no período.
                 </p>
 
                 <!-- Jornada de Trabalho -->
@@ -797,6 +863,52 @@
         </div>
     </div>
 
+    <!-- MODAL: VALORES DE VT/VA POR EMPREGADO -->
+    <div id="valoresVaVtModal" class="modal">
+        <div class="modal-content" style="max-width: 640px;">
+            <div class="modal-header">
+                <h3 style="margin: 0;">💰 Valores de VT/VA por Empregado</h3>
+                <button type="button" class="modal-close" onclick="fecharModalValoresVaVt()">×</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+
+                <!-- Busca de empresa -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="font-weight: 600; font-size: 13px; color: var(--text-primary);">Empresa</label>
+                    <input type="text" id="vvBuscaEmpresa"
+                        placeholder="Digite o nome ou código da empresa..."
+                        autocomplete="off"
+                        oninput="filtrarEmpresasValoresVaVt(this.value)"
+                        onfocus="filtrarEmpresasValoresVaVt(this.value)"
+                        style="width: 100%; box-sizing: border-box; margin-top: 4px;">
+                    <input type="hidden" id="vvCodigoEmpresa">
+                </div>
+
+                <div id="vvSemEmpresa" style="text-align: center; padding: 30px 0; color: var(--text-secondary); font-size: 13px;">
+                    Selecione uma empresa para configurar os valores diários de VT e VA de cada empregado.
+                </div>
+
+                <div id="vvConteudo" style="display: none;">
+                    <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                        <div style="background: var(--background-color); padding: 8px 14px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Empregado</span>
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">VT / dia (R$)</span>
+                            <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">VA / dia (R$)</span>
+                        </div>
+                        <div id="vvTabelaEmpregados" style="max-height: 320px; overflow-y: auto;"></div>
+                    </div>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">
+                        Valor diário de VT/VA a ser descontado do empregado em caso de falta ou atestado. Campos vazios equivalem a R$ 0,00.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 15px 20px; border-top: 1px solid #eee;">
+                <button type="button" class="btn btn-secondary" onclick="fecharModalValoresVaVt()">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="vvBtnSalvar" style="display: none;" onclick="salvarValoresVaVt()">💾 Salvar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Dropdown de busca de empresa — fora de qualquer container para evitar clipping -->
     <div id="buscaEmpresaResultados" style="
         display: none;
@@ -811,6 +923,18 @@
     "></div>
 
     <div id="cfgBuscaEmpresaResultados" style="
+        display: none;
+        position: fixed;
+        background: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        max-height: 240px;
+        overflow-y: auto;
+        z-index: 9000;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    "></div>
+
+    <div id="vvBuscaEmpresaResultados" style="
         display: none;
         position: fixed;
         background: #fff;
