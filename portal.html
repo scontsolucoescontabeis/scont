@@ -194,6 +194,41 @@
         }
         .btn-download:hover { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(139,58,58,0.3); }
 
+        /* ─── BUSCA DE FERRAMENTAS ─── */
+        .busca-ferramentas {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .busca-ferramentas input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text-secondary, #333);
+            background: var(--bg);
+            transition: var(--transition);
+        }
+
+        .busca-ferramentas input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(139, 58, 58, 0.1);
+            background: var(--card);
+        }
+
+        .busca-ferramentas .busca-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 15px;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
         /* ─── GRID DE FERRAMENTAS ─── */
         .ferramentas-grid {
             display: grid;
@@ -502,6 +537,10 @@
             <div class="card-title" id="cardTitleFerramentas">🔧 Suas Ferramentas Autorizadas</div>
             <div class="card-body">
                 <div id="alertPortal" class="alert alert-error"></div>
+                <div class="busca-ferramentas">
+                    <span class="busca-icon">🔍</span>
+                    <input type="text" id="buscaFerramentas" placeholder="Pesquisar ferramenta..." autocomplete="off">
+                </div>
                 <div class="ferramentas-grid" id="ferramentasGrid">
                     <div class="empty-state">
                         <div class="empty-state-icon">⏳</div>
@@ -584,6 +623,7 @@
 
         // ─── CARREGAR FERRAMENTAS ──────────────────────────────────
         let _isAdmin = false;
+        let _ferramentas = [];
 
         async function loadFerramentas(auth) {
             const isAdmin = auth ? auth.isAdmin : _isAdmin;
@@ -608,12 +648,11 @@
                         .filter(f => f && f.ativa)
                         .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
                 }
+                _ferramentas = ferramentas;
                 if (isAdmin) {
                     document.getElementById('cardTitleFerramentas').textContent = '🔧 Todas as Ferramentas';
-                    renderFerramentas(ferramentas, true);
-                } else {
-                    ferramentas.length ? renderFerramentas(ferramentas, false) : renderVazio();
                 }
+                aplicarFiltro();
             } catch (err) {
                 console.error('Erro ao carregar ferramentas:', err);
                 const el = document.getElementById('alertPortal');
@@ -622,6 +661,23 @@
                 renderVazio();
             }
         }
+
+        // ─── FILTRO DE BUSCA ───────────────────────────────────────
+        function aplicarFiltro() {
+            const termo = document.getElementById('buscaFerramentas').value.trim().toLowerCase();
+            const filtradas = termo
+                ? _ferramentas.filter(f => (f.nome || '').toLowerCase().includes(termo))
+                : _ferramentas;
+            if (_isAdmin) {
+                renderFerramentas(filtradas, true);
+            } else if (!filtradas.length) {
+                termo ? renderSemResultado() : renderVazio();
+            } else {
+                renderFerramentas(filtradas, false);
+            }
+        }
+
+        document.getElementById('buscaFerramentas').addEventListener('input', aplicarFiltro);
 
         // ─── RENDER FERRAMENTAS ────────────────────────────────────
         function criarCardFerramenta(f) {
@@ -683,6 +739,18 @@
                         <div class="empty-state-icon">🔐</div>
                         <p>Você ainda não tem ferramentas autorizadas.</p>
                         <p>Aguarde a aprovação do administrador.</p>
+                    </div>
+                </div>`;
+        }
+
+        function renderSemResultado() {
+            const grid = document.getElementById('ferramentasGrid');
+            grid.innerHTML = `
+                <div style="grid-column:1/-1">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔍</div>
+                        <p>Nenhuma ferramenta encontrada.</p>
+                        <p>Tente outro termo de busca.</p>
                     </div>
                 </div>`;
         }
