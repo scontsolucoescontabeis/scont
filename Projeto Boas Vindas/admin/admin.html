@@ -8,13 +8,16 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../../portal-auth-guard.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="admin-styles.css">
 </head>
 <body>
     <!-- AUTH OVERLAY -->
-    <div id="authOverlay" style="position:fixed;inset:0;background:#F0F2F5;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+    <div id="authOverlay" style="position:fixed;inset:0;background:#f5f3f0;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
         <div style="font-size:40px;">🔐</div>
-        <p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p>
+        <p style="font-family:sans-serif;color:#4e1820;font-weight:600;font-size:15px;">Verificando acesso...</p>
     </div>
 
     <!-- HEADER -->
@@ -22,12 +25,15 @@
         <div class="header-container">
             <div class="logo">
                 <i class="fas fa-handshake"></i>
-                <span>Boas Vindas — Admin</span>
+                <div class="logo-text">
+                    <span>Boas Vindas</span>
+                    <span class="logo-sub">Gerador de apresentações</span>
+                </div>
             </div>
-            <div style="display:flex;align-items:center;gap:14px;">
-                <span id="adminEmail" style="font-size:13px;opacity:0.8;"></span>
-                <a href="../../portal.html" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);padding:7px 16px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.25)'" onmouseout="this.style.background='rgba(255,255,255,0.15)'">
-                    🏠 Portal
+            <div class="header-acoes">
+                <span id="adminEmail" class="header-email"></span>
+                <a href="../../portal.html" class="btn-portal">
+                    <i class="fas fa-home"></i> Portal
                 </a>
             </div>
         </div>
@@ -54,33 +60,51 @@
             <!-- SEÇÃO 1: CRIAR APRESENTAÇÃO -->
             <section id="criar" class="admin-section active">
                 <div class="section-header">
-                    <h1><i class="fas fa-file-alt"></i> Criar Apresentação</h1>
-                    <p>Preencha os dados da empresa e gere uma apresentação personalizada</p>
+                    <h1>Criar Apresentação</h1>
+                    <p>Preencha os dados da empresa e gere uma apresentação de boas-vindas personalizada.</p>
                 </div>
 
                 <form id="formCriarApresentacao" class="admin-form">
-                    <!-- FIELDSET 1: DADOS DA EMPRESA -->
-                    <fieldset class="form-fieldset">
-                        <legend><i class="fas fa-building"></i> Dados da Empresa</legend>
+                    <!-- ETAPA 1: DADOS DA EMPRESA -->
+                    <div class="form-etapa">
+                        <div class="etapa-cabecalho">
+                            <span class="etapa-numero">1</span>
+                            <div>
+                                <h2>Dados da empresa</h2>
+                                <p>Informe o CNPJ e use "Buscar" para preencher automaticamente pela Receita Federal.</p>
+                            </div>
+                        </div>
                         <div class="form-row">
+                            <div class="form-group">
+                                <label for="cnpj">CNPJ <span class="obrigatorio">*</span></label>
+                                <div class="campo-com-botao">
+                                    <input type="text" id="cnpj" name="cnpj" placeholder="00.000.000/0000-00" inputmode="numeric" maxlength="18" required>
+                                    <button type="button" class="btn-buscar-cnpj" id="btnBuscarCnpj" onclick="buscarDadosCNPJ()" title="Buscar dados na Receita Federal">
+                                        <i class="fas fa-magnifying-glass"></i> Buscar
+                                    </button>
+                                </div>
+                                <small class="campo-dica" id="dicaCnpj">Preenche razão social, porte e CNAEs automaticamente</small>
+                            </div>
                             <div class="form-group">
                                 <label for="razaoSocial">Razão Social <span class="obrigatorio">*</span></label>
                                 <input type="text" id="razaoSocial" name="razaoSocial" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="cnpj">CNPJ <span class="obrigatorio">*</span></label>
-                                <input type="text" id="cnpj" name="cnpj" placeholder="00.000.000/0000-00" required>
                             </div>
                             <div class="form-group">
                                 <label for="inscricao">Inscrição Estadual</label>
                                 <input type="text" id="inscricao" name="inscricao">
                             </div>
                         </div>
-                    </fieldset>
+                    </div>
 
-                    <!-- FIELDSET 2: REGIME TRIBUTÁRIO -->
-                    <fieldset class="form-fieldset">
-                        <legend><i class="fas fa-file-invoice-dollar"></i> Regime Tributário</legend>
+                    <!-- ETAPA 2: REGIME TRIBUTÁRIO -->
+                    <div class="form-etapa">
+                        <div class="etapa-cabecalho">
+                            <span class="etapa-numero">2</span>
+                            <div>
+                                <h2>Regime tributário</h2>
+                                <p>Enquadramento fiscal e porte da empresa.</p>
+                            </div>
+                        </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="regime">Regime <span class="obrigatorio">*</span></label>
@@ -106,25 +130,31 @@
                                 <input type="text" id="ramo" name="ramo">
                             </div>
                         </div>
-                    </fieldset>
+                    </div>
 
-                    <!-- FIELDSET 3: ATIVIDADE ECONÔMICA (CNAE) -->
-                    <fieldset class="form-fieldset">
-                        <legend><i class="fas fa-briefcase"></i> Atividade Econômica (CNAE)</legend>
-                        
+                    <!-- ETAPA 3: ATIVIDADE ECONÔMICA (CNAE) -->
+                    <div class="form-etapa">
+                        <div class="etapa-cabecalho">
+                            <span class="etapa-numero">3</span>
+                            <div>
+                                <h2>Atividade econômica</h2>
+                                <p>CNAE principal e atividades secundárias.</p>
+                            </div>
+                        </div>
+
                         <!-- CNAE PRINCIPAL -->
                         <div class="form-group">
                             <label>CNAE Principal <span class="obrigatorio">*</span></label>
                             <div class="cnae-input-wrapper">
-                                <input 
-                                    type="text" 
-                                    id="cnaePrincipal" 
+                                <input
+                                    type="text"
+                                    id="cnaePrincipal"
                                     class="cnae-input-display"
                                     placeholder="Clique em Consultar para selecionar"
                                     readonly
                                 >
-                                <button 
-                                    type="button" 
+                                <button
+                                    type="button"
                                     class="btn-consultar-cnae"
                                     onclick="abrirModalCNAE('principal')"
                                 >
@@ -155,8 +185,8 @@
                             <div class="form-group">
                                 <label>
                                     CNAEs Secundários
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         class="btn-adicionar-cnae-secundario"
                                         onclick="abrirModalAdicionarSecundario()"
                                         title="Adicionar CNAE Secundário"
@@ -169,11 +199,17 @@
                                 </div>
                             </div>
                         </div>
-                    </fieldset>
+                    </div>
 
-                    <!-- FIELDSET 4: CONTATO -->
-                    <fieldset class="form-fieldset">
-                        <legend><i class="fas fa-user-tie"></i> Contato</legend>
+                    <!-- ETAPA 4: CONTATO -->
+                    <div class="form-etapa">
+                        <div class="etapa-cabecalho">
+                            <span class="etapa-numero">4</span>
+                            <div>
+                                <h2>Contato do cliente</h2>
+                                <p>Quem vai receber a apresentação.</p>
+                            </div>
+                        </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="nomeContato">Nome <span class="obrigatorio">*</span></label>
@@ -185,55 +221,63 @@
                             </div>
                             <div class="form-group">
                                 <label for="telefone">Telefone</label>
-                                <input type="tel" id="telefone" name="telefone" placeholder="(00) 00000-0000">
+                                <input type="tel" id="telefone" name="telefone" placeholder="(00) 00000-0000" inputmode="numeric" maxlength="15">
                             </div>
                             <div class="form-group">
                                 <label for="emailCliente">Email <span class="obrigatorio">*</span></label>
                                 <input type="email" id="emailCliente" name="emailCliente" required>
                             </div>
                         </div>
-                    </fieldset>
+                    </div>
 
-                    <!-- FIELDSET 5: MENSAGEM PERSONALIZADA -->
-                    <fieldset class="form-fieldset">
-                        <legend><i class="fas fa-comment"></i> Mensagem Personalizada</legend>
+                    <!-- ETAPA 5: MENSAGEM E ENVIO -->
+                    <div class="form-etapa">
+                        <div class="etapa-cabecalho">
+                            <span class="etapa-numero">5</span>
+                            <div>
+                                <h2>Mensagem e envio</h2>
+                                <p>Personalize a saudação exibida no topo da apresentação e escolha como notificar o cliente.</p>
+                            </div>
+                        </div>
                         <div class="form-group">
-                            <label for="mensagem">Mensagem (opcional)</label>
-                            <textarea 
-                                id="mensagem" 
-                                name="mensagem" 
+                            <label for="mensagem">Mensagem de boas-vindas (opcional)</label>
+                            <textarea
+                                id="mensagem"
+                                name="mensagem"
                                 rows="4"
-                                placeholder="Digite uma mensagem personalizada para o cliente..."
+                                maxlength="400"
+                                placeholder="Ex.: É um prazer receber sua empresa! Preparamos este guia com tudo que você precisa saber para começar com a Scont..."
                             ></textarea>
+                            <small class="campo-dica"><span id="contadorMensagem">0</span>/400 caracteres — aparece no destaque inicial da página</small>
                         </div>
-                    </fieldset>
 
-                    <!-- FIELDSET 6: NOTIFICAÇÕES -->
-                    <fieldset class="form-fieldset">
-                        <legend><i class="fas fa-bell"></i> Notificações</legend>
-                        <div class="form-row">
-                            <div class="form-group checkbox">
+                        <div class="envio-opcoes">
+                            <label class="opcao-envio" for="enviarEmail">
                                 <input type="checkbox" id="enviarEmail" name="enviarEmail" checked>
-                                <label for="enviarEmail">
-                                    <i class="fas fa-envelope"></i> Enviar por Email
-                                </label>
-                            </div>
-                            <div class="form-group checkbox">
+                                <span class="opcao-icone"><i class="fas fa-envelope"></i></span>
+                                <span class="opcao-texto">
+                                    <strong>Enviar por e-mail</strong>
+                                    <small>Dispara automaticamente ao gerar</small>
+                                </span>
+                            </label>
+                            <label class="opcao-envio" for="enviarWhatsApp">
                                 <input type="checkbox" id="enviarWhatsApp" name="enviarWhatsApp">
-                                <label for="enviarWhatsApp">
-                                    <i class="fas fa-whatsapp"></i> Enviar por WhatsApp
-                                </label>
-                            </div>
+                                <span class="opcao-icone"><i class="fab fa-whatsapp"></i></span>
+                                <span class="opcao-texto">
+                                    <strong>Enviar por WhatsApp</strong>
+                                    <small>Abre conversa com mensagem pronta</small>
+                                </span>
+                            </label>
                         </div>
-                    </fieldset>
+                    </div>
 
                     <!-- BOTÕES DE AÇÃO -->
                     <div class="form-actions">
-                        <button type="reset" class="btn btn-secondary">
+                        <button type="reset" class="btn btn-secondary" onclick="novaApresentacao()">
                             <i class="fas fa-redo"></i> Limpar
                         </button>
                         <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-check"></i> Gerar Apresentação
+                            <i class="fas fa-wand-magic-sparkles"></i> Gerar Apresentação
                         </button>
                     </div>
                 </form>
@@ -243,16 +287,30 @@
                     <div class="resultado-container">
                         <div class="resultado-card">
                             <div class="resultado-header">
-                                <i class="fas fa-check-circle"></i>
-                                <h2>Apresentação Criada com Sucesso!</h2>
+                                <span class="resultado-check"><i class="fas fa-check"></i></span>
+                                <div>
+                                    <h2>Apresentação criada</h2>
+                                    <p>O link exclusivo do cliente está pronto para ser compartilhado.</p>
+                                </div>
                             </div>
                             <div class="resultado-content">
-                                <p><strong>Cliente:</strong> <span id="resultadoCliente">-</span></p>
-                                <p><strong>Empresa:</strong> <span id="resultadoEmpresa">-</span></p>
-                                <p><strong>Data:</strong> <span id="resultadoData">-</span></p>
+                                <div class="resultado-resumo">
+                                    <div class="resumo-item">
+                                        <label>Empresa</label>
+                                        <span id="resultadoEmpresa">-</span>
+                                    </div>
+                                    <div class="resumo-item">
+                                        <label>Contato</label>
+                                        <span id="resultadoCliente">-</span>
+                                    </div>
+                                    <div class="resumo-item">
+                                        <label>Criada em</label>
+                                        <span id="resultadoData">-</span>
+                                    </div>
+                                </div>
 
                                 <div class="link-container">
-                                    <label>Link da Apresentação:</label>
+                                    <label>Link exclusivo da apresentação</label>
                                     <div class="link-box">
                                         <input type="text" id="linkUnico" readonly>
                                         <button type="button" class="btn btn-copy" onclick="copiarLink()">
@@ -283,25 +341,60 @@
             <!-- SEÇÃO 2: HISTÓRICO -->
             <section id="historico" class="admin-section">
                 <div class="section-header">
-                    <h1><i class="fas fa-history"></i> Histórico de Apresentações</h1>
-                    <p>Visualize todas as apresentações criadas</p>
+                    <h1>Histórico de Apresentações</h1>
+                    <p>Acompanhe as apresentações criadas e quantas vezes cada cliente acessou.</p>
+                </div>
+
+                <!-- ESTATÍSTICAS -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-icone"><i class="fas fa-file-lines"></i></span>
+                        <div>
+                            <span class="stat-valor" id="statTotal">—</span>
+                            <span class="stat-rotulo">Apresentações</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icone"><i class="fas fa-eye"></i></span>
+                        <div>
+                            <span class="stat-valor" id="statAcessos">—</span>
+                            <span class="stat-rotulo">Acessos totais</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-icone"><i class="fas fa-calendar-plus"></i></span>
+                        <div>
+                            <span class="stat-valor" id="statMes">—</span>
+                            <span class="stat-rotulo">Criadas neste mês</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BUSCA -->
+                <div class="historico-busca">
+                    <i class="fas fa-magnifying-glass"></i>
+                    <input
+                        type="search"
+                        id="buscaHistorico"
+                        placeholder="Buscar por empresa, contato ou e-mail..."
+                        oninput="filtrarHistorico()"
+                    >
                 </div>
 
                 <div class="tabela-container">
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th><i class="fas fa-building"></i> Empresa</th>
-                                <th><i class="fas fa-user"></i> Contato</th>
-                                <th><i class="fas fa-envelope"></i> Email</th>
-                                <th><i class="fas fa-calendar"></i> Data</th>
-                                <th><i class="fas fa-eye"></i> Acessos</th>
-                                <th><i class="fas fa-link"></i> Ação</th>
+                                <th>Empresa</th>
+                                <th>Contato</th>
+                                <th>Criada em</th>
+                                <th>Acessos</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody id="tabelaHistorico">
                             <tr>
-                                <td colspan="6" class="text-center">Carregando histórico...</td>
+                                <td colspan="5" class="text-center">Carregando histórico...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -324,9 +417,9 @@
             <div class="modal-cnae-body">
                 <!-- Filtro -->
                 <div class="cnae-filtro-container">
-                    <input 
-                        type="text" 
-                        id="filtroCNAE" 
+                    <input
+                        type="text"
+                        id="filtroCNAE"
                         placeholder="Filtrar por código ou atividade..."
                         class="cnae-filtro-input"
                         onkeyup="filtrarTabelaCNAE()"

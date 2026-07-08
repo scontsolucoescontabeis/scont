@@ -2,7 +2,7 @@
 
 /**
  * Utilitário global de notificações — SCONT
- * Email: Resend via Supabase Edge Function (API key segura no servidor)
+ * Email: Brevo ou SMTP via Supabase Edge Function (credenciais seguras no servidor)
  * WhatsApp: wa.me (abre chat com mensagem pré-preenchida)
  * Config armazenada em Supabase: tabela configuracoes_scont
  */

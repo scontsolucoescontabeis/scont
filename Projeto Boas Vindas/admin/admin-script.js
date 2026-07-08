@@ -10,6 +10,7 @@ let cnaesSecundariosSelecionados = [];
 let cnaesListaCompleta          = [];
 let modalCNAETipo               = 'principal';
 let _ultimaApresentacao        = null; // guarda dados para reenvio
+let _historicoCache            = [];   // cache para busca/filtro
 
 // ===== INICIALIZAÇÃO =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -20,8 +21,141 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('formCriarApresentacao')
         ?.addEventListener('submit', e => { e.preventDefault(); criarApresentacao(); });
 
+    // Máscaras de entrada
+    const cnpjInput = document.getElementById('cnpj');
+    cnpjInput?.addEventListener('input', () => {
+        cnpjInput.value = formatarCNPJ(cnpjInput.value);
+    });
+    cnpjInput?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); buscarDadosCNPJ(); }
+    });
+
+    const telInput = document.getElementById('telefone');
+    telInput?.addEventListener('input', () => {
+        telInput.value = formatarTelefone(telInput.value);
+    });
+
+    // Contador de caracteres da mensagem
+    const msgInput = document.getElementById('mensagem');
+    const contador = document.getElementById('contadorMensagem');
+    msgInput?.addEventListener('input', () => {
+        if (contador) contador.textContent = msgInput.value.length;
+    });
+
     carregarHistorico();
 });
+
+// ===== MÁSCARAS =====
+function formatarCNPJ(valor) {
+    const d = valor.replace(/\D/g, '').slice(0, 14);
+    return d
+        .replace(/^(\d{2})(\d)/, '$1.$2')
+        .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+        .replace(/\.(\d{3})(\d)/, '.$1/$2')
+        .replace(/(\d{4})(\d)/, '$1-$2');
+}
+
+function formatarTelefone(valor) {
+    const d = valor.replace(/\D/g, '').slice(0, 11);
+    if (d.length <= 10) {
+        return d
+            .replace(/^(\d{2})(\d)/, '($1) $2')
+            .replace(/(\d{4})(\d)/, '$1-$2');
+    }
+    return d
+        .replace(/^(\d{2})(\d)/, '($1) $2')
+        .replace(/(\d{5})(\d)/, '$1-$2');
+}
+
+// ===== BUSCA AUTOMÁTICA POR CNPJ (BrasilAPI) =====
+function formatarCodigoCnae(codigo) {
+    // BrasilAPI retorna 111301 (número) → padrão da lista: 0111-3/01
+    const d = String(codigo).replace(/\D/g, '').padStart(7, '0');
+    return `${d.slice(0, 4)}-${d.slice(4, 5)}/${d.slice(5, 7)}`;
+}
+
+async function buscarDadosCNPJ() {
+    const input = document.getElementById('cnpj');
+    const cnpjDigitos = (input?.value || '').replace(/\D/g, '');
+
+    if (cnpjDigitos.length !== 14) {
+        showToast('Informe um CNPJ completo (14 dígitos) antes de buscar', 'error');
+        input?.focus();
+        return;
+    }
+
+    const btn = document.getElementById('btnBuscarCnpj');
+    const htmlOriginal = btn?.innerHTML;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando...';
+    }
+
+    try {
+        const resp = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjDigitos}`);
+        if (!resp.ok) throw new Error(resp.status === 404 ? 'CNPJ não encontrado na Receita Federal' : 'Serviço de consulta indisponível no momento');
+        const dados = await resp.json();
+
+        // Preenche apenas campos vazios ou substituíveis
+        const setar = (id, valor) => {
+            const el = document.getElementById(id);
+            if (el && valor) el.value = valor;
+        };
+
+        setar('razaoSocial', dados.razao_social);
+        setar('ramo', dados.cnae_fiscal_descricao);
+
+        // Porte (mapeia nomenclatura da Receita para as opções do formulário)
+        const porteMapa = { 'MICRO EMPRESA': 'Microempresa', 'EMPRESA DE PEQUENO PORTE': 'Pequena Empresa' };
+        const porte = porteMapa[(dados.porte || '').toUpperCase()];
+        if (porte) document.getElementById('porte').value = porte;
+
+        // Regime: Simples Nacional quando optante
+        if (dados.opcao_pelo_simples === true) {
+            document.getElementById('regime').value = 'Simples Nacional';
+        }
+
+        // Telefone
+        if (dados.ddd_telefone_1) {
+            setar('telefone', formatarTelefone(dados.ddd_telefone_1));
+        }
+
+        // CNAE principal
+        if (dados.cnae_fiscal) {
+            selecionarCnaePrincipal(
+                formatarCodigoCnae(dados.cnae_fiscal),
+                dados.cnae_fiscal_descricao || 'Atividade principal'
+            );
+        }
+
+        // CNAEs secundários
+        if (Array.isArray(dados.cnaes_secundarios)) {
+            cnaesSecundariosSelecionados = [];
+            dados.cnaes_secundarios
+                .filter(c => c.codigo && c.descricao)
+                .forEach(c => cnaesSecundariosSelecionados.push({
+                    codigo: formatarCodigoCnae(c.codigo),
+                    atividade: c.descricao,
+                }));
+            atualizarListaCnaesSecundarios();
+            if (cnaesSecundariosSelecionados.length) {
+                const g = document.getElementById('grupoSecundarios');
+                if (g) g.style.display = 'block';
+            }
+        }
+
+        showToast(`Dados de "${dados.razao_social}" preenchidos automaticamente`, 'success');
+
+    } catch (err) {
+        console.error(err);
+        showToast(err.message || 'Não foi possível consultar o CNPJ', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = htmlOriginal;
+        }
+    }
+}
 
 // ===== NAVEGAÇÃO =====
 function mudarSecao(secao) {
@@ -212,53 +346,128 @@ function novaApresentacao() {
     removerCnaePrincipal();
     cnaesSecundariosSelecionados = [];
     atualizarListaCnaesSecundarios();
+    const g = document.getElementById('grupoSecundarios');
+    if (g) g.style.display = 'none';
+    const contador = document.getElementById('contadorMensagem');
+    if (contador) contador.textContent = '0';
+    document.getElementById('formCriarApresentacao').scrollIntoView({ behavior: 'smooth' });
 }
 
 // ===== CARREGAR HISTÓRICO =====
 async function carregarHistorico() {
     const tbody = document.getElementById('tabelaHistorico');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Carregando...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Carregando...</td></tr>';
 
     try {
         const { data, error } = await db
             .from('apresentacoes')
-            .select('id, razao_social, nome_contato, email_cliente, criado_em, acessos')
+            .select('id, razao_social, cnpj, nome_contato, email_cliente, telefone, criado_em, acessos')
             .eq('ativo', true)
             .order('criado_em', { ascending: false })
             .limit(50);
 
         if (error) throw error;
 
-        if (!data?.length) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center">Nenhuma apresentação criada ainda</td></tr>';
-            return;
-        }
+        _historicoCache = data || [];
+        atualizarEstatisticas(_historicoCache);
+        renderizarHistorico(_historicoCache);
 
-        tbody.innerHTML = data.map(item => {
-            const dt   = new Date(item.criado_em).toLocaleDateString('pt-BR');
-            const link = gerarLink(item.id);
-            return `<tr>
-                <td>${item.razao_social}</td>
-                <td>${item.nome_contato}</td>
-                <td>${item.email_cliente}</td>
-                <td>${dt}</td>
-                <td>${item.acessos || 0}</td>
-                <td style="display:flex;gap:6px;">
+    } catch (err) {
+        console.error(err);
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Erro ao carregar histórico</td></tr>';
+        showToast('Erro ao carregar histórico', 'error');
+    }
+}
+
+function atualizarEstatisticas(lista) {
+    const agora = new Date();
+    const noMes = lista.filter(i => {
+        const d = new Date(i.criado_em);
+        return d.getMonth() === agora.getMonth() && d.getFullYear() === agora.getFullYear();
+    }).length;
+    const acessos = lista.reduce((soma, i) => soma + (i.acessos || 0), 0);
+
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('statTotal', lista.length);
+    set('statAcessos', acessos);
+    set('statMes', noMes);
+}
+
+function filtrarHistorico() {
+    const termo = (document.getElementById('buscaHistorico')?.value || '').toLowerCase().trim();
+    if (!termo) { renderizarHistorico(_historicoCache); return; }
+    renderizarHistorico(_historicoCache.filter(i =>
+        (i.razao_social || '').toLowerCase().includes(termo) ||
+        (i.nome_contato || '').toLowerCase().includes(termo) ||
+        (i.email_cliente || '').toLowerCase().includes(termo) ||
+        (i.cnpj || '').toLowerCase().includes(termo)
+    ));
+}
+
+function renderizarHistorico(lista) {
+    const tbody = document.getElementById('tabelaHistorico');
+    if (!tbody) return;
+
+    if (!lista.length) {
+        const temBusca = (document.getElementById('buscaHistorico')?.value || '').trim();
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center">${
+            temBusca ? 'Nenhuma apresentação corresponde à busca' : 'Nenhuma apresentação criada ainda'
+        }</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = lista.map(item => {
+        const dt   = new Date(item.criado_em).toLocaleDateString('pt-BR');
+        const link = gerarLink(item.id);
+        const acessos = item.acessos || 0;
+        const badgeClasse = acessos > 0 ? 'badge-acessos ativo' : 'badge-acessos';
+        const iconeAcessos = acessos > 0 ? 'fa-eye' : 'fa-eye-slash';
+        const btnWhats = item.telefone
+            ? `<button onclick="enviarWhatsAppHistorico('${item.id}')" class="btn btn-success btn-sm" title="Enviar por WhatsApp">
+                   <i class="fab fa-whatsapp"></i>
+               </button>`
+            : '';
+        return `<tr>
+            <td class="celula-empresa">
+                <strong>${item.razao_social}</strong>
+                <small>${item.cnpj || ''}</small>
+            </td>
+            <td class="celula-contato">
+                <span>${item.nome_contato}</span>
+                <small>${item.email_cliente}</small>
+            </td>
+            <td>${dt}</td>
+            <td><span class="${badgeClasse}"><i class="fas ${iconeAcessos}"></i> ${acessos}</span></td>
+            <td>
+                <div class="acoes-tabela">
                     <a href="${link}" target="_blank" class="btn btn-info btn-sm" title="Visualizar">
                         <i class="fas fa-eye"></i>
                     </a>
                     <button onclick="copiarLinkHistorico('${link}')" class="btn btn-secondary btn-sm" title="Copiar link">
                         <i class="fas fa-copy"></i>
                     </button>
-                </td>
-            </tr>`;
-        }).join('');
+                    ${btnWhats}
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
 
+// ===== WHATSAPP A PARTIR DO HISTÓRICO =====
+function enviarWhatsAppHistorico(id) {
+    const item = _historicoCache.find(i => i.id === id);
+    if (!item?.telefone) {
+        showToast('Telefone não informado para este cliente', 'error');
+        return;
+    }
+    try {
+        const msg = `Olá, ${item.nome_contato}! 👋\n\n` +
+            `A *Scont Soluções Contábeis* preparou uma apresentação personalizada para a *${item.razao_social}*.\n\n` +
+            `Acesse agora: ${gerarLink(item.id)}`;
+        Notificacoes.abrirWhatsAppCliente({ numero: item.telefone, mensagem: msg });
     } catch (err) {
-        console.error(err);
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Erro ao carregar histórico</td></tr>';
-        showToast('Erro ao carregar histórico', 'error');
+        showToast('Não foi possível abrir o WhatsApp: ' + err.message, 'error');
     }
 }
 

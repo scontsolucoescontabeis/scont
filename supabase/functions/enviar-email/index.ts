@@ -121,20 +121,25 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
     ` + _rodape(nomeRemetente) + _fechamento();
 }
 
-// ── Envia via Resend (API HTTP) ───────────────────────────────
-async function enviarResend(cfg: Record<string, string>, payload: {
-    from: string; to: string; subject: string; html: string;
+// ── Envia via Brevo (API HTTP) ─────────────────────────────────
+async function enviarBrevo(cfg: Record<string, string>, payload: {
+    nomeRemetente: string; emailRemetente: string; to: string; subject: string; html: string;
 }) {
-    if (!cfg.resend_api_key) throw new Error('Resend API Key não configurada. Acesse Admin → Configurações.');
+    if (!cfg.brevo_api_key) throw new Error('Brevo API Key não configurada. Acesse Admin → Configurações.');
 
-    const resp = await fetch('https://api.resend.com/emails', {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
         method:  'POST',
-        headers: { 'Authorization': `Bearer ${cfg.resend_api_key}`, 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ from: payload.from, to: [payload.to], subject: payload.subject, html: payload.html }),
+        headers: { 'api-key': cfg.brevo_api_key, 'Content-Type': 'application/json', 'accept': 'application/json' },
+        body:    JSON.stringify({
+            sender:      { name: payload.nomeRemetente, email: payload.emailRemetente },
+            to:          [{ email: payload.to }],
+            subject:     payload.subject,
+            htmlContent: payload.html,
+        }),
     });
     const json = await resp.json();
-    if (!resp.ok) throw new Error('Resend: ' + (json?.message ?? JSON.stringify(json)));
-    return { provider: 'resend', id: json.id };
+    if (!resp.ok) throw new Error('Brevo: ' + (json?.message ?? JSON.stringify(json)));
+    return { provider: 'brevo', id: json.messageId };
 }
 
 // ── Envia via SMTP (Outlook, Gmail, etc.) via nodemailer ─────
@@ -203,8 +208,8 @@ Deno.serve(async (req) => {
         });
 
         const nomeRem  = cfg.nome_remetente  || 'Scont Soluções Contábeis';
-        const emailRem = cfg.email_remetente || cfg.smtp_usuario || 'onboarding@resend.dev';
-        const provedor = cfg.email_provedor  || 'resend';
+        const emailRem = cfg.email_remetente || cfg.smtp_usuario || 'contato@scontdf.com.br';
+        const provedor = cfg.email_provedor  || 'brevo';
 
         const mailPayload = {
             from:    `${nomeRem} <${emailRem}>`,
@@ -215,7 +220,7 @@ Deno.serve(async (req) => {
 
         const result = provedor === 'smtp'
             ? await enviarSmtp(cfg, mailPayload)
-            : await enviarResend(cfg, mailPayload);
+            : await enviarBrevo(cfg, { nomeRemetente: nomeRem, emailRemetente: emailRem, to: destinatario, subject: mailPayload.subject, html: mailPayload.html });
 
         return new Response(JSON.stringify({ ok: true, ...result }), {
             headers: { ...CORS, 'Content-Type': 'application/json' },
