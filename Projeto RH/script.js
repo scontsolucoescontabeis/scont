@@ -2462,6 +2462,7 @@ async function processarLoteGrupo(fileList) {
 
             const cfg = await _buscarConfigRubricas(codigo);
             const comTerceiroTurno = cfg?.['terceiro_turno']?.cod === '1';
+            const feriasCalculadas = await carregarFeriasCalculadas(codigo);
 
             const buffer = await file.arrayBuffer();
             const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
@@ -2472,7 +2473,7 @@ async function processarLoteGrupo(fileList) {
                 continue;
             }
 
-            itensFila.push({ codigo_empresa: codigo, nome_empresa: nomesEmpresas[codigo] || codigo, folhas, avisosAbas, cfg });
+            itensFila.push({ codigo_empresa: codigo, nome_empresa: nomesEmpresas[codigo] || codigo, folhas, avisosAbas, cfg, feriasCalculadas });
         } catch (erro) {
             console.error('Erro ao preparar empresa do lote', codigo, erro);
             resultadosIniciais.push({ codigo, status: 'erro', detalhe: erro.message || 'Erro desconhecido.' });
@@ -2515,6 +2516,7 @@ function _carregarProximaEmpresaFila() {
     state.folhas = item.folhas;
     state.abaAtivaIndex = 0;
     state.resultados = [];
+    state.feriasCalculadas = item.feriasCalculadas || {};
 
     _aplicarConfigEmpresaNaTelaEdicao(item.cfg);
 
