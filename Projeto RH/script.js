@@ -2256,6 +2256,33 @@ async function baixarModelosGrupo() {
     }
 }
 
+// --- AÇÕES EM LOTE: EXPORTAÇÃO TXT ---
+async function buscarEmpresasParaExportacaoGrupo(codigosGrupo) {
+    const comp = document.getElementById('exportCompetencia').value;
+    if (!validarCompetencia(comp)) { mostrarMensagem('Erro', 'Competência inválida.'); return; }
+    try {
+        const { data, error } = await supabaseClient.from('rh_saves').select('empresa_codigo').eq('competencia', comp);
+        if (error) throw error;
+        const codigosUnicos = [...new Set(data.map(item => item.empresa_codigo))].filter(c => codigosGrupo.includes(c));
+        if (codigosUnicos.length === 0) { mostrarMensagem('Aviso', 'Nenhuma empresa do grupo possui dados processados para esta competência.'); return; }
+        const empresasFiltradas = state.empresas.filter(emp => codigosUnicos.includes(emp.codigo_empresa));
+        renderizarListaEmpresasExportacao(empresasFiltradas);
+    } catch (erro) {
+        console.error('Erro ao buscar empresas do grupo:', erro);
+        mostrarMensagem('Erro', 'Falha ao buscar empresas do grupo com dados processados.');
+    }
+}
+
+async function abrirExportacaoTxtGrupo() {
+    if (!_grupoAtual?.id) { mostrarMensagem('Aviso', 'Salve o grupo antes de exportar o TXT.'); return; }
+    const comp = document.getElementById('grpCompetencia')?.value || '';
+    if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe a competência antes de exportar o TXT do grupo.'); return; }
+    await abrirModalExportacaoTXT();
+    document.getElementById('exportCompetencia').value = comp;
+    const codigosGrupo = _grupoAtual.empresas.map(e => e.codigo_empresa);
+    await buscarEmpresasParaExportacaoGrupo(codigosGrupo);
+}
+
 function abrirModalConfigRubricas() {
     document.getElementById('cfgCodigoEmpresa').value = '';
     document.getElementById('cfgBuscaEmpresa').value = '';
