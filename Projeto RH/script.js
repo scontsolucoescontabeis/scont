@@ -3248,7 +3248,7 @@ function _renderizarListaGruposBeneficios(grupos) {
     }
     container.innerHTML = grupos.map(g => `
         <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
-            <input type="checkbox" class="beneficios-grupo-check" value="${g.id}">
+            <input type="checkbox" class="beneficios-grupo-check" value="${g.id}" onchange="_aplicarGruposBeneficios()">
             ${g.nome_grupo} <span style="color: var(--text-secondary);">(${g.qtdEmpresas})</span>
         </label>
     `).join('');
@@ -3269,7 +3269,7 @@ function _filtrarListaGruposBeneficios() {
 
 function _aplicarGruposBeneficios() {
     const idsMarcados = Array.from(document.querySelectorAll('.beneficios-grupo-check:checked')).map(cb => cb.value);
-    if (idsMarcados.length === 0) { mostrarMensagem('Aviso', 'Selecione ao menos um grupo.'); return; }
+    if (idsMarcados.length === 0) return;
 
     const codigosParaMarcar = new Set(
         Array.from(document.querySelectorAll('.beneficios-emp-check:checked')).map(cb => cb.value)
