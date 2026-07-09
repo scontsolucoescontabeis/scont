@@ -280,6 +280,52 @@ CREATE POLICY "rh_config_rub_txt: escrita autenticado"
 
 
 -- ============================================================
+-- TABELA: rh_grupos_empresas
+--    Grupos nomeados de empresas para operações em lote.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.rh_grupos_empresas (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome_grupo  TEXT NOT NULL UNIQUE,
+    criado_em   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.rh_grupos_empresas ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "rh_grupos_empresas: leitura autenticado" ON public.rh_grupos_empresas;
+DROP POLICY IF EXISTS "rh_grupos_empresas: escrita autenticado" ON public.rh_grupos_empresas;
+
+CREATE POLICY "rh_grupos_empresas: leitura autenticado"
+    ON public.rh_grupos_empresas FOR SELECT TO authenticated USING (TRUE);
+
+CREATE POLICY "rh_grupos_empresas: escrita autenticado"
+    ON public.rh_grupos_empresas FOR ALL TO authenticated USING (TRUE) WITH CHECK (TRUE);
+
+-- ============================================================
+-- TABELA: rh_grupos_empresas_itens
+--    Empresas pertencentes a cada grupo.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.rh_grupos_empresas_itens (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    grupo_id       UUID NOT NULL REFERENCES public.rh_grupos_empresas(id) ON DELETE CASCADE,
+    codigo_empresa TEXT NOT NULL,
+    CONSTRAINT rh_grupo_item_uniq UNIQUE (grupo_id, codigo_empresa)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rh_grupo_itens_grupo ON public.rh_grupos_empresas_itens (grupo_id);
+
+ALTER TABLE public.rh_grupos_empresas_itens ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "rh_grupos_empresas_itens: leitura autenticado" ON public.rh_grupos_empresas_itens;
+DROP POLICY IF EXISTS "rh_grupos_empresas_itens: escrita autenticado" ON public.rh_grupos_empresas_itens;
+
+CREATE POLICY "rh_grupos_empresas_itens: leitura autenticado"
+    ON public.rh_grupos_empresas_itens FOR SELECT TO authenticated USING (TRUE);
+
+CREATE POLICY "rh_grupos_empresas_itens: escrita autenticado"
+    ON public.rh_grupos_empresas_itens FOR ALL TO authenticated USING (TRUE) WITH CHECK (TRUE);
+
+
+-- ============================================================
 -- 9. TABELA: rh_feriados
 --    Calendário de feriados global, compartilhado por todas as empresas.
 --    Ver migração: schema_rh_feriados_globais.sql
