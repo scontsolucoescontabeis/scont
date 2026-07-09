@@ -245,7 +245,12 @@ CREATE POLICY "rh_mapeamento: escrita autenticado"
 
 -- ============================================================
 -- 8. TABELA: rh_config_rubricas_txt
---    Presets de rubricas TXT por empresa (6 eventos fixos)
+--    Presets de rubricas TXT por empresa (6 eventos fixos) +
+--    config geral por empresa (jornada, observacoes, regras de
+--    horas extras/turnos): jornada_diaria, jornada_sexta_ativa,
+--    jornada_sexta, jornada_sabado_ativa, jornada_sabado,
+--    sabado_sempre_extra, observacoes, rule_extra_100_opcional,
+--    terceiro_turno, nao_compensar_extras
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.rh_config_rubricas_txt (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
