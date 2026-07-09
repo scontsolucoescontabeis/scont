@@ -2293,14 +2293,17 @@ async function buscarEmpresasParaExportacaoGrupo(codigosGrupo) {
     }
 }
 
+async function _abrirExportacaoTxtLote(codigosEmpresas, competencia) {
+    await abrirModalExportacaoTXT();
+    document.getElementById('exportCompetencia').value = competencia;
+    await buscarEmpresasParaExportacaoGrupo(codigosEmpresas);
+}
+
 async function abrirExportacaoTxtGrupo() {
     if (!_grupoAtual?.id) { mostrarMensagem('Aviso', 'Salve o grupo antes de exportar o TXT.'); return; }
     const comp = document.getElementById('grpCompetencia')?.value || '';
     if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe a competência antes de exportar o TXT do grupo.'); return; }
-    await abrirModalExportacaoTXT();
-    document.getElementById('exportCompetencia').value = comp;
-    const codigosGrupo = _grupoAtual.empresas.map(e => e.codigo_empresa);
-    await buscarEmpresasParaExportacaoGrupo(codigosGrupo);
+    await _abrirExportacaoTxtLote(_grupoAtual.empresas.map(e => e.codigo_empresa), comp);
 }
 
 // --- AÇÕES EM LOTE: PROCESSAMENTO (fila de revisão) ---
@@ -2489,13 +2492,26 @@ function _cancelarFilaLoteGrupo() {
     _finalizarFilaLoteGrupo();
 }
 
+let _pendingExportTxtLote = null;
+
 function _finalizarFilaLoteGrupo() {
     const fila = _filaLoteGrupo;
     _filaLoteGrupo = null;
     const banner = document.getElementById('filaLoteGrupoBanner');
     if (banner) banner.style.display = 'none';
     mostrarTela('gruposScreen');
+    const codigosOk = fila.resultados.filter(r => r.status === 'ok').map(r => r.codigo);
+    _pendingExportTxtLote = codigosOk.length > 0 ? { codigos: codigosOk, competencia: fila.competencia } : null;
     _mostrarResumoLote([...fila.resultadosIniciais, ...fila.resultados], codigo => fila.nomesEmpresas[codigo] || codigo);
+}
+
+function _fecharResumoLoteEAbrirExportacao() {
+    document.getElementById('loteResumoModal').classList.remove('active');
+    if (_pendingExportTxtLote) {
+        const pendente = _pendingExportTxtLote;
+        _pendingExportTxtLote = null;
+        _abrirExportacaoTxtLote(pendente.codigos, pendente.competencia);
+    }
 }
 
 function _atualizarBannerFilaLote(telaId) {
