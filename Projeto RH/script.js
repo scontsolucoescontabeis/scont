@@ -3152,15 +3152,16 @@ function mostrarTela(telaId) {
     document.getElementById('mainScreen').style.display = 'none';
     document.getElementById('resultsScreen').style.display = 'none';
     document.getElementById('gruposScreen').style.display = 'none';
+    document.getElementById('feriasScreen').style.display = 'none';
     document.getElementById(telaId).style.display = 'block';
     if (telaId === 'gruposScreen') carregarGrupos();
 
     const pageHeader = document.getElementById('pageHeader');
-    if (pageHeader) pageHeader.style.display = (telaId === 'selectionScreen' || telaId === 'gruposScreen') ? 'none' : 'block';
+    if (pageHeader) pageHeader.style.display = (telaId === 'selectionScreen' || telaId === 'gruposScreen' || telaId === 'feriasScreen') ? 'none' : 'block';
 
     const sub = document.getElementById('pageHeaderSub');
     if (sub) {
-        if (telaId !== 'selectionScreen' && telaId !== 'gruposScreen' && state.empresaSelecionada) {
+        if (telaId !== 'selectionScreen' && telaId !== 'gruposScreen' && telaId !== 'feriasScreen' && state.empresaSelecionada) {
             sub.textContent = `🏢 ${state.empresaSelecionada.codigo_empresa} — ${state.empresaSelecionada.nome_empresa}  ·  📅 ${state.competencia}`;
         } else {
             sub.textContent = 'Selecione a competência e empresa para começar';
@@ -3168,7 +3169,7 @@ function mostrarTela(telaId) {
     }
 
     atualizarBannerObservacoes();
-    if (telaId === 'gruposScreen') {
+    if (telaId === 'gruposScreen' || telaId === 'feriasScreen') {
         const obsBanner = document.getElementById('empresaObservacoesBanner');
         if (obsBanner) obsBanner.style.display = 'none';
     }
