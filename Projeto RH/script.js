@@ -855,13 +855,14 @@ function renderizarConteudoAba() {
         const isFerias = _dataEmFerias(dia.data, folha.empregadoId);
         const infoExtra = isFeriado
             ? `<span style="color: var(--danger-color); font-size: 11px; display: block;">Feriado</span>`
-            : (isFerias ? `<span style="color: #b45309; font-size: 11px; display: block;">Férias</span>` : '');
-        
+            : '';
+
         const temEntrada = dia.entrada1 || dia.entrada2 || (state.terceiroTurno && dia.entrada3);
         const flagFolga = folha.flagsFolga[dia.data] || '';
-        
+        const colspanHorarios = state.terceiroTurno ? 6 : 4;
+
         html += `
-            <tr class="${rowClass}">
+            <tr class="${rowClass}"${isFerias ? ' style="background-color: #fffbeb;"' : ''}>
                 <td>
                     <strong>${dia.data}</strong><br>
                     <span style="font-size: 12px; color: var(--text-secondary);">${dia.diaSemana}</span>
@@ -870,17 +871,24 @@ function renderizarConteudoAba() {
                 <td style="text-align: center; font-size: 12px; color: #6c757d;">
                     ${isDSR ? '<span style="background: #4f46e5; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold;">DSR</span>' : ''}
                 </td>
+                ${isFerias ? `
+                <td colspan="${colspanHorarios}" style="text-align: center; background-color: #fde68a; color: #78350f; font-weight: 700; font-size: 13px; letter-spacing: 0.3px; padding: 10px;">
+                    🏖️ FÉRIAS — sem lançamento de horas
+                </td>` : `
                 <td><input type="text" class="time-input" value="${dia.entrada1}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'entrada1', this.value)" placeholder="00:00" maxlength="5"></td>
                 <td><input type="text" class="time-input" value="${dia.saida1}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'saida1', this.value)" placeholder="00:00" maxlength="5"></td>
                 <td><input type="text" class="time-input" value="${dia.entrada2}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'entrada2', this.value)" placeholder="00:00" maxlength="5"></td>
                 <td><input type="text" class="time-input" value="${dia.saida2}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'saida2', this.value)" placeholder="00:00" maxlength="5"></td>
                 ${state.terceiroTurno ? `
                 <td><input type="text" class="time-input" value="${dia.entrada3}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'entrada3', this.value)" placeholder="00:00" maxlength="5"></td>
-                <td><input type="text" class="time-input" value="${dia.saida3}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'saida3', this.value)" placeholder="00:00" maxlength="5"></td>` : ''}
+                <td><input type="text" class="time-input" value="${dia.saida3}" onchange="atualizarDado(${state.abaAtivaIndex}, ${diaIndex}, 'saida3', this.value)" placeholder="00:00" maxlength="5"></td>` : ''}`}
                 <td style="text-align: center;">
-                    <input type="checkbox" ${isDSR ? 'checked' : ''} onchange="atualizarDSRDia(${state.abaAtivaIndex}, '${dia.data}', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">
+                    ${isFerias
+                        ? '<span style="color: #9ca3af; font-size: 12px;">—</span>'
+                        : `<input type="checkbox" ${isDSR ? 'checked' : ''} onchange="atualizarDSRDia(${state.abaAtivaIndex}, '${dia.data}', this.checked)" style="cursor: pointer; width: 18px; height: 18px;">`}
                 </td>
                 <td style="text-align: center;">
+                    ${isFerias ? '<span style="color: #9ca3af; font-size: 12px;">—</span>' : `
                     <select onchange="atualizarFlagFolga(${state.abaAtivaIndex}, '${dia.data}', this.value)" style="padding: 4px; border-radius: 4px; border: 1px solid #ced4da; font-size: 12px;">
                         <option value="">-</option>
                         ${!temEntrada ? `<option value="folga" ${flagFolga === 'folga' ? 'selected' : ''}>Folga</option>` : ''}
@@ -889,7 +897,7 @@ function renderizarConteudoAba() {
                         <option value="atestado" ${flagFolga === 'atestado' ? 'selected' : ''}>Atestado Médico</option>
                         <option value="atestado_comparecimento" ${flagFolga === 'atestado_comparecimento' ? 'selected' : ''}>Atestado de Comparecimento</option>
                         <option value="liberacao_meio_expediente" ${flagFolga === 'liberacao_meio_expediente' ? 'selected' : ''}>Liberação Meio Expediente</option>
-                    </select>
+                    </select>`}
                 </td>
                 <td><button type="button" class="btn-icon" onclick="limparLinha(${state.abaAtivaIndex}, ${diaIndex})" title="Limpar linha">🗑️</button></td>
             </tr>
