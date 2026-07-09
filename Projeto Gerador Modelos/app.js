@@ -336,19 +336,20 @@ function renderModelos() {
 
 // ── Eventos CRUD ──────────────────────────────────────────────
 async function carregarEventos() {
+  // Busca os modelos de cada evento já embutidos na mesma consulta (via a FK
+  // gm_eventos_modelos.modelo_id → gm_modelos.id), em vez de depender do array
+  // global `modelos` — que é carregado por carregarModelos() em paralelo a esta
+  // função na inicialização da página, sem ordem garantida entre as duas.
   const [{ data: evData, error: evErr }, { data: emData, error: emErr }] = await Promise.all([
     sb.from('gm_eventos').select('*').order('created_at', { ascending: false }),
-    sb.from('gm_eventos_modelos').select('evento_id, modelo_id, ordem').order('ordem', { ascending: true }),
+    sb.from('gm_eventos_modelos').select('evento_id, ordem, gm_modelos(*)').order('ordem', { ascending: true }),
   ]);
   if (evErr) { console.error(evErr); return; }
   if (emErr) { console.error(emErr); return; }
 
-  const modelosPorId = {};
-  modelos.forEach(m => { modelosPorId[m.id] = m; });
-
   eventos = (evData || []).map(ev => {
     const itens = (emData || []).filter(it => it.evento_id === ev.id);
-    const modelosOrdenados = itens.map(it => modelosPorId[it.modelo_id]).filter(Boolean);
+    const modelosOrdenados = itens.map(it => it.gm_modelos).filter(Boolean);
     return { ...ev, modelosOrdenados };
   });
 }
