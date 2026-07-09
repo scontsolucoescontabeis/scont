@@ -3206,45 +3206,84 @@ function _iniciarTelaBeneficios() {
     document.getElementById('beneficiosBuscaEmpresa').value = '';
     _atualizarLabelMesPagamentoBeneficios();
     _renderizarListaEmpresasBeneficios(state.empresas);
+    _atualizarResumoEmpresasSelecionadasBeneficios();
     _carregarGruposParaBeneficios();
 }
 
+let _gruposBeneficiosCache = [];       // [{ id, nome_grupo, qtdEmpresas }]
+let _itensGruposBeneficiosCache = {};  // grupo_id -> Set(codigo_empresa)
+
 async function _carregarGruposParaBeneficios() {
-    const select = document.getElementById('beneficiosGrupoSelect');
-    if (!select) return;
     try {
-        const { data, error } = await supabaseClient
-            .from('rh_grupos_empresas')
-            .select('id, nome_grupo')
-            .order('nome_grupo', { ascending: true });
-        if (error) throw error;
-        select.innerHTML = '<option value="">Selecionar grupo de empresas...</option>' +
-            (data || []).map(g => `<option value="${g.id}">${g.nome_grupo}</option>`).join('');
+        const [{ data: grupos, error: errG }, { data: itens, error: errI }] = await Promise.all([
+            supabaseClient.from('rh_grupos_empresas').select('id, nome_grupo').order('nome_grupo', { ascending: true }),
+            supabaseClient.from('rh_grupos_empresas_itens').select('grupo_id, codigo_empresa'),
+        ]);
+        if (errG) throw errG;
+        if (errI) throw errI;
+
+        _itensGruposBeneficiosCache = {};
+        (itens || []).forEach(it => {
+            (_itensGruposBeneficiosCache[it.grupo_id] ??= new Set()).add(it.codigo_empresa);
+        });
+        _gruposBeneficiosCache = (grupos || []).map(g => ({
+            id: g.id,
+            nome_grupo: g.nome_grupo,
+            qtdEmpresas: _itensGruposBeneficiosCache[g.id]?.size || 0,
+        }));
+
+        document.getElementById('beneficiosBuscaGrupo').value = '';
+        _renderizarListaGruposBeneficios(_gruposBeneficiosCache);
     } catch (erro) {
         console.error('Erro ao carregar grupos de empresas:', erro);
     }
 }
 
-async function _selecionarGrupoBeneficios() {
-    const grupoId = document.getElementById('beneficiosGrupoSelect').value;
-    if (!grupoId) return;
-    try {
-        const { data, error } = await supabaseClient
-            .from('rh_grupos_empresas_itens')
-            .select('codigo_empresa')
-            .eq('grupo_id', grupoId);
-        if (error) throw error;
-        const codigosDoGrupo = new Set((data || []).map(it => it.codigo_empresa));
-
-        document.getElementById('beneficiosBuscaEmpresa').value = '';
-        _renderizarListaEmpresasBeneficios(state.empresas);
-        document.querySelectorAll('.beneficios-emp-check').forEach(cb => {
-            cb.checked = codigosDoGrupo.has(cb.value);
-        });
-    } catch (erro) {
-        console.error('Erro ao carregar empresas do grupo:', erro);
-        mostrarMensagem('Erro', 'Falha ao carregar as empresas do grupo selecionado.');
+function _renderizarListaGruposBeneficios(grupos) {
+    const container = document.getElementById('beneficiosListaGrupos');
+    if (!container) return;
+    if (!grupos || grupos.length === 0) {
+        container.innerHTML = '<span style="font-size:12px;color:var(--text-secondary);">Nenhum grupo encontrado.</span>';
+        return;
     }
+    container.innerHTML = grupos.map(g => `
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+            <input type="checkbox" class="beneficios-grupo-check" value="${g.id}">
+            ${g.nome_grupo} <span style="color: var(--text-secondary);">(${g.qtdEmpresas})</span>
+        </label>
+    `).join('');
+}
+
+function _filtrarListaGruposBeneficios() {
+    const termo = (document.getElementById('beneficiosBuscaGrupo').value || '').toLowerCase().trim();
+    const marcados = new Set(Array.from(document.querySelectorAll('.beneficios-grupo-check:checked')).map(cb => cb.value));
+    const lista = termo
+        ? _gruposBeneficiosCache.filter(g => g.nome_grupo.toLowerCase().includes(termo))
+        : _gruposBeneficiosCache;
+    _renderizarListaGruposBeneficios(lista);
+    marcados.forEach(id => {
+        const cb = document.querySelector(`.beneficios-grupo-check[value="${id}"]`);
+        if (cb) cb.checked = true;
+    });
+}
+
+function _aplicarGruposBeneficios() {
+    const idsMarcados = Array.from(document.querySelectorAll('.beneficios-grupo-check:checked')).map(cb => cb.value);
+    if (idsMarcados.length === 0) { mostrarMensagem('Aviso', 'Selecione ao menos um grupo.'); return; }
+
+    const codigosParaMarcar = new Set(
+        Array.from(document.querySelectorAll('.beneficios-emp-check:checked')).map(cb => cb.value)
+    );
+    idsMarcados.forEach(id => {
+        (_itensGruposBeneficiosCache[id] || new Set()).forEach(codigo => codigosParaMarcar.add(codigo));
+    });
+
+    document.getElementById('beneficiosBuscaEmpresa').value = '';
+    _renderizarListaEmpresasBeneficios(state.empresas);
+    document.querySelectorAll('.beneficios-emp-check').forEach(cb => {
+        cb.checked = codigosParaMarcar.has(cb.value);
+    });
+    _atualizarResumoEmpresasSelecionadasBeneficios();
 }
 
 function _renderizarListaEmpresasBeneficios(empresas) {
@@ -3255,7 +3294,7 @@ function _renderizarListaEmpresasBeneficios(empresas) {
     }
     container.innerHTML = empresas.map(e => `
         <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
-            <input type="checkbox" class="beneficios-emp-check" value="${e.codigo_empresa}">
+            <input type="checkbox" class="beneficios-emp-check" value="${e.codigo_empresa}" onchange="_atualizarResumoEmpresasSelecionadasBeneficios()">
             <span style="font-family:monospace; color:var(--primary-color); font-weight:600;">${e.codigo_empresa}</span> ${e.nome_empresa}
         </label>
     `).join('');
@@ -3276,6 +3315,22 @@ function _filtrarListaEmpresasBeneficios() {
 
 function _selecionarTodasEmpresasBeneficios(marcar) {
     document.querySelectorAll('.beneficios-emp-check').forEach(cb => { cb.checked = marcar; });
+    _atualizarResumoEmpresasSelecionadasBeneficios();
+}
+
+function _atualizarResumoEmpresasSelecionadasBeneficios() {
+    const info = document.getElementById('beneficiosEmpresasSelecionadasInfo');
+    if (!info) return;
+    const marcados = Array.from(document.querySelectorAll('.beneficios-emp-check:checked'));
+    if (marcados.length === 0) {
+        info.textContent = 'Nenhuma empresa selecionada.';
+        return;
+    }
+    const nomes = marcados.map(cb => {
+        const emp = state.empresas.find(e => e.codigo_empresa === cb.value);
+        return `${cb.value} - ${emp?.nome_empresa || cb.value}`;
+    });
+    info.textContent = `${marcados.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
 }
 
 function _estimarDiasUteis5x2(competencia) {
