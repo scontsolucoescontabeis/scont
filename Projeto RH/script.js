@@ -1969,6 +1969,217 @@ function _limparCamposConfigRubricas() {
     if (cNaoComp)      cNaoComp.checked      = false;
 }
 
+// --- GRUPOS DE EMPRESAS ---
+let _grupos = [];
+let _grupoAtual = null;
+
+async function carregarGrupos() {
+    try {
+        const { data: grupos, error: errG } = await supabaseClient
+            .from('rh_grupos_empresas')
+            .select('id, nome_grupo')
+            .order('nome_grupo', { ascending: true });
+        if (errG) throw errG;
+        const { data: itens, error: errI } = await supabaseClient
+            .from('rh_grupos_empresas_itens')
+            .select('grupo_id, codigo_empresa');
+        if (errI) throw errI;
+        const contagem = {};
+        (itens || []).forEach(it => { contagem[it.grupo_id] = (contagem[it.grupo_id] || 0) + 1; });
+        _grupos = (grupos || []).map(g => ({ ...g, qtdEmpresas: contagem[g.id] || 0 }));
+        renderizarListaGrupos();
+    } catch (erro) {
+        console.error('Erro ao carregar grupos:', erro);
+        mostrarMensagem('Erro', 'Falha ao carregar grupos de empresas.');
+    }
+}
+
+function renderizarListaGrupos() {
+    const container = document.getElementById('listaGrupos');
+    if (!container) return;
+    if (_grupos.length === 0) {
+        container.innerHTML = '<div style="padding:14px; color: var(--text-secondary); font-size:13px;">Nenhum grupo cadastrado.</div>';
+        return;
+    }
+    container.innerHTML = _grupos.map(g => `
+        <div onclick="selecionarGrupo('${g.id}')"
+            style="padding:10px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #f0f0f0; ${_grupoAtual?.id === g.id ? 'background:#f5f5f5; font-weight:600;' : ''}">
+            ${g.nome_grupo} <span style="color: var(--text-secondary);">(${g.qtdEmpresas})</span>
+        </div>
+    `).join('');
+}
+
+function novoGrupo() {
+    _grupoAtual = { id: null, nome_grupo: '', empresas: [] };
+    renderizarListaGrupos();
+    _renderGrupoDetalhe();
+}
+
+async function selecionarGrupo(id) {
+    const grupo = _grupos.find(g => g.id === id);
+    if (!grupo) return;
+    try {
+        const { data: itens, error } = await supabaseClient
+            .from('rh_grupos_empresas_itens')
+            .select('codigo_empresa')
+            .eq('grupo_id', id);
+        if (error) throw error;
+        const empresas = (itens || []).map(it => {
+            const emp = state.empresas.find(e => e.codigo_empresa === it.codigo_empresa);
+            return { codigo_empresa: it.codigo_empresa, nome_empresa: emp?.nome_empresa || it.codigo_empresa };
+        });
+        _grupoAtual = { id: grupo.id, nome_grupo: grupo.nome_grupo, empresas };
+        renderizarListaGrupos();
+        _renderGrupoDetalhe();
+    } catch (erro) {
+        console.error('Erro ao carregar empresas do grupo:', erro);
+        mostrarMensagem('Erro', 'Falha ao carregar as empresas do grupo.');
+    }
+}
+
+function _renderGrpEmpresasList() {
+    const container = document.getElementById('grpEmpresasList');
+    if (!container) return;
+    if (_grupoAtual.empresas.length === 0) {
+        container.innerHTML = '<div style="padding:10px; color: var(--text-secondary); font-size:13px;">Nenhuma empresa adicionada.</div>';
+        return;
+    }
+    container.innerHTML = _grupoAtual.empresas.map(e => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid #f0f0f0; font-size:13px;">
+            <span><strong>${e.codigo_empresa}</strong> - ${e.nome_empresa}</span>
+            <button type="button" class="btn btn-danger btn-small" style="padding:2px 8px; font-size:11px;" onclick="removerEmpresaGrupo('${e.codigo_empresa}')">remover</button>
+        </div>
+    `).join('');
+}
+
+function removerEmpresaGrupo(codigo) {
+    _grupoAtual.empresas = _grupoAtual.empresas.filter(e => e.codigo_empresa !== codigo);
+    _renderGrpEmpresasList();
+}
+
+function filtrarEmpresasGrupo(termo) {
+    const box   = document.getElementById('grpBuscaEmpresaResultados');
+    const input = document.getElementById('grpBuscaEmpresa');
+    if (!box || !input) return;
+    const rect = input.getBoundingClientRect();
+    box.style.top   = (rect.bottom + 2) + 'px';
+    box.style.left  = rect.left + 'px';
+    box.style.width = rect.width + 'px';
+    const norm = termo.trim().toLowerCase();
+    const lista = norm
+        ? state.empresas.filter(e => e.nome_empresa.toLowerCase().includes(norm) || e.codigo_empresa.toLowerCase().includes(norm))
+        : state.empresas;
+    if (!lista.length) {
+        box.innerHTML = '<div style="padding:10px 14px;color:#999;font-size:13px;">Nenhuma empresa encontrada</div>';
+        box.style.display = 'block';
+        return;
+    }
+    box.innerHTML = lista.map(e => `
+        <div onclick="adicionarEmpresaGrupo('${e.codigo_empresa}', '${e.nome_empresa.replace(/'/g, "\\'")}')"
+            style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;"
+            onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+            <span style="font-family:monospace;font-weight:600;color:var(--primary-color);margin-right:8px;">${e.codigo_empresa}</span>${e.nome_empresa}
+        </div>`).join('');
+    box.style.display = 'block';
+}
+
+function adicionarEmpresaGrupo(codigo, nome) {
+    if (!_grupoAtual.empresas.some(e => e.codigo_empresa === codigo)) {
+        _grupoAtual.empresas.push({ codigo_empresa: codigo, nome_empresa: nome });
+    }
+    document.getElementById('grpBuscaEmpresa').value = '';
+    document.getElementById('grpBuscaEmpresaResultados').style.display = 'none';
+    _renderGrpEmpresasList();
+}
+
+async function salvarGrupo() {
+    const nome = (document.getElementById('grpNome')?.value || '').trim();
+    if (!nome) { mostrarMensagem('Aviso', 'Informe o nome do grupo.'); return; }
+    try {
+        let grupoId = _grupoAtual.id;
+        if (grupoId) {
+            const { error } = await supabaseClient.from('rh_grupos_empresas').update({ nome_grupo: nome }).eq('id', grupoId);
+            if (error) throw error;
+        } else {
+            const { data, error } = await supabaseClient.from('rh_grupos_empresas').insert({ nome_grupo: nome }).select('id').single();
+            if (error) throw error;
+            grupoId = data.id;
+        }
+        const { error: errDel } = await supabaseClient.from('rh_grupos_empresas_itens').delete().eq('grupo_id', grupoId);
+        if (errDel) throw errDel;
+        if (_grupoAtual.empresas.length > 0) {
+            const { error: errIns } = await supabaseClient.from('rh_grupos_empresas_itens')
+                .insert(_grupoAtual.empresas.map(e => ({ grupo_id: grupoId, codigo_empresa: e.codigo_empresa })));
+            if (errIns) throw errIns;
+        }
+        mostrarMensagem('Sucesso', '✅ Grupo salvo com sucesso!');
+        await carregarGrupos();
+        await selecionarGrupo(grupoId);
+    } catch (erro) {
+        console.error('Erro ao salvar grupo:', erro);
+        mostrarMensagem('Erro', 'Falha ao salvar o grupo: ' + erro.message);
+    }
+}
+
+async function excluirGrupo() {
+    if (!_grupoAtual?.id) return;
+    if (!confirm(`Excluir o grupo "${_grupoAtual.nome_grupo}"?`)) return;
+    try {
+        const { error } = await supabaseClient.from('rh_grupos_empresas').delete().eq('id', _grupoAtual.id);
+        if (error) throw error;
+        _grupoAtual = null;
+        await carregarGrupos();
+        _renderGrupoDetalhe();
+        mostrarMensagem('Sucesso', '✅ Grupo excluído com sucesso!');
+    } catch (erro) {
+        console.error('Erro ao excluir grupo:', erro);
+        mostrarMensagem('Erro', 'Falha ao excluir o grupo: ' + erro.message);
+    }
+}
+
+function _renderGrupoDetalhe() {
+    const container = document.getElementById('grupoDetalhe');
+    if (!container) return;
+    if (!_grupoAtual) {
+        container.innerHTML = '<p style="color: var(--text-secondary); font-size:13px;">Selecione um grupo à esquerda ou clique em "Novo Grupo".</p>';
+        return;
+    }
+    container.innerHTML = `
+        <div class="form-group" style="margin-bottom:14px;">
+            <label>Nome do Grupo</label>
+            <input type="text" id="grpNome" value="${_grupoAtual.nome_grupo.replace(/"/g, '&quot;')}" placeholder="Ex: Grupo Shopping X" style="width:100%; box-sizing:border-box;">
+        </div>
+        <div class="form-group" style="margin-bottom:8px;">
+            <label>Empresas do Grupo</label>
+            <input type="text" id="grpBuscaEmpresa" placeholder="Digite o nome ou código da empresa..." autocomplete="off"
+                oninput="filtrarEmpresasGrupo(this.value)" onfocus="filtrarEmpresasGrupo(this.value)"
+                style="width:100%; box-sizing:border-box; margin-top:4px;">
+        </div>
+        <div id="grpEmpresasList" style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden; margin-bottom:14px;"></div>
+        <div style="display:flex; justify-content:space-between; gap:10px;">
+            ${_grupoAtual.id ? '<button type="button" class="btn btn-danger btn-small" onclick="excluirGrupo()">🗑 Excluir Grupo</button>' : '<span></span>'}
+            <button type="button" class="btn btn-primary btn-small" onclick="salvarGrupo()">💾 Salvar Grupo</button>
+        </div>
+        ${_grupoAtual.id ? `
+        <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;">
+            <h4 style="margin:0 0 10px;">Ações em Lote</h4>
+            <div class="form-group" style="max-width:160px;">
+                <label>Competência</label>
+                <input type="text" id="grpCompetencia" placeholder="MM/AAAA" maxlength="7">
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:10px;">
+                <button type="button" class="btn btn-secondary btn-small" onclick="baixarModelosGrupo()">📥 Baixar Modelos (.zip)</button>
+                <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('grpArquivosLote').click()">📤 Processar em Lote</button>
+                <input type="file" id="grpArquivosLote" multiple accept=".xlsx" style="display:none;" onchange="processarLoteGrupo(this.files)">
+                <button type="button" class="btn btn-secondary btn-small" onclick="abrirExportacaoTxtGrupo()">📄 Exportar TXT do Grupo</button>
+            </div>
+        </div>` : ''}
+    `;
+    _renderGrpEmpresasList();
+    const compEl = document.getElementById('grpCompetencia');
+    if (compEl) compEl.addEventListener('input', e => { e.target.value = formatarCompetencia(e.target.value); });
+}
+
 function abrirModalConfigRubricas() {
     document.getElementById('cfgCodigoEmpresa').value = '';
     document.getElementById('cfgBuscaEmpresa').value = '';
