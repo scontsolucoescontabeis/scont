@@ -522,6 +522,13 @@ function openModalModelo(id) {
   document.getElementById('modelo-tipo').value = 'por_registro';
   document.getElementById('modelo-cabecalho').value = 'completo';
   document.getElementById('modelo-template').innerHTML = '';
+  // Sempre reabre no modo visual, mesmo que tenha ficado no modo HTML da vez anterior.
+  modoHtmlAtivo = false;
+  document.getElementById('modelo-template').style.display = '';
+  document.getElementById('modelo-template-html').style.display = 'none';
+  document.getElementById('modelo-template-html').value = '';
+  document.getElementById('tb-visual-only').style.display = 'contents';
+  document.getElementById('tb-btn-html').textContent = '</> Ver HTML';
   document.querySelectorAll('.fonte-cb').forEach(cb => {
     cb.checked = cb.value === 'empresas' || cb.value === 'empregados';
   });
@@ -643,7 +650,38 @@ function insertVar(varStr) {
   editor.appendChild(node);
 }
 
+// Alterna entre o editor visual (contenteditable) e a edição do HTML bruto —
+// mesma string `template` por baixo, só duas formas de editá-la.
+let modoHtmlAtivo = false;
+
+function toggleModoHtml() {
+  const editor     = document.getElementById('modelo-template');
+  const textarea   = document.getElementById('modelo-template-html');
+  const btn        = document.getElementById('tb-btn-html');
+  const visualOnly = document.getElementById('tb-visual-only');
+
+  if (!modoHtmlAtivo) {
+    textarea.value = editor.innerHTML;
+    editor.style.display = 'none';
+    textarea.style.display = 'block';
+    visualOnly.style.display = 'none';
+    btn.textContent = '✎ Ver Visual';
+    modoHtmlAtivo = true;
+  } else {
+    editor.innerHTML = textarea.value;
+    textarea.style.display = 'none';
+    editor.style.display = '';
+    visualOnly.style.display = 'contents';
+    btn.textContent = '</> Ver HTML';
+    modoHtmlAtivo = false;
+  }
+}
+
 async function salvarModelo() {
+  // Se estiver no modo HTML, sincroniza o textarea de volta pro editor visual antes de ler.
+  if (modoHtmlAtivo) {
+    document.getElementById('modelo-template').innerHTML = document.getElementById('modelo-template-html').value;
+  }
   const nome = document.getElementById('modelo-nome').value.trim();
   if (!nome) { toast('Informe o nome do modelo.', 'error'); return; }
   const template = document.getElementById('modelo-template').innerHTML.trim();

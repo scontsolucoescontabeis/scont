@@ -461,41 +461,47 @@
             <div id="editor-hdr-preview" class="editor-header-preview" style="display:none"></div>
             <!-- Toolbar -->
             <div class="editor-toolbar">
-              <button type="button" class="tb-btn" onclick="document.execCommand('bold')" title="Negrito"><b>N</b></button>
-              <button type="button" class="tb-btn" onclick="document.execCommand('italic')" title="Itálico"><i>I</i></button>
-              <button type="button" class="tb-btn" onclick="document.execCommand('underline')" title="Sublinhado"><u>S</u></button>
+              <span id="tb-visual-only" style="display:contents">
+                <button type="button" class="tb-btn" onclick="document.execCommand('bold')" title="Negrito"><b>N</b></button>
+                <button type="button" class="tb-btn" onclick="document.execCommand('italic')" title="Itálico"><i>I</i></button>
+                <button type="button" class="tb-btn" onclick="document.execCommand('underline')" title="Sublinhado"><u>S</u></button>
+                <div class="tb-sep"></div>
+                <button type="button" class="tb-btn" onclick="document.execCommand('justifyLeft')" title="Alinhar esquerda">⬤≡</button>
+                <button type="button" class="tb-btn" onclick="document.execCommand('justifyCenter')" title="Centralizar">≡</button>
+                <button type="button" class="tb-btn" onclick="document.execCommand('justifyRight')" title="Alinhar direita">≡⬤</button>
+                <button type="button" class="tb-btn" onclick="document.execCommand('justifyFull')" title="Justificar">&#x2261;</button>
+                <div class="tb-sep"></div>
+                <select class="tb-select" title="Tamanho da fonte" onchange="aplicarTamanhoFonte(this.value);this.value=''">
+                  <option value="">Tamanho</option>
+                  <option value="10px">Pequeno (10)</option>
+                  <option value="13px">Normal (13)</option>
+                  <option value="16px">Médio (16)</option>
+                  <option value="20px">Grande (20)</option>
+                  <option value="26px">Extra grande (26)</option>
+                </select>
+                <select class="tb-select" title="Fonte" onchange="aplicarFonte(this.value);this.value=''">
+                  <option value="">Fonte</option>
+                  <option value="'Segoe UI', Arial, sans-serif">Segoe UI (padrão)</option>
+                  <option value="Arial, sans-serif">Arial</option>
+                  <option value="'Times New Roman', serif">Times New Roman</option>
+                  <option value="'Courier New', monospace">Courier New</option>
+                  <option value="Georgia, serif">Georgia</option>
+                </select>
+                <div class="tb-sep"></div>
+                <button type="button" class="tb-btn" onclick="document.execCommand('removeFormat')" title="Limpar formatação">✕ Fmt</button>
+                <div class="tb-sep"></div>
+                <button type="button" class="tb-btn" id="tb-fit-zoom" onclick="toggleFitZoom()" title="Ajustar zoom para caber na janela">⛶ Ajustar</button>
+                <div class="tb-sep"></div>
+                <button type="button" class="tb-btn" id="tb-btn-tabela" onmousedown="event.preventDefault()" onclick="openTablePicker()" title="Inserir tabela">⊞ Tabela</button>
+              </span>
               <div class="tb-sep"></div>
-              <button type="button" class="tb-btn" onclick="document.execCommand('justifyLeft')" title="Alinhar esquerda">⬤≡</button>
-              <button type="button" class="tb-btn" onclick="document.execCommand('justifyCenter')" title="Centralizar">≡</button>
-              <button type="button" class="tb-btn" onclick="document.execCommand('justifyRight')" title="Alinhar direita">≡⬤</button>
-              <button type="button" class="tb-btn" onclick="document.execCommand('justifyFull')" title="Justificar">&#x2261;</button>
-              <div class="tb-sep"></div>
-              <select class="tb-select" title="Tamanho da fonte" onchange="aplicarTamanhoFonte(this.value);this.value=''">
-                <option value="">Tamanho</option>
-                <option value="10px">Pequeno (10)</option>
-                <option value="13px">Normal (13)</option>
-                <option value="16px">Médio (16)</option>
-                <option value="20px">Grande (20)</option>
-                <option value="26px">Extra grande (26)</option>
-              </select>
-              <select class="tb-select" title="Fonte" onchange="aplicarFonte(this.value);this.value=''">
-                <option value="">Fonte</option>
-                <option value="'Segoe UI', Arial, sans-serif">Segoe UI (padrão)</option>
-                <option value="Arial, sans-serif">Arial</option>
-                <option value="'Times New Roman', serif">Times New Roman</option>
-                <option value="'Courier New', monospace">Courier New</option>
-                <option value="Georgia, serif">Georgia</option>
-              </select>
-              <div class="tb-sep"></div>
-              <button type="button" class="tb-btn" onclick="document.execCommand('removeFormat')" title="Limpar formatação">✕ Fmt</button>
-              <div class="tb-sep"></div>
-              <button type="button" class="tb-btn" id="tb-fit-zoom" onclick="toggleFitZoom()" title="Ajustar zoom para caber na janela">⛶ Ajustar</button>
-              <div class="tb-sep"></div>
-              <button type="button" class="tb-btn" id="tb-btn-tabela" onmousedown="event.preventDefault()" onclick="openTablePicker()" title="Inserir tabela">⊞ Tabela</button>
+              <button type="button" class="tb-btn" id="tb-btn-html" onclick="toggleModoHtml()" title="Alternar entre editor visual e código-fonte HTML">&lt;/&gt; Ver HTML</button>
             </div>
             <!-- Área editável -->
             <div id="modelo-template" class="editor-content" contenteditable="true"
               data-placeholder="Digite aqui o conteúdo do modelo… Ex: Contrato firmado entre {{empresa.nome_empresa}} e {{empregado.nome_empregado}}."></div>
+            <!-- Editor de código-fonte HTML (alternativa ao editor visual) -->
+            <textarea id="modelo-template-html" class="editor-content" style="display:none;width:100%;box-sizing:border-box;border:none;outline:none;font-family:'Courier New',monospace;font-size:12px;white-space:pre;resize:vertical;" spellcheck="false" placeholder="Escreva o HTML do modelo diretamente aqui…"></textarea>
           </div>
         </div>
       </div>
