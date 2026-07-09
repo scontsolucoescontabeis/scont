@@ -3187,6 +3187,262 @@ async function gerarArquivoTXT() {
     }
 }
 
+// ===== GERAR BENEFÍCIOS (VT/VA) =====
+
+function _atualizarLabelMesPagamentoBeneficios() {
+    const comp = document.getElementById('beneficiosCompetencia').value;
+    const info = document.getElementById('beneficiosMesPagamentoInfo');
+    if (!info) return;
+    if (!validarCompetencia(comp)) { info.textContent = ''; return; }
+    const [mes, ano] = comp.split('/').map(Number);
+    const mesPag = mes === 12 ? 1 : mes + 1;
+    const anoPag = mes === 12 ? ano + 1 : ano;
+    info.textContent = `O benefício correspondente é pago em ${String(mesPag).padStart(2, '0')}/${anoPag}.`;
+}
+
+function _iniciarTelaBeneficios() {
+    document.getElementById('beneficiosPreviaContainer').style.display = 'none';
+    document.getElementById('beneficiosPreviaBody').innerHTML = '';
+    document.getElementById('beneficiosBuscaEmpresa').value = '';
+    _atualizarLabelMesPagamentoBeneficios();
+    _renderizarListaEmpresasBeneficios(state.empresas);
+}
+
+function _renderizarListaEmpresasBeneficios(empresas) {
+    const container = document.getElementById('beneficiosListaEmpresas');
+    if (!empresas || empresas.length === 0) {
+        container.innerHTML = '<span style="font-size:12px;color:var(--text-secondary);">Nenhuma empresa encontrada.</span>';
+        return;
+    }
+    container.innerHTML = empresas.map(e => `
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+            <input type="checkbox" class="beneficios-emp-check" value="${e.codigo_empresa}">
+            <span style="font-family:monospace; color:var(--primary-color); font-weight:600;">${e.codigo_empresa}</span> ${e.nome_empresa}
+        </label>
+    `).join('');
+}
+
+function _filtrarListaEmpresasBeneficios() {
+    const termo = (document.getElementById('beneficiosBuscaEmpresa').value || '').toLowerCase().trim();
+    const marcados = new Set(Array.from(document.querySelectorAll('.beneficios-emp-check:checked')).map(cb => cb.value));
+    const lista = termo
+        ? state.empresas.filter(e => e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo))
+        : state.empresas;
+    _renderizarListaEmpresasBeneficios(lista);
+    marcados.forEach(codigo => {
+        const cb = document.querySelector(`.beneficios-emp-check[value="${codigo}"]`);
+        if (cb) cb.checked = true;
+    });
+}
+
+function _selecionarTodasEmpresasBeneficios(marcar) {
+    document.querySelectorAll('.beneficios-emp-check').forEach(cb => { cb.checked = marcar; });
+}
+
+function _estimarDiasUteis5x2(competencia) {
+    return gerarDiasDoMes(competencia).filter(d => {
+        if (d.diaSemana === 'Sab' || d.diaSemana === 'Dom') return false;
+        const isFeriado = state.feriados.some(f => f.data === d.data || f.data === d.data.substring(0, 5));
+        return !isFeriado;
+    }).length;
+}
+
+function _feriasNoMes(periodos, competencia) {
+    if (!periodos || periodos.length === 0) return false;
+    const [mes, ano] = competencia.split('/');
+    const inicioMes = `${ano}-${mes}-01`;
+    const ultimoDia = new Date(Number(ano), Number(mes), 0).getDate();
+    const fimMes = `${ano}-${mes}-${String(ultimoDia).padStart(2, '0')}`;
+    return periodos.some(p => p.inicio <= fimMes && p.fim >= inicioMes);
+}
+
+// Recomputo simplificado (só contagem de dias) sobre uma Folha de Ponto já salva,
+// mesmo critério de dia útil/desconto usado em _construirConteudoTXTExportacao.
+function _calcularDiasFolhaSalva(save) {
+    const feriados = JSON.parse(save.feriados_json || '[]');
+    const dsrDias = JSON.parse(save.dsr_dias || '[]');
+    const flagsFolga = JSON.parse(save.flags_folga || '{}');
+    const dados = JSON.parse(save.dados_json || '[]');
+    let diasTrabalhar = 0, diasDescontar = 0;
+    dados.forEach(dia => {
+        const isFeriado = feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
+        const isDSR = dsrDias.includes(dia.data);
+        if (!(isFeriado || isDSR)) diasTrabalhar++;
+        const flag = flagsFolga[dia.data];
+        if (flag === 'falta' || flag === 'atestado') diasDescontar++;
+    });
+    return { diasTrabalhar, diasDescontar };
+}
+
+async function gerarPreviaBeneficios() {
+    const comp = document.getElementById('beneficiosCompetencia').value;
+    if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe uma competência válida (MM/AAAA).'); return; }
+    const codigosEmpresas = Array.from(document.querySelectorAll('.beneficios-emp-check:checked')).map(cb => cb.value);
+    if (codigosEmpresas.length === 0) { mostrarMensagem('Aviso', 'Selecione pelo menos uma empresa.'); return; }
+
+    mostrarMensagem('Aguarde', 'Calculando prévia de benefícios...');
+    try {
+        const [
+            { data: empresasData, error: errEmp },
+            { data: empregadosData, error: errFunc },
+            { data: valoresData, error: errVal },
+            { data: feriasData, error: errFer },
+            { data: savesData, error: errSaves },
+        ] = await Promise.all([
+            supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, cnpj').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, situacao, tipo_empregado').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_valores_va_vt').select('codigo_empresa, codigo_empregado, valor_vt, valor_va').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_ferias_calculadas').select('codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_saves').select('*').in('empresa_codigo', codigosEmpresas).eq('competencia', comp).order('data_criacao', { ascending: false }),
+        ]);
+        if (errEmp) throw errEmp;
+        if (errFunc) throw errFunc;
+        if (errVal) throw errVal;
+        if (errFer) throw errFer;
+        if (errSaves) throw errSaves;
+
+        const empresasMapa = {};
+        (empresasData || []).forEach(e => { empresasMapa[e.codigo_empresa] = e; });
+
+        const valoresMapa = {};
+        (valoresData || []).forEach(v => {
+            valoresMapa[`${v.codigo_empresa}_${v.codigo_empregado}`] = { vt: Number(v.valor_vt) || 0, va: Number(v.valor_va) || 0 };
+        });
+
+        const feriasMapa = {};
+        (feriasData || []).forEach(f => {
+            const chave = `${f.codigo_empresa}_${f.codigo_empregado}`;
+            (feriasMapa[chave] ??= []).push({ inicio: f.ferias_inicio, fim: f.ferias_fim });
+        });
+
+        // última versão salva por (empresa, nome do trabalhador) — mesmo critério da Exportação TXT
+        const savesMapa = {};
+        (savesData || []).forEach(s => {
+            const chave = `${s.empresa_codigo}_${s.nome_trabalhador}`;
+            if (!savesMapa[chave]) savesMapa[chave] = s;
+        });
+
+        const estimativa5x2 = _estimarDiasUteis5x2(comp);
+
+        const empregadosFiltrados = (empregadosData || []).filter(e =>
+            (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() !== 'Contribuinte'
+        );
+
+        if (empregadosFiltrados.length === 0) {
+            fecharModalMensagem();
+            mostrarMensagem('Aviso', 'Nenhum empregado (situação "Trabalhando") encontrado para as empresas selecionadas.');
+            document.getElementById('beneficiosPreviaContainer').style.display = 'none';
+            return;
+        }
+
+        const linhas = empregadosFiltrados.map(emp => {
+            const save = savesMapa[`${emp.codigo_empresa}_${emp.nome_empregado}`];
+            let diasTrabalhar, diasDescontar;
+            if (save) {
+                const calc = _calcularDiasFolhaSalva(save);
+                diasTrabalhar = calc.diasTrabalhar;
+                diasDescontar = calc.diasDescontar;
+            } else {
+                diasTrabalhar = estimativa5x2;
+                diasDescontar = 0;
+            }
+            const valores = valoresMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || { vt: 0, va: 0 };
+            const periodos = feriasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`];
+            const empresa = empresasMapa[emp.codigo_empresa] || { nome_empresa: emp.codigo_empresa, cnpj: '' };
+            return {
+                codigo_empresa: emp.codigo_empresa,
+                nome_empresa: empresa.nome_empresa,
+                cnpj: empresa.cnpj || '',
+                codigo_empregado: emp.codigo_empregado,
+                nome_empregado: emp.nome_empregado,
+                desc_cargo: emp.desc_cargo || '',
+                temFerias: _feriasNoMes(periodos, comp),
+                diasTrabalhar,
+                diasDescontar,
+                vtDiario: valores.vt,
+                vaDiario: valores.va,
+            };
+        });
+
+        linhas.sort((a, b) => (a.nome_empresa + a.nome_empregado).localeCompare(b.nome_empresa + b.nome_empregado));
+
+        fecharModalMensagem();
+        state._beneficiosLinhas = linhas;
+        _renderizarPreviaBeneficios(linhas);
+    } catch (erro) {
+        console.error('Erro ao gerar prévia de benefícios:', erro);
+        fecharModalMensagem();
+        mostrarMensagem('Erro', 'Falha ao gerar a prévia: ' + erro.message);
+    }
+}
+
+function _renderizarPreviaBeneficios(linhas) {
+    const tbody = document.getElementById('beneficiosPreviaBody');
+    const container = document.getElementById('beneficiosPreviaContainer');
+    const info = document.getElementById('beneficiosPreviaInfo');
+
+    info.textContent = `${linhas.length} empregado(s)`;
+    tbody.innerHTML = linhas.map((l, i) => {
+        const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
+        return `
+        <tr data-idx="${i}">
+            <td style="padding:6px 8px;">${l.codigo_empresa} - ${l.nome_empresa}</td>
+            <td style="padding:6px 8px;">${l.codigo_empregado} - ${l.nome_empregado}</td>
+            <td style="padding:6px 8px;">${l.desc_cargo}</td>
+            <td style="padding:6px 8px; text-align:center;" title="${l.temFerias ? 'Possui férias sobrepondo a competência' : ''}">${l.temFerias ? '🏖️' : ''}</td>
+            <td style="padding:6px 8px; text-align:center;"><input type="number" min="0" class="ben-dias-trabalhar" value="${l.diasTrabalhar}" style="width:60px;" oninput="_recalcularLinhaBeneficios(${i})"></td>
+            <td style="padding:6px 8px; text-align:center;"><input type="number" min="0" class="ben-dias-descontar" value="${l.diasDescontar}" style="width:60px;" oninput="_recalcularLinhaBeneficios(${i})"></td>
+            <td style="padding:6px 8px; text-align:center;" class="ben-dias-pagar">${diasPagar}</td>
+            <td style="padding:6px 8px; text-align:center;">${l.vtDiario ? l.vtDiario.toFixed(2).replace('.', ',') : ''}</td>
+            <td style="padding:6px 8px; text-align:center;">${l.vaDiario ? l.vaDiario.toFixed(2).replace('.', ',') : ''}</td>
+            <td style="padding:6px 8px; text-align:center;" class="ben-vt-mensal">${(diasPagar * l.vtDiario).toFixed(2).replace('.', ',')}</td>
+            <td style="padding:6px 8px; text-align:center;" class="ben-va-mensal">${(diasPagar * l.vaDiario).toFixed(2).replace('.', ',')}</td>
+        </tr>`;
+    }).join('');
+    container.style.display = 'block';
+}
+
+function _recalcularLinhaBeneficios(idx) {
+    const tr = document.querySelector(`#beneficiosPreviaBody tr[data-idx="${idx}"]`);
+    const linha = state._beneficiosLinhas?.[idx];
+    if (!tr || !linha) return;
+    const diasTrabalhar = parseInt(tr.querySelector('.ben-dias-trabalhar').value, 10) || 0;
+    const diasDescontar = parseInt(tr.querySelector('.ben-dias-descontar').value, 10) || 0;
+    const diasPagar = Math.max(0, diasTrabalhar - diasDescontar);
+    linha.diasTrabalhar = diasTrabalhar;
+    linha.diasDescontar = diasDescontar;
+    tr.querySelector('.ben-dias-pagar').textContent = diasPagar;
+    tr.querySelector('.ben-vt-mensal').textContent = (diasPagar * linha.vtDiario).toFixed(2).replace('.', ',');
+    tr.querySelector('.ben-va-mensal').textContent = (diasPagar * linha.vaDiario).toFixed(2).replace('.', ',');
+}
+
+function exportarBeneficiosExcel() {
+    const linhas = state._beneficiosLinhas || [];
+    if (linhas.length === 0) { mostrarMensagem('Aviso', 'Gere a prévia antes de exportar.'); return; }
+
+    const cabecalho = ['Cód Emp', 'NOME', 'CNPJ', 'Cód Epr', 'Nome', 'Descrição cargo', 'DIAS', 'DESCONTAR', 'DIAS A PAGAR', 'VT DIARIO', 'VA DIARIO', 'VT MENSAL', 'VA MENSAL'];
+    const linhasExcel = linhas.map(l => {
+        const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
+        return [
+            l.codigo_empresa, l.nome_empresa, l.cnpj, l.codigo_empregado, l.nome_empregado, l.desc_cargo,
+            l.diasTrabalhar, l.diasDescontar, diasPagar,
+            l.vtDiario || '', l.vaDiario || '',
+            Number((diasPagar * l.vtDiario).toFixed(2)), Number((diasPagar * l.vaDiario).toFixed(2))
+        ];
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([cabecalho, ...linhasExcel]);
+    ws['!cols'] = [10, 28, 20, 10, 28, 22, 8, 10, 12, 10, 10, 12, 12].map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, 'Empregados');
+
+    const comp = document.getElementById('beneficiosCompetencia').value;
+    const [mes, ano] = comp.split('/').map(Number);
+    const mesPag = mes === 12 ? 1 : mes + 1;
+    const anoPag = mes === 12 ? ano + 1 : ano;
+    XLSX.writeFile(wb, `Beneficios_VT_VA_${String(mesPag).padStart(2, '0')}${anoPag}_${Date.now()}.xlsx`);
+}
+
 // --- NAVEGAÇÃO E UTILITÁRIOS ---
 function atualizarBannerObservacoes() {
     const obsBanner = document.getElementById('empresaObservacoesBanner');
@@ -3200,15 +3456,17 @@ function mostrarTela(telaId) {
     document.getElementById('mainScreen').style.display = 'none';
     document.getElementById('resultsScreen').style.display = 'none';
     document.getElementById('gruposScreen').style.display = 'none';
+    document.getElementById('beneficiosScreen').style.display = 'none';
     document.getElementById(telaId).style.display = 'block';
     if (telaId === 'gruposScreen') carregarGrupos();
+    if (telaId === 'beneficiosScreen') _iniciarTelaBeneficios();
 
     const pageHeader = document.getElementById('pageHeader');
-    if (pageHeader) pageHeader.style.display = (telaId === 'selectionScreen' || telaId === 'gruposScreen') ? 'none' : 'block';
+    if (pageHeader) pageHeader.style.display = (telaId === 'selectionScreen' || telaId === 'gruposScreen' || telaId === 'beneficiosScreen') ? 'none' : 'block';
 
     const sub = document.getElementById('pageHeaderSub');
     if (sub) {
-        if (telaId !== 'selectionScreen' && telaId !== 'gruposScreen' && state.empresaSelecionada) {
+        if (telaId !== 'selectionScreen' && telaId !== 'gruposScreen' && telaId !== 'beneficiosScreen' && state.empresaSelecionada) {
             sub.textContent = `🏢 ${state.empresaSelecionada.codigo_empresa} — ${state.empresaSelecionada.nome_empresa}  ·  📅 ${state.competencia}`;
         } else {
             sub.textContent = 'Selecione a competência e empresa para começar';
@@ -3216,7 +3474,7 @@ function mostrarTela(telaId) {
     }
 
     atualizarBannerObservacoes();
-    if (telaId === 'gruposScreen') {
+    if (telaId === 'gruposScreen' || telaId === 'beneficiosScreen') {
         const obsBanner = document.getElementById('empresaObservacoesBanner');
         if (obsBanner) obsBanner.style.display = 'none';
     }

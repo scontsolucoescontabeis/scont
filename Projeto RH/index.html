@@ -47,6 +47,9 @@
         <button class="sidebar-item" onclick="mostrarTela('gruposScreen')">
             <span class="sidebar-item-icon">👥</span> Grupos de Empresas
         </button>
+        <button class="sidebar-item" onclick="mostrarTela('beneficiosScreen')">
+            <span class="sidebar-item-icon">🍽️</span> Gerar Benefícios
+        </button>
     </nav>
 
     <div class="sidebar-footer">
@@ -251,6 +254,65 @@
                 </div>
                 <div style="flex: 1 1 420px; border:1px solid var(--border-color); border-radius:8px; padding:16px;" id="grupoDetalhe">
                     <p style="color: var(--text-secondary); font-size:13px;">Selecione um grupo à esquerda ou clique em "Novo Grupo".</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TELA DE GERAR BENEFÍCIOS (VT/VA) -->
+        <div id="beneficiosScreen" style="display: none;">
+            <div style="margin-bottom:20px;">
+                <h2 style="color: var(--primary-color); margin:0;">🍽️ Gerar Benefícios (VT/VA)</h2>
+                <p style="color: var(--text-secondary); font-size:13px; margin-top:6px;">
+                    Gera as informações de VT/VA a pagar por empregado a partir da competência trabalhada, dos valores
+                    diários configurados e dos dias a trabalhar/descontar (pré-calculados quando há Folha de Ponto salva
+                    para a competência, sempre editáveis).
+                </p>
+            </div>
+
+            <div style="border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:16px;">
+                <div class="form-group" style="max-width:220px;">
+                    <label for="beneficiosCompetencia">Competência de referência (mês trabalhado)</label>
+                    <input type="text" id="beneficiosCompetencia" placeholder="MM/AAAA" maxlength="7"
+                        oninput="this.value = formatarCompetencia(this.value); _atualizarLabelMesPagamentoBeneficios();">
+                </div>
+                <p id="beneficiosMesPagamentoInfo" style="font-size:12px; color: var(--text-secondary); margin:4px 0 16px;"></p>
+
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+                    <label style="font-weight:600; font-size:13px; color: var(--text-primary); margin:0;">Empresas</label>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="_selecionarTodasEmpresasBeneficios(true)">Todas</button>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="_selecionarTodasEmpresasBeneficios(false)">Nenhuma</button>
+                    <input type="text" id="beneficiosBuscaEmpresa" placeholder="🔍 Buscar empresa..." style="flex:1; min-width:180px;"
+                        oninput="_filtrarListaEmpresasBeneficios()">
+                </div>
+                <div id="beneficiosListaEmpresas" style="max-height:180px; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px; padding:8px 12px; display:flex; flex-direction:column; gap:4px;"></div>
+
+                <button type="button" class="btn btn-primary" style="margin-top:16px;" onclick="gerarPreviaBeneficios()">🔎 Gerar Prévia</button>
+            </div>
+
+            <div id="beneficiosPreviaContainer" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+                    <span id="beneficiosPreviaInfo" style="font-size:13px; color: var(--text-secondary);"></span>
+                    <button type="button" class="btn btn-primary" onclick="exportarBeneficiosExcel()">📥 Gerar Excel</button>
+                </div>
+                <div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px; white-space:nowrap;">
+                        <thead>
+                            <tr style="background: var(--background-color);">
+                                <th style="padding:8px; text-align:left;">Empresa</th>
+                                <th style="padding:8px; text-align:left;">Empregado</th>
+                                <th style="padding:8px; text-align:left;">Cargo</th>
+                                <th style="padding:8px; text-align:center;">Férias</th>
+                                <th style="padding:8px; text-align:center;">Dias a Trabalhar</th>
+                                <th style="padding:8px; text-align:center;">Dias a Descontar</th>
+                                <th style="padding:8px; text-align:center;">Dias a Pagar</th>
+                                <th style="padding:8px; text-align:center;">VT Diário</th>
+                                <th style="padding:8px; text-align:center;">VA Diário</th>
+                                <th style="padding:8px; text-align:center;">VT Mensal</th>
+                                <th style="padding:8px; text-align:center;">VA Mensal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="beneficiosPreviaBody"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
