@@ -13,7 +13,6 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let planilhaData      = []; // [{nome, funcao, colunas: {colNome: valorBruto}}]
 let funcionariosMap   = {}; // nome_normalizado → codigo_empregado
 let rubricasConfig    = []; // [{coluna_planilha, codigo_rubrica, tipo_processo, tipo_valor, descricao}]
-let rhRubricasData    = []; // [{descricao_rubrica, codigo_rubrica}] — fallback de resolução
 let linhasTxt         = []; // linhas válidas para o TXT
 let tipoFolhaAtual    = '11'; // tipo_folha pré-selecionado no modal de TXT
 let empregadosConfig  = {}; // nome_normalizado → codigo_empregado (config desta ferramenta)
@@ -234,14 +233,6 @@ async function carregarRubricas() {
         .eq('ativo', true);
     if (cfgErr) throw cfgErr;
     rubricasConfig = cfgData || [];
-
-    // Fallback: rh_rubricas (somente para resolução fuzzy quando não há config)
-    const { data: rhData, error: rhErr } = await supabaseClient
-        .from('rh_rubricas')
-        .select('descricao_rubrica, codigo_rubrica')
-        .eq('codigo_empresa', CODIGO_EMPRESA);
-    if (rhErr) throw rhErr;
-    rhRubricasData = rhData || [];
 }
 
 // Resolve rubrica para um cabeçalho de coluna do Excel
@@ -267,16 +258,6 @@ function resolverColuna(header) {
     }
     if (melhorScore >= 0.80 && melhorCfg) {
         return { codigo_rubrica: melhorCfg.codigo_rubrica, tipo_valor: melhorCfg.tipo_valor, descricao: melhorCfg.descricao || header, fonte: 'config', valor_cota: melhorCfg.valor_cota || null };
-    }
-
-    // 3. Fuzzy match em rh_rubricas (fallback — tipo_valor desconhecido)
-    melhorScore = 0; let melhorRh = null;
-    for (const rh of rhRubricasData) {
-        const s = similaridade(header, rh.descricao_rubrica || '');
-        if (s > melhorScore) { melhorScore = s; melhorRh = rh; }
-    }
-    if (melhorScore >= 0.65 && melhorRh) {
-        return { codigo_rubrica: melhorRh.codigo_rubrica, tipo_valor: 'monetario', descricao: header, fonte: 'rh_rubricas', valor_cota: null };
     }
 
     return { codigo_rubrica: null, tipo_valor: null, descricao: header, fonte: null, valor_cota: null };
@@ -473,9 +454,7 @@ function renderizarRelatorio(linhas) {
         const fonteTag = !semRubrica && !ignorada
             ? (l.fonteRubrica === 'associacao'
                 ? '<span style="font-size:10px;color:var(--primary-color);margin-left:4px;" title="Associação da ferramenta">★</span>'
-                : l.fonteRubrica === 'rh_rubricas'
-                    ? '<span style="font-size:10px;color:#27AE60;margin-left:4px;" title="Código de rh_rubricas">●</span>'
-                    : '<span style="font-size:10px;color:#E67E22;margin-left:4px;" title="Config da empresa">○</span>')
+                : '<span style="font-size:10px;color:#E67E22;margin-left:4px;" title="Config da empresa">○</span>')
             : '';
 
         const tipoValorDisplay = !semRubrica && !ignorada

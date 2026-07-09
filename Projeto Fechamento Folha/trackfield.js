@@ -65,7 +65,6 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let planilhaData    = [];
 let funcionariosMap = {};
 let rubricasConfig  = [];
-let rhRubricasData  = [];
 let linhasTxt       = [];
 let linhasRelatorio = [];
 let tipoFolhaAtual  = '11';
@@ -373,21 +372,22 @@ async function carregarRubricas() {
         .eq('ativo', true);
     if (cfgErr) throw cfgErr;
     rubricasConfig = cfgData || [];
-
-    rhRubricasData = []; // carregado apenas na tela de configurações, não durante o processamento
 }
 
-function resolverColuna(header) {
+// Resolve rubrica para um cabeçalho de coluna — estritamente dentro da loja informada
+// (cada loja tem seu próprio cadastro em fechamento_rubricas_config; não há fallback genérico entre lojas)
+function resolverColuna(header, empresa) {
     const normH = normalizarNome(header);
+    const config = empresa ? rubricasConfig.filter(c => c.codigo_empresa === empresa) : [];
 
-    const exato = rubricasConfig.find(c =>
+    const exato = config.find(c =>
         normalizarNome(c.coluna_planilha) === normH ||
         normalizarNome(c.descricao || '') === normH
     );
     if (exato) return { codigo_rubrica: exato.codigo_rubrica, tipo_valor: exato.tipo_valor, descricao: exato.descricao || header, fonte: 'config', tipo_processo: exato.tipo_processo };
 
     let melhorScore = 0, melhorCfg = null;
-    for (const c of rubricasConfig) {
+    for (const c of config) {
         const s = Math.max(
             similaridade(normH, normalizarNome(c.coluna_planilha)),
             similaridade(normH, normalizarNome(c.descricao || ''))
@@ -470,7 +470,7 @@ async function processarPlanilha() {
             if (i <= COL_COLABORADOR) return; // LOJA, CARGO, ADMISSÃO, COLABORADOR — não são rubricas
             const header = String(h || '').trim();
             if (!header) return;
-            colunasRubrica.push({ idx: i, header, resolucao: resolverColuna(header) });
+            colunasRubrica.push({ idx: i, header });
         });
 
         // Dados: a partir da linha 4 (índice 3)
@@ -537,9 +537,11 @@ function construirRelatorio(comp) {
         const codEmpregado = buscarCodigoEmpregado(func.nome, codEmpresaDB);
         if (!codEmpregado) temSemMatch = true;
 
-        colunasRubrica.forEach(({ header, resolucao }) => {
+        colunasRubrica.forEach(({ header }) => {
             const bruto = func.colunas[header] || '';
             if (!bruto) return;
+
+            const resolucao = resolverColuna(header, codEmpresaDB);
 
             // Expande célula com múltiplos dias em linhas individuais
             if (isDomingoFeriado(header)) {
@@ -613,9 +615,7 @@ function renderizarRelatorio(linhas) {
         const precisaClassificar87 = ('tipo87' in l) && l.tipo87 === null;
 
         const fonteTag = !semRubrica && !ignorada
-            ? (l.fonteRubrica === 'config'
-                ? '<span style="font-size:10px;color:var(--primary-color);margin-left:4px;" title="Associação da ferramenta">★</span>'
-                : '<span style="font-size:10px;color:#7F8C8D;margin-left:4px;" title="rh_rubricas (fallback)">◎</span>')
+            ? '<span style="font-size:10px;color:var(--primary-color);margin-left:4px;" title="Associação da ferramenta">★</span>'
             : '';
 
         const tipo87Badge = ('tipo87' in l) && l.tipo87
@@ -859,15 +859,13 @@ function classificar87(idx, tipo) {
         : (tipo === 'domingo' ? COL_DOM        : COL_FER);
     l.coluna = novaColuna;
 
-    // Lookup EXATO com preferência pela empresa da linha — evita retornar entrada antiga de 'TF'
-    const normCol    = normalizarNome(novaColuna);
-    const empresaLinha = l.codEmpresa || CODIGO_EMPRESA;
-    const cfg = rubricasConfig.find(c => normalizarNome(c.coluna_planilha) === normCol && c.codigo_empresa === empresaLinha)
-             || rubricasConfig.find(c => normalizarNome(c.coluna_planilha) === normCol);
-    l.codigoRubrica = cfg?.codigo_rubrica || null;
-    l.fonteRubrica  = cfg ? 'config' : null;
-    l.descricao     = cfg?.descricao || novaColuna;
-    l.tipoProcesso  = cfg?.tipo_processo || '11';
+    // Lookup estritamente dentro da empresa (loja) da linha — sem fallback para outra loja
+    const empresaLinha = l.codEmpresa || null;
+    const res = resolverColuna(novaColuna, empresaLinha);
+    l.codigoRubrica = res.codigo_rubrica;
+    l.fonteRubrica  = res.fonte;
+    l.descricao     = res.descricao || novaColuna;
+    l.tipoProcesso  = res.tipo_processo || '11';
     // tipoValor e valorInt preservados conforme _tipoValorDomFer (87,00→inteiro/100; outros→monetario/centavos)
 
     renderizarRelatorio(linhasRelatorio);
@@ -948,13 +946,21 @@ async function salvarRubricaInline(idx) {
         return;
     }
 
-    const coluna = linhasRelatorio[idx].coluna;
+    const linha       = linhasRelatorio[idx];
+    const coluna      = linha.coluna;
+    const empresaLinha = linha.codEmpresa || null;
+
+    if (!empresaLinha) {
+        statusEl.textContent = '⚠ Loja da linha não identificada.';
+        statusEl.style.color = '#E74C3C';
+        return;
+    }
 
     try {
         const { error } = await supabaseClient
             .from('fechamento_rubricas_config')
             .upsert([{
-                codigo_empresa:  CODIGO_EMPRESA,
+                codigo_empresa:  empresaLinha,
                 coluna_planilha: coluna,
                 descricao:       coluna,
                 codigo_rubrica:  codigo,
@@ -964,9 +970,18 @@ async function salvarRubricaInline(idx) {
             }], { onConflict: 'codigo_empresa,coluna_planilha' });
         if (error) throw error;
 
-        // Atualizar todas as linhas com essa mesma coluna
+        rubricasConfig.push({
+            coluna_planilha: coluna,
+            codigo_rubrica:  codigo,
+            tipo_processo:   '11',
+            tipo_valor:      tipoValor,
+            descricao:       coluna,
+            codigo_empresa:  empresaLinha,
+        });
+
+        // Atualizar apenas as linhas dessa mesma coluna e mesma loja
         linhasRelatorio.forEach(l => {
-            if (l.coluna !== coluna) return;
+            if (l.coluna !== coluna || l.codEmpresa !== empresaLinha) return;
             l.codigoRubrica = codigo;
             l.fonteRubrica  = 'config';
             // Linhas tipo87 mantêm tipoValor/valorInt definidos por _tipoValorDomFer
@@ -974,14 +989,6 @@ async function salvarRubricaInline(idx) {
                 l.tipoValor = tipoValor;
                 l.valorInt  = tipoValor !== 'booleano' ? valorParaTxt(l.bruto, tipoValor, coluna) : 0;
             }
-        });
-
-        planilhaData.forEach(f => {
-            f.colunasRubrica.forEach(cr => {
-                if (cr.header === coluna) {
-                    cr.resolucao = { codigo_rubrica: codigo, tipo_valor: tipoValor, descricao: coluna, fonte: 'config' };
-                }
-            });
         });
 
         renderizarRelatorio(linhasRelatorio);
@@ -1123,8 +1130,34 @@ function fecharModalDescontoForm() {
     document.getElementById('modalDescontoForm').classList.remove('active');
 }
 
+// `planilhaData` só é populado por processarPlanilha() (upload de Excel na mesma
+// sessão). O fluxo normal de trabalho (abrir um envio da fila) passa por
+// processarEnvio() → recarregarPlanilha() ou processarDadosFormulario(), nenhum
+// dos quais preenche planilhaData — só linhasRelatorio, que por isso é a única
+// fonte confiável de "quem está presente nesta folha" nos três fluxos.
+function _rosterParaDesconto() {
+    if (planilhaData.length > 0) {
+        return planilhaData.map(f => ({
+            codEmpresa: codigoEmpresaPorLoja(f.loja),
+            nome: f.nome,
+            codEmpregado: buscarCodigoEmpregado(f.nome, codigoEmpresaDBPorLoja(f.loja)),
+        }));
+    }
+    const vistos = new Set();
+    const roster = [];
+    linhasRelatorio.forEach(l => {
+        if (!l.codEmpresa || !l.nome) return;
+        const chave = `${l.codEmpresa}|${l.nome}`;
+        if (vistos.has(chave)) return;
+        vistos.add(chave);
+        roster.push({ codEmpresa: l.codEmpresa, nome: l.nome, codEmpregado: l.codEmpregado });
+    });
+    return roster;
+}
+
 function popularSelectDescontoEmpresa() {
-    const codigosPresentes = [...new Set(planilhaData.map(f => codigoEmpresaPorLoja(f.loja)))]
+    const roster = _rosterParaDesconto();
+    const codigosPresentes = [...new Set(roster.map(r => r.codEmpresa))]
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     const sel = document.getElementById('descEmpresa');
     sel.innerHTML = '<option value="">Selecione...</option>' + codigosPresentes.map(cod => {
@@ -1138,9 +1171,9 @@ function popularSelectDescontoEmpregado() {
     const cod = document.getElementById('descEmpresa').value;
     const sel = document.getElementById('descEmpregado');
     if (!cod) { sel.innerHTML = '<option value="">Selecione a empresa primeiro</option>'; return; }
-    const empregados = planilhaData
-        .filter(f => codigoEmpresaPorLoja(f.loja) === cod)
-        .map(f => ({ nome: f.nome, codigo: buscarCodigoEmpregado(f.nome, codigoEmpresaDBPorLoja(f.loja)) }))
+    const empregados = _rosterParaDesconto()
+        .filter(r => r.codEmpresa === cod)
+        .map(r => ({ nome: r.nome, codigo: r.codEmpregado }))
         .filter((e, i, arr) => arr.findIndex(x => x.nome === e.nome) === i)
         .sort((a, b) => a.nome.localeCompare(b.nome));
     sel.innerHTML = empregados.map(e =>
@@ -1520,11 +1553,7 @@ async function processarDadosFormulario(envioRow) {
     document.getElementById('labelCompetencia2').textContent = 'Competência: ' + label;
     document.getElementById('labelCompetencia3').textContent = 'Competência: ' + label;
 
-    const colunasRubrica = Object.entries(CAMPO_PARA_HEADER).map(([campo, header]) => ({
-        campo,
-        header,
-        resolucao: resolverColuna(header) || { codigo_rubrica: null, tipo_valor: null, descricao: header, fonte: null, tipo_processo: null },
-    }));
+    const colunasRubrica = Object.entries(CAMPO_PARA_HEADER).map(([campo, header]) => ({ campo, header }));
 
     linhasRelatorio = [];
     linhasTxt       = [];
@@ -1536,9 +1565,11 @@ async function processarDadosFormulario(envioRow) {
         const codEmpregado = buscarCodigoEmpregado(emp.colaborador || emp.nome || '', codEmpresaDB);
         if (!codEmpregado) temSemMatch = true;
 
-        colunasRubrica.forEach(({ campo, header, resolucao }) => {
+        colunasRubrica.forEach(({ campo, header }) => {
             const bruto = emp[campo];
             if (bruto === '' || bruto == null) return;
+
+            const resolucao = resolverColuna(header, codEmpresaDB);
 
             // Expande célula com múltiplos dias em linhas individuais
             if (isDomingoFeriado(header)) {
@@ -1598,7 +1629,7 @@ async function processarDadosFormulario(envioRow) {
 
         // Campos de texto extra (observacoes) como informativos, se houver rubrica mapeada
         if (emp.observacoes) {
-            const resObs = resolverColuna('OBSERVAÇÕES');
+            const resObs = resolverColuna('OBSERVAÇÕES', codEmpresaDB);
             if (resObs?.codigo_rubrica) {
                 linhasRelatorio.push({
                     nome:          emp.colaborador || emp.nome || '',
