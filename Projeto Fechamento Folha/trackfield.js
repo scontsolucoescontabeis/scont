@@ -14,10 +14,10 @@
 
 const CODIGO_EMPRESA  = 'TF';
 const LINHA_CABECALHO = 3;
-// R$ 87,00 → tipo inteiro, valor 1 no TXT
+// Garantia Domingo/Feriado: valor configurável por empresa (fechamento_rubricas_config.valor_garantia) → tipo monetário, valor real em centavos no TXT
 const COL_87_DOMINGO  = 'COMISSÃO DOMINGOS/FERIADOS - DOMINGO - R87';
 const COL_87_FERIADO  = 'COMISSÃO DOMINGOS/FERIADOS - FERIADO - R87';
-// Demais valores → tipo monetário, valor em centavos no TXT
+// Demais valores (comissão normal) → tipo monetário, valor em centavos no TXT
 const COL_DOM         = 'COMISSÃO DOMINGOS/FERIADOS - DOMINGO';
 const COL_FER         = 'COMISSÃO DOMINGOS/FERIADOS - FERIADO';
 // Desconto manual de VT/VA por faltas/atestados (lançado ao gerar o TXT, não vem da planilha)
@@ -74,6 +74,7 @@ let rubricasIgnoradas = new Set(); // normalizarNome(coluna_planilha) → exclui
 let faltaDatasMap     = {}; // `${codEmpregado}::${normColuna}` → string raw de datas inseridas
 let descontoPendentes    = []; // lançamentos manuais de desconto VT/VA antes de gerar o TXT
 let tipoProcessoPendente = '11'; // tipo escolhido no modal, aguardando decisão de desconto VT/VA
+let valorGarantiaMap     = {}; // codigo_empresa (loja) → valor da Garantia Dom/Fer, em centavos
 
 // ──────────────────────────────────────────────
 // UTILITÁRIOS
@@ -244,22 +245,24 @@ function isDomingoFeriado(header) {
     return h.includes('domingo') || h.includes('feriado');
 }
 
-// Determina tipo e valor para qualquer entry de COMISSÃO DOMINGOS/FERIADOS:
-// R$ 87,00 = 100 inteiro (layout remove a vírgula: "1,00" → "100"); demais valores = centavos monetário
-function _tipoValorDomFer(bruto) {
+// Determina tipo e valor para qualquer entry de COMISSÃO DOMINGOS/FERIADOS.
+// Sempre monetário (centavos); quando o valor bate com a Garantia configurada
+// para a empresa (fechamento_rubricas_config.valor_garantia), marca ehGarantia
+// para usar a rubrica dedicada de Garantia em vez da rubrica geral.
+function _tipoValorDomFer(bruto, valorGarantiaCentavos) {
     const centavos = parseMoney(String(bruto));
-    if (centavos === 8700) return { tipoValor: 'inteiro', valorInt: 100 };
-    return { tipoValor: 'monetario', valorInt: centavos };
+    const ehGarantia = valorGarantiaCentavos != null && centavos === valorGarantiaCentavos;
+    return { tipoValor: 'monetario', valorInt: centavos, ehGarantia };
 }
 
 // Converte centavos em item de expansão usando a mesma regra
-function _itemExpansao(brutoStr, valorCentavos) {
-    const { tipoValor, valorInt } = _tipoValorDomFer(brutoStr);
-    return { bruto: brutoStr, valorInt, tipoValor };
+function _itemExpansao(brutoStr, valorCentavos, valorGarantiaCentavos) {
+    const { tipoValor, valorInt, ehGarantia } = _tipoValorDomFer(brutoStr, valorGarantiaCentavos);
+    return { bruto: brutoStr, valorInt, tipoValor, ehGarantia };
 }
 
-// Retorna [{bruto, valorInt, tipoValor}, ...] quando a célula contém múltiplos dias, ou null para valor único
-function expandirDomingosFeriados(rawBruto) {
+// Retorna [{bruto, valorInt, tipoValor, ehGarantia}, ...] quando a célula contém múltiplos dias, ou null para valor único
+function expandirDomingosFeriados(rawBruto, valorGarantiaCentavos) {
     const str = String(rawBruto).trim();
     if (!str) return null;
 
@@ -272,7 +275,7 @@ function expandirDomingosFeriados(rawBruto) {
             if (!m) return;
             const clean = m[0].replace(/R\$/i, '').trim().replace(/\./g, '').replace(',', '.');
             const centavos = Math.round((parseFloat(clean) || 0) * 100);
-            if (centavos > 0) resultados.push(_itemExpansao(linha, centavos));
+            if (centavos > 0) resultados.push(_itemExpansao(linha, centavos, valorGarantiaCentavos));
         });
         if (resultados.length > 1) return resultados;
     }
@@ -283,7 +286,7 @@ function expandirDomingosFeriados(rawBruto) {
         return matches.map(m => {
             const clean = m.replace(/R\$/i, '').trim().replace(/\./g, '').replace(',', '.');
             const centavos = Math.round((parseFloat(clean) || 0) * 100);
-            return _itemExpansao(m.trim(), centavos);
+            return _itemExpansao(m.trim(), centavos, valorGarantiaCentavos);
         }).filter(item => item.valorInt > 0);
     }
 
@@ -367,11 +370,18 @@ async function carregarRubricas() {
 
     const { data: cfgData, error: cfgErr } = await supabaseClient
         .from('fechamento_rubricas_config')
-        .select('coluna_planilha, codigo_rubrica, tipo_processo, tipo_valor, descricao, codigo_empresa')
+        .select('coluna_planilha, codigo_rubrica, tipo_processo, tipo_valor, descricao, codigo_empresa, valor_garantia')
         .in('codigo_empresa', codigos)
         .eq('ativo', true);
     if (cfgErr) throw cfgErr;
     rubricasConfig = cfgData || [];
+
+    valorGarantiaMap = {};
+    rubricasConfig.forEach(c => {
+        if ((c.coluna_planilha === COL_87_DOMINGO || c.coluna_planilha === COL_87_FERIADO) && c.valor_garantia != null) {
+            valorGarantiaMap[c.codigo_empresa] = Math.round(Number(c.valor_garantia) * 100);
+        }
+    });
 }
 
 // Resolve rubrica para um cabeçalho de coluna — estritamente dentro da loja informada
@@ -536,6 +546,7 @@ function construirRelatorio(comp) {
         const codEmpresaDB = codigoEmpresaDBPorLoja(func.loja);
         const codEmpregado = buscarCodigoEmpregado(func.nome, codEmpresaDB);
         if (!codEmpregado) temSemMatch = true;
+        const valorGarantiaCentavos = valorGarantiaMap[codEmpresaDB];
 
         colunasRubrica.forEach(({ header }) => {
             const bruto = func.colunas[header] || '';
@@ -545,7 +556,7 @@ function construirRelatorio(comp) {
 
             // Expande célula com múltiplos dias em linhas individuais
             if (isDomingoFeriado(header)) {
-                const itens = expandirDomingosFeriados(bruto);
+                const itens = expandirDomingosFeriados(bruto, valorGarantiaCentavos);
                 if (itens && itens.length > 0) {
                     itens.forEach(item => {
                         const entry = {
@@ -562,6 +573,7 @@ function construirRelatorio(comp) {
                             tipoValor:     item.tipoValor,
                             bruto:         item.bruto,
                             valorInt:      item.valorInt,
+                            ehGarantia:    item.ehGarantia,
                         };
                         entry.tipo87 = null; // toda entry dom/fer exige classificação
                         linhasRelatorio.push(entry);
@@ -591,10 +603,11 @@ function construirRelatorio(comp) {
                 valorInt,
             };
             if (isDomingoFeriado(header)) {
-                const tv = _tipoValorDomFer(bruto);
-                entryNormal.tipo87    = null;
-                entryNormal.tipoValor = tv.tipoValor;
-                entryNormal.valorInt  = tv.valorInt;
+                const tv = _tipoValorDomFer(bruto, valorGarantiaCentavos);
+                entryNormal.tipo87      = null;
+                entryNormal.tipoValor   = tv.tipoValor;
+                entryNormal.valorInt    = tv.valorInt;
+                entryNormal.ehGarantia  = tv.ehGarantia;
             }
             linhasRelatorio.push(entryNormal);
         });
@@ -688,7 +701,7 @@ function renderizarRelatorio(linhas) {
             <td>${l.descricao || l.coluna}${tipo87Badge}${fonteTag}</td>
             <td style="font-family:monospace;${semRubrica?'color:#e74c3c;':''}">${rubricaCell}</td>
             <td>${('tipo87' in l)
-                ? `<span class="badge" style="background:${l.tipoValor==='inteiro'?'#FFF3CD':'#e3f2fd'};color:${l.tipoValor==='inteiro'?'#856404':'#1565C0'};padding:3px 8px;border-radius:4px;font-size:11px;" title="Tipo definido pelo valor">${l.tipoValor}</span>`
+                ? `<span class="badge" style="background:${l.ehGarantia?'#FFF3CD':'#e3f2fd'};color:${l.ehGarantia?'#856404':'#1565C0'};padding:3px 8px;border-radius:4px;font-size:11px;" title="Tipo definido pelo valor">${l.ehGarantia ? 'garantia' : 'monetário'}</span>`
                 : !semRubrica && !ignorada
                     ? `<select class="tipo-select" onchange="alterarTipoRubrica(${i}, this.value)" title="Alterar tipo do valor">
                         <option value="monetario" ${l.tipoValor==='monetario'?'selected':''}>monetário</option>
@@ -853,8 +866,8 @@ function classificar87(idx, tipo) {
     }
 
     l.tipo87 = tipo;
-    // R$ 87,00 (inteiro) → rubrica específica; demais valores → rubrica geral
-    const novaColuna = l.tipoValor === 'inteiro'
+    // Valor bate com a Garantia configurada → rubrica específica; demais valores → rubrica geral
+    const novaColuna = l.ehGarantia
         ? (tipo === 'domingo' ? COL_87_DOMINGO : COL_87_FERIADO)
         : (tipo === 'domingo' ? COL_DOM        : COL_FER);
     l.coluna = novaColuna;
@@ -866,7 +879,7 @@ function classificar87(idx, tipo) {
     l.fonteRubrica  = res.fonte;
     l.descricao     = res.descricao || novaColuna;
     l.tipoProcesso  = res.tipo_processo || '11';
-    // tipoValor e valorInt preservados conforme _tipoValorDomFer (87,00→inteiro/100; outros→monetario/centavos)
+    // tipoValor (sempre monetario) e valorInt preservados conforme _tipoValorDomFer
 
     renderizarRelatorio(linhasRelatorio);
     persistirLinhas();
@@ -1564,6 +1577,7 @@ async function processarDadosFormulario(envioRow) {
         const codEmpresaDB = codigoEmpresaDBPorLoja(emp.loja || '');
         const codEmpregado = buscarCodigoEmpregado(emp.colaborador || emp.nome || '', codEmpresaDB);
         if (!codEmpregado) temSemMatch = true;
+        const valorGarantiaCentavos = valorGarantiaMap[codEmpresaDB];
 
         colunasRubrica.forEach(({ campo, header }) => {
             const bruto = emp[campo];
@@ -1573,7 +1587,7 @@ async function processarDadosFormulario(envioRow) {
 
             // Expande célula com múltiplos dias em linhas individuais
             if (isDomingoFeriado(header)) {
-                const itens = expandirDomingosFeriados(String(bruto));
+                const itens = expandirDomingosFeriados(String(bruto), valorGarantiaCentavos);
                 if (itens && itens.length > 0) {
                     itens.forEach(item => {
                         const entry = {
@@ -1590,6 +1604,7 @@ async function processarDadosFormulario(envioRow) {
                             tipoValor:     item.tipoValor,
                             bruto:         item.bruto,
                             valorInt:      item.valorInt,
+                            ehGarantia:    item.ehGarantia,
                         };
                         entry.tipo87 = null;
                         linhasRelatorio.push(entry);
@@ -1619,10 +1634,11 @@ async function processarDadosFormulario(envioRow) {
                 valorInt,
             };
             if (isDomingoFeriado(header)) {
-                const tv = _tipoValorDomFer(String(bruto));
-                entryNormal.tipo87    = null;
-                entryNormal.tipoValor = tv.tipoValor;
-                entryNormal.valorInt  = tv.valorInt;
+                const tv = _tipoValorDomFer(String(bruto), valorGarantiaCentavos);
+                entryNormal.tipo87      = null;
+                entryNormal.tipoValor   = tv.tipoValor;
+                entryNormal.valorInt    = tv.valorInt;
+                entryNormal.ehGarantia  = tv.ehGarantia;
             }
             linhasRelatorio.push(entryNormal);
         });
@@ -1893,12 +1909,12 @@ async function carregar87Config() {
 
     const { data, error } = await supabaseClient
         .from('fechamento_rubricas_config')
-        .select('id, codigo_empresa, coluna_planilha, codigo_rubrica')
+        .select('id, codigo_empresa, coluna_planilha, codigo_rubrica, valor_garantia')
         .in('codigo_empresa', codigos)
         .in('coluna_planilha', [COL_87_DOMINGO, COL_87_FERIADO, COL_DOM, COL_FER]);
 
     if (error) {
-        if (tbody) tbody.innerHTML = `<tr><td colspan="6" class="config-empty" style="color:#E74C3C;">Erro: ${error.message}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="config-empty" style="color:#E74C3C;">Erro: ${error.message}</td></tr>`;
         return;
     }
 
@@ -1921,15 +1937,20 @@ async function carregar87Config() {
         tbody.innerHTML = codigos.map(cod => {
             const m = mapa[cod];
             const lojaLabel = (_assocEmpresas.find(e => e.codigo_empresa === cod)?.nome_empresa || '');
+            const valorGarantia = m.dom87?.valor_garantia ?? m.fer87?.valor_garantia ?? null;
+            const valorGarantiaLabel = valorGarantia != null
+                ? 'R$ ' + Number(valorGarantia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+                : '<em style="color:#bbb;font-size:12px;">—</em>';
             return `<tr>
                 <td><strong>${cod}</strong> <span style="color:#7F8C8D;font-size:12px;">${lojaLabel}</span></td>
+                <td>${valorGarantiaLabel}</td>
                 <td>${cell(m.dom87)}</td>
                 <td>${cell(m.fer87)}</td>
                 <td>${cell(m.dom)}</td>
                 <td>${cell(m.fer)}</td>
                 <td>
                     <button class="btn btn-secondary btn-small"
-                        onclick="preencherEditar87('${cod}','${m.dom87?.codigo_rubrica||''}','${m.fer87?.codigo_rubrica||''}','${m.dom?.codigo_rubrica||''}','${m.fer?.codigo_rubrica||''}')">
+                        onclick="preencherEditar87('${cod}','${valorGarantia ?? ''}','${m.dom87?.codigo_rubrica||''}','${m.fer87?.codigo_rubrica||''}','${m.dom?.codigo_rubrica||''}','${m.fer?.codigo_rubrica||''}')">
                         ✏ Editar
                     </button>
                 </td>
@@ -1939,26 +1960,32 @@ async function carregar87Config() {
 }
 
 async function salvar87Config() {
-    const empresa      = document.getElementById('cfg87Empresa').value;
-    const codDom87     = document.getElementById('cfg87CodDomingo87').value.trim();
-    const codFer87     = document.getElementById('cfg87CodFeriado87').value.trim();
-    const codDomOutros = document.getElementById('cfg87CodDomingoOutros').value.trim();
-    const codFerOutros = document.getElementById('cfg87CodFeriadoOutros').value.trim();
+    const empresa       = document.getElementById('cfg87Empresa').value;
+    const valorGarantiaStr = document.getElementById('cfg87ValorGarantia').value.trim();
+    const codDom87      = document.getElementById('cfg87CodDomingo87').value.trim();
+    const codFer87      = document.getElementById('cfg87CodFeriado87').value.trim();
+    const codDomOutros  = document.getElementById('cfg87CodDomingoOutros').value.trim();
+    const codFerOutros  = document.getElementById('cfg87CodFeriadoOutros').value.trim();
 
     if (!empresa) { mostrarStatusConfig87('⚠ Selecione a empresa.', 'error'); return; }
     if (!codDom87 && !codFer87 && !codDomOutros && !codFerOutros) {
         mostrarStatusConfig87('⚠ Informe ao menos um código.', 'error'); return;
     }
+    if ((codDom87 || codFer87) && !valorGarantiaStr) {
+        mostrarStatusConfig87('⚠ Informe o valor da Garantia para identificar essas linhas na planilha.', 'error'); return;
+    }
+    const valorGarantiaReais = valorGarantiaStr ? parseMoney(valorGarantiaStr) / 100 : null;
 
-    const reg = (col, cod, tipo) => ({
+    const reg = (col, cod, tipo, valorGarantia) => ({
         codigo_empresa: empresa, coluna_planilha: col,
         descricao: col, codigo_rubrica: cod,
         tipo_processo: '11', tipo_valor: tipo, ativo: true,
+        ...(valorGarantia != null ? { valor_garantia: valorGarantia } : {}),
     });
 
     const registros = [
-        codDom87     && reg(COL_87_DOMINGO, codDom87,     'inteiro'),
-        codFer87     && reg(COL_87_FERIADO, codFer87,     'inteiro'),
+        codDom87     && reg(COL_87_DOMINGO, codDom87,     'monetario', valorGarantiaReais),
+        codFer87     && reg(COL_87_FERIADO, codFer87,     'monetario', valorGarantiaReais),
         codDomOutros && reg(COL_DOM,        codDomOutros, 'monetario'),
         codFerOutros && reg(COL_FER,        codFerOutros, 'monetario'),
     ].filter(Boolean);
@@ -1969,7 +1996,7 @@ async function salvar87Config() {
             .upsert(registros, { onConflict: 'codigo_empresa,coluna_planilha' });
         if (error) throw error;
 
-        ['cfg87CodDomingo87','cfg87CodFeriado87','cfg87CodDomingoOutros','cfg87CodFeriadoOutros']
+        ['cfg87ValorGarantia','cfg87CodDomingo87','cfg87CodFeriado87','cfg87CodDomingoOutros','cfg87CodFeriadoOutros']
             .forEach(id => { document.getElementById(id).value = ''; });
         mostrarStatusConfig87('✅ Salvo com sucesso!', 'success');
         carregar87Config();
@@ -1993,8 +2020,11 @@ async function deletar87Config(id) {
     }
 }
 
-function preencherEditar87(empresa, codDom87, codFer87, codDomOutros, codFerOutros) {
+function preencherEditar87(empresa, valorGarantia, codDom87, codFer87, codDomOutros, codFerOutros) {
     document.getElementById('cfg87Empresa').value           = empresa;
+    document.getElementById('cfg87ValorGarantia').value     = valorGarantia
+        ? Number(valorGarantia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+        : '';
     document.getElementById('cfg87CodDomingo87').value      = codDom87;
     document.getElementById('cfg87CodFeriado87').value      = codFer87;
     document.getElementById('cfg87CodDomingoOutros').value  = codDomOutros;
