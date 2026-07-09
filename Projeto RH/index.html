@@ -281,6 +281,9 @@
                     <label style="font-weight:600; font-size:13px; color: var(--text-primary); margin:0;">Empresas</label>
                     <button type="button" class="btn btn-secondary btn-small" onclick="_selecionarTodasEmpresasBeneficios(true)">Todas</button>
                     <button type="button" class="btn btn-secondary btn-small" onclick="_selecionarTodasEmpresasBeneficios(false)">Nenhuma</button>
+                    <select id="beneficiosGrupoSelect" style="max-width:220px;" onchange="_selecionarGrupoBeneficios()">
+                        <option value="">Selecionar grupo de empresas...</option>
+                    </select>
                     <input type="text" id="beneficiosBuscaEmpresa" placeholder="🔍 Buscar empresa..." style="flex:1; min-width:180px;"
                         oninput="_filtrarListaEmpresasBeneficios()">
                 </div>
@@ -297,7 +300,7 @@
                 <div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px;">
                     <table style="width:100%; border-collapse:collapse; font-size:12px; white-space:nowrap;">
                         <thead>
-                            <tr style="background: var(--background-color);">
+                            <tr>
                                 <th style="padding:8px; text-align:left;">Empresa</th>
                                 <th style="padding:8px; text-align:left;">Empregado</th>
                                 <th style="padding:8px; text-align:left;">Cargo</th>

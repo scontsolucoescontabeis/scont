@@ -3206,6 +3206,45 @@ function _iniciarTelaBeneficios() {
     document.getElementById('beneficiosBuscaEmpresa').value = '';
     _atualizarLabelMesPagamentoBeneficios();
     _renderizarListaEmpresasBeneficios(state.empresas);
+    _carregarGruposParaBeneficios();
+}
+
+async function _carregarGruposParaBeneficios() {
+    const select = document.getElementById('beneficiosGrupoSelect');
+    if (!select) return;
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_grupos_empresas')
+            .select('id, nome_grupo')
+            .order('nome_grupo', { ascending: true });
+        if (error) throw error;
+        select.innerHTML = '<option value="">Selecionar grupo de empresas...</option>' +
+            (data || []).map(g => `<option value="${g.id}">${g.nome_grupo}</option>`).join('');
+    } catch (erro) {
+        console.error('Erro ao carregar grupos de empresas:', erro);
+    }
+}
+
+async function _selecionarGrupoBeneficios() {
+    const grupoId = document.getElementById('beneficiosGrupoSelect').value;
+    if (!grupoId) return;
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_grupos_empresas_itens')
+            .select('codigo_empresa')
+            .eq('grupo_id', grupoId);
+        if (error) throw error;
+        const codigosDoGrupo = new Set((data || []).map(it => it.codigo_empresa));
+
+        document.getElementById('beneficiosBuscaEmpresa').value = '';
+        _renderizarListaEmpresasBeneficios(state.empresas);
+        document.querySelectorAll('.beneficios-emp-check').forEach(cb => {
+            cb.checked = codigosDoGrupo.has(cb.value);
+        });
+    } catch (erro) {
+        console.error('Erro ao carregar empresas do grupo:', erro);
+        mostrarMensagem('Erro', 'Falha ao carregar as empresas do grupo selecionado.');
+    }
 }
 
 function _renderizarListaEmpresasBeneficios(empresas) {
