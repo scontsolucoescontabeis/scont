@@ -3928,24 +3928,26 @@ function _renderizarResumoImportacaoFerias(porEmpresa, avisos, totalRegistros) {
     }
 
     html += `
-            <table style="width:100%; border-collapse:collapse; font-size:13px; margin-top:10px;">
+            <div class="table-wrapper" style="margin-top:10px;">
+            <table class="data-table">
                 <thead>
-                    <tr style="background:var(--background-color); text-align:left;">
-                        <th style="padding:8px; border-bottom:2px solid var(--border-color);">Empresa</th>
-                        <th style="padding:8px; border-bottom:2px solid var(--border-color); text-align:center;">Novos</th>
-                        <th style="padding:8px; border-bottom:2px solid var(--border-color); text-align:center;">Atualizados</th>
+                    <tr>
+                        <th>Empresa</th>
+                        <th style="text-align:center;">Novos</th>
+                        <th style="text-align:center;">Atualizados</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${Object.entries(porEmpresa).map(([codigo, info]) => `
                         <tr>
-                            <td style="padding:8px; border-bottom:1px solid #eee;">${codigo} - ${info.nome}</td>
-                            <td style="padding:8px; border-bottom:1px solid #eee; text-align:center;">${info.novos}</td>
-                            <td style="padding:8px; border-bottom:1px solid #eee; text-align:center;">${info.atualizados}</td>
+                            <td>${codigo} - ${info.nome}</td>
+                            <td style="text-align:center;">${info.novos}</td>
+                            <td style="text-align:center;">${info.atualizados}</td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
+            </div>
         </div>
     `;
 
