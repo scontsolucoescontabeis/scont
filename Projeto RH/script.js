@@ -125,13 +125,7 @@ function filtrarEmpresas(termo) {
     box.style.display = 'block';
 }
 
-async function selecionarEmpresa(codigo, nome) {
-    document.getElementById('codigoEmpresa').value = codigo;
-    document.getElementById('buscaEmpresa').value = `${codigo} - ${nome}`;
-    document.getElementById('buscaEmpresaResultados').style.display = 'none';
-    const label = document.getElementById('empresaSelecionadaLabel');
-    if (label) label.textContent = '';
-    const cfg = await _buscarConfigRubricas(codigo);
+function _aplicarConfigEmpresaNaTelaEdicao(cfg) {
     const ruleExtra100El = document.getElementById('ruleExtra100Optional');
     const terceiroTurnoEl = document.getElementById('terceiroTurno');
     if (ruleExtra100El) ruleExtra100El.checked = cfg?.['rule_extra_100_opcional']?.cod === '1';
@@ -148,8 +142,6 @@ async function selecionarEmpresa(codigo, nome) {
     const jSabCont      = document.getElementById('jornadaSabadoContainer');
     const jSab          = document.getElementById('jornadaSabado');
     const jSabSempreExt = document.getElementById('sabadoSempreExtra');
-    const obsBanner     = document.getElementById('empresaObservacoesBanner');
-    const obsTexto      = document.getElementById('empresaObservacoesTexto');
     if (cfg && cfg['jornada_diaria']) {
         if (jDiaria)   jDiaria.value = cfg['jornada_diaria']?.cod || '08:00';
         const sexAtiva = cfg['jornada_sexta_ativa']?.cod === '1';
@@ -172,6 +164,18 @@ async function selecionarEmpresa(codigo, nome) {
         if (jSab)      jSab.value       = '04:00';
         if (jSabSempreExt) jSabSempreExt.checked = false;
     }
+}
+
+async function selecionarEmpresa(codigo, nome) {
+    document.getElementById('codigoEmpresa').value = codigo;
+    document.getElementById('buscaEmpresa').value = `${codigo} - ${nome}`;
+    document.getElementById('buscaEmpresaResultados').style.display = 'none';
+    const label = document.getElementById('empresaSelecionadaLabel');
+    if (label) label.textContent = '';
+    const cfg = await _buscarConfigRubricas(codigo);
+    _aplicarConfigEmpresaNaTelaEdicao(cfg);
+    const obsBanner     = document.getElementById('empresaObservacoesBanner');
+    const obsTexto      = document.getElementById('empresaObservacoesTexto');
     const observacoes = cfg?.['observacoes']?.cod?.trim() || '';
     if (obsBanner && obsTexto) {
         obsTexto.textContent = observacoes;
@@ -2299,47 +2303,8 @@ async function abrirExportacaoTxtGrupo() {
     await buscarEmpresasParaExportacaoGrupo(codigosGrupo);
 }
 
-// --- AÇÕES EM LOTE: PROCESSAMENTO ---
-async function processarLoteGrupo(fileList) {
-    if (!_grupoAtual?.id) { mostrarMensagem('Aviso', 'Salve o grupo antes de processar em lote.'); return; }
-    const comp = document.getElementById('grpCompetencia')?.value || '';
-    if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe a competência antes de processar em lote.'); return; }
-    const arquivos = Array.from(fileList || []);
-    if (arquivos.length === 0) return;
-
-    const [compMM, compAAAA] = comp.split('/');
-    const codigosGrupo = _grupoAtual.empresas.map(e => e.codigo_empresa);
-    const nomeEmpresa = codigo => _grupoAtual.empresas.find(e => e.codigo_empresa === codigo)?.nome_empresa || codigo;
-
-    const resultados = [];
-    const arquivosValidos = [];
-    const codigosComArquivo = new Set();
-
-    arquivos.forEach(file => {
-        const m = file.name.match(/^Modelo_FolhaPonto_(.+)_(\d{2})-(\d{4})\.xlsx$/i);
-        if (!m) {
-            resultados.push({ codigo: file.name, status: 'erro', detalhe: 'Nome de arquivo inválido.' });
-            return;
-        }
-        const [, codEmp, mm, aaaa] = m;
-        if (mm !== compMM || aaaa !== compAAAA) {
-            resultados.push({ codigo: codEmp, status: 'erro', detalhe: `Competência do arquivo (${mm}/${aaaa}) não confere com ${comp}.` });
-            return;
-        }
-        if (!codigosGrupo.includes(codEmp)) {
-            resultados.push({ codigo: codEmp, status: 'erro', detalhe: 'Empresa não pertence ao grupo.' });
-            return;
-        }
-        if (codigosComArquivo.has(codEmp)) {
-            resultados.push({ codigo: codEmp, status: 'erro', detalhe: 'Arquivo duplicado para esta empresa (ignorado).' });
-            return;
-        }
-        codigosComArquivo.add(codEmp);
-        arquivosValidos.push({ codigo: codEmp, file });
-    });
-
-    mostrarMensagem('Processando', `Processando ${arquivosValidos.length} empresa(s)...`);
-
+// --- AÇÕES EM LOTE: PROCESSAMENTO (fila de revisão) ---
+function _parseExcelParaFolhas(wb, empregados, comTerceiroTurno, competencia) {
     const normalizeHora = (v) => {
         if (v === null || v === undefined || v === '') return '';
         if (typeof v === 'number') {
@@ -2352,19 +2317,80 @@ async function processarLoteGrupo(fileList) {
         const match = s.match(/^(\d{1,2}):(\d{2})/);
         return match ? `${match[1].padStart(2, '0')}:${match[2]}` : '';
     };
+    const folhas = [];
+    const avisosAbas = [];
+    wb.SheetNames.forEach(sheetName => {
+        const codEmpregado = sheetName.split(' ')[0].trim();
+        const empregado = empregados.find(e => e.codigo_empregado === codEmpregado);
+        if (!empregado) { avisosAbas.push(`aba "${sheetName}" sem correspondência`); return; }
 
-    const snapshot = {
-        jornada: state.jornada, jornadaSexta: state.jornadaSexta, jornadaSextaAtiva: state.jornadaSextaAtiva,
-        jornadaSabado: state.jornadaSabado, jornadaSabadoAtiva: state.jornadaSabadoAtiva,
-        sabadoSempreExtra: state.sabadoSempreExtra, ruleExtra100Optional: state.ruleExtra100Optional,
-        terceiroTurno: state.terceiroTurno, folhas: state.folhas, competencia: state.competencia,
-        empresaSelecionada: state.empresaSelecionada
-    };
-    state.competencia = comp;
+        const folha = { empregadoId: empregado.codigo_empregado, nome: empregado.nome_empregado, dados: gerarDiasDoMes(competencia), dsrDias: [], flagsFolga: {} };
+        const linhas = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+        for (let r = 1; r < linhas.length; r++) {
+            const row = linhas[r];
+            if (!row || !row[0]) continue;
+            const dataStr = String(row[0]).trim();
+            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) continue;
+            const diaIdx = folha.dados.findIndex(d => d.data === dataStr);
+            if (diaIdx === -1) continue;
+            folha.dados[diaIdx].entrada1 = normalizeHora(row[2]);
+            folha.dados[diaIdx].saida1   = normalizeHora(row[3]);
+            folha.dados[diaIdx].entrada2 = normalizeHora(row[4]);
+            folha.dados[diaIdx].saida2   = normalizeHora(row[5]);
+            if (comTerceiroTurno) {
+                folha.dados[diaIdx].entrada3 = normalizeHora(row[6]);
+                folha.dados[diaIdx].saida3   = normalizeHora(row[7]);
+            }
+        }
+        folhas.push(folha);
+    });
+    return { folhas, avisosAbas };
+}
 
-    const usuarioUUID = '00000000-0000-0000-0000-000000000000';
-    const nomeResponsavel = 'Processamento em Lote';
+let _filaLoteGrupo = null;
 
+async function processarLoteGrupo(fileList) {
+    if (!_grupoAtual?.id) { mostrarMensagem('Aviso', 'Salve o grupo antes de processar em lote.'); return; }
+    const comp = document.getElementById('grpCompetencia')?.value || '';
+    if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe a competência antes de processar em lote.'); return; }
+    const arquivos = Array.from(fileList || []);
+    if (arquivos.length === 0) return;
+
+    const [compMM, compAAAA] = comp.split('/');
+    const codigosGrupo = _grupoAtual.empresas.map(e => e.codigo_empresa);
+    const nomesEmpresas = {};
+    _grupoAtual.empresas.forEach(e => { nomesEmpresas[e.codigo_empresa] = e.nome_empresa; });
+
+    const resultadosIniciais = [];
+    const arquivosValidos = [];
+    const codigosComArquivo = new Set();
+
+    arquivos.forEach(file => {
+        const m = file.name.match(/^Modelo_FolhaPonto_(.+)_(\d{2})-(\d{4})\.xlsx$/i);
+        if (!m) {
+            resultadosIniciais.push({ codigo: file.name, status: 'erro', detalhe: 'Nome de arquivo inválido.' });
+            return;
+        }
+        const [, codEmp, mm, aaaa] = m;
+        if (mm !== compMM || aaaa !== compAAAA) {
+            resultadosIniciais.push({ codigo: codEmp, status: 'erro', detalhe: `Competência do arquivo (${mm}/${aaaa}) não confere com ${comp}.` });
+            return;
+        }
+        if (!codigosGrupo.includes(codEmp)) {
+            resultadosIniciais.push({ codigo: codEmp, status: 'erro', detalhe: 'Empresa não pertence ao grupo.' });
+            return;
+        }
+        if (codigosComArquivo.has(codEmp)) {
+            resultadosIniciais.push({ codigo: codEmp, status: 'erro', detalhe: 'Arquivo duplicado para esta empresa (ignorado).' });
+            return;
+        }
+        codigosComArquivo.add(codEmp);
+        arquivosValidos.push({ codigo: codEmp, file });
+    });
+
+    mostrarMensagem('Preparando', `Lendo ${arquivosValidos.length} arquivo(s)...`);
+
+    const itensFila = [];
     for (const { codigo, file } of arquivosValidos) {
         try {
             const { data: empregados, error: errEmp } = await supabaseClient
@@ -2373,111 +2399,130 @@ async function processarLoteGrupo(fileList) {
                 .eq('codigo_empresa', codigo);
             if (errEmp) throw errEmp;
             if (!empregados || empregados.length === 0) {
-                resultados.push({ codigo, status: 'erro', detalhe: 'Empresa sem empregados cadastrados.' });
+                resultadosIniciais.push({ codigo, status: 'erro', detalhe: 'Empresa sem empregados cadastrados.' });
                 continue;
             }
 
             const cfg = await _buscarConfigRubricas(codigo);
-            state.jornada            = cfg?.['jornada_diaria']?.cod || '08:00';
-            state.jornadaSextaAtiva  = cfg?.['jornada_sexta_ativa']?.cod === '1';
-            state.jornadaSexta       = cfg?.['jornada_sexta']?.cod || '04:00';
-            const sempreExtra        = cfg?.['sabado_sempre_extra']?.cod === '1';
-            state.sabadoSempreExtra  = sempreExtra;
-            state.jornadaSabadoAtiva = !sempreExtra && cfg?.['jornada_sabado_ativa']?.cod === '1';
-            state.jornadaSabado      = cfg?.['jornada_sabado']?.cod || '04:00';
-            state.ruleExtra100Optional = cfg?.['rule_extra_100_opcional']?.cod === '1';
-            state.terceiroTurno      = cfg?.['terceiro_turno']?.cod === '1';
+            const comTerceiroTurno = cfg?.['terceiro_turno']?.cod === '1';
 
             const buffer = await file.arrayBuffer();
             const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
+            const { folhas, avisosAbas } = _parseExcelParaFolhas(wb, empregados, comTerceiroTurno, comp);
 
-            const folhasEmpresa = [];
-            const avisosAbas = [];
-            wb.SheetNames.forEach(sheetName => {
-                const codEmpregado = sheetName.split(' ')[0].trim();
-                const empregado = empregados.find(e => e.codigo_empregado === codEmpregado);
-                if (!empregado) { avisosAbas.push(`aba "${sheetName}" sem correspondência`); return; }
-
-                const folha = { empregadoId: empregado.codigo_empregado, nome: empregado.nome_empregado, dados: gerarDiasDoMes(state.competencia), dsrDias: [], flagsFolga: {} };
-                const linhas = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
-                for (let r = 1; r < linhas.length; r++) {
-                    const row = linhas[r];
-                    if (!row || !row[0]) continue;
-                    const dataStr = String(row[0]).trim();
-                    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) continue;
-                    const diaIdx = folha.dados.findIndex(d => d.data === dataStr);
-                    if (diaIdx === -1) continue;
-                    folha.dados[diaIdx].entrada1 = normalizeHora(row[2]);
-                    folha.dados[diaIdx].saida1   = normalizeHora(row[3]);
-                    folha.dados[diaIdx].entrada2 = normalizeHora(row[4]);
-                    folha.dados[diaIdx].saida2   = normalizeHora(row[5]);
-                    if (state.terceiroTurno) {
-                        folha.dados[diaIdx].entrada3 = normalizeHora(row[6]);
-                        folha.dados[diaIdx].saida3   = normalizeHora(row[7]);
-                    }
-                }
-                folhasEmpresa.push(folha);
-            });
-
-            if (folhasEmpresa.length === 0) {
-                resultados.push({ codigo, status: 'erro', detalhe: 'Nenhum empregado correspondente encontrado no arquivo.' });
+            if (folhas.length === 0) {
+                resultadosIniciais.push({ codigo, status: 'erro', detalhe: 'Nenhum empregado correspondente encontrado no arquivo.' });
                 continue;
             }
 
-            const dadosParaSalvar = folhasEmpresa.map(folha => {
-                calcularFolha(folha);
-                return {
-                    usuario_id: usuarioUUID,
-                    empresa_codigo: codigo,
-                    nome_trabalhador: folha.nome,
-                    competencia: state.competencia,
-                    jornada: state.jornada,
-                    jornada_sexta: state.jornadaSextaAtiva ? state.jornadaSexta : null,
-                    jornada_sexta_ativa: state.jornadaSextaAtiva,
-                    jornada_sabado: state.jornadaSabadoAtiva ? state.jornadaSabado : null,
-                    jornada_sabado_ativa: state.jornadaSabadoAtiva,
-                    sabado_sempre_extra: state.sabadoSempreExtra,
-                    rule_extra_100_opcional: state.ruleExtra100Optional,
-                    dados_json: JSON.stringify(folha.dados),
-                    feriados_json: JSON.stringify(state.feriados),
-                    dsr_dias: JSON.stringify(folha.dsrDias),
-                    flags_folga: JSON.stringify(folha.flagsFolga),
-                    responsavel_alteracao: nomeResponsavel,
-                    status: 'finalizado',
-                    criado_por: nomeResponsavel,
-                    atualizado_por: nomeResponsavel,
-                    nome_usuario: nomeResponsavel
-                };
-            });
-
-            const { error: errSave } = await supabaseClient.from('rh_saves').upsert(dadosParaSalvar, { onConflict: 'empresa_codigo,nome_trabalhador,competencia' });
-            if (errSave) throw errSave;
-
-            const detalhe = avisosAbas.length > 0
-                ? `${folhasEmpresa.length} empregado(s) processado(s). Avisos: ${avisosAbas.join('; ')}.`
-                : `${folhasEmpresa.length} empregado(s) processado(s).`;
-            resultados.push({ codigo, status: 'ok', detalhe });
+            itensFila.push({ codigo_empresa: codigo, nome_empresa: nomesEmpresas[codigo] || codigo, folhas, avisosAbas, cfg });
         } catch (erro) {
-            console.error('Erro ao processar empresa em lote', codigo, erro);
-            resultados.push({ codigo, status: 'erro', detalhe: erro.message || 'Erro desconhecido.' });
+            console.error('Erro ao preparar empresa do lote', codigo, erro);
+            resultadosIniciais.push({ codigo, status: 'erro', detalhe: erro.message || 'Erro desconhecido.' });
         }
     }
 
     codigosGrupo.forEach(codigo => {
         if (!codigosComArquivo.has(codigo)) {
-            resultados.push({ codigo, status: 'sem-arquivo', detalhe: '—' });
+            resultadosIniciais.push({ codigo, status: 'sem-arquivo', detalhe: '—' });
         }
     });
 
-    Object.assign(state, snapshot);
-
     fecharModalMensagem();
-    _mostrarResumoLote(resultados, nomeEmpresa);
+    const inputArquivos = document.getElementById('grpArquivosLote');
+    if (inputArquivos) inputArquivos.value = '';
+
+    if (itensFila.length === 0) {
+        _mostrarResumoLote(resultadosIniciais, codigo => nomesEmpresas[codigo] || codigo);
+        return;
+    }
+
+    _filaLoteGrupo = {
+        itens: itensFila,
+        indice: 0,
+        competencia: comp,
+        resultados: [],
+        resultadosIniciais,
+        nomesEmpresas
+    };
+    _carregarProximaEmpresaFila();
+}
+
+function _carregarProximaEmpresaFila() {
+    const fila = _filaLoteGrupo;
+    if (!fila) return;
+    const item = fila.itens[fila.indice];
+
+    state.empresaSelecionada = { codigo_empresa: item.codigo_empresa, nome_empresa: item.nome_empresa };
+    state.competencia = fila.competencia;
+    state.folhas = item.folhas;
+    state.abaAtivaIndex = 0;
+    state.resultados = [];
+
+    _aplicarConfigEmpresaNaTelaEdicao(item.cfg);
+
+    mostrarTela('mainScreen');
+    renderizarAbas();
+}
+
+function _avancarFilaLoteGrupo() {
+    const fila = _filaLoteGrupo;
+    if (!fila) return;
+    const item = fila.itens[fila.indice];
+    const detalheAvisos = item.avisosAbas.length ? ` Avisos: ${item.avisosAbas.join('; ')}.` : '';
+    fila.resultados.push({ codigo: item.codigo_empresa, status: 'ok', detalhe: `${item.folhas.length} empregado(s) processado(s).${detalheAvisos}` });
+    fila.indice++;
+    if (fila.indice >= fila.itens.length) {
+        _finalizarFilaLoteGrupo();
+    } else {
+        _carregarProximaEmpresaFila();
+    }
+}
+
+function _cancelarFilaLoteGrupo() {
+    const fila = _filaLoteGrupo;
+    if (!fila) return;
+    if (!confirm('Cancelar o restante do lote? As empresas já processadas e salvas permanecem salvas; as demais ficam pendentes.')) return;
+    for (let i = fila.indice; i < fila.itens.length; i++) {
+        fila.resultados.push({ codigo: fila.itens[i].codigo_empresa, status: 'cancelado', detalhe: 'Cancelado pelo operador antes de processar.' });
+    }
+    _finalizarFilaLoteGrupo();
+}
+
+function _finalizarFilaLoteGrupo() {
+    const fila = _filaLoteGrupo;
+    _filaLoteGrupo = null;
+    const banner = document.getElementById('filaLoteGrupoBanner');
+    if (banner) banner.style.display = 'none';
+    mostrarTela('gruposScreen');
+    _mostrarResumoLote([...fila.resultadosIniciais, ...fila.resultados], codigo => fila.nomesEmpresas[codigo] || codigo);
+}
+
+function _atualizarBannerFilaLote(telaId) {
+    const banner = document.getElementById('filaLoteGrupoBanner');
+    if (!banner) return;
+    if (!_filaLoteGrupo || (telaId !== 'mainScreen' && telaId !== 'resultsScreen')) {
+        banner.style.display = 'none';
+        return;
+    }
+    const fila = _filaLoteGrupo;
+    const item = fila.itens[fila.indice];
+    const posicao = `${fila.indice + 1}/${fila.itens.length}`;
+    const texto = document.getElementById('filaLoteGrupoTexto');
+    const btnAvancar = document.getElementById('filaLoteAvancarBtn');
+    if (telaId === 'mainScreen') {
+        if (texto) texto.textContent = `📦 Lote do grupo "${_grupoAtual?.nome_grupo || ''}" — empresa ${posicao}: ${item.codigo_empresa} - ${item.nome_empresa}. Revise faltas, atestados, DSR e demais flags antes de processar.`;
+        if (btnAvancar) btnAvancar.style.display = 'none';
+    } else {
+        if (texto) texto.textContent = `✅ Empresa ${item.codigo_empresa} - ${item.nome_empresa} processada (${posicao}).`;
+        if (btnAvancar) btnAvancar.style.display = 'inline-flex';
+    }
+    banner.style.display = 'flex';
 }
 
 function _mostrarResumoLote(resultados, nomeEmpresaFn) {
-    const iconePorStatus = { ok: '✅', erro: '⚠️', 'sem-arquivo': '⬜' };
-    const rotuloPorStatus = { ok: 'Processada', erro: 'Erro', 'sem-arquivo': 'Sem arquivo enviado' };
+    const iconePorStatus = { ok: '✅', erro: '⚠️', 'sem-arquivo': '⬜', cancelado: '🚫' };
+    const rotuloPorStatus = { ok: 'Processada', erro: 'Erro', 'sem-arquivo': 'Sem arquivo enviado', cancelado: 'Cancelada' };
     const linhas = resultados.map(r => `
         <div style="display:grid; grid-template-columns: 1.4fr 1fr 2fr; gap:10px; padding:8px 0; border-bottom:1px solid #eee; font-size:13px;">
             <span>${nomeEmpresaFn(r.codigo)}</span>
@@ -2487,8 +2532,6 @@ function _mostrarResumoLote(resultados, nomeEmpresaFn) {
     `).join('');
     document.getElementById('loteResumoConteudo').innerHTML = linhas || '<p>Nenhum resultado.</p>';
     document.getElementById('loteResumoModal').classList.add('active');
-    const inputArquivos = document.getElementById('grpArquivosLote');
-    if (inputArquivos) inputArquivos.value = '';
 }
 
 function abrirModalConfigRubricas() {
@@ -3112,6 +3155,7 @@ function mostrarTela(telaId) {
         const obsBanner = document.getElementById('empresaObservacoesBanner');
         if (obsBanner) obsBanner.style.display = 'none';
     }
+    _atualizarBannerFilaLote(telaId);
 }
 
 function voltarParaEdicao() {

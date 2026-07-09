@@ -71,6 +71,15 @@
         <div class="page-header-sub" id="pageHeaderSub">Selecione a competência e empresa para começar</div>
     </div>
 
+    <!-- BANNER DA FILA DE PROCESSAMENTO EM LOTE DO GRUPO -->
+    <div id="filaLoteGrupoBanner" style="display:none; background:#fff7e6; border:1px solid #ffd591; color:#874d00; border-radius:8px; padding:12px 16px; margin:0 20px 16px; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <span id="filaLoteGrupoTexto" style="font-size:13px; font-weight:600;"></span>
+        <div style="display:flex; gap:8px;">
+            <button type="button" class="btn btn-primary btn-small" id="filaLoteAvancarBtn" onclick="_avancarFilaLoteGrupo()" style="display:none;">▶️ Próxima Empresa do Grupo</button>
+            <button type="button" class="btn btn-danger btn-small" onclick="_cancelarFilaLoteGrupo()">✖ Cancelar Lote</button>
+        </div>
+    </div>
+
     <!-- CONTAINER PRINCIPAL -->
     <div class="container">
 
