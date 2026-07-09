@@ -1521,6 +1521,7 @@ async function _salvarFeriasCalculadas(ENT, registros, avisos) {
 
     const registrosParaSalvar = registros.map(r => ({
         codigo_empresa: r.codigo_empresa,
+        nome_empresa: r.nome_empresa,
         codigo_empregado: r.codigo_empregado,
         nome_empregado: r.nome_empregado,
         aquisitivo_inicio: r.aquisitivo_inicio,

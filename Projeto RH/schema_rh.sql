@@ -352,6 +352,7 @@ CREATE POLICY "rh_grupos_empresas_itens: escrita autenticado"
 CREATE TABLE IF NOT EXISTS public.rh_ferias_calculadas (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     codigo_empresa    TEXT NOT NULL,
+    nome_empresa      TEXT,
     codigo_empregado  TEXT NOT NULL,
     nome_empregado    TEXT NOT NULL,
     aquisitivo_inicio DATE,
