@@ -343,6 +343,36 @@ CREATE POLICY "rh_grupos_empresas_itens: escrita autenticado"
 
 
 -- ============================================================
+-- 10. TABELA: rh_ferias_calculadas
+--    Períodos de férias por empregado, importados do PDF
+--    "Relação de Férias Calculadas" do sistema fonte.
+--    Upsert por (codigo_empresa, codigo_empregado, ferias_inicio).
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.rh_ferias_calculadas (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo_empresa    TEXT NOT NULL,
+    codigo_empregado  TEXT NOT NULL,
+    nome_empregado    TEXT NOT NULL,
+    ferias_inicio     DATE NOT NULL,
+    ferias_fim        DATE NOT NULL,
+    atualizado_em     TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT rh_ferias_calc_uniq UNIQUE (codigo_empresa, codigo_empregado, ferias_inicio)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rh_ferias_empresa_empregado
+    ON public.rh_ferias_calculadas (codigo_empresa, codigo_empregado);
+
+ALTER TABLE public.rh_ferias_calculadas ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "rh_ferias_calculadas: leitura autenticado"
+    ON public.rh_ferias_calculadas FOR SELECT TO authenticated USING (TRUE);
+
+CREATE POLICY "rh_ferias_calculadas: escrita autenticado"
+    ON public.rh_ferias_calculadas FOR ALL TO authenticated USING (TRUE) WITH CHECK (TRUE);
+
+
+-- ============================================================
 -- RESUMO DAS TABELAS
 -- ============================================================
 --
