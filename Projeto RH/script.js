@@ -132,6 +132,14 @@ async function selecionarEmpresa(codigo, nome) {
     const label = document.getElementById('empresaSelecionadaLabel');
     if (label) label.textContent = '';
     const cfg = await _buscarConfigRubricas(codigo);
+    const ruleExtra100El = document.getElementById('ruleExtra100Optional');
+    const terceiroTurnoEl = document.getElementById('terceiroTurno');
+    if (ruleExtra100El) ruleExtra100El.checked = cfg?.['rule_extra_100_opcional']?.cod === '1';
+    if (terceiroTurnoEl) {
+        const ativo = cfg?.['terceiro_turno']?.cod === '1';
+        terceiroTurnoEl.checked = ativo;
+        state.terceiroTurno = ativo;
+    }
     const jDiaria       = document.getElementById('jornada');
     const jSexAtiva     = document.getElementById('jornadaSextaAtiva');
     const jSexCont      = document.getElementById('jornadaSextaContainer');
@@ -1915,6 +1923,12 @@ function _preencherCamposConfigRubricas(cfg) {
     if (jSab)      jSab.value = cfg['jornada_sabado']?.cod || '04:00';
     if (jSabSempreExt) jSabSempreExt.checked = sempreExtra;
     if (jObservacoes) jObservacoes.value = cfg['observacoes']?.cod || '';
+    const cRuleExtra100 = document.getElementById('cfgRuleExtra100');
+    const cTerceiroT    = document.getElementById('cfgTerceiroTurno');
+    const cNaoComp      = document.getElementById('cfgNaoCompensarDefault');
+    if (cRuleExtra100) cRuleExtra100.checked = cfg['rule_extra_100_opcional']?.cod === '1';
+    if (cTerceiroT)    cTerceiroT.checked    = cfg['terceiro_turno']?.cod === '1';
+    if (cNaoComp)      cNaoComp.checked      = cfg['nao_compensar_extras']?.cod === '1';
 }
 
 function _limparCamposConfigRubricas() {
@@ -1942,6 +1956,12 @@ function _limparCamposConfigRubricas() {
     if (jSab)      jSab.value       = '04:00';
     if (jSabSempreExt) jSabSempreExt.checked = false;
     if (jObservacoes) jObservacoes.value = '';
+    const cRuleExtra100 = document.getElementById('cfgRuleExtra100');
+    const cTerceiroT    = document.getElementById('cfgTerceiroTurno');
+    const cNaoComp      = document.getElementById('cfgNaoCompensarDefault');
+    if (cRuleExtra100) cRuleExtra100.checked = false;
+    if (cTerceiroT)    cTerceiroT.checked    = false;
+    if (cNaoComp)      cNaoComp.checked      = false;
 }
 
 function abrirModalConfigRubricas() {
@@ -2016,6 +2036,9 @@ async function salvarConfigRubricas() {
         { codigo_empresa: codigoEmpresa, evento: 'jornada_sabado',        codigo_rubrica: (document.getElementById('cfgJornadaSabado')?.value || '04:00').trim(),      tipo_valor: 'jornada' },
         { codigo_empresa: codigoEmpresa, evento: 'sabado_sempre_extra',   codigo_rubrica: document.getElementById('cfgSabadoSempreExtra')?.checked ? '1' : '0',       tipo_valor: 'jornada' },
         { codigo_empresa: codigoEmpresa, evento: 'observacoes',           codigo_rubrica: (document.getElementById('cfgObservacoes')?.value || '').trim(),            tipo_valor: 'texto' },
+        { codigo_empresa: codigoEmpresa, evento: 'rule_extra_100_opcional', codigo_rubrica: document.getElementById('cfgRuleExtra100')?.checked ? '1' : '0',          tipo_valor: 'config' },
+        { codigo_empresa: codigoEmpresa, evento: 'terceiro_turno',          codigo_rubrica: document.getElementById('cfgTerceiroTurno')?.checked ? '1' : '0',         tipo_valor: 'config' },
+        { codigo_empresa: codigoEmpresa, evento: 'nao_compensar_extras',    codigo_rubrica: document.getElementById('cfgNaoCompensarDefault')?.checked ? '1' : '0',   tipo_valor: 'config' },
     ];
 
     try {
@@ -2289,16 +2312,16 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, m
 }
 
 async function abrirModalExportacaoTXT() {
-    document.getElementById('expNaoCompensar').checked = false;
-    document.getElementById('expLabelAtraso').textContent = 'Atraso';
+    const codEmp = state.empresaSelecionada?.codigo_empresa;
+    const cfg = codEmp ? await _buscarConfigRubricas(codEmp) : null;
+    document.getElementById('expNaoCompensar').checked = cfg?.['nao_compensar_extras']?.cod === '1';
+    _toggleNaoCompensar('exp');
     document.getElementById('exportTxtModal').classList.add('active');
     document.getElementById('exportCompetencia').value = state.competencia || '';
     document.getElementById('exportEmpresasContainer').style.display = 'none';
     document.getElementById('expTxtPrevia').style.display = 'none';
     document.getElementById('btnGerarTXT').style.display = 'none';
     document.getElementById('btnPreviewTXT').style.display = 'none';
-    const codEmp = state.empresaSelecionada?.codigo_empresa;
-    const cfg = codEmp ? await _buscarConfigRubricas(codEmp) : null;
     _aplicarConfigRubricasNoCampos('exp', cfg);
 }
 
@@ -2856,10 +2879,10 @@ async function abrirModalTxtResultados() {
         mostrarMensagem('Aviso', 'Não há dados processados para gerar o TXT.');
         return;
     }
-    document.getElementById('resNaoCompensar').checked = false;
-    document.getElementById('resLabelAtraso').textContent = 'Atraso';
     const codEmp = state.empresaSelecionada?.codigo_empresa;
     const cfg = codEmp ? await _buscarConfigRubricas(codEmp) : null;
+    document.getElementById('resNaoCompensar').checked = cfg?.['nao_compensar_extras']?.cod === '1';
+    _toggleNaoCompensar('res');
     _aplicarConfigRubricasNoCampos('res', cfg);
     document.getElementById('resTxtPrevia').style.display = 'none';
     const _laCont = document.getElementById('lancamentosAdicionaisContainer');
