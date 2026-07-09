@@ -178,6 +178,7 @@ async function selecionarEmpresa(codigo, nome) {
     if (label) label.textContent = '';
     const cfg = await _buscarConfigRubricas(codigo);
     _aplicarConfigEmpresaNaTelaEdicao(cfg);
+    state.feriasCalculadas = await carregarFeriasCalculadas(codigo);
     const obsBanner     = document.getElementById('empresaObservacoesBanner');
     const obsTexto      = document.getElementById('empresaObservacoesTexto');
     const observacoes = cfg?.['observacoes']?.cod?.trim() || '';
@@ -851,7 +852,10 @@ function renderizarConteudoAba() {
         const isFeriado = state.feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
         const isDSR = folha.dsrDias.includes(dia.data);
         const rowClass = (isFeriado || isDSR) ? 'holiday-row' : '';
-        const infoExtra = isFeriado ? `<span style="color: var(--danger-color); font-size: 11px; display: block;">Feriado</span>` : '';
+        const isFerias = _dataEmFerias(dia.data, folha.empregadoId);
+        const infoExtra = isFeriado
+            ? `<span style="color: var(--danger-color); font-size: 11px; display: block;">Feriado</span>`
+            : (isFerias ? `<span style="color: #b45309; font-size: 11px; display: block;">Férias</span>` : '');
         
         const temEntrada = dia.entrada1 || dia.entrada2 || (state.terceiroTurno && dia.entrada3);
         const flagFolga = folha.flagsFolga[dia.data] || '';
@@ -1369,6 +1373,7 @@ function calcularFolha(folha) {
         let extra50 = 0, extra100 = 0, faltante = 0;
         let flagDSR = isDSRCustomizado;
         let flagFolga = false, flagFalta = false, flagAtestado = false, flagAtestadoComparecimento = false, flagLiberacaoMeioExpediente = false, flagSemRegistro = false, flagCompensacao = false;
+        const flagFerias = _dataEmFerias(dia.data, folha.empregadoId);
 
         const flagFolgaData = folha.flagsFolga[dia.data];
         const isAtestadoMedico = flagFolgaData === 'atestado';
@@ -1433,7 +1438,10 @@ function calcularFolha(folha) {
                 flagCompensacao = true;
                 faltante = jornadaEfetiva;
             } else if (!isAtestado) {
-                flagSemRegistro = true;
+                if (!flagFerias) {
+                    flagSemRegistro = true;
+                }
+                // dia de férias sem flag manual: sem impacto em totais, mesmo tratamento de Folga
             }
         }
         
@@ -1473,7 +1481,8 @@ function calcularFolha(folha) {
             flagAtestadoComparecimento: flagAtestadoComparecimento,
             flagLiberacaoMeioExpediente: flagLiberacaoMeioExpediente,
             flagSemRegistro: flagSemRegistro,
-            flagCompensacao: flagCompensacao
+            flagCompensacao: flagCompensacao,
+            flagFerias: flagFerias
         };
     });
     
@@ -1714,6 +1723,9 @@ function renderizarTabelasDiarias() {
             if (dia.flagSemRegistro) {
                 flags += '<span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">SEM REGISTRO</span>';
             }
+            if (dia.flagFerias) {
+                flags += '<span style="background: #fde68a; color: #78350f; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; margin-right: 4px;">FÉRIAS</span>';
+            }
             if (isFeriado) {
                 flags += '<span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-weight: bold; font-size: 10px;">FERIADO</span>';
             }
@@ -1797,6 +1809,7 @@ state.resultados.forEach(res => {
         if (dia.flagAtestadoComparecimento) flagsStr += 'ATESTADO DE COMPARECIMENTO ';
         if (dia.flagLiberacaoMeioExpediente) flagsStr += 'LIBERAÇÃO MEIO EXPEDIENTE ';
         if (dia.flagSemRegistro) flagsStr += 'SEM REGISTRO ';
+        if (dia.flagFerias) flagsStr += 'FÉRIAS ';
         if (isFeriado) flagsStr += 'FERIADO ';
 
 dadosAbaIndividual.push({
@@ -3294,6 +3307,16 @@ function converterMinutosParaHora(minutos) {
     const h = Math.floor(minutos / 60);
     const m = minutos % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// ===== FÉRIAS CALCULADAS =====
+
+function _dataEmFerias(dataBR, empregadoId) {
+    const periodos = state.feriasCalculadas[empregadoId];
+    if (!periodos || periodos.length === 0) return false;
+    const [d, m, a] = dataBR.split('/');
+    const iso = `${a}-${m}-${d}`;
+    return periodos.some(p => iso >= p.inicio && iso <= p.fim);
 }
 
 function gerarDiasDoMes(competencia) {
