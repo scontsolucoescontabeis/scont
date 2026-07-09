@@ -2283,6 +2283,198 @@ async function abrirExportacaoTxtGrupo() {
     await buscarEmpresasParaExportacaoGrupo(codigosGrupo);
 }
 
+// --- AÇÕES EM LOTE: PROCESSAMENTO ---
+async function processarLoteGrupo(fileList) {
+    if (!_grupoAtual?.id) { mostrarMensagem('Aviso', 'Salve o grupo antes de processar em lote.'); return; }
+    const comp = document.getElementById('grpCompetencia')?.value || '';
+    if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe a competência antes de processar em lote.'); return; }
+    const arquivos = Array.from(fileList || []);
+    if (arquivos.length === 0) return;
+
+    const [compMM, compAAAA] = comp.split('/');
+    const codigosGrupo = _grupoAtual.empresas.map(e => e.codigo_empresa);
+    const nomeEmpresa = codigo => _grupoAtual.empresas.find(e => e.codigo_empresa === codigo)?.nome_empresa || codigo;
+
+    const resultados = [];
+    const arquivosValidos = [];
+    const codigosComArquivo = new Set();
+
+    arquivos.forEach(file => {
+        const m = file.name.match(/^Modelo_FolhaPonto_(.+)_(\d{2})-(\d{4})\.xlsx$/i);
+        if (!m) {
+            resultados.push({ codigo: file.name, status: 'erro', detalhe: 'Nome de arquivo inválido.' });
+            return;
+        }
+        const [, codEmp, mm, aaaa] = m;
+        if (mm !== compMM || aaaa !== compAAAA) {
+            resultados.push({ codigo: codEmp, status: 'erro', detalhe: `Competência do arquivo (${mm}/${aaaa}) não confere com ${comp}.` });
+            return;
+        }
+        if (!codigosGrupo.includes(codEmp)) {
+            resultados.push({ codigo: codEmp, status: 'erro', detalhe: 'Empresa não pertence ao grupo.' });
+            return;
+        }
+        if (codigosComArquivo.has(codEmp)) {
+            resultados.push({ codigo: codEmp, status: 'erro', detalhe: 'Arquivo duplicado para esta empresa (ignorado).' });
+            return;
+        }
+        codigosComArquivo.add(codEmp);
+        arquivosValidos.push({ codigo: codEmp, file });
+    });
+
+    mostrarMensagem('Processando', `Processando ${arquivosValidos.length} empresa(s)...`);
+
+    const normalizeHora = (v) => {
+        if (v === null || v === undefined || v === '') return '';
+        if (typeof v === 'number') {
+            const total = Math.round(v * 24 * 60);
+            const h = Math.floor(total / 60) % 24;
+            const m2 = total % 60;
+            return `${String(h).padStart(2, '0')}:${String(m2).padStart(2, '0')}`;
+        }
+        const s = String(v).trim();
+        const match = s.match(/^(\d{1,2}):(\d{2})/);
+        return match ? `${match[1].padStart(2, '0')}:${match[2]}` : '';
+    };
+
+    const snapshot = {
+        jornada: state.jornada, jornadaSexta: state.jornadaSexta, jornadaSextaAtiva: state.jornadaSextaAtiva,
+        jornadaSabado: state.jornadaSabado, jornadaSabadoAtiva: state.jornadaSabadoAtiva,
+        sabadoSempreExtra: state.sabadoSempreExtra, ruleExtra100Optional: state.ruleExtra100Optional,
+        terceiroTurno: state.terceiroTurno, folhas: state.folhas, competencia: state.competencia,
+        empresaSelecionada: state.empresaSelecionada
+    };
+    state.competencia = comp;
+
+    const usuarioUUID = '00000000-0000-0000-0000-000000000000';
+    const nomeResponsavel = 'Processamento em Lote';
+
+    for (const { codigo, file } of arquivosValidos) {
+        try {
+            const { data: empregados, error: errEmp } = await supabaseClient
+                .from('rh_empregados')
+                .select('codigo_empregado, nome_empregado')
+                .eq('codigo_empresa', codigo);
+            if (errEmp) throw errEmp;
+            if (!empregados || empregados.length === 0) {
+                resultados.push({ codigo, status: 'erro', detalhe: 'Empresa sem empregados cadastrados.' });
+                continue;
+            }
+
+            const cfg = await _buscarConfigRubricas(codigo);
+            state.jornada            = cfg?.['jornada_diaria']?.cod || '08:00';
+            state.jornadaSextaAtiva  = cfg?.['jornada_sexta_ativa']?.cod === '1';
+            state.jornadaSexta       = cfg?.['jornada_sexta']?.cod || '04:00';
+            const sempreExtra        = cfg?.['sabado_sempre_extra']?.cod === '1';
+            state.sabadoSempreExtra  = sempreExtra;
+            state.jornadaSabadoAtiva = !sempreExtra && cfg?.['jornada_sabado_ativa']?.cod === '1';
+            state.jornadaSabado      = cfg?.['jornada_sabado']?.cod || '04:00';
+            state.ruleExtra100Optional = cfg?.['rule_extra_100_opcional']?.cod === '1';
+            state.terceiroTurno      = cfg?.['terceiro_turno']?.cod === '1';
+
+            const buffer = await file.arrayBuffer();
+            const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
+
+            const folhasEmpresa = [];
+            const avisosAbas = [];
+            wb.SheetNames.forEach(sheetName => {
+                const codEmpregado = sheetName.split(' ')[0].trim();
+                const empregado = empregados.find(e => e.codigo_empregado === codEmpregado);
+                if (!empregado) { avisosAbas.push(`aba "${sheetName}" sem correspondência`); return; }
+
+                const folha = { empregadoId: empregado.codigo_empregado, nome: empregado.nome_empregado, dados: gerarDiasDoMes(state.competencia), dsrDias: [], flagsFolga: {} };
+                const linhas = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
+                for (let r = 1; r < linhas.length; r++) {
+                    const row = linhas[r];
+                    if (!row || !row[0]) continue;
+                    const dataStr = String(row[0]).trim();
+                    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) continue;
+                    const diaIdx = folha.dados.findIndex(d => d.data === dataStr);
+                    if (diaIdx === -1) continue;
+                    folha.dados[diaIdx].entrada1 = normalizeHora(row[2]);
+                    folha.dados[diaIdx].saida1   = normalizeHora(row[3]);
+                    folha.dados[diaIdx].entrada2 = normalizeHora(row[4]);
+                    folha.dados[diaIdx].saida2   = normalizeHora(row[5]);
+                    if (state.terceiroTurno) {
+                        folha.dados[diaIdx].entrada3 = normalizeHora(row[6]);
+                        folha.dados[diaIdx].saida3   = normalizeHora(row[7]);
+                    }
+                }
+                folhasEmpresa.push(folha);
+            });
+
+            if (folhasEmpresa.length === 0) {
+                resultados.push({ codigo, status: 'erro', detalhe: 'Nenhum empregado correspondente encontrado no arquivo.' });
+                continue;
+            }
+
+            const dadosParaSalvar = folhasEmpresa.map(folha => {
+                calcularFolha(folha);
+                return {
+                    usuario_id: usuarioUUID,
+                    empresa_codigo: codigo,
+                    nome_trabalhador: folha.nome,
+                    competencia: state.competencia,
+                    jornada: state.jornada,
+                    jornada_sexta: state.jornadaSextaAtiva ? state.jornadaSexta : null,
+                    jornada_sexta_ativa: state.jornadaSextaAtiva,
+                    jornada_sabado: state.jornadaSabadoAtiva ? state.jornadaSabado : null,
+                    jornada_sabado_ativa: state.jornadaSabadoAtiva,
+                    sabado_sempre_extra: state.sabadoSempreExtra,
+                    rule_extra_100_opcional: state.ruleExtra100Optional,
+                    dados_json: JSON.stringify(folha.dados),
+                    feriados_json: JSON.stringify(state.feriados),
+                    dsr_dias: JSON.stringify(folha.dsrDias),
+                    flags_folga: JSON.stringify(folha.flagsFolga),
+                    responsavel_alteracao: nomeResponsavel,
+                    status: 'finalizado',
+                    criado_por: nomeResponsavel,
+                    atualizado_por: nomeResponsavel,
+                    nome_usuario: nomeResponsavel
+                };
+            });
+
+            const { error: errSave } = await supabaseClient.from('rh_saves').upsert(dadosParaSalvar, { onConflict: 'empresa_codigo,nome_trabalhador,competencia' });
+            if (errSave) throw errSave;
+
+            const detalhe = avisosAbas.length > 0
+                ? `${folhasEmpresa.length} empregado(s) processado(s). Avisos: ${avisosAbas.join('; ')}.`
+                : `${folhasEmpresa.length} empregado(s) processado(s).`;
+            resultados.push({ codigo, status: 'ok', detalhe });
+        } catch (erro) {
+            console.error('Erro ao processar empresa em lote', codigo, erro);
+            resultados.push({ codigo, status: 'erro', detalhe: erro.message || 'Erro desconhecido.' });
+        }
+    }
+
+    codigosGrupo.forEach(codigo => {
+        if (!codigosComArquivo.has(codigo)) {
+            resultados.push({ codigo, status: 'sem-arquivo', detalhe: '—' });
+        }
+    });
+
+    Object.assign(state, snapshot);
+
+    fecharModalMensagem();
+    _mostrarResumoLote(resultados, nomeEmpresa);
+}
+
+function _mostrarResumoLote(resultados, nomeEmpresaFn) {
+    const iconePorStatus = { ok: '✅', erro: '⚠️', 'sem-arquivo': '⬜' };
+    const rotuloPorStatus = { ok: 'Processada', erro: 'Erro', 'sem-arquivo': 'Sem arquivo enviado' };
+    const linhas = resultados.map(r => `
+        <div style="display:grid; grid-template-columns: 1.4fr 1fr 2fr; gap:10px; padding:8px 0; border-bottom:1px solid #eee; font-size:13px;">
+            <span>${nomeEmpresaFn(r.codigo)}</span>
+            <span>${iconePorStatus[r.status]} ${rotuloPorStatus[r.status]}</span>
+            <span style="color: var(--text-secondary);">${r.detalhe}</span>
+        </div>
+    `).join('');
+    document.getElementById('loteResumoConteudo').innerHTML = linhas || '<p>Nenhum resultado.</p>';
+    document.getElementById('loteResumoModal').classList.add('active');
+    const inputArquivos = document.getElementById('grpArquivosLote');
+    if (inputArquivos) inputArquivos.value = '';
+}
+
 function abrirModalConfigRubricas() {
     document.getElementById('cfgCodigoEmpresa').value = '';
     document.getElementById('cfgBuscaEmpresa').value = '';
