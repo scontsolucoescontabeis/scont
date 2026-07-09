@@ -38,6 +38,7 @@
         <ul>
           <li><button class="nav-link active" id="nav-dashboard" onclick="showSection('dashboard')"><span class="nav-icon">📊</span> Dashboard</button></li>
           <li><button class="nav-link" id="nav-modelos" onclick="showSection('modelos')"><span class="nav-icon">📄</span> Modelos</button></li>
+          <li><button class="nav-link" id="nav-eventos" onclick="showSection('eventos')"><span class="nav-icon">🗂️</span> Eventos</button></li>
           <li><button class="nav-link" id="nav-gerar" onclick="showSection('gerar')"><span class="nav-icon">⚡</span> Gerar</button></li>
           <li><button class="nav-link" id="nav-historico" onclick="showSection('historico')"><span class="nav-icon">🕓</span> Histórico</button></li>
         </ul>
@@ -96,6 +97,23 @@
           <input type="text" id="filtro-modelos" placeholder="Buscar modelo…" oninput="renderModelos()">
         </div>
         <div id="modelos-grid" class="gm-grid"></div>
+      </section>
+
+      <!-- ═══ EVENTOS ═══ -->
+      <section id="sec-eventos" class="section">
+        <div class="page-header">
+          <div>
+            <h1>Eventos</h1>
+            <div class="page-header-sub">Agrupe vários modelos para gerar de uma vez (ex: Admissão)</div>
+          </div>
+          <div class="page-header-actions">
+            <button class="btn btn-primary" onclick="openModalEvento()">+ Novo Evento</button>
+          </div>
+        </div>
+        <div class="search-bar">
+          <input type="text" id="filtro-eventos" placeholder="Buscar evento…" oninput="renderEventos()">
+        </div>
+        <div id="eventos-grid" class="gm-grid"></div>
       </section>
 
       <!-- ═══ GERAR (wizard) ═══ -->
@@ -484,6 +502,47 @@
       <div class="modal-foot">
         <button class="btn btn-secondary" onclick="closeModalModelo()">Cancelar</button>
         <button class="btn btn-primary" onclick="salvarModelo()">Salvar Modelo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Criar/Editar Evento ══ -->
+  <div class="modal-overlay" id="modal-evento">
+    <div class="modal-box extra-wide">
+      <div class="modal-head">
+        <h3 id="modal-evento-title">Novo Evento</h3>
+        <button class="modal-close" onclick="closeModalEvento()">×</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="evento-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nome do Evento *</label>
+            <input type="text" id="evento-nome" class="form-control" placeholder="Ex: Admissão">
+          </div>
+          <div class="form-group">
+            <label>Descrição</label>
+            <input type="text" id="evento-descricao" class="form-control" placeholder="Descrição opcional">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Modelos disponíveis</label>
+            <input type="text" id="filtro-evento-modelos-disp" class="form-control" placeholder="Buscar modelo…"
+              style="margin-bottom:6px" oninput="renderEventoModelosDisponiveis()">
+            <div id="evento-modelos-disponiveis" style="border:1px solid var(--border);border-radius:8px;max-height:280px;overflow-y:auto;padding:8px;"></div>
+          </div>
+          <div class="form-group">
+            <label>Modelos do evento (ordem de geração)</label>
+            <div id="evento-modelos-selecionados" style="border:1px solid var(--border);border-radius:8px;max-height:280px;overflow-y:auto;padding:8px;">
+              <div class="empty" style="padding:20px"><span style="font-size:12px;color:var(--muted)">Nenhum modelo adicionado ainda</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModalEvento()">Cancelar</button>
+        <button class="btn btn-primary" onclick="salvarEvento()">Salvar Evento</button>
       </div>
     </div>
   </div>

@@ -5,6 +5,8 @@ let sb = null;
 // ── Estado global ────────────────────────────────────────────
 let currentUser = null;
 let modelos = [];
+let eventos = [];               // [{ id, nome, descricao, modelosOrdenados: [modelo,...] }]
+let eventoModalSelecao = [];    // ids dos modelos escolhidos no modal de evento, em ordem
 let empresas = [];
 let empregados = [];
 let socios = [];
@@ -21,6 +23,7 @@ let wizardRegistros = [];
 let wizardPreviewIndex = 0;
 let wizardCabecalho = 'completo';
 let wizardNomeEmpresaExcel = '';
+let wizardEventoAtivo = null;   // evento em uso na geração atual (null = modelo único)
 
 // Definição das variáveis disponíveis por fonte
 const VARS_DEF = {
@@ -183,6 +186,14 @@ const VARS_DEF = {
     label: '📊 Planilha',
     prefix: 'excel',
     campos: [] // preenchido dinamicamente
+  },
+  sistema: {
+    label: '📅 Sistema',
+    prefix: 'sistema',
+    campos: [
+      ['data_atual','Data Atual'],
+      ['data_atual_extenso','Data Atual (por extenso)'],
+    ]
   }
 };
 
@@ -213,7 +224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('overlay').classList.remove('show');
   });
 
-  await Promise.all([carregarModelos(), carregarEmpresas(), carregarDashboard()]);
+  await Promise.all([carregarModelos(), carregarEventos(), carregarEmpresas(), carregarDashboard()]);
 });
 
 // ── Navegação ────────────────────────────────────────────────
@@ -224,6 +235,7 @@ function showSection(name) {
   document.getElementById('nav-' + name)?.classList.add('active');
 
   if (name === 'modelos') renderModelos();
+  if (name === 'eventos') renderEventos();
   if (name === 'historico') carregarHistorico();
   if (name === 'gerar') iniciarWizard();
   if (name === 'dashboard') carregarDashboard();
@@ -322,6 +334,175 @@ function renderModelos() {
   `).join('');
 }
 
+// ── Eventos CRUD ──────────────────────────────────────────────
+async function carregarEventos() {
+  const [{ data: evData, error: evErr }, { data: emData, error: emErr }] = await Promise.all([
+    sb.from('gm_eventos').select('*').order('created_at', { ascending: false }),
+    sb.from('gm_eventos_modelos').select('evento_id, modelo_id, ordem').order('ordem', { ascending: true }),
+  ]);
+  if (evErr) { console.error(evErr); return; }
+  if (emErr) { console.error(emErr); return; }
+
+  const modelosPorId = {};
+  modelos.forEach(m => { modelosPorId[m.id] = m; });
+
+  eventos = (evData || []).map(ev => {
+    const itens = (emData || []).filter(it => it.evento_id === ev.id);
+    const modelosOrdenados = itens.map(it => modelosPorId[it.modelo_id]).filter(Boolean);
+    return { ...ev, modelosOrdenados };
+  });
+}
+
+function renderEventos() {
+  const filtro = (document.getElementById('filtro-eventos')?.value || '').toLowerCase();
+  const lista = eventos.filter(e => e.nome.toLowerCase().includes(filtro));
+  const grid = document.getElementById('eventos-grid');
+  if (!lista.length) {
+    grid.innerHTML = '<div class="empty"><span class="empty-icon">🗂️</span><p>Nenhum evento encontrado</p></div>';
+    return;
+  }
+  grid.innerHTML = lista.map(ev => `
+    <div class="gm-card">
+      <div class="gm-card-top">
+        <div class="gm-card-icon">🗂️</div>
+        <div class="gm-card-info">
+          <div class="gm-card-name">${esc(ev.nome)}</div>
+          <div class="gm-card-desc">${esc(ev.descricao || 'Sem descrição')}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span class="fonte-tag">${ev.modelosOrdenados.length} documento(s)</span>
+      </div>
+      <div class="gm-card-footer">
+        <button class="btn btn-primary btn-sm" onclick="usarEvento('${ev.id}')" ${ev.modelosOrdenados.length ? '' : 'disabled'}>⚡ Gerar</button>
+        <button class="btn btn-secondary btn-sm" onclick="openModalEvento('${ev.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="deletarEvento('${ev.id}')">Excluir</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openModalEvento(id) {
+  const ev = id ? eventos.find(e => e.id === id) : null;
+  document.getElementById('modal-evento-title').textContent = ev ? 'Editar Evento' : 'Novo Evento';
+  document.getElementById('evento-id').value = ev?.id || '';
+  document.getElementById('evento-nome').value = ev?.nome || '';
+  document.getElementById('evento-descricao').value = ev?.descricao || '';
+  eventoModalSelecao = ev ? ev.modelosOrdenados.map(m => m.id) : [];
+  document.getElementById('filtro-evento-modelos-disp').value = '';
+  renderEventoModelosDisponiveis();
+  renderEventoModelosSelecionados();
+  document.getElementById('modal-evento').classList.add('open');
+}
+
+function closeModalEvento() {
+  document.getElementById('modal-evento').classList.remove('open');
+}
+
+function renderEventoModelosDisponiveis() {
+  const filtro = (document.getElementById('filtro-evento-modelos-disp')?.value || '').toLowerCase();
+  const div = document.getElementById('evento-modelos-disponiveis');
+  const lista = modelos.filter(m => !eventoModalSelecao.includes(m.id) && m.nome.toLowerCase().includes(filtro));
+  if (!lista.length) {
+    div.innerHTML = '<div class="empty" style="padding:16px"><span style="font-size:12px;color:var(--muted)">Nenhum modelo disponível</span></div>';
+    return;
+  }
+  div.innerHTML = lista.map(m => `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);font-size:13px;">
+      <span>${esc(m.nome)}</span>
+      <button class="btn btn-secondary btn-sm" onclick="adicionarModeloEvento('${m.id}')">+ Adicionar</button>
+    </div>
+  `).join('');
+}
+
+function renderEventoModelosSelecionados() {
+  const div = document.getElementById('evento-modelos-selecionados');
+  if (!eventoModalSelecao.length) {
+    div.innerHTML = '<div class="empty" style="padding:20px"><span style="font-size:12px;color:var(--muted)">Nenhum modelo adicionado ainda</span></div>';
+    return;
+  }
+  const modelosPorId = {};
+  modelos.forEach(m => { modelosPorId[m.id] = m; });
+  div.innerHTML = eventoModalSelecao.map((id, i) => {
+    const m = modelosPorId[id];
+    if (!m) return '';
+    return `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);font-size:13px;">
+      <span><strong style="color:var(--muted);margin-right:6px;">${i + 1}.</strong>${esc(m.nome)}</span>
+      <span style="display:flex;gap:4px;flex-shrink:0;">
+        <button class="btn btn-secondary btn-sm" onclick="moverModeloEvento('${id}',-1)" title="Mover para cima" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="btn btn-secondary btn-sm" onclick="moverModeloEvento('${id}',1)" title="Mover para baixo" ${i === eventoModalSelecao.length - 1 ? 'disabled' : ''}>↓</button>
+        <button class="btn btn-danger btn-sm" onclick="removerModeloEvento('${id}')" title="Remover">✕</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+function adicionarModeloEvento(modeloId) {
+  if (eventoModalSelecao.includes(modeloId)) return;
+  eventoModalSelecao.push(modeloId);
+  renderEventoModelosDisponiveis();
+  renderEventoModelosSelecionados();
+}
+
+function removerModeloEvento(modeloId) {
+  eventoModalSelecao = eventoModalSelecao.filter(id => id !== modeloId);
+  renderEventoModelosDisponiveis();
+  renderEventoModelosSelecionados();
+}
+
+function moverModeloEvento(modeloId, direcao) {
+  const i = eventoModalSelecao.indexOf(modeloId);
+  const j = i + direcao;
+  if (i < 0 || j < 0 || j >= eventoModalSelecao.length) return;
+  [eventoModalSelecao[i], eventoModalSelecao[j]] = [eventoModalSelecao[j], eventoModalSelecao[i]];
+  renderEventoModelosSelecionados();
+}
+
+async function salvarEvento() {
+  const id        = document.getElementById('evento-id').value || null;
+  const nome      = document.getElementById('evento-nome').value.trim();
+  const descricao = document.getElementById('evento-descricao').value.trim();
+
+  if (!nome) { toast('Informe o nome do evento.', 'error'); return; }
+  if (!eventoModalSelecao.length) { toast('Adicione pelo menos um modelo ao evento.', 'error'); return; }
+
+  try {
+    let eventoId = id;
+    if (eventoId) {
+      const { error } = await sb.from('gm_eventos').update({ nome, descricao }).eq('id', eventoId);
+      if (error) throw error;
+      const { error: delErr } = await sb.from('gm_eventos_modelos').delete().eq('evento_id', eventoId);
+      if (delErr) throw delErr;
+    } else {
+      const { data, error } = await sb.from('gm_eventos')
+        .insert({ nome, descricao, criado_por: currentUser?.id }).select('id').single();
+      if (error) throw error;
+      eventoId = data.id;
+    }
+
+    const itens = eventoModalSelecao.map((modelo_id, ordem) => ({ evento_id: eventoId, modelo_id, ordem }));
+    const { error: insErr } = await sb.from('gm_eventos_modelos').insert(itens);
+    if (insErr) throw insErr;
+
+    toast('Evento salvo com sucesso!', 'success');
+    closeModalEvento();
+    await carregarEventos();
+    renderEventos();
+  } catch (err) {
+    console.error(err);
+    toast('Erro ao salvar evento: ' + err.message, 'error');
+  }
+}
+
+async function deletarEvento(id) {
+  if (!confirm('Excluir este evento? Os modelos individuais não são afetados.')) return;
+  const { error } = await sb.from('gm_eventos').delete().eq('id', id);
+  if (error) { toast('Erro ao excluir: ' + error.message, 'error'); return; }
+  await carregarEventos();
+  renderEventos();
+}
+
 function openModalModelo(id) {
   const el = document.getElementById('modal-modelo');
   el.classList.add('open');
@@ -406,7 +587,7 @@ function renderVarsPanel() {
   const panel = document.getElementById('vars-panel-content');
 
   let html = '';
-  for (const fonte of [...fontesAtivas, ...(hasExcel ? ['excel'] : [])]) {
+  for (const fonte of [...fontesAtivas, ...(hasExcel ? ['excel'] : []), 'sistema']) {
     const def = VARS_DEF[fonte];
     if (!def) continue;
     const campos = fonte === 'excel'
@@ -509,6 +690,46 @@ function usarModelo(id) {
   setTimeout(() => selecionarModeloWizard(id), 100);
 }
 
+// Um Evento gera vários modelos de uma vez para o(s) mesmo(s) registro(s).
+// Reaproveita toda a máquina do wizard (preview/exportar/registrarGeração)
+// tratando o evento como um "modelo sintético" cujo template é a concatenação,
+// na ordem configurada, dos templates dos modelos do evento — com quebra de
+// página entre cada um. Só registrarGeracao() precisa saber diferenciar,
+// para gravar uma linha de histórico por modelo real (não pelo sintético).
+function usarEvento(id) {
+  const evento = eventos.find(e => e.id === id);
+  if (!evento || !evento.modelosOrdenados.length) {
+    toast('Este evento não tem modelos configurados.', 'error');
+    return;
+  }
+  showSection('gerar');
+  setTimeout(() => _iniciarWizardComEvento(evento), 100);
+}
+
+function _iniciarWizardComEvento(evento) {
+  const fontesUniao = new Set(['empregados']); // eventos sempre geram por empregado
+  evento.modelosOrdenados.forEach(m => (m.fontes || []).forEach(f => fontesUniao.add(f)));
+
+  const templateConcatenado = evento.modelosOrdenados
+    .map(m => m.template || '')
+    .join('<div style="page-break-before:always;break-before:page;"></div>');
+
+  wizardModeloSelecionado = {
+    id: null,
+    nome: evento.nome,
+    tipo: 'por_registro',
+    fontes: [...fontesUniao],
+    template: templateConcatenado,
+    cabecalho_padrao: 'completo',
+  };
+  wizardEventoAtivo = evento;
+  wizardCabecalho = 'completo';
+  wizardSequencia = calcularSequencia().filter(p => p !== 'modelo');
+  renderWizardBar();
+  mostrarPainel(wizardSequencia[0]);
+  toast(`Evento "${evento.nome}" selecionado (${evento.modelosOrdenados.length} documento(s)).`, 'success');
+}
+
 // ── Empresas ──────────────────────────────────────────────────
 async function carregarEmpresas() {
   const { data } = await sb.from('rh_empresas').select('id,codigo_empresa,nome_empresa').order('nome_empresa');
@@ -568,6 +789,7 @@ async function iniciarWizard() {
   wizardSequencia            = ['modelo', 'empresas', 'exportar'];
   wizardPanelAtual           = 'modelo';
   wizardModeloSelecionado    = null;
+  wizardEventoAtivo          = null;
   wizardEmpresasSelecionadas  = [];
   wizardEmpregadosSelecionados = [];
   wizardSociosSelecionados    = [];
@@ -911,6 +1133,13 @@ function construirRegistros() {
   wizardPreviewIndex = 0;
 }
 
+const MESES_EXTENSO = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+function _dataAtualExtenso() {
+  const d = new Date();
+  return `${d.getDate()} de ${MESES_EXTENSO[d.getMonth()]} de ${d.getFullYear()}`;
+}
+
 function buildVarMap(empresa, empregado, socio, rubrica, excelRow) {
   const map = {};
   for (const [campo] of VARS_DEF.empresas.campos)   map[`empresa.${campo}`]   = empresa[campo]   ?? '';
@@ -918,6 +1147,8 @@ function buildVarMap(empresa, empregado, socio, rubrica, excelRow) {
   for (const [campo] of VARS_DEF.socios.campos)      map[`socio.${campo}`]     = socio[campo]     ?? '';
   for (const [campo] of VARS_DEF.rubricas.campos)    map[`rubrica.${campo}`]   = rubrica[campo]   ?? '';
   for (const h of excelHeaders)                       map[`excel.${h}`]         = excelRow[h]      ?? '';
+  map['sistema.data_atual']         = new Date().toLocaleDateString('pt-BR');
+  map['sistema.data_atual_extenso'] = _dataAtualExtenso();
   return map;
 }
 
@@ -1179,6 +1410,21 @@ async function exportarExcel() {
 
 async function registrarGeracao() {
   if (!wizardModeloSelecionado) return;
+
+  if (wizardEventoAtivo) {
+    const linhas = wizardEventoAtivo.modelosOrdenados.map(m => ({
+      modelo_id:       m.id,
+      modelo_nome:     m.nome,
+      empresas_ids:    wizardEmpresasSelecionadas,
+      total_registros: wizardRegistros.length,
+      cabecalho_usado: wizardCabecalho,
+      criado_por:      currentUser?.id,
+      evento_id:       wizardEventoAtivo.id,
+    }));
+    await sb.from('gm_geracoes').insert(linhas);
+    return;
+  }
+
   await sb.from('gm_geracoes').insert({
     modelo_id:       wizardModeloSelecionado.id,
     modelo_nome:     wizardModeloSelecionado.nome,
