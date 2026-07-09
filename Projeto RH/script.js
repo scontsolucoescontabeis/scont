@@ -3140,11 +3140,11 @@ function mostrarTela(telaId) {
     if (telaId === 'gruposScreen') carregarGrupos();
 
     const pageHeader = document.getElementById('pageHeader');
-    if (pageHeader) pageHeader.style.display = telaId === 'selectionScreen' ? 'none' : 'block';
+    if (pageHeader) pageHeader.style.display = (telaId === 'selectionScreen' || telaId === 'gruposScreen') ? 'none' : 'block';
 
     const sub = document.getElementById('pageHeaderSub');
     if (sub) {
-        if (telaId !== 'selectionScreen' && state.empresaSelecionada) {
+        if (telaId !== 'selectionScreen' && telaId !== 'gruposScreen' && state.empresaSelecionada) {
             sub.textContent = `🏢 ${state.empresaSelecionada.codigo_empresa} — ${state.empresaSelecionada.nome_empresa}  ·  📅 ${state.competencia}`;
         } else {
             sub.textContent = 'Selecione a competência e empresa para começar';
