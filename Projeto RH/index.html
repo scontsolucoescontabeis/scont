@@ -15,6 +15,7 @@
     <script src="../portal-auth-guard.js"></script>
     <!-- SheetJS para Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     
     <link rel="stylesheet" href="styles.css">
@@ -46,6 +47,9 @@
         <a class="sidebar-item" href="conversor.html" style="text-decoration:none;">
             <span class="sidebar-item-icon">📄</span> Conversor de Folha
         </a>
+        <button class="sidebar-item" onclick="mostrarTela('gruposScreen')">
+            <span class="sidebar-item-icon">👥</span> Grupos de Empresas
+        </button>
     </nav>
 
     <div class="sidebar-footer">
@@ -224,6 +228,22 @@
 
             <div id="consolidadoContainer"></div>
             <div id="tabelasContainer"></div>
+        </div>
+
+        <!-- TELA DE GRUPOS DE EMPRESAS -->
+        <div id="gruposScreen" style="display: none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
+                <h2 style="color: var(--primary-color); margin:0;">👥 Grupos de Empresas</h2>
+                <button type="button" class="btn btn-primary btn-small" onclick="novoGrupo()">➕ Novo Grupo</button>
+            </div>
+            <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start;">
+                <div style="flex: 0 0 260px; border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
+                    <div id="listaGrupos"></div>
+                </div>
+                <div style="flex: 1 1 420px; border:1px solid var(--border-color); border-radius:8px; padding:16px;" id="grupoDetalhe">
+                    <p style="color: var(--text-secondary); font-size:13px;">Selecione um grupo à esquerda ou clique em "Novo Grupo".</p>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -930,6 +950,22 @@
         </div>
     </div>
 
+    <!-- MODAL: RESUMO DO PROCESSAMENTO EM LOTE -->
+    <div id="loteResumoModal" class="modal">
+        <div class="modal-content" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3 style="margin:0;">📊 Resumo do Processamento em Lote</h3>
+                <button type="button" class="modal-close" onclick="document.getElementById('loteResumoModal').classList.remove('active')">×</button>
+            </div>
+            <div class="modal-body" style="padding:20px;">
+                <div id="loteResumoConteudo"></div>
+            </div>
+            <div class="modal-footer" style="display:flex; justify-content:flex-end; padding:15px 20px; border-top:1px solid #eee;">
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('loteResumoModal').classList.remove('active')">Fechar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Dropdown de busca de empresa — fora de qualquer container para evitar clipping -->
     <div id="buscaEmpresaResultados" style="
         display: none;
@@ -956,6 +992,18 @@
     "></div>
 
     <div id="vvBuscaEmpresaResultados" style="
+        display: none;
+        position: fixed;
+        background: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        max-height: 240px;
+        overflow-y: auto;
+        z-index: 9000;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    "></div>
+
+    <div id="grpBuscaEmpresaResultados" style="
         display: none;
         position: fixed;
         background: #fff;

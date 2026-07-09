@@ -191,6 +191,11 @@ document.addEventListener('click', e => {
     if (cfgBox && cfgInput && !cfgBox.contains(e.target) && e.target !== cfgInput) {
         cfgBox.style.display = 'none';
     }
+    const grpBox   = document.getElementById('grpBuscaEmpresaResultados');
+    const grpInput = document.getElementById('grpBuscaEmpresa');
+    if (grpBox && grpInput && !grpBox.contains(e.target) && e.target !== grpInput) {
+        grpBox.style.display = 'none';
+    }
 });
 
 async function carregarEmpregados(codigoEmpresa) {
@@ -2564,7 +2569,9 @@ function mostrarTela(telaId) {
     document.getElementById('selectionScreen').style.display = 'none';
     document.getElementById('mainScreen').style.display = 'none';
     document.getElementById('resultsScreen').style.display = 'none';
+    document.getElementById('gruposScreen').style.display = 'none';
     document.getElementById(telaId).style.display = 'block';
+    if (telaId === 'gruposScreen') carregarGrupos();
 
     const pageHeader = document.getElementById('pageHeader');
     if (pageHeader) pageHeader.style.display = telaId === 'selectionScreen' ? 'none' : 'block';
