@@ -24,7 +24,8 @@ const state = {
     sabadoSempreExtra: false,
     ruleExtra100Optional: false,
     terceiroTurno: false,
-    resultados: []
+    resultados: [],
+    feriasCalculadas: {} // codigo_empregado -> [{ inicio: 'AAAA-MM-DD', fim: 'AAAA-MM-DD' }, ...]
 };
 
 // ===== INICIALIZAÇÃO =====
@@ -52,6 +53,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('novaDataFeriado').addEventListener('input', (e) => {
         e.target.value = formatarData(e.target.value);
     });
+    if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
     await carregarEmpresas();
     await carregarFeriadosGlobais();
     inicializarEventos();
@@ -217,6 +221,26 @@ async function carregarEmpregados(codigoEmpresa) {
     }
 }
 
+// ✅ Mapa codigo_empregado -> períodos de férias, para exibição na Folha de Ponto
+async function carregarFeriasCalculadas(codigoEmpresa) {
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_ferias_calculadas')
+            .select('codigo_empregado, ferias_inicio, ferias_fim')
+            .eq('codigo_empresa', codigoEmpresa);
+        if (error) throw error;
+        const mapa = {};
+        (data || []).forEach(r => {
+            if (!mapa[r.codigo_empregado]) mapa[r.codigo_empregado] = [];
+            mapa[r.codigo_empregado].push({ inicio: r.ferias_inicio, fim: r.ferias_fim });
+        });
+        return mapa;
+    } catch (erro) {
+        console.error('Erro ao carregar férias calculadas:', erro);
+        return {};
+    }
+}
+
 // --- EVENTOS PRINCIPAIS ---
 function alternarTerceiroTurno(checked) {
     state.terceiroTurno = checked;
@@ -265,6 +289,23 @@ function inicializarEventos() {
             importarExcel(e.target.files[0]);
             e.target.value = '';
         }
+    });
+
+    document.getElementById('feriasArquivoPdf').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        const nomeSpan = document.getElementById('feriasArquivoNome');
+        const btn = document.getElementById('feriasProcessarBtn');
+        if (file) {
+            nomeSpan.textContent = file.name;
+            btn.disabled = false;
+        } else {
+            nomeSpan.textContent = 'Nenhum arquivo selecionado.';
+            btn.disabled = true;
+        }
+    });
+    document.getElementById('feriasProcessarBtn').addEventListener('click', () => {
+        const file = document.getElementById('feriasArquivoPdf').files[0];
+        if (file) processarPdfFerias(file);
     });
 }
 
@@ -3749,4 +3790,131 @@ async function _efetivarDownloadTXTResultados() {
     } catch (erro) {
         mostrarMensagem('Aviso', erro.message);
     }
+}
+
+// ===== IMPORTAÇÃO DE FÉRIAS CALCULADAS (PDF) =====
+
+async function processarPdfFerias(file) {
+    const btn = document.getElementById('feriasProcessarBtn');
+    btn.disabled = true;
+    mostrarMensagem('Processando', 'Lendo o PDF de férias calculadas...');
+    try {
+        const buffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+        let todasLinhas = [];
+        for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+            todasLinhas = todasLinhas.concat(_reconstruirLinhasPagina(content.items));
+        }
+
+        const { registros, avisos } = _parsearLinhasFerias(todasLinhas);
+        fecharModalMensagem();
+
+        if (registros.length === 0) {
+            mostrarMensagem('Aviso', 'Nenhum registro de férias foi reconhecido neste PDF.');
+            btn.disabled = false;
+            return;
+        }
+
+        await _salvarFeriasCalculadas(registros, avisos);
+    } catch (erro) {
+        console.error('Erro ao processar PDF de férias:', erro);
+        fecharModalMensagem();
+        mostrarMensagem('Erro', 'Falha ao processar o PDF. Verifique se o arquivo é válido.');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function _salvarFeriasCalculadas(registros, avisos) {
+    const codigosEmpresas = [...new Set(registros.map(r => r.codigo_empresa))];
+
+    const { data: existentesData, error: errExistentes } = await supabaseClient
+        .from('rh_ferias_calculadas')
+        .select('codigo_empresa, codigo_empregado, ferias_inicio')
+        .in('codigo_empresa', codigosEmpresas);
+    if (errExistentes) {
+        mostrarMensagem('Erro', 'Falha ao consultar registros existentes antes de salvar.');
+        return;
+    }
+    const chavesExistentes = new Set(
+        (existentesData || []).map(r => `${r.codigo_empresa}|${r.codigo_empregado}|${r.ferias_inicio}`)
+    );
+
+    const porEmpresa = {}; // codigo_empresa -> { nome, novos, atualizados }
+    registros.forEach(r => {
+        if (!porEmpresa[r.codigo_empresa]) {
+            porEmpresa[r.codigo_empresa] = { nome: r.nome_empresa, novos: 0, atualizados: 0 };
+        }
+        const chave = `${r.codigo_empresa}|${r.codigo_empregado}|${r.ferias_inicio}`;
+        if (chavesExistentes.has(chave)) {
+            porEmpresa[r.codigo_empresa].atualizados++;
+        } else {
+            porEmpresa[r.codigo_empresa].novos++;
+        }
+    });
+
+    const LOTE = 200;
+    for (let i = 0; i < registros.length; i += LOTE) {
+        const pedaco = registros.slice(i, i + LOTE);
+        const { error } = await supabaseClient
+            .from('rh_ferias_calculadas')
+            .upsert(pedaco, { onConflict: 'codigo_empresa,codigo_empregado,ferias_inicio' });
+        if (error) {
+            console.error('Erro ao salvar férias calculadas:', error);
+            mostrarMensagem('Erro', `Falha ao salvar registros no banco: ${error.message}`);
+            return;
+        }
+    }
+
+    _renderizarResumoImportacaoFerias(porEmpresa, avisos, registros.length);
+}
+
+function _renderizarResumoImportacaoFerias(porEmpresa, avisos, totalRegistros) {
+    const container = document.getElementById('feriasResumoContainer');
+    const totalNovos = Object.values(porEmpresa).reduce((s, e) => s + e.novos, 0);
+    const totalAtualizados = Object.values(porEmpresa).reduce((s, e) => s + e.atualizados, 0);
+
+    let html = `
+        <div style="border:1px solid var(--border-color); border-radius:8px; padding:16px;">
+            <p style="margin:0 0 10px; font-weight:600;">
+                ✅ ${totalRegistros} registro(s) salvos (${totalNovos} novo(s), ${totalAtualizados} atualizado(s))
+            </p>
+    `;
+
+    if (avisos.length > 0) {
+        html += `
+            <details style="margin:10px 0;">
+                <summary style="cursor:pointer; color:#92400e; font-weight:600;">⚠️ ${avisos.length} linha(s) não reconhecida(s)</summary>
+                <ul style="font-size:12px; color:#78350f; margin-top:8px;">
+                    ${avisos.map(a => `<li><strong>${a.motivo}:</strong> ${a.linha}</li>`).join('')}
+                </ul>
+            </details>
+        `;
+    }
+
+    html += `
+            <table style="width:100%; border-collapse:collapse; font-size:13px; margin-top:10px;">
+                <thead>
+                    <tr style="background:var(--background-color); text-align:left;">
+                        <th style="padding:8px; border-bottom:2px solid var(--border-color);">Empresa</th>
+                        <th style="padding:8px; border-bottom:2px solid var(--border-color); text-align:center;">Novos</th>
+                        <th style="padding:8px; border-bottom:2px solid var(--border-color); text-align:center;">Atualizados</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${Object.entries(porEmpresa).map(([codigo, info]) => `
+                        <tr>
+                            <td style="padding:8px; border-bottom:1px solid #eee;">${codigo} - ${info.nome}</td>
+                            <td style="padding:8px; border-bottom:1px solid #eee; text-align:center;">${info.novos}</td>
+                            <td style="padding:8px; border-bottom:1px solid #eee; text-align:center;">${info.atualizados}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    container.innerHTML = html;
 }
