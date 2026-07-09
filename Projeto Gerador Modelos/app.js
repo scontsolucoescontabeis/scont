@@ -706,12 +706,31 @@ function usarEvento(id) {
   setTimeout(() => _iniciarWizardComEvento(evento), 100);
 }
 
+// Cabeçalho com identidade visual da SCONT — mesmo estilo usado no
+// cabeçalho "completo" do wizard normal, mas com o nome do documento
+// específico (não do evento), para cada página parecer um documento
+// separado e devidamente identificado.
+function _headerDocumentoScont(nomeDocumento) {
+  const hdrStyle   = 'background:#8B3A3A;color:white;padding:12px 18px;display:flex;align-items:center;gap:14px;';
+  const logoStyle  = 'font-size:18px;font-weight:900;letter-spacing:2px;color:white;border:2px solid rgba(255,255,255,.6);padding:2px 7px;border-radius:3px;flex-shrink:0';
+  const sepStyle   = 'width:1px;background:rgba(255,255,255,.4);height:30px;flex-shrink:0';
+  const titleStyle = 'font-size:12px;font-weight:700;color:white;display:block;line-height:1.2';
+  const subStyle   = 'font-size:10px;color:rgba(255,255,255,.8);display:block;margin-top:2px';
+  return `<div style="${hdrStyle}">
+    <span style="${logoStyle}">SCONT</span><div style="${sepStyle}"></div>
+    <div><strong style="${titleStyle}">${esc(nomeDocumento)}</strong>
+    <span style="${subStyle}">SCONT Soluções Contábeis — Gestão de RH</span></div></div>`;
+}
+
 function _iniciarWizardComEvento(evento) {
   const fontesUniao = new Set(['empregados']); // eventos sempre geram por empregado
   evento.modelosOrdenados.forEach(m => (m.fontes || []).forEach(f => fontesUniao.add(f)));
 
+  // Cada modelo vira uma página própria: cabeçalho SCONT com o nome do
+  // documento + seu corpo, separado do próximo por quebra de página —
+  // são documentos distintos, não um único documento corrido.
   const templateConcatenado = evento.modelosOrdenados
-    .map(m => m.template || '')
+    .map(m => `${_headerDocumentoScont(m.nome)}<div style="padding-top:14px;">${m.template || ''}</div>`)
     .join('<div style="page-break-before:always;break-before:page;"></div>');
 
   wizardModeloSelecionado = {
@@ -720,10 +739,11 @@ function _iniciarWizardComEvento(evento) {
     tipo: 'por_registro',
     fontes: [...fontesUniao],
     template: templateConcatenado,
-    cabecalho_padrao: 'completo',
+    cabecalho_padrao: 'nenhum',
   };
   wizardEventoAtivo = evento;
-  wizardCabecalho = 'completo';
+  // 'nenhum' aqui evita duplicar cabeçalho: cada documento já embute o seu próprio acima.
+  wizardCabecalho = 'nenhum';
   wizardSequencia = calcularSequencia().filter(p => p !== 'modelo');
   renderWizardBar();
   mostrarPainel(wizardSequencia[0]);
