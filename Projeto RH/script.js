@@ -2180,6 +2180,82 @@ function _renderGrupoDetalhe() {
     if (compEl) compEl.addEventListener('input', e => { e.target.value = formatarCompetencia(e.target.value); });
 }
 
+// --- AÇÕES EM LOTE: MODELOS ---
+async function baixarModelosGrupo() {
+    if (!_grupoAtual?.id) { mostrarMensagem('Aviso', 'Salve o grupo antes de baixar os modelos.'); return; }
+    const comp = document.getElementById('grpCompetencia')?.value || '';
+    if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe a competência antes de baixar os modelos.'); return; }
+    if (_grupoAtual.empresas.length === 0) { mostrarMensagem('Aviso', 'O grupo não possui empresas.'); return; }
+
+    mostrarMensagem('Aguarde', 'Gerando modelos do grupo...');
+    const zip = new JSZip();
+    const avisos = [];
+    const diasDoMes = gerarDiasDoMes(comp);
+    const [mm, aaaa] = comp.split('/');
+
+    for (const empresa of _grupoAtual.empresas) {
+        try {
+            const { data: empregados, error } = await supabaseClient
+                .from('rh_empregados')
+                .select('codigo_empregado, nome_empregado')
+                .eq('codigo_empresa', empresa.codigo_empresa)
+                .order('nome_empregado', { ascending: true });
+            if (error) throw error;
+            if (!empregados || empregados.length === 0) {
+                avisos.push(`${empresa.codigo_empresa} - ${empresa.nome_empresa}: sem empregados cadastrados.`);
+                continue;
+            }
+            const cfg = await _buscarConfigRubricas(empresa.codigo_empresa);
+            const comTerceiroTurno = cfg?.['terceiro_turno']?.cod === '1';
+
+            const wb = XLSX.utils.book_new();
+            empregados.forEach(emp => {
+                const nomeSheet = `${emp.codigo_empregado} ${emp.nome_empregado}`.substring(0, 31);
+                const header = comTerceiroTurno
+                    ? ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Entrada 3', 'Saída 3']
+                    : ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2'];
+                const rows = [header, ...diasDoMes.map(d => comTerceiroTurno
+                    ? [d.data, d.diaSemana, '', '', '', '', '', '']
+                    : [d.data, d.diaSemana, '', '', '', ''])];
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                for (let r = 1; r < rows.length; r++) {
+                    const addr = XLSX.utils.encode_cell({ r, c: 0 });
+                    ws[addr] = { t: 's', v: rows[r][0] };
+                }
+                ws['!cols'] = comTerceiroTurno
+                    ? [{ wch: 13 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }]
+                    : [{ wch: 13 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
+                XLSX.utils.book_append_sheet(wb, ws, nomeSheet);
+            });
+
+            const binario = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+            zip.file(`Modelo_FolhaPonto_${empresa.codigo_empresa}_${mm}-${aaaa}.xlsx`, binario);
+        } catch (erro) {
+            console.error('Erro ao gerar modelo para', empresa.codigo_empresa, erro);
+            avisos.push(`${empresa.codigo_empresa} - ${empresa.nome_empresa}: erro ao gerar modelo (${erro.message}).`);
+        }
+    }
+
+    try {
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Modelos_${_grupoAtual.nome_grupo}_${mm}-${aaaa}.zip`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        fecharModalMensagem();
+        if (avisos.length > 0) {
+            mostrarMensagem('Concluído com avisos', 'Zip gerado. Empresas puladas:\n' + avisos.join('\n'));
+        } else {
+            mostrarMensagem('Sucesso', 'Modelos do grupo gerados e baixados com sucesso!');
+        }
+    } catch (erro) {
+        fecharModalMensagem();
+        mostrarMensagem('Erro', 'Falha ao gerar o arquivo zip: ' + erro.message);
+    }
+}
+
 function abrirModalConfigRubricas() {
     document.getElementById('cfgCodigoEmpresa').value = '';
     document.getElementById('cfgBuscaEmpresa').value = '';
