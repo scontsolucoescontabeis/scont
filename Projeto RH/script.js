@@ -2163,10 +2163,14 @@ function _renderGrupoDetalhe() {
                 style="width:100%; box-sizing:border-box; margin-top:4px;">
         </div>
         <div id="grpEmpresasList" style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden; margin-bottom:14px;"></div>
-        <div class="form-group" style="margin-bottom:14px;">
-            <label>Observações do Grupo</label>
-            <textarea id="grpObservacoes" rows="3" placeholder="Observações sobre este grupo..."
-                style="width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #ced4da; border-radius:4px; font-size:13px; font-family:inherit; resize:vertical;">${(_grupoAtual.observacoes || '').replace(/</g, '&lt;')}</textarea>
+        <div style="margin-bottom:18px; border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
+            <div style="background: var(--background-color); padding: 8px 14px;">
+                <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">📝 Observações do Grupo</span>
+            </div>
+            <div style="padding: 14px;">
+                <textarea id="grpObservacoes" rows="10" placeholder="Descreva aqui tudo o que for relevante sobre este grupo: particularidades das empresas, combinados com o cliente, exceções de processamento, prazos, etc. Não deixe nenhum detalhe de fora."
+                    style="width:100%; box-sizing:border-box; padding:12px; border:1px solid #ced4da; border-radius:6px; font-size:15px; line-height:1.5; font-family:inherit; resize:vertical; min-height:180px;">${(_grupoAtual.observacoes || '').replace(/</g, '&lt;')}</textarea>
+            </div>
         </div>
         <div style="display:flex; justify-content:space-between; gap:10px;">
             ${_grupoAtual.id ? '<button type="button" class="btn btn-danger btn-small" onclick="excluirGrupo()">🗑 Excluir Grupo</button>' : '<span></span>'}
