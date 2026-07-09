@@ -286,8 +286,12 @@ CREATE POLICY "rh_config_rub_txt: escrita autenticado"
 CREATE TABLE IF NOT EXISTS public.rh_grupos_empresas (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome_grupo  TEXT NOT NULL UNIQUE,
+    observacoes TEXT NOT NULL DEFAULT '',
     criado_em   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Migração idempotente para bancos onde a tabela já existia sem a coluna
+ALTER TABLE public.rh_grupos_empresas ADD COLUMN IF NOT EXISTS observacoes TEXT NOT NULL DEFAULT '';
 
 ALTER TABLE public.rh_grupos_empresas ENABLE ROW LEVEL SECURITY;
 

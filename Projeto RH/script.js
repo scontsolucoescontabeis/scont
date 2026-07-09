@@ -2010,7 +2010,7 @@ function renderizarListaGrupos() {
 }
 
 function novoGrupo() {
-    _grupoAtual = { id: null, nome_grupo: '', empresas: [] };
+    _grupoAtual = { id: null, nome_grupo: '', observacoes: '', empresas: [] };
     renderizarListaGrupos();
     _renderGrupoDetalhe();
 }
@@ -2019,6 +2019,12 @@ async function selecionarGrupo(id) {
     const grupo = _grupos.find(g => g.id === id);
     if (!grupo) return;
     try {
+        const { data: grupoCompleto, error: errG } = await supabaseClient
+            .from('rh_grupos_empresas')
+            .select('id, nome_grupo, observacoes')
+            .eq('id', id)
+            .single();
+        if (errG) throw errG;
         const { data: itens, error } = await supabaseClient
             .from('rh_grupos_empresas_itens')
             .select('codigo_empresa')
@@ -2028,7 +2034,7 @@ async function selecionarGrupo(id) {
             const emp = state.empresas.find(e => e.codigo_empresa === it.codigo_empresa);
             return { codigo_empresa: it.codigo_empresa, nome_empresa: emp?.nome_empresa || it.codigo_empresa };
         });
-        _grupoAtual = { id: grupo.id, nome_grupo: grupo.nome_grupo, empresas };
+        _grupoAtual = { id: grupoCompleto.id, nome_grupo: grupoCompleto.nome_grupo, observacoes: grupoCompleto.observacoes || '', empresas };
         renderizarListaGrupos();
         _renderGrupoDetalhe();
     } catch (erro) {
@@ -2095,13 +2101,14 @@ function adicionarEmpresaGrupo(codigo, nome) {
 async function salvarGrupo() {
     const nome = (document.getElementById('grpNome')?.value || '').trim();
     if (!nome) { mostrarMensagem('Aviso', 'Informe o nome do grupo.'); return; }
+    const observacoes = (document.getElementById('grpObservacoes')?.value || '').trim();
     try {
         let grupoId = _grupoAtual.id;
         if (grupoId) {
-            const { error } = await supabaseClient.from('rh_grupos_empresas').update({ nome_grupo: nome }).eq('id', grupoId);
+            const { error } = await supabaseClient.from('rh_grupos_empresas').update({ nome_grupo: nome, observacoes }).eq('id', grupoId);
             if (error) throw error;
         } else {
-            const { data, error } = await supabaseClient.from('rh_grupos_empresas').insert({ nome_grupo: nome }).select('id').single();
+            const { data, error } = await supabaseClient.from('rh_grupos_empresas').insert({ nome_grupo: nome, observacoes }).select('id').single();
             if (error) throw error;
             grupoId = data.id;
         }
@@ -2156,6 +2163,11 @@ function _renderGrupoDetalhe() {
                 style="width:100%; box-sizing:border-box; margin-top:4px;">
         </div>
         <div id="grpEmpresasList" style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden; margin-bottom:14px;"></div>
+        <div class="form-group" style="margin-bottom:14px;">
+            <label>Observações do Grupo</label>
+            <textarea id="grpObservacoes" rows="3" placeholder="Observações sobre este grupo..."
+                style="width:100%; box-sizing:border-box; padding:8px 10px; border:1px solid #ced4da; border-radius:4px; font-size:13px; font-family:inherit; resize:vertical;">${(_grupoAtual.observacoes || '').replace(/</g, '&lt;')}</textarea>
+        </div>
         <div style="display:flex; justify-content:space-between; gap:10px;">
             ${_grupoAtual.id ? '<button type="button" class="btn btn-danger btn-small" onclick="excluirGrupo()">🗑 Excluir Grupo</button>' : '<span></span>'}
             <button type="button" class="btn btn-primary btn-small" onclick="salvarGrupo()">💾 Salvar Grupo</button>
@@ -3092,6 +3104,10 @@ function mostrarTela(telaId) {
     }
 
     atualizarBannerObservacoes();
+    if (telaId === 'gruposScreen') {
+        const obsBanner = document.getElementById('empresaObservacoesBanner');
+        if (obsBanner) obsBanner.style.display = 'none';
+    }
 }
 
 function voltarParaEdicao() {
