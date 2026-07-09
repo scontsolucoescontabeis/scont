@@ -1842,8 +1842,8 @@ const _CFG_EVENTOS = [
     { ev: 'noturno',   sufRub: 'Noturno',   defaultTipo: 'horas' },
     { ev: 'atraso',    sufRub: 'Atraso',    defaultTipo: 'horas' },
     { ev: 'falta',     sufRub: 'Falta',     defaultTipo: 'dias'  },
-    { ev: 'descontoVT', sufRub: 'DescontoVT', defaultTipo: 'dias' },
-    { ev: 'descontoVA', sufRub: 'DescontoVA', defaultTipo: 'dias' },
+    { ev: 'descontoVT', sufRub: 'DescontoVT', defaultTipo: 'monetario' },
+    { ev: 'descontoVA', sufRub: 'DescontoVA', defaultTipo: 'monetario' },
 ];
 
 let _cacheConfigRubricas = {};
@@ -2795,9 +2795,9 @@ function _carregarConfigNoCampos(prefixo, c) {
     setVal(`${prefixo}RubFalta`,   c.rubFalta);
     setOpt(`${prefixo}TipoFalta`,  c.tipoFalta,  'dias');
     setVal(`${prefixo}RubDescontoVT`,  c.rubDescontoVT);
-    setOpt(`${prefixo}TipoDescontoVT`, c.tipoDescontoVT, 'dias');
+    setOpt(`${prefixo}TipoDescontoVT`, c.tipoDescontoVT, 'monetario');
     setVal(`${prefixo}RubDescontoVA`,  c.rubDescontoVA);
-    setOpt(`${prefixo}TipoDescontoVA`, c.tipoDescontoVA, 'dias');
+    setOpt(`${prefixo}TipoDescontoVA`, c.tipoDescontoVA, 'monetario');
 }
 
 function _lerCamposConfig(prefixo, radioName) {
@@ -2817,9 +2817,9 @@ function _lerCamposConfig(prefixo, radioName) {
         rubFalta:   g(`${prefixo}RubFalta`).trim(),
         tipoFalta:  g(`${prefixo}TipoFalta`)  || 'dias',
         rubDescontoVT:  g(`${prefixo}RubDescontoVT`).trim(),
-        tipoDescontoVT: g(`${prefixo}TipoDescontoVT`) || 'dias',
+        tipoDescontoVT: g(`${prefixo}TipoDescontoVT`) || 'monetario',
         rubDescontoVA:  g(`${prefixo}RubDescontoVA`).trim(),
-        tipoDescontoVA: g(`${prefixo}TipoDescontoVA`) || 'dias',
+        tipoDescontoVA: g(`${prefixo}TipoDescontoVA`) || 'monetario',
     };
 }
 
@@ -2852,7 +2852,7 @@ function _toggleNaoCompensar(prefix) {
     if (label) label.textContent = checked ? 'Horas Faltantes' : 'Atraso';
 }
 
-function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null) {
+function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null, diasFaltaDetalhes = []) {
     const tp = String(config.tipoProcesso).padStart(2, '0');
     const empFmt = String(codEmp).padStart(10, '0');
     const empFmt2 = String(codEmpresa).padStart(10, '0');
@@ -2876,6 +2876,7 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, m
         linha(config.rubNoturno,   _encMinutosParaTipo(mins_not,   config.tipoNoturno)),
         linha(config.rubAtraso,    _encMinutosParaTipo(mins_atr,   config.tipoAtraso)),
         linha(config.rubFalta,     encDiasOuHoras(config.tipoFalta, dias_falta)),
+        _linhasFaltas(diasFaltaDetalhes),
         linha(config.rubDescontoVT, encDescontoVaVt(config.tipoDescontoVT, valoresVT)),
         linha(config.rubDescontoVA, encDescontoVaVt(config.tipoDescontoVA, valoresVA)),
     ].join('');
@@ -3079,9 +3080,9 @@ async function _construirConteudoTXTExportacao() {
             tDev,
             tFaltaDias,
             tDiasDescontoVAVT,
-            valoresVaVtMapa[`${empCodigo}_${empInfo.codigo_empregado}`]
+            valoresVaVtMapa[`${empCodigo}_${empInfo.codigo_empregado}`],
+            diasFaltaDetalhes
         );
-        conteudoTXT += _linhasFaltas(diasFaltaDetalhes);
     });
 
     localStorage.setItem(TXT_RUBRICAS_KEY, JSON.stringify(_lerCamposConfig('exp', 'exportTipoProcesso')));
@@ -3644,9 +3645,9 @@ async function _construirConteudoTXTResultados(salvar = false) {
             minsAtr,
             diasFaltaRes.length,
             diasDescontoVAVT,
-            valoresVaVtMapa[res.empregadoId]
+            valoresVaVtMapa[res.empregadoId],
+            diasFaltaRes
         );
-        conteudoTXT += _linhasFaltas(diasFaltaRes);
     });
 
     conteudoTXT += _construirLinhasAdicionais(compFmt, codEmpresa, config.tipoProcesso);
