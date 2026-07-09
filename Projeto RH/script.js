@@ -3880,9 +3880,17 @@ async function _salvarFeriasCalculadas(registros, avisos) {
         }
     });
 
+    const registrosParaSalvar = registros.map(r => ({
+        codigo_empresa: r.codigo_empresa,
+        codigo_empregado: r.codigo_empregado,
+        nome_empregado: r.nome_empregado,
+        ferias_inicio: r.ferias_inicio,
+        ferias_fim: r.ferias_fim
+    }));
+
     const LOTE = 200;
-    for (let i = 0; i < registros.length; i += LOTE) {
-        const pedaco = registros.slice(i, i + LOTE);
+    for (let i = 0; i < registrosParaSalvar.length; i += LOTE) {
+        const pedaco = registrosParaSalvar.slice(i, i + LOTE);
         const { error } = await supabaseClient
             .from('rh_ferias_calculadas')
             .upsert(pedaco, { onConflict: 'codigo_empresa,codigo_empregado,ferias_inicio' });
