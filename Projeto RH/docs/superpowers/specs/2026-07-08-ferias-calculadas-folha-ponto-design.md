@@ -66,13 +66,14 @@ CREATE POLICY "rh_ferias_calculadas: escrita autenticado"
 
 ## Nova dependência: PDF.js
 
-Adicionar ao `index.html`, junto aos demais scripts de biblioteca (mesmo padrão do `xlsx.full.min.js` e `jszip.min.js`, já carregados via CDN):
+Adicionar ao `index.html`, junto aos demais scripts de biblioteca (mesmo padrão do `xlsx.full.min.js` e `jszip.min.js`, já carregados via CDN). A versão 3.11.174 é a última com build UMD (`pdf.min.js`, expõe `window.pdfjsLib` via `<script>` normal); versões 4+ do pacote só distribuem ES module (`.mjs`), incompatível com o padrão de scripts sem `type="module"` já usado no restante do projeto:
 
 ```html
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 ```
 
-Usado apenas para extração de texto (`getTextContent()` por página) — sem renderização visual do PDF na tela.
+`pdfjsLib.GlobalWorkerOptions.workerSrc` precisa apontar para a mesma URL do `pdf.worker.min.js` antes do primeiro uso. Usado apenas para extração de texto (`getTextContent()` por página) — sem renderização visual do PDF na tela.
 
 ---
 
@@ -120,11 +121,11 @@ Novo item na sidebar, mesmo padrão dos demais (`sidebar-item`, `onclick="mostra
 
 O texto bruto retornado por `page.getTextContent()` no PDF.js vem como uma lista de *text runs* com posição (`item.transform[4]` = x, `item.transform[5]` = y), **não necessariamente na ordem de leitura visual** (relatórios gerados por motores tipo Crystal Reports frequentemente desenham rótulos e valores em blocos separados no content stream). Por isso o parser reconstrói linhas visuais antes de aplicar qualquer regex:
 
-1. Agrupar os *text runs* de cada página por `y` (arredondado, tolerância de ~2px) — cada grupo é uma linha visual.
-2. Dentro de cada grupo, ordenar por `x` crescente e concatenar os `str` com espaço.
-3. Ordenar os grupos por `y` decrescente (topo → base da página, já que o eixo Y do PDF cresce para cima).
+1. Ordenar todos os *text runs* da página por `y` decrescente (topo → base, já que o eixo Y do PDF cresce para cima).
+2. Agrupar sequencialmente: um novo grupo (linha) começa sempre que o `y` do próximo item se afastar mais de `1.0` pt do `y`-âncora do grupo aberto (o `y` do primeiro item desse grupo). Validado com o PDF de exemplo real via `pdfjs-dist` (Node): itens de uma mesma linha de tabela compartilham o `y` exato (diferença `0.0`); pares rótulo/valor que só *parecem* alinhados na mesma linha visual (ex.: "Empresa:"/"CNPJ:" à esquerda vs. "Página:"/"Emissão:"/"Hora:" à direita) na verdade têm `y` ligeiramente diferente (~`1.5` pt) — por isso o limiar `1.0` os mantém em linhas separadas, exatamente como devem ficar (evita concatenar "Empresa: 2 - CENTRO AUTOMOTIVO... Página: 1/1" na mesma string). Linhas de tabela consecutivas (ex.: linha de início e linha de fim de um mesmo empregado) ficam ~`11`–`12` pt distantes, bem acima do limiar.
+3. Dentro de cada grupo, filtrar itens com `str` vazio (comuns nesse gerador de PDF — text runs "fantasma" de largura zero), ordenar por `x` crescente, concatenar os `str` restantes com um espaço entre cada par e normalizar espaços múltiplos (`.replace(/\s+/g, ' ').trim()`).
 
-Isso reproduz a disposição visual real da tabela (confirmado comparando com a renderização em imagem do PDF de exemplo): `Empresa: 2 - CENTRO AUTOMOTIVO E MECANICA PASSOS LTDA` numa única linha, cada empregado em duas linhas consecutivas (linha de início + linha de fim/complementos).
+Isso reproduz a disposição visual real da tabela: `Empresa: 2 - CENTRO AUTOMOTIVO E MECANICA PASSOS LTDA` numa única linha isolada, cada empregado em duas linhas consecutivas (linha de início + linha de fim/complementos) — confirmado byte a byte contra a extração real do PDF de exemplo do repositório.
 
 ### Reconhecimento de linhas
 
@@ -239,7 +240,7 @@ O design de `2026-07-08-grupos-empresas-lote-design.md` já processa múltiplas 
 
 ## Pontos de atenção para a fase de plano de implementação
 
-- **Validar o parsing contra o PDF real de exemplo** (`Projeto RH/Relação de Férias Calculadas.pdf`, já presente no repositório) rodando o parser de fato no navegador antes de considerar a extração pronta — a ordem dos *text runs* no content stream pode variar entre geradores de PDF, e a técnica de agrupamento por Y precisa de ajuste fino de tolerância se linhas da tabela não alinharem perfeitamente.
-- **Contagem de novos vs. atualizados no resumo:** para reportar corretamente "N novos / M atualizados" no resumo pós-importação, é preciso ler as chaves já existentes (`codigo_empresa, codigo_empregado, ferias_inicio`) antes do upsert e comparar — ou aceitar uma versão mais simples do resumo (só total processado por empresa, sem quebrar novos/atualizados) se a comparação prévia adicionar complexidade desproporcional.
-- **Nomes de empresa/empregado quebrados em duas linhas:** o parser assume nome em uma única linha visual; se algum nome de empresa/empregado for longo o suficiente para quebrar em duas linhas no PDF, cai em "linha não reconhecida" — verificar se ocorre no PDF real e, se sim, tratar como caso especial.
-- Testar manualmente o cruzamento fim-a-fim: importar o PDF de exemplo, processar a Folha de Ponto de uma das empresas/empregados nele contidos com competência dentro do período de férias, e confirmar que o dia aparece com badge "FÉRIAS" e não conta em faltante/faltas.
+- **Parsing já validado contra o PDF real de exemplo** (`Projeto RH/Relação de Férias Calculadas.pdf`) durante o desenho deste spec, usando `pdfjs-dist` em Node para inspecionar as posições reais (`x`/`y`) dos *text runs* de várias páginas (incluindo casos com múltiplos empregados por empresa e com Abono/3 datas). O algoritmo de reconstrução de linhas (Seção "Parsing do PDF") e a regra "segunda data = Férias" foram confirmados byte a byte contra esses dados reais — não é mais um risco em aberto, mas o plano de implementação deve incluir testes automatizados (Node, sem framework) que fixem esse comportamento usando linhas reais extraídas do PDF de exemplo como fixture.
+- **Contagem de novos vs. atualizados no resumo:** implementar lendo as chaves já existentes (`codigo_empresa, codigo_empregado, ferias_inicio`) filtradas pelas empresas presentes no PDF antes do upsert, e comparar com os registros parseados — o volume é pequeno o suficiente (uma consulta por importação) para não pesar.
+- **Nomes de empresa/empregado quebrados em duas linhas:** o parser assume nome em uma única linha visual; não ocorre no PDF de exemplo (32 páginas, nenhum nome quebrado), mas linhas que não casarem os padrões esperados caem na lista de "avisos" em vez de serem descartadas silenciosamente ou travarem a importação.
+- Testar manualmente o cruzamento fim-a-fim: importar o PDF de exemplo, processar a Folha de Ponto de uma das empresas/empregados nele contidos (ex.: empresa `2`, empregado `9` LUIZ FELIPE LUCENA SILVA, férias `16/07/2026` a `30/07/2026`) com competência `07/2026`, e confirmar que os dias aparecem com badge "FÉRIAS" e não contam em faltante/faltas.
