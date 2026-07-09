@@ -9,6 +9,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 document.addEventListener('DOMContentLoaded', () => {
     carregarEmpresas();
     carregarEmpregados();
+    carregarFeriasInfo();
     carregarSocios();
     carregarRubricas();
     carregarRegras();
@@ -652,6 +653,98 @@ async function deletarEmpregado(codigoEmpresa, codigoEmpregado) {
     } catch (erro) { mostrarStatus('statusEmpregados', 'Erro ao deletar empregado: ' + erro.message, 'error'); }
 }
 
+// --- FÉRIAS (INFORMAÇÕES) ---
+
+let _todasFeriasInfo = [];
+let _feriasInfoFiltradas = [];
+let _paginaFeriasInfo = 1;
+const _porPaginaFeriasInfo = 50;
+
+async function carregarFeriasInfo() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_ferias_calculadas')
+            .select('*')
+            .order('codigo_empresa', { ascending: true })
+            .order('ferias_inicio', { ascending: false });
+        if (error) throw error;
+        _todasFeriasInfo = data || [];
+        _feriasInfoFiltradas = [..._todasFeriasInfo];
+        _paginaFeriasInfo = 1;
+        renderizarTabelaFeriasInfo();
+    } catch (erro) { mostrarStatus('statusFeriasInfo', 'Erro ao carregar informações de férias.', 'error'); }
+}
+
+function filtrarFeriasInfo() {
+    const texto = (document.getElementById('filtroFeriasTexto')?.value || '').toLowerCase().trim();
+    _feriasInfoFiltradas = _todasFeriasInfo.filter(f => {
+        if (!texto) return true;
+        return (
+            (f.codigo_empresa || '').toLowerCase().includes(texto) ||
+            (f.nome_empresa || '').toLowerCase().includes(texto) ||
+            (f.codigo_empregado || '').toLowerCase().includes(texto) ||
+            (f.nome_empregado || '').toLowerCase().includes(texto)
+        );
+    });
+    _paginaFeriasInfo = 1;
+    renderizarTabelaFeriasInfo();
+}
+
+function renderizarTabelaFeriasInfo() {
+    const tbody = document.getElementById('feriasInfoTableBody');
+    const paginacao = document.getElementById('paginacaoFeriasInfo');
+    const info = document.getElementById('infoFeriasInfo');
+    tbody.innerHTML = '';
+
+    if (_feriasInfoFiltradas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#95A5A6;padding:20px;">Nenhum período de férias encontrado</td></tr>';
+        paginacao.innerHTML = '';
+        if (info) info.textContent = '';
+        return;
+    }
+
+    const totalPags = Math.ceil(_feriasInfoFiltradas.length / _porPaginaFeriasInfo);
+    const inicio    = (_paginaFeriasInfo - 1) * _porPaginaFeriasInfo;
+    const pagina    = _feriasInfoFiltradas.slice(inicio, inicio + _porPaginaFeriasInfo);
+
+    if (info) info.textContent = _feriasInfoFiltradas.length < _todasFeriasInfo.length
+        ? `${_feriasInfoFiltradas.length} de ${_todasFeriasInfo.length} período(s)`
+        : `${_todasFeriasInfo.length} período(s)`;
+
+    const fmtData = v => {
+        if (!v) return '<span style="color:#C0C0C0;">—</span>';
+        const d = new Date(v + 'T00:00:00');
+        return isNaN(d) ? v : d.toLocaleDateString('pt-BR');
+    };
+
+    pagina.forEach(f => {
+        tbody.innerHTML += `<tr>
+            <td><strong>${f.codigo_empresa}</strong></td>
+            <td>${f.nome_empresa || ''}</td>
+            <td>${f.codigo_empregado}</td>
+            <td>${f.nome_empregado || ''}</td>
+            <td>${fmtData(f.aquisitivo_inicio)}</td>
+            <td>${fmtData(f.aquisitivo_fim)}</td>
+            <td>${fmtData(f.ferias_inicio)}</td>
+            <td>${fmtData(f.ferias_fim)}</td>
+        </tr>`;
+    });
+
+    paginacao.innerHTML = totalPags <= 1 ? '' : `
+        <button onclick="mudarPaginaFeriasInfo(${_paginaFeriasInfo - 1})" ${_paginaFeriasInfo === 1 ? 'disabled' : ''}>‹ Anterior</button>
+        <span class="pag-info">Página <strong>${_paginaFeriasInfo}</strong> de <strong>${totalPags}</strong> — ${_feriasInfoFiltradas.length} período(s)</span>
+        <button onclick="mudarPaginaFeriasInfo(${_paginaFeriasInfo + 1})" ${_paginaFeriasInfo === totalPags ? 'disabled' : ''}>Próxima ›</button>
+    `;
+}
+
+function mudarPaginaFeriasInfo(pag) {
+    const totalPags = Math.ceil(_feriasInfoFiltradas.length / _porPaginaFeriasInfo);
+    if (pag < 1 || pag > totalPags) return;
+    _paginaFeriasInfo = pag;
+    renderizarTabelaFeriasInfo();
+    document.getElementById('ferias')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 // --- SÓCIOS ---
 
 let _todosSocios = [];
@@ -1280,7 +1373,7 @@ function _exibirTimestampImportacao(tipo, iso) {
 }
 
 function _carregarTimestampsImportacao() {
-    ['Empresas', 'Empregados', 'Rubricas', 'Socios'].forEach(tipo => {
+    ['Empresas', 'Empregados', 'Ferias', 'Rubricas', 'Socios'].forEach(tipo => {
         const iso = localStorage.getItem(`rh_ultima_importacao_${tipo}`);
         if (iso) _exibirTimestampImportacao(tipo, iso);
     });
@@ -1349,6 +1442,133 @@ async function importarEmpresas(file) {
     } finally {
         limparInput('fileEmpresas');
     }
+}
+
+// ── FÉRIAS (PDF) ──────────────────────────────────────────────
+
+function handleImportarFerias(event) {
+    const file = event.target.files?.[0];
+    if (file) processarPdfFerias(file);
+}
+
+async function processarPdfFerias(file) {
+    const ENT = 'Ferias';
+    document.getElementById('resumoImportarFerias').innerHTML = '';
+    try {
+        setStatusImport(ENT, 'Lendo o PDF de férias calculadas...', 'info');
+        setProgresso(ENT, 10);
+
+        const buffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+        let todasLinhas = [];
+        for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+            todasLinhas = todasLinhas.concat(_reconstruirLinhasPagina(content.items));
+            setProgresso(ENT, 10 + Math.round((p / pdf.numPages) * 40));
+        }
+
+        const { registros, avisos } = _parsearLinhasFerias(todasLinhas);
+
+        if (registros.length === 0) {
+            setProgresso(ENT, null);
+            setStatusImport(ENT, 'Nenhum registro de férias foi reconhecido neste PDF.', 'error');
+            return;
+        }
+
+        setStatusImport(ENT, `Salvando ${registros.length} registro(s)...`, 'info');
+        setProgresso(ENT, 60);
+        await _salvarFeriasCalculadas(ENT, registros, avisos);
+        setProgresso(ENT, null);
+        _salvarTimestampImportacao('Ferias');
+        carregarFeriasInfo();
+    } catch (erro) {
+        console.error('Erro ao processar PDF de férias:', erro);
+        setProgresso(ENT, null);
+        setStatusImport(ENT, '❌ Falha ao processar o PDF. Verifique se o arquivo é válido.', 'error');
+    } finally {
+        limparInput('fileFerias');
+    }
+}
+
+async function _salvarFeriasCalculadas(ENT, registros, avisos) {
+    const codigosEmpresas = [...new Set(registros.map(r => r.codigo_empresa))];
+
+    const { data: existentesData, error: errExistentes } = await supabaseClient
+        .from('rh_ferias_calculadas')
+        .select('codigo_empresa, codigo_empregado, ferias_inicio')
+        .in('codigo_empresa', codigosEmpresas);
+    if (errExistentes) {
+        setStatusImport(ENT, 'Falha ao consultar registros existentes antes de salvar.', 'error');
+        return;
+    }
+    const chavesExistentes = new Set(
+        (existentesData || []).map(r => `${r.codigo_empresa}|${r.codigo_empregado}|${r.ferias_inicio}`)
+    );
+
+    const porEmpresa = {}; // codigo_empresa -> { nome, novos, atualizados }
+    registros.forEach(r => {
+        if (!porEmpresa[r.codigo_empresa]) {
+            porEmpresa[r.codigo_empresa] = { nome: r.nome_empresa, novos: 0, atualizados: 0 };
+        }
+        const chave = `${r.codigo_empresa}|${r.codigo_empregado}|${r.ferias_inicio}`;
+        if (chavesExistentes.has(chave)) {
+            porEmpresa[r.codigo_empresa].atualizados++;
+        } else {
+            porEmpresa[r.codigo_empresa].novos++;
+        }
+    });
+
+    const registrosParaSalvar = registros.map(r => ({
+        codigo_empresa: r.codigo_empresa,
+        codigo_empregado: r.codigo_empregado,
+        nome_empregado: r.nome_empregado,
+        aquisitivo_inicio: r.aquisitivo_inicio,
+        aquisitivo_fim: r.aquisitivo_fim,
+        ferias_inicio: r.ferias_inicio,
+        ferias_fim: r.ferias_fim
+    }));
+
+    const LOTE = 200;
+    for (let i = 0; i < registrosParaSalvar.length; i += LOTE) {
+        const pedaco = registrosParaSalvar.slice(i, i + LOTE);
+        const { error } = await supabaseClient
+            .from('rh_ferias_calculadas')
+            .upsert(pedaco, { onConflict: 'codigo_empresa,codigo_empregado,ferias_inicio' });
+        if (error) {
+            console.error('Erro ao salvar férias calculadas:', error);
+            setStatusImport(ENT, `Falha ao salvar registros no banco: ${error.message}`, 'error');
+            return;
+        }
+    }
+
+    const totalNovos = Object.values(porEmpresa).reduce((s, e) => s + e.novos, 0);
+    const totalAtualizados = Object.values(porEmpresa).reduce((s, e) => s + e.atualizados, 0);
+    setStatusImport(ENT, `✅ ${registros.length} registro(s) salvos (${totalNovos} novo(s), ${totalAtualizados} atualizado(s))`, 'success');
+    _renderizarResumoImportacaoFerias(porEmpresa, avisos);
+}
+
+function _renderizarResumoImportacaoFerias(porEmpresa, avisos) {
+    const container = document.getElementById('resumoImportarFerias');
+    let html = `<div style="margin-top:8px;">
+        <strong>Empresa(s) atualizada(s):</strong>
+        <ul style="margin:6px 0 0; padding-left:18px;">
+            ${Object.entries(porEmpresa).map(([codigo, info]) => `<li>${codigo} - ${info.nome}: ${info.novos} novo(s), ${info.atualizados} atualizado(s)</li>`).join('')}
+        </ul>
+    </div>`;
+
+    if (avisos.length > 0) {
+        html += `
+            <details style="margin-top:8px;">
+                <summary style="cursor:pointer; color:#92400e; font-weight:600;">⚠️ ${avisos.length} linha(s) não reconhecida(s)</summary>
+                <ul style="margin-top:6px; padding-left:18px; color:#78350f;">
+                    ${avisos.map(a => `<li><strong>${a.motivo}:</strong> ${a.linha}</li>`).join('')}
+                </ul>
+            </details>
+        `;
+    }
+
+    container.innerHTML = html;
 }
 
 // ── EMPREGADOS ────────────────────────────────────────────────

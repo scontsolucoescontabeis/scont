@@ -82,6 +82,9 @@
         <button class="sidebar-item" id="nav-empregados" onclick="abrirAba('empregados', this)">
             <span class="sidebar-item-icon">👥</span> Empregados
         </button>
+        <button class="sidebar-item" id="nav-ferias" onclick="abrirAba('ferias', this)">
+            <span class="sidebar-item-icon">🏖️</span> Informações de Férias
+        </button>
         <button class="sidebar-item" id="nav-socios" onclick="abrirAba('socios', this)">
             <span class="sidebar-item-icon">🤝</span> Sócios
         </button>
@@ -96,6 +99,9 @@
         </button>
     </nav>
     <div class="sidebar-footer">
+        <a href="index.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
+            <span class="sidebar-item-icon">📋</span> Controle de Frequência
+        </a>
         <a href="../portal.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
             <span class="sidebar-item-icon">🏠</span> Voltar ao Portal
         </a>
@@ -255,6 +261,41 @@
                         <button type="button" class="btn-save" onclick="adicionarEmpregado()">➕ Adicionar Empregado</button>
                     </div>
                 </details>
+            </div>
+        </div>
+
+        <!-- ABA FÉRIAS -->
+        <div id="ferias" class="admin-tab-content">
+            <div class="admin-section">
+                <h2>Informações de Férias</h2>
+                <p style="color:#7F8C8D;font-size:13px;margin-bottom:16px;">Períodos de férias importados via PDF em <strong>Importar Dados</strong>. Estes dados também alimentam o badge "Férias" no Controle de Frequência.</p>
+                <div id="statusFeriasInfo" class="status-message"></div>
+                <div style="background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+                    <div class="form-group" style="margin-bottom:0;flex:2;min-width:220px;">
+                        <label>Buscar por Empresa ou Empregado</label>
+                        <input type="text" id="filtroFeriasTexto" placeholder="Código/nome da empresa ou do empregado..." oninput="filtrarFeriasInfo()">
+                    </div>
+                    <div style="flex:0 0 auto;padding-bottom:1px;">
+                        <button type="button" onclick="document.getElementById('filtroFeriasTexto').value='';filtrarFeriasInfo();" style="padding:9px 16px;border:1px solid #C0C0C0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-weight:600;">✕ Limpar</button>
+                    </div>
+                    <span id="infoFeriasInfo" style="font-size:12px;color:#7F8C8D;align-self:center;white-space:nowrap;"></span>
+                </div>
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead><tr>
+                            <th>Cód. Empresa</th>
+                            <th>Empresa</th>
+                            <th>Cód. Empregado</th>
+                            <th>Empregado</th>
+                            <th>Aquisitivo Início</th>
+                            <th>Aquisitivo Fim</th>
+                            <th>Férias Início</th>
+                            <th>Férias Fim</th>
+                        </tr></thead>
+                        <tbody id="feriasInfoTableBody"><tr><td colspan="8" style="text-align: center; color: #95A5A6;">Carregando...</td></tr></tbody>
+                    </table>
+                    <div class="paginacao" id="paginacaoFeriasInfo"></div>
+                </div>
             </div>
         </div>
 
@@ -518,6 +559,36 @@
                         <div id="ultimaImportacaoEmpregados" style="font-size:11px;color:#7F8C8D;display:none;">📅 Última importação: <span></span></div>
                     </div>
 
+                    <!-- FÉRIAS -->
+                    <div class="import-card">
+                        <div class="import-card-header">
+                            <span class="import-card-icon">🏖️</span>
+                            <div>
+                                <div class="import-card-title">Férias</div>
+                                <div class="import-card-subtitle">PDF do sistema fonte</div>
+                            </div>
+                        </div>
+                        <div class="import-fields">PDF "Relação de Férias Calculadas" (todas as empresas) · Cód./Nome da Empresa · Cód./Nome do Empregado · Aquisitivo Início/Fim · Férias Início/Fim</div>
+                        <div id="statusImportarFerias" class="status-message"></div>
+                        <div class="upload-area-sm" onclick="document.getElementById('fileFerias').click()"
+                             ondragover="event.preventDefault();this.style.borderColor='#8B3A3A'"
+                             ondragleave="this.style.borderColor=''"
+                             ondrop="event.preventDefault();this.style.borderColor='';handleImportarFerias({target:{files:event.dataTransfer.files}})">
+                            📄 Clique ou arraste o arquivo (.pdf)
+                        </div>
+                        <input type="file" id="fileFerias" accept=".pdf" style="display:none" onchange="handleImportarFerias(event)">
+                        <div id="progressFerias" style="display:none;">
+                            <div style="background:#D1ECF1;padding:10px;border-radius:6px;font-size:12px;color:#0C5460;">
+                                <strong>Processando PDF de férias...</strong>
+                                <div style="margin-top:6px;background:white;border-radius:4px;height:8px;overflow:hidden;">
+                                    <div id="progressBarFerias" style="background:#17A2B8;height:100%;width:0%;transition:width 0.3s;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="resumoImportarFerias" style="font-size:11px;color:#7F8C8D;"></div>
+                        <div id="ultimaImportacaoFerias" style="font-size:11px;color:#7F8C8D;display:none;">📅 Última importação: <span></span></div>
+                    </div>
+
                     <!-- RUBRICAS -->
                     <div class="import-card">
                         <div class="import-card-header">
@@ -624,6 +695,8 @@
 <script src="../supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="ferias-parser.js"></script>
 <script src="../portal-auth-guard.js"></script>
 <script src="admin.js"></script>
 

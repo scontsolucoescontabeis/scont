@@ -345,7 +345,8 @@ CREATE POLICY "rh_grupos_empresas_itens: escrita autenticado"
 -- ============================================================
 -- 10. TABELA: rh_ferias_calculadas
 --    Períodos de férias por empregado, importados do PDF
---    "Relação de Férias Calculadas" do sistema fonte.
+--    "Relação de Férias Calculadas" do sistema fonte, via
+--    Administração > Importar Dados (admin.html).
 --    Upsert por (codigo_empresa, codigo_empregado, ferias_inicio).
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.rh_ferias_calculadas (
@@ -353,6 +354,8 @@ CREATE TABLE IF NOT EXISTS public.rh_ferias_calculadas (
     codigo_empresa    TEXT NOT NULL,
     codigo_empregado  TEXT NOT NULL,
     nome_empregado    TEXT NOT NULL,
+    aquisitivo_inicio DATE,
+    aquisitivo_fim    DATE,
     ferias_inicio     DATE NOT NULL,
     ferias_fim        DATE NOT NULL,
     atualizado_em     TIMESTAMPTZ NOT NULL DEFAULT now(),

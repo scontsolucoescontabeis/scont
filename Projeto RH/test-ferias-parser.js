@@ -71,6 +71,8 @@ teste('_parsearLinhasFerias extrai um registro simples (2 datas, sem abono) — 
         nome_empresa: 'CENTRO AUTOMOTIVO E MECANICA PASSOS LTDA',
         codigo_empregado: '9',
         nome_empregado: 'LUIZ FELIPE LUCENA SILVA',
+        aquisitivo_inicio: '2025-04-25',
+        aquisitivo_fim: '2026-04-24',
         ferias_inicio: '2026-07-16',
         ferias_fim: '2026-07-30'
     }]);
@@ -101,6 +103,8 @@ teste('_parsearLinhasFerias extrai múltiplos empregados, com e sem Abono (3 dat
         nome_empresa: 'AGUAS CLARAS COMERCIO DE SORVETES LTDA',
         codigo_empregado: '8',
         nome_empregado: 'LETICIA DA SILVA CARVALHO',
+        aquisitivo_inicio: '2025-05-23',
+        aquisitivo_fim: '2026-05-22',
         ferias_inicio: '2026-07-08',
         ferias_fim: '2026-07-27'
     });
@@ -109,6 +113,8 @@ teste('_parsearLinhasFerias extrai múltiplos empregados, com e sem Abono (3 dat
         nome_empresa: 'AGUAS CLARAS COMERCIO DE SORVETES LTDA',
         codigo_empregado: '22',
         nome_empregado: 'GABRIEL WILLIAN DE SOUZA ALVES',
+        aquisitivo_inicio: '2025-04-01',
+        aquisitivo_fim: '2026-03-31',
         ferias_inicio: '2026-06-11',
         ferias_fim: '2026-06-30'
     });
@@ -117,6 +123,8 @@ teste('_parsearLinhasFerias extrai múltiplos empregados, com e sem Abono (3 dat
         nome_empresa: 'AGUAS CLARAS COMERCIO DE SORVETES LTDA',
         codigo_empregado: '24',
         nome_empregado: 'NATALIA CONCEICAO SILVA',
+        aquisitivo_inicio: '2025-06-14',
+        aquisitivo_fim: '2026-06-13',
         ferias_inicio: '2026-07-14',
         ferias_fim: '2026-08-02'
     });

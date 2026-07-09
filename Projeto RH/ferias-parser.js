@@ -86,6 +86,7 @@ function _parsearLinhasFerias(linhas) {
             pendente = {
                 codigo_empregado: mPrimeira[1].trim(),
                 nome_empregado: mPrimeira[2].trim(),
+                aquisitivoInicioISO: _dataBRparaISO(datas[0]),
                 feriasInicioISO: _dataBRparaISO(datas[1]),
                 qtdDatas: datas.length
             };
@@ -104,6 +105,8 @@ function _parsearLinhasFerias(linhas) {
                 nome_empresa: empresaAtual.nome,
                 codigo_empregado: pendente.codigo_empregado,
                 nome_empregado: pendente.nome_empregado,
+                aquisitivo_inicio: pendente.aquisitivoInicioISO,
+                aquisitivo_fim: _dataBRparaISO(datas[0]),
                 ferias_inicio: pendente.feriasInicioISO,
                 ferias_fim: _dataBRparaISO(datas[1])
             });

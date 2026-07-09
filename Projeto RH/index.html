@@ -16,10 +16,8 @@
     <!-- SheetJS para Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="ferias-parser.js"></script>
 
-    
+
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -52,12 +50,12 @@
         <button class="sidebar-item" onclick="mostrarTela('gruposScreen')">
             <span class="sidebar-item-icon">👥</span> Grupos de Empresas
         </button>
-        <button class="sidebar-item" onclick="mostrarTela('feriasScreen')">
-            <span class="sidebar-item-icon">🏖️</span> Importar Férias
-        </button>
     </nav>
 
     <div class="sidebar-footer">
+        <a href="admin.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
+            <span class="sidebar-item-icon">⚙️</span> Administração RH
+        </a>
         <a href="../portal.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;">
             <span class="sidebar-item-icon">🏠</span> Voltar ao Portal
         </a>
@@ -258,24 +256,6 @@
                     <p style="color: var(--text-secondary); font-size:13px;">Selecione um grupo à esquerda ou clique em "Novo Grupo".</p>
                 </div>
             </div>
-        </div>
-
-        <!-- TELA DE IMPORTAÇÃO DE FÉRIAS CALCULADAS -->
-        <div id="feriasScreen" style="display: none;">
-            <div style="margin-bottom:20px;">
-                <h2 style="color: var(--primary-color); margin:0;">🏖️ Importar Férias Calculadas</h2>
-                <p style="color: var(--text-secondary); font-size:13px; margin-top:6px;">
-                    Envie o PDF "Relação de Férias Calculadas" (todas as empresas). Os períodos de férias
-                    encontrados ficam disponíveis automaticamente na Folha de Ponto de qualquer empresa/competência.
-                </p>
-            </div>
-            <div style="border:1px solid var(--border-color); border-radius:8px; padding:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                <label for="feriasArquivoPdf" class="btn btn-secondary" style="cursor:pointer; margin:0;">📎 Selecionar arquivo PDF</label>
-                <input type="file" id="feriasArquivoPdf" accept=".pdf" style="display:none">
-                <span id="feriasArquivoNome" style="font-size:13px; color: var(--text-secondary);">Nenhum arquivo selecionado.</span>
-                <button type="button" class="btn btn-primary" id="feriasProcessarBtn" disabled>📥 Processar PDF</button>
-            </div>
-            <div id="feriasResumoContainer" style="margin-top:20px;"></div>
         </div>
 
     </div>
