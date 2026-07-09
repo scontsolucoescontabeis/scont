@@ -3333,11 +3333,23 @@ function _atualizarResumoEmpresasSelecionadasBeneficios() {
     info.textContent = `${marcados.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
 }
 
-function _estimarDiasUteis5x2(competencia) {
+// Dias úteis (segunda a sexta, exceto feriados globais) da competência — jornada 5x2.
+function _diasUteisNoMes(competencia) {
     return gerarDiasDoMes(competencia).filter(d => {
         if (d.diaSemana === 'Sab' || d.diaSemana === 'Dom') return false;
         const isFeriado = state.feriados.some(f => f.data === d.data || f.data === d.data.substring(0, 5));
         return !isFeriado;
+    });
+}
+
+// Dentre os dias úteis da competência, conta só os que NÃO caem em nenhum
+// período de férias do empregado (períodos já vêm no formato ISO AAAA-MM-DD).
+function _contarDiasUteisForaDeFerias(diasUteisDoMes, periodos) {
+    if (!periodos || periodos.length === 0) return diasUteisDoMes.length;
+    return diasUteisDoMes.filter(d => {
+        const [dd, mm, aa] = d.data.split('/');
+        const iso = `${aa}-${mm}-${dd}`;
+        return !periodos.some(p => iso >= p.inicio && iso <= p.fim);
     }).length;
 }
 
@@ -3417,7 +3429,7 @@ async function gerarPreviaBeneficios() {
             if (!savesMapa[chave]) savesMapa[chave] = s;
         });
 
-        const estimativa5x2 = _estimarDiasUteis5x2(comp);
+        const diasUteisDoMes = _diasUteisNoMes(comp);
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
             (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() !== 'Contribuinte'
@@ -3432,10 +3444,10 @@ async function gerarPreviaBeneficios() {
 
         const linhas = empregadosFiltrados.map(emp => {
             const save = savesMapa[`${emp.codigo_empresa}_${emp.nome_empregado}`];
-            const diasTrabalhar = estimativa5x2;
+            const periodos = feriasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`];
+            const diasTrabalhar = _contarDiasUteisForaDeFerias(diasUteisDoMes, periodos);
             const diasDescontar = save ? _calcularDiasDescontarFolhaSalva(save) : 0;
             const valores = valoresMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || { vt: 0, va: 0 };
-            const periodos = feriasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`];
             const empresa = empresasMapa[emp.codigo_empresa] || { nome_empresa: emp.codigo_empresa, cnpj: '' };
             return {
                 codigo_empresa: emp.codigo_empresa,
