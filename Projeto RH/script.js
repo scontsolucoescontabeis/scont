@@ -3286,31 +3286,32 @@ function _estimarDiasUteis5x2(competencia) {
     }).length;
 }
 
-function _feriasNoMes(periodos, competencia) {
-    if (!periodos || periodos.length === 0) return false;
+function _isoParaBR(iso) {
+    const [a, m, d] = iso.split('-');
+    return `${d}/${m}/${a}`;
+}
+
+// Retorna o texto do(s) período(s) de férias que sobrepõem a competência ('' se nenhum).
+function _periodosFeriasNoMesTexto(periodos, competencia) {
+    if (!periodos || periodos.length === 0) return '';
     const [mes, ano] = competencia.split('/');
     const inicioMes = `${ano}-${mes}-01`;
     const ultimoDia = new Date(Number(ano), Number(mes), 0).getDate();
     const fimMes = `${ano}-${mes}-${String(ultimoDia).padStart(2, '0')}`;
-    return periodos.some(p => p.inicio <= fimMes && p.fim >= inicioMes);
+    return periodos
+        .filter(p => p.inicio <= fimMes && p.fim >= inicioMes)
+        .map(p => `${_isoParaBR(p.inicio)} a ${_isoParaBR(p.fim)}`)
+        .join('; ');
 }
 
-// Recomputo simplificado (só contagem de dias) sobre uma Folha de Ponto já salva,
-// mesmo critério de dia útil/desconto usado em _construirConteudoTXTExportacao.
-function _calcularDiasFolhaSalva(save) {
-    const feriados = JSON.parse(save.feriados_json || '[]');
-    const dsrDias = JSON.parse(save.dsr_dias || '[]');
+// Conta só os dias de falta/atestado integral sobre uma Folha de Ponto já salva
+// (mesmo critério de desconto usado em _construirConteudoTXTExportacao). "Dias a
+// Trabalhar" NÃO vem daqui — é sempre a estimativa de dias úteis (5x2), já que o
+// DSR salvo na folha marca só folgas específicas, não o padrão semanal, e não é
+// um indicador confiável de fim de semana/dia útil.
+function _calcularDiasDescontarFolhaSalva(save) {
     const flagsFolga = JSON.parse(save.flags_folga || '{}');
-    const dados = JSON.parse(save.dados_json || '[]');
-    let diasTrabalhar = 0, diasDescontar = 0;
-    dados.forEach(dia => {
-        const isFeriado = feriados.some(f => f.data === dia.data || f.data === dia.data.substring(0, 5));
-        const isDSR = dsrDias.includes(dia.data);
-        if (!(isFeriado || isDSR)) diasTrabalhar++;
-        const flag = flagsFolga[dia.data];
-        if (flag === 'falta' || flag === 'atestado') diasDescontar++;
-    });
-    return { diasTrabalhar, diasDescontar };
+    return Object.values(flagsFolga).filter(flag => flag === 'falta' || flag === 'atestado').length;
 }
 
 async function gerarPreviaBeneficios() {
@@ -3376,15 +3377,8 @@ async function gerarPreviaBeneficios() {
 
         const linhas = empregadosFiltrados.map(emp => {
             const save = savesMapa[`${emp.codigo_empresa}_${emp.nome_empregado}`];
-            let diasTrabalhar, diasDescontar;
-            if (save) {
-                const calc = _calcularDiasFolhaSalva(save);
-                diasTrabalhar = calc.diasTrabalhar;
-                diasDescontar = calc.diasDescontar;
-            } else {
-                diasTrabalhar = estimativa5x2;
-                diasDescontar = 0;
-            }
+            const diasTrabalhar = estimativa5x2;
+            const diasDescontar = save ? _calcularDiasDescontarFolhaSalva(save) : 0;
             const valores = valoresMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || { vt: 0, va: 0 };
             const periodos = feriasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`];
             const empresa = empresasMapa[emp.codigo_empresa] || { nome_empresa: emp.codigo_empresa, cnpj: '' };
@@ -3395,7 +3389,7 @@ async function gerarPreviaBeneficios() {
                 codigo_empregado: emp.codigo_empregado,
                 nome_empregado: emp.nome_empregado,
                 desc_cargo: emp.desc_cargo || '',
-                temFerias: _feriasNoMes(periodos, comp),
+                feriasTexto: _periodosFeriasNoMesTexto(periodos, comp),
                 diasTrabalhar,
                 diasDescontar,
                 vtDiario: valores.vt,
@@ -3428,7 +3422,7 @@ function _renderizarPreviaBeneficios(linhas) {
             <td style="padding:6px 8px;">${l.codigo_empresa} - ${l.nome_empresa}</td>
             <td style="padding:6px 8px;">${l.codigo_empregado} - ${l.nome_empregado}</td>
             <td style="padding:6px 8px;">${l.desc_cargo}</td>
-            <td style="padding:6px 8px; text-align:center;" title="${l.temFerias ? 'Possui férias sobrepondo a competência' : ''}">${l.temFerias ? '🏖️' : ''}</td>
+            <td style="padding:6px 8px; text-align:center; white-space:normal;">${l.feriasTexto ? `🏖️ ${l.feriasTexto}` : ''}</td>
             <td style="padding:6px 8px; text-align:center;"><input type="number" min="0" class="ben-dias-trabalhar" value="${l.diasTrabalhar}" style="width:60px;" oninput="_recalcularLinhaBeneficios(${i})"></td>
             <td style="padding:6px 8px; text-align:center;"><input type="number" min="0" class="ben-dias-descontar" value="${l.diasDescontar}" style="width:60px;" oninput="_recalcularLinhaBeneficios(${i})"></td>
             <td style="padding:6px 8px; text-align:center;" class="ben-dias-pagar">${diasPagar}</td>
