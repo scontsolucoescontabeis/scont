@@ -1,35 +1,12 @@
 -- ============================================================
--- GERADOR DE MODELOS — Seed: 9 modelos de Admissão + Evento "Admissão"
--- Conteúdo transcrito dos arquivos em "MODELO ADMISSÃO/", com os dados
--- do último preenchimento substituídos por variáveis do sistema.
--- Trechos específicos de cada acordo (valores de hora extra, horário
--- semanal, dados de contato da empresa) não têm campo correspondente
--- no cadastro e ficam como texto para preenchimento manual.
--- Execute no SQL Editor do Supabase (depois de schema-gerador-modelos.sql
--- e schema-gerador-modelos-eventos.sql)
+-- GERADOR DE MODELOS — Ajusta layout dos 9 modelos de Admissão
+-- (espaçamento mais compacto antes dos blocos de assinatura, para
+-- cada documento caber de forma mais eficiente na folha)
+-- Execute no SQL Editor do Supabase (em bancos que já rodaram
+-- schema-gerador-modelos-seed-admissao.sql)
 -- ============================================================
 
-DO $seed$
-DECLARE
-  v_evento_id         UUID;
-  v_confiabilidade    UUID;
-  v_lgpd              UUID;
-  v_imagem            UUID;
-  v_vt_solicitacao    UUID;
-  v_vt_desistencia    UUID;
-  v_plano_saude       UUID;
-  v_compensacao       UUID;
-  v_prorrogacao       UUID;
-  v_responsabilidade  UUID;
-BEGIN
-
-  -- 1) Termo de Confiabilidade -------------------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Termo de Confiabilidade',
-    'Admissão — sigilo de informações da empresa',
-    'por_registro',
-    $doc$<p style="text-align:center"><strong>TERMO DE CONFIABILIDADE</strong></p>
+UPDATE public.gm_modelos SET template = $doc$<p style="text-align:center"><strong>TERMO DE CONFIABILIDADE</strong></p>
 <p>Pelo presente termo de confiabilidade, eu {{empregado.nome_empregado}}, portador do CPF {{empregado.cpf}}, funcionário da empresa {{empresa.nome_empresa}}, comprometo-me a guardar segredo das informações sigilosas obtidas nesta empresa, entendendo-se como tais as de caráter técnico, funcional ou pessoal, que porventura possam instigar ou interessar à concorrência, relacionadas ou não com o exercício de minha função.</p>
 <p>Declaro, ainda, que estou ciente de que qualquer prejuízo causado à empresa, perpetrado pela quebra do sigilo acima declinado, gerará o pagamento de multa no valor de 20 (vinte) salários-mínimos atuais, além das implicações nas esferas cível, criminal e administrativa.</p>
 <p>Por derradeiro, declaro que li e compreendi os termos aqui dispostos, assinando-o voluntariamente.</p>
@@ -38,17 +15,9 @@ BEGIN
 <table style="width:100%"><tr>
 <td style="text-align:center">_____________________________<br>({{empresa.nome_empresa}})</td>
 <td style="text-align:center">_____________________________<br>({{empregado.nome_empregado}})</td>
-</tr></table>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_confiabilidade;
+</tr></table>$doc$ WHERE nome = 'Termo de Confiabilidade';
 
-  -- 2) Termo LGPD ----------------------------------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Termo de Consentimento LGPD',
-    'Admissão — consentimento para tratamento de dados pessoais',
-    'por_registro',
-    $doc$<p style="text-align:center"><strong>TERMO DE CONSENTIMENTO PARA TRATAMENTO DE DADOS PESSOAIS</strong></p>
+UPDATE public.gm_modelos SET template = $doc$<p style="text-align:center"><strong>TERMO DE CONSENTIMENTO PARA TRATAMENTO DE DADOS PESSOAIS</strong></p>
 <p>Este documento visa registrar a manifestação livre, informada e inequívoca pela qual o Titular concorda com o tratamento de seus dados pessoais para finalidade específica, em conformidade com a Lei nº 13.709 – Lei Geral de Proteção de Dados Pessoais (LGPD).</p>
 <p><strong>Titular:</strong> Pessoa a quem se referem os dados pessoais que são objeto de tratamento.<br>
 Nome: {{empregado.nome_empregado}}<br>
@@ -86,31 +55,15 @@ CPF: {{empregado.cpf}}</p>
 <p>Manifesto-me de forma informada, livre, expressa e consciente, no sentido de autorizar o controlador a realizar contato comigo através dos seguintes canais: e-mail, ligação, SMS ou App de comunicação.</p>
 <p style="text-align:right">{{empresa.cidade}}, {{sistema.data_atual}}.</p>
 <div style="margin-top:26px;"></div>
-<p style="text-align:center">_____________________________<br>{{empregado.nome_empregado}}</p>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_lgpd;
+<p style="text-align:center">_____________________________<br>{{empregado.nome_empregado}}</p>$doc$ WHERE nome = 'Termo de Consentimento LGPD';
 
-  -- 3) Termo de Autorização de Uso de Imagem --------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Termo de Autorização de Uso de Imagem',
-    'Admissão — autorização de uso de imagem',
-    'por_registro',
-    $doc$<p style="text-align:center"><strong>TERMO DE AUTORIZAÇÃO DE USO DE IMAGEM</strong></p>
+UPDATE public.gm_modelos SET template = $doc$<p style="text-align:center"><strong>TERMO DE AUTORIZAÇÃO DE USO DE IMAGEM</strong></p>
 <p>Pelo presente instrumento, eu {{empregado.nome_empregado}}, inscrito(a) no CPF/MF sob o nº {{empregado.cpf}}, autorizo, a título gratuito e a qualquer tempo, a captação e utilização de minha imagem em divulgação dos serviços pela empresa {{empresa.nome_empresa}}, inscrita no CNPJ/MF sob o nº {{empresa.cnpj}}. Declaro, em caráter irrevogável e irretratável, estar ciente e de acordo com o uso institucional e comercial do material captado. E, por ser a expressão da verdade, firmo o presente TERMO DE AUTORIZAÇÃO DE USO DE IMAGEM.</p>
 <p style="text-align:right">{{empresa.cidade}}, {{sistema.data_atual_extenso}}.</p>
 <div style="margin-top:26px;"></div>
-<p style="text-align:center">_____________________________<br>{{empregado.nome_empregado}}<br>CPF: {{empregado.cpf}}</p>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_imagem;
+<p style="text-align:center">_____________________________<br>{{empregado.nome_empregado}}<br>CPF: {{empregado.cpf}}</p>$doc$ WHERE nome = 'Termo de Autorização de Uso de Imagem';
 
-  -- 4) Solicitação de Vale-Transporte ---------------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Solicitação de Vale-Transporte',
-    'Admissão — opção pela utilização do Vale-Transporte',
-    'por_registro',
-    $doc$<p>À<br>
+UPDATE public.gm_modelos SET template = $doc$<p>À<br>
 Empresa: {{empresa.nome_empresa}}<br>
 Endereço: {{empresa.endereco}} — {{empresa.cidade}} — CEP: {{empresa.cep}}<br>
 Empregado: {{empregado.nome_empregado}} — CPF: {{empregado.cpf}}<br>
@@ -124,17 +77,9 @@ CTPS: {{empregado.ctps}} - {{empregado.serie_ctps}}</p>
 <p>d) Declaro estar ciente de que a declaração falsa ou o uso indevido do Vale-Transporte constituem falta grave.</p>
 <p style="text-align:right">{{empresa.cidade}}, {{sistema.data_atual}}.</p>
 <div style="margin-top:26px;"></div>
-<p style="text-align:center">_____________________________<br>{{empregado.nome_empregado}}</p>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_vt_solicitacao;
+<p style="text-align:center">_____________________________<br>{{empregado.nome_empregado}}</p>$doc$ WHERE nome = 'Solicitação de Vale-Transporte';
 
-  -- 5) Opção de Desistência de Vale-Transporte ------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Opção de Desistência de Vale-Transporte',
-    'Admissão — desistência da utilização do Vale-Transporte',
-    'por_registro',
-    $doc$<p style="text-align:center"><strong>OPÇÃO DE DESISTÊNCIA DE VALE-TRANSPORTE</strong></p>
+UPDATE public.gm_modelos SET template = $doc$<p style="text-align:center"><strong>OPÇÃO DE DESISTÊNCIA DE VALE-TRANSPORTE</strong></p>
 <p>Via nº: _____<br>
 Razão Social: {{empresa.nome_empresa}} — CNPJ: {{empresa.cnpj}}<br>
 Endereço: {{empresa.endereco}} — {{empresa.cidade}} — CEP: {{empresa.cep}}</p>
@@ -146,17 +91,9 @@ Função: {{empregado.desc_funcao}}</p>
 <p>Atenciosamente,</p>
 <p style="text-align:right">{{empresa.cidade}}, {{sistema.data_atual}}.</p>
 <div style="margin-top:26px;"></div>
-<p style="text-align:center">_____________________________<br>{{empregado.nome_empregado}}</p>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_vt_desistencia;
+<p style="text-align:center">_____________________________<br>{{empregado.nome_empregado}}</p>$doc$ WHERE nome = 'Opção de Desistência de Vale-Transporte';
 
-  -- 6) Autorização de Desconto do Plano de Saúde ----------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Autorização de Desconto do Plano de Saúde',
-    'Admissão — opção de adesão ao plano de saúde',
-    'por_registro',
-    $doc$<p style="text-align:center"><strong>TERMO DE AUTORIZAÇÃO PARA DESCONTO DO PLANO DE SAÚDE EM FOLHA DE PAGAMENTO</strong></p>
+UPDATE public.gm_modelos SET template = $doc$<p style="text-align:center"><strong>TERMO DE AUTORIZAÇÃO PARA DESCONTO DO PLANO DE SAÚDE EM FOLHA DE PAGAMENTO</strong></p>
 <p>Eu, {{empregado.nome_empregado}}, CPF: {{empregado.cpf}}, tomei ciência dos benefícios oferecidos pela empresa {{empresa.nome_empresa}}, CNPJ {{empresa.cnpj}}, e estou marcando com X minha opção de aderir ou não aderir, conforme relacionados abaixo.</p>
 <p>Estou ciente e de acordo com as condições de pagamento do referido benefício, tanto para mim como para meu(s) dependente(s) declarado(s) também como optante(s), bem como os reajustes anuais e por faixa etária, tabela de valores para quem optar pelo plano com coparticipação, prazos e carências.</p>
 <p>( &nbsp;) Tenho interesse em aderir o plano<br>
@@ -171,17 +108,9 @@ Função: {{empregado.desc_funcao}}</p>
 <p>Por fim, autorizo o desconto do referido benefício em folha de pagamento, conforme política de benefícios praticada pela empresa.</p>
 <p style="text-align:right">{{empresa.cidade}}, {{sistema.data_atual_extenso}}.</p>
 <div style="margin-top:26px;"></div>
-<p style="text-align:center">_____________________________<br>Assinatura<br>CPF: {{empregado.cpf}}</p>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_plano_saude;
+<p style="text-align:center">_____________________________<br>Assinatura<br>CPF: {{empregado.cpf}}</p>$doc$ WHERE nome = 'Autorização de Desconto do Plano de Saúde';
 
-  -- 7) Acordo de Compensação de Horas de Trabalho ---------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Acordo de Compensação de Horas de Trabalho',
-    'Admissão — banco de horas / compensação semanal',
-    'por_registro',
-    $doc$<p style="text-align:center"><strong>ACORDO DE COMPENSAÇÃO DE HORAS DE TRABALHO</strong></p>
+UPDATE public.gm_modelos SET template = $doc$<p style="text-align:center"><strong>ACORDO DE COMPENSAÇÃO DE HORAS DE TRABALHO</strong></p>
 <p>Pelo presente acordo para compensação de horas de trabalho, firmado entre a empresa {{empresa.nome_empresa}}, com estabelecimento em {{empresa.cidade}}, {{empresa.endereco}}, inscrita no CNPJ/CEI sob o nº {{empresa.cnpj}}, neste ato representada pelo(a) Sr(a): _____________________________, e seu empregado(a) {{empregado.nome_empregado}}, portador(a) da Carteira de Trabalho e Previdência Social nº/série {{empregado.ctps}} - {{empregado.serie_ctps}} - {{empregado.uf_ctps}}, fica convencionado, de acordo com as disposições legais vigentes, o seguinte horário normal de trabalho semanal:</p>
 <table style="width:100%;border-collapse:collapse" border="1">
 <tr><th>Dias da Semana</th><th>Horário de Trabalho</th><th>Intervalo para Repouso e Alimentação</th></tr>
@@ -204,17 +133,9 @@ Função: {{empregado.desc_funcao}}</p>
 <table style="width:100%"><tr>
 <td style="text-align:center">Testemunha</td>
 <td style="text-align:center">Testemunha</td>
-</tr></table>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_compensacao;
+</tr></table>$doc$ WHERE nome = 'Acordo de Compensação de Horas de Trabalho';
 
-  -- 8) Acordo de Prorrogação de Horas ----------------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Acordo de Prorrogação de Horas',
-    'Admissão — prorrogação da jornada diária',
-    'por_registro',
-    $doc$<p style="text-align:center"><strong>ACORDO DE PRORROGAÇÃO DE HORAS</strong></p>
+UPDATE public.gm_modelos SET template = $doc$<p style="text-align:center"><strong>ACORDO DE PRORROGAÇÃO DE HORAS</strong></p>
 <p>Entre a empresa {{empresa.nome_empresa}} com estabelecimento à {{empresa.endereco}}, {{empresa.cidade}}, neste ato representada pelo(a) Sr(a): _____________________________ e seu(sua) empregado(a) {{empregado.nome_empregado}}, abaixo assinado(a), portador(a) da Carteira de Trabalho e Previdência Social nº {{empregado.ctps}} - {{empregado.serie_ctps}} - {{empregado.uf_ctps}}, fica acertado este acordo para Prorrogação da Jornada de Trabalho, que se regerá pelas cláusulas abaixo:</p>
 <p>1º) A duração do trabalho diário poderá ser prorrogada por _____ (_____ HORAS), sendo considerada(s) extraordinária(s) e pagas com acréscimo abaixo as horas que ultrapassarem o horário normal de trabalho.</p>
 <p>2º) A remuneração de trabalho será a seguinte:<br>
@@ -233,17 +154,9 @@ Hora extra a _____% (_____) no valor de R$ _____ (_____)</p>
 <table style="width:100%"><tr>
 <td style="text-align:center">Testemunha</td>
 <td style="text-align:center">Testemunha</td>
-</tr></table>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_prorrogacao;
+</tr></table>$doc$ WHERE nome = 'Acordo de Prorrogação de Horas';
 
-  -- 9) Termo de Responsabilidade (Salário Família) --------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Termo de Responsabilidade (Salário Família)',
-    'Admissão — concessão de salário família (Portaria MPAS nº 3.040/82)',
-    'por_registro',
-    $doc$<p>Empresa: {{empresa.nome_empresa}}<br>
+UPDATE public.gm_modelos SET template = $doc$<p>Empresa: {{empresa.nome_empresa}}<br>
 C.N.P.J/C.E.I: {{empresa.cnpj}}</p>
 <p>Nome do segurado: {{empregado.nome_empregado}}<br>
 Cart. Prof./Série: {{empregado.ctps}} - {{empregado.serie_ctps}}</p>
@@ -264,24 +177,4 @@ Cart. Prof./Série: {{empregado.ctps}} - {{empregado.serie_ctps}}</p>
 <li>Cessação da invalidez de filho inválido;</li>
 <li>Sentença judicial que determine o pagamento a outrem (casos de divórcio, desquite ou separação, abandono de filho ou perda do pátrio poder).</li>
 </ul>
-<p>Estou ciente, ainda, de que a falta de cumprimento do compromisso ora assumido, além de obrigar à devolução das importâncias recebidas indevidamente, sujeitar-me-á às penalidades previstas no art. 171 do Código Penal e à rescisão do contrato de trabalho, por justa causa, nos termos do art. 482 da Consolidação das Leis do Trabalho.</p>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_responsabilidade;
-
-  -- ── Evento "Admissão" agrupando os 9 modelos acima, na ordem de assinatura ──
-  INSERT INTO public.gm_eventos (nome, descricao)
-  VALUES ('Admissão', 'Documentos gerados no momento da admissão de um empregado (pasta MODELO ADMISSÃO)')
-  RETURNING id INTO v_evento_id;
-
-  INSERT INTO public.gm_eventos_modelos (evento_id, modelo_id, ordem) VALUES
-    (v_evento_id, v_confiabilidade,   0),
-    (v_evento_id, v_lgpd,             1),
-    (v_evento_id, v_imagem,           2),
-    (v_evento_id, v_vt_solicitacao,   3),
-    (v_evento_id, v_vt_desistencia,   4),
-    (v_evento_id, v_plano_saude,      5),
-    (v_evento_id, v_compensacao,      6),
-    (v_evento_id, v_prorrogacao,      7),
-    (v_evento_id, v_responsabilidade, 8);
-
-END $seed$;
+<p>Estou ciente, ainda, de que a falta de cumprimento do compromisso ora assumido, além de obrigar à devolução das importâncias recebidas indevidamente, sujeitar-me-á às penalidades previstas no art. 171 do Código Penal e à rescisão do contrato de trabalho, por justa causa, nos termos do art. 482 da Consolidação das Leis do Trabalho.</p>$doc$ WHERE nome = 'Termo de Responsabilidade (Salário Família)';

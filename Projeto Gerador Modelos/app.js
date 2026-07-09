@@ -753,7 +753,7 @@ function _iniciarWizardComEvento(evento) {
 
 // ── Empresas ──────────────────────────────────────────────────
 async function carregarEmpresas() {
-  const { data } = await sb.from('rh_empresas').select('id,codigo_empresa,nome_empresa').order('nome_empresa');
+  const { data } = await sb.from('rh_empresas').select('*').order('nome_empresa');
   empresas = data || [];
 }
 
