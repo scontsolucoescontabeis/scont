@@ -750,11 +750,19 @@ function _iniciarWizardComEvento(evento) {
   evento.modelosOrdenados.forEach(m => (m.fontes || []).forEach(f => fontesUniao.add(f)));
 
   // Cada modelo já traz seu próprio cabeçalho/identidade visual embutidos no
-  // template (ver schema-gerador-modelos-identidade-visual.sql) — aqui só
-  // concatena, separando cada documento do próximo por quebra de página.
-  const templateConcatenado = evento.modelosOrdenados
-    .map(m => m.template || '')
-    .join('<div style="page-break-before:always;break-before:page;"></div>');
+  // template (ver schema-gerador-modelos-identidade-visual.sql). Cada um vira
+  // uma folha independente: envolve o template do modelo em uma div com
+  // page-break-after (exceto o último), mesma técnica já usada para separar
+  // registros em exportarPDF — em vez de uma div divisória à parte, que se
+  // mostrou pouco confiável para separar documentos de fato independentes.
+  const modelosDoEvento = evento.modelosOrdenados;
+  const templateConcatenado = modelosDoEvento
+    .map((m, i) => {
+      const isUltimo = i === modelosDoEvento.length - 1;
+      const quebra = isUltimo ? '' : 'page-break-after:always;break-after:page;';
+      return `<div style="${quebra}">${m.template || ''}</div>`;
+    })
+    .join('');
 
   wizardModeloSelecionado = {
     id: null,
