@@ -749,32 +749,19 @@ function _iniciarWizardComEvento(evento) {
   const fontesUniao = new Set(['empregados']); // eventos sempre geram por empregado
   evento.modelosOrdenados.forEach(m => (m.fontes || []).forEach(f => fontesUniao.add(f)));
 
-  // Cada modelo já traz seu próprio cabeçalho/identidade visual embutidos no
-  // template (ver schema-gerador-modelos-identidade-visual.sql). Cada um vira
-  // uma folha independente: envolve o template do modelo em uma div com
-  // page-break-after (exceto o último), mesma técnica já usada para separar
-  // registros em exportarPDF — em vez de uma div divisória à parte, que se
-  // mostrou pouco confiável para separar documentos de fato independentes.
-  const modelosDoEvento = evento.modelosOrdenados;
-  const templateConcatenado = modelosDoEvento
-    .map((m, i) => {
-      const isUltimo = i === modelosDoEvento.length - 1;
-      const quebra = isUltimo ? '' : 'page-break-after:always;break-after:page;';
-      return `<div style="${quebra}">${m.template || ''}</div>`;
-    })
-    .join('');
-
+  // O cabeçalho de cada modelo é montado dinamicamente por-registro em
+  // renderPreview()/exportarPDF() (precisa da empresa do registro, que só é
+  // conhecida em tempo de geração) — aqui o `template` do sintético serve só
+  // para calcularSequencia() detectar uso de variáveis de planilha ({{excel.*}}).
   wizardModeloSelecionado = {
     id: null,
     nome: evento.nome,
     tipo: 'por_registro',
     fontes: [...fontesUniao],
-    template: templateConcatenado,
-    cabecalho_padrao: 'nenhum',
+    template: evento.modelosOrdenados.map(m => m.template || '').join(''),
   };
   wizardEventoAtivo = evento;
-  // 'nenhum' aqui evita duplicar cabeçalho: cada documento já embute o seu próprio acima.
-  wizardCabecalho = 'nenhum';
+  wizardCabecalho = 'completo';
   wizardSequencia = calcularSequencia().filter(p => p !== 'modelo');
   renderWizardBar();
   mostrarPainel(wizardSequencia[0]);
@@ -1270,6 +1257,34 @@ function substituirVars(template, varMap, highlight = false) {
 }
 
 // ── Preview ───────────────────────────────────────────────────
+// Cabeçalho compartilhado por preview, exportação em PDF e prévia do editor.
+// 'completo': Logo SCONT + nome da empresa cliente + título do modelo.
+// 'neutro':   nome da empresa cliente + título do modelo, com
+//             "SCONT Soluções Contábeis" no canto inferior direito do cabeçalho.
+// 'nenhum'/outro: sem cabeçalho.
+function _gerarCabecalhoModelo(modo, nomeEmpresaCliente, tituloModelo) {
+  const hdr   = 'background:#8B3A3A;color:white;padding:12px 18px;display:flex;align-items:center;gap:14px;position:relative;';
+  const logo  = 'font-size:18px;font-weight:900;letter-spacing:2px;color:white;border:2px solid rgba(255,255,255,.6);padding:2px 7px;border-radius:3px;flex-shrink:0';
+  const sep   = 'width:1px;background:rgba(255,255,255,.4);height:30px;flex-shrink:0';
+  const title = 'font-size:12px;font-weight:700;color:white;display:block;line-height:1.2';
+  const sub   = 'font-size:10px;color:rgba(255,255,255,.8);display:block;margin-top:2px';
+  const canto = 'position:absolute;right:18px;bottom:9px;font-size:9px;color:rgba(255,255,255,.75);letter-spacing:.3px;';
+
+  if (modo === 'completo') {
+    return `<div style="${hdr}">
+      <span style="${logo}">SCONT</span><div style="${sep}"></div>
+      <div><strong style="${title}">${esc(nomeEmpresaCliente)}</strong>
+      <span style="${sub}">${esc(tituloModelo)}</span></div></div>`;
+  }
+  if (modo === 'neutro') {
+    return `<div style="${hdr}">
+      <div><strong style="${title}">${esc(nomeEmpresaCliente)}</strong>
+      <span style="${sub}">${esc(tituloModelo)}</span></div>
+      <span style="${canto}">SCONT Soluções Contábeis</span></div>`;
+  }
+  return '';
+}
+
 function renderPreview() {
   const area    = document.getElementById('preview-area');
   const counter = document.getElementById('preview-counter');
@@ -1280,31 +1295,24 @@ function renderPreview() {
   const total = wizardRegistros.length;
   wizardPreviewIndex = Math.max(0, Math.min(wizardPreviewIndex, total - 1));
   const varMap = wizardRegistros[wizardPreviewIndex];
-  const corpo  = substituirVars(wizardModeloSelecionado.template, varMap, true);
-  const m      = wizardModeloSelecionado;
-
-  const hdrStyle   = 'background:#8B3A3A;color:white;padding:10px 18px;display:flex;align-items:center;gap:12px;';
-  const logoStyle  = 'background:rgba(255,255,255,0.22);border-radius:3px;padding:2px 8px;font-size:11px;font-weight:800;letter-spacing:1.5px;border:1.5px solid rgba(255,255,255,.45);flex-shrink:0';
-  const sepStyle   = 'width:1px;height:28px;background:rgba(255,255,255,0.3);flex-shrink:0';
-  const titleStyle = 'font-size:12px;font-weight:700;color:white;display:block;line-height:1.2';
-  const subStyle   = 'font-size:10px;color:rgba(255,255,255,.75);display:block;margin-top:2px';
-  const bodyStyle  = 'padding:16px 0;font-size:13px;line-height:1.8;background:#fff;';
-
+  const bodyStyle = 'padding:16px 0;font-size:13px;line-height:1.8;background:#fff;';
   const nomeEmp = varMap['empresa.nome_empresa'] || wizardNomeEmpresaExcel || 'Empresa';
-  let hdrHtml = '';
-  if (wizardCabecalho === 'completo') {
-    hdrHtml = `<div style="${hdrStyle}">
-      <span style="${logoStyle}">SCONT</span>
-      <div style="${sepStyle}"></div>
-      <div><strong style="${titleStyle}">${esc(m.nome)}</strong>
-      <span style="${subStyle}">SCONT Soluções Contábeis — Gestão de RH</span></div></div>`;
-  } else if (wizardCabecalho === 'neutro') {
-    hdrHtml = `<div style="${hdrStyle}">
-      <div><strong style="${titleStyle}">${esc(nomeEmp)}</strong>
-      <span style="${subStyle}">${esc(m.nome)}</span></div></div>`;
+
+  let conteudo;
+  if (wizardEventoAtivo) {
+    // Um cabeçalho por modelo do evento, cada um com seu próprio título.
+    conteudo = wizardEventoAtivo.modelosOrdenados.map(m => {
+      const hdr   = _gerarCabecalhoModelo(wizardCabecalho, nomeEmp, m.nome);
+      const corpo = substituirVars(m.template || '', varMap, true);
+      return `${hdr}<div style="${bodyStyle}">${corpo}</div>`;
+    }).join('<hr style="margin:18px 0;border:none;border-top:2px dashed #ddd;">');
+  } else {
+    const hdr   = _gerarCabecalhoModelo(wizardCabecalho, nomeEmp, wizardModeloSelecionado.nome);
+    const corpo = substituirVars(wizardModeloSelecionado.template, varMap, true);
+    conteudo = `${hdr}<div style="${bodyStyle}">${corpo}</div>`;
   }
 
-  area.innerHTML = hdrHtml + `<div style="${bodyStyle}">${corpo}</div>`;
+  area.innerHTML = conteudo;
   counter.textContent = `${wizardPreviewIndex + 1} / ${total}`;
 }
 
@@ -1342,37 +1350,39 @@ async function exportarPDF() {
 
   toast('Gerando PDF…', '');
   const modelo = wizardModeloSelecionado;
+  const bodyStyle = 'padding:16px 0;font-family:Segoe UI,Arial,sans-serif;font-size:11px;line-height:1.7;color:#2C3E50;';
+  const nomeEmpDe = (varMap) => varMap['empresa.nome_empresa'] || wizardNomeEmpresaExcel || 'Empresa';
 
-  const S = {
-    hdr:   'background:#8B3A3A;color:white;padding:12px 18px;display:flex;align-items:center;gap:14px;',
-    logo:  'font-size:18px;font-weight:900;letter-spacing:2px;color:white;border:2px solid rgba(255,255,255,.6);padding:2px 7px;border-radius:3px;flex-shrink:0',
-    sep:   'width:1px;background:rgba(255,255,255,.4);height:30px;flex-shrink:0',
-    title: 'font-size:12px;font-weight:700;color:white;display:block;line-height:1.2',
-    sub:   'font-size:10px;color:rgba(255,255,255,.8);display:block;margin-top:2px',
-    body:  'padding:16px 0;font-family:Segoe UI,Arial,sans-serif;font-size:11px;line-height:1.7;color:#2C3E50;',
-  };
-
-  const buildHdr = (varMap) => {
-    const emp = varMap['empresa.nome_empresa'] || wizardNomeEmpresaExcel || 'Empresa';
-    if (wizardCabecalho === 'completo') return `<div style="${S.hdr}">
-      <span style="${S.logo}">SCONT</span><div style="${S.sep}"></div>
-      <div><strong style="${S.title}">${esc(modelo.nome)}</strong>
-      <span style="${S.sub}">SCONT Soluções Contábeis — Gestão de RH</span></div></div>`;
-    if (wizardCabecalho === 'neutro') return `<div style="${S.hdr}">
-      <div><strong style="${S.title}">${esc(emp)}</strong>
-      <span style="${S.sub}">${esc(modelo.nome)}</span></div></div>`;
-    return '';
-  };
-
-  const porRegistro = modelo.tipo === 'por_registro';
-  const paginas = wizardRegistros.map((varMap, idx) => {
-    const corpo    = substituirVars(modelo.template, varMap, false);
-    const isUltimo = idx === wizardRegistros.length - 1;
-    const pageBreak = porRegistro && !isUltimo
-      ? 'page-break-after:always;break-after:page;'
-      : '';
-    return `<div style="${pageBreak}">${buildHdr(varMap)}<div style="${S.body}">${corpo}</div></div>`;
-  });
+  let paginas;
+  if (wizardEventoAtivo) {
+    // Um cabeçalho por modelo do evento — cada documento em folha própria,
+    // tanto entre modelos de um mesmo registro quanto entre registros.
+    const modelosEvento = wizardEventoAtivo.modelosOrdenados;
+    const blocos = [];
+    wizardRegistros.forEach((varMap) => {
+      modelosEvento.forEach((m) => {
+        const hdr   = _gerarCabecalhoModelo(wizardCabecalho, nomeEmpDe(varMap), m.nome);
+        const corpo = substituirVars(m.template || '', varMap, false);
+        blocos.push(`${hdr}<div style="${bodyStyle}">${corpo}</div>`);
+      });
+    });
+    paginas = blocos.map((html, idx) => {
+      const isUltimo = idx === blocos.length - 1;
+      const pageBreak = !isUltimo ? 'page-break-after:always;break-after:page;' : '';
+      return `<div style="${pageBreak}">${html}</div>`;
+    });
+  } else {
+    const porRegistro = modelo.tipo === 'por_registro';
+    paginas = wizardRegistros.map((varMap, idx) => {
+      const hdr      = _gerarCabecalhoModelo(wizardCabecalho, nomeEmpDe(varMap), modelo.nome);
+      const corpo    = substituirVars(modelo.template, varMap, false);
+      const isUltimo = idx === wizardRegistros.length - 1;
+      const pageBreak = porRegistro && !isUltimo
+        ? 'page-break-after:always;break-after:page;'
+        : '';
+      return `<div style="${pageBreak}">${hdr}<div style="${bodyStyle}">${corpo}</div></div>`;
+    });
+  }
 
   const innerHtml = paginas.join('');
 
@@ -1799,25 +1809,29 @@ function updateEditorHeaderPreview() {
   }
 
   el.style.display = 'flex';
-  const logoStyle = 'background:rgba(255,255,255,0.22);border-radius:3px;padding:2px 8px;font-size:11px;font-weight:800;letter-spacing:1.5px;border:1.5px solid rgba(255,255,255,.45);flex-shrink:0;color:white';
-  const sepStyle  = 'width:1px;height:28px;background:rgba(255,255,255,0.3);flex-shrink:0';
+  el.style.position = 'relative';
+  const logoStyle  = 'background:rgba(255,255,255,0.22);border-radius:3px;padding:2px 8px;font-size:11px;font-weight:800;letter-spacing:1.5px;border:1.5px solid rgba(255,255,255,.45);flex-shrink:0;color:white';
+  const sepStyle   = 'width:1px;height:28px;background:rgba(255,255,255,0.3);flex-shrink:0';
   const titleStyle = 'display:block;font-size:12px;font-weight:700;line-height:1.2;color:white';
   const subStyle   = 'font-size:10px;opacity:0.75;color:white;display:block;margin-top:2px';
+  const cantoStyle = 'position:absolute;right:14px;bottom:8px;font-size:9px;color:rgba(255,255,255,.75);';
 
+  // Placeholder: no editor não há uma empresa cliente real ainda, só o nome do modelo.
   if (tipo === 'completo') {
     el.innerHTML = `
       <span style="${logoStyle}">SCONT</span>
       <div style="${sepStyle}"></div>
       <div>
-        <strong style="${titleStyle}">${esc(nome)}</strong>
-        <span style="${subStyle}">SCONT Soluções Contábeis — Gestão de RH</span>
+        <strong style="${titleStyle}">Nome da Empresa Cliente</strong>
+        <span style="${subStyle}">${esc(nome)}</span>
       </div>`;
   } else {
     el.innerHTML = `
       <div>
-        <strong style="${titleStyle}">Nome da Empresa</strong>
+        <strong style="${titleStyle}">Nome da Empresa Cliente</strong>
         <span style="${subStyle}">${esc(nome)}</span>
-      </div>`;
+      </div>
+      <span style="${cantoStyle}">SCONT Soluções Contábeis</span>`;
   }
 }
 

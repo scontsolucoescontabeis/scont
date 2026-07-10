@@ -1,35 +1,16 @@
 -- ============================================================
--- GERADOR DE MODELOS — Seed: 9 modelos de Admissão + Evento "Admissão"
--- Conteúdo transcrito dos arquivos em "MODELO ADMISSÃO/", com os dados
--- do último preenchimento substituídos por variáveis do sistema.
--- Trechos específicos de cada acordo (valores de hora extra, horário
--- semanal, dados de contato da empresa) não têm campo correspondente
--- no cadastro e ficam como texto para preenchimento manual.
--- Execute no SQL Editor do Supabase (depois de schema-gerador-modelos.sql
--- e schema-gerador-modelos-eventos.sql)
+-- GERADOR DE MODELOS — Remove o cabeçalho embutido nos 9 modelos de
+-- Admissão (header/title-block estáticos "SCONT" sem nome da empresa
+-- cliente). O cabeçalho agora é gerado dinamicamente por
+-- _gerarCabecalhoModelo() em app.js, com a empresa real de cada
+-- registro e o título de cada modelo — respeitando a escolha de
+-- cabeçalho completo/neutro/nenhum feita no wizard, e aparecendo em
+-- TODOS os modelos do evento (não só no primeiro).
+-- Execute no SQL Editor do Supabase (em bancos que já rodaram
+-- schema-gerador-modelos-seed-admissao.sql)
 -- ============================================================
 
-DO $seed$
-DECLARE
-  v_evento_id         UUID;
-  v_confiabilidade    UUID;
-  v_lgpd              UUID;
-  v_imagem            UUID;
-  v_vt_solicitacao    UUID;
-  v_vt_desistencia    UUID;
-  v_plano_saude       UUID;
-  v_compensacao       UUID;
-  v_prorrogacao       UUID;
-  v_responsabilidade  UUID;
-BEGIN
-
-  -- 1) Termo de Confiabilidade -------------------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Termo de Confiabilidade',
-    'Admissão — sigilo de informações da empresa',
-    'por_registro',
-    $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+UPDATE public.gm_modelos SET template = $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   .gm-confiabilidade * { box-sizing: border-box; }
   .gm-confiabilidade {
@@ -277,17 +258,9 @@ BEGIN
     </div>
 
   </div>
-</div>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_confiabilidade;
+</div>$doc$ WHERE nome = 'Termo de Confiabilidade';
 
-  -- 2) Termo LGPD ----------------------------------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Termo de Consentimento LGPD',
-    'Admissão — consentimento para tratamento de dados pessoais',
-    'por_registro',
-    $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+UPDATE public.gm_modelos SET template = $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   .gm-lgpd * { box-sizing: border-box; }
   .gm-lgpd {
@@ -570,17 +543,9 @@ BEGIN
     </div>
 
   </div>
-</div>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_lgpd;
+</div>$doc$ WHERE nome = 'Termo de Consentimento LGPD';
 
-  -- 3) Termo de Autorização de Uso de Imagem --------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Termo de Autorização de Uso de Imagem',
-    'Admissão — autorização de uso de imagem',
-    'por_registro',
-    $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+UPDATE public.gm_modelos SET template = $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   .gm-imagem * { box-sizing: border-box; }
   .gm-imagem {
@@ -822,17 +787,9 @@ BEGIN
     </div>
 
   </div>
-</div>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_imagem;
+</div>$doc$ WHERE nome = 'Termo de Autorização de Uso de Imagem';
 
-  -- 4) Solicitação de Vale-Transporte ---------------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Solicitação de Vale-Transporte',
-    'Admissão — opção pela utilização do Vale-Transporte',
-    'por_registro',
-    $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+UPDATE public.gm_modelos SET template = $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   .gm-solic-vt * { box-sizing: border-box; }
   .gm-solic-vt {
@@ -1097,17 +1054,9 @@ BEGIN
     </div>
 
   </div>
-</div>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_vt_solicitacao;
+</div>$doc$ WHERE nome = 'Solicitação de Vale-Transporte';
 
-  -- 5) Opção de Desistência de Vale-Transporte ------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Opção de Desistência de Vale-Transporte',
-    'Admissão — desistência da utilização do Vale-Transporte',
-    'por_registro',
-    $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+UPDATE public.gm_modelos SET template = $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   .gm-desist-vt * { box-sizing: border-box; }
   .gm-desist-vt {
@@ -1357,17 +1306,9 @@ BEGIN
     </div>
 
   </div>
-</div>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_vt_desistencia;
+</div>$doc$ WHERE nome = 'Opção de Desistência de Vale-Transporte';
 
-  -- 6) Autorização de Desconto do Plano de Saúde ----------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Autorização de Desconto do Plano de Saúde',
-    'Admissão — opção de adesão ao plano de saúde',
-    'por_registro',
-    $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+UPDATE public.gm_modelos SET template = $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   .gm-plano-saude * { box-sizing: border-box; }
   .gm-plano-saude {
@@ -1622,17 +1563,9 @@ BEGIN
     </div>
 
   </div>
-</div>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_plano_saude;
+</div>$doc$ WHERE nome = 'Autorização de Desconto do Plano de Saúde';
 
-  -- 7) Acordo de Compensação de Horas de Trabalho ---------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Acordo de Compensação de Horas de Trabalho',
-    'Admissão — banco de horas / compensação semanal',
-    'por_registro',
-    $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+UPDATE public.gm_modelos SET template = $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   .gm-acordo-comp * { box-sizing: border-box; }
   .gm-acordo-comp {
@@ -1937,17 +1870,9 @@ BEGIN
     </div>
 
   </div>
-</div>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_compensacao;
+</div>$doc$ WHERE nome = 'Acordo de Compensação de Horas de Trabalho';
 
-  -- 8) Acordo de Prorrogação de Horas ----------------------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Acordo de Prorrogação de Horas',
-    'Admissão — prorrogação da jornada diária',
-    'por_registro',
-    $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+UPDATE public.gm_modelos SET template = $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   .gm-prorrogacao * { box-sizing: border-box; }
   .gm-prorrogacao {
@@ -2199,17 +2124,9 @@ BEGIN
     </div>
 
   </div>
-</div>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_prorrogacao;
+</div>$doc$ WHERE nome = 'Acordo de Prorrogação de Horas';
 
-  -- 9) Termo de Responsabilidade (Salário Família) --------------------------
-  INSERT INTO public.gm_modelos (nome, descricao, tipo, template, fontes)
-  VALUES (
-    'Termo de Responsabilidade (Salário Família)',
-    'Admissão — concessão de salário família (Portaria MPAS nº 3.040/82)',
-    'por_registro',
-    $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+UPDATE public.gm_modelos SET template = $doc$<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   .gm-resp-familia * { box-sizing: border-box; }
   .gm-resp-familia {
@@ -2471,24 +2388,4 @@ BEGIN
     </div>
 
   </div>
-</div>$doc$,
-    '{empregados}'
-  ) RETURNING id INTO v_responsabilidade;
-
-  -- ── Evento "Admissão" agrupando os 9 modelos acima, na ordem de assinatura ──
-  INSERT INTO public.gm_eventos (nome, descricao)
-  VALUES ('Admissão', 'Documentos gerados no momento da admissão de um empregado (pasta MODELO ADMISSÃO)')
-  RETURNING id INTO v_evento_id;
-
-  INSERT INTO public.gm_eventos_modelos (evento_id, modelo_id, ordem) VALUES
-    (v_evento_id, v_confiabilidade,   0),
-    (v_evento_id, v_lgpd,             1),
-    (v_evento_id, v_imagem,           2),
-    (v_evento_id, v_vt_solicitacao,   3),
-    (v_evento_id, v_vt_desistencia,   4),
-    (v_evento_id, v_plano_saude,      5),
-    (v_evento_id, v_compensacao,      6),
-    (v_evento_id, v_prorrogacao,      7),
-    (v_evento_id, v_responsabilidade, 8);
-
-END $seed$;
+</div>$doc$ WHERE nome = 'Termo de Responsabilidade (Salário Família)';
