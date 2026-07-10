@@ -375,6 +375,11 @@ textarea.form-control { min-height: 120px; resize: vertical; }
     position: absolute; right: 12px; bottom: 8px;
     font-size: 9px; opacity: 0.75; letter-spacing: 0.3px;
 }
+.cab-preview-empty {
+    border: 1px dashed var(--border); background: transparent;
+    padding: 16px 14px; display: flex; align-items: center; justify-content: center;
+    text-align: center; font-size: 11px; color: var(--muted); min-height: 50px;
+}
 
 /* ── BACK LINK ────────────────────────────────────────────── */
 .back-link {

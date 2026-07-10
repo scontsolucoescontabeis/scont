@@ -1324,6 +1324,7 @@ function selectCabecalho(val) {
   wizardCabecalho = val;
   document.getElementById('cab-opt-completo').classList.toggle('selected', val === 'completo');
   document.getElementById('cab-opt-neutro').classList.toggle('selected', val === 'neutro');
+  document.getElementById('cab-opt-nenhum').classList.toggle('selected', val === 'nenhum');
 }
 
 function buildWizardResumo() {
