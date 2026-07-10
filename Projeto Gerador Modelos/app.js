@@ -1335,7 +1335,10 @@ function buildWizardResumo() {
   document.getElementById('res-empresas').textContent = nomes.join(', ') || '—';
   document.getElementById('res-registros').textContent = wizardRegistros.length;
   const primeiraEmpresa = empresas.find(e => e.codigo_empresa === wizardEmpresasSelecionadas[0]);
-  document.getElementById('cab-neutro-empresa-name').textContent = primeiraEmpresa?.nome_empresa || wizardNomeEmpresaExcel || 'Nome da Empresa';
+  const nomeEmpresaPreview = primeiraEmpresa?.nome_empresa || wizardNomeEmpresaExcel || 'Nome da Empresa';
+  document.getElementById('cab-completo-empresa-name').textContent = nomeEmpresaPreview;
+  document.getElementById('cab-completo-titulo').textContent = m.nome;
+  document.getElementById('cab-neutro-empresa-name').textContent = nomeEmpresaPreview;
   document.getElementById('cab-neutro-titulo').textContent = m.nome;
   // Aplica cabeçalho padrão do modelo
   selectCabecalho(wizardCabecalho);

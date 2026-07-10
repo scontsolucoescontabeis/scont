@@ -293,14 +293,14 @@
                 <label class="cab-option selected" id="cab-opt-completo">
                   <input type="radio" name="cabecalho" value="completo" checked onchange="selectCabecalho('completo')">
                   <div class="cab-option-title">Cabeçalho Completo</div>
-                  <div class="cab-option-desc">Logo + "SCONT Soluções Contábeis" + título do modelo</div>
+                  <div class="cab-option-desc">Logo + nome da empresa cliente + título do modelo</div>
                   <div class="cab-preview-box">
                     <div class="cab-preview-bar">
                       <span class="logo-placeholder">SCONT</span>
                       <div class="cab-sep" style="width:1px;height:28px;background:rgba(255,255,255,0.3);flex-shrink:0"></div>
                       <div class="cab-text">
-                        <strong>Título do Modelo</strong>
-                        <span>SCONT Soluções Contábeis — Gestão de RH</span>
+                        <strong id="cab-completo-empresa-name">Nome da Empresa</strong>
+                        <span id="cab-completo-titulo">Título do Modelo</span>
                       </div>
                     </div>
                   </div>
@@ -308,13 +308,14 @@
                 <label class="cab-option" id="cab-opt-neutro">
                   <input type="radio" name="cabecalho" value="neutro" onchange="selectCabecalho('neutro')">
                   <div class="cab-option-title">Cabeçalho Neutro</div>
-                  <div class="cab-option-desc">Nome da empresa cliente + título do modelo (sem referência SCONT)</div>
+                  <div class="cab-option-desc">Nome da empresa cliente + título do modelo, com "SCONT Soluções Contábeis" no canto do cabeçalho</div>
                   <div class="cab-preview-box">
                     <div class="cab-preview-bar">
                       <div class="cab-text">
                         <strong id="cab-neutro-empresa-name">Nome da Empresa</strong>
                         <span id="cab-neutro-titulo">Título do Modelo</span>
                       </div>
+                      <span class="cab-canto-scont">SCONT Soluções Contábeis</span>
                     </div>
                   </div>
                 </label>
