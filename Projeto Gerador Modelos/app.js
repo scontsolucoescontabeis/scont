@@ -1140,8 +1140,17 @@ function construirRegistros() {
   const socsSel  = _dbSocios.filter(s => wizardSociosSelecionados.includes(s.id));
   const rubsSel  = _dbRubricas.filter(r => wizardRubricasSelecionados.includes(r.id));
 
+  // Normaliza o código da empresa antes de cruzar rh_empregados × rh_empresas —
+  // protege contra espaços em branco acidentais em uma das duas tabelas que
+  // fariam o cruzamento falhar silenciosamente (empresa some do documento).
+  const _normCod = (v) => String(v ?? '').trim();
   const empresaMap = {};
-  empresas.forEach(e => { empresaMap[e.codigo_empresa] = e; });
+  empresas.forEach(e => { empresaMap[_normCod(e.codigo_empresa)] = e; });
+  const buscarEmpresa = (cod) => {
+    const found = empresaMap[_normCod(cod)];
+    if (!found) console.warn('[Gerador de Modelos] Empresa não encontrada para codigo_empresa =', JSON.stringify(cod), '— confira se esse código existe em rh_empresas com o mesmo valor.');
+    return found || {};
+  };
 
   // Quando há Excel junto com DB, cada registro recebe a linha do Excel pelo índice
   // (ou a primeira linha se houver menos linhas que registros)
@@ -1151,14 +1160,14 @@ function construirRegistros() {
     const base = fontes.includes('empregados') && empsSel.length ? empsSel : null;
     if (base) {
       wizardRegistros = base.map((emp, i) => {
-        const empresa = empresaMap[emp.codigo_empresa] || {};
+        const empresa = buscarEmpresa(emp.codigo_empresa);
         const socio   = socsSel.find(s => s.codigo_empresa === emp.codigo_empresa) || {};
         const rubrica = rubsSel.find(r => r.codigo_empresa === emp.codigo_empresa) || {};
         return buildVarMap(empresa, emp, socio, rubrica, excelRow(i));
       });
     } else {
       wizardRegistros = wizardEmpresasSelecionadas.map((cod, i) => {
-        const empresa = empresaMap[cod] || {};
+        const empresa = buscarEmpresa(cod);
         const socio   = socsSel.find(s => s.codigo_empresa === cod) || {};
         const rubrica = rubsSel.find(r => r.codigo_empresa === cod) || {};
         return buildVarMap(empresa, {}, socio, rubrica, excelRow(i));
@@ -1166,7 +1175,7 @@ function construirRegistros() {
     }
   } else {
     wizardRegistros = wizardEmpresasSelecionadas.map((cod, i) => {
-      const empresa = empresaMap[cod] || {};
+      const empresa = buscarEmpresa(cod);
       const emp     = empsSel.find(e => e.codigo_empresa === cod) || {};
       const socio   = socsSel.find(s => s.codigo_empresa === cod) || {};
       const rubrica = rubsSel.find(r => r.codigo_empresa === cod) || {};
