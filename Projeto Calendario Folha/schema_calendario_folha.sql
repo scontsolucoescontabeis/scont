@@ -12,9 +12,9 @@
 -- ============================================================
 -- 1. TABELA: cal_folha_templates
 --    Cronograma recorrente (modelo de atividades da folha).
---    codigo_empresa NULL = vale para TODAS as empresas
---    (na geração da competência, é expandido em um evento
---     por empresa, para acompanhamento individual).
+--    codigo_empresa NULL = geral (na geração da competência vira
+--    1 evento único, calendário unificado); preenchido = atividade
+--    exclusiva daquela empresa (gera 1 evento só dela).
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.cal_folha_templates (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
