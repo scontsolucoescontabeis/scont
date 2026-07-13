@@ -76,28 +76,79 @@ CREATE INDEX IF NOT EXISTS idx_cal_eventos_empresa     ON public.cal_folha_event
 CREATE INDEX IF NOT EXISTS idx_cal_eventos_competencia ON public.cal_folha_eventos (competencia);
 CREATE INDEX IF NOT EXISTS idx_cal_eventos_status      ON public.cal_folha_eventos (status, data);
 
--- Evita duplicar evento gerado do cronograma para a mesma
--- empresa e competência (a geração também deduplica no cliente;
--- este índice é a garantia final no banco)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_cal_eventos_geracao_unica
+-- Evita duplicar evento gerado do cronograma para a mesma competência.
+-- Calendário é único: um template geral (codigo_empresa NULL) gera
+-- 1 evento só; um template de empresa específica gera 1 evento dela.
+-- Dois índices porque UNIQUE padrão trata NULL como distinto de NULL.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cal_eventos_geracao_unica_empresa
     ON public.cal_folha_eventos (template_id, codigo_empresa, competencia)
-    WHERE template_id IS NOT NULL;
+    WHERE template_id IS NOT NULL AND codigo_empresa IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cal_eventos_geracao_unica_geral
+    ON public.cal_folha_eventos (template_id, competencia)
+    WHERE template_id IS NOT NULL AND codigo_empresa IS NULL;
 
 
 -- ============================================================
--- 3. ROW LEVEL SECURITY
+-- 3. TABELA: cal_folha_observacoes
+--    Observações por empresa dentro de um evento do calendário
+--    único (ex.: "Empresa X pediu prorrogação"). Mural de notas,
+--    não sobrescreve histórico anterior.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.cal_folha_observacoes (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    evento_id       UUID NOT NULL REFERENCES public.cal_folha_eventos(id) ON DELETE CASCADE,
+    codigo_empresa  TEXT NOT NULL,
+    texto           TEXT NOT NULL,
+    criado_por      TEXT,
+    criado_em       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cal_obs_evento  ON public.cal_folha_observacoes (evento_id);
+CREATE INDEX IF NOT EXISTS idx_cal_obs_empresa ON public.cal_folha_observacoes (codigo_empresa);
+
+
+-- ============================================================
+-- 4. TABELA: cal_folha_checklist_itens
+--    Checklist dentro de um evento. codigo_empresa NULL = item
+--    genérico (não amarrado a nenhuma empresa); preenchido = item
+--    daquela empresa específica (criado avulso ou "para todas").
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.cal_folha_checklist_itens (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    evento_id       UUID NOT NULL REFERENCES public.cal_folha_eventos(id) ON DELETE CASCADE,
+    codigo_empresa  TEXT,                                 -- NULL = item genérico
+    texto           TEXT NOT NULL,
+    concluido       BOOLEAN NOT NULL DEFAULT FALSE,
+    concluido_por   TEXT,
+    concluido_em    TIMESTAMPTZ,
+    criado_em       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cal_check_evento  ON public.cal_folha_checklist_itens (evento_id);
+CREATE INDEX IF NOT EXISTS idx_cal_check_empresa ON public.cal_folha_checklist_itens (codigo_empresa);
+
+
+-- ============================================================
+-- 5. ROW LEVEL SECURITY
 --    Mesmo padrão dos demais módulos internos (RH / Fechamento):
 --    qualquer usuário autenticado lê e escreve; o acesso à
 --    ferramenta em si é controlado pelo portal-auth-guard
 --    (tabela usuario_ferramentas).
 -- ============================================================
-ALTER TABLE public.cal_folha_templates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.cal_folha_eventos   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cal_folha_templates      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cal_folha_eventos        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cal_folha_observacoes    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cal_folha_checklist_itens ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "cal_templates: leitura autenticado" ON public.cal_folha_templates;
 DROP POLICY IF EXISTS "cal_templates: escrita autenticado"  ON public.cal_folha_templates;
 DROP POLICY IF EXISTS "cal_eventos: leitura autenticado"    ON public.cal_folha_eventos;
 DROP POLICY IF EXISTS "cal_eventos: escrita autenticado"     ON public.cal_folha_eventos;
+DROP POLICY IF EXISTS "cal_obs: leitura autenticado"        ON public.cal_folha_observacoes;
+DROP POLICY IF EXISTS "cal_obs: escrita autenticado"        ON public.cal_folha_observacoes;
+DROP POLICY IF EXISTS "cal_check: leitura autenticado"      ON public.cal_folha_checklist_itens;
+DROP POLICY IF EXISTS "cal_check: escrita autenticado"      ON public.cal_folha_checklist_itens;
 
 CREATE POLICY "cal_templates: leitura autenticado"
     ON public.cal_folha_templates FOR SELECT
@@ -115,9 +166,25 @@ CREATE POLICY "cal_eventos: escrita autenticado"
     ON public.cal_folha_eventos FOR ALL
     TO authenticated USING (TRUE) WITH CHECK (TRUE);
 
+CREATE POLICY "cal_obs: leitura autenticado"
+    ON public.cal_folha_observacoes FOR SELECT
+    TO authenticated USING (TRUE);
+
+CREATE POLICY "cal_obs: escrita autenticado"
+    ON public.cal_folha_observacoes FOR ALL
+    TO authenticated USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY "cal_check: leitura autenticado"
+    ON public.cal_folha_checklist_itens FOR SELECT
+    TO authenticated USING (TRUE);
+
+CREATE POLICY "cal_check: escrita autenticado"
+    ON public.cal_folha_checklist_itens FOR ALL
+    TO authenticated USING (TRUE) WITH CHECK (TRUE);
+
 
 -- ============================================================
--- 4. SEED: cronograma padrão de obrigações da folha
+-- 6. SEED: cronograma padrão de obrigações da folha
 --    Modelos globais (todas as empresas). Ajuste dias e regras
 --    conforme a rotina do escritório — são apenas ponto de partida.
 -- ============================================================
@@ -162,7 +229,7 @@ WHERE NOT EXISTS (
 
 
 -- ============================================================
--- 5. REGISTRO NO PORTAL
+-- 7. REGISTRO NO PORTAL
 --    Disponibiliza a ferramenta no catálogo (conceda o acesso
 --    aos usuários pela tela de admin, como nas demais)
 -- ============================================================

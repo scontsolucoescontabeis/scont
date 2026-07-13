@@ -76,7 +76,6 @@
         <div class="view-switch" id="viewSwitch">
           <button data-view="mes" class="active" onclick="setView('mes')">Mês</button>
           <button data-view="agenda" onclick="setView('agenda')">Agenda</button>
-          <button data-view="empresas" onclick="setView('empresas')">Empresas</button>
         </div>
 
         <select id="filtroEmpresa" onchange="aplicarFiltros()">
@@ -112,15 +111,12 @@
       <!-- ── Visão Agenda ── -->
       <div id="viewAgenda" style="display:none"></div>
 
-      <!-- ── Visão Empresas ── -->
-      <div id="viewEmpresas" class="empresa-board" style="display:none"></div>
-
     </div>
   </div><!-- /#app -->
 
   <!-- ── Modal: evento (novo/editar) ── -->
   <div class="modal-overlay" id="modalEvento">
-    <div class="modal">
+    <div class="modal modal-lg">
       <div class="modal-head">
         <h3 id="modalEventoTitulo">Novo evento</h3>
         <button class="modal-close" onclick="fecharModal('modalEvento')">✕</button>
@@ -163,13 +159,42 @@
               <option value="em_andamento">Em andamento</option>
               <option value="concluido">Concluído</option>
             </select>
+            <p class="form-hint" id="evStatusHint" style="display:none"></p>
           </div>
           <div class="form-group full">
-            <label>Descrição / Observações</label>
-            <textarea id="evDescricao" maxlength="2000" placeholder="Detalhes, instruções, particularidades da empresa…"></textarea>
+            <label>Descrição</label>
+            <textarea id="evDescricao" maxlength="2000" placeholder="Detalhes, instruções gerais do evento…"></textarea>
           </div>
         </div>
         <p class="form-hint" id="evOrigemHint" style="display:none"></p>
+
+        <!-- ── Observações por empresa ── -->
+        <div class="ev-subsection" id="evSecObservacoes" style="display:none">
+          <h4>📝 Observações por empresa</h4>
+          <div class="obs-add-row">
+            <select id="obsEmpresa"></select>
+            <input type="text" id="obsTexto" maxlength="500" placeholder="Nova observação…" />
+            <button class="btn-secondary" onclick="adicionarObservacao()">Adicionar</button>
+          </div>
+          <div class="obs-list" id="obsList"></div>
+        </div>
+
+        <!-- ── Checklist (genérico / por empresa) ── -->
+        <div class="ev-subsection" id="evSecChecklist" style="display:none">
+          <h4>✅ Checklist</h4>
+          <div class="chk-add-row">
+            <input type="text" id="chkTexto" maxlength="200" placeholder="Descrição da tarefa…" />
+            <select id="chkEscopo" onchange="atualizarEscopoChecklist()">
+              <option value="generico">Genérico</option>
+              <option value="todas">Todas as empresas</option>
+              <option value="empresa">Uma empresa específica</option>
+            </select>
+            <select id="chkEmpresaEspecifica" style="display:none"></select>
+            <button class="btn-secondary" onclick="adicionarChecklistItem()">Adicionar</button>
+          </div>
+          <div class="chk-progress" id="chkProgress"></div>
+          <div class="chk-list" id="chkList"></div>
+        </div>
       </div>
       <div class="modal-foot">
         <button class="btn-danger left" id="btnExcluirEvento" style="display:none" onclick="excluirEvento()">🗑️ Excluir</button>
@@ -318,18 +343,14 @@
       </div>
       <div class="modal-body">
         <p class="form-hint" style="margin-bottom:14px">
-          Cria os eventos do cronograma recorrente para a competência escolhida — um por empresa —
-          com as datas ajustadas por fins de semana e feriados. Eventos já gerados não são duplicados
-          nem têm o status sobrescrito.
+          Cria os eventos do cronograma recorrente para a competência escolhida — um evento único por
+          atividade — com as datas ajustadas por fins de semana e feriados. Eventos já gerados não são
+          duplicados nem têm o status sobrescrito.
         </p>
         <div class="form-grid">
-          <div class="form-group">
+          <div class="form-group full">
             <label>Competência *</label>
             <input type="month" id="gerarCompetencia" />
-          </div>
-          <div class="form-group">
-            <label>Empresa</label>
-            <select id="gerarEmpresa"><option value="">Todas as empresas</option></select>
           </div>
         </div>
         <div id="gerarResultado" class="form-hint" style="margin-top:12px"></div>

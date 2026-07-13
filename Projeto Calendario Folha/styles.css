@@ -463,47 +463,87 @@ button { font-family: inherit; cursor: pointer; }
 .badge-status-em_andamento { background: #FFF7ED; color: #EA580C; }
 .badge-status-concluido    { background: #ECFDF5; color: #059669; }
 .badge-cronograma { background: #F5F3FF; color: #6D28D9; text-transform: none; }
+.badge-checklist  { background: #EFF6FF; color: #2563EB; text-transform: none; }
 
-/* ── Visão por empresa ── */
-.empresa-board { display: flex; flex-direction: column; gap: 14px; }
-
-.empresa-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
+.event-card .ec-check-auto {
+  font-size: 15px;
+  border: none;
+  background: transparent;
+  cursor: default;
 }
-.empresa-card-head {
+
+/* ── Observações e checklist dentro do evento ── */
+.ev-subsection {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+.ev-subsection h4 { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+
+.obs-add-row, .chk-add-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--border-light);
+  gap: 8px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 }
-.empresa-card-head h3 { font-size: 15px; font-weight: 700; color: var(--text); }
-.empresa-card-head .ecode {
-  font-size: 11px; font-weight: 700;
-  background: var(--bg-light); border: 1px solid var(--border);
-  border-radius: 6px; padding: 2px 8px; color: var(--text-light);
+.obs-add-row select, .chk-add-row select {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
 }
-.empresa-progress { margin-left: auto; display: flex; align-items: center; gap: 10px; min-width: 200px; }
-.empresa-progress .pg-bar {
-  flex: 1; height: 8px;
-  background: var(--border-light);
-  border-radius: 6px;
-  overflow: hidden;
+.obs-add-row input, .chk-add-row input {
+  flex: 1;
+  min-width: 160px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--card);
 }
-.empresa-progress .pg-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--success), #2ECC71);
-  border-radius: 6px;
-  transition: width .4s ease;
-}
-.empresa-progress .pg-label { font-size: 12px; font-weight: 700; color: var(--text-light); white-space: nowrap; }
 
-.empresa-card-body { padding: 12px 18px; }
+.obs-list { display: flex; flex-direction: column; gap: 8px; }
+.obs-item {
+  background: var(--bg-light);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+.obs-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.obs-empresa { font-size: 11px; font-weight: 700; color: var(--primary); }
+.obs-meta { font-size: 10px; color: var(--muted); margin-left: auto; }
+.obs-del {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 12px; line-height: 1; padding: 2px;
+}
+.obs-del:hover { color: #DC2626; }
+.obs-texto { font-size: 13px; color: var(--text); }
+
+.chk-progress { font-size: 11px; font-weight: 700; color: var(--text-light); margin-bottom: 8px; }
+.chk-group { margin-bottom: 12px; }
+.chk-group h5 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--text-light); margin-bottom: 6px;
+}
+.chk-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--border-light);
+}
+.chk-item:last-child { border-bottom: none; }
+.chk-item.feito .chk-texto { text-decoration: line-through; color: var(--muted); }
+.chk-texto { flex: 1; font-size: 13px; color: var(--text); }
+.chk-empresa { font-size: 11px; font-weight: 700; color: var(--primary); }
+.chk-del {
+  border: none; background: transparent; color: var(--muted);
+  font-size: 12px; line-height: 1; padding: 2px;
+}
+.chk-del:hover { color: #DC2626; }
 
 /* ── Estado vazio ── */
 .empty-state {
@@ -685,6 +725,6 @@ button { font-family: inherit; cursor: pointer; }
   .day-feriado { display: none; }
   .month-label { min-width: 130px; font-size: 15px; }
   .form-grid { grid-template-columns: 1fr; }
-  .empresa-progress { min-width: 130px; }
+  .obs-add-row, .chk-add-row { flex-direction: column; align-items: stretch; }
   .toolbar select { max-width: 140px; }
 }

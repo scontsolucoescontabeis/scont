@@ -21,6 +21,8 @@ let atrasados = [];         // pendências vencidas (qualquer data)
 
 let eventoEditando = null;
 let templateEditando = null;
+let observacoesEditando = [];   // observações por empresa do evento aberto no modal
+let checklistEditando = [];     // itens de checklist do evento aberto no modal
 
 const TIPOS = {
   fechamento: { label: 'Fechamento',  emoji: '🔒', cor: '#8B3A3A' },
@@ -82,7 +84,8 @@ function popularSelectEmpresas() {
   document.getElementById('filtroEmpresa').innerHTML = '<option value="">Todas as empresas</option>' + opts;
   document.getElementById('evEmpresa').innerHTML     = '<option value="">Geral (todas)</option>' + opts;
   document.getElementById('tpEmpresa').innerHTML     = '<option value="">Todas as empresas</option>' + opts;
-  document.getElementById('gerarEmpresa').innerHTML  = '<option value="">Todas as empresas</option>' + opts;
+  document.getElementById('obsEmpresa').innerHTML    = opts;
+  document.getElementById('chkEmpresaEspecifica').innerHTML = opts;
 }
 
 async function carregarFeriados() {
@@ -101,7 +104,27 @@ async function carregarTemplates() {
 
 async function recarregar() {
   await Promise.all([carregarEventos(), carregarAtrasados()]);
+  await ligarChecklistNosEventos();
   render();
+}
+
+/** carrega, em lote, os itens de checklist dos eventos visíveis (mês + atrasados)
+ *  — usado para o filtro por empresa e para o indicador de progresso nos cards */
+async function carregarChecklistParaEventos(idsEventos) {
+  if (!idsEventos.length) return {};
+  const { data, error } = await sb.from('cal_folha_checklist_itens')
+    .select('id, evento_id, codigo_empresa, concluido')
+    .in('evento_id', idsEventos);
+  if (error) return {};
+  const mapa = {};
+  (data || []).forEach(it => (mapa[it.evento_id] = mapa[it.evento_id] || []).push(it));
+  return mapa;
+}
+
+async function ligarChecklistNosEventos() {
+  const ids = [...new Set([...eventos, ...atrasados].map(e => e.id))];
+  const mapa = await carregarChecklistParaEventos(ids);
+  [...eventos, ...atrasados].forEach(ev => { ev._checklist = mapa[ev.id] || []; });
 }
 
 /* janela de datas exibida na grade do mês (inclui sobras das semanas) */
@@ -232,7 +255,11 @@ function filtrosAtuais() {
 
 function eventoVisivel(ev) {
   const f = filtrosAtuais();
-  if (f.empresa && ev.codigo_empresa !== f.empresa) return false;
+  if (f.empresa) {
+    const pertence = ev.codigo_empresa === f.empresa
+      || (ev._checklist || []).some(i => i.codigo_empresa === f.empresa);
+    if (!pertence) return false;
+  }
   if (f.tipo && ev.tipo !== f.tipo) return false;
   if (f.status === 'atrasado') {
     if (!ehAtrasado(ev)) return false;
@@ -275,6 +302,7 @@ function filtroRapido(qual) {
 async function mudarMes(delta) {
   mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + delta, 1);
   await carregarEventos();
+  await ligarChecklistNosEventos();
   render();
 }
 
@@ -285,6 +313,7 @@ async function irParaHoje() {
     mesAtual = alvo;
     await carregarEventos();
   }
+  await ligarChecklistNosEventos();
   render();
 }
 
@@ -302,16 +331,14 @@ function render() {
   const nomeMes = mesAtual.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   document.getElementById('monthLabel').textContent = nomeMes;
 
-  document.getElementById('viewMes').style.display      = viewAtual === 'mes' ? 'block' : 'none';
-  document.getElementById('viewAgenda').style.display   = viewAtual === 'agenda' ? 'block' : 'none';
-  document.getElementById('viewEmpresas').style.display = viewAtual === 'empresas' ? 'flex' : 'none';
+  document.getElementById('viewMes').style.display    = viewAtual === 'mes' ? 'block' : 'none';
+  document.getElementById('viewAgenda').style.display = viewAtual === 'agenda' ? 'block' : 'none';
 
   renderStats();
   renderAlertStrip();
 
-  if (viewAtual === 'mes')      renderMes();
-  if (viewAtual === 'agenda')   renderAgenda();
-  if (viewAtual === 'empresas') renderEmpresas();
+  if (viewAtual === 'mes')    renderMes();
+  if (viewAtual === 'agenda') renderAgenda();
 }
 
 function renderStats() {
@@ -433,15 +460,25 @@ function renderAgenda() {
   }).join('');
 }
 
+function checklistBadgeHtml(ev) {
+  const itens = ev._checklist || [];
+  if (!itens.length) return '';
+  const done = itens.filter(i => i.concluido).length;
+  return `<span class="badge badge-checklist" title="Itens de checklist concluídos">☑️ ${done}/${itens.length}</span>`;
+}
+
 function cardHtml(ev) {
   const t = TIPOS[ev.tipo] || TIPOS.outro;
   const atras = ehAtrasado(ev);
   const emp = nomeEmpresa(ev.codigo_empresa);
+  const temChecklist = (ev._checklist || []).length > 0;
   return `
     <div class="event-card ${ev.status}" style="border-left-color: ${t.cor}"
          onclick="abrirEventoPorId('${ev.id}')">
-      <button class="ec-check" title="Alternar status"
-              onclick="event.stopPropagation(); alternarStatus('${ev.id}')">✓</button>
+      ${temChecklist
+        ? `<span class="ec-check ec-check-auto" title="Status calculado pelo checklist">${ev.status === 'concluido' ? '✅' : '◐'}</span>`
+        : `<button class="ec-check" title="Alternar status"
+              onclick="event.stopPropagation(); alternarStatus('${ev.id}')">✓</button>`}
       <div class="ec-body">
         <div class="ec-title">
           <span class="tipo-txt-${ev.tipo}">${t.emoji}</span> ${esc(ev.titulo)}
@@ -453,61 +490,13 @@ function cardHtml(ev) {
                 : '<span class="badge badge-empresa">🌐 Geral</span>'}
           <span class="badge badge-${ev.prioridade}">${PRIORIDADES[ev.prioridade] || ev.prioridade}</span>
           <span class="badge badge-status-${ev.status}">${STATUS_LABEL[ev.status]}</span>
+          ${checklistBadgeHtml(ev)}
           ${ev.origem === 'cronograma' ? '<span class="badge badge-cronograma">⚙️ Cronograma</span>' : ''}
           ${ev.responsavel ? `<span>👤 ${esc(ev.responsavel)}</span>` : ''}
           ${ev.status === 'concluido' && ev.concluido_por ? `<span>✅ ${esc(ev.concluido_por)} em ${ev.concluido_em ? fmtBr(ev.concluido_em.slice(0, 10)) : ''}</span>` : ''}
         </div>
       </div>
     </div>`;
-}
-
-/* ── visão empresas ── */
-function renderEmpresas() {
-  const cont = document.getElementById('viewEmpresas');
-  const visiveis = eventos.filter(eventoVisivel)
-    .filter(e => deIso(e.data).getMonth() === mesAtual.getMonth()
-              && deIso(e.data).getFullYear() === mesAtual.getFullYear());
-
-  const grupos = new Map();
-  visiveis.forEach(ev => {
-    const key = ev.codigo_empresa || '__geral__';
-    if (!grupos.has(key)) grupos.set(key, []);
-    grupos.get(key).push(ev);
-  });
-
-  if (!grupos.size) {
-    cont.innerHTML = emptyHtml('Nenhum evento', 'Gere a competência ou crie eventos para ver o quadro por empresa.');
-    return;
-  }
-
-  const chaves = [...grupos.keys()].sort((a, b) => {
-    if (a === '__geral__') return -1;
-    if (b === '__geral__') return 1;
-    return (nomeEmpresa(a) || a).localeCompare(nomeEmpresa(b) || b);
-  });
-
-  cont.innerHTML = chaves.map(key => {
-    const evs = grupos.get(key).sort((a, b) => a.data.localeCompare(b.data));
-    const acompanhaveis = evs.filter(e => e.tipo !== 'observacao');
-    const done = acompanhaveis.filter(e => e.status === 'concluido').length;
-    const pct = acompanhaveis.length ? Math.round(done / acompanhaveis.length * 100) : 0;
-    const nome = key === '__geral__' ? '🌐 Eventos gerais (todas as empresas)' : esc(nomeEmpresa(key) || key);
-
-    return `
-      <div class="empresa-card">
-        <div class="empresa-card-head">
-          <h3>${nome}</h3>
-          ${key !== '__geral__' ? `<span class="ecode">${esc(key)}</span>` : ''}
-          <div class="empresa-progress">
-            <div class="pg-bar"><div class="pg-fill" style="width:${pct}%"></div></div>
-            <span class="pg-label">${done}/${acompanhaveis.length} · ${pct}%</span>
-          </div>
-        </div>
-        <div class="empresa-card-body">
-          ${evs.map(ev => cardHtml(ev)).join('')}
-        </div>
-      </div>`;
-  }).join('');
 }
 
 function emptyHtml(titulo, sub) {
@@ -540,6 +529,8 @@ function abrirDia(dataIso) {
 
 function abrirNovoEvento(dataIso) {
   eventoEditando = null;
+  observacoesEditando = [];
+  checklistEditando = [];
   document.getElementById('modalEventoTitulo').textContent = 'Novo evento';
   document.getElementById('evTitulo').value = '';
   document.getElementById('evData').value = dataIso || iso(hoje);
@@ -548,14 +539,18 @@ function abrirNovoEvento(dataIso) {
   document.getElementById('evPrioridade').value = 'atencao';
   document.getElementById('evResponsavel').value = '';
   document.getElementById('evStatus').value = 'pendente';
+  document.getElementById('evStatus').disabled = false;
   document.getElementById('evDescricao').value = '';
   document.getElementById('btnExcluirEvento').style.display = 'none';
   document.getElementById('evOrigemHint').style.display = 'none';
+  document.getElementById('evStatusHint').style.display = 'none';
+  document.getElementById('evSecObservacoes').style.display = 'none';
+  document.getElementById('evSecChecklist').style.display = 'none';
   abrirModal('modalEvento');
   setTimeout(() => document.getElementById('evTitulo').focus(), 50);
 }
 
-function abrirEventoPorId(id) {
+async function abrirEventoPorId(id) {
   const ev = eventos.find(e => e.id === id) || atrasados.find(e => e.id === id);
   if (!ev) return;
   eventoEditando = ev;
@@ -576,8 +571,19 @@ function abrirEventoPorId(id) {
     hint.textContent = '⚙️ Evento gerado do cronograma recorrente (competência ' + fmtCompetencia(ev.competencia) + ').';
   } else hint.style.display = 'none';
 
+  document.getElementById('evSecObservacoes').style.display = 'block';
+  document.getElementById('evSecChecklist').style.display = 'block';
+  document.getElementById('obsTexto').value = '';
+  document.getElementById('chkTexto').value = '';
+  document.getElementById('chkEscopo').value = 'generico';
+  atualizarEscopoChecklist();
+
   fecharModal('modalDia');
   abrirModal('modalEvento');
+
+  await Promise.all([carregarObservacoesEvento(ev.id), carregarChecklistEvento(ev.id)]);
+  renderObservacoes();
+  renderChecklist();
 }
 
 async function salvarEvento() {
@@ -646,6 +652,201 @@ async function alternarStatus(id) {
   const { error } = await sb.from('cal_folha_eventos').update(payload).eq('id', id);
   if (error) { toast('Erro: ' + error.message, 'error'); return; }
   await recarregar();
+}
+
+/* ─────────────────────── Observações por empresa ─────────────────────── */
+
+async function carregarObservacoesEvento(eventoId) {
+  const { data, error } = await sb.from('cal_folha_observacoes')
+    .select('*').eq('evento_id', eventoId).order('criado_em', { ascending: false });
+  if (error) { toast('Erro ao carregar observações: ' + error.message, 'error'); observacoesEditando = []; return; }
+  observacoesEditando = data || [];
+}
+
+function renderObservacoes() {
+  const cont = document.getElementById('obsList');
+  if (!observacoesEditando.length) {
+    cont.innerHTML = '<p class="form-hint">Nenhuma observação registrada.</p>';
+    return;
+  }
+  cont.innerHTML = observacoesEditando.map(o => `
+    <div class="obs-item">
+      <div class="obs-item-head">
+        <span class="obs-empresa">🏢 ${esc(nomeEmpresa(o.codigo_empresa) || o.codigo_empresa)}</span>
+        <span class="obs-meta">${esc(o.criado_por || '')}${o.criado_por && o.criado_em ? ' · ' : ''}${o.criado_em ? fmtBr(o.criado_em.slice(0, 10)) : ''}</span>
+        <button class="obs-del" title="Excluir" onclick="excluirObservacao('${o.id}')">✕</button>
+      </div>
+      <div class="obs-texto">${esc(o.texto)}</div>
+    </div>`).join('');
+}
+
+async function adicionarObservacao() {
+  if (!eventoEditando) return;
+  const codigo_empresa = document.getElementById('obsEmpresa').value;
+  const texto = document.getElementById('obsTexto').value.trim();
+  if (!codigo_empresa) { toast('Escolha a empresa.', 'error'); return; }
+  if (!texto) { toast('Escreva a observação.', 'error'); return; }
+
+  const { error } = await sb.from('cal_folha_observacoes').insert({
+    evento_id: eventoEditando.id,
+    codigo_empresa,
+    texto,
+    criado_por: usuario?.nome || usuario?.email || null
+  });
+  if (error) { toast('Erro ao salvar: ' + error.message, 'error'); return; }
+
+  document.getElementById('obsTexto').value = '';
+  await carregarObservacoesEvento(eventoEditando.id);
+  renderObservacoes();
+}
+
+async function excluirObservacao(id) {
+  if (!confirm('Excluir esta observação?')) return;
+  const { error } = await sb.from('cal_folha_observacoes').delete().eq('id', id);
+  if (error) { toast('Erro: ' + error.message, 'error'); return; }
+  await carregarObservacoesEvento(eventoEditando.id);
+  renderObservacoes();
+}
+
+/* ─────────────────────── Checklist (genérico / por empresa) ─────────────────────── */
+
+function atualizarEscopoChecklist() {
+  const escopo = document.getElementById('chkEscopo').value;
+  document.getElementById('chkEmpresaEspecifica').style.display = escopo === 'empresa' ? 'inline-block' : 'none';
+}
+
+async function carregarChecklistEvento(eventoId) {
+  const { data, error } = await sb.from('cal_folha_checklist_itens')
+    .select('*').eq('evento_id', eventoId).order('criado_em');
+  if (error) { toast('Erro ao carregar checklist: ' + error.message, 'error'); checklistEditando = []; return; }
+  checklistEditando = data || [];
+}
+
+function renderChecklist() {
+  if (eventoEditando) eventoEditando._checklist = checklistEditando;
+
+  const cont = document.getElementById('chkList');
+  const prog = document.getElementById('chkProgress');
+
+  if (!checklistEditando.length) {
+    cont.innerHTML = '<p class="form-hint">Nenhum item no checklist.</p>';
+    prog.textContent = '';
+  } else {
+    const done = checklistEditando.filter(i => i.concluido).length;
+    prog.textContent = `${done}/${checklistEditando.length} concluídos`;
+
+    const linha = it => `
+      <div class="chk-item ${it.concluido ? 'feito' : ''}">
+        <input type="checkbox" ${it.concluido ? 'checked' : ''} onchange="alternarChecklistItem('${it.id}')" />
+        <span class="chk-texto">${esc(it.texto)}${it.codigo_empresa ? ` <span class="chk-empresa">🏢 ${esc(nomeEmpresa(it.codigo_empresa) || it.codigo_empresa)}</span>` : ''}</span>
+        <button class="chk-del" title="Excluir" onclick="excluirChecklistItem('${it.id}')">✕</button>
+      </div>`;
+
+    const genericos  = checklistEditando.filter(i => !i.codigo_empresa);
+    const porEmpresa = checklistEditando.filter(i => i.codigo_empresa)
+      .sort((a, b) => (nomeEmpresa(a.codigo_empresa) || a.codigo_empresa).localeCompare(nomeEmpresa(b.codigo_empresa) || b.codigo_empresa));
+
+    cont.innerHTML =
+      (genericos.length  ? `<div class="chk-group"><h5>Geral</h5>${genericos.map(linha).join('')}</div>` : '') +
+      (porEmpresa.length ? `<div class="chk-group"><h5>Por empresa</h5>${porEmpresa.map(linha).join('')}</div>` : '');
+  }
+
+  atualizarStatusUI();
+  render();   // atualiza pills/cards do calendário por trás do modal (status/badge já em memória)
+}
+
+async function adicionarChecklistItem() {
+  if (!eventoEditando) return;
+  const texto = document.getElementById('chkTexto').value.trim();
+  if (!texto) { toast('Escreva a descrição da tarefa.', 'error'); return; }
+  const escopo = document.getElementById('chkEscopo').value;
+
+  let linhas = [];
+  if (escopo === 'generico') {
+    linhas = [{ evento_id: eventoEditando.id, codigo_empresa: null, texto }];
+  } else if (escopo === 'todas') {
+    if (!empresas.length) { toast('Nenhuma empresa cadastrada.', 'error'); return; }
+    linhas = empresas.map(e => ({ evento_id: eventoEditando.id, codigo_empresa: e.codigo_empresa, texto }));
+  } else {
+    const cod = document.getElementById('chkEmpresaEspecifica').value;
+    if (!cod) { toast('Escolha a empresa.', 'error'); return; }
+    linhas = [{ evento_id: eventoEditando.id, codigo_empresa: cod, texto }];
+  }
+
+  const { error } = await sb.from('cal_folha_checklist_itens').insert(linhas);
+  if (error) { toast('Erro ao salvar: ' + error.message, 'error'); return; }
+
+  document.getElementById('chkTexto').value = '';
+  await carregarChecklistEvento(eventoEditando.id);
+  await sincronizarStatusPorChecklist(eventoEditando.id);
+  renderChecklist();
+}
+
+async function alternarChecklistItem(id) {
+  const item = checklistEditando.find(i => i.id === id);
+  if (!item) return;
+  const concluido = !item.concluido;
+  const payload = { concluido };
+  if (concluido) {
+    payload.concluido_por = usuario?.nome || usuario?.email || 'usuário';
+    payload.concluido_em = new Date().toISOString();
+  } else {
+    payload.concluido_por = null;
+    payload.concluido_em = null;
+  }
+
+  const { error } = await sb.from('cal_folha_checklist_itens').update(payload).eq('id', id);
+  if (error) { toast('Erro: ' + error.message, 'error'); return; }
+
+  await carregarChecklistEvento(eventoEditando.id);
+  await sincronizarStatusPorChecklist(eventoEditando.id);
+  renderChecklist();
+}
+
+async function excluirChecklistItem(id) {
+  if (!confirm('Excluir este item do checklist?')) return;
+  const { error } = await sb.from('cal_folha_checklist_itens').delete().eq('id', id);
+  if (error) { toast('Erro: ' + error.message, 'error'); return; }
+
+  await carregarChecklistEvento(eventoEditando.id);
+  await sincronizarStatusPorChecklist(eventoEditando.id);
+  renderChecklist();
+}
+
+/** mantém cal_folha_eventos.status em sincronia com o progresso do checklist
+ *  (pendente = nada feito, em_andamento = parcial, concluído = tudo feito) */
+async function sincronizarStatusPorChecklist(eventoId) {
+  const itens = checklistEditando;
+  if (!itens.length) return;   // sem checklist: status continua manual
+
+  const done = itens.filter(i => i.concluido).length;
+  const novoStatus = done === 0 ? 'pendente' : (done === itens.length ? 'concluido' : 'em_andamento');
+  const payload = { status: novoStatus, atualizado_em: new Date().toISOString() };
+  if (novoStatus === 'concluido') {
+    payload.concluido_por = usuario?.nome || usuario?.email || 'usuário';
+    payload.concluido_em = new Date().toISOString();
+  } else {
+    payload.concluido_por = null;
+    payload.concluido_em = null;
+  }
+
+  await sb.from('cal_folha_eventos').update(payload).eq('id', eventoId);
+  if (eventoEditando && eventoEditando.id === eventoId) Object.assign(eventoEditando, payload);
+}
+
+function atualizarStatusUI() {
+  const sel = document.getElementById('evStatus');
+  const hint = document.getElementById('evStatusHint');
+  if (checklistEditando.length) {
+    sel.disabled = true;
+    sel.value = eventoEditando.status;
+    const done = checklistEditando.filter(i => i.concluido).length;
+    hint.style.display = 'block';
+    hint.textContent = `Status calculado automaticamente pelo checklist (${done}/${checklistEditando.length} concluídos).`;
+  } else {
+    sel.disabled = false;
+    hint.style.display = 'none';
+  }
 }
 
 /* ─────────────────────── CRUD: cronograma (templates) ─────────────────────── */
@@ -802,9 +1003,7 @@ function abrirGerarCompetencia() {
 
 async function gerarCompetencia() {
   const comp = document.getElementById('gerarCompetencia').value;   // 'AAAA-MM'
-  const empSel = document.getElementById('gerarEmpresa').value;
   if (!comp) { toast('Escolha a competência.', 'error'); return; }
-  if (!empresas.length) { toast('Cadastre empresas no módulo RH antes de gerar.', 'error'); return; }
 
   const btn = document.getElementById('btnGerar');
   btn.disabled = true; btn.textContent = 'Gerando…';
@@ -823,29 +1022,26 @@ async function gerarCompetencia() {
     if (errExist) { toast('Erro ao verificar eventos existentes: ' + errExist.message, 'error'); return; }
     const jaGerado = new Set((existentes || []).map(e => e.template_id + '|' + (e.codigo_empresa || '')));
 
+    // calendário único: cada template gera 1 evento (geral, ou da empresa
+    // específica do template — sem expandir por empresa)
     const linhas = [];
     let pulados = 0;
     for (const t of ativos) {
-      // empresas-alvo: a do template, ou todas (expandidas uma a uma)
-      let alvo = t.codigo_empresa ? [t.codigo_empresa] : empresas.map(e => e.codigo_empresa);
-      if (empSel) alvo = alvo.filter(c => c === empSel);
+      const cod = t.codigo_empresa || null;
+      if (jaGerado.has(t.id + '|' + (cod || ''))) { pulados++; continue; }
 
-      const dataEv = iso(dataDoTemplate(t, ano, mes0));
-      for (const cod of alvo) {
-        if (jaGerado.has(t.id + '|' + cod)) { pulados++; continue; }
-        linhas.push({
-          codigo_empresa: cod,
-          titulo: t.titulo,
-          descricao: t.descricao,
-          tipo: t.tipo,
-          prioridade: t.prioridade,
-          data: dataEv,
-          competencia: comp,
-          origem: 'cronograma',
-          template_id: t.id,
-          criado_por: usuario?.nome || usuario?.email || null
-        });
-      }
+      linhas.push({
+        codigo_empresa: cod,
+        titulo: t.titulo,
+        descricao: t.descricao,
+        tipo: t.tipo,
+        prioridade: t.prioridade,
+        data: iso(dataDoTemplate(t, ano, mes0)),
+        competencia: comp,
+        origem: 'cronograma',
+        template_id: t.id,
+        criado_por: usuario?.nome || usuario?.email || null
+      });
     }
 
     if (!linhas.length) {
@@ -859,7 +1055,7 @@ async function gerarCompetencia() {
     if (error) { toast('Erro ao gerar: ' + error.message, 'error'); return; }
 
     document.getElementById('gerarResultado').textContent =
-      `Competência ${fmtCompetencia(comp)}: ${linhas.length} eventos gerados` +
+      `Competência ${fmtCompetencia(comp)}: ${linhas.length} evento(s) gerado(s)` +
       (pulados ? ` (${pulados} já existiam e foram mantidos).` : '.');
 
     toast('Competência gerada.', 'success');
