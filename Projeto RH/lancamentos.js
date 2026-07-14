@@ -32,14 +32,6 @@ const EVENTOS_FIXOS_RUBRICA = [
     { ev: 'descontoVA', label: 'Desconto VA',        tipoValor: 'monetario' },
 ];
 
-// Eventos de jornada/turnos/regras gerais da empresa — configuráveis só no Controle de Frequência.
-// A tela de Configurações do Lançamentos não exibe nem edita esses eventos.
-const EVENTOS_CONFIG_GERAL_RESTRITOS = [
-    'jornada_diaria', 'jornada_sexta_ativa', 'jornada_sexta',
-    'jornada_sabado_ativa', 'jornada_sabado', 'sabado_sempre_extra',
-    'rule_extra_100_opcional', 'terceiro_turno', 'nao_compensar_extras',
-];
-
 // Empresas cadastradas (preenchido em carregarEmpresas), reaproveitado pela grade e pelo modal de Configurações
 let empresasCadastradas = [];
 
@@ -380,30 +372,6 @@ function renderSeletorEventoRubrica() {
         }
     });
 
-    const vistos = new Set();
-    codigosEmpresasLote.forEach(cod => {
-        const cfgEmpresa = configRubricasPorEmpresa[cod] || {};
-        Object.keys(cfgEmpresa).forEach(evento => {
-            const ehFixo = EVENTOS_FIXOS_RUBRICA.some(e => e.ev === evento);
-            const ehConfigGeral = EVENTOS_CONFIG_GERAL_RESTRITOS.includes(evento);
-            if (ehFixo || ehConfigGeral || evento === 'observacoes' || vistos.has(evento)) return;
-            vistos.add(evento);
-
-            const porEmpresa = {};
-            let tipoValor = 'horas';
-            let label = evento;
-            codigosEmpresasLote.forEach(cod2 => {
-                const cfg = configRubricasPorEmpresa[cod2] && configRubricasPorEmpresa[cod2][evento];
-                if (cfg && cfg.codigo) {
-                    porEmpresa[cod2] = cfg.codigo;
-                    tipoValor = cfg.tipo || tipoValor;
-                    label = cfg.descricao || label;
-                }
-            });
-            eventosRubricaDisponiveis.push({ evento, label, tipoValor, codigosPorEmpresa: porEmpresa });
-        });
-    });
-
     let html = '<option value="">Selecione...</option>';
     eventosRubricaDisponiveis.forEach(item => {
         const codigosUnicos = [...new Set(Object.values(item.codigosPorEmpresa))];
@@ -412,7 +380,7 @@ function renderSeletorEventoRubrica() {
             : Object.entries(item.codigosPorEmpresa).map(([cod, codigo]) => `${nomeEmpresaPorCodigo(cod)}: ${codigo}`).join(', ');
         html += `<option value="${item.evento}">${item.label} (${detalhe})</option>`;
     });
-    html += '<option value="__manual__">Outra rubrica (digitar código)</option>';
+    html += '<option value="__manual__">Outra rubrica (buscar no catálogo ou digitar código)</option>';
 
     select.innerHTML = html;
     onEventoRubricaChange();
