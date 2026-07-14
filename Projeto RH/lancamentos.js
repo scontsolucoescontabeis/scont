@@ -422,8 +422,9 @@ function renderSeletorRubricaCatalogo() {
         const desc = (r.descricao_rubrica || '').trim();
         if (!desc) return;
         const chave = desc.toLowerCase();
-        if (!grupos.has(chave)) grupos.set(chave, { descricao: desc, codigosPorEmpresa: {} });
+        if (!grupos.has(chave)) grupos.set(chave, { descricao: desc, codigosPorEmpresa: {}, tipos: new Set() });
         grupos.get(chave).codigosPorEmpresa[r.codigo_empresa] = r.codigo_rubrica;
+        if (r.tipo) grupos.get(chave).tipos.add(r.tipo);
     });
 
     rubricasCatalogoAgrupadas = Array.from(grupos.values())
@@ -435,7 +436,8 @@ function renderSeletorRubricaCatalogo() {
         const detalhe = codigosUnicos.length === 1
             ? codigosUnicos[0]
             : Object.entries(item.codigosPorEmpresa).map(([cod, codigo]) => `${nomeEmpresaPorCodigo(cod)}: ${codigo}`).join(', ');
-        html += `<option value="${idx}">${item.descricao} (${detalhe})</option>`;
+        const tipo = item.tipos.size > 0 ? ` — ${[...item.tipos].join('/')}` : '';
+        html += `<option value="${idx}">${item.descricao}${tipo} (${detalhe})</option>`;
     });
     html += '<option value="__manual__">Outra rubrica (digitar código)</option>';
 
