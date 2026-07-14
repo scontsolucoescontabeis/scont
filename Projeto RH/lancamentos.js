@@ -32,6 +32,14 @@ const EVENTOS_FIXOS_RUBRICA = [
     { ev: 'descontoVA', label: 'Desconto VA',        tipoValor: 'monetario' },
 ];
 
+// Eventos de jornada/turnos/regras gerais da empresa — configuráveis só no Controle de Frequência.
+// A tela de Configurações do Lançamentos não exibe nem edita esses eventos.
+const EVENTOS_CONFIG_GERAL_RESTRITOS = [
+    'jornada_diaria', 'jornada_sexta_ativa', 'jornada_sexta',
+    'jornada_sabado_ativa', 'jornada_sabado', 'sabado_sempre_extra',
+    'rule_extra_100_opcional', 'terceiro_turno', 'nao_compensar_extras',
+];
+
 // Empresas cadastradas (preenchido em carregarEmpresas), reaproveitado pela grade e pelo modal de Configurações
 let empresasCadastradas = [];
 
@@ -377,7 +385,8 @@ function renderSeletorEventoRubrica() {
         const cfgEmpresa = configRubricasPorEmpresa[cod] || {};
         Object.keys(cfgEmpresa).forEach(evento => {
             const ehFixo = EVENTOS_FIXOS_RUBRICA.some(e => e.ev === evento);
-            if (ehFixo || evento === 'observacoes' || vistos.has(evento)) return;
+            const ehConfigGeral = EVENTOS_CONFIG_GERAL_RESTRITOS.includes(evento);
+            if (ehFixo || ehConfigGeral || evento === 'observacoes' || vistos.has(evento)) return;
             vistos.add(evento);
 
             const porEmpresa = {};
@@ -909,7 +918,11 @@ function renderConfigLancamentos(linhas) {
     document.getElementById('cfgLancObservacoes').textContent = textoObs || 'Nenhuma observação cadastrada.';
 
     const eventosFixosSet = new Set(EVENTOS_FIXOS_RUBRICA.map(e => e.ev));
-    const personalizadas = linhas.filter(l => l.evento !== 'observacoes' && !eventosFixosSet.has(l.evento));
+    const personalizadas = linhas.filter(l =>
+        l.evento !== 'observacoes' &&
+        !eventosFixosSet.has(l.evento) &&
+        !EVENTOS_CONFIG_GERAL_RESTRITOS.includes(l.evento)
+    );
 
     const tbodyPersonalizadas = document.querySelector('#cfgLancTabelaPersonalizadas tbody');
     if (personalizadas.length === 0) {
