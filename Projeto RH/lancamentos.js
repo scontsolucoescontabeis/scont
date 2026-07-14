@@ -41,6 +41,9 @@ let configRubricasPorEmpresa = {};
 // Rubricas disponíveis no seletor do Passo 3 (recalculado a cada avancarParaParametros)
 let eventosRubricaDisponiveis = [];
 
+// Catálogo de rubricas (rh_rubricas) das empresas do lote — só sugestão no modo manual do Passo 3
+let catalogoRubricasLote = [];
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Formatação do campo de competência
     document.getElementById('lanCompetencia').addEventListener('input', (e) => {
@@ -275,10 +278,15 @@ async function avancarParaParametros() {
     const gradeContainer = document.getElementById('gradeContainer');
     gradeContainer.innerHTML = '<div class="grade-empty-msg">Carregando rubricas configuradas...</div>';
 
-    await carregarConfigRubricasLote(empresasDoLote());
+    const codigosEmpresasLote = empresasDoLote();
+    await Promise.all([
+        carregarConfigRubricasLote(codigosEmpresasLote),
+        carregarCatalogoRubricasLote(codigosEmpresasLote),
+    ]);
 
     renderSeletorEventoRubrica();
     renderObservacoesLote();
+    renderCatalogoRubricasDatalist();
     renderGrade();
 }
 
@@ -316,6 +324,23 @@ async function carregarConfigRubricasLote(codigosEmpresa) {
             descricao: row.descricao_rubrica
         };
     });
+}
+
+async function carregarCatalogoRubricasLote(codigosEmpresa) {
+    catalogoRubricasLote = [];
+    if (!codigosEmpresa || codigosEmpresa.length === 0) return;
+
+    const { data, error } = await supabaseClient
+        .from('rh_rubricas')
+        .select('codigo_empresa, codigo_rubrica, descricao_rubrica, tipo')
+        .in('codigo_empresa', codigosEmpresa);
+
+    if (error) {
+        console.error('Erro ao buscar catálogo de rubricas do lote:', error);
+        return;
+    }
+
+    catalogoRubricasLote = data || [];
 }
 
 // --- ✅ NOVO: SISTEMA DE ACÚMULO DE PARAMETRIZAÇÕES ---
@@ -430,6 +455,16 @@ function renderObservacoesLote() {
     container.style.display = 'block';
 }
 
+function renderCatalogoRubricasDatalist() {
+    const datalist = document.getElementById('catalogoRubricasDatalist');
+    datalist.innerHTML = catalogoRubricasLote.map(r => {
+        const nomeEmp = nomeEmpresaPorCodigo(r.codigo_empresa);
+        const desc = r.descricao_rubrica || '(sem descrição)';
+        const tipo = r.tipo ? ` · ${r.tipo}` : '';
+        return `<option value="${r.codigo_rubrica}">${desc} — ${nomeEmp}${tipo}</option>`;
+    }).join('');
+}
+
 function validarFormatoValor(valor, tipoValor) {
     const v = String(valor).trim();
     if (!v) return false;
@@ -491,7 +526,10 @@ function adicionarRubricaGrade() {
             return;
         }
 
-        novaColuna = { id: Date.now(), evento: null, label: `Rubrica ${codigo}`, tipoValor, codigo };
+        const catalogado = catalogoRubricasLote.find(r => r.codigo_rubrica === codigo);
+        const label = catalogado ? `${catalogado.descricao_rubrica} (${codigo})` : `Rubrica ${codigo}`;
+
+        novaColuna = { id: Date.now(), evento: null, label, tipoValor, codigo };
     } else {
         const item = eventosRubricaDisponiveis.find(e => e.evento === select.value);
         if (!item) {
