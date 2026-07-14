@@ -20,6 +20,27 @@ let empregadosInfoAtual = {};
 let rubricasGrid = [];   // [{ id, codigo, tipoValor }]
 let valoresGrid = {};    // valoresGrid[rubricaId][empregadoKey] = "valor digitado"
 
+// Eventos fixos de rubrica (mesmos do Controle de Frequência)
+const EVENTOS_FIXOS_RUBRICA = [
+    { ev: 'horasTrab',  label: 'Horas Trabalhadas',  tipoValor: 'horas'     },
+    { ev: 'he50',       label: 'Horas Extras 50%',   tipoValor: 'horas'     },
+    { ev: 'he100',      label: 'Horas Extras 100%',  tipoValor: 'horas'     },
+    { ev: 'noturno',    label: 'Adicional Noturno',  tipoValor: 'horas'     },
+    { ev: 'atraso',     label: 'Atraso',              tipoValor: 'horas'     },
+    { ev: 'falta',      label: 'Falta (dias)',       tipoValor: 'dias'      },
+    { ev: 'descontoVT', label: 'Desconto VT',        tipoValor: 'monetario' },
+    { ev: 'descontoVA', label: 'Desconto VA',        tipoValor: 'monetario' },
+];
+
+// Empresas cadastradas (preenchido em carregarEmpresas), reaproveitado pela grade e pelo modal de Configurações
+let empresasCadastradas = [];
+
+// Config de rubricas/observações por empresa do lote atual (Passo 3), sem cache entre levas
+let configRubricasPorEmpresa = {};
+
+// Rubricas disponíveis no seletor do Passo 3 (recalculado a cada avancarParaParametros)
+let eventosRubricaDisponiveis = [];
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Formatação do campo de competência
     document.getElementById('lanCompetencia').addEventListener('input', (e) => {
@@ -97,6 +118,8 @@ async function carregarEmpresas() {
             .order('nome_empresa', { ascending: true });
 
         if (error) throw error;
+
+        empresasCadastradas = data || [];
 
         container.innerHTML = '';
         if (!data || data.length === 0) {
@@ -224,7 +247,7 @@ async function buscarEmpregados() {
     }
 }
 
-function avancarParaParametros() {
+async function avancarParaParametros() {
     const checkboxesEmpregados = document.querySelectorAll('#listaEmpregados input[type="checkbox"]:checked');
 
     if (checkboxesEmpregados.length === 0) {
@@ -245,10 +268,54 @@ function avancarParaParametros() {
     // ✅ NOVO: Reinicia a grade empregado x rubrica para esta leva
     rubricasGrid = [];
     valoresGrid = {};
-    renderGrade();
 
     // ✅ CORRIGIDO: Usar ativarStep em vez de apenas adicionar classe
     ativarStep('step3');
+
+    const gradeContainer = document.getElementById('gradeContainer');
+    gradeContainer.innerHTML = '<div class="grade-empty-msg">Carregando rubricas configuradas...</div>';
+
+    await carregarConfigRubricasLote(empresasDoLote());
+
+    renderSeletorEventoRubrica();
+    renderObservacoesLote();
+    renderGrade();
+}
+
+function empresasDoLote() {
+    const codigos = new Set();
+    empregadosSelecionadosAtual.forEach(empKey => codigos.add(empKey.split('|')[0]));
+    return Array.from(codigos);
+}
+
+function nomeEmpresaPorCodigo(codigoEmpresa) {
+    const emp = empresasCadastradas.find(e => e.codigo_empresa === codigoEmpresa);
+    return emp ? emp.nome_empresa : codigoEmpresa;
+}
+
+async function carregarConfigRubricasLote(codigosEmpresa) {
+    configRubricasPorEmpresa = {};
+    if (!codigosEmpresa || codigosEmpresa.length === 0) return;
+
+    const { data, error } = await supabaseClient
+        .from('rh_config_rubricas_txt')
+        .select('codigo_empresa, evento, codigo_rubrica, tipo_valor, descricao_rubrica')
+        .in('codigo_empresa', codigosEmpresa);
+
+    if (error) {
+        console.error('Erro ao buscar config de rubricas do lote:', error);
+        mostrarMensagem('Erro', 'Falha ao buscar rubricas configuradas: ' + error.message);
+        return;
+    }
+
+    (data || []).forEach(row => {
+        if (!configRubricasPorEmpresa[row.codigo_empresa]) configRubricasPorEmpresa[row.codigo_empresa] = {};
+        configRubricasPorEmpresa[row.codigo_empresa][row.evento] = {
+            codigo: row.codigo_rubrica,
+            tipo: row.tipo_valor,
+            descricao: row.descricao_rubrica
+        };
+    });
 }
 
 // --- ✅ NOVO: SISTEMA DE ACÚMULO DE PARAMETRIZAÇÕES ---
