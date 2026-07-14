@@ -838,3 +838,145 @@ function baixarTXT() {
 
     ativarStep('step1');
 }
+
+// --- ✅ NOVO: TELA DE CONFIGURAÇÕES DO LANÇAMENTO ---
+
+let _cfgLancEmpresaAtual = null;
+
+function abrirModalConfigLancamentos() {
+    document.getElementById('cfgLancEmpresaBusca').value = '';
+    document.getElementById('cfgLancConteudo').style.display = 'none';
+    _cfgLancEmpresaAtual = null;
+    renderListaEmpresasConfigLancamentos(empresasCadastradas);
+    document.getElementById('configLancamentosModal').classList.add('active');
+}
+
+function fecharModalConfigLancamentos() {
+    document.getElementById('configLancamentosModal').classList.remove('active');
+}
+
+function renderListaEmpresasConfigLancamentos(lista) {
+    const container = document.getElementById('cfgLancListaEmpresas');
+    container.innerHTML = lista.map(emp => `
+        <div class="checkbox-item" style="cursor: pointer;" onclick="selecionarEmpresaConfigLancamentos('${emp.codigo_empresa}')">
+            <label style="cursor: pointer; margin: 0;">${emp.codigo_empresa} - ${emp.nome_empresa}</label>
+        </div>
+    `).join('');
+}
+
+function filtrarEmpresaConfigLancamentos() {
+    const termo = document.getElementById('cfgLancEmpresaBusca').value.toLowerCase();
+    const filtradas = empresasCadastradas.filter(emp =>
+        `${emp.codigo_empresa} ${emp.nome_empresa}`.toLowerCase().includes(termo)
+    );
+    renderListaEmpresasConfigLancamentos(filtradas);
+}
+
+async function _buscarLinhasConfigRubricas(codigoEmpresa) {
+    const { data, error } = await supabaseClient
+        .from('rh_config_rubricas_txt')
+        .select('id, evento, codigo_rubrica, tipo_valor, descricao_rubrica')
+        .eq('codigo_empresa', codigoEmpresa);
+
+    if (error) {
+        mostrarMensagem('Erro', 'Falha ao buscar configuração da empresa: ' + error.message);
+        return [];
+    }
+    return data || [];
+}
+
+async function selecionarEmpresaConfigLancamentos(codigoEmpresa) {
+    _cfgLancEmpresaAtual = codigoEmpresa;
+    document.getElementById('cfgLancEmpresaBusca').value = `${codigoEmpresa} - ${nomeEmpresaPorCodigo(codigoEmpresa)}`;
+
+    const linhas = await _buscarLinhasConfigRubricas(codigoEmpresa);
+    renderConfigLancamentos(linhas);
+    document.getElementById('cfgLancConteudo').style.display = 'block';
+}
+
+function renderConfigLancamentos(linhas) {
+    const porEvento = {};
+    linhas.forEach(l => { porEvento[l.evento] = l; });
+
+    const tbodyFixas = document.querySelector('#cfgLancTabelaFixas tbody');
+    tbodyFixas.innerHTML = EVENTOS_FIXOS_RUBRICA.map(evtDef => {
+        const linha = porEvento[evtDef.ev];
+        return `<tr><td>${evtDef.label}</td><td>${linha && linha.codigo_rubrica ? linha.codigo_rubrica : '—'}</td><td>${linha && linha.codigo_rubrica ? linha.tipo_valor : '—'}</td></tr>`;
+    }).join('');
+
+    const obs = porEvento['observacoes'];
+    const textoObs = obs && obs.codigo_rubrica ? obs.codigo_rubrica.trim() : '';
+    document.getElementById('cfgLancObservacoes').textContent = textoObs || 'Nenhuma observação cadastrada.';
+
+    const eventosFixosSet = new Set(EVENTOS_FIXOS_RUBRICA.map(e => e.ev));
+    const personalizadas = linhas.filter(l => l.evento !== 'observacoes' && !eventosFixosSet.has(l.evento));
+
+    const tbodyPersonalizadas = document.querySelector('#cfgLancTabelaPersonalizadas tbody');
+    if (personalizadas.length === 0) {
+        tbodyPersonalizadas.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #999;">Nenhuma rubrica personalizada cadastrada.</td></tr>';
+    } else {
+        tbodyPersonalizadas.innerHTML = personalizadas.map(l => `
+            <tr>
+                <td>${l.codigo_rubrica}</td>
+                <td>${l.descricao_rubrica || ''}</td>
+                <td>${l.tipo_valor}</td>
+                <td><span class="btn-remove" onclick="removerRubricaPersonalizada('${l.id}')">🗑️</span></td>
+            </tr>
+        `).join('');
+    }
+}
+
+async function adicionarRubricaPersonalizada() {
+    if (!_cfgLancEmpresaAtual) {
+        mostrarMensagem('Atenção', 'Selecione uma empresa primeiro.');
+        return;
+    }
+
+    const codigo = document.getElementById('cfgLancNovoCodigo').value.trim();
+    const descricao = document.getElementById('cfgLancNovaDescricao').value.trim();
+    const tipo = document.getElementById('cfgLancNovoTipo').value;
+
+    if (!codigo || !/^\d+$/.test(codigo)) {
+        mostrarMensagem('Atenção', 'Informe um código de rubrica válido (apenas números).');
+        return;
+    }
+    if (!descricao) {
+        mostrarMensagem('Atenção', 'Informe uma descrição para a rubrica.');
+        return;
+    }
+
+    const evento = 'custom_' + crypto.randomUUID();
+
+    const { error } = await supabaseClient
+        .from('rh_config_rubricas_txt')
+        .insert([{ codigo_empresa: _cfgLancEmpresaAtual, evento, codigo_rubrica: codigo, tipo_valor: tipo, descricao_rubrica: descricao }]);
+
+    if (error) {
+        mostrarMensagem('Erro', 'Falha ao salvar rubrica personalizada: ' + error.message);
+        return;
+    }
+
+    document.getElementById('cfgLancNovoCodigo').value = '';
+    document.getElementById('cfgLancNovaDescricao').value = '';
+    document.getElementById('cfgLancNovoTipo').value = 'horas';
+
+    delete configRubricasPorEmpresa[_cfgLancEmpresaAtual];
+
+    const linhas = await _buscarLinhasConfigRubricas(_cfgLancEmpresaAtual);
+    renderConfigLancamentos(linhas);
+}
+
+async function removerRubricaPersonalizada(id) {
+    if (!confirm('Remover esta rubrica personalizada?')) return;
+
+    const { error } = await supabaseClient.from('rh_config_rubricas_txt').delete().eq('id', id);
+    if (error) {
+        mostrarMensagem('Erro', 'Falha ao remover rubrica personalizada: ' + error.message);
+        return;
+    }
+
+    delete configRubricasPorEmpresa[_cfgLancEmpresaAtual];
+
+    const linhas = await _buscarLinhasConfigRubricas(_cfgLancEmpresaAtual);
+    renderConfigLancamentos(linhas);
+}
