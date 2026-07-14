@@ -463,19 +463,25 @@ function validarFormatoValor(valor, tipoValor) {
     return /\d/.test(v);
 }
 
-function gerarConteudoTXT(comp, tipoProcesso, rubrica, tipoValor, itens) {
+function resolverCodigoRubrica(coluna, codEmpresa) {
+    if (coluna.codigo) return coluna.codigo;
+    return coluna.codigosPorEmpresa ? coluna.codigosPorEmpresa[codEmpresa] : undefined;
+}
+
+function gerarConteudoTXT(comp, tipoProcesso, coluna, itens) {
     const fixo = "10";
     const compParts = comp.split('/');
     const compFormatada = compParts[1] + compParts[0]; // AAAA + MM
     const tipoProcFormatado = String(tipoProcesso).padStart(2, '0');
-    const rubFormatada = String(rubrica).padStart(9, '0');
 
     let conteudo = '';
     itens.forEach(item => {
         const [codEmpresa, codEmpregado] = item.empregado.split('|');
+        const codigoRubrica = resolverCodigoRubrica(coluna, codEmpresa);
+        const rubFormatada = String(codigoRubrica).padStart(9, '0');
         const codEmpregadoFormatado = String(codEmpregado).padStart(10, '0');
         const codEmpresaFormatada = String(codEmpresa).padStart(10, '0');
-        const valorInt = encodeValorParaTipo(item.valor, tipoValor);
+        const valorInt = encodeValorParaTipo(item.valor, coluna.tipoValor);
         const valFormatado = String(valorInt).padStart(9, '0');
         conteudo += `${fixo}${codEmpregadoFormatado}${compFormatada}${rubFormatada}${tipoProcFormatado}${valFormatado}${codEmpresaFormatada}\n`;
     });
@@ -633,7 +639,14 @@ function gerarParametrizacoes() {
 
             if (!validarFormatoValor(valor, r.tipoValor)) {
                 const nomeEmp = empregadosInfoAtual[empKey] || empKey;
-                mostrarMensagem('Atenção', `Valor inválido para "${nomeEmp}" na rubrica ${r.codigo}: "${valor}". Corrija antes de gerar.`);
+                mostrarMensagem('Atenção', `Valor inválido para "${nomeEmp}" na rubrica ${r.label}: "${valor}". Corrija antes de gerar.`);
+                return;
+            }
+
+            const [codEmpresaItem] = empKey.split('|');
+            if (!resolverCodigoRubrica(r, codEmpresaItem)) {
+                const nomeEmp = empregadosInfoAtual[empKey] || empKey;
+                mostrarMensagem('Atenção', `Empregado "${nomeEmp}" (empresa ${codEmpresaItem}): a rubrica "${r.label}" não está configurada para essa empresa.`);
                 return;
             }
 
@@ -645,17 +658,17 @@ function gerarParametrizacoes() {
         }
 
         if (itens.length === 0) {
-            rubricasIgnoradas.push(r.codigo);
+            rubricasIgnoradas.push(r.label);
             continue;
         }
 
-        const conteudoTXT = gerarConteudoTXT(comp, tipoProcesso, r.codigo, r.tipoValor, itens);
+        const conteudoTXT = gerarConteudoTXT(comp, tipoProcesso, r, itens);
 
         novasParametrizacoes.push({
             id: Date.now() + Math.random(),
             competencia: comp,
             tipoProcesso: tipoProcesso,
-            rubrica: r.codigo,
+            rubrica: r.label,
             tipoValor: r.tipoValor,
             itens: itens,
             conteudoTXT: conteudoTXT,
