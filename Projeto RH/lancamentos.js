@@ -356,6 +356,103 @@ function atualizarPlaceholderValorPadrao() {
     dica.textContent = info.dica;
 }
 
+function renderSeletorEventoRubrica() {
+    const select = document.getElementById('gradeRubricaEvento');
+    const codigosEmpresasLote = empresasDoLote();
+    eventosRubricaDisponiveis = [];
+
+    EVENTOS_FIXOS_RUBRICA.forEach(evtDef => {
+        const porEmpresa = {};
+        codigosEmpresasLote.forEach(cod => {
+            const cfg = configRubricasPorEmpresa[cod] && configRubricasPorEmpresa[cod][evtDef.ev];
+            if (cfg && cfg.codigo) porEmpresa[cod] = cfg.codigo;
+        });
+        if (Object.keys(porEmpresa).length > 0) {
+            eventosRubricaDisponiveis.push({ evento: evtDef.ev, label: evtDef.label, tipoValor: evtDef.tipoValor, codigosPorEmpresa: porEmpresa });
+        }
+    });
+
+    const vistos = new Set();
+    codigosEmpresasLote.forEach(cod => {
+        const cfgEmpresa = configRubricasPorEmpresa[cod] || {};
+        Object.keys(cfgEmpresa).forEach(evento => {
+            const ehFixo = EVENTOS_FIXOS_RUBRICA.some(e => e.ev === evento);
+            if (ehFixo || evento === 'observacoes' || vistos.has(evento)) return;
+            vistos.add(evento);
+
+            const porEmpresa = {};
+            let tipoValor = 'horas';
+            let label = evento;
+            codigosEmpresasLote.forEach(cod2 => {
+                const cfg = configRubricasPorEmpresa[cod2] && configRubricasPorEmpresa[cod2][evento];
+                if (cfg && cfg.codigo) {
+                    porEmpresa[cod2] = cfg.codigo;
+                    tipoValor = cfg.tipo || tipoValor;
+                    label = cfg.descricao || label;
+                }
+            });
+            eventosRubricaDisponiveis.push({ evento, label, tipoValor, codigosPorEmpresa: porEmpresa });
+        });
+    });
+
+    let html = '<option value="">Selecione...</option>';
+    eventosRubricaDisponiveis.forEach(item => {
+        const codigosUnicos = [...new Set(Object.values(item.codigosPorEmpresa))];
+        const detalhe = codigosUnicos.length === 1
+            ? codigosUnicos[0]
+            : Object.entries(item.codigosPorEmpresa).map(([cod, codigo]) => `${nomeEmpresaPorCodigo(cod)}: ${codigo}`).join(', ');
+        html += `<option value="${item.evento}">${item.label} (${detalhe})</option>`;
+    });
+    html += '<option value="__manual__">Outra rubrica (digitar código)</option>';
+
+    select.innerHTML = html;
+    onEventoRubricaChange();
+}
+
+function onEventoRubricaChange() {
+    const select = document.getElementById('gradeRubricaEvento');
+    const isManual = select.value === '__manual__';
+    document.getElementById('gradeRubricaManualFields').style.display = isManual ? 'block' : 'none';
+    document.getElementById('gradeRubricaManualTipo').style.display = isManual ? 'block' : 'none';
+    document.getElementById('gradeRubricaTipoDerivadoWrap').style.display = (!isManual && select.value) ? 'block' : 'none';
+
+    if (isManual) {
+        atualizarPlaceholderValorPadrao();
+        return;
+    }
+    if (!select.value) return;
+
+    const item = eventosRubricaDisponiveis.find(e => e.evento === select.value);
+    if (!item) return;
+
+    const info = infoTipoValor(item.tipoValor);
+    document.getElementById('gradeRubricaTipoDerivado').textContent = `${item.tipoValor} (${info.placeholder})`;
+    document.getElementById('gradeRubricaValorPadrao').placeholder = info.placeholder;
+    document.getElementById('gradeRubricaValorPadraoDica').textContent = info.dica;
+}
+
+function renderObservacoesLote() {
+    const container = document.getElementById('obsEmpresasLote');
+    const codigosEmpresasLote = empresasDoLote();
+
+    const linhas = codigosEmpresasLote
+        .map(cod => {
+            const cfg = configRubricasPorEmpresa[cod] && configRubricasPorEmpresa[cod]['observacoes'];
+            const texto = cfg && cfg.codigo ? cfg.codigo.trim() : '';
+            return texto ? `<strong>${nomeEmpresaPorCodigo(cod)}:</strong> ${texto}` : null;
+        })
+        .filter(Boolean);
+
+    if (linhas.length === 0) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = linhas.map(l => `<div style="margin-bottom: 6px;">${l}</div>`).join('');
+    container.style.display = 'block';
+}
+
 function validarFormatoValor(valor, tipoValor) {
     const v = String(valor).trim();
     if (!v) return false;
@@ -387,12 +484,11 @@ function gerarConteudoTXT(comp, tipoProcesso, rubrica, tipoValor, itens) {
 }
 
 function adicionarRubricaGrade() {
-    const codigo = document.getElementById('gradeRubricaCodigo').value.trim();
-    const tipoValor = document.getElementById('gradeRubricaTipoValor').value;
+    const select = document.getElementById('gradeRubricaEvento');
     const valorPadrao = document.getElementById('gradeRubricaValorPadrao').value.trim();
 
-    if (!codigo || !/^\d+$/.test(codigo)) {
-        mostrarMensagem('Atenção', 'Informe um Código de Rubrica válido (apenas números).');
+    if (!select.value) {
+        mostrarMensagem('Atenção', 'Selecione uma rubrica.');
         return;
     }
 
@@ -401,18 +497,40 @@ function adicionarRubricaGrade() {
         return;
     }
 
-    const id = Date.now();
-    rubricasGrid.push({ id, codigo, tipoValor });
-    valoresGrid[id] = {};
+    let novaColuna;
+
+    if (select.value === '__manual__') {
+        const codigo = document.getElementById('gradeRubricaCodigo').value.trim();
+        const tipoValor = document.getElementById('gradeRubricaTipoValor').value;
+
+        if (!codigo || !/^\d+$/.test(codigo)) {
+            mostrarMensagem('Atenção', 'Informe um Código de Rubrica válido (apenas números).');
+            return;
+        }
+
+        novaColuna = { id: Date.now(), evento: null, label: `Rubrica ${codigo}`, tipoValor, codigo };
+    } else {
+        const item = eventosRubricaDisponiveis.find(e => e.evento === select.value);
+        if (!item) {
+            mostrarMensagem('Atenção', 'Rubrica inválida. Selecione novamente.');
+            return;
+        }
+        novaColuna = { id: Date.now(), evento: item.evento, label: item.label, tipoValor: item.tipoValor, codigosPorEmpresa: { ...item.codigosPorEmpresa } };
+    }
+
+    rubricasGrid.push(novaColuna);
+    valoresGrid[novaColuna.id] = {};
 
     if (valorPadrao) {
         empregadosSelecionadosAtual.forEach(empKey => {
-            valoresGrid[id][empKey] = valorPadrao;
+            valoresGrid[novaColuna.id][empKey] = valorPadrao;
         });
     }
 
     document.getElementById('gradeRubricaCodigo').value = '';
     document.getElementById('gradeRubricaValorPadrao').value = '';
+    select.value = '';
+    onEventoRubricaChange();
 
     renderGrade();
 }
@@ -422,7 +540,7 @@ function removerRubricaGrade(id) {
     if (!rubrica) return;
 
     const temValores = valoresGrid[id] && Object.values(valoresGrid[id]).some(v => v && v.trim());
-    if (temValores && !confirm(`A rubrica ${rubrica.codigo} já tem valores preenchidos. Remover mesmo assim?`)) {
+    if (temValores && !confirm(`A rubrica ${rubrica.label} já tem valores preenchidos. Remover mesmo assim?`)) {
         return;
     }
 
@@ -444,7 +562,7 @@ function renderGrade() {
     // Chips das rubricas adicionadas
     chipsContainer.innerHTML = rubricasGrid.map(r => `
         <span class="chip-rubrica">
-            Rubrica ${r.codigo} (${r.tipoValor})
+            ${r.label} (${r.tipoValor})
             <span class="chip-remove" onclick="removerRubricaGrade(${r.id})">×</span>
         </span>
     `).join('');
@@ -456,7 +574,7 @@ function renderGrade() {
 
     let html = '<table class="grade-table"><thead><tr><th class="grade-emp-col">Empregado</th>';
     rubricasGrid.forEach(r => {
-        html += `<th>Rubrica ${r.codigo}<br><small>${infoTipoValor(r.tipoValor).placeholder}</small></th>`;
+        html += `<th>${r.label}<br><small>${infoTipoValor(r.tipoValor).placeholder}</small></th>`;
     });
     html += '</tr></thead><tbody>';
 
