@@ -38,9 +38,6 @@ let empresasCadastradas = [];
 // Config de rubricas/observações por empresa do lote atual (Passo 3), sem cache entre levas
 let configRubricasPorEmpresa = {};
 
-// Rubricas disponíveis no seletor do Passo 3 (recalculado a cada avancarParaParametros)
-let eventosRubricaDisponiveis = [];
-
 // Catálogo de rubricas (rh_rubricas) das empresas do lote — só sugestão no modo manual do Passo 3
 let catalogoRubricasLote = [];
 
@@ -284,9 +281,9 @@ async function avancarParaParametros() {
         carregarCatalogoRubricasLote(codigosEmpresasLote),
     ]);
 
-    renderSeletorEventoRubrica();
     renderObservacoesLote();
     renderCatalogoRubricasDatalist();
+    atualizarPlaceholderValorPadrao();
     renderGrade();
 }
 
@@ -381,58 +378,6 @@ function atualizarPlaceholderValorPadrao() {
     dica.textContent = info.dica;
 }
 
-function renderSeletorEventoRubrica() {
-    const select = document.getElementById('gradeRubricaEvento');
-    const codigosEmpresasLote = empresasDoLote();
-    eventosRubricaDisponiveis = [];
-
-    EVENTOS_FIXOS_RUBRICA.forEach(evtDef => {
-        const porEmpresa = {};
-        codigosEmpresasLote.forEach(cod => {
-            const cfg = configRubricasPorEmpresa[cod] && configRubricasPorEmpresa[cod][evtDef.ev];
-            if (cfg && cfg.codigo) porEmpresa[cod] = cfg.codigo;
-        });
-        if (Object.keys(porEmpresa).length > 0) {
-            eventosRubricaDisponiveis.push({ evento: evtDef.ev, label: evtDef.label, tipoValor: evtDef.tipoValor, codigosPorEmpresa: porEmpresa });
-        }
-    });
-
-    let html = '<option value="">Selecione...</option>';
-    eventosRubricaDisponiveis.forEach(item => {
-        const codigosUnicos = [...new Set(Object.values(item.codigosPorEmpresa))];
-        const detalhe = codigosUnicos.length === 1
-            ? codigosUnicos[0]
-            : Object.entries(item.codigosPorEmpresa).map(([cod, codigo]) => `${nomeEmpresaPorCodigo(cod)}: ${codigo}`).join(', ');
-        html += `<option value="${item.evento}">${item.label} (${detalhe})</option>`;
-    });
-    html += '<option value="__manual__">Outra rubrica (buscar no catálogo ou digitar código)</option>';
-
-    select.innerHTML = html;
-    onEventoRubricaChange();
-}
-
-function onEventoRubricaChange() {
-    const select = document.getElementById('gradeRubricaEvento');
-    const isManual = select.value === '__manual__';
-    document.getElementById('gradeRubricaManualFields').style.display = isManual ? 'block' : 'none';
-    document.getElementById('gradeRubricaManualTipo').style.display = isManual ? 'block' : 'none';
-    document.getElementById('gradeRubricaTipoDerivadoWrap').style.display = (!isManual && select.value) ? 'block' : 'none';
-
-    if (isManual) {
-        atualizarPlaceholderValorPadrao();
-        return;
-    }
-    if (!select.value) return;
-
-    const item = eventosRubricaDisponiveis.find(e => e.evento === select.value);
-    if (!item) return;
-
-    const info = infoTipoValor(item.tipoValor);
-    document.getElementById('gradeRubricaTipoDerivado').textContent = `${item.tipoValor} (${info.placeholder})`;
-    document.getElementById('gradeRubricaValorPadrao').placeholder = info.placeholder;
-    document.getElementById('gradeRubricaValorPadraoDica').textContent = info.dica;
-}
-
 function renderObservacoesLote() {
     const container = document.getElementById('obsEmpresasLote');
     const codigosEmpresasLote = empresasDoLote();
@@ -475,22 +420,16 @@ function validarFormatoValor(valor, tipoValor) {
     return /\d/.test(v);
 }
 
-function resolverCodigoRubrica(coluna, codEmpresa) {
-    if (coluna.codigo) return coluna.codigo;
-    return coluna.codigosPorEmpresa ? coluna.codigosPorEmpresa[codEmpresa] : undefined;
-}
-
 function gerarConteudoTXT(comp, tipoProcesso, coluna, itens) {
     const fixo = "10";
     const compParts = comp.split('/');
     const compFormatada = compParts[1] + compParts[0]; // AAAA + MM
     const tipoProcFormatado = String(tipoProcesso).padStart(2, '0');
+    const rubFormatada = String(coluna.codigo).padStart(9, '0');
 
     let conteudo = '';
     itens.forEach(item => {
         const [codEmpresa, codEmpregado] = item.empregado.split('|');
-        const codigoRubrica = resolverCodigoRubrica(coluna, codEmpresa);
-        const rubFormatada = String(codigoRubrica).padStart(9, '0');
         const codEmpregadoFormatado = String(codEmpregado).padStart(10, '0');
         const codEmpresaFormatada = String(codEmpresa).padStart(10, '0');
         const valorInt = encodeValorParaTipo(item.valor, coluna.tipoValor);
@@ -502,11 +441,12 @@ function gerarConteudoTXT(comp, tipoProcesso, coluna, itens) {
 }
 
 function adicionarRubricaGrade() {
-    const select = document.getElementById('gradeRubricaEvento');
+    const codigo = document.getElementById('gradeRubricaCodigo').value.trim();
+    const tipoValor = document.getElementById('gradeRubricaTipoValor').value;
     const valorPadrao = document.getElementById('gradeRubricaValorPadrao').value.trim();
 
-    if (!select.value) {
-        mostrarMensagem('Atenção', 'Selecione uma rubrica.');
+    if (!codigo || !/^\d+$/.test(codigo)) {
+        mostrarMensagem('Atenção', 'Informe um Código de Rubrica válido (apenas números).');
         return;
     }
 
@@ -515,29 +455,10 @@ function adicionarRubricaGrade() {
         return;
     }
 
-    let novaColuna;
+    const catalogado = catalogoRubricasLote.find(r => r.codigo_rubrica === codigo);
+    const label = catalogado ? `${catalogado.descricao_rubrica} (${codigo})` : `Rubrica ${codigo}`;
 
-    if (select.value === '__manual__') {
-        const codigo = document.getElementById('gradeRubricaCodigo').value.trim();
-        const tipoValor = document.getElementById('gradeRubricaTipoValor').value;
-
-        if (!codigo || !/^\d+$/.test(codigo)) {
-            mostrarMensagem('Atenção', 'Informe um Código de Rubrica válido (apenas números).');
-            return;
-        }
-
-        const catalogado = catalogoRubricasLote.find(r => r.codigo_rubrica === codigo);
-        const label = catalogado ? `${catalogado.descricao_rubrica} (${codigo})` : `Rubrica ${codigo}`;
-
-        novaColuna = { id: Date.now(), evento: null, label, tipoValor, codigo };
-    } else {
-        const item = eventosRubricaDisponiveis.find(e => e.evento === select.value);
-        if (!item) {
-            mostrarMensagem('Atenção', 'Rubrica inválida. Selecione novamente.');
-            return;
-        }
-        novaColuna = { id: Date.now(), evento: item.evento, label: item.label, tipoValor: item.tipoValor, codigosPorEmpresa: { ...item.codigosPorEmpresa } };
-    }
+    const novaColuna = { id: Date.now(), label, tipoValor, codigo };
 
     rubricasGrid.push(novaColuna);
     valoresGrid[novaColuna.id] = {};
@@ -550,8 +471,6 @@ function adicionarRubricaGrade() {
 
     document.getElementById('gradeRubricaCodigo').value = '';
     document.getElementById('gradeRubricaValorPadrao').value = '';
-    select.value = '';
-    onEventoRubricaChange();
 
     renderGrade();
 }
@@ -655,13 +574,6 @@ function gerarParametrizacoes() {
             if (!validarFormatoValor(valor, r.tipoValor)) {
                 const nomeEmp = empregadosInfoAtual[empKey] || empKey;
                 mostrarMensagem('Atenção', `Valor inválido para "${nomeEmp}" na rubrica ${r.label}: "${valor}". Corrija antes de gerar.`);
-                return;
-            }
-
-            const [codEmpresaItem] = empKey.split('|');
-            if (!resolverCodigoRubrica(r, codEmpresaItem)) {
-                const nomeEmp = empregadosInfoAtual[empKey] || empKey;
-                mostrarMensagem('Atenção', `Empregado "${nomeEmp}" (empresa ${codEmpresaItem}): a rubrica "${r.label}" não está configurada para essa empresa.`);
                 return;
             }
 

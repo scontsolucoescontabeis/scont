@@ -169,28 +169,18 @@
             <div style="background: #f5f5f5; padding: 15px; border-radius: 6px; margin-top: 15px;">
                 <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 10px;">Adicionar Rubrica à Grade</label>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px;">
-                    <div class="form-group" style="margin-bottom: 0; grid-column: 1 / -1;">
-                        <label for="gradeRubricaEvento">Rubrica *</label>
-                        <select id="gradeRubricaEvento" onchange="onEventoRubricaChange()">
-                            <option value="">Selecione...</option>
-                        </select>
-                    </div>
-                    <div class="form-group" id="gradeRubricaManualFields" style="display: none; margin-bottom: 0;">
+                    <div class="form-group" style="margin-bottom: 0;">
                         <label for="gradeRubricaCodigo">Código da Rubrica *</label>
                         <input type="text" id="gradeRubricaCodigo" list="catalogoRubricasDatalist" placeholder="Ex: 1285 ou busque no catálogo" maxlength="9" oninput="this.value = this.value.replace(/\D/g, '')">
                         <datalist id="catalogoRubricasDatalist"></datalist>
                     </div>
-                    <div class="form-group" id="gradeRubricaManualTipo" style="display: none; margin-bottom: 0;">
+                    <div class="form-group" style="margin-bottom: 0;">
                         <label for="gradeRubricaTipoValor">Tipo do Valor *</label>
                         <select id="gradeRubricaTipoValor" onchange="atualizarPlaceholderValorPadrao()">
                             <option value="horas">Horas (HH:MM)</option>
                             <option value="monetario">Monetário (R$ 0,00)</option>
                             <option value="dias">Dias (inteiro)</option>
                         </select>
-                    </div>
-                    <div class="form-group" id="gradeRubricaTipoDerivadoWrap" style="display: none; margin-bottom: 0;">
-                        <label>Tipo do Valor</label>
-                        <div id="gradeRubricaTipoDerivado" style="padding: 10px; font-size: 13px; color: var(--text-secondary);"></div>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <label for="gradeRubricaValorPadrao">Valor Padrão (opcional)</label>
