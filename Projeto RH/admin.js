@@ -127,6 +127,7 @@ function renderizarTabelaEmpresas() {
             <td title="${e.endereco||''}">${fmt(e.endereco)}</td>
             <td title="${e.cep||''}">${fmt(e.cep)}</td>
             <td title="${e.cidade||''}">${fmt(e.cidade)}</td>
+            <td title="${e.uf||''}">${fmt(e.uf)}</td>
         </tr>`;
     });
 
@@ -1379,6 +1380,104 @@ function _carregarTimestampsImportacao() {
     });
 }
 
+// ── UF a partir do CEP (API ViaCEP + fallback por faixa) ──────
+
+const _FAIXAS_CEP_UF = [
+    { min:  1000000, max: 19999999, uf: 'SP' },
+    { min: 20000000, max: 28999999, uf: 'RJ' },
+    { min: 29000000, max: 29999999, uf: 'ES' },
+    { min: 30000000, max: 39999999, uf: 'MG' },
+    { min: 40000000, max: 48999999, uf: 'BA' },
+    { min: 49000000, max: 49999999, uf: 'SE' },
+    { min: 50000000, max: 56999999, uf: 'PE' },
+    { min: 57000000, max: 57999999, uf: 'AL' },
+    { min: 58000000, max: 58999999, uf: 'PB' },
+    { min: 59000000, max: 59999999, uf: 'RN' },
+    { min: 60000000, max: 63999999, uf: 'CE' },
+    { min: 64000000, max: 64999999, uf: 'PI' },
+    { min: 65000000, max: 65999999, uf: 'MA' },
+    { min: 66000000, max: 68899999, uf: 'PA' },
+    { min: 68900000, max: 68999999, uf: 'AP' },
+    { min: 69000000, max: 69299999, uf: 'AM' },
+    { min: 69300000, max: 69399999, uf: 'RR' },
+    { min: 69400000, max: 69899999, uf: 'AM' },
+    { min: 69900000, max: 69999999, uf: 'AC' },
+    { min: 70000000, max: 72799999, uf: 'DF' },
+    { min: 72800000, max: 72999999, uf: 'GO' },
+    { min: 73000000, max: 73699999, uf: 'DF' },
+    { min: 73700000, max: 76799999, uf: 'GO' },
+    { min: 76800000, max: 76999999, uf: 'RO' },
+    { min: 77000000, max: 77999999, uf: 'TO' },
+    { min: 78000000, max: 78899999, uf: 'MT' },
+    { min: 78900000, max: 78999999, uf: 'RO' },
+    { min: 79000000, max: 79999999, uf: 'MS' },
+    { min: 80000000, max: 87999999, uf: 'PR' },
+    { min: 88000000, max: 89999999, uf: 'SC' },
+    { min: 90000000, max: 99999999, uf: 'RS' },
+];
+
+function _buscarUFPorFaixaCep(cepNumerico) {
+    const faixa = _FAIXAS_CEP_UF.find(f => cepNumerico >= f.min && cepNumerico <= f.max);
+    return faixa ? faixa.uf : null;
+}
+
+async function buscarUFPorCep(cep) {
+    const digitos = String(cep || '').replace(/\D/g, '');
+    if (digitos.length !== 8) return null;
+
+    try {
+        const resp = await fetch(`https://viacep.com.br/ws/${digitos}/json/`);
+        if (resp.ok) {
+            const dados = await resp.json();
+            if (dados && !dados.erro && dados.uf) return dados.uf;
+        }
+    } catch (_) { /* API indisponível — cai no fallback local */ }
+
+    return _buscarUFPorFaixaCep(Number(digitos));
+}
+
+async function _buscarUFsEmLotes(itens, obterCep, aoResolver, onProgresso) {
+    const TAMANHO_LOTE = 5;
+    for (let i = 0; i < itens.length; i += TAMANHO_LOTE) {
+        const lote = itens.slice(i, i + TAMANHO_LOTE);
+        await Promise.all(lote.map(async item => {
+            const uf = await buscarUFPorCep(obterCep(item));
+            aoResolver(item, uf);
+        }));
+        if (onProgresso) onProgresso(Math.min(i + TAMANHO_LOTE, itens.length), itens.length);
+        if (i + TAMANHO_LOTE < itens.length) await new Promise(r => setTimeout(r, 200));
+    }
+}
+
+async function preencherUFPendentes() {
+    const ENT = 'Empresas';
+    const pendentes = _todasEmpresas.filter(e => e.cep && !e.uf);
+    if (!pendentes.length) {
+        setStatusImport(ENT, 'Nenhuma empresa pendente de UF (todas já têm UF ou não têm CEP cadastrado).', 'info');
+        return;
+    }
+
+    setStatusImport(ENT, `Buscando UF de ${pendentes.length} empresa(s)...`, 'info');
+    setProgresso(ENT, 0);
+
+    let falhas = 0;
+    await _buscarUFsEmLotes(
+        pendentes,
+        e => e.cep,
+        async (empresa, uf) => {
+            if (!uf) { falhas++; return; }
+            const { error } = await supabaseClient.from('rh_empresas').update({ uf }).eq('codigo_empresa', empresa.codigo_empresa);
+            if (error) falhas++;
+        },
+        (feitos, total) => setProgresso(ENT, Math.round(feitos / total * 100))
+    );
+
+    setProgresso(ENT, null);
+    const sucesso = pendentes.length - falhas;
+    setStatusImport(ENT, `✅ UF preenchida para ${sucesso} empresa(s)${falhas ? ` (${falhas} não resolvida(s))` : ''}.`, falhas ? 'info' : 'success');
+    carregarEmpresas();
+}
+
 function handleImportarEmpresas(event) {
     const file = event.target.files?.[0];
     if (file) importarEmpresas(file);
@@ -1417,6 +1516,21 @@ async function importarEmpresas(file) {
 
         const modo = await confirmarModoImportacao('Empresas', rows.length);
         if (!modo) { setStatusImport(ENT, '', ''); setProgresso(ENT, null); return; }
+
+        const rowsComCep = rows.filter(r => r.cep);
+        if (rowsComCep.length) {
+            setStatusImport(ENT, `Buscando UF de ${rowsComCep.length} empresa(s) pelo CEP...`, 'info');
+            await _buscarUFsEmLotes(
+                rowsComCep,
+                r => r.cep,
+                (row, uf) => { row.uf = uf; },
+                (feitos, total) => setProgresso(ENT, 10 + Math.round(feitos / total * 40))
+            );
+            // No modo "acrescentar", não sobrescrever UF já salva quando a busca desta linha falhou.
+            if (modo === 'acrescentar') {
+                rowsComCep.forEach(r => { if (!r.uf) delete r.uf; });
+            }
+        }
 
         setProgresso(ENT, 50);
         setStatusImport(ENT, `Salvando ${rows.length} empresa(s)...`, 'info');

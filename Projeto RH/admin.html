@@ -157,8 +157,9 @@
                             <th>Endereço</th>
                             <th>CEP</th>
                             <th>Cidade</th>
+                            <th>UF</th>
                         </tr></thead>
-                        <tbody id="empresasTableBody"><tr><td colspan="12" style="text-align: center; color: #95A5A6;">Carregando...</td></tr></tbody>
+                        <tbody id="empresasTableBody"><tr><td colspan="13" style="text-align: center; color: #95A5A6;">Carregando...</td></tr></tbody>
                     </table>
                     <div class="paginacao" id="paginacaoEmpresas"></div>
                 </div>
@@ -527,6 +528,7 @@
                             </div>
                         </div>
                         <div id="ultimaImportacaoEmpresas" style="font-size:11px;color:#7F8C8D;display:none;">📅 Última importação: <span></span></div>
+                        <button type="button" onclick="preencherUFPendentes()" style="margin-top:8px;padding:6px 10px;border:1px solid #C0C0C0;border-radius:6px;background:white;cursor:pointer;font-size:11px;font-weight:600;width:100%;">🌍 Preencher UF pendentes</button>
                     </div>
 
                     <!-- EMPREGADOS -->
