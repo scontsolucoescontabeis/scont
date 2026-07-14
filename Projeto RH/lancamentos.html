@@ -169,7 +169,14 @@
             <div style="background: #f5f5f5; padding: 15px; border-radius: 6px; margin-top: 15px;">
                 <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 10px;">Adicionar Rubrica à Grade</label>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px;">
-                    <div class="form-group" style="margin-bottom: 0;">
+                    <div class="form-group" style="margin-bottom: 0; grid-column: 1 / -1;">
+                        <label for="gradeRubricaSelecao">Rubrica *</label>
+                        <select id="gradeRubricaSelecao" onchange="onRubricaSelecaoChange()">
+                            <option value="">Selecione...</option>
+                        </select>
+                        <small>Rubricas cadastradas no catálogo (rh_rubricas) das empresas selecionadas — o código é adequado automaticamente por empregado conforme a empresa dele</small>
+                    </div>
+                    <div class="form-group" id="gradeRubricaManualFields" style="display: none; margin-bottom: 0;">
                         <label for="gradeRubricaCodigo">Código da Rubrica *</label>
                         <input type="text" id="gradeRubricaCodigo" list="catalogoRubricasDatalist" placeholder="Ex: 1285 ou busque no catálogo" maxlength="9" oninput="this.value = this.value.replace(/\D/g, '')">
                         <datalist id="catalogoRubricasDatalist"></datalist>

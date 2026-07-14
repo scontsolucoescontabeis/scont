@@ -38,8 +38,11 @@ let empresasCadastradas = [];
 // Config de rubricas/observações por empresa do lote atual (Passo 3), sem cache entre levas
 let configRubricasPorEmpresa = {};
 
-// Catálogo de rubricas (rh_rubricas) das empresas do lote — só sugestão no modo manual do Passo 3
+// Catálogo de rubricas (rh_rubricas) das empresas do lote — sugestão no modo manual do Passo 3
 let catalogoRubricasLote = [];
+
+// Catálogo agrupado por descrição (mesma rubrica em empresas diferentes, códigos possivelmente distintos)
+let rubricasCatalogoAgrupadas = []; // [{ descricao, codigosPorEmpresa: {codEmpresa: codigo} }]
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Formatação do campo de competência
@@ -282,6 +285,7 @@ async function avancarParaParametros() {
     ]);
 
     renderObservacoesLote();
+    renderSeletorRubricaCatalogo();
     renderCatalogoRubricasDatalist();
     atualizarPlaceholderValorPadrao();
     renderGrade();
@@ -410,6 +414,41 @@ function renderCatalogoRubricasDatalist() {
     }).join('');
 }
 
+function renderSeletorRubricaCatalogo() {
+    const select = document.getElementById('gradeRubricaSelecao');
+
+    const grupos = new Map();
+    catalogoRubricasLote.forEach(r => {
+        const desc = (r.descricao_rubrica || '').trim();
+        if (!desc) return;
+        const chave = desc.toLowerCase();
+        if (!grupos.has(chave)) grupos.set(chave, { descricao: desc, codigosPorEmpresa: {} });
+        grupos.get(chave).codigosPorEmpresa[r.codigo_empresa] = r.codigo_rubrica;
+    });
+
+    rubricasCatalogoAgrupadas = Array.from(grupos.values())
+        .sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR'));
+
+    let html = '<option value="">Selecione...</option>';
+    rubricasCatalogoAgrupadas.forEach((item, idx) => {
+        const codigosUnicos = [...new Set(Object.values(item.codigosPorEmpresa))];
+        const detalhe = codigosUnicos.length === 1
+            ? codigosUnicos[0]
+            : Object.entries(item.codigosPorEmpresa).map(([cod, codigo]) => `${nomeEmpresaPorCodigo(cod)}: ${codigo}`).join(', ');
+        html += `<option value="${idx}">${item.descricao} (${detalhe})</option>`;
+    });
+    html += '<option value="__manual__">Outra rubrica (digitar código)</option>';
+
+    select.innerHTML = html;
+    onRubricaSelecaoChange();
+}
+
+function onRubricaSelecaoChange() {
+    const select = document.getElementById('gradeRubricaSelecao');
+    const isManual = select.value === '__manual__';
+    document.getElementById('gradeRubricaManualFields').style.display = isManual ? 'block' : 'none';
+}
+
 function validarFormatoValor(valor, tipoValor) {
     const v = String(valor).trim();
     if (!v) return false;
@@ -420,16 +459,22 @@ function validarFormatoValor(valor, tipoValor) {
     return /\d/.test(v);
 }
 
+function resolverCodigoRubrica(coluna, codEmpresa) {
+    if (coluna.codigo) return coluna.codigo;
+    return coluna.codigosPorEmpresa ? coluna.codigosPorEmpresa[codEmpresa] : undefined;
+}
+
 function gerarConteudoTXT(comp, tipoProcesso, coluna, itens) {
     const fixo = "10";
     const compParts = comp.split('/');
     const compFormatada = compParts[1] + compParts[0]; // AAAA + MM
     const tipoProcFormatado = String(tipoProcesso).padStart(2, '0');
-    const rubFormatada = String(coluna.codigo).padStart(9, '0');
 
     let conteudo = '';
     itens.forEach(item => {
         const [codEmpresa, codEmpregado] = item.empregado.split('|');
+        const codigoRubrica = resolverCodigoRubrica(coluna, codEmpresa);
+        const rubFormatada = String(codigoRubrica).padStart(9, '0');
         const codEmpregadoFormatado = String(codEmpregado).padStart(10, '0');
         const codEmpresaFormatada = String(codEmpresa).padStart(10, '0');
         const valorInt = encodeValorParaTipo(item.valor, coluna.tipoValor);
@@ -441,12 +486,12 @@ function gerarConteudoTXT(comp, tipoProcesso, coluna, itens) {
 }
 
 function adicionarRubricaGrade() {
-    const codigo = document.getElementById('gradeRubricaCodigo').value.trim();
+    const select = document.getElementById('gradeRubricaSelecao');
     const tipoValor = document.getElementById('gradeRubricaTipoValor').value;
     const valorPadrao = document.getElementById('gradeRubricaValorPadrao').value.trim();
 
-    if (!codigo || !/^\d+$/.test(codigo)) {
-        mostrarMensagem('Atenção', 'Informe um Código de Rubrica válido (apenas números).');
+    if (!select.value) {
+        mostrarMensagem('Atenção', 'Selecione uma rubrica.');
         return;
     }
 
@@ -455,10 +500,28 @@ function adicionarRubricaGrade() {
         return;
     }
 
-    const catalogado = catalogoRubricasLote.find(r => r.codigo_rubrica === codigo);
-    const label = catalogado ? `${catalogado.descricao_rubrica} (${codigo})` : `Rubrica ${codigo}`;
+    let novaColuna;
 
-    const novaColuna = { id: Date.now(), label, tipoValor, codigo };
+    if (select.value === '__manual__') {
+        const codigo = document.getElementById('gradeRubricaCodigo').value.trim();
+
+        if (!codigo || !/^\d+$/.test(codigo)) {
+            mostrarMensagem('Atenção', 'Informe um Código de Rubrica válido (apenas números).');
+            return;
+        }
+
+        const catalogado = catalogoRubricasLote.find(r => r.codigo_rubrica === codigo);
+        const label = catalogado ? `${catalogado.descricao_rubrica} (${codigo})` : `Rubrica ${codigo}`;
+
+        novaColuna = { id: Date.now(), label, tipoValor, codigo };
+    } else {
+        const item = rubricasCatalogoAgrupadas[Number(select.value)];
+        if (!item) {
+            mostrarMensagem('Atenção', 'Rubrica inválida. Selecione novamente.');
+            return;
+        }
+        novaColuna = { id: Date.now(), label: item.descricao, tipoValor, codigosPorEmpresa: { ...item.codigosPorEmpresa } };
+    }
 
     rubricasGrid.push(novaColuna);
     valoresGrid[novaColuna.id] = {};
@@ -471,6 +534,8 @@ function adicionarRubricaGrade() {
 
     document.getElementById('gradeRubricaCodigo').value = '';
     document.getElementById('gradeRubricaValorPadrao').value = '';
+    select.value = '';
+    onRubricaSelecaoChange();
 
     renderGrade();
 }
@@ -574,6 +639,13 @@ function gerarParametrizacoes() {
             if (!validarFormatoValor(valor, r.tipoValor)) {
                 const nomeEmp = empregadosInfoAtual[empKey] || empKey;
                 mostrarMensagem('Atenção', `Valor inválido para "${nomeEmp}" na rubrica ${r.label}: "${valor}". Corrija antes de gerar.`);
+                return;
+            }
+
+            const [codEmpresaItem] = empKey.split('|');
+            if (!resolverCodigoRubrica(r, codEmpresaItem)) {
+                const nomeEmp = empregadosInfoAtual[empKey] || empKey;
+                mostrarMensagem('Atenção', `Empregado "${nomeEmp}" (empresa ${nomeEmpresaPorCodigo(codEmpresaItem)}): a rubrica "${r.label}" não está cadastrada no catálogo dessa empresa.`);
                 return;
             }
 
