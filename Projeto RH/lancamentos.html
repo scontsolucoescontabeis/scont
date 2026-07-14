@@ -289,30 +289,6 @@
                     <h4 style="margin: 15px 0 8px; font-size: 14px; color: var(--primary-color);">Observações (somente leitura)</h4>
                     <div id="cfgLancObservacoes" style="background: var(--background-color); border-radius: 6px; padding: 10px; font-size: 13px; color: var(--text-primary);"></div>
 
-                    <h4 style="margin: 15px 0 8px; font-size: 14px; color: var(--primary-color);">Rubricas Personalizadas (Lançamentos)</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 2fr 1fr auto; gap: 10px; align-items: end;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label for="cfgLancNovoCodigo">Código</label>
-                            <input type="text" id="cfgLancNovoCodigo" maxlength="9" oninput="this.value = this.value.replace(/\D/g, '')">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label for="cfgLancNovaDescricao">Descrição</label>
-                            <input type="text" id="cfgLancNovaDescricao">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label for="cfgLancNovoTipo">Tipo</label>
-                            <select id="cfgLancNovoTipo">
-                                <option value="horas">Horas</option>
-                                <option value="monetario">Monetário</option>
-                                <option value="dias">Dias</option>
-                            </select>
-                        </div>
-                        <button type="button" class="btn btn-secondary btn-small" onclick="adicionarRubricaPersonalizada()">➕ Adicionar</button>
-                    </div>
-                    <table class="detalhes-table" id="cfgLancTabelaPersonalizadas" style="margin-top: 10px;">
-                        <thead><tr><th>Código</th><th>Descrição</th><th>Tipo</th><th></th></tr></thead>
-                        <tbody></tbody>
-                    </table>
                 </div>
             </div>
             <div class="modal-footer">
