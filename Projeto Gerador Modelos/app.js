@@ -43,6 +43,7 @@ const VARS_DEF = {
       ['endereco','Endereço'],
       ['cep','CEP'],
       ['cidade','Cidade'],
+      ['uf','UF'],
     ]
   },
   empregados: {
