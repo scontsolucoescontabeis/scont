@@ -58,7 +58,7 @@ function _agruparItensPorLinha(items) {
     return grupos.map(g => g.slice().sort((a, b) => a.x - b.x));
 }
 
-const _RE_EMPRESA = /^(\d+)-(.+)$/;
+const _RE_EMPRESA_JORNADA = /^(\d+)-(.+)$/;
 const _RE_DATA_GRUDADA = /\d{2}\/\d{2}\/\d{4}/;
 const _RE_HORA = /^\d{2}:\d{2}$/;
 const _RE_INTERVALO = /^(\d{2}:\d{2})\s+as\s+(\d{2}:\d{2})$/i;
@@ -116,7 +116,7 @@ function _parsearLinhasJornada(linhas) {
             const valor = linha.find(it =>
                 it.str !== 'Empresa:' && !_RE_PAGINA.test(it.str) && !_RE_NUM_PAGINA.test(it.str)
             );
-            const m = valor && valor.str.match(_RE_EMPRESA);
+            const m = valor && valor.str.match(_RE_EMPRESA_JORNADA);
             if (m) {
                 const novoCodigo = m[1].trim();
                 // Empresa que continua na página seguinte repete o mesmo cabeçalho
