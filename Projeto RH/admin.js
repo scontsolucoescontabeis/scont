@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     carregarEmpresas();
     carregarEmpregados();
     carregarFeriasInfo();
+    carregarJornadaInfo();
     carregarSocios();
     carregarRubricas();
     carregarRegras();
@@ -1374,7 +1375,7 @@ function _exibirTimestampImportacao(tipo, iso) {
 }
 
 function _carregarTimestampsImportacao() {
-    ['Empresas', 'Empregados', 'Ferias', 'Rubricas', 'Socios'].forEach(tipo => {
+    ['Empresas', 'Empregados', 'Ferias', 'Jornada', 'Rubricas', 'Socios'].forEach(tipo => {
         const iso = localStorage.getItem(`rh_ultima_importacao_${tipo}`);
         if (iso) _exibirTimestampImportacao(tipo, iso);
     });
@@ -1684,6 +1685,219 @@ function _renderizarResumoImportacaoFerias(porEmpresa, avisos) {
     }
 
     container.innerHTML = html;
+}
+
+// ── JORNADA DE TRABALHO ──────────────────────────────────────────
+
+function handleImportarJornada(event) {
+    const file = event.target.files?.[0];
+    if (file) processarPdfJornada(file);
+}
+
+async function processarPdfJornada(file) {
+    const ENT = 'Jornada';
+    document.getElementById('resumoImportarJornada').innerHTML = '';
+    try {
+        setStatusImport(ENT, 'Lendo o PDF de jornada de trabalho...', 'info');
+        setProgresso(ENT, 10);
+
+        const buffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+        let todasLinhas = [];
+        for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+            todasLinhas = todasLinhas.concat(_agruparItensPorLinha(content.items));
+            setProgresso(ENT, 10 + Math.round((p / pdf.numPages) * 40));
+        }
+
+        const { registros, avisos } = _parsearLinhasJornada(todasLinhas);
+
+        if (registros.length === 0) {
+            setProgresso(ENT, null);
+            setStatusImport(ENT, 'Nenhum registro de jornada foi reconhecido neste PDF.', 'error');
+            return;
+        }
+
+        setStatusImport(ENT, `Salvando ${registros.length} registro(s)...`, 'info');
+        setProgresso(ENT, 60);
+        await _salvarJornadaTrabalho(ENT, registros, avisos);
+        setProgresso(ENT, null);
+        _salvarTimestampImportacao('Jornada');
+        carregarJornadaInfo();
+    } catch (erro) {
+        console.error('Erro ao processar PDF de jornada de trabalho:', erro);
+        setProgresso(ENT, null);
+        setStatusImport(ENT, '❌ Falha ao processar o PDF. Verifique se o arquivo é válido.', 'error');
+    } finally {
+        limparInput('fileJornada');
+    }
+}
+
+async function _salvarJornadaTrabalho(ENT, registros, avisos) {
+    // Snapshot completo: cada import reflete o estado atual da jornada de
+    // todos os empregados. Uma chave duplicada (mesma empresa+empregado+dia)
+    // dentro do próprio arquivo mantém só a última ocorrência.
+    const porChave = new Map();
+    let duplicatasNoArquivo = 0;
+    for (const r of registros) {
+        const chave = `${r.codigo_empresa}|${r.codigo_empregado}|${r.dia_semana}`;
+        if (porChave.has(chave)) duplicatasNoArquivo++;
+        porChave.set(chave, r);
+    }
+    const registrosParaSalvar = [...porChave.values()];
+
+    const { error: errDelete } = await supabaseClient.from('rh_jornada_trabalho').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (errDelete) {
+        setStatusImport(ENT, 'Falha ao limpar os dados existentes antes de salvar.', 'error');
+        return;
+    }
+
+    const LOTE = 500;
+    for (let i = 0; i < registrosParaSalvar.length; i += LOTE) {
+        const pedaco = registrosParaSalvar.slice(i, i + LOTE);
+        const { error } = await supabaseClient.from('rh_jornada_trabalho').insert(pedaco);
+        if (error) {
+            console.error('Erro ao salvar jornada de trabalho:', error);
+            setStatusImport(ENT, `Falha ao salvar registros no banco: ${error.message}`, 'error');
+            return;
+        }
+    }
+
+    const empresas = new Set(registrosParaSalvar.map(r => r.codigo_empresa));
+    const empregados = new Set(registrosParaSalvar.map(r => `${r.codigo_empresa}|${r.codigo_empregado}`));
+    setStatusImport(ENT, `✅ ${registrosParaSalvar.length} registro(s) salvos — ${empregados.size} empregado(s) em ${empresas.size} empresa(s)`, 'success');
+    _renderizarResumoImportacaoJornada(empresas.size, empregados.size, duplicatasNoArquivo, avisos);
+}
+
+function _renderizarResumoImportacaoJornada(qtdEmpresas, qtdEmpregados, duplicatasNoArquivo, avisos) {
+    const container = document.getElementById('resumoImportarJornada');
+    let html = `<div style="margin-top:8px;">${qtdEmpregados} empregado(s) em ${qtdEmpresas} empresa(s) atualizado(s).</div>`;
+
+    if (duplicatasNoArquivo > 0) {
+        html += `<div style="margin-top:6px;color:#92400e;">⚠️ ${duplicatasNoArquivo} linha(s) duplicada(s) no arquivo (mesma empresa/empregado/dia) — mantida a última ocorrência.</div>`;
+    }
+
+    if (avisos.length > 0) {
+        html += `
+            <details style="margin-top:8px;">
+                <summary style="cursor:pointer; color:#92400e; font-weight:600;">⚠️ ${avisos.length} linha(s) não reconhecida(s)</summary>
+                <ul style="margin-top:6px; padding-left:18px; color:#78350f;">
+                    ${avisos.map(a => `<li><strong>${a.motivo}:</strong> ${a.linha}</li>`).join('')}
+                </ul>
+            </details>
+        `;
+    }
+
+    container.innerHTML = html;
+}
+
+let _todaJornadaInfo = [];
+let _jornadaInfoFiltrada = [];
+let _paginaJornadaInfo = 1;
+const _porPaginaJornadaInfo = 50;
+const _DIAS_SEMANA_ORDEM = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
+
+async function carregarJornadaInfo() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_jornada_trabalho')
+            .select('*')
+            .order('codigo_empresa', { ascending: true })
+            .order('nome_empregado', { ascending: true });
+        if (error) throw error;
+        _todaJornadaInfo = _agruparJornadaPorEmpregado(data || []);
+        _jornadaInfoFiltrada = [..._todaJornadaInfo];
+        _paginaJornadaInfo = 1;
+        renderizarTabelaJornadaInfo();
+    } catch (erro) { mostrarStatus('statusJornadaInfo', 'Erro ao carregar informações de jornada de trabalho.', 'error'); }
+}
+
+function _agruparJornadaPorEmpregado(linhas) {
+    const porEmpregado = new Map();
+    for (const l of linhas) {
+        const chave = `${l.codigo_empresa}|${l.codigo_empregado}`;
+        if (!porEmpregado.has(chave)) {
+            porEmpregado.set(chave, {
+                codigo_empresa: l.codigo_empresa,
+                nome_empresa: l.nome_empresa,
+                codigo_empregado: l.codigo_empregado,
+                nome_empregado: l.nome_empregado,
+                dias: {}
+            });
+        }
+        porEmpregado.get(chave).dias[l.dia_semana] = l;
+    }
+    return [...porEmpregado.values()];
+}
+
+function filtrarJornadaInfo() {
+    const texto = (document.getElementById('filtroJornadaTexto')?.value || '').toLowerCase().trim();
+    _jornadaInfoFiltrada = _todaJornadaInfo.filter(j => {
+        if (!texto) return true;
+        return (
+            (j.codigo_empresa || '').toLowerCase().includes(texto) ||
+            (j.nome_empresa || '').toLowerCase().includes(texto) ||
+            (j.codigo_empregado || '').toLowerCase().includes(texto) ||
+            (j.nome_empregado || '').toLowerCase().includes(texto)
+        );
+    });
+    _paginaJornadaInfo = 1;
+    renderizarTabelaJornadaInfo();
+}
+
+function _fmtHorarioDia(dia) {
+    if (!dia) return '<span style="color:#C0C0C0;">—</span>';
+    if (dia.intervalo_inicio && dia.intervalo_fim) {
+        return `${dia.entrada}-${dia.intervalo_inicio} / ${dia.intervalo_fim}-${dia.saida}`;
+    }
+    return `${dia.entrada}-${dia.saida}`;
+}
+
+function renderizarTabelaJornadaInfo() {
+    const tbody = document.getElementById('jornadaInfoTableBody');
+    const paginacao = document.getElementById('paginacaoJornadaInfo');
+    const info = document.getElementById('infoJornadaInfo');
+    tbody.innerHTML = '';
+
+    if (_jornadaInfoFiltrada.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#95A5A6;padding:20px;">Nenhum empregado encontrado</td></tr>';
+        paginacao.innerHTML = '';
+        if (info) info.textContent = '';
+        return;
+    }
+
+    const totalPags = Math.ceil(_jornadaInfoFiltrada.length / _porPaginaJornadaInfo);
+    const inicio    = (_paginaJornadaInfo - 1) * _porPaginaJornadaInfo;
+    const pagina    = _jornadaInfoFiltrada.slice(inicio, inicio + _porPaginaJornadaInfo);
+
+    if (info) info.textContent = _jornadaInfoFiltrada.length < _todaJornadaInfo.length
+        ? `${_jornadaInfoFiltrada.length} de ${_todaJornadaInfo.length} empregado(s)`
+        : `${_todaJornadaInfo.length} empregado(s)`;
+
+    pagina.forEach(j => {
+        tbody.innerHTML += `<tr>
+            <td><strong>${j.codigo_empresa}</strong></td>
+            <td>${j.nome_empresa || ''}</td>
+            <td>${j.codigo_empregado}</td>
+            <td>${j.nome_empregado || ''}</td>
+            ${_DIAS_SEMANA_ORDEM.map(d => `<td>${_fmtHorarioDia(j.dias[d])}</td>`).join('')}
+        </tr>`;
+    });
+
+    paginacao.innerHTML = totalPags <= 1 ? '' : `
+        <button onclick="mudarPaginaJornadaInfo(${_paginaJornadaInfo - 1})" ${_paginaJornadaInfo === 1 ? 'disabled' : ''}>‹ Anterior</button>
+        <span class="pag-info">Página <strong>${_paginaJornadaInfo}</strong> de <strong>${totalPags}</strong> — ${_jornadaInfoFiltrada.length} empregado(s)</span>
+        <button onclick="mudarPaginaJornadaInfo(${_paginaJornadaInfo + 1})" ${_paginaJornadaInfo === totalPags ? 'disabled' : ''}>Próxima ›</button>
+    `;
+}
+
+function mudarPaginaJornadaInfo(pag) {
+    const totalPags = Math.ceil(_jornadaInfoFiltrada.length / _porPaginaJornadaInfo);
+    if (pag < 1 || pag > totalPags) return;
+    _paginaJornadaInfo = pag;
+    renderizarTabelaJornadaInfo();
+    document.getElementById('jornada')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // ── EMPREGADOS ────────────────────────────────────────────────
