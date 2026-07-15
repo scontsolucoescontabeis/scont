@@ -86,10 +86,12 @@ async function carregarEmpresas() {
     try {
         const { data, error } = await supabaseClient
             .from('rh_empresas')
-            .select('codigo_empresa, nome_empresa')
+            .select('codigo_empresa, nome_empresa, status_situacao')
             .order('nome_empresa', { ascending: true });
         if (error) throw error;
-        state.empresas = data || [];
+        // Só empresas ativas (mesmo critério da Administração: sem status = ativa por padrão)
+        const isEmpresaAtiva = s => !s || String(s).trim().toLowerCase().startsWith('ativ');
+        state.empresas = (data || []).filter(emp => isEmpresaAtiva(emp.status_situacao));
     } catch (erro) {
         console.error('Erro ao carregar empresas:', erro);
         mostrarMensagem('Erro', 'Falha ao carregar a lista de empresas do servidor.');

@@ -117,20 +117,22 @@ async function carregarEmpresas() {
         // Busca as empresas cadastradas pelo Administrador
         const { data, error } = await supabaseClient
             .from('rh_empresas')
-            .select('codigo_empresa, nome_empresa')
+            .select('codigo_empresa, nome_empresa, status_situacao')
             .order('nome_empresa', { ascending: true });
 
         if (error) throw error;
 
-        empresasCadastradas = data || [];
+        // Só empresas ativas (mesmo critério da Administração: sem status = ativa por padrão)
+        const isEmpresaAtiva = s => !s || String(s).trim().toLowerCase().startsWith('ativ');
+        empresasCadastradas = (data || []).filter(emp => isEmpresaAtiva(emp.status_situacao));
 
         container.innerHTML = '';
-        if (!data || data.length === 0) {
-            container.innerHTML = '<div style="padding: 10px; text-align: center; color: #666;">Nenhuma empresa cadastrada no sistema.</div>';
+        if (empresasCadastradas.length === 0) {
+            container.innerHTML = '<div style="padding: 10px; text-align: center; color: #666;">Nenhuma empresa ativa cadastrada no sistema.</div>';
             return;
         }
 
-        data.forEach(emp => {
+        empresasCadastradas.forEach(emp => {
             container.innerHTML += `
                 <div class="checkbox-item">
                     <input type="checkbox" id="emp_${emp.codigo_empresa}" value="${emp.codigo_empresa}">
