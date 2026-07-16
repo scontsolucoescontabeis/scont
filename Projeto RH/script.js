@@ -3545,6 +3545,491 @@ function exportarBeneficiosExcel() {
     XLSX.writeFile(wb, `Beneficios_VT_VA_${String(mesPag).padStart(2, '0')}${anoPag}_${Date.now()}.xlsx`);
 }
 
+// ===== GERAR ESCALA =====
+
+function _iniciarTelaEscala() {
+    document.getElementById('escalaResultadoContainer').style.display = 'none';
+    document.getElementById('escalaListaEmpregados').innerHTML = '';
+    document.getElementById('escalaBuscaEmpresa').value = '';
+    _renderizarListaEmpresasEscala(state.empresas);
+    _atualizarResumoEmpresasSelecionadasEscala();
+    _carregarGruposParaEscala();
+}
+
+let _gruposEscalaCache = [];
+let _itensGruposEscalaCache = {};
+
+async function _carregarGruposParaEscala() {
+    try {
+        const [{ data: grupos, error: errG }, { data: itens, error: errI }] = await Promise.all([
+            supabaseClient.from('rh_grupos_empresas').select('id, nome_grupo').order('nome_grupo', { ascending: true }),
+            supabaseClient.from('rh_grupos_empresas_itens').select('grupo_id, codigo_empresa'),
+        ]);
+        if (errG) throw errG;
+        if (errI) throw errI;
+
+        _itensGruposEscalaCache = {};
+        (itens || []).forEach(it => {
+            (_itensGruposEscalaCache[it.grupo_id] ??= new Set()).add(it.codigo_empresa);
+        });
+        _gruposEscalaCache = (grupos || []).map(g => ({
+            id: g.id,
+            nome_grupo: g.nome_grupo,
+            qtdEmpresas: _itensGruposEscalaCache[g.id]?.size || 0,
+        }));
+
+        document.getElementById('escalaBuscaGrupo').value = '';
+        _renderizarListaGruposEscala(_gruposEscalaCache);
+    } catch (erro) {
+        console.error('Erro ao carregar grupos de empresas:', erro);
+    }
+}
+
+function _renderizarListaGruposEscala(grupos) {
+    const container = document.getElementById('escalaListaGrupos');
+    if (!container) return;
+    if (!grupos || grupos.length === 0) {
+        container.innerHTML = '<span style="font-size:12px;color:var(--text-secondary);">Nenhum grupo encontrado.</span>';
+        return;
+    }
+    container.innerHTML = grupos.map(g => `
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+            <input type="checkbox" class="escala-grupo-check" value="${g.id}" onchange="_aplicarGruposEscala()">
+            ${g.nome_grupo} <span style="color: var(--text-secondary);">(${g.qtdEmpresas})</span>
+        </label>
+    `).join('');
+}
+
+function _filtrarListaGruposEscala() {
+    const termo = (document.getElementById('escalaBuscaGrupo').value || '').toLowerCase().trim();
+    const marcados = new Set(Array.from(document.querySelectorAll('.escala-grupo-check:checked')).map(cb => cb.value));
+    const lista = termo
+        ? _gruposEscalaCache.filter(g => g.nome_grupo.toLowerCase().includes(termo))
+        : _gruposEscalaCache;
+    _renderizarListaGruposEscala(lista);
+    marcados.forEach(id => {
+        const cb = document.querySelector(`.escala-grupo-check[value="${id}"]`);
+        if (cb) cb.checked = true;
+    });
+}
+
+function _aplicarGruposEscala() {
+    const idsMarcados = Array.from(document.querySelectorAll('.escala-grupo-check:checked')).map(cb => cb.value);
+    if (idsMarcados.length === 0) return;
+
+    const codigosParaMarcar = new Set(
+        Array.from(document.querySelectorAll('.escala-emp-check:checked')).map(cb => cb.value)
+    );
+    idsMarcados.forEach(id => {
+        (_itensGruposEscalaCache[id] || new Set()).forEach(codigo => codigosParaMarcar.add(codigo));
+    });
+
+    document.getElementById('escalaBuscaEmpresa').value = '';
+    _renderizarListaEmpresasEscala(state.empresas);
+    document.querySelectorAll('.escala-emp-check').forEach(cb => {
+        cb.checked = codigosParaMarcar.has(cb.value);
+    });
+    _atualizarResumoEmpresasSelecionadasEscala();
+}
+
+function _renderizarListaEmpresasEscala(empresas) {
+    const container = document.getElementById('escalaListaEmpresas');
+    if (!empresas || empresas.length === 0) {
+        container.innerHTML = '<span style="font-size:12px;color:var(--text-secondary);">Nenhuma empresa encontrada.</span>';
+        return;
+    }
+    container.innerHTML = empresas.map(e => `
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+            <input type="checkbox" class="escala-emp-check" value="${e.codigo_empresa}" onchange="_atualizarResumoEmpresasSelecionadasEscala()">
+            <span style="font-family:monospace; color:var(--primary-color); font-weight:600;">${e.codigo_empresa}</span> ${e.nome_empresa}
+        </label>
+    `).join('');
+}
+
+function _filtrarListaEmpresasEscala() {
+    const termo = (document.getElementById('escalaBuscaEmpresa').value || '').toLowerCase().trim();
+    const marcados = new Set(Array.from(document.querySelectorAll('.escala-emp-check:checked')).map(cb => cb.value));
+    const lista = termo
+        ? state.empresas.filter(e => e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo))
+        : state.empresas;
+    _renderizarListaEmpresasEscala(lista);
+    marcados.forEach(codigo => {
+        const cb = document.querySelector(`.escala-emp-check[value="${codigo}"]`);
+        if (cb) cb.checked = true;
+    });
+}
+
+function _selecionarTodasEmpresasEscala(marcar) {
+    document.querySelectorAll('.escala-emp-check').forEach(cb => { cb.checked = marcar; });
+    _atualizarResumoEmpresasSelecionadasEscala();
+}
+
+function _atualizarResumoEmpresasSelecionadasEscala() {
+    const info = document.getElementById('escalaEmpresasSelecionadasInfo');
+    if (!info) return;
+    const marcados = Array.from(document.querySelectorAll('.escala-emp-check:checked'));
+    if (marcados.length === 0) {
+        info.textContent = 'Nenhuma empresa selecionada.';
+        return;
+    }
+    const nomes = marcados.map(cb => {
+        const emp = state.empresas.find(e => e.codigo_empresa === cb.value);
+        return `${cb.value} - ${emp?.nome_empresa || cb.value}`;
+    });
+    info.textContent = `${marcados.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
+}
+
+// Os campos JSONB de rh_escala_trabalho são gravados via JSON.stringify (mesmo
+// padrão de rh_saves.flags_folga/dsr_dias) e por isso precisam de JSON.parse na leitura.
+function _parsearCamposEscala(row) {
+    if (!row) return row;
+    return {
+        ...row,
+        dias_semana: row.dias_semana ? JSON.parse(row.dias_semana) : null,
+        datas_folga: row.datas_folga ? JSON.parse(row.datas_folga) : null,
+        padrao_blocos: row.padrao_blocos ? JSON.parse(row.padrao_blocos) : null,
+    };
+}
+
+const DIAS_SEMANA_ESCALA = [
+    { chave: 'segunda', label: 'Seg' }, { chave: 'terca', label: 'Ter' }, { chave: 'quarta', label: 'Qua' },
+    { chave: 'quinta', label: 'Qui' }, { chave: 'sexta', label: 'Sex' }, { chave: 'sabado', label: 'Sáb' },
+    { chave: 'domingo', label: 'Dom' }
+];
+
+async function gerarEscala() {
+    const comp = document.getElementById('escalaCompetencia').value;
+    if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe uma competência válida (MM/AAAA).'); return; }
+    const codigosEmpresas = Array.from(document.querySelectorAll('.escala-emp-check:checked')).map(cb => cb.value);
+    if (codigosEmpresas.length === 0) { mostrarMensagem('Aviso', 'Selecione pelo menos uma empresa.'); return; }
+
+    mostrarMensagem('Aguarde', 'Calculando escala...');
+    try {
+        const [
+            { data: empregadosData, error: errFunc },
+            { data: escalasData, error: errEsc },
+        ] = await Promise.all([
+            supabaseClient.from('rh_empregados').select('codigo_empresa, nome_empresa, codigo_empregado, nome_empregado, situacao, tipo_empregado').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_escala_trabalho').select('*').in('codigo_empresa', codigosEmpresas),
+        ]);
+        if (errFunc) throw errFunc;
+        if (errEsc) throw errEsc;
+
+        const escalasMapa = {};
+        (escalasData || []).forEach(e => { escalasMapa[`${e.codigo_empresa}_${e.codigo_empregado}`] = _parsearCamposEscala(e); });
+
+        const empregadosFiltrados = (empregadosData || []).filter(e =>
+            (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() !== 'Contribuinte'
+        );
+
+        if (empregadosFiltrados.length === 0) {
+            fecharModalMensagem();
+            mostrarMensagem('Aviso', 'Nenhum empregado (situação "Trabalhando") encontrado para as empresas selecionadas.');
+            document.getElementById('escalaResultadoContainer').style.display = 'none';
+            return;
+        }
+
+        const linhas = empregadosFiltrados.map(emp => {
+            const escala = escalasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || null;
+            return {
+                codigo_empresa: emp.codigo_empresa,
+                nome_empresa: emp.nome_empresa,
+                codigo_empregado: emp.codigo_empregado,
+                nome_empregado: emp.nome_empregado,
+                escala,
+                resumo: calcularResumoMes(escala, comp),
+                expandido: false
+            };
+        });
+
+        linhas.sort((a, b) => (a.nome_empresa + a.nome_empregado).localeCompare(b.nome_empresa + b.nome_empregado));
+
+        fecharModalMensagem();
+        state._escalaLinhas = linhas;
+        state._escalaCompetencia = comp;
+        _renderizarListaEscala();
+    } catch (erro) {
+        console.error('Erro ao gerar escala:', erro);
+        fecharModalMensagem();
+        mostrarMensagem('Erro', 'Falha ao gerar a escala: ' + erro.message);
+    }
+}
+
+function _badgeTipoEscala(escala) {
+    if (!escala) return '<span style="color:#B8860B;">⚠️ Sem escala — padrão 5x2</span>';
+    if (escala.tipo_escala === 'fixa') return '<span style="color:var(--success-color);">Fixa</span>';
+    if (escala.tipo_escala === 'variavel_datas') return '<span style="color:var(--primary-color);">Variável — datas de folga</span>';
+    if (escala.tipo_escala === 'variavel_padrao') return '<span style="color:var(--primary-color);">Variável — padrão de repetição</span>';
+    return '';
+}
+
+function _renderizarListaEscala() {
+    const linhas = state._escalaLinhas || [];
+    const container = document.getElementById('escalaListaEmpregados');
+    const info = document.getElementById('escalaResultadoInfo');
+    info.textContent = `${linhas.length} empregado(s)`;
+
+    container.innerHTML = linhas.map((l, i) => `
+        <div class="escala-linha" data-idx="${i}" style="border:1px solid var(--border-color); border-radius:8px; margin-bottom:10px; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; flex-wrap:wrap; gap:8px; cursor:pointer;" onclick="_toggleExpandirEscala(${i})">
+                <div>
+                    <strong>${l.codigo_empregado} - ${l.nome_empregado}</strong>
+                    <div style="font-size:12px; color:var(--text-secondary);">${l.codigo_empresa} - ${l.nome_empresa}</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:16px; font-size:13px;">
+                    <span>${_badgeTipoEscala(l.escala)}</span>
+                    <span>✅ ${l.resumo.totalTrabalho} trabalho</span>
+                    <span>🌴 ${l.resumo.totalFolga} folga</span>
+                    <span style="font-size:16px;">${l.expandido ? '▲' : '▼'}</span>
+                </div>
+            </div>
+            <div class="escala-detalhe" style="display:${l.expandido ? 'block' : 'none'}; border-top:1px solid var(--border-color); padding:14px; background:var(--background-color);">
+                ${l.expandido ? _renderizarDetalheEscala(l, i) : ''}
+            </div>
+        </div>
+    `).join('');
+
+    document.getElementById('escalaResultadoContainer').style.display = 'block';
+}
+
+function _toggleExpandirEscala(idx) {
+    const linha = state._escalaLinhas[idx];
+    linha.expandido = !linha.expandido;
+    linha._formTipo = linha._formTipo || (linha.escala ? (linha.escala.tipo_escala === 'fixa' ? 'fixa' : 'variavel') : 'fixa');
+    linha._formSubtipoVariavel = linha._formSubtipoVariavel || (linha.escala && linha.escala.tipo_escala === 'variavel_padrao' ? 'padrao' : 'datas');
+    linha._formDiasSemana = linha._formDiasSemana || (linha.escala?.dias_semana ? linha.escala.dias_semana.slice() : []);
+    linha._formDatasFolga = linha._formDatasFolga || (linha.escala?.datas_folga ? linha.escala.datas_folga.slice() : []);
+    linha._formAncora = linha._formAncora || linha.escala?.padrao_ancora || '';
+    linha._formBlocos = linha._formBlocos || (linha.escala?.padrao_blocos ? linha.escala.padrao_blocos.map(b => ({ ...b })) : []);
+    _renderizarListaEscala();
+}
+
+function _renderizarDetalheEscala(linha, idx) {
+    return `
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; align-items:start;">
+            <div>
+                <h4 style="margin:0 0 10px; font-size:13px; color:var(--text-primary);">Configurar Escala</h4>
+                ${_renderizarFormConfigEscala(linha, idx)}
+            </div>
+            <div>
+                <h4 style="margin:0 0 10px; font-size:13px; color:var(--text-primary);">Calendário — ${state._escalaCompetencia}</h4>
+                ${_renderizarMiniCalendarioEscala(linha)}
+            </div>
+        </div>
+    `;
+}
+
+function _renderizarMiniCalendarioEscala(linha) {
+    const primeiroDiaSemana = { Dom: 0, Seg: 1, Ter: 2, Qua: 3, Qui: 4, Sex: 5, Sab: 6 }[linha.resumo.dias[0].diaSemana];
+    const celulasVazias = Array.from({ length: primeiroDiaSemana }, () => '<div></div>').join('');
+    const celulasDias = linha.resumo.dias.map(d => {
+        const cor = d.tipo === 'trabalho' ? '#27AE60' : '#B8860B';
+        const dia = d.data.split('/')[0];
+        return `<div title="${d.data} — ${d.tipo}" style="text-align:center; padding:4px 2px; border-radius:4px; background:${cor}22; color:${cor}; font-weight:600; font-size:12px;">${dia}</div>`;
+    }).join('');
+    return `
+        <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; font-size:11px;">
+            <div style="text-align:center; font-weight:700; color:var(--text-secondary);">D</div>
+            <div style="text-align:center; font-weight:700; color:var(--text-secondary);">S</div>
+            <div style="text-align:center; font-weight:700; color:var(--text-secondary);">T</div>
+            <div style="text-align:center; font-weight:700; color:var(--text-secondary);">Q</div>
+            <div style="text-align:center; font-weight:700; color:var(--text-secondary);">Q</div>
+            <div style="text-align:center; font-weight:700; color:var(--text-secondary);">S</div>
+            <div style="text-align:center; font-weight:700; color:var(--text-secondary);">S</div>
+            ${celulasVazias}${celulasDias}
+        </div>
+    `;
+}
+
+function _renderizarFormConfigEscala(linha, idx) {
+    const tipo = linha._formTipo;
+    const subtipo = linha._formSubtipoVariavel;
+    return `
+        <div style="display:flex; gap:14px; margin-bottom:10px; font-size:13px;">
+            <label style="cursor:pointer;"><input type="radio" name="escalaTipo${idx}" value="fixa" ${tipo === 'fixa' ? 'checked' : ''} onchange="_alternarTipoEscalaForm(${idx}, 'fixa')"> Fixa</label>
+            <label style="cursor:pointer;"><input type="radio" name="escalaTipo${idx}" value="variavel" ${tipo === 'variavel' ? 'checked' : ''} onchange="_alternarTipoEscalaForm(${idx}, 'variavel')"> Variável</label>
+        </div>
+        <div id="escalaFormFixa${idx}" style="display:${tipo === 'fixa' ? 'block' : 'none'};">
+            <button type="button" class="btn btn-secondary btn-small" style="margin-bottom:8px;" onclick="_marcarDiasUteisFixa(${idx})">Dias úteis (Seg-Sex)</button>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                ${DIAS_SEMANA_ESCALA.map(d => `
+                    <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer;">
+                        <input type="checkbox" class="escala-dia-semana-check-${idx}" value="${d.chave}" ${linha._formDiasSemana.includes(d.chave) ? 'checked' : ''}>
+                        ${d.label}
+                    </label>
+                `).join('')}
+            </div>
+        </div>
+        <div id="escalaFormVariavel${idx}" style="display:${tipo === 'variavel' ? 'block' : 'none'};">
+            <div style="display:flex; gap:14px; margin-bottom:10px; font-size:13px;">
+                <label style="cursor:pointer;"><input type="radio" name="escalaSubtipo${idx}" value="datas" ${subtipo === 'datas' ? 'checked' : ''} onchange="_alternarSubtipoVariavelEscalaForm(${idx}, 'datas')"> Dias de folga específicos</label>
+                <label style="cursor:pointer;"><input type="radio" name="escalaSubtipo${idx}" value="padrao" ${subtipo === 'padrao' ? 'checked' : ''} onchange="_alternarSubtipoVariavelEscalaForm(${idx}, 'padrao')"> Padrão de repetição</label>
+            </div>
+            <div id="escalaSubDatas${idx}" style="display:${subtipo === 'datas' ? 'block' : 'none'};">
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="date" id="escalaNovaDataFolga${idx}" style="flex:1;">
+                    <button type="button" class="btn btn-secondary btn-small" onclick="_adicionarDataFolgaEscala(${idx})">➕ Adicionar</button>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    ${linha._formDatasFolga.map(data => `
+                        <span style="background:#eee; border-radius:12px; padding:3px 10px; font-size:12px; display:flex; align-items:center; gap:6px;">
+                            ${_isoParaBR(data)}
+                            <span style="cursor:pointer; font-weight:700;" onclick="_removerDataFolgaEscala(${idx}, '${data}')">×</span>
+                        </span>
+                    `).join('') || '<span style="font-size:12px; color:var(--text-secondary);">Nenhuma data de folga adicionada.</span>'}
+                </div>
+            </div>
+            <div id="escalaSubPadrao${idx}" style="display:${subtipo === 'padrao' ? 'block' : 'none'};">
+                <div class="form-group" style="max-width:220px; margin-bottom:10px;">
+                    <label>Data âncora (início do 1º bloco)</label>
+                    <input type="date" id="escalaAncora${idx}" value="${linha._formAncora}" onchange="_atualizarAncoraEscala(${idx})">
+                </div>
+                <div id="escalaBlocosLista${idx}">
+                    ${linha._formBlocos.map((b, bi) => `
+                        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+                            <select id="escalaBlocoTipo${idx}_${bi}" onchange="_atualizarBlocoEscala(${idx}, ${bi})" style="flex:1;">
+                                <option value="trabalho" ${b.tipo === 'trabalho' ? 'selected' : ''}>Trabalha</option>
+                                <option value="folga" ${b.tipo === 'folga' ? 'selected' : ''}>Folga</option>
+                            </select>
+                            <input type="number" min="1" id="escalaBlocoDias${idx}_${bi}" value="${b.dias}" oninput="_atualizarBlocoEscala(${idx}, ${bi})" style="width:70px;"> dias
+                            <span style="cursor:pointer; font-weight:700; color:var(--danger-color);" onclick="_removerBlocoEscala(${idx}, ${bi})">×</span>
+                        </div>
+                    `).join('') || '<span style="font-size:12px; color:var(--text-secondary);">Nenhum bloco adicionado.</span>'}
+                </div>
+                <button type="button" class="btn btn-secondary btn-small" onclick="_adicionarBlocoEscala(${idx})">➕ Adicionar Bloco</button>
+            </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-small" style="margin-top:14px;" onclick="_salvarEscalaEmpregado(${idx})">💾 Salvar Escala</button>
+    `;
+}
+
+function _alternarTipoEscalaForm(idx, tipo) {
+    state._escalaLinhas[idx]._formTipo = tipo;
+    _renderizarListaEscala();
+}
+
+function _alternarSubtipoVariavelEscalaForm(idx, subtipo) {
+    state._escalaLinhas[idx]._formSubtipoVariavel = subtipo;
+    _renderizarListaEscala();
+}
+
+function _marcarDiasUteisFixa(idx) {
+    const linha = state._escalaLinhas[idx];
+    linha._formDiasSemana = ['segunda', 'terca', 'quarta', 'quinta', 'sexta'];
+    _renderizarListaEscala();
+}
+
+function _lerDiasSemanaFormAtual(idx) {
+    return Array.from(document.querySelectorAll(`.escala-dia-semana-check-${idx}:checked`)).map(cb => cb.value);
+}
+
+function _adicionarDataFolgaEscala(idx) {
+    const input = document.getElementById(`escalaNovaDataFolga${idx}`);
+    if (!input.value) return;
+    const linha = state._escalaLinhas[idx];
+    linha._formDiasSemana = _lerDiasSemanaFormAtual(idx); // preserva seleção da aba Fixa ao re-renderizar
+    if (!linha._formDatasFolga.includes(input.value)) {
+        linha._formDatasFolga.push(input.value);
+        linha._formDatasFolga.sort();
+    }
+    _renderizarListaEscala();
+}
+
+function _removerDataFolgaEscala(idx, data) {
+    const linha = state._escalaLinhas[idx];
+    linha._formDiasSemana = _lerDiasSemanaFormAtual(idx);
+    linha._formDatasFolga = linha._formDatasFolga.filter(d => d !== data);
+    _renderizarListaEscala();
+}
+
+function _atualizarAncoraEscala(idx) {
+    const linha = state._escalaLinhas[idx];
+    linha._formDiasSemana = _lerDiasSemanaFormAtual(idx);
+    linha._formAncora = document.getElementById(`escalaAncora${idx}`).value;
+}
+
+function _adicionarBlocoEscala(idx) {
+    const linha = state._escalaLinhas[idx];
+    linha._formDiasSemana = _lerDiasSemanaFormAtual(idx);
+    linha._formAncora = document.getElementById(`escalaAncora${idx}`)?.value || linha._formAncora;
+    linha._formBlocos.push({ tipo: 'trabalho', dias: 1 });
+    _renderizarListaEscala();
+}
+
+function _removerBlocoEscala(idx, blocoIdx) {
+    const linha = state._escalaLinhas[idx];
+    linha._formDiasSemana = _lerDiasSemanaFormAtual(idx);
+    linha._formAncora = document.getElementById(`escalaAncora${idx}`)?.value || linha._formAncora;
+    linha._formBlocos.splice(blocoIdx, 1);
+    _renderizarListaEscala();
+}
+
+function _atualizarBlocoEscala(idx, blocoIdx) {
+    const linha = state._escalaLinhas[idx];
+    const tipo = document.getElementById(`escalaBlocoTipo${idx}_${blocoIdx}`).value;
+    const dias = parseInt(document.getElementById(`escalaBlocoDias${idx}_${blocoIdx}`).value, 10) || 1;
+    linha._formBlocos[blocoIdx] = { tipo, dias };
+}
+
+async function _salvarEscalaEmpregado(idx) {
+    const linha = state._escalaLinhas[idx];
+    const tipo = linha._formTipo;
+
+    let escala;
+    if (tipo === 'fixa') {
+        escala = { tipo_escala: 'fixa', dias_semana: _lerDiasSemanaFormAtual(idx) };
+    } else if (linha._formSubtipoVariavel === 'datas') {
+        escala = { tipo_escala: 'variavel_datas', datas_folga: linha._formDatasFolga };
+    } else {
+        escala = {
+            tipo_escala: 'variavel_padrao',
+            padrao_ancora: document.getElementById(`escalaAncora${idx}`)?.value || linha._formAncora,
+            padrao_blocos: linha._formBlocos
+        };
+    }
+
+    const validacao = validarConfigEscala(escala);
+    if (!validacao.ok) { mostrarMensagem('Aviso', validacao.erro); return; }
+
+    mostrarMensagem('Aguarde', 'Salvando escala...');
+    try {
+        const registro = {
+            codigo_empresa: linha.codigo_empresa,
+            nome_empresa: linha.nome_empresa,
+            codigo_empregado: linha.codigo_empregado,
+            nome_empregado: linha.nome_empregado,
+            tipo_escala: escala.tipo_escala,
+            dias_semana: escala.dias_semana ? JSON.stringify(escala.dias_semana) : null,
+            datas_folga: escala.datas_folga ? JSON.stringify(escala.datas_folga) : null,
+            padrao_ancora: escala.padrao_ancora || null,
+            padrao_blocos: escala.padrao_blocos ? JSON.stringify(escala.padrao_blocos) : null,
+            atualizado_em: new Date().toISOString()
+        };
+        const { data, error } = await supabaseClient
+            .from('rh_escala_trabalho')
+            .upsert(registro, { onConflict: 'codigo_empresa,codigo_empregado' })
+            .select()
+            .single();
+        if (error) throw error;
+
+        linha.escala = _parsearCamposEscala(data);
+        linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia);
+        delete linha._formTipo;
+        delete linha._formSubtipoVariavel;
+        delete linha._formDiasSemana;
+        delete linha._formDatasFolga;
+        delete linha._formAncora;
+        delete linha._formBlocos;
+
+        fecharModalMensagem();
+        _renderizarListaEscala();
+    } catch (erro) {
+        console.error('Erro ao salvar escala:', erro);
+        fecharModalMensagem();
+        mostrarMensagem('Erro', 'Falha ao salvar a escala: ' + erro.message);
+    }
+}
+
 // --- NAVEGAÇÃO E UTILITÁRIOS ---
 function atualizarBannerObservacoes() {
     const obsBanner = document.getElementById('empresaObservacoesBanner');
@@ -3559,16 +4044,20 @@ function mostrarTela(telaId) {
     document.getElementById('resultsScreen').style.display = 'none';
     document.getElementById('gruposScreen').style.display = 'none';
     document.getElementById('beneficiosScreen').style.display = 'none';
+    document.getElementById('escalaScreen').style.display = 'none';
     document.getElementById(telaId).style.display = 'block';
     if (telaId === 'gruposScreen') carregarGrupos();
     if (telaId === 'beneficiosScreen') _iniciarTelaBeneficios();
+    if (telaId === 'escalaScreen') _iniciarTelaEscala();
+
+    const telasSemHeaderPadrao = ['selectionScreen', 'gruposScreen', 'beneficiosScreen', 'escalaScreen'];
 
     const pageHeader = document.getElementById('pageHeader');
-    if (pageHeader) pageHeader.style.display = (telaId === 'selectionScreen' || telaId === 'gruposScreen' || telaId === 'beneficiosScreen') ? 'none' : 'block';
+    if (pageHeader) pageHeader.style.display = telasSemHeaderPadrao.includes(telaId) ? 'none' : 'block';
 
     const sub = document.getElementById('pageHeaderSub');
     if (sub) {
-        if (telaId !== 'selectionScreen' && telaId !== 'gruposScreen' && telaId !== 'beneficiosScreen' && state.empresaSelecionada) {
+        if (!telasSemHeaderPadrao.includes(telaId) && state.empresaSelecionada) {
             sub.textContent = `🏢 ${state.empresaSelecionada.codigo_empresa} — ${state.empresaSelecionada.nome_empresa}  ·  📅 ${state.competencia}`;
         } else {
             sub.textContent = 'Selecione a competência e empresa para começar';
@@ -3576,7 +4065,7 @@ function mostrarTela(telaId) {
     }
 
     atualizarBannerObservacoes();
-    if (telaId === 'gruposScreen' || telaId === 'beneficiosScreen') {
+    if (telasSemHeaderPadrao.includes(telaId) && telaId !== 'selectionScreen') {
         const obsBanner = document.getElementById('empresaObservacoesBanner');
         if (obsBanner) obsBanner.style.display = 'none';
     }

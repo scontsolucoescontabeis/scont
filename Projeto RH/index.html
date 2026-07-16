@@ -50,6 +50,9 @@
         <button class="sidebar-item" onclick="mostrarTela('beneficiosScreen')">
             <span class="sidebar-item-icon">🍽️</span> Gerar Benefícios
         </button>
+        <button class="sidebar-item" onclick="mostrarTela('escalaScreen')">
+            <span class="sidebar-item-icon">🗓️</span> Gerar Escala
+        </button>
     </nav>
 
     <div class="sidebar-footer">
@@ -322,6 +325,53 @@
                         <tbody id="beneficiosPreviaBody"></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- TELA DE GERAR ESCALA -->
+        <div id="escalaScreen" style="display: none;">
+            <div style="margin-bottom:20px;">
+                <h2 style="color: var(--primary-color); margin:0;">🗓️ Gerar Escala</h2>
+                <p style="color: var(--text-secondary); font-size:13px; margin-top:6px;">
+                    Configura a escala de trabalho (dias a trabalhar x dias de folga) de cada empregado — fixa
+                    (dias da semana) ou variável (datas de folga específicas ou um ciclo de blocos que se repete) —
+                    e mostra o resumo de dias a trabalhar/folgar na competência escolhida. Independente da jornada
+                    (horário de entrada/saída).
+                </p>
+            </div>
+
+            <div style="border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:16px;">
+                <div class="form-group" style="max-width:220px;">
+                    <label for="escalaCompetencia">Competência (MM/AAAA)</label>
+                    <input type="text" id="escalaCompetencia" placeholder="MM/AAAA" maxlength="7"
+                        oninput="this.value = formatarCompetencia(this.value);">
+                </div>
+
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+                    <label style="font-weight:600; font-size:13px; color: var(--text-primary); margin:0;">Grupos de Empresas (opcional)</label>
+                    <input type="text" id="escalaBuscaGrupo" placeholder="🔍 Buscar grupo..." style="flex:1; min-width:160px;"
+                        oninput="_filtrarListaGruposEscala()">
+                </div>
+                <div id="escalaListaGrupos" style="max-height:120px; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px; padding:8px 12px; margin-bottom:16px; display:flex; flex-direction:column; gap:4px;"></div>
+
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+                    <label style="font-weight:600; font-size:13px; color: var(--text-primary); margin:0;">Empresas</label>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="_selecionarTodasEmpresasEscala(true)">Todas</button>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="_selecionarTodasEmpresasEscala(false)">Nenhuma</button>
+                    <input type="text" id="escalaBuscaEmpresa" placeholder="🔍 Buscar empresa..." style="flex:1; min-width:180px;"
+                        oninput="_filtrarListaEmpresasEscala()">
+                </div>
+                <div id="escalaListaEmpresas" style="max-height:180px; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px; padding:8px 12px; display:flex; flex-direction:column; gap:4px;"></div>
+                <p id="escalaEmpresasSelecionadasInfo" style="font-size:12px; color: var(--text-secondary); margin:8px 0 0;">Nenhuma empresa selecionada.</p>
+
+                <button type="button" class="btn btn-primary" style="margin-top:16px;" onclick="gerarEscala()">🔎 Gerar</button>
+            </div>
+
+            <div id="escalaResultadoContainer" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+                    <span id="escalaResultadoInfo" style="font-size:13px; color: var(--text-secondary);"></span>
+                </div>
+                <div id="escalaListaEmpregados"></div>
             </div>
         </div>
 
@@ -1094,6 +1144,7 @@
         box-shadow: 0 6px 20px rgba(0,0,0,0.15);
     "></div>
 
+    <script src="escala-calculo.js"></script>
     <script src="script.js"></script>
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
     <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
