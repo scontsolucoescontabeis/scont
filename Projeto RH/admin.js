@@ -579,7 +579,7 @@ function gerarRelatorioPDFEmpregados() {
         color: #888;
     }
 
-    @page { size: ${muitasCols ? 'A4 landscape' : 'A4 portrait'}; margin: 10mm; }
+    @page { size: A4 landscape; margin: 10mm; }
     @media print {
         .report-header { border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         thead tr { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
