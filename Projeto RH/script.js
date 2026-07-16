@@ -3806,15 +3806,35 @@ function _renderizarListaEscala() {
     document.getElementById('escalaResultadoContainer').style.display = 'block';
 }
 
+// Preenche os campos _form* a partir da escala salva de uma linha. Só sobrescreve
+// campos ainda não inicializados, a menos que forcar=true (usado logo após salvar,
+// quando o form precisa refletir o que acabou de ir para o banco).
+function _inicializarFormEscala(linha, forcar) {
+    const semEscala = !linha.escala;
+    if (forcar || linha._formTipo === undefined) {
+        linha._formTipo = semEscala ? 'fixa' : (linha.escala.tipo_escala === 'fixa' ? 'fixa' : 'variavel');
+    }
+    if (forcar || linha._formSubtipoVariavel === undefined) {
+        linha._formSubtipoVariavel = (!semEscala && linha.escala.tipo_escala === 'variavel_padrao') ? 'padrao' : 'datas';
+    }
+    if (forcar || linha._formDiasSemana === undefined) {
+        linha._formDiasSemana = linha.escala?.dias_semana ? linha.escala.dias_semana.slice() : [];
+    }
+    if (forcar || linha._formDatasFolga === undefined) {
+        linha._formDatasFolga = linha.escala?.datas_folga ? linha.escala.datas_folga.slice() : [];
+    }
+    if (forcar || linha._formAncora === undefined) {
+        linha._formAncora = linha.escala?.padrao_ancora || '';
+    }
+    if (forcar || linha._formBlocos === undefined) {
+        linha._formBlocos = linha.escala?.padrao_blocos ? linha.escala.padrao_blocos.map(b => ({ ...b })) : [];
+    }
+}
+
 function _toggleExpandirEscala(idx) {
     const linha = state._escalaLinhas[idx];
     linha.expandido = !linha.expandido;
-    linha._formTipo = linha._formTipo || (linha.escala ? (linha.escala.tipo_escala === 'fixa' ? 'fixa' : 'variavel') : 'fixa');
-    linha._formSubtipoVariavel = linha._formSubtipoVariavel || (linha.escala && linha.escala.tipo_escala === 'variavel_padrao' ? 'padrao' : 'datas');
-    linha._formDiasSemana = linha._formDiasSemana || (linha.escala?.dias_semana ? linha.escala.dias_semana.slice() : []);
-    linha._formDatasFolga = linha._formDatasFolga || (linha.escala?.datas_folga ? linha.escala.datas_folga.slice() : []);
-    linha._formAncora = linha._formAncora || linha.escala?.padrao_ancora || '';
-    linha._formBlocos = linha._formBlocos || (linha.escala?.padrao_blocos ? linha.escala.padrao_blocos.map(b => ({ ...b })) : []);
+    _inicializarFormEscala(linha, false);
     _renderizarListaEscala();
 }
 
@@ -4029,12 +4049,9 @@ async function _salvarEscalaEmpregado(idx) {
 
         linha.escala = _parsearCamposEscala(data);
         linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia, linha.periodosFerias);
-        delete linha._formTipo;
-        delete linha._formSubtipoVariavel;
-        delete linha._formDiasSemana;
-        delete linha._formDatasFolga;
-        delete linha._formAncora;
-        delete linha._formBlocos;
+        // A linha pode continuar expandida após salvar — o form precisa refletir
+        // o que acabou de ir para o banco, por isso forcar=true aqui.
+        _inicializarFormEscala(linha, true);
 
         fecharModalMensagem();
         _renderizarListaEscala();
