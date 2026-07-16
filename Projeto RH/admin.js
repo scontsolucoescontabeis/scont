@@ -218,7 +218,6 @@ const _GRUPOS_CAMPOS = [
     { nome: 'Situação Trabalhista', cols: ['situacao','data_demissao','motivo_demissao','tipo_empregado'] },
     { nome: 'Dados Bancários', cols: ['nome_banco','tipo_conta','agencia','conta_bancaria'] },
     { nome: 'Deficiência', cols: ['possui_deficiencia','deficiencia_fisica','deficiencia_visual','deficiencia_auditiva','deficiencia_intelectual','deficiencia_mental','outra_deficiencia','reabilitado','obs_deficiencia','cota_deficiente'] },
-    { nome: 'Conselho', cols: ['nome_conselho','numero_conselho','expedicao_conselho','validade_conselho'] },
     { nome: 'Dependentes', cols: ['nom_dep_1','nasc_dep_1','cpf_dep_1','parentesco_dep_1','nom_dep_2','nasc_dep_2','cpf_dep_2','parentesco_dep_2','nom_dep_3','nasc_dep_3','cpf_dep_3','parentesco_dep_3','nom_dep_4','nasc_dep_4','cpf_dep_4','parentesco_dep_4','nom_dep_5','nasc_dep_5','cpf_dep_5','parentesco_dep_5','nom_dep_6','nasc_dep_6','cpf_dep_6','parentesco_dep_6','nom_dep_7','nasc_dep_7','cpf_dep_7','parentesco_dep_7'] },
 ];
 
@@ -2060,7 +2059,6 @@ const _COLS_EMPREGADOS = [
     'possui_deficiencia','deficiencia_fisica','deficiencia_visual','deficiencia_auditiva',
     'deficiencia_intelectual','deficiencia_mental','outra_deficiencia','reabilitado',
     'obs_deficiencia','cota_deficiente',
-    'nome_conselho','numero_conselho','expedicao_conselho','validade_conselho',
     'nom_dep_1','nasc_dep_1','cpf_dep_1','parentesco_dep_1',
     'nom_dep_2','nasc_dep_2','cpf_dep_2','parentesco_dep_2',
     'nom_dep_3','nasc_dep_3','cpf_dep_3','parentesco_dep_3',
@@ -2091,7 +2089,6 @@ const _HEADERS_EMPREGADOS = [
     'Possui deficiência','Deficiência física','Deficiência visual','Deficiência auditiva',
     'Deficiência intelectual','Deficiência mental','Outra deficiência','Reabilitado(a)',
     'Observação deficiência','Cota deficiente',
-    'Nome Conselho','Numero Conselho','Expedição Conselho','Validade Conselho',
     'Nome Dependente 1','Nascimento Dependente 1','CPF Dependente 1','Parentesco Dependente 1',
     'Nome Dependente 2','Nascimento Dependente 2','CPF Dependente 2','Parentesco Dependente 2',
     'Nome Dependente 3','Nascimento Dependente 3','CPF Dependente 3','Parentesco Dependente 3',
@@ -2105,7 +2102,7 @@ const _DATE_COLS_EMPREGADOS = new Set([
     'data_admissao','fim_determinado','fim_prorrogacao','expedicao_rg',
     'data_nascimento','data_exp_ric','validade_ric','emissao_passaporte',
     'validade_passaporte','expedicao_rne','expedicao_cnh','vencimento_cnh',
-    'expedicao_ctps','data_demissao','expedicao_conselho','validade_conselho',
+    'expedicao_ctps','data_demissao',
     'nasc_dep_1','nasc_dep_2','nasc_dep_3','nasc_dep_4',
     'nasc_dep_5','nasc_dep_6','nasc_dep_7'
 ]);
@@ -2134,6 +2131,75 @@ function baixarModeloEmpregados() {
     XLSX.writeFile(wb, 'modelo_empregados.xlsx');
 }
 
+// O relatório de "Todas as empresas" (Apenas Ativos) repete a linha de
+// cabeçalho a cada troca de empresa, e alguns campos (ex.: Agência/Conta)
+// vêm em ordem diferente dependendo da empresa. Por isso a leitura é feita
+// por NOME da coluna (a cada linha de cabeçalho encontrada) em vez de por
+// posição fixa — assim cada bloco de empresa é remapeado corretamente e
+// linhas de cabeçalho repetidas não viram "empregados" fantasmas.
+
+function _pareceLinhaCabecalhoEmpregados(linha) {
+    return String(linha?.[0] ?? '').trim() === _HEADERS_EMPREGADOS[0];
+}
+
+function _construirMapaColunasEmpregados(linhaCabecalho) {
+    const indicesPorRotulo = {};
+    _HEADERS_EMPREGADOS.forEach((rotulo, i) => {
+        const chave = rotulo.trim();
+        (indicesPorRotulo[chave] ||= []).push(i);
+    });
+
+    const usados = {};
+    const mapa = {}; // índice da coluna no arquivo -> chave interna (_COLS_EMPREGADOS)
+    linhaCabecalho.forEach((celula, idxArquivo) => {
+        const rotulo = String(celula ?? '').trim();
+        if (!rotulo) return; // coluna em branco/sem nome no arquivo — ignorada
+        const ocorrencias = indicesPorRotulo[rotulo];
+        if (!ocorrencias) return; // rótulo não reconhecido — ignorado
+
+        // Rótulos duplicados no modelo (ex.: "Categoria" para categoria do
+        // empregado e categoria da CNH) são resolvidos pela ordem de
+        // aparição: a N-ésima ocorrência no arquivo mapeia para a N-ésima
+        // ocorrência no modelo canônico.
+        const n = usados[rotulo] || 0;
+        const idxCanonico = ocorrencias[Math.min(n, ocorrencias.length - 1)];
+        usados[rotulo] = n + 1;
+        mapa[idxArquivo] = _COLS_EMPREGADOS[idxCanonico];
+    });
+    return mapa;
+}
+
+function lerPlanilhaEmpregados(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+                const sheet = wb.Sheets[wb.SheetNames[0]];
+                const linhas = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+                const registros = [];
+                let mapaAtual = null;
+                for (const linha of linhas) {
+                    if (_pareceLinhaCabecalhoEmpregados(linha)) {
+                        mapaAtual = _construirMapaColunasEmpregados(linha);
+                        continue;
+                    }
+                    if (!mapaAtual) continue; // linha antes do primeiro cabeçalho reconhecido
+                    const obj = {};
+                    Object.entries(mapaAtual).forEach(([idxArquivo, chave]) => {
+                        obj[chave] = linha[idxArquivo];
+                    });
+                    registros.push(obj);
+                }
+                resolve(registros);
+            } catch (err) { reject(err); }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+    });
+}
+
 function handleImportarEmpregados(event) {
     const file = event.target.files?.[0];
     if (file) importarEmpregadosIndividual(file);
@@ -2145,7 +2211,7 @@ async function importarEmpregadosIndividual(file) {
         setStatusImport(ENT, 'Lendo arquivo...', 'info');
         setProgresso(ENT, 10);
 
-        const raw = await lerPlanilha(file, _COLS_EMPREGADOS);
+        const raw = await lerPlanilhaEmpregados(file);
 
         if (!raw.length) throw new Error('Arquivo vazio ou sem dados reconhecíveis.');
 
