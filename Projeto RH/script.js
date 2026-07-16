@@ -3708,15 +3708,24 @@ async function gerarEscala() {
         const [
             { data: empregadosData, error: errFunc },
             { data: escalasData, error: errEsc },
+            { data: feriasData, error: errFer },
         ] = await Promise.all([
             supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, situacao, tipo_empregado').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_escala_trabalho').select('*').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_ferias_calculadas').select('codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim').in('codigo_empresa', codigosEmpresas),
         ]);
         if (errFunc) throw errFunc;
         if (errEsc) throw errEsc;
+        if (errFer) throw errFer;
 
         const escalasMapa = {};
         (escalasData || []).forEach(e => { escalasMapa[`${e.codigo_empresa}_${e.codigo_empregado}`] = _parsearCamposEscala(e); });
+
+        const feriasMapa = {};
+        (feriasData || []).forEach(f => {
+            const chave = `${f.codigo_empresa}_${f.codigo_empregado}`;
+            (feriasMapa[chave] ??= []).push({ inicio: f.ferias_inicio, fim: f.ferias_fim });
+        });
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
             (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() !== 'Contribuinte'
@@ -3732,13 +3741,16 @@ async function gerarEscala() {
         const linhas = empregadosFiltrados.map(emp => {
             const escala = escalasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || null;
             const empresa = state.empresas.find(e => e.codigo_empresa === emp.codigo_empresa);
+            const periodosFerias = feriasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`];
             return {
                 codigo_empresa: emp.codigo_empresa,
                 nome_empresa: empresa?.nome_empresa || emp.codigo_empresa,
                 codigo_empregado: emp.codigo_empregado,
                 nome_empregado: emp.nome_empregado,
                 escala,
-                resumo: calcularResumoMes(escala, comp),
+                periodosFerias,
+                feriasTexto: _periodosFeriasNoMesTexto(periodosFerias, comp),
+                resumo: calcularResumoMes(escala, comp, periodosFerias),
                 expandido: false
             };
         });
@@ -3776,11 +3788,12 @@ function _renderizarListaEscala() {
                 <div>
                     <strong>${l.codigo_empregado} - ${l.nome_empregado}</strong>
                     <div style="font-size:12px; color:var(--text-secondary);">${l.codigo_empresa} - ${l.nome_empresa}</div>
+                    ${l.feriasTexto ? `<div style="font-size:12px; color:#2C7BE5; margin-top:2px;">🏖️ Férias: ${l.feriasTexto}</div>` : ''}
                 </div>
                 <div style="display:flex; align-items:center; gap:16px; font-size:13px;">
                     <span>${_badgeTipoEscala(l.escala)}</span>
                     <span>✅ ${l.resumo.totalTrabalho} trabalho</span>
-                    <span>🌴 ${l.resumo.totalFolga} folga</span>
+                    <span>🌴 ${l.resumo.totalFolga} folga${l.resumo.totalFerias ? ` (${l.resumo.totalFerias} de férias)` : ''}</span>
                     <span style="font-size:16px;">${l.expandido ? '▲' : '▼'}</span>
                 </div>
             </div>
@@ -3824,9 +3837,10 @@ function _renderizarMiniCalendarioEscala(linha) {
     const primeiroDiaSemana = { Dom: 0, Seg: 1, Ter: 2, Qua: 3, Qui: 4, Sex: 5, Sab: 6 }[linha.resumo.dias[0].diaSemana];
     const celulasVazias = Array.from({ length: primeiroDiaSemana }, () => '<div></div>').join('');
     const celulasDias = linha.resumo.dias.map(d => {
-        const cor = d.tipo === 'trabalho' ? '#27AE60' : '#B8860B';
+        const cor = d.ferias ? '#2C7BE5' : (d.tipo === 'trabalho' ? '#27AE60' : '#B8860B');
+        const rotulo = d.ferias ? 'férias' : d.tipo;
         const dia = d.data.split('/')[0];
-        return `<div title="${d.data} — ${d.tipo}" style="text-align:center; padding:4px 2px; border-radius:4px; background:${cor}22; color:${cor}; font-weight:600; font-size:12px;">${dia}</div>`;
+        return `<div title="${d.data} — ${rotulo}" style="text-align:center; padding:4px 2px; border-radius:4px; background:${cor}22; color:${cor}; font-weight:600; font-size:12px;">${dia}</div>`;
     }).join('');
     return `
         <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; font-size:11px;">
@@ -4014,7 +4028,7 @@ async function _salvarEscalaEmpregado(idx) {
         if (error) throw error;
 
         linha.escala = _parsearCamposEscala(data);
-        linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia);
+        linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia, linha.periodosFerias);
         delete linha._formTipo;
         delete linha._formSubtipoVariavel;
         delete linha._formDiasSemana;

@@ -96,16 +96,28 @@ function calcularTipoDia(escala, dataBR, abrevDiaSemana) {
     }
 }
 
-// Retorna { dias: [{data, diaSemana, tipo}], totalTrabalho, totalFolga, totalDias }
-function calcularResumoMes(escala, competencia) {
+function _dataEmPeriodo(dataIso, periodos) {
+    return (periodos || []).some(p => dataIso >= p.inicio && dataIso <= p.fim);
+}
+
+// Retorna { dias: [{data, diaSemana, tipo, ferias}], totalTrabalho, totalFolga, totalFerias, totalDias }
+// periodosFerias (opcional): [{inicio: 'AAAA-MM-DD', fim: 'AAAA-MM-DD'}, ...]. Dia que cai em
+// algum período de férias sempre vira folga, independente do que a escala diga para aquele dia
+// (mesmo critério usado em "Gerar Benefícios": férias sempre sai do cálculo de dias a trabalhar).
+function calcularResumoMes(escala, competencia, periodosFerias) {
     const diasDoMes = _gerarDiasDoMes(competencia);
-    const dias = diasDoMes.map(d => ({
-        data: d.data,
-        diaSemana: d.diaSemana,
-        tipo: calcularTipoDia(escala, d.data, d.diaSemana)
-    }));
+    const dias = diasDoMes.map(d => {
+        const emFerias = _dataEmPeriodo(_brParaIso(d.data), periodosFerias);
+        return {
+            data: d.data,
+            diaSemana: d.diaSemana,
+            tipo: emFerias ? 'folga' : calcularTipoDia(escala, d.data, d.diaSemana),
+            ferias: emFerias
+        };
+    });
     const totalTrabalho = dias.filter(d => d.tipo === 'trabalho').length;
-    return { dias, totalTrabalho, totalFolga: dias.length - totalTrabalho, totalDias: dias.length };
+    const totalFerias = dias.filter(d => d.ferias).length;
+    return { dias, totalTrabalho, totalFolga: dias.length - totalTrabalho, totalFerias, totalDias: dias.length };
 }
 
 // Validação de uma configuração de escala montada na tela, antes de salvar.
@@ -144,6 +156,7 @@ if (typeof module !== 'undefined' && module.exports) {
         _brParaIso,
         _gerarDiasDoMes,
         _diasEntreIso,
+        _dataEmPeriodo,
         calcularTipoDiaFixa,
         calcularTipoDiaVariavelDatas,
         calcularTipoDiaVariavelPadrao,

@@ -1,6 +1,6 @@
 const assert = require('node:assert');
 const {
-    _brParaIso, _diasEntreIso, _gerarDiasDoMes,
+    _brParaIso, _diasEntreIso, _gerarDiasDoMes, _dataEmPeriodo,
     calcularTipoDiaFixa, calcularTipoDiaVariavelDatas, calcularTipoDiaVariavelPadrao,
     calcularTipoDiaPadrao5x2, calcularTipoDia, calcularResumoMes, validarConfigEscala
 } = require('./escala-calculo.js');
@@ -147,6 +147,39 @@ teste('calcularResumoMes: sem escala (null) usa padrão 5x2', () => {
     const resumo = calcularResumoMes(null, '07/2026');
     const domingosSabados = resumo.dias.filter(d => d.diaSemana === 'Dom' || d.diaSemana === 'Sab').length;
     assert.strictEqual(resumo.totalFolga, domingosSabados);
+});
+
+// ===== férias sobrepondo a escala =====
+
+teste('_dataEmPeriodo: identifica data dentro/fora de períodos', () => {
+    const periodos = [{ inicio: '2026-07-10', fim: '2026-07-20' }];
+    assert.strictEqual(_dataEmPeriodo('2026-07-15', periodos), true);
+    assert.strictEqual(_dataEmPeriodo('2026-07-10', periodos), true); // borda inicial
+    assert.strictEqual(_dataEmPeriodo('2026-07-20', periodos), true); // borda final
+    assert.strictEqual(_dataEmPeriodo('2026-07-21', periodos), false);
+});
+
+teste('calcularResumoMes: dias em período de férias sempre viram folga, mesmo em dia de trabalho da escala', () => {
+    const escalaFixa = { tipo_escala: 'fixa', dias_semana: ['segunda', 'terca', 'quarta', 'quinta', 'sexta'] };
+    const periodos = [{ inicio: '2026-07-13', fim: '2026-07-17' }]; // segunda a sexta, dias de trabalho na escala
+    const resumo = calcularResumoMes(escalaFixa, '07/2026', periodos);
+
+    const diasFerias = resumo.dias.filter(d => ['13/07/2026', '14/07/2026', '15/07/2026', '16/07/2026', '17/07/2026'].includes(d.data));
+    assert.strictEqual(diasFerias.length, 5);
+    diasFerias.forEach(d => {
+        assert.strictEqual(d.tipo, 'folga');
+        assert.strictEqual(d.ferias, true);
+    });
+    assert.strictEqual(resumo.totalFerias, 5);
+
+    // sem férias, esses 5 dias úteis contariam como trabalho — confirma que a férias realmente reduziu o total
+    const resumoSemFerias = calcularResumoMes(escalaFixa, '07/2026');
+    assert.strictEqual(resumoSemFerias.totalTrabalho - resumo.totalTrabalho, 5);
+});
+
+teste('calcularResumoMes: sem períodos de férias, totalFerias é 0 e nada muda', () => {
+    const resumo = calcularResumoMes(null, '07/2026', []);
+    assert.strictEqual(resumo.totalFerias, 0);
 });
 
 // ===== validarConfigEscala =====
