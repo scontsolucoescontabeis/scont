@@ -54,6 +54,9 @@ CREATE INDEX IF NOT EXISTS idx_rh_escala_trabalho_empresa_empregado
 
 ALTER TABLE public.rh_escala_trabalho ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "rh_escala_trabalho: leitura autenticado" ON public.rh_escala_trabalho;
+DROP POLICY IF EXISTS "rh_escala_trabalho: escrita autenticado" ON public.rh_escala_trabalho;
+
 CREATE POLICY "rh_escala_trabalho: leitura autenticado"
     ON public.rh_escala_trabalho FOR SELECT TO authenticated USING (TRUE);
 
