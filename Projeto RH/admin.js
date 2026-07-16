@@ -1800,17 +1800,37 @@ const _DIAS_SEMANA_ORDEM = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sa
 
 async function carregarJornadaInfo() {
     try {
-        const { data, error } = await supabaseClient
-            .from('rh_jornada_trabalho')
-            .select('*')
-            .order('codigo_empresa', { ascending: true })
-            .order('nome_empregado', { ascending: true });
-        if (error) throw error;
-        _todaJornadaInfo = _agruparJornadaPorEmpregado(data || []);
+        const linhas = await _buscarTodasLinhasJornada();
+        const agrupados = _agruparJornadaPorEmpregado(linhas);
+        agrupados.sort((a, b) =>
+            a.codigo_empresa.localeCompare(b.codigo_empresa, 'pt-BR', { numeric: true }) ||
+            (a.nome_empregado || '').localeCompare(b.nome_empregado || '', 'pt-BR')
+        );
+        _todaJornadaInfo = agrupados;
         _jornadaInfoFiltrada = [..._todaJornadaInfo];
         _paginaJornadaInfo = 1;
         renderizarTabelaJornadaInfo();
     } catch (erro) { mostrarStatus('statusJornadaInfo', 'Erro ao carregar informações de jornada de trabalho.', 'error'); }
+}
+
+// O Supabase/PostgREST limita a quantidade de linhas por requisição (padrão:
+// 1000) — com >14 mil linhas em rh_jornada_trabalho, uma única .select('*')
+// traz só a primeira página. Busca em blocos com .range() até esgotar os dados.
+async function _buscarTodasLinhasJornada() {
+    const TAMANHO_BLOCO = 1000;
+    let todas = [];
+    let inicio = 0;
+    while (true) {
+        const { data, error } = await supabaseClient
+            .from('rh_jornada_trabalho')
+            .select('*')
+            .range(inicio, inicio + TAMANHO_BLOCO - 1);
+        if (error) throw error;
+        todas = todas.concat(data || []);
+        if (!data || data.length < TAMANHO_BLOCO) break;
+        inicio += TAMANHO_BLOCO;
+    }
+    return todas;
 }
 
 function _agruparJornadaPorEmpregado(linhas) {

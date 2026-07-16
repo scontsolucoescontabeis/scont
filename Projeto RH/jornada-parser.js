@@ -62,7 +62,6 @@ const _RE_EMPRESA_JORNADA = /^(\d+)-(.+)$/;
 const _RE_DATA_GRUDADA = /\d{2}\/\d{2}\/\d{4}/;
 const _RE_HORA = /^\d{2}:\d{2}$/;
 const _RE_INTERVALO = /^(\d{2}:\d{2})\s+as\s+(\d{2}:\d{2})$/i;
-const _RE_DIA_FAIXA = /^Segunda\s+[aà]\s+sexta$/i;
 const _RE_PAGINA = /^P[aá]gina:?$/i;
 const _RE_NUM_PAGINA = /^\d+\/\d+$/;
 
@@ -75,7 +74,11 @@ const _DIA_MAP = {
     'sábado': 'sabado', 'sabado': 'sabado',
     'domingo': 'domingo'
 };
-const _DIAS_UTEIS_SEG_SEX = ['segunda', 'terca', 'quarta', 'quinta', 'sexta'];
+const _ORDEM_DIAS = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
+const _NOMES_DIA_ALT = 'segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo';
+// Faixa genérica "DiaA à DiaB" (ex.: "Segunda à sexta", "Terça à Sábado") — o PDF
+// de origem varia qual par de dias aparece agrupado dependendo da empresa/empregado.
+const _RE_DIA_FAIXA = new RegExp(`^(${_NOMES_DIA_ALT})\\s+[aà]\\s+(${_NOMES_DIA_ALT})$`, 'i');
 
 const _IGNORAR_PREFIXOS = [
     'CNPJ:', 'Empregador:', 'Endereço:', 'Endereço:',
@@ -85,8 +88,19 @@ const _IGNORAR_PREFIXOS = [
 
 function _normalizarDia(texto) {
     if (!texto) return null;
-    if (_RE_DIA_FAIXA.test(texto.trim())) return _DIAS_UTEIS_SEG_SEX.slice();
-    const chave = texto.trim().toLowerCase();
+    const t = texto.trim();
+
+    const mFaixa = t.match(_RE_DIA_FAIXA);
+    if (mFaixa) {
+        const inicio = _DIA_MAP[mFaixa[1].toLowerCase()];
+        const fim = _DIA_MAP[mFaixa[2].toLowerCase()];
+        const idxInicio = _ORDEM_DIAS.indexOf(inicio);
+        const idxFim = _ORDEM_DIAS.indexOf(fim);
+        if (idxInicio === -1 || idxFim === -1 || idxInicio > idxFim) return null;
+        return _ORDEM_DIAS.slice(idxInicio, idxFim + 1);
+    }
+
+    const chave = t.toLowerCase();
     return _DIA_MAP[chave] ? [_DIA_MAP[chave]] : null;
 }
 

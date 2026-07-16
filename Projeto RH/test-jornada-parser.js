@@ -31,6 +31,16 @@ teste('_normalizarDia expande a faixa "Segunda à sexta" em 5 dias', () => {
     assert.deepStrictEqual(_normalizarDia('Segunda à sexta'), ['segunda', 'terca', 'quarta', 'quinta', 'sexta']);
 });
 
+teste('_normalizarDia expande qualquer faixa "DiaA à DiaB" (não só Segunda a sexta)', () => {
+    assert.deepStrictEqual(_normalizarDia('Terça à Sábado'), ['terca', 'quarta', 'quinta', 'sexta', 'sabado']);
+    assert.deepStrictEqual(_normalizarDia('Quarta a domingo'), ['quarta', 'quinta', 'sexta', 'sabado', 'domingo']);
+    assert.deepStrictEqual(_normalizarDia('Sexta à sexta'), ['sexta']);
+});
+
+teste('_normalizarDia retorna null para faixa invertida (fim antes do início)', () => {
+    assert.strictEqual(_normalizarDia('Sexta à segunda'), null);
+});
+
 teste('_normalizarDia retorna null para texto não reconhecido', () => {
     assert.strictEqual(_normalizarDia('Feriado'), null);
 });
