@@ -1881,7 +1881,7 @@ function renderizarTabelaJornadaInfo() {
     tbody.innerHTML = '';
 
     if (_jornadaInfoFiltrada.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#95A5A6;padding:20px;">Nenhum empregado encontrado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#95A5A6;padding:20px;">Nenhum empregado encontrado</td></tr>';
         paginacao.innerHTML = '';
         if (info) info.textContent = '';
         return;
@@ -1902,6 +1902,7 @@ function renderizarTabelaJornadaInfo() {
             <td>${j.codigo_empregado}</td>
             <td>${j.nome_empregado || ''}</td>
             ${_DIAS_SEMANA_ORDEM.map(d => `<td>${_fmtHorarioDia(j.dias[d])}</td>`).join('')}
+            <td><button type="button" onclick="abrirModalEditarJornada('${j.codigo_empresa}','${j.codigo_empregado}')" style="padding:6px 10px;border:1px solid #C0C0C0;border-radius:6px;background:white;cursor:pointer;font-size:12px;">✏️ Editar</button></td>
         </tr>`;
     });
 
@@ -1918,6 +1919,122 @@ function mudarPaginaJornadaInfo(pag) {
     _paginaJornadaInfo = pag;
     renderizarTabelaJornadaInfo();
     document.getElementById('jornada')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+const _DIAS_SEMANA_LABEL = {
+    segunda: 'Segunda-feira', terca: 'Terça-feira', quarta: 'Quarta-feira',
+    quinta: 'Quinta-feira', sexta: 'Sexta-feira', sabado: 'Sábado', domingo: 'Domingo'
+};
+
+function abrirModalEditarJornada(codigoEmpresa, codigoEmpregado) {
+    const registro = _todaJornadaInfo.find(j => j.codigo_empresa === codigoEmpresa && j.codigo_empregado === codigoEmpregado);
+    if (!registro) return;
+
+    document.getElementById('jornadaEditEmpresa').value = codigoEmpresa;
+    document.getElementById('jornadaEditEmpregado').value = codigoEmpregado;
+    document.getElementById('jornadaEditTitulo').textContent =
+        `Editar Jornada — ${registro.nome_empregado || ''} (${codigoEmpregado}) — ${registro.nome_empresa || codigoEmpresa}`;
+    document.getElementById('statusJornadaEdit').innerHTML = '';
+
+    const tbody = document.getElementById('jornadaEditTableBody');
+    tbody.innerHTML = _DIAS_SEMANA_ORDEM.map(dia => {
+        const d = registro.dias[dia];
+        const trabalha = !!d;
+        return `<tr data-dia="${dia}">
+            <td><input type="checkbox" id="jeTrabalha_${dia}" ${trabalha ? 'checked' : ''} onchange="_toggleDiaJornadaEdit('${dia}')"></td>
+            <td>${_DIAS_SEMANA_LABEL[dia]}</td>
+            <td><input type="time" id="jeEntrada_${dia}" value="${d?.entrada || ''}" ${trabalha ? '' : 'disabled'}></td>
+            <td><input type="time" id="jeIntIni_${dia}" value="${d?.intervalo_inicio || ''}" ${trabalha ? '' : 'disabled'}></td>
+            <td><input type="time" id="jeIntFim_${dia}" value="${d?.intervalo_fim || ''}" ${trabalha ? '' : 'disabled'}></td>
+            <td><input type="time" id="jeSaida_${dia}" value="${d?.saida || ''}" ${trabalha ? '' : 'disabled'}></td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('modalJornadaEdit').classList.add('active');
+}
+
+function _toggleDiaJornadaEdit(dia) {
+    const trabalha = document.getElementById(`jeTrabalha_${dia}`).checked;
+    ['jeEntrada_', 'jeIntIni_', 'jeIntFim_', 'jeSaida_'].forEach(prefixo => {
+        document.getElementById(`${prefixo}${dia}`).disabled = !trabalha;
+    });
+}
+
+function fecharModalJornadaEdit() {
+    document.getElementById('modalJornadaEdit').classList.remove('active');
+}
+
+async function salvarJornadaEdit() {
+    const codigoEmpresa = document.getElementById('jornadaEditEmpresa').value;
+    const codigoEmpregado = document.getElementById('jornadaEditEmpregado').value;
+    const registro = _todaJornadaInfo.find(j => j.codigo_empresa === codigoEmpresa && j.codigo_empregado === codigoEmpregado);
+    if (!registro) return;
+
+    const paraSalvar = [];
+    const diasParaExcluir = [];
+
+    for (const dia of _DIAS_SEMANA_ORDEM) {
+        const trabalha = document.getElementById(`jeTrabalha_${dia}`).checked;
+        const existiaAntes = !!registro.dias[dia];
+
+        if (!trabalha) {
+            if (existiaAntes) diasParaExcluir.push(dia);
+            continue;
+        }
+
+        const entrada = document.getElementById(`jeEntrada_${dia}`).value;
+        const saida = document.getElementById(`jeSaida_${dia}`).value;
+        const intervaloInicio = document.getElementById(`jeIntIni_${dia}`).value;
+        const intervaloFim = document.getElementById(`jeIntFim_${dia}`).value;
+
+        if (!entrada || !saida) {
+            mostrarStatus('statusJornadaEdit', `${_DIAS_SEMANA_LABEL[dia]}: entrada e saída são obrigatórias.`, 'error');
+            return;
+        }
+        if (entrada >= saida) {
+            mostrarStatus('statusJornadaEdit', `${_DIAS_SEMANA_LABEL[dia]}: entrada deve ser antes da saída.`, 'error');
+            return;
+        }
+        if ((intervaloInicio && !intervaloFim) || (!intervaloInicio && intervaloFim)) {
+            mostrarStatus('statusJornadaEdit', `${_DIAS_SEMANA_LABEL[dia]}: preencha início e fim do intervalo, ou deixe os dois em branco.`, 'error');
+            return;
+        }
+
+        paraSalvar.push({
+            codigo_empresa: codigoEmpresa,
+            nome_empresa: registro.nome_empresa,
+            codigo_empregado: codigoEmpregado,
+            nome_empregado: registro.nome_empregado,
+            dia_semana: dia,
+            entrada,
+            intervalo_inicio: intervaloInicio || null,
+            intervalo_fim: intervaloFim || null,
+            saida
+        });
+    }
+
+    try {
+        if (diasParaExcluir.length > 0) {
+            const { error } = await supabaseClient
+                .from('rh_jornada_trabalho')
+                .delete()
+                .eq('codigo_empresa', codigoEmpresa)
+                .eq('codigo_empregado', codigoEmpregado)
+                .in('dia_semana', diasParaExcluir);
+            if (error) throw error;
+        }
+        if (paraSalvar.length > 0) {
+            const { error } = await supabaseClient
+                .from('rh_jornada_trabalho')
+                .upsert(paraSalvar, { onConflict: 'codigo_empresa,codigo_empregado,dia_semana' });
+            if (error) throw error;
+        }
+        fecharModalJornadaEdit();
+        mostrarStatus('statusJornadaInfo', '✅ Jornada atualizada!', 'success');
+        await carregarJornadaInfo();
+    } catch (err) {
+        mostrarStatus('statusJornadaEdit', 'Erro ao salvar: ' + err.message, 'error');
+    }
 }
 
 // ── EMPREGADOS ────────────────────────────────────────────────
