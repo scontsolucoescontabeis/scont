@@ -9,6 +9,10 @@ const LINHA_DADOS_INI = 5; // primeira linha de dados
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
 // Estado global
 let planilhaData      = []; // [{nome, funcao, colunas: {colNome: valorBruto}}]
 let funcionariosMap   = {}; // nome_normalizado → codigo_empregado
@@ -43,7 +47,7 @@ function fecharModal() {
 }
 
 function mostrarStep(n) {
-    [1,2,3,6].forEach(i => {
+    [1,2,3].forEach(i => {
         const el = document.getElementById('step' + i);
         if (el) el.style.display = (i === n) ? 'block' : 'none';
     });
@@ -935,7 +939,7 @@ function baixarTXT() {
 // SIDEBAR + NAVEGAÇÃO
 // ──────────────────────────────────────────────
 
-let _modoAtual = 'processamento'; // 'processamento' | 'config-rubricas' | 'config-bancario'
+let _modoAtual = 'processamento'; // 'processamento' | 'liquido' | 'config-rubricas' | 'config-bancario'
 
 // Hamburger para mobile
 (function() {
@@ -957,11 +961,11 @@ function fecharSidebar() {
     document.getElementById('sidebarOverlay').classList.remove('active');
 }
 
-// Permite abrir direto numa subtela via ?tela=config-rubricas|config-bancario (ex: link do index.html)
+// Permite abrir direto numa subtela via ?tela=liquido|config-rubricas|config-bancario (ex: link do index.html)
 (function() {
     document.addEventListener('DOMContentLoaded', () => {
         const tela = new URLSearchParams(location.search).get('tela');
-        if (tela === 'config-rubricas' || tela === 'config-bancario') navegarPara(tela);
+        if (tela === 'liquido' || tela === 'config-rubricas' || tela === 'config-bancario') navegarPara(tela);
     });
 })();
 
@@ -970,13 +974,16 @@ function navegarPara(modo) {
     fecharSidebar();
 
     document.getElementById('navProcessamento').classList.toggle('active', modo === 'processamento');
+    document.getElementById('navLiquido').classList.toggle('active', modo === 'liquido');
     document.getElementById('navConfigRubricas').classList.toggle('active', modo === 'config-rubricas');
     document.getElementById('navConfigBancario').classList.toggle('active', modo === 'config-bancario');
 
-    const telaProc    = document.getElementById('telaProcessamento');
-    const telaCfgRub  = document.getElementById('telaConfigRubricas');
-    const telaCfgBanc = document.getElementById('telaConfigBancario');
+    const telaProc     = document.getElementById('telaProcessamento');
+    const telaLiquido  = document.getElementById('telaLiquido');
+    const telaCfgRub   = document.getElementById('telaConfigRubricas');
+    const telaCfgBanc  = document.getElementById('telaConfigBancario');
 
+    telaLiquido.classList.toggle('active', modo === 'liquido');
     telaCfgRub.classList.toggle('active', modo === 'config-rubricas');
     telaCfgBanc.classList.toggle('active', modo === 'config-bancario');
 
@@ -984,6 +991,7 @@ function navegarPara(modo) {
         if (telaProc) telaProc.style.display = '';
     } else {
         if (telaProc) telaProc.style.display = 'none';
+        if (modo === 'liquido') iniciarLiquido();
         if (modo === 'config-rubricas') iniciarConfigRubricas();
         if (modo === 'config-bancario') iniciarConfigBancario();
     }
@@ -1749,6 +1757,49 @@ const MAPA_LIQUIDO = {
     valor:  ['valor'],
 };
 
+// Extrai lançamentos (código, nome, valor) do PDF "Relação Geral dos Líquidos"
+// emitido pelo sistema de folha. O texto do PDF vem em itens soltos (sem
+// noção de linha/tabela), então cada linha visual é reconstruída agrupando
+// os itens pela mesma coordenada Y e ordenando por X — como remapear o PDF
+// para um texto tabular (markdown-like) antes de aplicar a regex de linha.
+// Sem CPF nem dados bancários: quem não tiver cadastro cai em pendência,
+// igual a um empregado novo importado por planilha sem a aba bancária.
+async function lerPDFLiquido(file) {
+    if (!window.pdfjsLib) throw new Error('Biblioteca de leitura de PDF não carregada.');
+
+    const buffer = await file.arrayBuffer();
+    const pdf    = await pdfjsLib.getDocument({ data: buffer }).promise;
+
+    const linhaRegex = /^(\d{1,6})\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})$/;
+    const linhas = [];
+
+    for (let p = 1; p <= pdf.numPages; p++) {
+        const page    = await pdf.getPage(p);
+        const content = await page.getTextContent();
+
+        const porY = {};
+        content.items.forEach(item => {
+            const y = Math.round(item.transform[5]);
+            (porY[y] = porY[y] || []).push(item);
+        });
+
+        Object.keys(porY)
+            .map(Number).sort((a, b) => b - a) // topo → base da página
+            .forEach(y => {
+                const texto = porY[y]
+                    .sort((a, b) => a.transform[4] - b.transform[4]) // esquerda → direita
+                    .map(i => i.str).join(' ').replace(/\s+/g, ' ').trim();
+                const m = texto.match(linhaRegex);
+                if (m) linhas.push({ codigo: m[1], nome: m[2].trim(), cpf: '', valor: m[3] });
+            });
+    }
+
+    if (!linhas.length) {
+        throw new Error('Nenhum lançamento encontrado no PDF. Confirme que é o relatório "Relação Geral dos Líquidos".');
+    }
+    return linhas;
+}
+
 // Gera e baixa um .xlsx de exemplo no formato aceito por processarLiquido()
 // (mesmas abas/cabeçalhos de MAPA_BANCARIA e MAPA_LIQUIDO).
 function baixarModeloLiquido() {
@@ -1839,38 +1890,48 @@ async function sincronizarDadosBancarios(linhasPlanilha) {
 }
 
 async function processarLiquido() {
-    const comp = document.getElementById('competencia').value.trim();
+    const comp = document.getElementById('competenciaLiquido').value.trim();
     if (!/^\d{2}\/\d{4}$/.test(comp)) {
-        mostrarMensagem('Atenção', 'Preencha a Competência no Step 1 (formato MM/AAAA) antes de gerar o Relatório Líquido.');
+        mostrarMensagem('Atenção', 'Preencha a Competência (formato MM/AAAA) antes de gerar o Relatório Líquido.');
         return;
     }
     if (!empresaLiquido) {
-        mostrarMensagem('Atenção', 'Selecione a empresa antes de processar a planilha.');
+        mostrarMensagem('Atenção', 'Selecione a empresa antes de processar o arquivo.');
         return;
     }
     if (!arquivoLiquido) {
-        mostrarMensagem('Atenção', 'Selecione a planilha de Informações Bancárias / Líquido.');
+        mostrarMensagem('Atenção', 'Selecione a planilha (Excel) ou o Relatório de Líquidos (PDF).');
         return;
     }
 
     try {
-        const buffer   = await arquivoLiquido.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
+        const ehPdf = /\.pdf$/i.test(arquivoLiquido.name);
+        let linhasBancariaPlanilha = [];
+        let linhasLiquidoPlanilha;
 
-        const sheetBancaria = encontrarAba(workbook, ['informacoes bancarias']);
-        const sheetLiquido  = encontrarAba(workbook, ['liquido']);
+        if (ehPdf) {
+            // PDF do sistema de folha não traz dados bancários — usa sempre o que
+            // já está persistido no Supabase (ver sincronizarDadosBancarios).
+            linhasLiquidoPlanilha = await lerPDFLiquido(arquivoLiquido);
+        } else {
+            const buffer   = await arquivoLiquido.arrayBuffer();
+            const workbook = XLSX.read(buffer, { type: 'array' });
 
-        if (!sheetLiquido) {
-            mostrarMensagem('Erro', 'A planilha precisa conter a aba "Líquido".');
-            return;
+            const sheetBancaria = encontrarAba(workbook, ['informacoes bancarias']);
+            const sheetLiquido  = encontrarAba(workbook, ['liquido']);
+
+            if (!sheetLiquido) {
+                mostrarMensagem('Erro', 'A planilha precisa conter a aba "Líquido".');
+                return;
+            }
+
+            // A aba "Informações bancárias" é opcional: se ausente, usa os dados já
+            // persistidos no Supabase de importações anteriores (ver sincronizarDadosBancarios).
+            linhasBancariaPlanilha = sheetBancaria
+                ? dedupeBancaria(lerAbaComoObjetos(sheetBancaria, MAPA_BANCARIA))
+                : [];
+            linhasLiquidoPlanilha = lerAbaComoObjetos(sheetLiquido, MAPA_LIQUIDO);
         }
-
-        // A aba "Informações bancárias" é opcional: se ausente, usa os dados já
-        // persistidos no Supabase de importações anteriores (ver sincronizarDadosBancarios).
-        const linhasBancariaPlanilha = sheetBancaria
-            ? dedupeBancaria(lerAbaComoObjetos(sheetBancaria, MAPA_BANCARIA))
-            : [];
-        const linhasLiquidoPlanilha  = lerAbaComoObjetos(sheetLiquido, MAPA_LIQUIDO);
 
         await sincronizarDadosBancarios(linhasBancariaPlanilha);
 
@@ -1883,14 +1944,19 @@ async function processarLiquido() {
             }))
             .filter(l => l.codigo_empregado && l.valorInt > 0);
 
+        if (!linhasLiquido.length) {
+            mostrarMensagem('Erro', 'Nenhum lançamento válido encontrado no arquivo.');
+            return;
+        }
+
         excluidosDoRelatorio.clear();
         montarGruposLiquido();
         renderizarRevisaoLiquido();
-        document.getElementById('labelCompetencia6').textContent = 'Competência: ' + comp;
+        document.getElementById('labelCompetenciaLiquido').textContent = 'Competência: ' + comp;
         mostrarPainelLiquido('revisao');
     } catch (e) {
-        console.error('Erro ao processar planilha do Relatório Líquido:', e);
-        mostrarMensagem('Erro', 'Falha ao processar a planilha: ' + e.message);
+        console.error('Erro ao processar arquivo do Relatório Líquido:', e);
+        mostrarMensagem('Erro', 'Falha ao processar o arquivo: ' + e.message);
     }
 }
 
@@ -2131,16 +2197,10 @@ function onEmpresaLiquidoAlterada() {
     mostrarPainelLiquido('upload');
 }
 
-async function irStep6() {
-    const comp = document.getElementById('competencia').value.trim();
-    if (!/^\d{2}\/\d{4}$/.test(comp)) {
-        mostrarMensagem('Atenção', 'Preencha a Competência no Step 1 (formato MM/AAAA) antes de acessar o Relatório Líquido.');
-        return;
-    }
-    document.getElementById('labelCompetencia6').textContent = 'Competência: ' + comp;
+async function iniciarLiquido() {
+    document.getElementById('labelCompetenciaLiquido').textContent = '';
     await carregarEmpresasLiquido();
     mostrarPainelLiquido('upload');
-    mostrarStep(6);
 }
 
 // "04/2026" → "01/04/2026 a 30/04/2026"
@@ -2168,7 +2228,7 @@ function gerarPDFLiquido() {
         return;
     }
 
-    const comp   = document.getElementById('competencia').value.trim();
+    const comp   = document.getElementById('competenciaLiquido').value.trim();
     const { jsPDF } = window.jspdf;
     const doc    = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
     const MARGEM = 10;

@@ -466,8 +466,8 @@ tbody tr.banco-row td {
 ══════════════════════════════════════════ */
 #telaConfig { display: none; }
 #telaConfig.active { display: block; }
-#telaConfigRubricas, #telaConfigBancario { display: none; }
-#telaConfigRubricas.active, #telaConfigBancario.active { display: block; }
+#telaConfigRubricas, #telaConfigBancario, #telaLiquido { display: none; }
+#telaConfigRubricas.active, #telaConfigBancario.active, #telaLiquido.active { display: block; }
 
 .config-card {
     background: white;

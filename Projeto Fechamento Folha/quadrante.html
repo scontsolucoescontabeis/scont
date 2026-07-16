@@ -13,6 +13,8 @@
     <!-- jsPDF + AutoTable (Relatório Líquido) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <!-- pdf.js (leitura do PDF "Relação Geral dos Líquidos" no Relatório Líquido) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -33,6 +35,9 @@
 
         <button class="sidebar-item active" id="navProcessamento" onclick="navegarPara('processamento')">
             <span class="sidebar-item-icon">📊</span> Processamento
+        </button>
+        <button class="sidebar-item sidebar-subitem" id="navLiquido" onclick="navegarPara('liquido')">
+            <span class="sidebar-item-icon">🏷️</span> Relatório Líquido
         </button>
         <div class="sidebar-section" style="padding-top:10px;">Configurações</div>
         <button class="sidebar-item sidebar-subitem" id="navConfigRubricas" onclick="navegarPara('config-rubricas')">
@@ -198,7 +203,7 @@
                 <button class="btn btn-secondary" onclick="voltarStep(1)">← Voltar</button>
                 <button class="btn btn-primary" onclick="irStep3()">▶ Gerar TXT</button>
                 <button class="btn btn-info" onclick="window.location.href='ferias.html'">📅 Programação de Férias</button>
-                <button class="btn btn-info" onclick="irStep6()">🏷️ Etiquetas Bancárias</button>
+                <button class="btn btn-info" onclick="navegarPara('liquido')">🏷️ Etiquetas Bancárias</button>
             </div>
         </div>
 
@@ -222,36 +227,49 @@
                 <button class="btn btn-secondary" onclick="voltarStep(2)">← Voltar</button>
                 <button class="btn btn-success" onclick="baixarTXT()">⬇ Baixar TXT</button>
                 <button class="btn btn-info" onclick="window.location.href='ferias.html'">📅 Programação de Férias</button>
-                <button class="btn btn-info" onclick="irStep6()">🏷️ Etiquetas Bancárias</button>
+                <button class="btn btn-info" onclick="navegarPara('liquido')">🏷️ Etiquetas Bancárias</button>
             </div>
         </div>
 
-        <!-- STEP 6: RELATÓRIO LÍQUIDO -->
-        <div class="step-card" id="step6" style="display:none;">
+    </div>
+    </div><!-- /telaProcessamento -->
+
+    <!-- ===== TELA RELATÓRIO LÍQUIDO ===== -->
+    <div id="telaLiquido">
+    <div class="container">
+
+        <div class="step-card">
             <div class="step-title">
-                <div class="step-number">6</div>
+                <span style="font-size:18px;">🏷️</span>
                 Relatório Líquido — Etiquetas Bancárias
-                <span id="labelCompetencia6" style="font-size:12px; font-weight:400; color:var(--text-secondary); margin-left:10px;"></span>
+                <span id="labelCompetenciaLiquido" style="font-size:12px; font-weight:400; color:var(--text-secondary); margin-left:10px;"></span>
             </div>
 
             <!-- Painel: Upload -->
             <div id="painelUploadLiquido">
-                <div class="form-group" style="max-width:320px;">
-                    <label for="selectEmpresaLiquido">Empresa *</label>
-                    <select id="selectEmpresaLiquido" onchange="onEmpresaLiquidoAlterada()">
-                        <option value="">Selecione a empresa...</option>
-                    </select>
+                <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                    <div class="form-group" style="max-width:160px;">
+                        <label for="competenciaLiquido">Competência *</label>
+                        <input type="text" id="competenciaLiquido" placeholder="MM/AAAA" maxlength="7">
+                        <small>Mês e ano do fechamento</small>
+                    </div>
+                    <div class="form-group" style="max-width:320px; flex:1;">
+                        <label for="selectEmpresaLiquido">Empresa *</label>
+                        <select id="selectEmpresaLiquido" onchange="onEmpresaLiquidoAlterada()">
+                            <option value="">Selecione a empresa...</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="alert alert-info">
-                    Faça o upload da planilha com a aba "Líquido" (obrigatória). A aba "Informações bancárias" é opcional — se não vier na planilha, o relatório usa os dados bancários já salvos de importações anteriores. Quando presente, os dados bancários são atualizados e reaproveitados nas competências seguintes.
+                    Excel: envie a planilha com a aba "Líquido" (obrigatória). A aba "Informações bancárias" é opcional — se não vier, o relatório usa os dados bancários já salvos de importações anteriores. PDF: envie o relatório "Relação Geral dos Líquidos" emitido pelo sistema de folha — nesse caso os dados bancários vêm sempre do que já está salvo (o PDF não traz agência/conta). Em ambos os casos, empregados sem dados bancários cadastrados caem em pendência para completar manualmente.
                 </div>
 
                 <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
                     <label style="font-weight:600; font-size:13px;">
-                        Planilha de Líquido, com Informações Bancárias opcional (Excel) *
+                        Planilha de Líquido (Excel) ou Relatório de Líquidos (PDF) *
                     </label>
-                    <button type="button" class="btn btn-secondary btn-small" onclick="baixarModeloLiquido()">📥 Baixar modelo</button>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="baixarModeloLiquido()">📥 Baixar modelo (Excel)</button>
                 </div>
                 <div class="upload-area" id="uploadAreaLiquido" onclick="document.getElementById('inputLiquido').click()">
                     <div class="upload-icon">🏷️</div>
@@ -259,15 +277,14 @@
                         Arraste o arquivo aqui ou <strong>clique para selecionar</strong>
                     </div>
                     <div class="upload-text" style="font-size:11px; margin-top:4px;">
-                        Aba obrigatória: "Líquido" · Aba opcional: "Informações bancárias"
+                        Excel — aba obrigatória "Líquido" (aba "Informações bancárias" opcional) · PDF — relatório "Relação Geral dos Líquidos"
                     </div>
                     <div class="upload-filename" id="filenameLiquido"></div>
-                    <input type="file" id="inputLiquido" accept=".xlsx,.xls">
+                    <input type="file" id="inputLiquido" accept=".xlsx,.xls,.pdf">
                 </div>
 
                 <div class="btn-group">
-                    <button class="btn btn-secondary" onclick="voltarStep(3)">← Voltar</button>
-                    <button class="btn btn-primary" onclick="processarLiquido()">▶ Processar Planilha</button>
+                    <button class="btn btn-primary" onclick="processarLiquido()">▶ Processar Arquivo</button>
                 </div>
             </div>
 
@@ -305,7 +322,7 @@
         </div>
 
     </div>
-    </div><!-- /telaProcessamento -->
+    </div><!-- /telaLiquido -->
 
     <!-- ===== TELA CONFIGURAÇÕES · RUBRICAS ===== -->
     <div id="telaConfigRubricas">
