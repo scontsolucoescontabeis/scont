@@ -3709,7 +3709,7 @@ async function gerarEscala() {
             { data: empregadosData, error: errFunc },
             { data: escalasData, error: errEsc },
         ] = await Promise.all([
-            supabaseClient.from('rh_empregados').select('codigo_empresa, nome_empresa, codigo_empregado, nome_empregado, situacao, tipo_empregado').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, situacao, tipo_empregado').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_escala_trabalho').select('*').in('codigo_empresa', codigosEmpresas),
         ]);
         if (errFunc) throw errFunc;
@@ -3731,9 +3731,10 @@ async function gerarEscala() {
 
         const linhas = empregadosFiltrados.map(emp => {
             const escala = escalasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || null;
+            const empresa = state.empresas.find(e => e.codigo_empresa === emp.codigo_empresa);
             return {
                 codigo_empresa: emp.codigo_empresa,
-                nome_empresa: emp.nome_empresa,
+                nome_empresa: empresa?.nome_empresa || emp.codigo_empresa,
                 codigo_empregado: emp.codigo_empregado,
                 nome_empregado: emp.nome_empregado,
                 escala,
