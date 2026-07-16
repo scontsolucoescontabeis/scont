@@ -2176,6 +2176,9 @@ function lerPlanilhaEmpregados(file) {
             try {
                 const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
                 const sheet = wb.Sheets[wb.SheetNames[0]];
+                if (!sheet) {
+                    throw new Error('Não foi possível ler o conteúdo deste arquivo .xls — o navegador reconheceu a aba mas não conseguiu extrair as células (arquivo gerado em formato não padrão pelo sistema de origem). Abra o arquivo no Excel ou LibreOffice Calc, use "Salvar como" → .xlsx, e importe o arquivo convertido.');
+                }
                 const linhas = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
                 const registros = [];
