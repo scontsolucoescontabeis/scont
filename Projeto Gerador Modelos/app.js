@@ -23,6 +23,8 @@ let wizardRegistros = [];
 let wizardPreviewIndex = 0;
 let wizardCabecalho = 'completo';
 let wizardNomeEmpresaExcel = '';
+let wizardColunaEmpresaExcel = '';       // header escolhido para agrupar por empresa, ou '' = "mesma empresa para todas"
+let wizardColunaCodigoEmpresaExcel = ''; // header de código, auto-detectado, sem controle de UI
 let wizardEventoAtivo = null;   // evento em uso na geração atual (null = modelo único)
 
 // Definição das variáveis disponíveis por fonte
@@ -837,6 +839,8 @@ async function iniciarWizard() {
   wizardPreviewIndex         = 0;
   wizardCabecalho            = 'completo';
   wizardNomeEmpresaExcel     = '';
+  wizardColunaEmpresaExcel       = '';
+  wizardColunaCodigoEmpresaExcel = '';
   _dbEmpregados = []; _dbSocios = []; _dbRubricas = [];
   excelData = []; excelHeaders = [];
   _limparUIPlanilha();
@@ -909,7 +913,7 @@ async function wizardAvançar() {
     const usaExcel = fontes.includes('excel') || template.includes('{{excel.');
     const temFonteDB = fontes.some(f => ['empresas','empregados','socios','rubricas'].includes(f));
     const soExcel = usaExcel && !temFonteDB;
-    if (soExcel && !wizardNomeEmpresaExcel) {
+    if (soExcel && !wizardColunaEmpresaExcel && !wizardNomeEmpresaExcel) {
       abrirModalNomeEmpresaExcel(); return;
     }
     construirRegistros();
@@ -1121,11 +1125,20 @@ function construirRegistros() {
   const temFonteDB = fontes.some(f => ['empresas','empregados','socios','rubricas'].includes(f));
   const soExcel  = usaExcel && !temFonteDB;
 
-  // Modo Excel puro: um documento por linha da planilha
+  // Modo Excel puro: um documento por linha da planilha. Quando uma coluna
+  // de empresa foi identificada, grava empresa.nome_empresa (e
+  // empresa.codigo_empresa, se detectado) por linha para que
+  // _agruparRegistrosPorEmpresa() separe a exportação em um PDF por empresa.
   if (soExcel) {
     wizardRegistros = excelData.map(row => {
       const map = {};
       for (const h of excelHeaders) map[`excel.${h}`] = row[h] ?? '';
+      if (wizardColunaEmpresaExcel) {
+        map['empresa.nome_empresa'] = row[wizardColunaEmpresaExcel] ?? '';
+        if (wizardColunaCodigoEmpresaExcel) {
+          map['empresa.codigo_empresa'] = row[wizardColunaCodigoEmpresaExcel] ?? '';
+        }
+      }
       return map;
     });
     wizardPreviewIndex = 0;
@@ -1337,7 +1350,11 @@ function buildWizardResumo() {
   document.getElementById('res-empresas').textContent = nomes.join(', ') || '—';
   document.getElementById('res-registros').textContent = wizardRegistros.length;
   const primeiraEmpresa = empresas.find(e => e.codigo_empresa === wizardEmpresasSelecionadas[0]);
-  const nomeEmpresaPreview = primeiraEmpresa?.nome_empresa || wizardNomeEmpresaExcel || 'Nome da Empresa';
+  const nomeEmpresaPreview =
+    primeiraEmpresa?.nome_empresa ||
+    wizardRegistros[0]?.['empresa.nome_empresa'] ||
+    wizardNomeEmpresaExcel ||
+    'Nome da Empresa';
   document.getElementById('cab-completo-empresa-name').textContent = nomeEmpresaPreview;
   document.getElementById('cab-completo-titulo').textContent = m.nome;
   document.getElementById('cab-neutro-empresa-name').textContent = nomeEmpresaPreview;
@@ -1623,6 +1640,37 @@ function removeExcel() {
   renderVarsPanel();
 }
 
+// Candidatos de nome de cabeçalho (normalizados) que identificam a empresa
+// de cada linha numa planilha Excel usada no modo "Excel puro" do wizard.
+const _CANDIDATOS_COLUNA_EMPRESA = [
+  'empresa', 'nome empresa', 'nome_empresa', 'cliente', 'razao social',
+  'nome da empresa', 'nome fantasia'
+];
+const _CANDIDATOS_COLUNA_CODIGO_EMPRESA = [
+  'codigo empresa', 'cod empresa', 'codigo_empresa', 'cod_empresa'
+];
+
+function _normalizarHeader(h) {
+  return String(h ?? '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().trim();
+}
+
+function _detectarColuna(headers, candidatos) {
+  for (const h of headers) {
+    if (candidatos.includes(_normalizarHeader(h))) return h;
+  }
+  return '';
+}
+
+function _detectarColunaEmpresa(headers) {
+  return _detectarColuna(headers, _CANDIDATOS_COLUNA_EMPRESA);
+}
+
+function _detectarColunaCodigoEmpresa(headers) {
+  return _detectarColuna(headers, _CANDIDATOS_COLUNA_CODIGO_EMPRESA);
+}
+
 function handleWizardExcel(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -1635,6 +1683,8 @@ function handleWizardExcel(event) {
     const { headers, data } = _normalizeExcelData(json);
     excelHeaders = headers;
     excelData    = data;
+    wizardColunaEmpresaExcel       = _detectarColunaEmpresa(headers);
+    wizardColunaCodigoEmpresaExcel = _detectarColunaCodigoEmpresa(headers);
     _renderPlanilhaInfo();
     toast(`Planilha carregada: ${excelData.length} linha(s), ${excelHeaders.length} coluna(s).`, 'success');
   };
@@ -1643,7 +1693,14 @@ function handleWizardExcel(event) {
 
 function limparWizardExcel() {
   excelData = []; excelHeaders = [];
+  wizardColunaEmpresaExcel = '';
+  wizardColunaCodigoEmpresaExcel = '';
   _limparUIPlanilha();
+}
+
+function onChangeColunaEmpresaExcel(val) {
+  wizardColunaEmpresaExcel = val;
+  _renderPlanilhaInfo();
 }
 
 function _renderPlanilhaInfo() {
@@ -1652,10 +1709,32 @@ function _renderPlanilhaInfo() {
   if (!excelHeaders.length) { div.innerHTML = ''; return; }
   const preview = excelData.slice(0, 3);
   const cols = excelHeaders;
+
+  const colunaSelect = `
+    <div style="margin-bottom:14px">
+      <label class="form-label">Coluna que identifica a empresa em cada linha</label>
+      <select class="form-control" onchange="onChangeColunaEmpresaExcel(this.value)">
+        <option value=""${wizardColunaEmpresaExcel ? '' : ' selected'}>— Mesma empresa para todas as linhas —</option>
+        ${cols.map(h => `<option value="${esc(h)}"${wizardColunaEmpresaExcel === h ? ' selected' : ''}>${esc(h)}</option>`).join('')}
+      </select>
+    </div>`;
+
+  let infoEmpresas = '';
+  if (wizardColunaEmpresaExcel) {
+    const n = new Set(excelData.map(r => r[wizardColunaEmpresaExcel])).size;
+    infoEmpresas = `
+      <div style="font-size:12px;color:var(--text-light);margin-bottom:8px">
+        🏢 ${n} empresa${n === 1 ? '' : 's'} diferente${n === 1 ? '' : 's'} detectada${n === 1 ? '' : 's'}
+        → ser${n === 1 ? 'á gerado 1 PDF' : 'ão gerados ' + n + ' PDFs separados'} ao exportar.
+      </div>`;
+  }
+
   div.innerHTML = `
     <div style="font-size:12px;color:var(--success);font-weight:600;margin-bottom:8px">
       ✅ ${excelData.length} linha(s) · ${excelHeaders.length} coluna(s)
     </div>
+    ${colunaSelect}
+    ${infoEmpresas}
     <div style="overflow-x:auto">
       <table style="width:100%;font-size:12px;border-collapse:collapse">
         <thead>
