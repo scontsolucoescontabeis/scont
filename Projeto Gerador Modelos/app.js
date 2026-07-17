@@ -1337,6 +1337,23 @@ function renderPreview() {
 function previewPrev() { wizardPreviewIndex = Math.max(0, wizardPreviewIndex - 1); renderPreview(); }
 function previewNext() { wizardPreviewIndex = Math.min(wizardRegistros.length - 1, wizardPreviewIndex + 1); renderPreview(); }
 
+// Remove da geração o registro atualmente em prévia — sai tanto do PDF
+// quanto do Excel exportado, já que ambos usam wizardRegistros. Some ao
+// reconstruir os registros (voltar e avançar de novo no wizard).
+function descartarRegistroPreview() {
+  if (!wizardRegistros.length) return;
+  const total = wizardRegistros.length;
+  const confirmado = confirm(
+    `Descartar o registro ${wizardPreviewIndex + 1} de ${total}? Ele não entrará no PDF nem no Excel gerados.`
+  );
+  if (!confirmado) return;
+  wizardRegistros.splice(wizardPreviewIndex, 1);
+  wizardPreviewIndex = Math.max(0, Math.min(wizardPreviewIndex, wizardRegistros.length - 1));
+  renderPreview();
+  buildWizardResumo();
+  toast(`Registro descartado. ${wizardRegistros.length} restante(s).`, 'success');
+}
+
 // ── Exportar — cabeçalho ──────────────────────────────────────
 function selectCabecalho(val) {
   wizardCabecalho = val;
