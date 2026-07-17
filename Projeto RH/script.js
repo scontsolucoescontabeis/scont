@@ -3531,19 +3531,34 @@ function exportarBeneficiosExcel() {
     if (linhas.length === 0) { mostrarMensagem('Aviso', 'Gere a prévia antes de exportar.'); return; }
 
     const cabecalho = ['Cód Emp', 'NOME', 'CNPJ', 'Cód Epr', 'Nome', 'Descrição cargo', 'DIAS', 'DESCONTAR', 'DIAS A PAGAR', 'VT DIARIO', 'VA DIARIO', 'VT MENSAL', 'VA MENSAL'];
+    // VT/VA (diário e mensal) saem como texto com 2 casas decimais (não número),
+    // conforme exigido para importação em outros sistemas.
     const linhasExcel = linhas.map(l => {
         const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
+        const vtDiario = l.vtDiario || 0;
+        const vaDiario = l.vaDiario || 0;
         return [
             l.codigo_empresa, l.nome_empresa, l.cnpj, l.codigo_empregado, l.nome_empregado, l.desc_cargo,
             l.diasTrabalhar, l.diasDescontar, diasPagar,
-            l.vtDiario || '', l.vaDiario || '',
-            Number((diasPagar * l.vtDiario).toFixed(2)), Number((diasPagar * l.vaDiario).toFixed(2))
+            l.vtDiario ? vtDiario.toFixed(2).replace('.', ',') : '',
+            l.vaDiario ? vaDiario.toFixed(2).replace('.', ',') : '',
+            (diasPagar * vtDiario).toFixed(2).replace('.', ','),
+            (diasPagar * vaDiario).toFixed(2).replace('.', ',')
         ];
     });
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([cabecalho, ...linhasExcel]);
     ws['!cols'] = [10, 28, 20, 10, 28, 22, 8, 10, 12, 10, 10, 12, 12].map(w => ({ wch: w }));
+    // Garante que VT/VA (colunas 9 a 12: diário e mensal) fiquem como texto no
+    // arquivo, mesmo que o Excel tente reinterpretar o conteúdo como número.
+    const COLS_VALOR_TEXTO = [9, 10, 11, 12];
+    for (let r = 1; r < linhasExcel.length + 1; r++) {
+        COLS_VALOR_TEXTO.forEach(c => {
+            const addr = XLSX.utils.encode_cell({ r, c });
+            if (ws[addr]) ws[addr].t = 's';
+        });
+    }
     XLSX.utils.book_append_sheet(wb, ws, 'Empregados');
 
     const comp = document.getElementById('beneficiosCompetencia').value;
