@@ -1348,15 +1348,32 @@ function buildWizardResumo() {
 }
 
 // ── Exportar PDF ──────────────────────────────────────────────
-async function exportarPDF() {
-  if (!wizardModeloSelecionado || !wizardRegistros.length) {
-    toast('Nenhum dado para exportar.', 'error'); return;
-  }
+const _nomeEmpDe = (varMap) => varMap['empresa.nome_empresa'] || wizardNomeEmpresaExcel || 'Empresa';
 
-  toast('Gerando PDF…', '');
-  const modelo = wizardModeloSelecionado;
+// Agrupa os registros por empresa (codigo_empresa, com fallback pro nome) —
+// cada grupo vira um arquivo/janela de impressão separado quando há mais de
+// uma empresa envolvida na geração.
+function _agruparRegistrosPorEmpresa(registros) {
+  const grupos = [];
+  const porChave = new Map();
+  registros.forEach((varMap) => {
+    const chave = varMap['empresa.codigo_empresa'] || varMap['empresa.nome_empresa'] || '__sem_empresa__';
+    let grupo = porChave.get(chave);
+    if (!grupo) {
+      grupo = { nomeEmpresa: _nomeEmpDe(varMap), registros: [] };
+      porChave.set(chave, grupo);
+      grupos.push(grupo);
+    }
+    grupo.registros.push(varMap);
+  });
+  return grupos;
+}
+
+// Monta o HTML das páginas (um documento por registro, ou por modelo do
+// evento) a partir de uma lista de registros — reaproveitado tanto para o
+// arquivo único quanto para cada arquivo por empresa.
+function _montarPaginasPDF(modelo, registros) {
   const bodyStyle = 'padding:16px 0;font-family:Segoe UI,Arial,sans-serif;font-size:11px;line-height:1.7;color:#2C3E50;';
-  const nomeEmpDe = (varMap) => varMap['empresa.nome_empresa'] || wizardNomeEmpresaExcel || 'Empresa';
 
   let paginas;
   if (wizardEventoAtivo) {
@@ -1364,9 +1381,9 @@ async function exportarPDF() {
     // tanto entre modelos de um mesmo registro quanto entre registros.
     const modelosEvento = wizardEventoAtivo.modelosOrdenados;
     const blocos = [];
-    wizardRegistros.forEach((varMap) => {
+    registros.forEach((varMap) => {
       modelosEvento.forEach((m) => {
-        const hdr   = _gerarCabecalhoModelo(wizardCabecalho, nomeEmpDe(varMap), m.nome);
+        const hdr   = _gerarCabecalhoModelo(wizardCabecalho, _nomeEmpDe(varMap), m.nome);
         const corpo = substituirVars(m.template || '', varMap, false);
         blocos.push(`${hdr}<div style="${bodyStyle}">${corpo}</div>`);
       });
@@ -1378,10 +1395,10 @@ async function exportarPDF() {
     });
   } else {
     const porRegistro = modelo.tipo === 'por_registro';
-    paginas = wizardRegistros.map((varMap, idx) => {
-      const hdr      = _gerarCabecalhoModelo(wizardCabecalho, nomeEmpDe(varMap), modelo.nome);
+    paginas = registros.map((varMap, idx) => {
+      const hdr      = _gerarCabecalhoModelo(wizardCabecalho, _nomeEmpDe(varMap), modelo.nome);
       const corpo    = substituirVars(modelo.template, varMap, false);
-      const isUltimo = idx === wizardRegistros.length - 1;
+      const isUltimo = idx === registros.length - 1;
       const pageBreak = porRegistro && !isUltimo
         ? 'page-break-after:always;break-after:page;'
         : '';
@@ -1389,13 +1406,16 @@ async function exportarPDF() {
     });
   }
 
-  const innerHtml = paginas.join('');
+  return paginas.join('');
+}
 
+// Abre uma janela de impressão com o HTML já montado. Retorna false se o
+// navegador bloqueou o pop-up. `printDelayMs` escalona o disparo do
+// diálogo de impressão dentro da janela (usado para não empilhar vários
+// diálogos de impressão de uma vez quando há uma janela por empresa).
+function _abrirJanelaImpressao(titulo, innerHtml, printDelayMs = 300) {
   const printWin = window.open('', '_blank');
-  if (!printWin) {
-    toast('Permita pop-ups nesta página para exportar PDF.', 'error');
-    return;
-  }
+  if (!printWin) return false;
 
   const printCss = `
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1414,18 +1434,51 @@ async function exportarPDF() {
 
   printWin.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
     <meta charset="UTF-8">
-    <title>${esc(modelo.nome)}</title>
+    <title>${esc(titulo)}</title>
     <style>${printCss}</style>
   </head><body>
     ${innerHtml}
     <script>
-      window.onload = function() { setTimeout(function() { window.print(); }, 300); };
+      window.onload = function() { setTimeout(function() { window.print(); }, ${printDelayMs}); };
     </script>
   </body></html>`);
   printWin.document.close();
+  return true;
+}
+
+async function exportarPDF() {
+  if (!wizardModeloSelecionado || !wizardRegistros.length) {
+    toast('Nenhum dado para exportar.', 'error'); return;
+  }
+
+  const modelo = wizardModeloSelecionado;
+  const grupos = _agruparRegistrosPorEmpresa(wizardRegistros);
+  const multiplasEmpresas = grupos.length > 1;
+
+  toast(multiplasEmpresas ? `Gerando ${grupos.length} PDFs — um por empresa…` : 'Gerando PDF…', '');
+
+  // As janelas são abertas de forma síncrona, todas dentro do mesmo gesto de
+  // clique — abrir pop-ups de dentro de um setTimeout costuma ser bloqueado
+  // pelo navegador. O disparo do diálogo de impressão de cada janela (feito
+  // internamente via window.onload) é escalonado para não empilhar vários
+  // diálogos de impressão de uma vez.
+  const bloqueadas = [];
+  grupos.forEach((grupo, idx) => {
+    const innerHtml = _montarPaginasPDF(modelo, grupo.registros);
+    const titulo = multiplasEmpresas ? `${modelo.nome} — ${grupo.nomeEmpresa}` : modelo.nome;
+    const ok = _abrirJanelaImpressao(titulo, innerHtml, 300 + idx * 700);
+    if (!ok) bloqueadas.push(grupo.nomeEmpresa);
+  });
 
   await registrarGeracao();
-  toast('Diálogo de impressão aberto — desmarque "Cabeçalhos e rodapés" para remover a data.', 'success');
+
+  if (bloqueadas.length) {
+    toast(`Permita pop-ups nesta página — ${bloqueadas.length} de ${grupos.length} PDF(s) não abriram (${bloqueadas.join(', ')}).`, 'error');
+  } else {
+    toast(multiplasEmpresas
+      ? 'Diálogos de impressão abertos — um por empresa. Desmarque "Cabeçalhos e rodapés" para remover a data.'
+      : 'Diálogo de impressão aberto — desmarque "Cabeçalhos e rodapés" para remover a data.', 'success');
+  }
 }
 
 function abrirModalNomeEmpresaExcel() {
