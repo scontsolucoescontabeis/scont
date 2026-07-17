@@ -22,6 +22,7 @@ let wizardModeloSelecionado = null;
 let wizardRegistros = [];
 let wizardPreviewIndex = 0;
 let wizardCabecalho = 'completo';
+let wizardCaberUmaPagina = false;
 let wizardNomeEmpresaExcel = '';
 let wizardColunaEmpresaExcel = '';       // header escolhido para agrupar por empresa, ou '' = "mesma empresa para todas"
 let wizardColunaCodigoEmpresaExcel = ''; // header de código, auto-detectado, sem controle de UI
@@ -765,6 +766,7 @@ function _iniciarWizardComEvento(evento) {
   };
   wizardEventoAtivo = evento;
   wizardCabecalho = 'completo';
+  wizardCaberUmaPagina = false;
   wizardSequencia = calcularSequencia().filter(p => p !== 'modelo');
   renderWizardBar();
   mostrarPainel(wizardSequencia[0]);
@@ -838,6 +840,7 @@ async function iniciarWizard() {
   wizardRegistros            = [];
   wizardPreviewIndex         = 0;
   wizardCabecalho            = 'completo';
+  wizardCaberUmaPagina       = false;
   wizardNomeEmpresaExcel     = '';
   wizardColunaEmpresaExcel       = '';
   wizardColunaCodigoEmpresaExcel = '';
@@ -961,6 +964,7 @@ function selecionarModeloWizard(id) {
   if (!wizardModeloSelecionado) return;
   wizardSequencia = calcularSequencia();
   wizardCabecalho = wizardModeloSelecionado.cabecalho_padrao || 'completo';
+  wizardCaberUmaPagina = false;
   renderModelosWizard();
   renderWizardBar();
   toast(`Modelo "${wizardModeloSelecionado.nome}" selecionado.`, 'success');
@@ -1362,6 +1366,8 @@ function buildWizardResumo() {
   // Aplica cabeçalho padrão do modelo
   selectCabecalho(wizardCabecalho);
   document.querySelector(`input[name=cabecalho][value="${wizardCabecalho}"]`)?.click();
+  const chkCaber = document.getElementById('chk-caber-uma-pagina');
+  if (chkCaber) chkCaber.checked = wizardCaberUmaPagina;
 }
 
 // ── Exportar PDF ──────────────────────────────────────────────
@@ -1408,7 +1414,7 @@ function _montarPaginasPDF(modelo, registros) {
     paginas = blocos.map((html, idx) => {
       const isUltimo = idx === blocos.length - 1;
       const pageBreak = !isUltimo ? 'page-break-after:always;break-after:page;' : '';
-      return `<div style="${pageBreak}">${html}</div>`;
+      return `<div class="pdf-fit-page" style="${pageBreak}"><div class="pdf-fit-inner">${html}</div></div>`;
     });
   } else {
     const porRegistro = modelo.tipo === 'por_registro';
@@ -1419,7 +1425,7 @@ function _montarPaginasPDF(modelo, registros) {
       const pageBreak = porRegistro && !isUltimo
         ? 'page-break-after:always;break-after:page;'
         : '';
-      return `<div style="${pageBreak}">${hdr}<div style="${bodyStyle}">${corpo}</div></div>`;
+      return `<div class="pdf-fit-page" style="${pageBreak}"><div class="pdf-fit-inner">${hdr}<div style="${bodyStyle}">${corpo}</div></div></div>`;
     });
   }
 
@@ -1430,7 +1436,7 @@ function _montarPaginasPDF(modelo, registros) {
 // navegador bloqueou o pop-up. `printDelayMs` escalona o disparo do
 // diálogo de impressão dentro da janela (usado para não empilhar vários
 // diálogos de impressão de uma vez quando há uma janela por empresa).
-function _abrirJanelaImpressao(titulo, innerHtml, printDelayMs = 300) {
+function _abrirJanelaImpressao(titulo, innerHtml, printDelayMs = 300, caberUmaPagina = false) {
   const printWin = window.open('', '_blank');
   if (!printWin) return false;
 
@@ -1447,7 +1453,26 @@ function _abrirJanelaImpressao(titulo, innerHtml, printDelayMs = 300) {
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
+    ${caberUmaPagina ? '.pdf-fit-page { width: 180mm; } .pdf-fit-inner { transform-origin: top left; }' : ''}
   `;
+
+  // Quando "caber em 1 página" está ligado, mede a altura real de cada
+  // documento (largura fixa em mm reproduz a largura de impressão) contra a
+  // área útil da A4 (297mm - 12mm×2 de margem) e aplica um scale ≤ 1 —
+  // nunca amplia, e só encolhe quem realmente estoura a página.
+  const fitScript = caberUmaPagina ? `
+      function _ajustarParaUmaPagina() {
+        var pxPorMm = 96 / 25.4;
+        var alturaDisponivel = 273 * pxPorMm;
+        document.querySelectorAll('.pdf-fit-page').forEach(function (pagina) {
+          var inner = pagina.querySelector('.pdf-fit-inner');
+          if (!inner) return;
+          var alturaNatural = inner.scrollHeight;
+          var escala = Math.min(1, alturaDisponivel / alturaNatural);
+          if (escala < 1) inner.style.transform = 'scale(' + escala + ')';
+        });
+      }
+      _ajustarParaUmaPagina();` : '';
 
   printWin.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
     <meta charset="UTF-8">
@@ -1456,7 +1481,9 @@ function _abrirJanelaImpressao(titulo, innerHtml, printDelayMs = 300) {
   </head><body>
     ${innerHtml}
     <script>
-      window.onload = function() { setTimeout(function() { window.print(); }, ${printDelayMs}); };
+      window.onload = function() {${fitScript}
+        setTimeout(function() { window.print(); }, ${printDelayMs});
+      };
     </script>
   </body></html>`);
   printWin.document.close();
@@ -1483,7 +1510,7 @@ async function exportarPDF() {
   grupos.forEach((grupo, idx) => {
     const innerHtml = _montarPaginasPDF(modelo, grupo.registros);
     const titulo = multiplasEmpresas ? `${modelo.nome} — ${grupo.nomeEmpresa}` : modelo.nome;
-    const ok = _abrirJanelaImpressao(titulo, innerHtml, 300 + idx * 700);
+    const ok = _abrirJanelaImpressao(titulo, innerHtml, 300 + idx * 700, wizardCaberUmaPagina);
     if (!ok) bloqueadas.push(grupo.nomeEmpresa);
   });
 
