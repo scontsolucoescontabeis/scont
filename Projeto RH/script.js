@@ -1986,6 +1986,8 @@ function _preencherCamposConfigRubricas(cfg) {
     if (cRuleExtra100) cRuleExtra100.checked = cfg['rule_extra_100_opcional']?.cod === '1';
     if (cTerceiroT)    cTerceiroT.checked    = cfg['terceiro_turno']?.cod === '1';
     if (cNaoComp)      cNaoComp.checked      = cfg['nao_compensar_extras']?.cod === '1';
+    const cBenExcluirFeriados = document.getElementById('cfgBeneficiosExcluirFeriados');
+    if (cBenExcluirFeriados) cBenExcluirFeriados.checked = cfg['beneficios_excluir_feriados']?.cod !== '0'; // default: excluir (true)
 }
 
 function _limparCamposConfigRubricas() {
@@ -2019,6 +2021,8 @@ function _limparCamposConfigRubricas() {
     if (cRuleExtra100) cRuleExtra100.checked = false;
     if (cTerceiroT)    cTerceiroT.checked    = false;
     if (cNaoComp)      cNaoComp.checked      = false;
+    const cBenExcluirFeriados = document.getElementById('cfgBeneficiosExcluirFeriados');
+    if (cBenExcluirFeriados) cBenExcluirFeriados.checked = true; // default: excluir feriados
 }
 
 // --- GRUPOS DE EMPRESAS ---
@@ -2675,6 +2679,7 @@ async function salvarConfigRubricas() {
         { codigo_empresa: codigoEmpresa, evento: 'rule_extra_100_opcional', codigo_rubrica: document.getElementById('cfgRuleExtra100')?.checked ? '1' : '0',          tipo_valor: 'config' },
         { codigo_empresa: codigoEmpresa, evento: 'terceiro_turno',          codigo_rubrica: document.getElementById('cfgTerceiroTurno')?.checked ? '1' : '0',         tipo_valor: 'config' },
         { codigo_empresa: codigoEmpresa, evento: 'nao_compensar_extras',    codigo_rubrica: document.getElementById('cfgNaoCompensarDefault')?.checked ? '1' : '0',   tipo_valor: 'config' },
+        { codigo_empresa: codigoEmpresa, evento: 'beneficios_excluir_feriados', codigo_rubrica: document.getElementById('cfgBeneficiosExcluirFeriados')?.checked ? '1' : '0', tipo_valor: 'config' },
     ];
 
     try {
@@ -3335,24 +3340,8 @@ function _atualizarResumoEmpresasSelecionadasBeneficios() {
     info.textContent = `${marcados.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
 }
 
-// Dias úteis (segunda a sexta, exceto feriados globais) da competência — jornada 5x2.
-function _diasUteisNoMes(competencia) {
-    return gerarDiasDoMes(competencia).filter(d => {
-        if (d.diaSemana === 'Sab' || d.diaSemana === 'Dom') return false;
-        const isFeriado = state.feriados.some(f => f.data === d.data || f.data === d.data.substring(0, 5));
-        return !isFeriado;
-    });
-}
-
-// Dentre os dias úteis da competência, conta só os que NÃO caem em nenhum
-// período de férias do empregado (períodos já vêm no formato ISO AAAA-MM-DD).
-function _contarDiasUteisForaDeFerias(diasUteisDoMes, periodos) {
-    if (!periodos || periodos.length === 0) return diasUteisDoMes.length;
-    return diasUteisDoMes.filter(d => {
-        const [dd, mm, aa] = d.data.split('/');
-        const iso = `${aa}-${mm}-${dd}`;
-        return !periodos.some(p => iso >= p.inicio && iso <= p.fim);
-    }).length;
+function _isFeriadoNoDia(dataBR) {
+    return state.feriados.some(f => f.data === dataBR || f.data === dataBR.substring(0, 5));
 }
 
 function _isoParaBR(iso) {
@@ -3397,18 +3386,21 @@ async function gerarPreviaBeneficios() {
             { data: valoresData, error: errVal },
             { data: feriasData, error: errFer },
             { data: savesData, error: errSaves },
+            { data: escalasData, error: errEsc },
         ] = await Promise.all([
             supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, cnpj').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, situacao, tipo_empregado').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_valores_va_vt').select('codigo_empresa, codigo_empregado, valor_vt, valor_va').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_ferias_calculadas').select('codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_saves').select('*').in('empresa_codigo', codigosEmpresas).eq('competencia', comp).order('data_criacao', { ascending: false }),
+            supabaseClient.from('rh_escala_trabalho').select('*').in('codigo_empresa', codigosEmpresas),
         ]);
         if (errEmp) throw errEmp;
         if (errFunc) throw errFunc;
         if (errVal) throw errVal;
         if (errFer) throw errFer;
         if (errSaves) throw errSaves;
+        if (errEsc) throw errEsc;
 
         const empresasMapa = {};
         (empresasData || []).forEach(e => { empresasMapa[e.codigo_empresa] = e; });
@@ -3431,7 +3423,16 @@ async function gerarPreviaBeneficios() {
             if (!savesMapa[chave]) savesMapa[chave] = s;
         });
 
-        const diasUteisDoMes = _diasUteisNoMes(comp);
+        const escalasMapa = {};
+        (escalasData || []).forEach(e => { escalasMapa[`${e.codigo_empresa}_${e.codigo_empregado}`] = _parsearCamposEscala(e); });
+
+        // Config por empresa: se deve excluir feriados nacionais do cálculo de "Dias a Trabalhar"
+        // (a escala em si não considera feriados — ver [[project_rh_escala_trabalho]]).
+        const excluirFeriadosPorEmpresa = {};
+        await Promise.all(codigosEmpresas.map(async cod => {
+            const cfg = await _buscarConfigRubricas(cod);
+            excluirFeriadosPorEmpresa[cod] = cfg?.['beneficios_excluir_feriados']?.cod !== '0'; // default: excluir (true)
+        }));
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
             (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() !== 'Contribuinte'
@@ -3447,7 +3448,12 @@ async function gerarPreviaBeneficios() {
         const linhas = empregadosFiltrados.map(emp => {
             const save = savesMapa[`${emp.codigo_empresa}_${emp.nome_empregado}`];
             const periodos = feriasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`];
-            const diasTrabalhar = _contarDiasUteisForaDeFerias(diasUteisDoMes, periodos);
+            const escala = escalasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || null;
+            const excluirFeriados = excluirFeriadosPorEmpresa[emp.codigo_empresa];
+            const resumoEscala = calcularResumoMes(escala, comp, periodos);
+            const diasTrabalhar = resumoEscala.dias.filter(d =>
+                d.tipo === 'trabalho' && !(excluirFeriados && _isFeriadoNoDia(d.data))
+            ).length;
             const diasDescontar = save ? _calcularDiasDescontarFolhaSalva(save) : 0;
             const valores = valoresMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || { vt: 0, va: 0 };
             const empresa = empresasMapa[emp.codigo_empresa] || { nome_empresa: emp.codigo_empresa, cnpj: '' };

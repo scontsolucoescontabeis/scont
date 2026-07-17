@@ -267,8 +267,10 @@
                 <h2 style="color: var(--primary-color); margin:0;">🍽️ Gerar Benefícios (VT/VA)</h2>
                 <p style="color: var(--text-secondary); font-size:13px; margin-top:6px;">
                     Gera as informações de VT/VA a pagar por empregado a partir da competência trabalhada, dos valores
-                    diários configurados e dos dias a trabalhar/descontar (pré-calculados quando há Folha de Ponto salva
-                    para a competência, sempre editáveis).
+                    diários configurados e dos dias a trabalhar/descontar (sempre editáveis). "Dias a Trabalhar" vem da
+                    escala configurada em "Gerar Escala" (dias úteis 5x2 se não houver escala), descontando férias e,
+                    opcionalmente, feriados nacionais (configurável por empresa). "Dias a Descontar" vem das faltas/atestados
+                    lançados na Folha de Ponto da competência.
                 </p>
             </div>
 
@@ -988,6 +990,19 @@
                             <input type="checkbox" id="cfgSabadoSempreExtra" style="width: 16px; height: 16px; cursor: pointer;"
                                 onchange="if (this.checked) { document.getElementById('cfgJornadaSabadoAtiva').checked = false; document.getElementById('cfgJornadaSabadoContainer').style.display = 'none'; }">
                             <label for="cfgSabadoSempreExtra" style="font-size: 13px; cursor: pointer; margin: 0;">Sábado sempre extra</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Benefícios (VT/VA) -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Benefícios (VT/VA)</span>
+                    </div>
+                    <div style="padding: 14px 14px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="cfgBeneficiosExcluirFeriados" checked style="width: 16px; height: 16px; cursor: pointer;">
+                            <label for="cfgBeneficiosExcluirFeriados" style="font-size: 13px; cursor: pointer; margin: 0;">Excluir feriados nacionais do cálculo de "Dias a Trabalhar" em Gerar Benefícios</label>
                         </div>
                     </div>
                 </div>
