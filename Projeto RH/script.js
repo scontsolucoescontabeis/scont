@@ -3207,10 +3207,16 @@ function _atualizarLabelMesPagamentoBeneficios() {
     info.textContent = `O benefício correspondente é pago em ${String(mesPag).padStart(2, '0')}/${anoPag}.`;
 }
 
+// Fonte única da seleção de empresas: sobrevive a filtros/re-renderizações da lista
+// (checkboxes de empresas fora do filtro atual não existem no DOM, então não podem
+// guardar o estado marcado/desmarcado sozinhos).
+let _beneficiosEmpresasSelecionadas = new Set();
+
 function _iniciarTelaBeneficios() {
     document.getElementById('beneficiosPreviaContainer').style.display = 'none';
     document.getElementById('beneficiosPreviaBody').innerHTML = '';
     document.getElementById('beneficiosBuscaEmpresa').value = '';
+    _beneficiosEmpresasSelecionadas = new Set();
     _atualizarLabelMesPagamentoBeneficios();
     _renderizarListaEmpresasBeneficios(state.empresas);
     _atualizarResumoEmpresasSelecionadasBeneficios();
@@ -3278,18 +3284,12 @@ function _aplicarGruposBeneficios() {
     const idsMarcados = Array.from(document.querySelectorAll('.beneficios-grupo-check:checked')).map(cb => cb.value);
     if (idsMarcados.length === 0) return;
 
-    const codigosParaMarcar = new Set(
-        Array.from(document.querySelectorAll('.beneficios-emp-check:checked')).map(cb => cb.value)
-    );
     idsMarcados.forEach(id => {
-        (_itensGruposBeneficiosCache[id] || new Set()).forEach(codigo => codigosParaMarcar.add(codigo));
+        (_itensGruposBeneficiosCache[id] || new Set()).forEach(codigo => _beneficiosEmpresasSelecionadas.add(codigo));
     });
 
     document.getElementById('beneficiosBuscaEmpresa').value = '';
     _renderizarListaEmpresasBeneficios(state.empresas);
-    document.querySelectorAll('.beneficios-emp-check').forEach(cb => {
-        cb.checked = codigosParaMarcar.has(cb.value);
-    });
     _atualizarResumoEmpresasSelecionadasBeneficios();
 }
 
@@ -3301,43 +3301,45 @@ function _renderizarListaEmpresasBeneficios(empresas) {
     }
     container.innerHTML = empresas.map(e => `
         <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
-            <input type="checkbox" class="beneficios-emp-check" value="${e.codigo_empresa}" onchange="_atualizarResumoEmpresasSelecionadasBeneficios()">
+            <input type="checkbox" class="beneficios-emp-check" value="${e.codigo_empresa}" ${_beneficiosEmpresasSelecionadas.has(e.codigo_empresa) ? 'checked' : ''} onchange="_toggleEmpresaBeneficios('${e.codigo_empresa}', this.checked)">
             <span style="font-family:monospace; color:var(--primary-color); font-weight:600;">${e.codigo_empresa}</span> ${e.nome_empresa}
         </label>
     `).join('');
 }
 
+function _toggleEmpresaBeneficios(codigoEmpresa, marcado) {
+    if (marcado) _beneficiosEmpresasSelecionadas.add(codigoEmpresa);
+    else _beneficiosEmpresasSelecionadas.delete(codigoEmpresa);
+    _atualizarResumoEmpresasSelecionadasBeneficios();
+}
+
 function _filtrarListaEmpresasBeneficios() {
     const termo = (document.getElementById('beneficiosBuscaEmpresa').value || '').toLowerCase().trim();
-    const marcados = new Set(Array.from(document.querySelectorAll('.beneficios-emp-check:checked')).map(cb => cb.value));
     const lista = termo
         ? state.empresas.filter(e => e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo))
         : state.empresas;
     _renderizarListaEmpresasBeneficios(lista);
-    marcados.forEach(codigo => {
-        const cb = document.querySelector(`.beneficios-emp-check[value="${codigo}"]`);
-        if (cb) cb.checked = true;
-    });
 }
 
 function _selecionarTodasEmpresasBeneficios(marcar) {
-    document.querySelectorAll('.beneficios-emp-check').forEach(cb => { cb.checked = marcar; });
+    if (marcar) state.empresas.forEach(e => _beneficiosEmpresasSelecionadas.add(e.codigo_empresa));
+    else _beneficiosEmpresasSelecionadas.clear();
+    _filtrarListaEmpresasBeneficios();
     _atualizarResumoEmpresasSelecionadasBeneficios();
 }
 
 function _atualizarResumoEmpresasSelecionadasBeneficios() {
     const info = document.getElementById('beneficiosEmpresasSelecionadasInfo');
     if (!info) return;
-    const marcados = Array.from(document.querySelectorAll('.beneficios-emp-check:checked'));
-    if (marcados.length === 0) {
+    if (_beneficiosEmpresasSelecionadas.size === 0) {
         info.textContent = 'Nenhuma empresa selecionada.';
         return;
     }
-    const nomes = marcados.map(cb => {
-        const emp = state.empresas.find(e => e.codigo_empresa === cb.value);
-        return `${cb.value} - ${emp?.nome_empresa || cb.value}`;
+    const nomes = Array.from(_beneficiosEmpresasSelecionadas).map(codigo => {
+        const emp = state.empresas.find(e => e.codigo_empresa === codigo);
+        return `${codigo} - ${emp?.nome_empresa || codigo}`;
     });
-    info.textContent = `${marcados.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
+    info.textContent = `${nomes.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
 }
 
 function _isFeriadoNoDia(dataBR) {
@@ -3375,7 +3377,7 @@ function _calcularDiasDescontarFolhaSalva(save) {
 async function gerarPreviaBeneficios() {
     const comp = document.getElementById('beneficiosCompetencia').value;
     if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe uma competência válida (MM/AAAA).'); return; }
-    const codigosEmpresas = Array.from(document.querySelectorAll('.beneficios-emp-check:checked')).map(cb => cb.value);
+    const codigosEmpresas = Array.from(_beneficiosEmpresasSelecionadas);
     if (codigosEmpresas.length === 0) { mostrarMensagem('Aviso', 'Selecione pelo menos uma empresa.'); return; }
 
     mostrarMensagem('Aguarde', 'Calculando prévia de benefícios...');
@@ -3435,7 +3437,7 @@ async function gerarPreviaBeneficios() {
         }));
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
-            (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() !== 'Contribuinte'
+            (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() === 'Empregado'
         );
 
         if (empregadosFiltrados.length === 0) {
@@ -3734,7 +3736,7 @@ async function gerarEscala() {
         });
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
-            (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() !== 'Contribuinte'
+            (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() === 'Empregado'
         );
 
         if (empregadosFiltrados.length === 0) {
