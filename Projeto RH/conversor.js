@@ -348,3 +348,66 @@ window.atualizarCelulaDia = function(diaIdx, campo, valor) {
     if (!colab) return;
     colab.dias[diaIdx][campo] = valor;
 };
+
+// ===== ETAPA 4 — GERAÇÃO DO EXCEL =====
+window.gerarExcel = function() {
+    if (!state.colaboradoresConfirmados || !state.colaboradoresConfirmados.length) {
+        mostrarMsg('msgStep4', 'erro', 'Nenhum colaborador confirmado para gerar o Excel.');
+        return;
+    }
+
+    const header = state.terceiroTurno
+        ? ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Entrada 3', 'Saída 3']
+        : ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2'];
+    const campos = state.terceiroTurno
+        ? ['entrada1', 'saida1', 'entrada2', 'saida2', 'entrada3', 'saida3']
+        : ['entrada1', 'saida1', 'entrada2', 'saida2'];
+
+    const wb = XLSX.utils.book_new();
+    const linhasOcorrencias = [['Código', 'Empregado', 'Data', 'Dia da Semana', 'Ocorrência']];
+
+    state.colaboradoresConfirmados.forEach(colab => {
+        const aoa = [header, ...colab.dias.map(dia => [
+            dia.data,
+            dia.diaSemana,
+            ...campos.map(c => dia[c] || '')
+        ])];
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        for (let r = 1; r < aoa.length; r++) {
+            const addr = XLSX.utils.encode_cell({ r, c: 0 });
+            ws[addr] = { t: 's', v: aoa[r][0] };
+        }
+        ws['!cols'] = header.map(() => ({ wch: 13 }));
+
+        const nomeAba = (colab.codigo ? `${colab.codigo} ${colab.nome}` : colab.nome).substring(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, nomeAba);
+
+        colab.dias.forEach(dia => {
+            if (dia.ocorrencia) {
+                linhasOcorrencias.push([colab.codigo, colab.nome, dia.data, dia.diaSemana, dia.ocorrencia]);
+            }
+        });
+    });
+
+    if (linhasOcorrencias.length > 1) {
+        const wsOcorr = XLSX.utils.aoa_to_sheet(linhasOcorrencias);
+        for (let r = 1; r < linhasOcorrencias.length; r++) {
+            const addr = XLSX.utils.encode_cell({ r, c: 2 });
+            wsOcorr[addr] = { t: 's', v: linhasOcorrencias[r][2] };
+        }
+        wsOcorr['!cols'] = [{ wch: 12 }, { wch: 28 }, { wch: 13 }, { wch: 10 }, { wch: 30 }];
+        XLSX.utils.book_append_sheet(wb, wsOcorr, 'Ocorrências');
+    }
+
+    const [mm, aaaa] = state.competencia.split('/');
+    const nomeArq = `FolhaPonto_${state.empresa.codigo_empresa}_${mm}-${aaaa}.xlsx`;
+    XLSX.writeFile(wb, nomeArq);
+
+    mostrarMsg('msgStep4', 'ok',
+        `✓ "${nomeArq}" gerado com ${state.colaboradoresConfirmados.length} colaborador(es). ` +
+        `Importe no Controle de Frequência usando "Importar Excel". ` +
+        (linhasOcorrencias.length > 1
+            ? `A aba "Ocorrências" lista Falta/Atestado/Abono/etc. para marcação manual dos flags após importar (o importador vai avisar que essa aba não corresponde a nenhum empregado — pode ignorar esse aviso).`
+            : ''));
+};
