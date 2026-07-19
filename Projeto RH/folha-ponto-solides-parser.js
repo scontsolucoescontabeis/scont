@@ -117,21 +117,29 @@ function _parsearCorpoDia(corpo) {
     let periodoIdx = 0;
     const statusEncontrados = [];
 
-    segmentosPeriodo.forEach(seg => {
+    for (const seg of segmentosPeriodo) {
         const horarios = _horariosEm(seg);
-        if (horarios.length >= 2) {
+        if (horarios.length === 2) {
             const chaveEntrada = chavesPeriodo[periodoIdx * 2];
             const chaveSaida = chavesPeriodo[periodoIdx * 2 + 1];
             if (chaveEntrada && chaveSaida) {
                 resultado[chaveEntrada] = horarios[0];
                 resultado[chaveSaida] = horarios[1];
             }
-        } else {
+        } else if (horarios.length === 0) {
             const status = _extrairStatus(seg);
             if (status) statusEncontrados.push(status);
+        } else {
+            // horarios.length === 1 ou >= 3: segmento contaminado — sinal de que o texto
+            // de ocorrência do dia seguinte quebrou em duas linhas no PDF e colou nos
+            // totais deste dia. A partir daqui o restante do corpo não é mais confiável
+            // (pode pertencer ao dia seguinte), então paramos por aqui propositalmente
+            // em vez de gravar horário ou ocorrência errados; a Etapa 4 (revisão manual)
+            // é o mecanismo de correção para esse caso raro.
+            break;
         }
         periodoIdx++;
-    });
+    }
 
     resultado.ocorrencia = statusEncontrados.join(' + ');
     return resultado;

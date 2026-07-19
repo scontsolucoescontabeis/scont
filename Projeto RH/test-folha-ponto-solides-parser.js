@@ -193,6 +193,21 @@ teste('_parsearCorpoDia reconhece dia misto: 1º período trabalhado + 2º perí
     assert.strictEqual(r.ocorrencia, 'ABONO');
 });
 
+teste('_parsearCorpoDia para no primeiro segmento contaminado por quebra de linha do dia seguinte (não inventa 3º período nem ocorrência errada)', () => {
+    // Caso real (Jaconias, 03/06): a linha "ABONO | ABONO | (FERIADO: Corpus" do dia
+    // seguinte (04/06) quebrou no PDF e colou nos totais deste dia, formando um corpo
+    // com 4 pipes: "06:46 13:11 | 14:12 18:06 | 10:19 09:00 01:19\nABONO | ABONO | (FERIADO: Corpus".
+    // O 3º segmento tem 3 horários (não 2) — a partir dali o restante é descartado.
+    const r = _parsearCorpoDia(' 06:46 13:11 | 14:12 18:06 | 10:19 09:00 01:19\nABONO | ABONO | (FERIADO: Corpus');
+    assert.strictEqual(r.entrada1, '06:46');
+    assert.strictEqual(r.saida1, '13:11');
+    assert.strictEqual(r.entrada2, '14:12');
+    assert.strictEqual(r.saida2, '18:06');
+    assert.strictEqual(r.entrada3, '', 'não deve inventar um 3º período a partir dos totais');
+    assert.strictEqual(r.saida3, '');
+    assert.strictEqual(r.ocorrencia, '', 'não deve atribuir a este dia uma ocorrência que pertence ao dia seguinte');
+});
+
 // ===== _extrairDiasPontos =====
 
 teste('_extrairDiasPontos monta a data completa (DD/MM/AAAA) para cada dia encontrado', () => {
