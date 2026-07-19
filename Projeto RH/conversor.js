@@ -278,3 +278,73 @@ window.avancarEtapa4 = function() {
     mostrarEtapa(4);
     prepararEtapa4();
 };
+
+// ===== ETAPA 4 — TABELA EDITÁVEL =====
+function prepararEtapa4() {
+    state.colaboradoresConfirmados = state.colaboradoresPdf
+        .map((colab, idx) => ({ colab, vinculo: state.vinculos[idx] }))
+        .filter(item => !item.vinculo.ignorar)
+        .map(item => ({
+            nome: item.vinculo.empregado ? item.vinculo.empregado.nome_empregado : item.colab.nome,
+            codigo: item.vinculo.empregado ? item.vinculo.empregado.codigo_empregado : '',
+            dias: item.colab.dias
+        }));
+
+    state.terceiroTurno = state.colaboradoresConfirmados.some(c =>
+        c.dias.some(d => d.entrada3 || d.saida3)
+    );
+
+    state.abaAtivaEtapa4 = 0;
+    renderizarAbasColab();
+    renderizarTabelaColab();
+    ocultarMsg('msgStep4');
+}
+
+function renderizarAbasColab() {
+    const container = document.getElementById('colabTabs');
+    container.innerHTML = state.colaboradoresConfirmados.map((c, idx) =>
+        `<button type="button" class="colab-tab ${idx === state.abaAtivaEtapa4 ? 'ativo' : ''}" onclick="selecionarAbaColab(${idx})">${c.nome}</button>`
+    ).join('');
+}
+
+window.selecionarAbaColab = function(idx) {
+    state.abaAtivaEtapa4 = idx;
+    renderizarAbasColab();
+    renderizarTabelaColab();
+};
+
+function renderizarTabelaColab() {
+    const thead = document.getElementById('editThead');
+    const tbody = document.getElementById('editTbody');
+    const colab = state.colaboradoresConfirmados[state.abaAtivaEtapa4];
+    if (!colab) { thead.innerHTML = ''; tbody.innerHTML = ''; return; }
+
+    const colunas = state.terceiroTurno
+        ? ['Data', 'Dia', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Entrada 3', 'Saída 3', 'Ocorrência']
+        : ['Data', 'Dia', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Ocorrência'];
+    thead.innerHTML = '<tr>' + colunas.map(c => `<th>${c}</th>`).join('') + '</tr>';
+
+    const campos = state.terceiroTurno
+        ? ['entrada1', 'saida1', 'entrada2', 'saida2', 'entrada3', 'saida3']
+        : ['entrada1', 'saida1', 'entrada2', 'saida2'];
+
+    tbody.innerHTML = colab.dias.map((dia, diaIdx) => {
+        const camposHtml = campos.map(campo =>
+            `<td><input type="text" value="${dia[campo] || ''}" maxlength="5" placeholder="00:00"
+                onchange="atualizarCelulaDia(${diaIdx}, '${campo}', this.value)"></td>`
+        ).join('');
+        return `<tr>
+            <td class="ro">${dia.data}</td>
+            <td class="ro">${dia.diaSemana}</td>
+            ${camposHtml}
+            <td><input type="text" value="${dia.ocorrencia || ''}"
+                onchange="atualizarCelulaDia(${diaIdx}, 'ocorrencia', this.value)"></td>
+        </tr>`;
+    }).join('');
+}
+
+window.atualizarCelulaDia = function(diaIdx, campo, valor) {
+    const colab = state.colaboradoresConfirmados[state.abaAtivaEtapa4];
+    if (!colab) return;
+    colab.dias[diaIdx][campo] = valor;
+};
