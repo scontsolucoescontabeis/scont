@@ -209,3 +209,72 @@ window.avancarEtapa3 = function() {
     mostrarEtapa(3);
     prepararEtapa3();
 };
+
+// ===== ETAPA 3 — REVISÃO DE COLABORADORES =====
+const VALOR_IGNORAR = '__ignorar__';
+
+function prepararEtapa3() {
+    ocultarMsg('msgStep3');
+    state.vinculos = state.colaboradoresPdf.map(colab => {
+        const sugestao = _melhorMatchEmpregado(colab.nome, state.empregados);
+        return { empregado: sugestao || null, ignorar: false };
+    });
+    renderizarVinculos();
+    atualizarBotaoProximo3();
+}
+
+function renderizarVinculos() {
+    const container = document.getElementById('listaVinculos');
+
+    container.innerHTML = state.colaboradoresPdf.map((colab, idx) => {
+        const vinculo = state.vinculos[idx];
+        const semSugestao = !vinculo.empregado && !vinculo.ignorar;
+        const opcoesEmpregados = state.empregados.map(e => {
+            const selecionado = vinculo.empregado && vinculo.empregado.codigo_empregado === e.codigo_empregado;
+            return `<option value="${e.codigo_empregado}" ${selecionado ? 'selected' : ''}>${e.codigo_empregado} — ${e.nome_empregado}</option>`;
+        }).join('');
+        return `
+        <div class="vinculo-grid">
+            <div>
+                <strong>${colab.nome}</strong><br>
+                <span style="font-size:11px;color:#7F8C8D;">CPF: ${colab.cpf || '—'} · Função: ${colab.funcao || '—'}</span>
+                ${semSugestao ? '<br><span style="font-size:11px;color:#C0392B;">Sem sugestão automática — selecione manualmente</span>' : ''}
+            </div>
+            <div>
+                <select onchange="atualizarVinculo(${idx}, this.value)">
+                    <option value="" ${!vinculo.empregado && !vinculo.ignorar ? 'selected' : ''}>-- Selecione --</option>
+                    ${opcoesEmpregados}
+                    <option value="${VALOR_IGNORAR}" ${vinculo.ignorar ? 'selected' : ''}>Não importar este colaborador</option>
+                </select>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+window.atualizarVinculo = function(idx, valor) {
+    if (valor === VALOR_IGNORAR) {
+        state.vinculos[idx] = { empregado: null, ignorar: true };
+    } else if (!valor) {
+        state.vinculos[idx] = { empregado: null, ignorar: false };
+    } else {
+        const emp = state.empregados.find(e => e.codigo_empregado === valor);
+        state.vinculos[idx] = { empregado: emp || null, ignorar: false };
+    }
+    atualizarBotaoProximo3();
+};
+
+function atualizarBotaoProximo3() {
+    const todosDecididos = state.vinculos.length > 0 &&
+        state.vinculos.every(v => v.ignorar || !!v.empregado);
+    document.getElementById('btnProximo3').disabled = !todosDecididos;
+    if (!todosDecididos) {
+        mostrarMsg('msgStep3', 'aviso', 'Escolha um vínculo (ou "Não importar") para todos os colaboradores antes de continuar.');
+    } else {
+        ocultarMsg('msgStep3');
+    }
+}
+
+window.avancarEtapa4 = function() {
+    mostrarEtapa(4);
+    prepararEtapa4();
+};
