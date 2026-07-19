@@ -125,3 +125,87 @@ window.handleArquivo = async function(file) {
         console.error(e);
     }
 };
+
+// ===== ETAPA 2 — EMPRESA + COMPETÊNCIA =====
+function prepararEtapa2() {
+    const inputComp = document.getElementById('competencia');
+    const msgOrigem = document.getElementById('competenciaOrigemMsg');
+    if (state.competencia) {
+        inputComp.value = state.competencia;
+    }
+    msgOrigem.textContent = state.competenciaAutoDetectada
+        ? 'Competência detectada automaticamente a partir do PDF — confirme ou ajuste se necessário.'
+        : 'Não foi possível detectar a competência no PDF — preencha manualmente.';
+    atualizarBotaoProximo2();
+}
+
+async function carregarEmpresas() {
+    try {
+        const { data, error } = await state.sb
+            .from('rh_empresas')
+            .select('codigo_empresa, nome_empresa')
+            .order('nome_empresa', { ascending: true });
+        if (error) throw error;
+        state._todasEmpresas = data || [];
+    } catch (e) {
+        console.warn('Erro ao carregar empresas:', e.message);
+    }
+}
+
+window.filtrarEmpresas = function(termo) {
+    const lista = document.getElementById('listaEmpresas');
+    const norm = termo.trim().toLowerCase();
+    const todas = state._todasEmpresas || [];
+    const filtradas = norm
+        ? todas.filter(e => e.nome_empresa.toLowerCase().includes(norm) || e.codigo_empresa.toLowerCase().includes(norm))
+        : todas;
+    if (!filtradas.length) { lista.style.display = 'none'; return; }
+    lista.innerHTML = filtradas.map(e =>
+        `<div class="autocomplete-item" onclick="selecionarEmpresa('${e.codigo_empresa}','${e.nome_empresa.replace(/'/g, "\\'")}')">
+            <strong>${e.codigo_empresa}</strong> — ${e.nome_empresa}
+         </div>`
+    ).join('');
+    lista.style.display = 'block';
+};
+
+window.selecionarEmpresa = async function(codigo, nome) {
+    state.empresa = { codigo_empresa: codigo, nome_empresa: nome };
+    document.getElementById('buscaEmpresa').value = `${codigo} — ${nome}`;
+    document.getElementById('codigoEmpresaHidden').value = codigo;
+    document.getElementById('listaEmpresas').style.display = 'none';
+    atualizarBotaoProximo2();
+    await carregarEmpregados(codigo);
+};
+
+async function carregarEmpregados(codigoEmpresa) {
+    try {
+        const { data, error } = await state.sb
+            .from('rh_empregados')
+            .select('codigo_empregado, nome_empregado')
+            .eq('codigo_empresa', codigoEmpresa)
+            .order('nome_empregado', { ascending: true });
+        if (error) throw error;
+        state.empregados = data || [];
+    } catch (e) {
+        console.warn('Erro ao carregar empregados:', e.message);
+        state.empregados = [];
+    }
+}
+
+window.formatarCompetenciaInput = function(el) {
+    let v = el.value.replace(/\D/g, '');
+    if (v.length >= 2) v = v.substring(0, 2) + '/' + v.substring(2, 6);
+    el.value = v;
+    state.competencia = el.value;
+    atualizarBotaoProximo2();
+};
+
+function atualizarBotaoProximo2() {
+    const ok = !!state.empresa && /^(0[1-9]|1[0-2])\/\d{4}$/.test(state.competencia);
+    document.getElementById('btnProximo2').disabled = !ok;
+}
+
+window.avancarEtapa3 = function() {
+    mostrarEtapa(3);
+    prepararEtapa3();
+};
