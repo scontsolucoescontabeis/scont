@@ -59,11 +59,100 @@ function _extrairCompetencia(textoPagina) {
     return `${m[2]}/${m[3]}`;
 }
 
+function _dividirBlocosDia(texto) {
+    const re = /(\d{2})\/(\d{2})\s+(segunda-feira|ter[çc]a-feira|quarta-feira|quinta-feira|sexta-feira|s[áa]bado|domingo)/gi;
+    const anchors = [];
+    let m;
+    while ((m = re.exec(texto)) !== null) {
+        anchors.push({ index: m.index, fim: m.index + m[0].length, dia: m[1], mes: m[2] });
+    }
+
+    const blocos = [];
+    for (let i = 0; i < anchors.length; i++) {
+        const inicio = anchors[i].fim;
+        const fim = i + 1 < anchors.length ? anchors[i + 1].index : texto.length;
+        let corpo = texto.substring(inicio, fim);
+        const idxTotal = corpo.indexOf('Total:');
+        if (idxTotal !== -1) corpo = corpo.substring(0, idxTotal);
+        blocos.push({ dia: anchors[i].dia, mes: anchors[i].mes, corpo });
+    }
+    return blocos;
+}
+
+const _RE_STATUS = /ATESTADO M[ÉE]DICO|ATESTADO DE COMPARECIMENTO|FALTA\s*-\s*FERIADO:?\s*[^0-9|]*|FALTA\s*N[ÃA]O\s*JUSTIFICADA|FERIADO|ABONO/i;
+
+function _extrairStatus(texto) {
+    const m = (texto || '').match(_RE_STATUS);
+    if (!m) return '';
+    return m[0].replace(/\s+/g, ' ').trim();
+}
+
+function _horariosEm(texto) {
+    const out = [];
+    const re = /([01]?\d|2[0-3]):([0-5]\d)/g;
+    let m;
+    while ((m = re.exec(texto || '')) !== null) {
+        out.push(`${m[1].padStart(2, '0')}:${m[2]}`);
+    }
+    return out;
+}
+
+function _parsearCorpoDia(corpo) {
+    const resultado = { entrada1: '', saida1: '', entrada2: '', saida2: '', entrada3: '', saida3: '', ocorrencia: '' };
+    const semQuebras = (corpo || '').replace(/\n/g, ' ').trim();
+
+    if (semQuebras === '-' || semQuebras === '') {
+        return resultado;
+    }
+
+    const partes = semQuebras.split('|');
+
+    if (partes.length === 1) {
+        resultado.ocorrencia = _extrairStatus(partes[0]);
+        return resultado;
+    }
+
+    const segmentosPeriodo = partes.slice(0, -1);
+    const chavesPeriodo = ['entrada1', 'saida1', 'entrada2', 'saida2', 'entrada3', 'saida3'];
+    let periodoIdx = 0;
+    const statusEncontrados = [];
+
+    segmentosPeriodo.forEach(seg => {
+        const horarios = _horariosEm(seg);
+        if (horarios.length >= 2) {
+            const chaveEntrada = chavesPeriodo[periodoIdx * 2];
+            const chaveSaida = chavesPeriodo[periodoIdx * 2 + 1];
+            if (chaveEntrada && chaveSaida) {
+                resultado[chaveEntrada] = horarios[0];
+                resultado[chaveSaida] = horarios[1];
+            }
+        } else {
+            const status = _extrairStatus(seg);
+            if (status) statusEncontrados.push(status);
+        }
+        periodoIdx++;
+    });
+
+    resultado.ocorrencia = statusEncontrados.join(' + ');
+    return resultado;
+}
+
+function _extrairDiasPontos(textoPagina, ano) {
+    const blocos = _dividirBlocosDia(textoPagina || '');
+    return blocos.map(b => {
+        const dados = _parsearCorpoDia(b.corpo);
+        return Object.assign({ data: `${b.dia}/${b.mes}/${ano}` }, dados);
+    });
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         _linhasDaPagina,
         _pareceSolides,
         _extrairCabecalhoColaborador,
-        _extrairCompetencia
+        _extrairCompetencia,
+        _dividirBlocosDia,
+        _parsearCorpoDia,
+        _extrairDiasPontos
     };
 }
