@@ -207,4 +207,107 @@ teste('_extrairDiasPontos monta a data completa (DD/MM/AAAA) para cada dia encon
     assert.strictEqual(dias[1].ocorrencia, 'ABONO');
 });
 
+const {
+    _gerarDiasDoMes,
+    _mesclarDias,
+    _normalizarNome,
+    _melhorMatchEmpregado,
+    _parsearPaginaColaborador
+} = require('./folha-ponto-solides-parser.js');
+
+// ===== _gerarDiasDoMes =====
+
+teste('_gerarDiasDoMes gera todos os dias do mês com dia da semana abreviado', () => {
+    const dias = _gerarDiasDoMes('06/2026');
+    assert.strictEqual(dias.length, 30);
+    assert.strictEqual(dias[0].data, '01/06/2026');
+    assert.strictEqual(dias[0].diaSemana, 'Seg');
+    assert.strictEqual(dias[29].data, '30/06/2026');
+    assert.strictEqual(dias[0].entrada1, '');
+    assert.strictEqual(dias[0].ocorrencia, '');
+});
+
+teste('_gerarDiasDoMes retorna vazio sem competência', () => {
+    assert.deepStrictEqual(_gerarDiasDoMes(''), []);
+});
+
+// ===== _mesclarDias =====
+
+teste('_mesclarDias preenche os dias do esqueleto com os dados extraídos, mantendo os demais em branco', () => {
+    const base = _gerarDiasDoMes('06/2026');
+    const extraidos = [
+        { data: '01/06/2026', entrada1: '07:40', saida1: '12:11', entrada2: '13:08', saida2: '18:13', entrada3: '', saida3: '', ocorrencia: '' },
+        { data: '04/06/2026', entrada1: '', saida1: '', entrada2: '', saida2: '', entrada3: '', saida3: '', ocorrencia: 'ABONO' }
+    ];
+    const mesclado = _mesclarDias(base, extraidos);
+    assert.strictEqual(mesclado.length, 30);
+    assert.strictEqual(mesclado[0].entrada1, '07:40');
+    assert.strictEqual(mesclado[0].diaSemana, 'Seg');
+    assert.strictEqual(mesclado[3].ocorrencia, 'ABONO');
+    assert.strictEqual(mesclado[1].entrada1, '', 'dia 02/06 sem dado extraído deve continuar em branco');
+});
+
+// ===== _normalizarNome / _melhorMatchEmpregado =====
+
+teste('_normalizarNome remove acentos, baixa a caixa e colapsa espaços', () => {
+    assert.strictEqual(_normalizarNome('  Daniela  Das Graças Nasário '), 'daniela das gracas nasario');
+});
+
+teste('_melhorMatchEmpregado encontra correspondência exata ignorando acento/caixa', () => {
+    const empregados = [
+        { codigo_empregado: '10', nome_empregado: 'Daniela das Graças Nasario' },
+        { codigo_empregado: '11', nome_empregado: 'Jaconias da Silva Vieira' }
+    ];
+    const match = _melhorMatchEmpregado('DANIELA DAS GRAÇAS NASARIO', empregados);
+    assert.strictEqual(match.codigo_empregado, '10');
+});
+
+teste('_melhorMatchEmpregado retorna null quando não há nenhuma correspondência razoável', () => {
+    const empregados = [{ codigo_empregado: '10', nome_empregado: 'Fulano de Tal' }];
+    assert.strictEqual(_melhorMatchEmpregado('CICRANO OUTRO NOME', empregados), null);
+});
+
+// ===== _parsearPaginaColaborador =====
+
+teste('_parsearPaginaColaborador monta o registro completo do colaborador com dias do mês inteiro', () => {
+    // Simula os itens de uma página real, todos numa única linha por simplicidade
+    // (a reconstrução linha-a-linha já é coberta pelos testes de _linhasDaPagina)
+    function linhaComoItens(texto, y) {
+        return texto.split(' ').map((palavra, i) => ({ str: palavra, transform: [1, 0, 0, 1, i * 10, y] }));
+    }
+    const items = [
+        ...linhaComoItens('01/06/2026 a 30/06/2026', 800),
+        ...linhaComoItens('DADOS DO COLABORADOR', 790),
+        { str: 'Nome:', transform: [1, 0, 0, 1, 0, 780] },
+        { str: 'DANIELA DAS GRAÇAS NASARIO', transform: [1, 0, 0, 1, 10, 780] },
+        { str: 'CPF:', transform: [1, 0, 0, 1, 200, 780] },
+        { str: '88492745134', transform: [1, 0, 0, 1, 210, 780] },
+        { str: 'Código:', transform: [1, 0, 0, 1, 220, 780] },
+        { str: 'Admissão:', transform: [1, 0, 0, 1, 0, 770] },
+        { str: '25/02/2026', transform: [1, 0, 0, 1, 10, 770] },
+        { str: 'Função:', transform: [1, 0, 0, 1, 100, 770] },
+        { str: 'OPERADOR', transform: [1, 0, 0, 1, 110, 770] },
+        { str: 'DE', transform: [1, 0, 0, 1, 120, 770] },
+        { str: 'CAIXA', transform: [1, 0, 0, 1, 130, 770] },
+        { str: 'Centro', transform: [1, 0, 0, 1, 140, 770] },
+        { str: 'de', transform: [1, 0, 0, 1, 150, 770] },
+        { str: 'Custo:', transform: [1, 0, 0, 1, 160, 770] },
+        ...linhaComoItens('PONTOS TRABALHADAS ABONO PREVISTAS SALDO', 750),
+        ...linhaComoItens('01/06 segunda-feira 07:40 12:11 | 13:08 18:13 | 09:36 09:00 00:36', 740),
+        ...linhaComoItens('04/06 quinta-feira ABONO 09:00 09:00', 730),
+        ...linhaComoItens('Total: 166:03 17:00 194:00', 100)
+    ];
+
+    const colaborador = _parsearPaginaColaborador(items, 2026);
+    assert.strictEqual(colaborador.nome, 'DANIELA DAS GRAÇAS NASARIO');
+    assert.strictEqual(colaborador.cpf, '88492745134');
+    assert.strictEqual(colaborador.funcao, 'OPERADOR DE CAIXA');
+    assert.strictEqual(colaborador.competencia, '06/2026');
+    assert.strictEqual(colaborador.dias.length, 30);
+    const dia1 = colaborador.dias.find(d => d.data === '01/06/2026');
+    assert.strictEqual(dia1.entrada1, '07:40');
+    const dia4 = colaborador.dias.find(d => d.data === '04/06/2026');
+    assert.strictEqual(dia4.ocorrencia, 'ABONO');
+});
+
 console.log(`\n${testesExecutados} teste(s) passaram.`);

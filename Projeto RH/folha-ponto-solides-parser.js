@@ -145,6 +145,74 @@ function _extrairDiasPontos(textoPagina, ano) {
     });
 }
 
+const _DIAS_SEMANA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+
+function _gerarDiasDoMes(competencia) {
+    if (!competencia) return [];
+    const [mes, ano] = competencia.split('/');
+    const mesInt = parseInt(mes, 10);
+    const anoInt = parseInt(ano, 10);
+    const mesStr = String(mesInt).padStart(2, '0');
+    const ultimoDia = new Date(anoInt, mesInt, 0).getDate();
+    const dias = [];
+    for (let i = 1; i <= ultimoDia; i++) {
+        const data = new Date(anoInt, mesInt - 1, i);
+        dias.push({
+            data: `${String(i).padStart(2, '0')}/${mesStr}/${anoInt}`,
+            diaSemana: _DIAS_SEMANA_ABREV[data.getDay()],
+            entrada1: '', saida1: '', entrada2: '', saida2: '', entrada3: '', saida3: '',
+            ocorrencia: ''
+        });
+    }
+    return dias;
+}
+
+function _mesclarDias(diasBase, diasExtraidos) {
+    const porData = new Map((diasExtraidos || []).map(d => [d.data, d]));
+    return (diasBase || []).map(dia => {
+        const extra = porData.get(dia.data);
+        if (!extra) return Object.assign({}, dia);
+        return Object.assign({}, dia, {
+            entrada1: extra.entrada1, saida1: extra.saida1,
+            entrada2: extra.entrada2, saida2: extra.saida2,
+            entrada3: extra.entrada3, saida3: extra.saida3,
+            ocorrencia: extra.ocorrencia
+        });
+    });
+}
+
+function _normalizarNome(nome) {
+    return (nome || '')
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function _melhorMatchEmpregado(nomeExtraido, empregados) {
+    const alvo = _normalizarNome(nomeExtraido);
+    if (!alvo) return null;
+
+    let parcial = null;
+    for (const emp of (empregados || [])) {
+        const nomeEmp = _normalizarNome(emp.nome_empregado);
+        if (nomeEmp === alvo) return emp;
+        if (!parcial && (nomeEmp.includes(alvo) || alvo.includes(nomeEmp))) parcial = emp;
+    }
+    return parcial;
+}
+
+function _parsearPaginaColaborador(items, anoFallback) {
+    const texto = _linhasDaPagina(items).join('\n');
+    const cabecalho = _extrairCabecalhoColaborador(texto);
+    const competencia = _extrairCompetencia(texto);
+    const ano = competencia ? competencia.split('/')[1] : String(anoFallback || new Date().getFullYear());
+    const diasExtraidos = _extrairDiasPontos(texto, ano);
+    const diasBase = competencia ? _gerarDiasDoMes(competencia) : [];
+    const dias = diasBase.length ? _mesclarDias(diasBase, diasExtraidos) : diasExtraidos;
+    return Object.assign({ competencia, dias }, cabecalho);
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         _linhasDaPagina,
@@ -153,6 +221,11 @@ if (typeof module !== 'undefined' && module.exports) {
         _extrairCompetencia,
         _dividirBlocosDia,
         _parsearCorpoDia,
-        _extrairDiasPontos
+        _extrairDiasPontos,
+        _gerarDiasDoMes,
+        _mesclarDias,
+        _normalizarNome,
+        _melhorMatchEmpregado,
+        _parsearPaginaColaborador
     };
 }
