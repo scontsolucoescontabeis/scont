@@ -350,7 +350,9 @@ function filtrarEmpregados() {
         if (nome && !((e.nome_empregado || '').toLowerCase().includes(nome) || (e.codigo_empregado || '').toLowerCase().includes(nome))) return false;
         if (!todasSituacoes && _situacoesSelecionadas.size > 0 && !_situacoesSelecionadas.has(e.situacao || '')) return false;
         if (_situacoesSelecionadas.size === 0) return false;
-        if (tipoEmp && (e.tipo_empregado || '') !== tipoEmp) return false;
+        if (tipoEmp === 'EMP_ESTAG') {
+            if (!['Empregado', 'Estagiário'].includes(e.tipo_empregado || '')) return false;
+        } else if (tipoEmp && (e.tipo_empregado || '') !== tipoEmp) return false;
         return true;
     });
     _paginaEmpregados = 1;
