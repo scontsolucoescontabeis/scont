@@ -259,6 +259,7 @@
           </div>
           <div class="page-header-actions">
             <button class="btn btn-secondary" onclick="abrirImportarContatos()">📥 Importar Excel</button>
+            <button class="btn btn-secondary" onclick="exportarContatosExcel()">📤 Exportar Excel</button>
             <button id="btn-excluir-contatos" class="btn btn-danger" style="display:none" onclick="excluirContatosSelecionados()">🗑 Excluir selecionados (<span id="count-cont-sel">0</span>)</button>
             <button class="btn btn-primary" onclick="openModalContato()">+ Novo Contato</button>
           </div>
@@ -1814,11 +1815,28 @@ Equipe SCONT"
     renderContatos();
   }
 
-  function renderContatos() {
+  function _contatosFiltrados() {
     const filtro = (document.getElementById('filtro-contatos')?.value || '').toLowerCase();
-    const lista  = filtro
+    return filtro
       ? contatos.filter(c => c.nome.toLowerCase().includes(filtro) || (c.empresa||'').toLowerCase().includes(filtro))
       : contatos;
+  }
+
+  function exportarContatosExcel() {
+    const lista = _contatosFiltrados();
+    if (!lista.length) { toast('Nenhum contato para exportar', 'error'); return; }
+    const headers = ['Nome', 'Email', 'Telefone', 'Empresa', 'Cargo'];
+    const linhas  = lista.map(c => [c.nome, c.email || '', c.telefone || '', c.empresa || '', c.cargo || '']);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...linhas]);
+    ws['!cols'] = headers.map(() => ({ wch: 26 }));
+    XLSX.utils.book_append_sheet(wb, ws, 'Contatos');
+    const data = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `contatos-mala-direta-${data}.xlsx`);
+  }
+
+  function renderContatos() {
+    const lista = _contatosFiltrados();
     const tbody = document.getElementById('contatos-tbody');
 
     if (!lista.length) {
