@@ -2,10 +2,10 @@
  * SCONT — Onboarding Contábil
  * Catálogo do checklist de balanço inicial, restrito a itens de natureza
  * contábil. Premissa: os onboardings fiscal e de departamento pessoal já
- * foram feitos separadamente, então itens desses domínios (acessos a
- * portais fiscais, declarações/apurações fiscais por regime, dados de
- * empregados) não entram aqui — só o que a equipe contábil precisa para
- * montar o balanço de abertura.
+ * foram feitos separadamente, e os dados cadastrais/societários e os
+ * acessos/procurações (antigas Seções A e B) são levantados pelo
+ * Administrativo — então nada desses domínios entra aqui, só o que a
+ * equipe contábil precisa para montar o balanço de abertura.
  *
  * Cada seção pode ter `condicaoSecao` (a seção inteira só é gerada se a
  * condição bater). Cada item pode ter `condicao` (o item só é gerado se a
@@ -24,27 +24,6 @@
   }
 
   const CATALOGO = [
-    {
-      secao: 'A',
-      titulo: 'Seção A — Dados cadastrais e societários',
-      itens: [
-        { codigo: 'A1', texto: 'Cartão CNPJ atualizado (Comprovante de Inscrição e Situação Cadastral)', exigencia: 'obrigatorio' },
-        { codigo: 'A2', texto: 'Contrato social / estatuto e todas as alterações consolidadas', exigencia: 'obrigatorio' },
-        { codigo: 'A4', texto: 'Documentos dos sócios (RG/CPF ou CNH) e percentuais de participação', exigencia: 'obrigatorio' },
-        { codigo: 'A5', texto: 'Comprovante de endereço da sede', exigencia: 'obrigatorio' },
-        { codigo: 'A7', texto: 'Certificado digital e-CNPJ vigente (tipo e validade)', exigencia: 'obrigatorio', observacao: 'Anotar vencimento' },
-        { codigo: 'A8', texto: 'Dados de contato dos responsáveis (financeiro, fiscal, RH)', exigencia: 'obrigatorio' },
-        { codigo: 'A9', texto: 'Identificação da contabilidade anterior (nome, CRC, contato)', exigencia: 'condicional', observacao: 'Se houver escrituração anterior', condicao: { campo: 'tem_contabilidade_anterior', valor: true } },
-      ],
-    },
-    {
-      secao: 'B',
-      titulo: 'Seção B — Acessos, procurações e credenciais',
-      itens: [
-        { codigo: 'B1', texto: 'Procuração eletrônica e-CAC em favor da SCONT', exigencia: 'obrigatorio' },
-        { codigo: 'B7', texto: 'Acessos bancários para extratos (internet banking, open finance ou envio periódico)', exigencia: 'obrigatorio' },
-      ],
-    },
     {
       secao: 'C1',
       titulo: 'Seção C.1 — Com escrituração contábil anterior',
