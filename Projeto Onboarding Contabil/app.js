@@ -243,7 +243,7 @@
       grupo.innerHTML = `
         <label>Empresa nova</label>
         <div class="empresa-nova-campos">
-          <input type="text" id="novoCodigoEmpresa" class="campo-codigo" placeholder="Código">
+          <input type="text" id="novoCodigoEmpresa" class="campo-codigo" placeholder="Código (opcional)">
           <input type="text" id="novoNomeEmpresa" placeholder="Nome da empresa (razão social)">
         </div>
       `;
@@ -264,6 +264,23 @@
     }
   }
 
+  function gerarCodigoEmpresa(nome) {
+    const base = (nome || 'EMPRESA')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '')
+      .slice(0, 12) || 'EMPRESA';
+
+    const existentes = new Set(empresas.map((e) => e.codigo_empresa.toUpperCase()));
+    let candidato = base;
+    let sufixo = 1;
+    while (existentes.has(candidato)) {
+      sufixo += 1;
+      candidato = `${base}${sufixo}`;
+    }
+    return candidato;
+  }
+
   async function salvarNovoOnboarding() {
     const empresaNova = document.getElementById('chkEmpresaNova').checked;
     const regime = document.getElementById('novoRegime').value;
@@ -273,10 +290,14 @@
     if (empresaNova) {
       codigoEmpresa = document.getElementById('novoCodigoEmpresa').value.trim();
       nomeEmpresa = document.getElementById('novoNomeEmpresa').value.trim();
-      if (!codigoEmpresa || !nomeEmpresa) { mostrarToast('Preencha o código e o nome da nova empresa.', 'erro'); return; }
-      if (empresas.some((e) => e.codigo_empresa.toLowerCase() === codigoEmpresa.toLowerCase())) {
-        mostrarToast('Já existe uma empresa com esse código. Desmarque "Empresa nova" e selecione-a na lista.', 'erro');
-        return;
+      if (!nomeEmpresa) { mostrarToast('Preencha o nome da nova empresa.', 'erro'); return; }
+      if (codigoEmpresa) {
+        if (empresas.some((e) => e.codigo_empresa.toLowerCase() === codigoEmpresa.toLowerCase())) {
+          mostrarToast('Já existe uma empresa com esse código. Desmarque "Empresa nova" e selecione-a na lista, ou deixe o código em branco para gerar automaticamente.', 'erro');
+          return;
+        }
+      } else {
+        codigoEmpresa = gerarCodigoEmpresa(nomeEmpresa);
       }
     } else {
       codigoEmpresa = document.getElementById('novoEmpresa').value;
