@@ -375,6 +375,68 @@ function infoTipoValor(tipo) {
     return { placeholder: 'Ex: 3', dica: 'Número inteiro de dias' };
 }
 
+// --- Detecção e tratamento de rubricas "Dias Falta" / "Dias Falta DSR" ---
+
+function _normalizarDescricaoRubrica(descricao) {
+    return String(descricao || '').toUpperCase().trim().replace(/\.+$/, '').trim();
+}
+
+function detectarFaltaTipo(descricao) {
+    const norm = _normalizarDescricaoRubrica(descricao);
+    if (!norm.includes('DIAS FALTAS')) return null;
+    return norm.includes('DSR') ? 'dsr' : 'normal';
+}
+
+function placeholderColuna(coluna) {
+    if (coluna.faltaTipo) {
+        return { placeholder: 'Ex: 5,12,20', dica: 'Dias do mês da competência com falta, separados por vírgula' };
+    }
+    return infoTipoValor(coluna.tipoValor);
+}
+
+function parseDiasFalta(valor) {
+    return [...new Set(String(valor).split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n)))].sort((a, b) => a - b);
+}
+
+function ultimoDiaDoMes(comp) {
+    const [mes, ano] = comp.split('/').map(Number);
+    return new Date(ano, mes, 0).getDate();
+}
+
+function validarFormatoDiasFalta(valor, comp) {
+    const v = String(valor).trim();
+    if (!v) return { ok: false, motivo: 'vazio' };
+    if (!/^\d{1,2}(\s*,\s*\d{1,2})*$/.test(v)) return { ok: false, motivo: 'formato' };
+    const ultimoDia = ultimoDiaDoMes(comp);
+    const diaInvalido = parseDiasFalta(v).find(d => d < 1 || d > ultimoDia);
+    if (diaInvalido !== undefined) return { ok: false, motivo: 'intervalo', diaInvalido, ultimoDia };
+    return { ok: true };
+}
+
+function _aplicarTravaFaltaNoFormulario(faltaTipo) {
+    const tipoSelect = document.getElementById('gradeRubricaTipoValor');
+    const valorPadraoInput = document.getElementById('gradeRubricaValorPadrao');
+    const dica = document.getElementById('gradeRubricaValorPadraoDica');
+
+    if (faltaTipo) {
+        tipoSelect.value = 'dias';
+        tipoSelect.disabled = true;
+        valorPadraoInput.placeholder = 'Ex: 5,12,20';
+        dica.textContent = 'Detectado como rubrica de Dias de Falta' + (faltaTipo === 'dsr' ? ' (com perda de DSR)' : '') +
+            ' — informe os dias do mês separados por vírgula (aplica a todos; edite depois por empregado).';
+    } else {
+        tipoSelect.disabled = false;
+        atualizarPlaceholderValorPadrao();
+    }
+}
+
+function onCodigoManualInput() {
+    const codigo = document.getElementById('gradeRubricaCodigo').value.trim();
+    const catalogado = catalogoRubricasLote.find(r => r.codigo_rubrica === codigo);
+    const faltaTipo = catalogado ? detectarFaltaTipo(catalogado.descricao_rubrica) : null;
+    _aplicarTravaFaltaNoFormulario(faltaTipo);
+}
+
 function atualizarPlaceholderValorPadrao() {
     const tipo = document.getElementById('gradeRubricaTipoValor').value;
     const input = document.getElementById('gradeRubricaValorPadrao');
@@ -451,6 +513,14 @@ function onRubricaSelecaoChange() {
     const select = document.getElementById('gradeRubricaSelecao');
     const isManual = select.value === '__manual__';
     document.getElementById('gradeRubricaManualFields').style.display = isManual ? 'block' : 'none';
+
+    if (isManual) {
+        onCodigoManualInput();
+        return;
+    }
+
+    const item = rubricasCatalogoAgrupadas[Number(select.value)];
+    _aplicarTravaFaltaNoFormulario(item ? detectarFaltaTipo(item.descricao) : null);
 }
 
 function validarFormatoValor(valor, tipoValor) {
@@ -481,9 +551,18 @@ function gerarConteudoTXT(comp, tipoProcesso, coluna, itens) {
         const rubFormatada = String(codigoRubrica).padStart(9, '0');
         const codEmpregadoFormatado = String(codEmpregado).padStart(10, '0');
         const codEmpresaFormatada = String(codEmpresa).padStart(10, '0');
-        const valorInt = encodeValorParaTipo(item.valor, coluna.tipoValor);
+
+        const diasFalta = coluna.faltaTipo ? parseDiasFalta(item.valor) : null;
+        const valorInt = coluna.faltaTipo ? diasFalta.length : encodeValorParaTipo(item.valor, coluna.tipoValor);
         const valFormatado = String(valorInt).padStart(9, '0');
         conteudo += `${fixo}${codEmpregadoFormatado}${compFormatada}${rubFormatada}${tipoProcFormatado}${valFormatado}${codEmpresaFormatada}\n`;
+
+        if (coluna.faltaTipo && diasFalta.length > 0) {
+            const flag = coluna.faltaTipo === 'dsr' ? '2' : '1';
+            diasFalta.forEach(dia => {
+                conteudo += `11${compFormatada}${String(dia).padStart(2, '0')}${flag}\n`;
+            });
+        }
     });
 
     return conteudo;
@@ -491,7 +570,7 @@ function gerarConteudoTXT(comp, tipoProcesso, coluna, itens) {
 
 function adicionarRubricaGrade() {
     const select = document.getElementById('gradeRubricaSelecao');
-    const tipoValor = document.getElementById('gradeRubricaTipoValor').value;
+    const tipoValorSelecionado = document.getElementById('gradeRubricaTipoValor').value;
     const valorPadrao = document.getElementById('gradeRubricaValorPadrao').value.trim();
 
     if (!select.value) {
@@ -516,15 +595,17 @@ function adicionarRubricaGrade() {
 
         const catalogado = catalogoRubricasLote.find(r => r.codigo_rubrica === codigo);
         const label = catalogado ? `${catalogado.descricao_rubrica} (${codigo})` : `Rubrica ${codigo}`;
+        const faltaTipo = catalogado ? detectarFaltaTipo(catalogado.descricao_rubrica) : null;
 
-        novaColuna = { id: Date.now(), label, tipoValor, codigo };
+        novaColuna = { id: Date.now(), label, tipoValor: faltaTipo ? 'dias' : tipoValorSelecionado, codigo, faltaTipo };
     } else {
         const item = rubricasCatalogoAgrupadas[Number(select.value)];
         if (!item) {
             mostrarMensagem('Atenção', 'Rubrica inválida. Selecione novamente.');
             return;
         }
-        novaColuna = { id: Date.now(), label: item.descricao, tipoValor, codigosPorEmpresa: { ...item.codigosPorEmpresa } };
+        const faltaTipo = detectarFaltaTipo(item.descricao);
+        novaColuna = { id: Date.now(), label: item.descricao, tipoValor: faltaTipo ? 'dias' : tipoValorSelecionado, codigosPorEmpresa: { ...item.codigosPorEmpresa }, faltaTipo };
     }
 
     rubricasGrid.push(novaColuna);
@@ -538,6 +619,7 @@ function adicionarRubricaGrade() {
 
     document.getElementById('gradeRubricaCodigo').value = '';
     document.getElementById('gradeRubricaValorPadrao').value = '';
+    document.getElementById('gradeRubricaTipoValor').disabled = false;
     select.value = '';
     onRubricaSelecaoChange();
 
@@ -569,12 +651,15 @@ function renderGrade() {
     if (!chipsContainer || !gradeContainer) return;
 
     // Chips das rubricas adicionadas
-    chipsContainer.innerHTML = rubricasGrid.map(r => `
+    chipsContainer.innerHTML = rubricasGrid.map(r => {
+        const sufixoFalta = r.faltaTipo === 'dsr' ? ' · falta c/ DSR' : (r.faltaTipo === 'normal' ? ' · falta' : '');
+        return `
         <span class="chip-rubrica">
-            ${r.label} (${r.tipoValor})
+            ${r.label} (${r.tipoValor}${sufixoFalta})
             <span class="chip-remove" onclick="removerRubricaGrade(${r.id})">×</span>
         </span>
-    `).join('');
+    `;
+    }).join('');
 
     if (rubricasGrid.length === 0 || empregadosSelecionadosAtual.length === 0) {
         gradeContainer.innerHTML = '<div class="grade-empty-msg">Adicione ao menos uma rubrica acima para montar a grade.</div>';
@@ -583,7 +668,7 @@ function renderGrade() {
 
     let html = '<table class="grade-table"><thead><tr><th class="grade-emp-col">Empregado</th>';
     rubricasGrid.forEach(r => {
-        html += `<th>${r.label}<br><small>${infoTipoValor(r.tipoValor).placeholder}</small></th>`;
+        html += `<th>${r.label}<br><small>${placeholderColuna(r).placeholder}</small></th>`;
     });
     html += '</tr></thead><tbody>';
 
@@ -593,7 +678,8 @@ function renderGrade() {
         html += `<tr data-emp-busca="${buscaAttr}"><td class="grade-emp-col">${nome}</td>`;
         rubricasGrid.forEach(r => {
             const valorAtual = (valoresGrid[r.id] && valoresGrid[r.id][empKey]) || '';
-            html += `<td><input type="text" class="grade-input" placeholder="${infoTipoValor(r.tipoValor).placeholder}" value="${valorAtual}" onchange="atualizarValorCelula(${r.id}, '${empKey}', this.value)"></td>`;
+            const info = placeholderColuna(r);
+            html += `<td><input type="text" class="grade-input" placeholder="${info.placeholder}" title="${info.dica}" value="${valorAtual}" onchange="atualizarValorCelula(${r.id}, '${empKey}', this.value)"></td>`;
         });
         html += '</tr>';
     });
@@ -640,7 +726,17 @@ function gerarParametrizacoes() {
             const valor = valoresColuna[empKey];
             if (!valor || !valor.trim()) continue;
 
-            if (!validarFormatoValor(valor, r.tipoValor)) {
+            if (r.faltaTipo) {
+                const validacao = validarFormatoDiasFalta(valor, comp);
+                if (!validacao.ok) {
+                    const nomeEmp = empregadosInfoAtual[empKey] || empKey;
+                    const detalhe = validacao.motivo === 'intervalo'
+                        ? `dia ${validacao.diaInvalido} não existe na competência ${comp} (máx: ${validacao.ultimoDia})`
+                        : 'use os dias do mês separados por vírgula (ex: 5,12,20)';
+                    mostrarMensagem('Atenção', `Dias de falta inválidos para "${nomeEmp}" na rubrica ${r.label}: "${valor}" (${detalhe}).`);
+                    return;
+                }
+            } else if (!validarFormatoValor(valor, r.tipoValor)) {
                 const nomeEmp = empregadosInfoAtual[empKey] || empKey;
                 mostrarMensagem('Atenção', `Valor inválido para "${nomeEmp}" na rubrica ${r.label}: "${valor}". Corrija antes de gerar.`);
                 return;
@@ -769,6 +865,7 @@ function novaParametrizacao() {
     document.getElementById('gradeRubricaCodigo').value = '';
     document.getElementById('gradeRubricaValorPadrao').value = '';
     document.getElementById('gradeRubricaTipoValor').value = 'horas';
+    document.getElementById('gradeRubricaTipoValor').disabled = false;
     atualizarPlaceholderValorPadrao();
 
     // Voltar ao Step 1 para nova leva (nova seleção de empresas/empregados)
@@ -834,6 +931,7 @@ function baixarTXT() {
     document.getElementById('gradeRubricaCodigo').value = '';
     document.getElementById('gradeRubricaValorPadrao').value = '';
     document.getElementById('gradeRubricaTipoValor').value = 'horas';
+    document.getElementById('gradeRubricaTipoValor').disabled = false;
     document.getElementById('buscaEmpresa').value = '';
     document.getElementById('buscaEmpregado').value = '';
     atualizarPlaceholderValorPadrao();

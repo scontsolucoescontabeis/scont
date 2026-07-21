@@ -178,7 +178,7 @@
                     </div>
                     <div class="form-group" id="gradeRubricaManualFields" style="display: none; margin-bottom: 0;">
                         <label for="gradeRubricaCodigo">Código da Rubrica *</label>
-                        <input type="text" id="gradeRubricaCodigo" list="catalogoRubricasDatalist" placeholder="Ex: 1285 ou busque no catálogo" maxlength="9" oninput="this.value = this.value.replace(/\D/g, '')">
+                        <input type="text" id="gradeRubricaCodigo" list="catalogoRubricasDatalist" placeholder="Ex: 1285 ou busque no catálogo" maxlength="9" oninput="this.value = this.value.replace(/\D/g, ''); onCodigoManualInput();">
                         <datalist id="catalogoRubricasDatalist"></datalist>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
