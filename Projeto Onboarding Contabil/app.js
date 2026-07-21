@@ -12,6 +12,7 @@
 
   const GATILHOS = [
     { campo: 'tem_contabilidade_anterior', label: 'Possui contabilidade anterior?' },
+    { campo: 'empresa_recem_aberta', label: 'Empresa recém-aberta (em constituição)?', dependeDe: { campo: 'tem_contabilidade_anterior', valor: false } },
     { campo: 'tem_empregados', label: 'Possui empregados?' },
     { campo: 'tem_estoque', label: 'Possui estoques?' },
     { campo: 'tem_emprestimos', label: 'Possui empréstimos/financiamentos?' },
@@ -134,7 +135,7 @@
     const main = document.getElementById('main');
     const opcoesRegime = REGIMES.map((r) => `<option value="${r.valor}">${r.label}</option>`).join('');
     const gatilhosHtml = GATILHOS.map((g) => `
-      <div class="gatilho-item">
+      <div class="gatilho-item" data-campo="${g.campo}" ${g.dependeDe ? `data-depende-campo="${g.dependeDe.campo}" data-depende-valor="${g.dependeDe.valor}"` : ''}>
         <label for="gat_${g.campo}">${g.label}</label>
         <label class="switch">
           <input type="checkbox" id="gat_${g.campo}" data-campo="${g.campo}">
@@ -204,11 +205,28 @@
     renderGrupoEmpresa(false);
     document.getElementById('chkEmpresaNova').addEventListener('change', (e) => renderGrupoEmpresa(e.target.checked));
 
+    main.querySelectorAll('.gatilhos-grid input[type="checkbox"]').forEach((el) => {
+      el.addEventListener('change', atualizarGatilhosDependentes);
+    });
+    atualizarGatilhosDependentes();
+
     document.getElementById('btnCancelarNovo').addEventListener('click', () => {
       document.getElementById('main').innerHTML = '';
       renderEmptyState();
     });
     document.getElementById('btnSalvarNovo').addEventListener('click', salvarNovoOnboarding);
+  }
+
+  function atualizarGatilhosDependentes() {
+    document.querySelectorAll('.gatilho-item[data-depende-campo]').forEach((el) => {
+      const inputDep = document.getElementById(`gat_${el.dataset.dependeCampo}`);
+      const valorEsperado = el.dataset.dependeValor === 'true';
+      const habilitado = !!inputDep && inputDep.checked === valorEsperado;
+      const inputEste = el.querySelector('input[type="checkbox"]');
+      el.classList.toggle('disabled', !habilitado);
+      inputEste.disabled = !habilitado;
+      if (!habilitado) inputEste.checked = false;
+    });
   }
 
   function renderGrupoEmpresa(empresaNova) {

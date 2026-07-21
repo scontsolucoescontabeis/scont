@@ -7,8 +7,15 @@
  * Administrativo — então nada desses domínios entra aqui, só o que a
  * equipe contábil precisa para montar o balanço de abertura.
  *
+ * Seção C.0 cobre o cenário de empresa recém-aberta (em constituição):
+ * capital social, integralização, alocação dos recursos e imobilizado
+ * inicial. É um refinamento de "sem contabilidade anterior" — só aparece
+ * quando o gatilho `empresa_recem_aberta` está marcado (e esse gatilho só
+ * fica habilitável quando `tem_contabilidade_anterior` é falso).
+ *
  * Cada seção pode ter `condicaoSecao` (a seção inteira só é gerada se a
- * condição bater). Cada item pode ter `condicao` (o item só é gerado se a
+ * condição bater; pode ser um objeto único ou um array de condições, todas
+ * avaliadas em AND). Cada item pode ter `condicao` (o item só é gerado se a
  * condição bater); itens sem `condicao` são sempre gerados quando a seção
  * está ativa — a equipe marca "não aplicável" manualmente quando não há um
  * gatilho binário claro para aquele item.
@@ -18,12 +25,31 @@
 
   function bate(condicao, respostas) {
     if (!condicao) return true;
-    const valorAtual = respostas[condicao.campo];
-    if (condicao.valores) return condicao.valores.includes(valorAtual);
-    return valorAtual === condicao.valor;
+    const lista = Array.isArray(condicao) ? condicao : [condicao];
+    return lista.every((c) => {
+      const valorAtual = respostas[c.campo];
+      if (c.valores) return c.valores.includes(valorAtual);
+      return valorAtual === c.valor;
+    });
   }
 
   const CATALOGO = [
+    {
+      secao: 'C0',
+      titulo: 'Seção C.0 — Empresa recém-aberta (constituição)',
+      condicaoSecao: { campo: 'empresa_recem_aberta', valor: true },
+      itens: [
+        { codigo: 'C0-1', texto: 'Capital social subscrito: valor total e prazo de integralização', exigencia: 'obrigatorio', observacao: 'Conforme contrato social' },
+        { codigo: 'C0-2', texto: 'Comprovante de integralização do capital em dinheiro (extrato da conta mostrando o depósito)', exigencia: 'obrigatorio' },
+        { codigo: 'C0-3', texto: 'Bens conferidos para integralização de capital (notas fiscais e/ou laudo de avaliação)', exigencia: 'condicional', observacao: 'Se parte do capital foi integralizada em bens' },
+        { codigo: 'C0-4', texto: 'Destinação/aplicação dos recursos do capital social', exigencia: 'obrigatorio', observacao: 'O que foi comprado ou reservado como capital de giro' },
+        { codigo: 'C0-5', texto: 'Notas fiscais de aquisição de imobilizado/equipamentos iniciais', exigencia: 'condicional', observacao: 'Se houve compra de bens/equipamentos na abertura' },
+        { codigo: 'C0-6', texto: 'Estoque inicial adquirido (notas fiscais de compra)', exigencia: 'condicional', observacao: 'Se houver estoques', condicao: { campo: 'tem_estoque', valor: true } },
+        { codigo: 'C0-7', texto: 'Despesas pré-operacionais (taxas de registro, honorários, reformas/instalações anteriores ao início das atividades)', exigencia: 'obrigatorio' },
+        { codigo: 'C0-8', texto: 'Data efetiva de início das operações (primeira venda/nota fiscal emitida)', exigencia: 'obrigatorio', observacao: 'Separa o período pré-operacional' },
+        { codigo: 'C0-9', texto: 'Plano de contas a ser adotado, definido em conjunto com o cliente', exigencia: 'obrigatorio', observacao: 'Sem histórico anterior para basear o de-para' },
+      ],
+    },
     {
       secao: 'C1',
       titulo: 'Seção C.1 — Com escrituração contábil anterior',
@@ -45,7 +71,10 @@
     {
       secao: 'C2',
       titulo: 'Seção C.2 — Sem escrituração contábil anterior',
-      condicaoSecao: { campo: 'tem_contabilidade_anterior', valor: false },
+      condicaoSecao: [
+        { campo: 'tem_contabilidade_anterior', valor: false },
+        { campo: 'empresa_recem_aberta', valor: false },
+      ],
       itens: [
         { codigo: 'C2-1', texto: 'Extratos bancários de todas as contas na data de corte', exigencia: 'obrigatorio' },
         { codigo: 'C2-2', texto: 'Relação de bens e direitos com documentos de aquisição (notas fiscais)', exigencia: 'obrigatorio' },
@@ -94,6 +123,7 @@
         { codigo: 'H8', texto: 'Divergências documentadas e formalizadas ao cliente', exigencia: 'obrigatorio', observacao: 'Relatório de divergências' },
         { codigo: 'H9', texto: 'Arquivo de importação de lançamentos gerado e validado no Domínio', exigencia: 'obrigatorio' },
         { codigo: 'H10', texto: 'Lançamento de abertura conferido por segundo colaborador (dupla checagem)', exigencia: 'obrigatorio' },
+        { codigo: 'H11', texto: 'Capital social integralizado batendo com a aplicação dos recursos (Ativo = Capital Social)', exigencia: 'condicional', observacao: 'Somente empresas recém-abertas', condicao: { campo: 'empresa_recem_aberta', valor: true } },
       ],
     },
   ];

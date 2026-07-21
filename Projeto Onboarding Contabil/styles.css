@@ -355,6 +355,9 @@ input,select,textarea{font:inherit}
   background:var(--surface-2);
 }
 .gatilho-item label{font-size:.86rem;font-weight:600}
+.gatilho-item.disabled{opacity:.45}
+.gatilho-item.disabled label{cursor:not-allowed}
+.gatilho-item.disabled .switch .slider{cursor:not-allowed}
 .switch{
   position:relative;
   width:42px;
