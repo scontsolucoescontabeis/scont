@@ -1895,6 +1895,26 @@ const _CFG_EVENTOS = [
 ];
 
 let _cacheConfigRubricas = {};
+let _cacheCatalogoRubricas = {};
+let _catalogoRubricasAtual = [];
+
+async function _buscarCatalogoRubricas(codigoEmpresa) {
+    if (!codigoEmpresa) return [];
+    if (_cacheCatalogoRubricas[codigoEmpresa] !== undefined) return _cacheCatalogoRubricas[codigoEmpresa];
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_rubricas')
+            .select('codigo_rubrica, descricao_rubrica, tipo')
+            .eq('codigo_empresa', codigoEmpresa)
+            .order('descricao_rubrica');
+        if (error) throw error;
+        _cacheCatalogoRubricas[codigoEmpresa] = data || [];
+        return data || [];
+    } catch (e) {
+        console.error('Erro ao buscar catálogo de rubricas:', e);
+        return [];
+    }
+}
 
 async function _buscarConfigRubricas(codigoEmpresa) {
     if (!codigoEmpresa) return null;
@@ -4437,6 +4457,7 @@ async function abrirModalTxtResultados() {
     }
     const codEmp = state.empresaSelecionada?.codigo_empresa;
     const cfg = codEmp ? await _buscarConfigRubricas(codEmp) : null;
+    _catalogoRubricasAtual = codEmp ? await _buscarCatalogoRubricas(codEmp) : [];
     document.getElementById('resNaoCompensar').checked = cfg?.['nao_compensar_extras']?.cod === '1';
     _toggleNaoCompensar('res');
     _aplicarConfigRubricasNoCampos('res', cfg);
@@ -4472,12 +4493,30 @@ function _adicionarLancamentoAdicional() {
         sel.appendChild(opt);
     });
 
-    const rubInput = document.createElement('input');
-    rubInput.type = 'text';
-    rubInput.className = 'lanc-rubrica';
-    rubInput.maxLength = 9;
-    rubInput.placeholder = 'Ex: 000610';
-    rubInput.style.cssText = 'padding:5px 6px;border:1px solid #ced4da;border-radius:4px;font-size:12px;font-family:monospace;width:100%;box-sizing:border-box;';
+    const rubSel = document.createElement('select');
+    rubSel.className = 'lanc-rubrica';
+    rubSel.style.cssText = 'padding:5px 6px;border:1px solid #ced4da;border-radius:4px;font-size:12px;width:100%;';
+    let rubOptsHtml = '<option value="">Selecione...</option>';
+    _catalogoRubricasAtual.forEach(r => {
+        const desc = r.descricao_rubrica || '(sem descrição)';
+        rubOptsHtml += `<option value="${r.codigo_rubrica}">${desc} (${r.codigo_rubrica})</option>`;
+    });
+    rubOptsHtml += '<option value="__manual__">Outra rubrica (digitar código)</option>';
+    rubSel.innerHTML = rubOptsHtml;
+
+    const rubManual = document.createElement('input');
+    rubManual.type = 'text';
+    rubManual.className = 'lanc-rubrica-manual';
+    rubManual.maxLength = 9;
+    rubManual.placeholder = 'Ex: 000610';
+    rubManual.style.cssText = 'display:none;grid-column:1 / -1;padding:5px 6px;border:1px solid #ced4da;border-radius:4px;font-size:12px;font-family:monospace;width:100%;box-sizing:border-box;margin-top:6px;';
+    rubManual.oninput = function() { this.value = this.value.replace(/\D/g, ''); };
+
+    rubSel.onchange = function() {
+        const manual = this.value === '__manual__';
+        rubManual.style.display = manual ? 'block' : 'none';
+        if (!manual) rubManual.value = '';
+    };
 
     const tipoSel = document.createElement('select');
     tipoSel.className = 'lanc-tipo';
@@ -4511,10 +4550,11 @@ function _adicionarLancamentoAdicional() {
     };
 
     row.appendChild(sel);
-    row.appendChild(rubInput);
+    row.appendChild(rubSel);
     row.appendChild(tipoSel);
     row.appendChild(valInput);
     row.appendChild(removeBtn);
+    row.appendChild(rubManual);
     container.appendChild(row);
 
     if (header) header.style.display = 'grid';
@@ -4532,8 +4572,11 @@ function _construirLinhasAdicionais(compFmt, codEmpresa, tipoProcesso) {
     let linhas = '';
 
     rows.forEach(row => {
-        const codEmp  = (row.querySelector('.lanc-empregado')?.value || '').trim();
-        const rubrica = (row.querySelector('.lanc-rubrica')?.value  || '').trim();
+        const codEmp = (row.querySelector('.lanc-empregado')?.value || '').trim();
+        const rubricaSel = row.querySelector('.lanc-rubrica')?.value || '';
+        const rubrica = rubricaSel === '__manual__'
+            ? (row.querySelector('.lanc-rubrica-manual')?.value || '').trim()
+            : rubricaSel;
         const tipo    = row.querySelector('.lanc-tipo')?.value || 'monetario';
         const valorStr= (row.querySelector('.lanc-valor')?.value    || '').trim();
 
