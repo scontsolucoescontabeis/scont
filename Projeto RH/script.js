@@ -3588,6 +3588,256 @@ function exportarBeneficiosExcel() {
     XLSX.writeFile(wb, `Beneficios_VT_VA_${String(mesPag).padStart(2, '0')}${anoPag}_${Date.now()}.xlsx`);
 }
 
+// ===== RECIBOS DE BENEFÍCIOS (VT/VA) =====
+
+const _EXTENSO_UNIDADES = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+const _EXTENSO_DEZ_A_DEZENOVE = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+const _EXTENSO_DEZENAS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+const _EXTENSO_CENTENAS = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+
+// Converte 0-999 para extenso.
+function _extensoGrupo(n) {
+    if (n === 0) return '';
+    if (n === 100) return 'cem';
+    const partes = [];
+    const c = Math.floor(n / 100);
+    const r = n % 100;
+    if (c > 0) partes.push(_EXTENSO_CENTENAS[c]);
+    if (r > 0) {
+        if (r < 10) partes.push(_EXTENSO_UNIDADES[r]);
+        else if (r < 20) partes.push(_EXTENSO_DEZ_A_DEZENOVE[r - 10]);
+        else {
+            const d = Math.floor(r / 10);
+            const u = r % 10;
+            partes.push(u > 0 ? `${_EXTENSO_DEZENAS[d]} e ${_EXTENSO_UNIDADES[u]}` : _EXTENSO_DEZENAS[d]);
+        }
+    }
+    return partes.join(' e ');
+}
+
+// Converte um inteiro não-negativo para extenso (suporta milhares).
+function _extensoInteiro(n) {
+    if (n === 0) return 'zero';
+    const milhar = Math.floor(n / 1000);
+    const resto = n % 1000;
+    const partes = [];
+    if (milhar > 0) partes.push(milhar === 1 ? 'mil' : `${_extensoGrupo(milhar)} mil`);
+    if (resto > 0) partes.push((milhar > 0 && resto < 100 ? 'e ' : '') + _extensoGrupo(resto));
+    return partes.join(' ');
+}
+
+// Valor monetário (R$) por extenso, com singular/plural de real e centavo.
+function _valorPorExtenso(valor) {
+    const valorArred = Math.round((valor || 0) * 100) / 100;
+    const reais = Math.floor(valorArred);
+    const centavos = Math.round((valorArred - reais) * 100);
+    const textoReais = reais > 0 ? `${_extensoInteiro(reais)} ${reais === 1 ? 'real' : 'reais'}` : '';
+    const textoCentavos = centavos > 0 ? `${_extensoInteiro(centavos)} ${centavos === 1 ? 'centavo' : 'centavos'}` : '';
+    if (textoReais && textoCentavos) return `${textoReais} e ${textoCentavos}`;
+    return textoReais || textoCentavos || 'zero reais';
+}
+
+function _fmtMoedaRecibo(v) {
+    return (v || 0).toFixed(2).replace('.', ',');
+}
+
+const _RECIBO_BENEFICIO_CSS = `
+  .gm-recibo-va * { box-sizing: border-box; }
+  .gm-recibo-va {
+    font-family: 'DM Sans', Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    color: #3a3431;
+    background-color: #f4f1f0;
+    padding: 16px 0;
+  }
+  .gm-recibo-va .sheet { max-width: 950px; margin: 0 auto; padding: 0 16px; }
+  .gm-recibo-va .via-block {
+    background-color: #ffffff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    margin-bottom: 14px;
+  }
+  .gm-recibo-va .header {
+    background-color: #7a1e1e;
+    padding: 20px 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .gm-recibo-va .header .logo { font-family: 'DM Sans', Arial, sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 1px; color: #ffffff; }
+  .gm-recibo-va .header .via-tag { font-family: 'DM Mono', 'Courier New', monospace; font-size: 11px; color: #e8cfcf; text-transform: uppercase; letter-spacing: 1px; }
+  .gm-recibo-va .title-block { padding: 20px 44px 4px 44px; }
+  .gm-recibo-va .title-block .eyebrow { margin: 0; font-family: 'DM Mono', 'Courier New', monospace; font-size: 11px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: #7a1e1e; }
+  .gm-recibo-va .title-block h1 { margin: 6px 0 0 0; font-family: 'DM Sans', Arial, sans-serif; font-size: 19px; font-weight: 700; color: #2a2422; line-height: 1.35; }
+  .gm-recibo-va .body-content { padding: 16px 44px 6px 44px; font-size: 13px; line-height: 1.85; }
+  .gm-recibo-va .info-grid { display: flex; gap: 40px; margin-bottom: 18px; }
+  .gm-recibo-va .info-grid .col { flex: 1; }
+  .gm-recibo-va .info-label { font-family: 'DM Mono', 'Courier New', monospace; font-size: 9.5px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; color: #9a8f8a; margin: 0 0 3px 0; }
+  .gm-recibo-va .info-value { font-size: 14px; font-weight: 700; color: #2a2422; margin: 0 0 12px 0; }
+  .gm-recibo-va .body-content p.paragraph { margin: 0 0 16px 0; text-align: justify; }
+  .gm-recibo-va .highlight { color: #7a1e1e; font-weight: 700; }
+  .gm-recibo-va .calc-box { background-color: #f7efef; border-left: 4px solid #7a1e1e; border-radius: 4px; padding: 14px 18px; margin: 0 0 18px 0; }
+  .gm-recibo-va .calc-box .label { margin: 0 0 6px 0; font-family: 'DM Mono', 'Courier New', monospace; font-size: 9.5px; font-weight: 500; letter-spacing: 1.5px; text-transform: uppercase; color: #7a1e1e; }
+  .gm-recibo-va .calc-box .value { margin: 0; font-size: 14.5px; font-weight: 700; color: #2a2422; line-height: 1.6; }
+  .gm-recibo-va .signature-area { padding: 10px 44px 0 44px; }
+  .gm-recibo-va .signature-date { margin: 0 0 34px 0; font-size: 13px; text-align: center; }
+  .gm-recibo-va .signature-row { display: flex; justify-content: center; margin-bottom: 8px; }
+  .gm-recibo-va .signature-col { flex: 0 0 55%; text-align: center; }
+  .gm-recibo-va .signature-line { border-top: 1px solid #2a2422; padding-top: 8px; font-size: 12px; font-weight: 500; color: #2a2422; }
+  .gm-recibo-va .footer { padding: 14px 44px 20px 44px; }
+  .gm-recibo-va .footer-inner { border-top: 1px solid #ece6e4; padding-top: 12px; font-family: 'DM Mono', 'Courier New', monospace; font-size: 9.5px; line-height: 1.6; color: #9a8f8a; text-align: center; }
+  .gm-recibo-va .cut-line { display: flex; align-items: center; gap: 10px; margin: 6px 0 14px 0; color: #b3a9a4; font-family: 'DM Mono', 'Courier New', monospace; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  .gm-recibo-va .cut-line::before, .gm-recibo-va .cut-line::after { content: ""; flex: 1; border-top: 1px dashed #c9beb9; }
+
+  @media print {
+    @page { size: A4; margin: 8mm 10mm; }
+    html, body { background-color: #ffffff; height: auto; }
+    .gm-recibo-va { background-color: #ffffff; padding: 0; }
+    .gm-recibo-va .sheet { max-width: 100%; padding: 0; }
+    .gm-recibo-va .via-block { box-shadow: none; border: 1px solid #ece6e4; border-radius: 0; margin-bottom: 0; page-break-inside: avoid; }
+    .gm-recibo-va .header { padding: 12px 28px; }
+    .gm-recibo-va .header .logo { font-size: 16px; }
+    .gm-recibo-va .title-block { padding: 12px 28px 2px 28px; }
+    .gm-recibo-va .title-block h1 { font-size: 15px; }
+    .gm-recibo-va .body-content { padding: 10px 28px 2px 28px; font-size: 11.5px; line-height: 1.65; }
+    .gm-recibo-va .info-grid { gap: 30px; margin-bottom: 12px; }
+    .gm-recibo-va .info-value { font-size: 12px; margin-bottom: 8px; }
+    .gm-recibo-va .body-content p.paragraph { margin-bottom: 10px; }
+    .gm-recibo-va .calc-box { padding: 10px 14px; margin-bottom: 12px; }
+    .gm-recibo-va .calc-box .value { font-size: 13px; }
+    .gm-recibo-va .signature-area { padding: 6px 28px 0 28px; }
+    .gm-recibo-va .signature-date { margin-bottom: 20px; }
+    .gm-recibo-va .footer { padding: 8px 28px 12px 28px; }
+    .gm-recibo-va .cut-line { margin: 2px 0 8px 0; }
+    #reciboBatch > .gm-recibo-va:not(:last-child) { page-break-after: always; }
+  }
+`;
+
+function _reciboViaHTML(d) {
+    return `
+    <div class="via-block">
+      <div class="header">
+        <div class="logo">${d.nomeEmpresa}</div>
+        <div class="via-tag">${d.viaTag}</div>
+      </div>
+      <div class="title-block">
+        <p class="eyebrow">Departamento Pessoal · Benefícios</p>
+        <h1>Recibo de Entrega de ${d.tituloBeneficio}</h1>
+      </div>
+      <div class="body-content">
+        <div class="info-grid">
+          <div class="col">
+            <p class="info-label">Empresa</p>
+            <p class="info-value">${d.nomeEmpresa}</p>
+            <p class="info-label">CNPJ</p>
+            <p class="info-value">${d.cnpj || '—'}</p>
+          </div>
+          <div class="col">
+            <p class="info-label">Empregado</p>
+            <p class="info-value">${d.nomeEmpregado}</p>
+            <p class="info-label">Função</p>
+            <p class="info-value">${d.cargo || '—'}</p>
+          </div>
+        </div>
+        <p class="paragraph">
+          Recebi da empresa <span class="highlight">${d.nomeEmpresa}</span> o equivalente a
+          R$ ${_fmtMoedaRecibo(d.mensalValor)} (${_valorPorExtenso(d.mensalValor)}) em ${d.pluralDesc}, na quantidade
+          abaixo discriminada, para minha utilização no período de ${d.periodoTexto}.
+        </p>
+        <div class="calc-box">
+          <p class="label">Composição do benefício</p>
+          <p class="value">${d.diasPagar} vales × R$ ${_fmtMoedaRecibo(d.diarioValor)} (${_valorPorExtenso(d.diarioValor)}) = R$ ${_fmtMoedaRecibo(d.mensalValor)} (${_valorPorExtenso(d.mensalValor)})</p>
+        </div>
+      </div>
+      <div class="signature-area">
+        <p class="signature-date">Brasília, &nbsp;&nbsp;&nbsp;&nbsp; de &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; de &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;.</p>
+        <div class="signature-row">
+          <div class="signature-col">
+            <div class="signature-line">Assinatura do Empregado</div>
+          </div>
+        </div>
+      </div>
+      ${d.footerTexto ? `<div class="footer"><div class="footer-inner">${d.footerTexto}</div></div>` : ''}
+    </div>`;
+}
+
+function _reciboSheetHTML(tipo, linha, periodoTexto) {
+    const diasPagar = Math.max(0, linha.diasTrabalhar - linha.diasDescontar);
+    const cfg = tipo === 'va'
+        ? { tituloBeneficio: 'Vale Alimentação', pluralDesc: 'vales alimentação', diarioValor: linha.vaDiario, mensalValor: diasPagar * linha.vaDiario, comFooter: false }
+        : { tituloBeneficio: 'Vale Transporte', pluralDesc: 'vales transporte', diarioValor: linha.vtDiario, mensalValor: diasPagar * linha.vtDiario, comFooter: true };
+
+    const base = {
+        nomeEmpresa: linha.nome_empresa, cnpj: linha.cnpj, nomeEmpregado: linha.nome_empregado, cargo: linha.desc_cargo,
+        tituloBeneficio: cfg.tituloBeneficio, pluralDesc: cfg.pluralDesc, periodoTexto, diasPagar,
+        diarioValor: cfg.diarioValor, mensalValor: cfg.mensalValor,
+    };
+
+    const via1 = _reciboViaHTML({ ...base, viaTag: '1ª Via · Empresa', footerTexto: cfg.comFooter ? 'SCONT Soluções Contábeis · Departamento Pessoal — via para arquivo da empresa' : '' });
+    const via2 = _reciboViaHTML({ ...base, viaTag: '2ª Via · Empregado', footerTexto: cfg.comFooter ? 'SCONT Soluções Contábeis · Departamento Pessoal — via do empregado' : '' });
+
+    return `<div class="gm-recibo-va"><div class="sheet">${via1}<div class="cut-line">Recorte aqui</div>${via2}</div></div>`;
+}
+
+function _abrirJanelaRecibos(tituloJanela, sheetsHtml) {
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>${tituloJanela}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>${_RECIBO_BENEFICIO_CSS}</style>
+</head>
+<body>
+<div id="reciboBatch">${sheetsHtml}</div>
+<script>window.onload = function(){ window.print(); }<\/script>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=1000,height=800');
+    if (!win) { mostrarMensagem('Aviso', 'Permita pop-ups para gerar os recibos.'); return; }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+}
+
+function gerarRecibosBeneficios() {
+    const linhas = state._beneficiosLinhas || [];
+    if (linhas.length === 0) { mostrarMensagem('Aviso', 'Gere a prévia antes de gerar os recibos.'); return; }
+
+    const comp = document.getElementById('beneficiosCompetencia').value;
+    const [mes, ano] = comp.split('/').map(Number);
+    const mesPag = mes === 12 ? 1 : mes + 1;
+    const anoPag = mes === 12 ? ano + 1 : ano;
+    const ultimoDia = new Date(anoPag, mesPag, 0).getDate();
+    const mesPagFmt = String(mesPag).padStart(2, '0');
+    const periodoTexto = `01/${mesPagFmt}/${anoPag} a ${String(ultimoDia).padStart(2, '0')}/${mesPagFmt}/${anoPag}`;
+
+    const porEmpresa = new Map();
+    linhas.forEach(l => {
+        if (!porEmpresa.has(l.codigo_empresa)) porEmpresa.set(l.codigo_empresa, { nomeEmpresa: l.nome_empresa, linhas: [] });
+        porEmpresa.get(l.codigo_empresa).linhas.push(l);
+    });
+
+    let algumGerado = false;
+    porEmpresa.forEach(grupo => {
+        [['va', 'Vale Alimentação'], ['vt', 'Vale Transporte']].forEach(([tipo, label]) => {
+            const elegiveis = grupo.linhas.filter(l => {
+                const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
+                const diario = tipo === 'va' ? l.vaDiario : l.vtDiario;
+                return diasPagar * (diario || 0) > 0;
+            });
+            if (elegiveis.length === 0) return;
+            const sheetsHtml = elegiveis.map(l => _reciboSheetHTML(tipo, l, periodoTexto)).join('');
+            _abrirJanelaRecibos(`Recibos de ${label} — ${grupo.nomeEmpresa}`, sheetsHtml);
+            algumGerado = true;
+        });
+    });
+
+    if (!algumGerado) mostrarMensagem('Aviso', 'Nenhum recibo gerado — todos os valores de VT/VA estão zerados ou em branco.');
+}
+
 // ===== GERAR ESCALA =====
 
 function _iniciarTelaEscala() {

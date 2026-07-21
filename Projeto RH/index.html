@@ -308,7 +308,10 @@
             <div id="beneficiosPreviaContainer" style="display:none;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
                     <span id="beneficiosPreviaInfo" style="font-size:13px; color: var(--text-secondary);"></span>
-                    <button type="button" class="btn btn-primary" onclick="exportarBeneficiosExcel()">📥 Gerar Excel</button>
+                    <div style="display:flex; gap:10px;">
+                        <button type="button" class="btn btn-secondary" onclick="gerarRecibosBeneficios()">🧾 Gerar Recibo</button>
+                        <button type="button" class="btn btn-primary" onclick="exportarBeneficiosExcel()">📥 Gerar Excel</button>
+                    </div>
                 </div>
                 <div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:8px;">
                     <table style="width:100%; border-collapse:collapse; font-size:12px; white-space:nowrap;">
