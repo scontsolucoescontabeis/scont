@@ -3491,6 +3491,7 @@ async function gerarPreviaBeneficios() {
                 diasDescontar,
                 vtDiario: valores.vt,
                 vaDiario: valores.va,
+                selecionado: true,
             };
         });
 
@@ -3509,13 +3510,12 @@ async function gerarPreviaBeneficios() {
 function _renderizarPreviaBeneficios(linhas) {
     const tbody = document.getElementById('beneficiosPreviaBody');
     const container = document.getElementById('beneficiosPreviaContainer');
-    const info = document.getElementById('beneficiosPreviaInfo');
 
-    info.textContent = `${linhas.length} empregado(s)`;
     tbody.innerHTML = linhas.map((l, i) => {
         const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
         return `
         <tr data-idx="${i}">
+            <td style="padding:6px 8px; text-align:center;"><input type="checkbox" class="ben-selecionado" ${l.selecionado !== false ? 'checked' : ''} onchange="_toggleLinhaBeneficios(${i}, this.checked)"></td>
             <td style="padding:6px 8px;">${l.codigo_empresa} - ${l.nome_empresa}</td>
             <td style="padding:6px 8px;">${l.codigo_empregado} - ${l.nome_empregado}</td>
             <td style="padding:6px 8px;">${l.desc_cargo}</td>
@@ -3530,6 +3530,29 @@ function _renderizarPreviaBeneficios(linhas) {
         </tr>`;
     }).join('');
     container.style.display = 'block';
+    _atualizarInfoBeneficios();
+}
+
+function _atualizarInfoBeneficios() {
+    const info = document.getElementById('beneficiosPreviaInfo');
+    const checkTodos = document.getElementById('beneficiosSelecionarTodos');
+    const linhas = state._beneficiosLinhas || [];
+    const selecionados = linhas.filter(l => l.selecionado !== false).length;
+    info.textContent = `${selecionados} de ${linhas.length} empregado(s) selecionado(s)`;
+    if (checkTodos) checkTodos.checked = linhas.length > 0 && selecionados === linhas.length;
+}
+
+function _toggleLinhaBeneficios(idx, checked) {
+    const linha = state._beneficiosLinhas?.[idx];
+    if (!linha) return;
+    linha.selecionado = checked;
+    _atualizarInfoBeneficios();
+}
+
+function _toggleSelecionarTodosBeneficios(checked) {
+    (state._beneficiosLinhas || []).forEach(l => { l.selecionado = checked; });
+    document.querySelectorAll('#beneficiosPreviaBody .ben-selecionado').forEach(cb => { cb.checked = checked; });
+    _atualizarInfoBeneficios();
 }
 
 function _recalcularLinhaBeneficios(idx) {
@@ -3547,8 +3570,9 @@ function _recalcularLinhaBeneficios(idx) {
 }
 
 function exportarBeneficiosExcel() {
-    const linhas = state._beneficiosLinhas || [];
-    if (linhas.length === 0) { mostrarMensagem('Aviso', 'Gere a prévia antes de exportar.'); return; }
+    if ((state._beneficiosLinhas || []).length === 0) { mostrarMensagem('Aviso', 'Gere a prévia antes de exportar.'); return; }
+    const linhas = state._beneficiosLinhas.filter(l => l.selecionado !== false);
+    if (linhas.length === 0) { mostrarMensagem('Aviso', 'Selecione ao menos um empregado antes de exportar.'); return; }
 
     const cabecalho = ['Cód Emp', 'NOME', 'CNPJ', 'Cód Epr', 'Nome', 'Descrição cargo', 'DIAS', 'DESCONTAR', 'DIAS A PAGAR', 'VT DIARIO', 'VA DIARIO', 'VT MENSAL', 'VA MENSAL'];
     // VT/VA (diário e mensal) saem como texto com 2 casas decimais (não número),
@@ -3803,8 +3827,9 @@ function _abrirJanelaRecibos(tituloJanela, sheetsHtml) {
 }
 
 function gerarRecibosBeneficios() {
-    const linhas = state._beneficiosLinhas || [];
-    if (linhas.length === 0) { mostrarMensagem('Aviso', 'Gere a prévia antes de gerar os recibos.'); return; }
+    if ((state._beneficiosLinhas || []).length === 0) { mostrarMensagem('Aviso', 'Gere a prévia antes de gerar os recibos.'); return; }
+    const linhas = state._beneficiosLinhas.filter(l => l.selecionado !== false);
+    if (linhas.length === 0) { mostrarMensagem('Aviso', 'Selecione ao menos um empregado antes de gerar os recibos.'); return; }
 
     const comp = document.getElementById('beneficiosCompetencia').value;
     const [mes, ano] = comp.split('/').map(Number);
