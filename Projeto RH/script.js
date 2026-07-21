@@ -4749,7 +4749,8 @@ function _adicionarLancamentoAdicional() {
     let rubOptsHtml = '<option value="">Selecione...</option>';
     _catalogoRubricasAtual.forEach(r => {
         const desc = r.descricao_rubrica || '(sem descrição)';
-        rubOptsHtml += `<option value="${r.codigo_rubrica}">${desc} (${r.codigo_rubrica})</option>`;
+        const tipo = r.tipo ? ` — ${r.tipo}` : '';
+        rubOptsHtml += `<option value="${r.codigo_rubrica}">${desc}${tipo} (${r.codigo_rubrica})</option>`;
     });
     rubOptsHtml += '<option value="__manual__">Outra rubrica (digitar código)</option>';
     rubSel.innerHTML = rubOptsHtml;
