@@ -57,7 +57,7 @@
   async function carregarEmpresas() {
     const { data, error } = await supabaseClient
       .from('rh_empresas')
-      .select('codigo_empresa, nome_empresa, status_situacao')
+      .select('codigo_empresa, nome_empresa, cnpj, status_situacao')
       .order('nome_empresa', { ascending: true });
     if (error) { console.error(error); return; }
     const ativa = (s) => !s || String(s).trim().toLowerCase().startsWith('ativ');
@@ -134,7 +134,6 @@
     renderListaOnboardings();
 
     const main = document.getElementById('main');
-    const opcoesEmpresa = empresas.map((e) => `<option value="${escapeAttr(e.codigo_empresa)}">${escapeHtml(e.nome_empresa)}</option>`).join('');
     const opcoesRegime = REGIMES.map((r) => `<option value="${r.valor}">${r.label}</option>`).join('');
     const gatilhosHtml = GATILHOS.map((g) => `
       <div class="gatilho-item">
@@ -156,15 +155,16 @@
 
       <div class="card">
         <h3>Dados cadastrais</h3>
-        <p class="card-sub">Empresa deve já estar cadastrada em rh_empresas.</p>
+        <p class="card-sub" id="dadosCadastraisSub">Empresa deve já estar cadastrada em rh_empresas.</p>
+        <div class="empresa-nova-toggle">
+          <label class="switch">
+            <input type="checkbox" id="chkEmpresaNova">
+            <span class="slider"></span>
+          </label>
+          <span>Empresa nova (ainda não cadastrada em rh_empresas)</span>
+        </div>
         <div class="form-grid">
-          <div class="form-group">
-            <label for="novoEmpresa">Empresa</label>
-            <select id="novoEmpresa">
-              <option value="">Selecione...</option>
-              ${opcoesEmpresa}
-            </select>
-          </div>
+          <div class="form-group" id="grupoEmpresa"></div>
           <div class="form-group">
             <label for="novoCnpj">CNPJ</label>
             <input type="text" id="novoCnpj" placeholder="00.000.000/0000-00">
@@ -203,6 +203,9 @@
       </div>
     `;
 
+    renderGrupoEmpresa(false);
+    document.getElementById('chkEmpresaNova').addEventListener('change', (e) => renderGrupoEmpresa(e.target.checked));
+
     document.getElementById('btnCancelarNovo').addEventListener('click', () => {
       document.getElementById('main').innerHTML = '';
       renderEmptyState();
@@ -210,27 +213,87 @@
     document.getElementById('btnSalvarNovo').addEventListener('click', salvarNovoOnboarding);
   }
 
+  function renderGrupoEmpresa(empresaNova) {
+    const grupo = document.getElementById('grupoEmpresa');
+    const sub = document.getElementById('dadosCadastraisSub');
+    if (sub) {
+      sub.textContent = empresaNova
+        ? 'Empresa ainda não cadastrada — será criada em rh_empresas ao gerar o checklist.'
+        : 'Empresa deve já estar cadastrada em rh_empresas.';
+    }
+
+    if (empresaNova) {
+      grupo.classList.add('full');
+      grupo.innerHTML = `
+        <label>Empresa nova</label>
+        <div class="empresa-nova-campos">
+          <input type="text" id="novoCodigoEmpresa" class="campo-codigo" placeholder="Código">
+          <input type="text" id="novoNomeEmpresa" placeholder="Nome da empresa (razão social)">
+        </div>
+      `;
+    } else {
+      grupo.classList.remove('full');
+      const opcoesEmpresa = empresas.map((e) => `<option value="${escapeAttr(e.codigo_empresa)}">${escapeHtml(e.nome_empresa)}</option>`).join('');
+      grupo.innerHTML = `
+        <label for="novoEmpresa">Empresa</label>
+        <select id="novoEmpresa">
+          <option value="">Selecione...</option>
+          ${opcoesEmpresa}
+        </select>
+      `;
+      document.getElementById('novoEmpresa').addEventListener('change', (e) => {
+        const emp = empresas.find((x) => x.codigo_empresa === e.target.value);
+        document.getElementById('novoCnpj').value = emp?.cnpj || '';
+      });
+    }
+  }
+
   async function salvarNovoOnboarding() {
-    const codigoEmpresa = document.getElementById('novoEmpresa').value;
+    const empresaNova = document.getElementById('chkEmpresaNova').checked;
     const regime = document.getElementById('novoRegime').value;
-    if (!codigoEmpresa) { mostrarToast('Selecione a empresa.', 'erro'); return; }
     if (!regime) { mostrarToast('Selecione o regime tributário.', 'erro'); return; }
 
-    const emp = empresas.find((x) => x.codigo_empresa === codigoEmpresa);
+    let codigoEmpresa, nomeEmpresa;
+    if (empresaNova) {
+      codigoEmpresa = document.getElementById('novoCodigoEmpresa').value.trim();
+      nomeEmpresa = document.getElementById('novoNomeEmpresa').value.trim();
+      if (!codigoEmpresa || !nomeEmpresa) { mostrarToast('Preencha o código e o nome da nova empresa.', 'erro'); return; }
+      if (empresas.some((e) => e.codigo_empresa.toLowerCase() === codigoEmpresa.toLowerCase())) {
+        mostrarToast('Já existe uma empresa com esse código. Desmarque "Empresa nova" e selecione-a na lista.', 'erro');
+        return;
+      }
+    } else {
+      codigoEmpresa = document.getElementById('novoEmpresa').value;
+      if (!codigoEmpresa) { mostrarToast('Selecione a empresa.', 'erro'); return; }
+      nomeEmpresa = (empresas.find((x) => x.codigo_empresa === codigoEmpresa) || {}).nome_empresa || codigoEmpresa;
+    }
+
     const respostas = { regime_tributario: regime };
     GATILHOS.forEach((g) => { respostas[g.campo] = document.getElementById(`gat_${g.campo}`).checked; });
+    const cnpjInformado = document.getElementById('novoCnpj').value || null;
 
     const btn = document.getElementById('btnSalvarNovo');
     btn.disabled = true;
     btn.textContent = 'Gerando...';
 
     try {
+      if (empresaNova) {
+        const { data: novaEmpresa, error: errEmpresa } = await supabaseClient
+          .from('rh_empresas')
+          .insert({ codigo_empresa: codigoEmpresa, nome_empresa: nomeEmpresa, cnpj: cnpjInformado, status_situacao: 'Ativo' })
+          .select()
+          .single();
+        if (errEmpresa) throw errEmpresa;
+        empresas.push(novaEmpresa);
+        empresas.sort((a, b) => a.nome_empresa.localeCompare(b.nome_empresa));
+      }
+
       const { data: onboarding, error } = await supabaseClient
         .from('contabil_onboardings')
         .insert({
           codigo_empresa: codigoEmpresa,
-          razao_social: emp ? emp.nome_empresa : codigoEmpresa,
-          cnpj: document.getElementById('novoCnpj').value || null,
+          razao_social: nomeEmpresa,
+          cnpj: cnpjInformado,
           data_corte: document.getElementById('novoDataCorte').value || null,
           regime_tributario: regime,
           responsavel_scont: document.getElementById('novoResponsavel').value || null,
@@ -301,10 +364,13 @@
           <span class="tag">${escapeHtml(onboarding.codigo_empresa)}</span>
           <p class="meta">Responsável: ${escapeHtml(onboarding.responsavel_scont || '—')} · Data de corte: ${formatarData(onboarding.data_corte)} · Início: ${formatarData(onboarding.data_inicio)}</p>
         </div>
-        <div class="onboarding-progresso-geral">
-          <small>Progresso geral</small>
-          <span class="num">${pctGeral}%</span>
-          <div class="progress-bar"><div class="progress-bar-fill" style="width:${pctGeral}%"></div></div>
+        <div class="onboarding-header-actions">
+          <div class="onboarding-progresso-geral">
+            <small>Progresso geral</small>
+            <span class="num">${pctGeral}%</span>
+            <div class="progress-bar"><div class="progress-bar-fill" style="width:${pctGeral}%"></div></div>
+          </div>
+          <button class="btn btn-danger" id="btnExcluirOnboarding" title="Excluir onboarding">🗑 Excluir</button>
         </div>
       </div>
 
@@ -322,7 +388,22 @@
       renderConteudoAba(onboarding, abaAtual === 'checklist' ? itensChecklist : itensInternos);
     }));
 
+    document.getElementById('btnExcluirOnboarding').addEventListener('click', () => excluirOnboarding(onboarding));
+
     renderConteudoAba(onboarding, abaAtual === 'checklist' ? itensChecklist : itensInternos);
+  }
+
+  async function excluirOnboarding(onboarding) {
+    if (!confirm(`Excluir o onboarding de "${onboarding.razao_social}"? Esta ação não pode ser desfeita.`)) return;
+
+    const { error } = await supabaseClient.from('contabil_onboardings').delete().eq('id', onboarding.id);
+    if (error) { console.error(error); mostrarToast('Erro ao excluir: ' + error.message, 'erro'); return; }
+
+    mostrarToast('Onboarding excluído.', 'sucesso');
+    onboardingAtualId = null;
+    document.getElementById('main').innerHTML = '';
+    renderEmptyState();
+    await carregarOnboardings();
   }
 
   function renderConteudoAba(onboarding, itensDaAba) {

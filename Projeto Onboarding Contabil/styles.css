@@ -237,6 +237,11 @@ input,select,textarea{font:inherit}
   color:var(--muted);
   font-size:.86rem;
 }
+.onboarding-header-actions{
+  display:flex;
+  align-items:flex-start;
+  gap:14px;
+}
 .onboarding-progresso-geral{
   min-width:220px;
 }
@@ -389,6 +394,25 @@ input,select,textarea{font:inherit}
 .btn-primary:hover{ opacity:.92; transform:translateY(-1px); }
 .btn-secondary{ background:var(--surface-2); color:var(--text); border:1px solid var(--line); }
 .btn-secondary:hover{ background:var(--line-soft); }
+.btn-danger{ background:#fff; color:#b3261e; border:1px solid #f2b8b5; }
+.btn-danger:hover{ background:#fdecea; }
+
+.empresa-nova-toggle{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:16px;
+  font-size:.86rem;
+  font-weight:600;
+}
+.empresa-nova-campos{
+  display:flex;
+  gap:12px;
+}
+.empresa-nova-campos .campo-codigo{
+  width:140px;
+  flex:none;
+}
 
 /* ─── CHECKLIST ─── */
 .secao-bloco{margin-bottom:20px}
