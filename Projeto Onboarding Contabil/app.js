@@ -14,8 +14,6 @@
     { campo: 'tem_contabilidade_anterior', label: 'Possui contabilidade anterior?' },
     { campo: 'tem_empregados', label: 'Possui empregados?' },
     { campo: 'tem_estoque', label: 'Possui estoques?' },
-    { campo: 'contribuinte_icms', label: 'É contribuinte de ICMS?' },
-    { campo: 'prestador_servicos', label: 'É prestador de serviços?' },
     { campo: 'tem_emprestimos', label: 'Possui empréstimos/financiamentos?' },
   ];
 
