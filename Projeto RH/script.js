@@ -3713,29 +3713,6 @@ const _RECIBO_BENEFICIO_CSS = `
   .gm-recibo-va .footer-inner { border-top: 1px solid #ece6e4; padding-top: 12px; font-family: 'DM Mono', 'Courier New', monospace; font-size: 9.5px; line-height: 1.6; color: #9a8f8a; text-align: center; }
   .gm-recibo-va .cut-line { display: flex; align-items: center; gap: 10px; margin: 6px 0 14px 0; color: #b3a9a4; font-family: 'DM Mono', 'Courier New', monospace; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
   .gm-recibo-va .cut-line::before, .gm-recibo-va .cut-line::after { content: ""; flex: 1; border-top: 1px dashed #c9beb9; }
-
-  @media print {
-    @page { size: A4; margin: 8mm 10mm; }
-    html, body { background-color: #ffffff; height: auto; }
-    .gm-recibo-va { background-color: #ffffff; padding: 0; }
-    .gm-recibo-va .sheet { max-width: 100%; padding: 0; }
-    .gm-recibo-va .via-block { box-shadow: none; border: 1px solid #ece6e4; border-radius: 0; margin-bottom: 0; page-break-inside: avoid; }
-    .gm-recibo-va .header { padding: 12px 28px; }
-    .gm-recibo-va .header .logo { font-size: 16px; }
-    .gm-recibo-va .title-block { padding: 12px 28px 2px 28px; }
-    .gm-recibo-va .title-block h1 { font-size: 15px; }
-    .gm-recibo-va .body-content { padding: 10px 28px 2px 28px; font-size: 11.5px; line-height: 1.65; }
-    .gm-recibo-va .info-grid { gap: 30px; margin-bottom: 12px; }
-    .gm-recibo-va .info-value { font-size: 12px; margin-bottom: 8px; }
-    .gm-recibo-va .body-content p.paragraph { margin-bottom: 10px; }
-    .gm-recibo-va .calc-box { padding: 10px 14px; margin-bottom: 12px; }
-    .gm-recibo-va .calc-box .value { font-size: 13px; }
-    .gm-recibo-va .signature-area { padding: 6px 28px 0 28px; }
-    .gm-recibo-va .signature-date { margin-bottom: 20px; }
-    .gm-recibo-va .footer { padding: 8px 28px 12px 28px; }
-    .gm-recibo-va .cut-line { margin: 2px 0 8px 0; }
-    #reciboBatch > .gm-recibo-va:not(:last-child) { page-break-after: always; }
-  }
 `;
 
 function _reciboViaHTML(d) {
@@ -3804,29 +3781,61 @@ function _reciboSheetHTML(tipo, linha, periodoTexto) {
     return `<div class="gm-recibo-va"><div class="sheet">${via1}<div class="cut-line">Recorte aqui</div>${via2}</div></div>`;
 }
 
-function _abrirJanelaRecibos(tituloJanela, sheetsHtml) {
-    const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>${tituloJanela}</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>${_RECIBO_BENEFICIO_CSS}</style>
-</head>
-<body>
-<div id="reciboBatch">${sheetsHtml}</div>
-<script>window.onload = function(){ window.print(); }<\/script>
-</body>
-</html>`;
-
-    const win = window.open('', '_blank', 'width=1000,height=800');
-    if (!win) { mostrarMensagem('Aviso', 'Permita pop-ups para gerar os recibos.'); return; }
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
+// Container fora da tela (não impresso, não visível) usado só para o html2canvas
+// capturar cada recibo como imagem antes de montar o PDF — troca o antigo fluxo de
+// abrir uma janela de impressão por empresa/tipo (que exigia salvar manualmente em
+// PDF um por um) por um `pdf.save()` que baixa o arquivo automaticamente.
+function _prepararContainerRecibosOffscreen(sheetsHtml) {
+    let container = document.getElementById('_reciboOffscreenContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = '_reciboOffscreenContainer';
+        container.style.cssText = 'position:fixed; left:-99999px; top:0; width:950px; background:#ffffff;';
+        document.body.appendChild(container);
+    }
+    if (!document.getElementById('_reciboBeneficioCssTag')) {
+        const style = document.createElement('style');
+        style.id = '_reciboBeneficioCssTag';
+        style.textContent = _RECIBO_BENEFICIO_CSS;
+        document.head.appendChild(style);
+    }
+    container.innerHTML = sheetsHtml;
+    return container;
 }
 
-function gerarRecibosBeneficios() {
+// Gera 1 PDF (1 página por empregado elegível, 2 vias cada) e dispara o download
+// automático — sem diálogo de impressão.
+async function _gerarPdfRecibos(nomeArquivo, sheetsHtml) {
+    const container = _prepararContainerRecibosOffscreen(sheetsHtml);
+    try {
+        const paginas = Array.from(container.querySelectorAll('.gm-recibo-va'));
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+        const larguraPagina = pdf.internal.pageSize.getWidth();
+        const alturaPagina = pdf.internal.pageSize.getHeight();
+
+        for (let i = 0; i < paginas.length; i++) {
+            const canvas = await html2canvas(paginas[i], { scale: 2, backgroundColor: '#ffffff' });
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            let larguraImg = larguraPagina;
+            let alturaImg = (canvas.height * larguraImg) / canvas.width;
+            if (alturaImg > alturaPagina) {
+                alturaImg = alturaPagina;
+                larguraImg = (canvas.width * alturaImg) / canvas.height;
+            }
+            const x = (larguraPagina - larguraImg) / 2;
+            const y = (alturaPagina - alturaImg) / 2;
+            if (i > 0) pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', x, y, larguraImg, alturaImg);
+        }
+
+        pdf.save(nomeArquivo);
+    } finally {
+        container.remove();
+    }
+}
+
+async function gerarRecibosBeneficios() {
     if ((state._beneficiosLinhas || []).length === 0) { mostrarMensagem('Aviso', 'Gere a prévia antes de gerar os recibos.'); return; }
     const linhas = state._beneficiosLinhas.filter(l => l.selecionado !== false);
     if (linhas.length === 0) { mostrarMensagem('Aviso', 'Selecione ao menos um empregado antes de gerar os recibos.'); return; }
@@ -3845,7 +3854,7 @@ function gerarRecibosBeneficios() {
         porEmpresa.get(l.codigo_empresa).linhas.push(l);
     });
 
-    let algumGerado = false;
+    const grupos = [];
     porEmpresa.forEach(grupo => {
         [['va', 'Vale Alimentação'], ['vt', 'Vale Transporte']].forEach(([tipo, label]) => {
             const elegiveis = grupo.linhas.filter(l => {
@@ -3853,14 +3862,26 @@ function gerarRecibosBeneficios() {
                 const diario = tipo === 'va' ? l.vaDiario : l.vtDiario;
                 return diasPagar * (diario || 0) > 0;
             });
-            if (elegiveis.length === 0) return;
-            const sheetsHtml = elegiveis.map(l => _reciboSheetHTML(tipo, l, periodoTexto)).join('');
-            _abrirJanelaRecibos(`Recibos de ${label} — ${grupo.nomeEmpresa}`, sheetsHtml);
-            algumGerado = true;
+            if (elegiveis.length > 0) grupos.push({ nomeEmpresa: grupo.nomeEmpresa, tipo, label, elegiveis });
         });
     });
 
-    if (!algumGerado) mostrarMensagem('Aviso', 'Nenhum recibo gerado — todos os valores de VT/VA estão zerados ou em branco.');
+    if (grupos.length === 0) { mostrarMensagem('Aviso', 'Nenhum recibo gerado — todos os valores de VT/VA estão zerados ou em branco.'); return; }
+
+    mostrarMensagem('Aguarde', `Gerando ${grupos.length} PDF(s) de recibos...`);
+    try {
+        for (const grupo of grupos) {
+            const sheetsHtml = grupo.elegiveis.map(l => _reciboSheetHTML(grupo.tipo, l, periodoTexto)).join('');
+            const nomeEmpresaArquivo = grupo.nomeEmpresa.replace(/[^\p{L}\p{N}]+/gu, '_');
+            const nomeArquivo = `Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesPagFmt}${anoPag}.pdf`;
+            await _gerarPdfRecibos(nomeArquivo, sheetsHtml);
+        }
+        fecharModalMensagem();
+    } catch (erro) {
+        console.error('Erro ao gerar recibos em PDF:', erro);
+        fecharModalMensagem();
+        mostrarMensagem('Erro', 'Falha ao gerar os recibos: ' + erro.message);
+    }
 }
 
 // ===== GERAR ESCALA =====
