@@ -1,0 +1,144 @@
+<p class="manual-intro">Simulador de custo de folha para equipes de vendas (loja), usado para comparar o custo mensal e anual de uma equipe sob os regimes tributários Simples Nacional e Lucro Presumido, e para acompanhar se o custo da folha está dentro da meta de eficiência (AV%) definida sobre o faturamento.</p>
+
+<section class="manual-item" id="cenarios">
+  <h2>Cenários</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na aba <strong>Cenários</strong>, escolha o Regime Tributário: <strong>Simples Nacional</strong> ou <strong>Lucro Presumido</strong>.</li>
+    <li>Informe os dados da loja: Faturamento Mensal, Dias Úteis (dias de funcionamento no mês), Vale-Alimentação (valor por dia útil trabalhado), Plano de Saúde (mensalidade por colaborador) e o AV Alvo (% de custo de folha sobre faturamento que se considera saudável).</li>
+    <li>Adicione um card por colaborador: Nome, Cargo, Tipo de contratação (<strong>Celetista</strong> ou <strong>Comissionado</strong>), Salário/Piso e % de Comissão.</li>
+    <li>Clique em <strong>Criar Cenário</strong>, dê um nome ao cenário e salve — o sistema calcula automaticamente todos os custos e grava o cenário no banco.</li>
+    <li>Cenários existentes podem ser reabertos para edição (substitui os colaboradores) ou excluídos.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Cadastro de múltiplos colaboradores por cenário, com tipo de contratação distinto por pessoa.</li>
+    <li>Cálculo automático de remuneração, comissão, DSR sobre comissão, encargos sociais, férias, 1/3 de férias, 13º, provisão de rescisão, benefícios e custo total (mensal e anual).</li>
+    <li>Indicador de eficiência (AV%) por cenário, sinalizando se o custo de folha está dentro, próximo ou acima da meta definida.</li>
+    <li>Exportação de cenários em CSV/impressão (botão de exportar em cada aba relevante).</li>
+    <li>Persistência dos cenários no Supabase (tabelas <code>sim_cenarios</code> e <code>sim_colaboradores</code>), por usuário.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>A venda individual é a base da comissão de cada colaborador:</p>
+  <div class="manual-formula">Venda Individual = Faturamento Mensal ÷ Nº de Colaboradores
+Comissão do colaborador = Venda Individual × (% Comissão do colaborador ÷ 100)</div>
+
+  <p>A remuneração e o DSR (Descanso Semanal Remunerado) sobre a comissão variam pelo tipo de contratação:</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Tipo</th><th>Remuneração</th><th>Base do DSR</th></tr></thead>
+    <tbody>
+      <tr><td>Celetista</td><td>Salário Base + Comissão</td><td>Comissão</td></tr>
+      <tr><td>Comissionado</td><td>Maior valor entre Comissão e Salário/Piso</td><td>Maior valor entre Comissão e Salário/Piso</td></tr>
+    </tbody>
+  </table>
+  <div class="manual-formula">Dias Não Úteis = 30 − Dias Úteis
+DSR = (Base do DSR ÷ Dias Úteis) × Dias Não Úteis</div>
+
+  <p>Os encargos sociais são aplicados sobre remuneração + DSR, com percentual total que depende do regime (ver seção <a href="#configuracoes">Configurações</a> abaixo para os percentuais vigentes):</p>
+  <div class="manual-formula">Base de Encargos = Remuneração + DSR
+Encargos do colaborador = Base de Encargos × (% total de encargos do regime)</div>
+
+  <p>Provisões de férias, 13º e rescisão, por colaborador:</p>
+  <div class="manual-formula">Férias = Base de Encargos ÷ 12
+1/3 de Férias = Férias ÷ 3
+13º = Base de Encargos ÷ 12
+FGTS sobre 13º = 13º × 8%
+FGTS sobre Férias = Férias × 8%
+FGTS sobre 1/3 = 1/3 de Férias × 8%
+Multa de 40% do FGTS = (FGTS 13º + FGTS Férias + FGTS 1/3) × 40%
+Provisão de Rescisão = FGTS 13º + FGTS Férias + FGTS 1/3 + Multa de 40%</div>
+
+  <p>Benefícios e custo total do cenário (soma de todos os colaboradores):</p>
+  <div class="manual-formula">Benefícios = (Vale-Alimentação × Dias Úteis × Nº Colaboradores) + (Plano de Saúde × Nº Colaboradores)
+
+Custo Mensal = Remuneração + Encargos + DSR + Férias + 1/3 + 13º + Rescisão + Benefícios
+Custo Anual = Custo Mensal × 12
+
+Imposto Anual = (Faturamento Mensal × 12) × alíquota tributária do regime
+Custo Total Anual = Custo Anual + Imposto Anual</div>
+
+  <p>Indicador de eficiência (AV — Análise Vertical do custo de folha sobre o faturamento):</p>
+  <div class="manual-formula">AV = Custo Mensal ÷ Faturamento Mensal
+
+Se AV > (AV Alvo + 2 pontos percentuais)  → status Crítico
+Se AV > AV Alvo (até 2 p.p. acima)        → status Atenção
+Caso contrário                             → status Saudável</div>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Por que o cálculo do DSR muda entre Celetista e Comissionado?</dt>
+    <dd>Para o celetista, o DSR incide só sobre a parte variável (comissão), já que o salário fixo já remunera o descanso semanal. Para o comissionado (sem salário fixo garantido acima do piso), o DSR incide sobre o maior valor entre a comissão apurada e o piso.</dd>
+    <dt>O imposto anual considera o lucro da loja?</dt>
+    <dd>Não. O Imposto Anual é uma estimativa simplificada calculada como a alíquota do regime aplicada diretamente sobre o faturamento anual — não é o cálculo tributário completo (que envolve outras variáveis fora do escopo deste simulador).</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="comparacao">
+  <h2>Comparação</h2>
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra a aba <strong>Comparação</strong> para ver todos os cenários salvos lado a lado.</li>
+    <li>Compare regime, número de colaboradores (celetistas × comissionados), faturamento, custo mensal, custo anual e AV% de cada cenário na mesma tabela.</li>
+  </ol>
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Tabela comparativa entre todos os cenários criados, útil para decidir qual composição de equipe/regime é mais eficiente.</li>
+    <li>Exportação da comparação em CSV.</li>
+  </ul>
+  <h3>Memórias de cálculo</h3>
+  <p>Não há cálculo adicional nesta aba — os valores exibidos são os mesmos já calculados na aba Cenários (ver <a href="#cenarios">Memórias de cálculo</a> acima), apenas lado a lado para facilitar a comparação.</p>
+</section>
+
+<section class="manual-item" id="dashboard">
+  <h2>Dashboard</h2>
+  <h3>Como usar</h3>
+  <ol>
+    <li>Aba inicial ao abrir a ferramenta. Mostra visão consolidada dos cenários: custo, faturamento, análise por regime tributário e status de eficiência (AV) de cada cenário.</li>
+  </ol>
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Cards de indicadores por cenário (custo mensal, AV% vs. AV alvo, regime, composição de equipe).</li>
+    <li>Bloco "Análise por Regime Tributário" comparando os cenários simulados em Simples Nacional e em Lucro Presumido.</li>
+  </ul>
+  <h3>Memórias de cálculo</h3>
+  <p>Reaproveita os totais já calculados na aba Cenários — não há fórmula própria do Dashboard.</p>
+</section>
+
+<section class="manual-item" id="memoria">
+  <h2>Memória (aba dentro da ferramenta)</h2>
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra a aba <strong>Memória</strong> para ver, cenário por cenário e colaborador por colaborador, o passo a passo do cálculo (venda individual, comissão, DSR, encargos, férias, rescisão etc.) já com os valores em reais aplicados — é a mesma lógica descrita em <a href="#cenarios">Cenários → Memórias de cálculo</a>, mas renderizada dentro do próprio sistema para conferência/auditoria.</li>
+  </ol>
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Exibe a memória de cálculo detalhada e já substituída pelos números reais de cada colaborador do cenário selecionado — não exige refazer as contas manualmente para conferir um valor.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="configuracoes">
+  <h2>Configurações</h2>
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na aba <strong>Configurações</strong>, ajuste os percentuais de encargos sociais e a alíquota tributária de cada regime.</li>
+    <li>Para o Lucro Presumido, informe o percentual de INSS Patronal (RAT e Terceiros também compõem o total, exibidos na mesma tela).</li>
+    <li>Salve — todos os cenários já criados são recalculados automaticamente com os novos percentuais.</li>
+  </ol>
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Percentuais configuráveis por regime, em vez de fixos no código — podem ser atualizados quando a legislação/negociação mudar.</li>
+  </ul>
+  <h3>Memórias de cálculo</h3>
+  <p>Valores padrão de fábrica de cada regime (editáveis na tela de Configurações; os efetivamente aplicados no cálculo são sempre os salvos em configuração, não estes valores fixos):</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Regime</th><th>FGTS</th><th>INSS Patronal</th><th>RAT</th><th>Terceiros</th><th>Total de Encargos</th><th>Alíquota Tributária (sobre faturamento)</th></tr></thead>
+    <tbody>
+      <tr><td>Simples Nacional</td><td>8%</td><td>—</td><td>—</td><td>—</td><td>8% (só FGTS)</td><td>6%</td></tr>
+      <tr><td>Lucro Presumido</td><td>8%</td><td>20%</td><td>5%</td><td>1,8%</td><td>34,8%</td><td>15%</td></tr>
+    </tbody>
+  </table>
+  <p>No Simples Nacional, apenas o FGTS incide como encargo (sem INSS Patronal, RAT ou Terceiros). O "Total de Encargos" de cada regime é o percentual usado na fórmula de <code>Encargos do colaborador</code> descrita em Cenários.</p>
+</section>

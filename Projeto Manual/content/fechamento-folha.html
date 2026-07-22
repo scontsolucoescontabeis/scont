@@ -1,0 +1,138 @@
+<p class="manual-intro">O módulo de Fechamento de Folha reúne o processamento mensal de três empresas com layout próprio de planilha — <strong>Quadrante Etiquetas</strong> (cód. 453), <strong>Track &amp; Field</strong> (cód. TF, multi-loja) e <strong>Anankê</strong> (cód. 293) — mais duas ferramentas transversais: o acompanhamento do fluxo de fechamento e a programação de férias. Cada empresa tem sua própria tela de "Planilha" (processamento) e "Formulário" (lançamento manual), acessíveis pelo menu lateral.</p>
+
+<section class="manual-item" id="quadrante">
+  <h2>Quadrante Etiquetas — Planilha e Formulário</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na tela <strong>Processamento</strong>, informe a <strong>Competência</strong> (MM/AAAA) e envie a planilha Excel de fechamento da empresa (cabeçalho na linha 4, dados a partir da linha 5).</li>
+    <li>O sistema cruza cada linha por nome do empregado (com correção manual quando não encontra) e mostra o relatório de rubricas identificadas por coluna.</li>
+    <li>Revise as linhas sem funcionário ou sem rubrica reconhecida — é possível corrigir o código do empregado ou da rubrica direto na tela.</li>
+    <li>Escolha o Tipo de Processo e clique em "Gerar TXT" para baixar o arquivo de lançamento no formato do sistema de folha.</li>
+    <li>Para a relação bancária de pagamento, use o item <strong>Relatório Líquido</strong> do menu lateral (independente do processamento acima): selecione a empresa, envie a planilha "Informações Bancárias" + "Líquido" (ou baixe o modelo pronto), revise e gere o PDF de etiquetas bancárias.</li>
+    <li>Em <strong>Configurações</strong>, cadastre o código de rubrica correspondente a cada coluna da planilha, os dados bancários dos empregados e as regras especiais (comissão garantida de domingo/feriado, quando aplicável).</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Leitura de planilha Excel com detecção automática das colunas de rubrica a partir do cabeçalho.</li>
+    <li>Casamento de empregado por nome com prioridade: código manual cadastrado em Configurações → correspondência exata em <code>rh_empregados</code> → correspondência aproximada (fuzzy).</li>
+    <li>Geração do TXT de lançamento no layout aceito pelo sistema de folha, com rubrica, tipo de processo e valor codificado por tipo.</li>
+    <li>Rascunho com auto-save (a cada 3s) do formulário manual, priorizando a versão salva no Supabase e caindo para armazenamento local se ficar offline.</li>
+    <li>Relatório Líquido: gera a relação de lançamentos bancários (uma tabela por banco, com subtotal) em PDF, para qualquer empresa cadastrada — não só a Quadrante.</li>
+    <li>Modelo de planilha (.xlsx) para download com o formato exato esperado pelo Relatório Líquido.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Cada coluna da planilha é resolvida contra a tabela de configuração de rubricas da empresa (<code>fechamento_rubricas_config</code>), que define o <strong>código da rubrica</strong> e o <strong>tipo de valor</strong> da coluna:</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Tipo de valor</th><th>Como o valor da célula é convertido</th></tr></thead>
+    <tbody>
+      <tr><td><code>monetario</code></td><td>Valor em reais → convertido para centavos (<code>valor × 100</code>, arredondado) para o TXT.</td></tr>
+      <tr><td><code>minutos</code> / <code>dias</code></td><td>Valor numérico direto, sem conversão de escala.</td></tr>
+      <tr><td><code>booleano</code></td><td>Célula preenchida com "Sim" → lança o <strong>valor de cota</strong> configurado para aquela rubrica (também em centavos); qualquer outro valor → zero.</td></tr>
+    </tbody>
+  </table>
+  <div class="manual-formula">valorInt = tipoValor === 'booleano'
+    ? (célula == "sim" ? round(valorCota × 100) : 0)
+    : converterPorTipo(célula, tipoValor)</div>
+  <p><strong>Relatório Líquido:</strong> o valor líquido de cada empregado (aba "Líquido" da planilha) é casado com o cadastro bancário por código de empregado (fallback por CPF), agrupado por banco (tabela FEBRABAN de códigos → nome do banco) e somado em um total por banco e um total geral. Empregados sem cadastro bancário bloqueiam a geração do PDF até serem completados.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>O empregado não aparece no relatório, o que fazer?</dt>
+    <dd>Verifique se o nome bate com o cadastro em Administração RH. Se o nome da planilha for diferente do cadastro, defina o código do empregado manualmente na própria linha do relatório — a correção vale para todas as linhas com esse nome.</dd>
+    <dt>Uma coluna aparece sem rubrica?</dt>
+    <dd>Cadastre o código da rubrica correspondente a essa coluna na tela de Configurações, usando o nome exato do cabeçalho da planilha.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="trackfield">
+  <h2>Track &amp; Field — Planilha e Formulário</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Envie a planilha de fechamento da loja (o processamento cobre múltiplas lojas da rede, cada uma com seu código de empresa próprio).</li>
+    <li>Revise o relatório de rubricas gerado por coluna, igual ao fluxo da Quadrante.</li>
+    <li>Ao clicar em "Gerar TXT", escolha o Tipo de Processo e, se houver desconto de Vale Transporte/Vale Alimentação por falta ou atestado na competência, responda "Sim" ao ser perguntado e lance o valor por empregado — o sistema usa o código de rubrica de VT/VA cadastrado para a empresa daquele empregado.</li>
+    <li>Na tela de Configurações, cadastre por empresa: o código de cada rubrica, o valor "garantido" de comissão de domingo/feriado (quando a empresa tiver essa regra) e os códigos de rubrica de desconto de VT/VA.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Mesma engine de resolução de coluna → rubrica → valor da Quadrante, adaptada para múltiplas lojas (empresa identificada por loja dentro da mesma planilha).</li>
+    <li>Lançamento manual pontual de desconto de VT/VA por falta/atestado, incluído no TXT junto com o restante sem precisar reprocessar a planilha.</li>
+    <li>Classificação de comissão de domingo/feriado como "garantida" quando abaixo de um valor mínimo configurado por empresa.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p><strong>Garantia de comissão de domingo/feriado (rubrica "R$87"):</strong> quando a comissão apurada de um empregado num domingo ou feriado trabalhado fica abaixo do valor mínimo configurado para a empresa (<code>valor_garantia</code>), a linha pode ser classificada como "Domingo" ou "Feriado" garantido — nesse caso o sistema lança o valor mínimo configurado (não o valor apurado) usando a rubrica específica de garantia, em vez da rubrica normal de comissão.</p>
+  <p><strong>Desconto de VT/VA por falta:</strong> não vem da planilha — é lançado manualmente por empregado no momento de gerar o TXT. Exige que a empresa tenha o código de rubrica de VT e/ou VA cadastrado em Configurações; sem o cadastro, o lançamento é bloqueado com uma mensagem indicando onde cadastrar. O valor informado em reais é convertido para centavos e entra no TXT com o mesmo tipo de processo escolhido para o restante da geração.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Posso lançar desconto de VT sem lançar de VA (ou vice-versa)?</dt>
+    <dd>Sim, os dois campos do lançamento são independentes — preencha só o que se aplica àquele empregado.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="ananke">
+  <h2>Anankê — Planilha e Formulário</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Envie a planilha de fechamento da Anankê (cabeçalho em duas linhas: nome da rubrica e, quando aplicável, um qualificador como "Insalubridade 20%"/"40%").</li>
+    <li>O código do empregado costuma vir direto de uma coluna da própria planilha (em vez de depender só do casamento por nome), reduzindo a chance de divergência de cadastro.</li>
+    <li>Revise o relatório e gere o TXT, mesmo padrão das demais empresas do módulo.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Suporte a colunas com qualificador (ex.: percentuais de insalubridade) tratadas como rubricas distintas.</li>
+    <li>Lançamento de plano de saúde (Unimed): cada linha de convênio informada no formulário vira um lançamento independente na rubrica configurada, associado ao empregado pelo primeiro nome.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Segue a mesma conversão de valor por <code>tipo_valor</code> (monetário/minutos/dias/booleano) descrita na seção da Quadrante. A particularidade da Anankê é o plano Unimed: cada linha de convênio lançada no formulário (um card por titular/dependente) gera uma linha de TXT própria, com a rubrica de "Plano Unimed" configurada, valor em reais convertido para centavos.</p>
+</section>
+
+<section class="manual-item" id="fluxo">
+  <h2>Fluxo de Fechamento</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra a tela para visualizar o andamento do fechamento da folha do mês entre as empresas do módulo.</li>
+    <li>Acompanhe o status de cada etapa (ex.: planilha recebida, TXT gerado, relatório líquido emitido) conforme forem concluídas.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Visão consolidada do progresso do fechamento mensal, sem precisar entrar em cada tela de empresa individualmente.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="ferias">
+  <h2>Programação de Férias</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Envie o PDF da "Programação de Férias" exportado do sistema de folha — o nome da empresa e o CNPJ são extraídos automaticamente do conteúdo do PDF.</li>
+    <li>Escolha quais colunas exibir, a ordem e, se quiser, renomeie os cabeçalhos.</li>
+    <li>Ordene a lista por qualquer coluna (ex.: data de início das férias) e use a busca para filtrar por qualquer campo.</li>
+    <li>Gere o PDF final formatado (paisagem, largura ajustada automaticamente às colunas escolhidas) para impressão ou envio.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Extração automática de texto do PDF de origem (não depende de planilha Excel).</li>
+    <li>Agrupamento de linhas que pertencem ao mesmo registro (registros que ocupam mais de uma linha no PDF original são reunidos automaticamente).</li>
+    <li>Múltiplos temas visuais de exportação.</li>
+    <li>Ferramenta genérica: não é fixada em nenhuma empresa específica do módulo — pode ser usada para a programação de férias de qualquer empresa. É a mesma tela acessada tanto pelo menu lateral do portal quanto pelos atalhos de "Programação de Férias" dentro da Quadrante/Track&amp;Field/Anankê.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>O PDF não extraiu a empresa/CNPJ corretamente, o que fazer?</dt>
+    <dd>É possível digitar manualmente esses campos quando a extração automática não reconhece o layout do PDF de origem.</dd>
+  </dl>
+</section>

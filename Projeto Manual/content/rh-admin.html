@@ -1,0 +1,227 @@
+<p class="manual-intro">Administração do módulo RH: cadastro de empresas, empregados, sócios e rubricas, além das configurações que alimentam o Controle de Frequência, os Lançamentos e o Renomeador de Arquivos. É a base de dados de onde todas as outras ferramentas do módulo RH puxam informação.</p>
+
+<section class="manual-item" id="empresas">
+    <h2>Empresas</h2>
+
+    <h3>Como usar</h3>
+    <ol>
+        <li>Acesse a aba <strong>Empresas</strong> no menu lateral.</li>
+        <li>Use os filtros de <strong>Código/Nome</strong> e <strong>Status</strong> para localizar uma empresa na tabela.</li>
+        <li>Para atualizar o cadastro em massa, vá em <strong>Importar Dados → Empresas</strong>, arraste o relatório exportado do ERP e escolha entre <strong>Substituir</strong> (apaga tudo e recria) ou <strong>Acrescentar</strong> (atualiza/insere sem apagar o resto).</li>
+        <li>Se alguma empresa ficar sem UF preenchida, use o botão <strong>🌍 Preencher UF pendentes</strong> na aba de importação de Empresas.</li>
+    </ol>
+
+    <h3>Funcionalidades</h3>
+    <ul>
+        <li>Listagem paginada com busca por código/nome e filtro por situação (Ativo/Inativo).</li>
+        <li>Importação em lote a partir do relatório nativo <strong>"Relação de Empresas"</strong> exportado direto do ERP — não é mais um modelo de planilha manual.</li>
+        <li>Preenchimento automático da <strong>UF</strong> a partir do CEP de cada empresa (sem precisar digitar).</li>
+        <li>Modo de importação com dois caminhos: substituir a base inteira ou apenas atualizar/inserir sem apagar nada.</li>
+    </ul>
+
+    <h3>Memórias de cálculo</h3>
+    <p>A importação lê o relatório exportado do ERP a partir da <strong>linha 8</strong> (7 linhas de título/paginação são ignoradas). Os dados vêm intercalados com colunas em branco (resquício de células mescladas do relatório original), então a leitura é posicional, coluna a coluna:</p>
+    <div class="manual-formula">nome_empresa  ← vem da coluna "Razão Social", não da coluna "Empresa"
+                (a coluna "Empresa" costuma vir truncada em parte das linhas)
+email         ← novo campo, mapeado da coluna "Email" do relatório
+Data de Encerramento e códigos internos do ERP → ignorados, não importados</div>
+    <p>Preenchimento de UF: para cada linha com CEP preenchido, o sistema consulta a API pública <strong>ViaCEP</strong>; se a API falhar ou não responder, cai para uma tabela local de faixas numéricas de CEP por estado (ex.: CEPs entre 01000-000 e 19999-999 → SP). Se nada resolver, a UF fica em branco.</p>
+    <p>No modo <strong>Acrescentar</strong>, se a busca de UF falhar para uma empresa que já tinha UF salva, o valor antigo é preservado (nunca é sobrescrito por vazio). No modo <strong>Substituir</strong>, a UF sempre reflete o resultado da importação atual — inclusive ficando vazia se a busca falhar.</p>
+
+    <h3>Perguntas frequentes</h3>
+    <dl>
+        <dt>Por que uma empresa importada ficou com o nome diferente do que aparece no ERP?</dt>
+        <dd>O nome usado é sempre o da coluna "Razão Social" do relatório, que é mais confiável do que a coluna "Empresa" (que vem truncada em cerca de 28% das linhas do relatório).</dd>
+        <dt>Preciso preencher a UF manualmente?</dt>
+        <dd>Não — ela é sempre derivada do CEP, automaticamente, na importação ou pelo botão "Preencher UF pendentes". Não existe campo de edição manual de UF.</dd>
+    </dl>
+</section>
+
+<section class="manual-item" id="empregados">
+    <h2>Empregados</h2>
+
+    <h3>Como usar</h3>
+    <ol>
+        <li>Acesse a aba <strong>Empregados</strong>.</li>
+        <li>Filtre por empresa (uma ou várias, com busca), por situação (Trabalhando, Demitido, afastamentos etc.) e por tipo de empregado (Empregado, Contribuinte, Estagiário).</li>
+        <li>Abra <strong>"📋 Selecionar Campos do Relatório"</strong> para escolher quais colunas exportar/imprimir, depois use <strong>📥 Exportar Excel</strong> ou <strong>🖨️ Gerar PDF</strong>.</li>
+        <li>Para atualizar em massa, use <strong>Importar Dados → Empregados</strong> com o relatório de empregados exportado do ERP.</li>
+        <li>Para adicionar um único empregado manualmente, abra <strong>"➕ Adicionar Novo Empregado"</strong> e informe empresa, código e nome.</li>
+    </ol>
+
+    <h3>Funcionalidades</h3>
+    <ul>
+        <li>Tabela paginada com filtro combinado por empresa(s), situação e tipo de empregado.</li>
+        <li>Seleção de campos do relatório (mais de 60 campos possíveis, incluindo endereço, documentos, dependentes e dados bancários) para exportação em Excel ou PDF.</li>
+        <li>Importação em lote com detecção automática de colunas pelo nome do cabeçalho — tolerante a arquivos com uma empresa por bloco.</li>
+        <li>Cadastro manual rápido (empresa + código + nome) para casos avulsos.</li>
+    </ul>
+
+    <h3>Memórias de cálculo</h3>
+    <p>A importação de empregados lê a planilha por <strong>nome de coluna</strong>, não por posição fixa, porque o relatório do ERP repete a linha de cabeçalho a cada troca de empresa dentro do mesmo arquivo (uma exportação com várias empresas gera vários blocos, cada um com seu próprio cabeçalho). O sistema:</p>
+    <div class="manual-formula">1. Percorre o arquivo linha a linha.
+2. Ao encontrar uma linha cujo primeiro campo é exatamente "Cód Emp", reconhece
+   como cabeçalho e remonta o mapa "posição da coluna → campo do sistema"
+   com base nos rótulos daquela linha (não gera empregado para essa linha).
+3. Linhas seguintes usam esse mapa até o próximo cabeçalho aparecer.
+4. Rótulos repetidos no arquivo (ex.: "Categoria" aparece tanto para a
+   categoria do empregado quanto para a categoria da CNH) são resolvidos
+   pela ordem de aparição: a 1ª ocorrência mapeia para a 1ª do modelo,
+   a 2ª para a 2ª.</div>
+    <p>Isso evita dois problemas do relatório real: linhas de cabeçalho repetidas virarem "empregados fantasmas", e a ordem das colunas de dados bancários (Agência/Conta) mudar de empresa para empresa dentro do mesmo arquivo.</p>
+
+    <h3>Perguntas frequentes</h3>
+    <dl>
+        <dt>A importação apaga os empregados que não estão na planilha nova?</dt>
+        <dd>Depende do modo escolhido no diálogo de importação: "Substituir" apaga e recria; "Acrescentar" só atualiza/insere, sem excluir ninguém.</dd>
+    </dl>
+</section>
+
+<section class="manual-item" id="ferias">
+    <h2>Informações de Férias</h2>
+    <h3>Como usar</h3>
+    <ol>
+        <li>Importe o PDF "Relação de Férias Calculadas" (todas as empresas de uma vez) em <strong>Importar Dados → Férias</strong>.</li>
+        <li>Consulte os períodos aquisitivo e de gozo de cada empregado na aba <strong>Informações de Férias</strong>, com busca por empresa ou empregado.</li>
+    </ol>
+    <h3>Funcionalidades</h3>
+    <ul>
+        <li>Extração automática, a partir do PDF, de: empresa, empregado, início/fim do período aquisitivo e início/fim das férias.</li>
+        <li>Esses dados alimentam o badge "Férias" exibido no Controle de Frequência para o período em que o empregado estiver de férias.</li>
+    </ul>
+    <h3>Perguntas frequentes</h3>
+    <dl>
+        <dt>Dá para editar manualmente um período de férias importado?</dt>
+        <dd>Não — assim como a Jornada, os dados de férias só entram via importação do PDF; uma nova importação substitui o conteúdo anterior.</dd>
+    </dl>
+</section>
+
+<section class="manual-item" id="jornada">
+    <h2>Jornada de Trabalho</h2>
+
+    <h3>Como usar</h3>
+    <ol>
+        <li>Importe o PDF "Horário de Trabalho" (todas as empresas) em <strong>Importar Dados → Jornada de Trabalho</strong>.</li>
+        <li>Consulte na aba <strong>Jornada de Trabalho</strong> os horários de cada empregado, um por linha, com os 7 dias da semana em colunas.</li>
+        <li>Para corrigir um horário pontual sem reimportar tudo, clique em <strong>✏️ Editar</strong> na linha do empregado.</li>
+    </ul>
+
+    <h3>Funcionalidades</h3>
+    <ul>
+        <li>Importação em massa via PDF: um empregado por linha, com entrada/intervalo/saída de cada dia em que trabalha.</li>
+        <li>Edição manual pontual: marcar/desmarcar um dia como "não trabalha" (folga) e ajustar entrada, intervalo (início/fim) e saída dos dias trabalhados, sem precisar reimportar o PDF inteiro.</li>
+        <li>Essa jornada é a base usada pelo Controle de Frequência para calcular horas trabalhadas, atrasos e horas extras.</li>
+    </ul>
+
+    <h3>Memórias de cálculo</h3>
+    <p>A importação do PDF é um <strong>snapshot completo</strong>: cada nova importação apaga e recria toda a tabela de jornada. Uma edição manual feita antes é perdida se aquele mesmo empregado aparecer de novo no próximo PDF importado — é um efeito colateral aceito, não um bug.</p>
+    <p>Na edição manual, a regra de validação é: se o dia está marcado como "Trabalha", Entrada e Saída são obrigatórios; o intervalo (início/fim) é opcional, mas não pode ser preenchido só de um lado.</p>
+
+    <h3>Perguntas frequentes</h3>
+    <dl>
+        <dt>Editei a jornada manualmente e depois importei um novo PDF — o que aconteceu com a edição?</dt>
+        <dd>Foi substituída. A importação de PDF sempre recria a tabela inteira; edições manuais só sobrevivem até a próxima importação.</dd>
+        <dt>A edição manual cadastra um empregado novo?</dt>
+        <dd>Não — só edita horários de quem já está na lista (trazido por uma importação anterior). Empregado novo entra sempre via PDF.</dd>
+    </dl>
+</section>
+
+<section class="manual-item" id="socios">
+    <h2>Sócios</h2>
+    <h3>Como usar</h3>
+    <ol>
+        <li>Consulte a aba <strong>Sócios</strong>, com filtro por nome, CPF, empresa e situação da empresa (ativa/inativa).</li>
+        <li>Para atualizar em massa, use <strong>Importar Dados → Sócios</strong> (Excel/CSV) — baixe o modelo pelo botão "⬇️ Modelo" antes de preencher.</li>
+    </ol>
+    <h3>Funcionalidades</h3>
+    <ul>
+        <li>Cadastro de quadro societário: nome, CPF, participação, cargo, datas de ingresso/saída e e-mail de cada sócio, vinculados à empresa.</li>
+        <li>Importação também atualiza dados da própria empresa relacionados ao quadro societário (capital social, e-mail, data de atualização do quadro).</li>
+    </ul>
+</section>
+
+<section class="manual-item" id="rubricas">
+    <h2>Rubricas</h2>
+
+    <h3>Como usar</h3>
+    <ol>
+        <li>Filtre por empresa e/ou texto (código ou descrição) na aba <strong>Rubricas</strong>.</li>
+        <li>Para cadastrar uma rubrica avulsa, use <strong>"➕ Adicionar / Editar Rubrica"</strong> (empresa, código, descrição e tipo).</li>
+        <li>Para atualizar em massa, use <strong>📥 Importar Excel</strong> (modelo disponível em "⬇️ Modelo").</li>
+    </ol>
+
+    <h3>Funcionalidades</h3>
+    <ul>
+        <li>Catálogo de rubricas por empresa: código, descrição e tipo (ex.: Vencimento, Desconto).</li>
+        <li>É esse catálogo que o Controle de Frequência e os Lançamentos usam para <strong>detectar automaticamente</strong> rubricas de falta e de DSR por falta, a partir do texto da descrição — sem precisar configurar um código fixo por empresa.</li>
+    </ul>
+
+    <h3>Memórias de cálculo</h3>
+    <p>Detecção automática de rubricas de falta (usada no Controle de Frequência e nos Lançamentos): a descrição de cada rubrica do catálogo é normalizada (maiúsculas, sem ponto final) e comparada por conteúdo:</p>
+    <div class="manual-formula">contém "DIAS FALTAS" e NÃO contém "DSR"  →  rubrica de falta normal
+contém "DIAS FALTAS" e contém "DSR"      →  rubrica de desconto de DSR por falta</div>
+    <p>Cobre variações já vistas no catálogo real, como <code>DIAS FALTAS</code>, <code>DIAS FALTAS 1</code>, <code>DIAS FALTAS DSR</code>, <code>DIAS FALTAS DSR.</code>. Se uma empresa não tiver a rubrica de DSR cadastrada aqui, o cálculo automático de desconto de DSR é pulado só para ela (as demais empresas do lote continuam normalmente), com aviso ao final da geração do TXT.</p>
+
+    <h3>Perguntas frequentes</h3>
+    <dl>
+        <dt>Esse cadastro de rubricas é o mesmo dos "códigos de rubrica" configurados na tela de exportação de TXT do Controle de Frequência?</dt>
+        <dd>Não. Este é o catálogo geral de rubricas da empresa (o que existe no ERP). A configuração de qual código usar para cada evento (Horas Extras, Falta etc.) ao gerar o TXT é feita em outra tela, dentro do próprio Controle de Frequência.</dd>
+    </dl>
+</section>
+
+<section class="manual-item" id="renomear-arquivos">
+    <h2>Regras de Renomeação de Arquivos</h2>
+
+    <h3>Como usar</h3>
+    <ol>
+        <li>Em <strong>"1. Padrões de Renomeação"</strong>, cadastre um padrão <strong>DE</strong> (como o arquivo chega) e um padrão <strong>PARA</strong> (como ele deve ficar), usando as tags disponíveis.</li>
+        <li>Em <strong>"2. Dicionário de Nomes de Documentos"</strong>, associe o texto cru extraído do nome original a um nome final mais legível (ex.: <code>ExtratoMensal</code> → <code>Folha de Pagamento</code>).</li>
+        <li>Os padrões e o dicionário cadastrados aqui são consumidos pela ferramenta <strong>Conversor e Renomeador de Arquivos</strong> — é lá que a renomeação de fato acontece.</li>
+    </ol>
+
+    <h3>Funcionalidades</h3>
+    <ul>
+        <li>Tags disponíveis: <code>{CODIGO_EMPRESA}</code>, <code>{NOME_EMPRESA}</code>, <code>{NOME_ARQUIVO}</code>, <code>{NOME_DOCUMENTO}</code>, <code>{MM}</code>, <code>{AAAA}</code>, <code>{IGNORAR}</code>.</li>
+        <li>Vários padrões podem ficar cadastrados ao mesmo tempo, para diferentes formatos de arquivo recebidos.</li>
+    </ul>
+
+    <h3>Memórias de cálculo</h3>
+    <p>O padrão <strong>DE</strong> é um molde para extrair pedaços do nome original: <code>{CODIGO_EMPRESA}</code> e <code>{NOME_ARQUIVO}</code> capturam texto; <code>{IGNORAR}</code> descarta um trecho sem usá-lo. O padrão <strong>PARA</strong> monta o nome novo substituindo cada tag pelo valor capturado (ou, no caso de <code>{NOME_EMPRESA}</code> e <code>{NOME_DOCUMENTO}</code>, por valores buscados no cadastro de empresas / dicionário de nomes):</p>
+    <div class="manual-formula">DE:   {CODIGO_EMPRESA}_{NOME_ARQUIVO}_{IGNORAR}_{MM}{AAAA}
+PARA: {NOME_DOCUMENTO}_{NOME_EMPRESA}_{AAAA}_{MM}
+
+Exemplo: "012_ExtratoMensal_v2_072026.pdf"
+  código da empresa = 012
+  nome do arquivo    = ExtratoMensal  → dicionário → "Folha de Pagamento"
+  trecho "v2"        = ignorado
+  mês/ano             = 07/2026
+  resultado: "Folha de Pagamento_Nome da Empresa Ltda_2026_07.pdf"</div>
+
+    <h3>Perguntas frequentes</h3>
+    <dl>
+        <dt>Preciso cadastrar o mapeamento no dicionário mesmo se o padrão PARA não usar {NOME_DOCUMENTO}?</dt>
+        <dd>Não — o dicionário só é consultado quando a tag {NOME_DOCUMENTO} aparece no padrão PARA.</dd>
+    </dl>
+</section>
+
+<section class="manual-item" id="importar-dados">
+    <h2>Importar Dados</h2>
+
+    <h3>Como usar</h3>
+    <ol>
+        <li>Acesse a aba <strong>Importar Dados</strong>: cada cartão (Empresas, Empregados, Férias, Jornada, Rubricas, Sócios) importa um tipo de cadastro separadamente.</li>
+        <li>Baixe o modelo quando disponível (botão "⬇️ Modelo"), preencha e arraste o arquivo — ou clique para selecionar.</li>
+        <li>Quando o sistema perguntar o modo de importação, escolha <strong>Substituir</strong> (apaga os dados anteriores daquele tipo e importa os novos) ou <strong>Acrescentar</strong> (mantém o que já existe e atualiza/insere).</li>
+    </ol>
+
+    <h3>Funcionalidades</h3>
+    <ul>
+        <li>Empresas e Empregados: leem o relatório exportado diretamente do ERP (não é mais um modelo simples de planilha).</li>
+        <li>Rubricas e Sócios: leem planilha no modelo próprio do sistema, baixável na tela.</li>
+        <li>Férias e Jornada: leem PDF exportado do sistema fonte (não planilha).</li>
+        <li>Barra de progresso e registro da data/hora da última importação de cada tipo.</li>
+    </ul>
+
+    <h3>Memórias de cálculo</h3>
+    <p>Regra geral: nenhuma importação exclui um registro que não esteja na planilha/PDF novo, <strong>a menos que o modo "Substituir" seja escolhido explicitamente</strong>. O modo "Acrescentar" (upsert) sempre atualiza pela chave de identificação de cada cadastro (ex.: código da empresa, ou empresa + empregado), sem apagar o que não veio no arquivo.</p>
+</section>

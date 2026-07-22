@@ -1,0 +1,88 @@
+<p class="manual-intro">Cronograma e controle das atividades da folha de pagamento do escritório: um calendário único (não um calendário separado por empresa) onde cada evento pode ser da empresa ou "geral" (todas), com prazos legais recorrentes gerados automaticamente mês a mês.</p>
+
+<section class="manual-item" id="visao-geral">
+  <h2>Calendário da Folha — visão geral</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra o Calendário da Folha pelo portal. A visão inicial é o <strong>Mês</strong> atual, com os eventos marcados em cada dia.</li>
+    <li>Use as setas <code>‹ ›</code> ao lado do nome do mês para navegar, ou o botão <strong>Hoje</strong> para voltar à data atual.</li>
+    <li>Alterne entre as visões <strong>Mês</strong> (grade de calendário) e <strong>Agenda</strong> (lista cronológica com check rápido de status) pelo seletor no topo.</li>
+    <li>Filtre por <strong>empresa</strong>, <strong>tipo</strong> de evento ou <strong>status</strong> (incluindo "Atrasado") usando os seletores da barra de ferramentas.</li>
+    <li>Clique em um dia para ver todos os eventos daquela data, ou em um evento para abrir seus detalhes.</li>
+    <li>Para criar um evento avulso, clique em <strong>＋ Novo evento</strong>.</li>
+    <li>Para exportar a agenda para Outlook/Google Agenda, use o botão <strong>📤 Exportar .ics</strong>.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Chips de estatística no topo: eventos <strong>para hoje</strong>, <strong>atrasados</strong>, dos <strong>próximos 7 dias</strong> e <strong>concluídos no mês</strong> — clicáveis, aplicam um filtro rápido.</li>
+    <li>Faixa de alertas com as pendências vencidas, clicável para ir direto ao evento.</li>
+    <li>Cada evento tem: empresa (ou "Geral" para todas), título, descrição, tipo (fechamento, pagamento, obrigação, envio, férias, 13º, alerta, observação, outro), prioridade (🔴 crítico / 🟠 urgente / 🟡 atenção / 🔵 informativo — mesma escala da Central de Alertas), data, competência, status e responsável.</li>
+    <li>Toque rápido de status direto no card do evento: pendente → em andamento → concluído.</li>
+    <li>Feriados (cadastrados no módulo RH) aparecem marcados no calendário.</li>
+    <li>Exportação <code>.ics</code> compatível com Outlook e Google Agenda.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Um evento é considerado <strong>atrasado</strong> quando sua data é anterior a hoje e ele ainda não foi concluído. Observações não contam para esse cálculo — só o status do evento em si.</p>
+  <p>Ao concluir um evento, o sistema registra automaticamente quem concluiu e em que momento (<code>concluido_por</code>, <code>concluido_em</code>).</p>
+</section>
+
+<section class="manual-item" id="cronograma-recorrente">
+  <h2>Cronograma recorrente (⚙️ Cronograma)</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Clique em <strong>⚙️ Cronograma</strong> para ver a lista de atividades recorrentes (modelos) já cadastradas.</li>
+    <li>Para criar uma nova, clique em <strong>＋ Nova atividade recorrente</strong> e preencha título, empresa (ou "Todas as empresas"), tipo, regra de data, prioridade e, se for o caso, o mês específico em que ela ocorre (ex.: 13º salário só em novembro/dezembro).</li>
+    <li>Depois de cadastrar os modelos desejados, use <strong>⚡ Gerar competência</strong>, escolha o mês/ano e clique em <strong>Gerar eventos</strong> — o sistema cria automaticamente um evento por empresa (ou um evento "Geral", conforme o modelo) para aquela competência.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Modelo global (empresa em branco) é expandido em um evento por empresa cadastrada; modelo com empresa específica gera evento só para ela.</li>
+    <li>Geração de competência é <strong>idempotente</strong>: eventos já gerados para aquele modelo/empresa/competência não são duplicados nem têm status ou observações sobrescritos, então pode ser clicado de novo sem risco.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Cada modelo de atividade recorrente define uma <strong>regra de data</strong> em vez de uma data fixa, calculada automaticamente na geração da competência:</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Regra</th><th>Como calcula</th></tr></thead>
+    <tbody>
+      <tr><td><code>dia_fixo</code></td><td>Usa o dia do mês informado no modelo (ex.: dia 25).</td></tr>
+      <tr><td><code>dia_util</code> (N-ésimo)</td><td>Conta os dias úteis do mês em ordem a partir do dia 1 e usa a data do N-ésimo (ex.: 5º dia útil = pagamento de salários). Sábado, domingo e feriado cadastrado no RH não contam como dia útil.</td></tr>
+      <tr><td><code>ultimo_dia_util</code></td><td>Parte do último dia do mês e volta dia a dia até achar um dia útil.</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Mês do evento:</strong> cada modelo também define se a data cai no mesmo mês da competência (ex.: fechamento) ou no mês seguinte (ex.: FGTS/DCTFWeb, sempre dia 20 do mês <em>seguinte</em> à competência).</p>
+  <p><strong>Ajuste de fim de semana/feriado</strong> (só para regra <code>dia_fixo</code>, já que as outras duas regras só produzem dias úteis por definição):</p>
+  <ul>
+    <li><code>antecipa</code> — se a data cair em dia não útil, volta para o dia útil anterior.</li>
+    <li><code>posterga</code> — avança para o próximo dia útil.</li>
+    <li><code>mantem</code> — mantém a data mesmo caindo em fim de semana/feriado.</li>
+  </ul>
+  <p>Feriados usados no cálculo de dia útil vêm do cadastro global de feriados do módulo RH (mesma base usada no Controle de Frequência).</p>
+  <div class="manual-formula">Exemplos do cronograma padrão:
+Recebimento de variáveis .... dia 25 (mesmo mês)
+Fechamento ................... último dia útil (mesmo mês)
+Pagamento de salários ........ 5º dia útil (mês seguinte)
+eSocial S-1299 ................ dia 15 (mesmo mês)
+FGTS Digital / DCTFWeb ........ dia 20 (mês seguinte)
+13º salário — 1ª parcela ...... 30/11
+13º salário — 2ª parcela ...... 20/12</div>
+</section>
+
+<section class="manual-item" id="perguntas-frequentes">
+  <h2>Perguntas frequentes</h2>
+  <dl>
+    <dt>O calendário é um por empresa, ou um só para todas?</dt>
+    <dd>É um calendário único. Cada evento pode ser vinculado a uma empresa específica ou marcado como "Geral" (vale para todas). Não existem calendários separados por cliente.</dd>
+    <dt>Como acompanho o andamento de um evento "Geral" empresa por empresa?</dt>
+    <dd>Dentro do evento, use as seções <strong>Observações por empresa</strong> e <strong>Checklist</strong> (com escopo "Uma empresa específica" ou "Todas as empresas") para detalhar e marcar o progresso de cada empresa dentro do mesmo evento.</dd>
+    <dt>Gerar a competência de novo duplica os eventos?</dt>
+    <dd>Não. A geração é idempotente — eventos já criados para aquele modelo/empresa/mês são preservados (status e observações não são sobrescritos).</dd>
+    <dt>De onde vêm os feriados marcados no calendário?</dt>
+    <dd>Do cadastro global de feriados do módulo RH — o mesmo usado no Controle de Frequência para cálculo de dias úteis.</dd>
+  </dl>
+</section>

@@ -1,0 +1,112 @@
+<p class="manual-intro">A gestão de Vale Transporte (VT) e Vale Alimentação (VA) é feita em dois pontos do portal: a ferramenta <strong>Benefícios VA/VT</strong> (lançamentos, escalas, férias e configurações completas) e a tela <strong>Gerar Benefícios</strong>, dentro do Controle de Frequência, que monta rapidamente uma prévia por competência a partir dos dados já lançados na Folha de Ponto.</p>
+
+<section class="manual-item" id="gestao-beneficios">
+  <h2>Gestão de Benefícios (Projeto Benefícios)</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Acesse pelo card <strong>Benefícios VA/VT</strong> no portal.</li>
+    <li>Na tela <strong>Lançamentos</strong>: selecione a empresa, preencha a <strong>Competência de Pagamento</strong> e o <strong>Mês de Referência dos Dias</strong>, o Tipo de Processo e, se necessário, filtre os empregados pelo painel de checkboxes.</li>
+    <li>Informe o VT/Dia e o VA/Dia padrão da empresa e os Dias a Trabalhar (ou traga o valor pronto da tela Escalas), depois clique em <strong>"Aplicar Padrão a Todos"</strong> — ou ajuste linha a linha na grade.</li>
+    <li>Se preferir carga em massa, use <strong>"Importar Excel"</strong> (colunas: código da empresa, código do empregado, VT/dia, VA/dia, dias).</li>
+    <li>Clique <strong>"Salvar"</strong> para guardar o lançamento (reaberto automaticamente da próxima vez que selecionar a mesma empresa + competência de pagamento) e depois <strong>"Gerar TXT"</strong> para baixar o arquivo de importação na folha.</li>
+    <li>Na tela <strong>Escalas</strong>: escolha empresa e mês de referência, calcule os dias úteis em um dos três modos e clique <strong>"Aplicar nos Lançamentos"</strong> para levar o resultado direto para a tela Lançamentos.</li>
+    <li>Na tela <strong>Férias</strong>: arraste o PDF da Programação de Férias para importar; use os filtros de empresa/competência para ver quem está de férias no período.</li>
+    <li>Na tela <strong>Configurações</strong>: cadastre, por empresa, a rubrica/tipo de processo/valor padrão de VT e VA, valores individuais por empregado (quando o padrão não se aplica) e observações que aparecem como aviso ao lançar.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Banner no topo dos Lançamentos deixando explícita a diferença entre Competência de Pagamento (mês que entra no TXT) e Mês de Referência dos Dias (mês em que o empregado efetivamente vai trabalhar).</li>
+    <li>Grade de empregados editável com badge de status: <strong>Padrão</strong> (valor da empresa), <strong>Individual</strong> (valor pré-configurado só daquele empregado) ou <strong>Divergente</strong> (o valor digitado ou importado é diferente do configurado — pede confirmação antes de aceitar).</li>
+    <li>Importação de Excel com detecção de divergência linha a linha e aviso para empregados não encontrados na grade.</li>
+    <li>Cálculo de dias úteis em 3 modos na tela Escalas: Dias da Semana, Revezamento e Manual — com calendário visual e opção de descontar feriados da empresa (os mesmos cadastrados no Controle de Frequência).</li>
+    <li>Importação do PDF de Programação de Férias, com filtro por empresa/competência e opção de ocultar empresas sem férias no período.</li>
+    <li>Banner de aviso quando a empresa selecionada tem férias na competência ou observações cadastradas.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>A regra mais importante do módulo é a defasagem de um mês entre o período trabalhado e o pagamento do benefício:</p>
+  <div class="manual-formula">Mês de Referência dos Dias (mês trabalhado) → benefício pago na Competência de Pagamento = Mês de Referência + 1 mês
+Ex.: dias trabalhados em 05/2026 → VT/VA pagos na competência 06/2026</div>
+  <p>Totais por empregado na grade:</p>
+  <div class="manual-formula">Total VT = VT/Dia × Dias
+Total VA = VA/Dia × Dias</div>
+  <p>Cada empregado com valor maior que zero gera uma linha de VT e uma linha de VA no TXT (empregado com valor 0 é omitido):</p>
+  <div class="manual-formula">10 + cód. empregado (10 díg.) + AAAAMM da Competência de Pagamento + código da rubrica (9 díg.) + tipo de processo (2 díg.) + valor em centavos (9 díg., = arredondar(valorDiário × dias × 100)) + cód. empresa (10 díg.)</div>
+  <p>Modos de cálculo de dias úteis (tela Escalas):</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Modo</th><th>Como calcula</th></tr></thead>
+    <tbody>
+      <tr><td>Dias da Semana</td><td>Conta quantas vezes os dias da semana marcados (ex.: seg a sex) ocorrem no mês, descontando os feriados marcados na tabela de feriados.</td></tr>
+      <tr><td>Revezamento</td><td>A partir de uma data de início e do padrão "X dias trabalhados / Y dias de folga", projeta a rotação sobre o mês de referência.</td></tr>
+      <tr><td>Manual</td><td>Todos os dias do mês começam como trabalhados; o usuário clica para marcar as folgas. Resultado = total de dias do mês − dias de folga marcados − feriados marcados.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Por que existem dois campos de mês (Pagamento e Referência) nos Lançamentos?</dt>
+    <dd>Porque o VT/VA de um mês trabalhado só é pago no mês seguinte. O TXT gerado usa sempre a Competência de Pagamento; os dias contados usam o Mês de Referência.</dd>
+    <dt>O que significa o badge "Divergente" na grade?</dt>
+    <dd>O valor de VT ou VA daquele empregado (digitado manualmente ou importado do Excel) é diferente do valor configurado como padrão da empresa ou individual — o sistema pede confirmação antes de aceitar, para evitar erro de digitação.</dd>
+    <dt>Se eu não preencher "Dias a Trabalhar", o que acontece?</dt>
+    <dd>O campo fica com o valor que estiver na grade (zero, se nunca foi preenchido); é sempre editável manualmente ou pode ser preenchido de uma vez com "Aplicar Padrão a Todos" ou vindo da tela Escalas.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="gerar-beneficios">
+  <h2>Gerar Benefícios (dentro do Controle de Frequência)</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>No Controle de Frequência (Projeto RH), abra <strong>"Gerar Benefícios"</strong> no menu lateral.</li>
+    <li>Informe a <strong>competência de referência</strong> (mês trabalhado) — a tela mostra automaticamente o mês de pagamento correspondente (referência + 1).</li>
+    <li>Marque as empresas a incluir (busca por texto, ou botões "Todas"/"Nenhuma").</li>
+    <li>Clique em <strong>"Gerar Prévia"</strong>.</li>
+    <li>Na tabela de prévia, revise por empregado os campos <strong>Dias a Trabalhar</strong> e <strong>Dias a Descontar</strong> — ambos ficam sempre editáveis, mesmo quando já vêm pré-calculados.</li>
+    <li>Fique atento ao selo 🏖️: indica que o empregado tem férias registradas dentro do mês de referência (é só um aviso — o ajuste do desconto continua manual).</li>
+    <li>Clique <strong>"📥 Gerar Excel"</strong> para baixar a planilha pronta para pagamento, e/ou <strong>"🧾 Gerar Recibo"</strong> para imprimir os recibos de entrega de VA/VT.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Permite gerar a prévia para várias empresas de uma vez, mesmo que a Folha de Ponto da competência ainda não tenha sido processada.</li>
+    <li>Pré-calcula os dias a partir da Folha de Ponto salva quando ela existe para aquela competência; quando não existe, estima uma jornada 5×2 a partir do calendário.</li>
+    <li>Exporta um Excel com a aba "Empregados" no mesmo layout usado manualmente antes desta tela existir (13 colunas: código/nome da empresa, CNPJ, código/nome/cargo do empregado, dias, desconto, dias a pagar, valores diários e mensais de VT e VA).</li>
+    <li>Gera recibos de entrega de VA e VT prontos para impressão, em 2 vias (empresa e empregado), separados por empresa e por tipo de benefício, com o valor por extenso.</li>
+    <li>Não grava nada no banco — é um relatório pontual; os ajustes feitos na prévia não ficam salvos entre sessões.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Mesma regra de defasagem de um mês da ferramenta Benefícios VA/VT: o valor informado é o mês trabalhado (referência), e o pagamento é sempre no mês seguinte.</p>
+  <p>Empregados incluídos na prévia: cadastro em situação <strong>"Trabalhando"</strong> e tipo de empregado igual a <strong>"Empregado"</strong> (contribuintes e demais tipos ficam de fora).</p>
+  <p><strong>Dias a Trabalhar</strong> vem sempre da escala configurada em <a href="#gerar-escala">Gerar Escala</a> (fixa, variável por datas ou variável por padrão de repetição) mais os períodos de férias do empregado — não depende de a Folha de Ponto da competência já ter sido processada. Empregado sem escala configurada usa o padrão 5×2 (segunda a sexta) embutido na própria escala. Por empresa, é possível configurar se feriados nacionais em dia útil contam como dia de trabalho ou são descontados (opção "Excluir feriados", ativada por padrão).</p>
+  <p><strong>Dias a Descontar</strong> só é preenchido automaticamente quando já existe Folha de Ponto salva para a competência de referência; sem Folha de Ponto salva, começa em zero e fica por conta do ajuste manual:</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Situação</th><th>Dias a Descontar (automático)</th></tr></thead>
+    <tbody>
+      <tr><td>Com Folha de Ponto salva</td><td>Dias de falta integral + atestado médico integral (mesma regra do aviso de descontos ao gerar TXT no Controle de Frequência)</td></tr>
+      <tr><td>Sem Folha de Ponto salva</td><td>Zero (ajuste manual)</td></tr>
+    </tbody>
+  </table>
+  <div class="manual-formula">Dias a Pagar = Dias a Trabalhar − Dias a Descontar  (nunca fica negativo)
+
+VT Mensal = Dias a Pagar × VT Diário (configurado em "Valores VT/VA")
+VA Mensal = Dias a Pagar × VA Diário (configurado em "Valores VT/VA")</div>
+  <p>Um recibo só é gerado por benefício elegível:</p>
+  <div class="manual-formula">Recibo de VA gerado somente se: Dias a Pagar × VA Diário > 0
+Recibo de VT gerado somente se: Dias a Pagar × VT Diário > 0
+(avaliados de forma independente — um empregado pode ter só VA, só VT, os dois ou nenhum)</div>
+  <p>No recibo, o período de utilização impresso é sempre o mês de pagamento (referência + 1 mês), do dia 01 ao último dia do mês.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Por que consigo gerar a prévia mesmo sem a Folha de Ponto do mês estar processada?</dt>
+    <dd>Porque o benefício de um mês costuma precisar ser gerado antes do fechamento da folha desse mês. "Dias a Trabalhar" vem sempre da escala (ou do padrão 5×2, se o empregado não tem escala configurada) e não depende da Folha de Ponto; só "Dias a Descontar" fica zerado até existir Folha de Ponto salva, exigindo ajuste manual do operador.</dd>
+    <dt>Onde eu configuro o valor diário de VT/VA de cada empregado?</dt>
+    <dd>Na tela "Valores VT/VA" do Controle de Frequência. Aqui em "Gerar Benefícios" esse valor é só consultado (somente leitura).</dd>
+    <dt>Se eu editar "Dias a Trabalhar" ou "Dias a Descontar" na prévia, isso fica salvo?</dt>
+    <dd>Não. É um relatório pontual — feche a tela e os ajustes se perdem. Gere o Excel/recibo antes de sair.</dd>
+  </dl>
+</section>

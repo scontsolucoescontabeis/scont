@@ -1,0 +1,86 @@
+<p class="manual-intro">Duas ferramentas utilitárias do módulo RH que preparam arquivos para os outros processos: o <strong>Conversor</strong> transforma o PDF de ponto exportado pelo Sólides no Excel que o Controle de Frequência importa, e o <strong>Renomeador</strong> aplica regras de nomenclatura em lote e distribui os arquivos em duas estruturas de pastas de destino.</p>
+
+<section class="manual-item" id="conversor">
+  <h2>Conversor de Folha de Ponto (Sólides)</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Acesse <strong>Conversor de Folha</strong> pelo menu lateral do módulo RH.</li>
+    <li><strong>Etapa 1 — Upload:</strong> arraste ou selecione o PDF da Folha de Ponto exportado do Sólides (um colaborador por página). A ferramenta valida se o arquivo é realmente um export do Sólides antes de continuar.</li>
+    <li><strong>Etapa 2 — Configuração:</strong> selecione a Empresa (busca por código ou nome) e confirme a Competência (MM/AAAA) — o sistema tenta detectar a competência automaticamente a partir do período informado no PDF; se não conseguir, é preciso digitar manualmente.</li>
+    <li><strong>Etapa 3 — Colaboradores:</strong> confira o vínculo sugerido entre cada colaborador encontrado no PDF e o cadastro de empregados da empresa. Quem não tiver sugestão automática precisa ser vinculado manualmente ou marcado como "Não importar este colaborador". Só é possível avançar quando todos tiverem uma decisão.</li>
+    <li><strong>Etapa 4 — Dados e Geração:</strong> revise em abas (uma por colaborador) a tabela de batidas dia a dia; qualquer célula pode ser corrigida manualmente. Clique em <strong>Gerar Excel</strong> para baixar o arquivo.</li>
+    <li>Importe o Excel gerado no <strong>Controle de Frequência</strong>, usando a opção "Importar Excel".</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Leitura do PDF direto no navegador (sem OCR) — só reconhece o layout de PDF digital exportado pelo Sólides, com as seções "DADOS DO COLABORADOR" e "PONTOS".</li>
+    <li>Detecção automática de 3º turno: as colunas Entrada 3/Saída 3 só aparecem na revisão e no Excel gerado se algum dia de algum colaborador do arquivo realmente tiver um terceiro período batido.</li>
+    <li>Aba consolidada "Ocorrências" no Excel final, listando Falta/Atestado/Abono/Feriado etc. detectados por colaborador e data — serve de referência para marcação manual dos flags depois de importar.</li>
+    <li>Vínculo automático (fuzzy match) do nome extraído do PDF com o cadastro de empregados da empresa selecionada, com revisão manual obrigatória para casos sem sugestão.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>O parser lê o texto do PDF por posição (linha por coordenada Y, colunas ordenadas por X) e usa como âncora de cada dia o padrão <code>DD/MM + dia da semana por extenso</code> (ex.: <code>05/06 quinta-feira</code>) para cortar o texto em blocos, um por dia.</p>
+  <p>Dentro de cada bloco de dia, o conteúdo é dividido pelo caractere <code>|</code>:</p>
+  <ul>
+    <li><strong>Sem <code>|</code>:</strong> o bloco inteiro é um status de dia sem batida (ex.: <code>ABONO</code>, <code>FALTA NÃO JUSTIFICADA</code>, <code>FERIADO</code>) — vira só a coluna Ocorrência, sem horários.</li>
+    <li><strong>Com <code>|</code>:</strong> os segmentos antes do último <code>|</code> são períodos de trabalho (cada par de horários encontrado vira Entrada/Saída na ordem em que aparece — 1º segmento → Entrada 1/Saída 1, e assim por diante); o segmento depois do último <code>|</code> traz os totais do dia e é descartado.</li>
+  </ul>
+  <p>Se um segmento sai com 1 ou 3+ horários (contaminação por quebra de linha no PDF original), o parser interrompe a leitura daquele dia por segurança em vez de gravar um horário errado — esses casos ficam para correção manual na Etapa 4.</p>
+  <p>A competência é extraída do período informado no cabeçalho do PDF (<code>DD/MM/AAAA a DD/MM/AAAA</code>): usa-se o mês/ano da <strong>data final</strong> do período.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>O sistema recusou o PDF dizendo que não reconhece o formato. Por quê?</dt>
+    <dd>O conversor só aceita o export nativo em PDF do Sólides (precisa conter os textos "DADOS DO COLABORADOR", "PONTOS" e "TRABALHADAS"). PDFs escaneados/imagem ou de outra plataforma não são suportados.</dd>
+    <dt>Preciso marcar manualmente as faltas/atestados depois de importar?</dt>
+    <dd>Sim. A aba "Ocorrências" do Excel gerado é só informativa — o importador do Controle de Frequência não a reconhece como aba de colaborador (o aviso de "aba não encontrada" ao importar essa aba é esperado e pode ser ignorado). Os flags de falta/atestado continuam sendo marcados manualmente na tela do Controle de Frequência.</dd>
+    <dt>Um colaborador do PDF não apareceu na lista de sugestões de vínculo. O que fazer?</dt>
+    <dd>Selecione manualmente o empregado correspondente no <code>select</code>, ou marque "Não importar este colaborador" se ele não deve entrar nesta leva.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="renomeador">
+  <h2>Renomeador de Arquivos</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Acesse <strong>Renomeador de Arquivos</strong> no portal.</li>
+    <li><strong>Passo 1 — Parâmetros de Destino:</strong> informe a Competência (MM/AAAA) e confirme (ou ajuste) os dois caminhos lógicos de destino: <strong>EXPRESS</strong> (pasta plana) e <strong>Dinâmico</strong> (estrutura de subpastas, com placeholders como <code>{CODIGO_EMPRESA}\{AAAA}\{MM}</code>).</li>
+    <li><strong>Passo 2 — Upload:</strong> arraste ou selecione os arquivos originais (múltiplos de uma vez).</li>
+    <li>Clique em <strong>Analisar e Aplicar Regras</strong> — a ferramenta tenta casar o nome de cada arquivo com uma regra cadastrada e mostra uma prévia com o novo nome e os dois destinos.</li>
+    <li><strong>Passo 3 — Salvar nos Destinos:</strong> clique em <strong>Salvar nos Destinos</strong> e selecione, quando solicitado, a pasta local correspondente a EXPRESS e depois a pasta correspondente a Dinâmico. Os arquivos processados com sucesso ("Pronto") são gravados nos dois locais.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Regras de renomeação cadastradas no sistema (tabela <code>rh_regras_renomeacao</code>): cada regra define um padrão de entrada e um padrão de saída, usando placeholders.</li>
+    <li>Reconhecimento automático da empresa pelo código extraído do nome do arquivo (contra <code>rh_empresas</code>) e mapeamento opcional de nomes de documento (<code>rh_mapeamento_nomes</code>).</li>
+    <li>Geração simultânea de dois destinos a partir do mesmo arquivo: um caminho "EXPRESS" (arquivo solto na raiz) e um caminho "Dinâmico" (organizado em subpastas por empresa/ano/mês).</li>
+    <li>Gravação direta em pastas locais via seleção de diretório do navegador (Chrome/Edge 86+) — não depende de download + organização manual.</li>
+    <li>Tabela de prévia com status por arquivo ("Pronto", "Padrão não reconhecido", "Empresa X não encontrada") antes de qualquer gravação.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>O reconhecimento do padrão de entrada (<code>padrao_de</code> da regra) é feito convertendo os placeholders em grupos de regex nomeados:</p>
+  <div class="manual-formula">{CODIGO_EMPRESA} → (?&lt;codigo&gt;\d+)
+{NOME_ARQUIVO}    → (?&lt;nome&gt;.+?)
+{MM}              → (?&lt;mes&gt;\d{2})
+{AAAA}            → (?&lt;ano&gt;\d{4})
+{IGNORAR}         → .*?  (trecho descartado)</div>
+  <p>O nome do arquivo (sem extensão) é testado contra cada regra cadastrada, na ordem em que estão no sistema; a primeira que casar é aplicada. Se nenhuma casar, o status fica "Padrão não reconhecido".</p>
+  <p>Com a regra casada, o <strong>novo nome</strong> e os <strong>dois caminhos de destino</strong> são montados substituindo os mesmos placeholders (mais <code>{NOME_EMPRESA}</code> e <code>{NOME_DOCUMENTO}</code>, resolvidos pelo código extraído e pelo mapeamento de nomes) no padrão de saída (<code>padrao_para</code>) da regra e no caminho Dinâmico informado no Passo 1. A extensão original do arquivo é sempre preservada.</p>
+  <p>Se o código de empresa extraído do nome do arquivo não existir em <code>rh_empresas</code>, o arquivo fica com status "Empresa &lt;código&gt; não encontrada" e não é processado no Passo 3.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Por que preciso selecionar duas pastas ao salvar?</dt>
+    <dd>Cada arquivo processado é gravado em dois lugares ao mesmo tempo: a pasta EXPRESS (estrutura plana) e a pasta Dinâmico (estrutura em subpastas por empresa/competência). São seleções independentes porque normalmente apontam para raízes diferentes.</dd>
+    <dt>O botão "Salvar nos Destinos" não funciona no meu navegador.</dt>
+    <dd>Essa função depende da File System Access API, disponível apenas em Chrome/Edge (versão 86 ou superior). Em outros navegadores a gravação direta não é suportada.</dd>
+    <dt>Um arquivo ficou com status "Padrão não reconhecido". O que fazer?</dt>
+    <dd>O nome do arquivo não bateu com nenhuma regra cadastrada em <code>rh_regras_renomeacao</code>. É preciso ajustar o nome do arquivo original ou cadastrar/ajustar uma regra que reconheça esse padrão.</dd>
+  </dl>
+</section>

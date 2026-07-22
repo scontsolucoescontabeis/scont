@@ -1,0 +1,98 @@
+<p class="manual-intro">Lançamento em lote de rubricas (horas, valores monetários, dias) para vários empregados e empresas ao mesmo tempo, gerando o arquivo TXT de importação no formato do ERP.</p>
+
+<section class="manual-item" id="fluxo-de-lancamento">
+  <h2>Fluxo de Lançamento em Lote</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>No Passo 1, informe a <strong>Competência</strong> (MM/AAAA) e marque as empresas para as quais vai lançar. Clique em <strong>Buscar Empregados</strong>.</li>
+    <li>No Passo 2, marque os empregados que vão receber o lançamento (todos vêm pré-marcados; use a busca e "Selecionar Todas/Retirar Seleção" para ajustar). Clique em <strong>Continuar para Parâmetros</strong>.</li>
+    <li>No Passo 3, escolha o <strong>Tipo do Processo</strong> (11-Mensal, 41-Adiantamento, 42-Complementar, 51-Adiantamento 13º, 52-13º Salário, 70-PLR) — vale para toda a grade montada nesta leva.</li>
+    <li>Adicione uma ou mais rubricas à grade: selecione no catálogo (rubricas já cadastradas em <code>rh_rubricas</code> para as empresas escolhidas) ou use "Outra rubrica" para digitar um código manualmente. Defina o tipo de valor (Horas, Monetário ou Dias) e, se quiser, um valor padrão que preenche a coluna toda de uma vez.</li>
+    <li>Preencha/edite a grade Empregado × Rubrica célula a célula. Use a busca para localizar um empregado específico na grade.</li>
+    <li>Clique em <strong>Gerar Parametrizações</strong>. O sistema valida os valores, resolve o código de rubrica de cada empregado pela empresa dele, e acumula o resultado no Passo 3.5.</li>
+    <li>Repita os passos 1 a 6 quantas vezes precisar (rubricas diferentes, grupos de empregados diferentes) — cada rodada vira uma "parametrização" na lista acumulada, sem perder as anteriores. Use <strong>Adicionar Nova Parametrização</strong> para voltar ao Passo 1 mantendo o que já foi gerado.</li>
+    <li>Quando terminar, clique em <strong>Finalizar e Exportar</strong>, confira a prévia do TXT e baixe o arquivo em <strong>Baixar Arquivo TXT</strong>. Ao baixar, a sessão é reiniciada (parametrizações e seleções são limpas).</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Lançamento simultâneo para várias empresas e vários empregados, com resolução automática do código de rubrica correto por empresa (mesma rubrica pode ter códigos diferentes em empresas diferentes).</li>
+    <li>Grade Empregado × Rubrica: cada rodada pode ter várias rubricas ao mesmo tempo, uma coluna por rubrica.</li>
+    <li>Três tipos de valor por rubrica: <strong>Horas</strong> (HH:MM), <strong>Monetário</strong> (R$) e <strong>Dias</strong> (inteiro).</li>
+    <li>Detecção automática de rubricas de falta ("Dias Falta" / "Dias Falta DSR") pelo nome, trocando o formato de entrada da célula para lista de dias do mês.</li>
+    <li>Cálculo automático do desconto de DSR por falta, sem precisar cadastrar uma coluna manual separada.</li>
+    <li>Acúmulo de múltiplas parametrizações na mesma sessão antes de gerar um único arquivo TXT final (evita gerar/baixar um TXT por rubrica).</li>
+    <li>Botão <strong>Configurações</strong> no topo: consulta (somente leitura) as rubricas fixas configuradas por empresa no Controle de Frequência e as observações cadastradas para aquela empresa.</li>
+    <li>Prévia do conteúdo do TXT antes de baixar, para conferir a formatação (zeros à esquerda) linha a linha.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Cada linha de rubrica no TXT segue um layout de posições fixas, montado em <code>gerarConteudoTXT</code>:</p>
+  <div class="manual-formula">"10" + código do empregado (10 dígitos) + competência AAAAMM (6 dígitos)
+    + código da rubrica (9 dígitos) + tipo do processo (2 dígitos)
+    + valor (9 dígitos) + código da empresa (10 dígitos)</div>
+  <p>A codificação do valor depende do tipo escolhido para a rubrica:</p>
+  <div class="manual-formula">Horas (HH:MM): "01:30" → 1*100 + 30 = 130
+Monetário (R$): "150,50" → remove separadores → 15050
+Dias: número inteiro digitado, sem formatação</div>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Por que a rubrica que eu escolhi não aparece disponível para um empregado?</dt>
+    <dd>A rubrica precisa estar cadastrada no catálogo (<code>rh_rubricas</code>) da empresa daquele empregado especificamente. Se não estiver, o sistema bloqueia a geração e avisa qual empregado/empresa está faltando o cadastro.</dd>
+    <dt>Posso lançar rubricas de empresas diferentes na mesma grade?</dt>
+    <dd>Sim — a grade é montada a partir de todos os empregados selecionados no Passo 2, independentemente da empresa. O código de rubrica correto é resolvido automaticamente por empregado, conforme a empresa dele.</dd>
+    <dt>O que acontece se eu não preencher a célula de um empregado numa rubrica?</dt>
+    <dd>Células vazias são ignoradas — só empregados com valor preenchido entram na parametrização gerada. Se nenhuma célula da coluna estiver preenchida, a rubrica é listada como "ignorada" na mensagem final.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="calculo-dsr-automatico">
+  <h2>Cálculo automático de DSR por falta</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Adicione à grade uma rubrica cujo nome no catálogo contenha "DIAS FALTAS" (sem "DSR" no nome) — o sistema já força o tipo de valor para "Dias" e muda a dica do campo para o formato de lista de dias.</li>
+    <li>Preencha, para cada empregado, os dias do mês em que ele faltou, separados por vírgula (ex: <code>5,12,20</code>).</li>
+    <li>Deixe marcado o checkbox <strong>"Calcular desconto de DSR automaticamente..."</strong> (vem marcado por padrão). Desmarque só se quiser lançar o DSR manualmente por fora.</li>
+    <li>Ao clicar em Gerar Parametrizações, além da parametrização da rubrica de falta em si, é criada automaticamente uma segunda parametrização rotulada <em>"&lt;rubrica&gt; → DSR (automático)"</em>, já calculada.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Identificação automática de rubrica de falta e de falta-com-DSR só pelo nome cadastrado no catálogo (não precisa de configuração extra por empresa).</li>
+    <li>Trava o tipo de valor da coluna para "Dias" e ajusta o placeholder/dica de preenchimento assim que a rubrica é reconhecida.</li>
+    <li>Geração automática da(s) linha(s) de desconto de DSR a partir dos dias de falta informados, sem precisar montar uma segunda coluna manual.</li>
+    <li>Avisa, na mensagem final, quais empresas não têm a rubrica "DIAS FALTAS DSR" cadastrada no catálogo (nesses casos os empregados delas simplesmente não geram o desconto automático, sem travar o restante).</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Detecção do tipo de rubrica pelo nome (normalizado: maiúsculas, sem ponto final):</p>
+  <div class="manual-formula">Contém "DIAS FALTAS" e NÃO contém "DSR"  → tipo "normal" (falta simples)
+Contém "DIAS FALTAS" e contém "DSR"      → tipo "dsr" (rubrica de desconto de DSR)
+Não contém "DIAS FALTAS"                  → não é rubrica de falta (comportamento padrão)</div>
+  <p>Regra do domingo perdido:</p>
+  <div class="manual-formula">Semana de referência: segunda-feira a sábado.
+Cada falta gera perda de DSR no DOMINGO SEGUINTE à semana em que ela ocorreu.
+Duas ou mais faltas do mesmo empregado na mesma semana → uma única linha de
+desconto de DSR para aquele domingo (deduplicado, não desconta em dobro).
+O desconto (linha "10...") é sempre lançado na COMPETÊNCIA ATUAL sendo
+processada — mesmo quando o domingo cai no mês seguinte. Só a linha
+informativa "11..." carrega a data real do domingo, que pode estar no mês
+seguinte.</div>
+  <p>A linha informativa gerada por dia de falta segue o formato:</p>
+  <div class="manual-formula">"11" + data (AAAAMMDD) + flag
+  flag "1" = dia de falta normal (não gera perda de DSR)
+  flag "2" = domingo com perda de DSR</div>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Preciso criar uma coluna separada de "DIAS FALTAS DSR" na grade?</dt>
+    <dd>Não. Com o checkbox de cálculo automático marcado, a coluna de DSR é gerada sozinha a partir da coluna de "DIAS FALTAS" normal. Só use uma coluna manual de DSR se o cálculo automático estiver desmarcado por algum motivo.</dd>
+    <dt>Posso usar ao mesmo tempo o cálculo automático e uma coluna manual de "DIAS FALTAS DSR"?</dt>
+    <dd>Tecnicamente sim, mas os dois mecanismos não se cruzam nem se sobrescrevem — se ambos gerarem desconto para o mesmo domingo do mesmo empregado, o desconto sai em duplicidade no TXT. É uma limitação conhecida: evite combinar os dois para a mesma leva.</dd>
+    <dt>Por que apareceu um aviso de empresa sem rubrica DSR cadastrada?</dt>
+    <dd>Significa que a empresa daquele(s) empregado(s) não tem, no catálogo de rubricas (<code>rh_rubricas</code>), nenhuma rubrica cujo nome seja reconhecido como "DIAS FALTAS DSR". O cálculo automático é pulado só para os empregados dessa empresa; cadastre a rubrica no catálogo dela para habilitar.</dd>
+  </dl>
+</section>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual do Usuário — SCONT</title>
+    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+    <link rel="stylesheet" href="../shared.css">
+    <link rel="stylesheet" href="manual.css">
+    <script src="../supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../portal-auth-guard.js"></script>
+    <script src="tools-map.js"></script>
+</head>
+<body>
+
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-spinner"></div>
+        <p class="auth-msg">Verificando acesso…</p>
+    </div>
+
+    <div id="app" class="manual-app" style="display:none">
+
+        <aside class="manual-sidebar">
+            <a class="manual-voltar" href="../portal.html">← Voltar ao Portal</a>
+            <h1>📘 Manual do Usuário</h1>
+            <p class="subtitulo">Guia de uso das ferramentas do portal SCONT</p>
+            <input type="text" id="manualBusca" class="manual-busca" placeholder="🔍 Buscar ferramenta…">
+            <nav id="manualNav"></nav>
+        </aside>
+
+        <main class="manual-conteudo">
+            <div class="manual-header-conteudo">
+                <h1 id="manualHeaderTitulo">Selecione uma ferramenta</h1>
+                <p>Forma de uso, funcionalidades e memórias de cálculo de cada ferramenta do portal.</p>
+            </div>
+            <div id="manualCorpo" class="manual-corpo">
+                <div class="manual-vazio"><div class="icone">⏳</div><p>Carregando…</p></div>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="manual.js"></script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<p class="manual-intro">Ferramenta principal de lançamento e apuração de ponto do RH: importa/digita as batidas de entrada e saída de cada empregado, calcula horas extras, faltas, DSR e adicional noturno, e gera o TXT de rubricas para a folha de pagamento — empresa por empresa ou em lote, por grupo.</p>
+
+<section class="manual-item" id="lancamento-e-apuracao">
+  <h2>Lançamento e Apuração da Folha de Ponto</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na tela inicial, informe a <strong>Competência</strong> (MM/AAAA) e busque a <strong>Empresa</strong> pelo nome ou código. Se a empresa tiver observações cadastradas, elas aparecem imediatamente num banner ao selecioná-la.</li>
+    <li>Clique <strong>"Continuar"</strong>. Se já existirem lançamentos salvos para essa empresa/competência, o sistema pergunta se quer retomar de onde parou ou começar uma folha em branco.</li>
+    <li>Na tela de preenchimento, cada empregado é uma aba. Use <strong>"➕ Nova Folha"</strong> para adicionar um empregado, ou <strong>"📥 Importar Excel"</strong> para subir um arquivo já preenchido no formato do modelo (uma aba por empregado, nome da aba começando pelo código dele).</li>
+    <li>Se preferir gerar o modelo antes de preencher fora do sistema, use <strong>"Baixar Modelo Excel"</strong> na tela inicial — pergunta se a empresa tem 2 ou 3 turnos por dia antes de montar o arquivo.</li>
+    <li>Revise a seção <strong>"⚙️ Configurações"</strong> antes de processar: jornada diária, jornada diferenciada de sexta/sábado (ou "sábado sempre extra"), regra de hora extra 100% a partir da 3ª hora, empresa com 3 turnos (Entrada 3/Saída 3) e feriados. Empresas já configuradas em "Configurar Rubricas por Empresa" trazem esses campos pré-preenchidos automaticamente.</li>
+    <li>Para dias sem batida de ponto, use o seletor <strong>Folga/Falta</strong> ao lado do dia: Folga, Falta ou Compensação (só aparecem quando não há entrada registrada naquele dia) e Atestado Médico, Atestado de Comparecimento ou Liberação Meio Expediente (aparecem sempre, mesmo em dias com batida parcial).</li>
+    <li>Clique <strong>"✅ Processar e Salvar Folha"</strong>. O sistema pede seu nome/e-mail como responsável pela alteração antes de calcular e gravar.</li>
+    <li>Na tela de <strong>Resultados</strong>, confira os totais por empregado, exporte para Excel ou gere o TXT de rubricas. <strong>"✏️ Voltar para Edição"</strong> retorna para ajustar algo sem perder o que já foi processado.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Múltiplas abas de empregado na mesma folha, com importação em massa via Excel (2 ou 3 turnos).</li>
+    <li>Retomada automática de preenchimentos salvos anteriormente para a mesma empresa/competência.</li>
+    <li>Banner de observações da empresa, visível nas três telas (inicial, edição e resultados) sempre que houver texto cadastrado.</li>
+    <li>Jornada diferenciada por dia da semana (sexta e/ou sábado reduzidos) e "sábado sempre extra" (todas as horas do sábado contam como extra, sem parte normal).</li>
+    <li>Suporte a 3º turno de trabalho (Entrada 3/Saída 3), ativado por checkbox, aplicado a cálculo, importação de Excel, modelo e exportação.</li>
+    <li>Calendário de feriados global e compartilhado entre empresas (gerenciado no modal "📅 Gerenciar Feriados") — cada folha salva grava uma cópia (snapshot) dos feriados vigentes no momento do processamento, então alterações futuras no calendário não reescrevem o histórico já salvo.</li>
+    <li>Badge informativo "FÉRIAS" nos dias em que o empregado tem período de férias importado (PDF "Relação de Férias Calculadas"), sem interferir no cálculo — é só um alerta para o operador revisar.</li>
+    <li>Botão "🔄 Limpar Dados" para reiniciar a folha em edição.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Cada dia é classificado em um único estado, na seguinte ordem de prioridade:</p>
+  <div class="manual-formula">1. Atestado Médico → dia inteiro desconsiderado (sem faltante, sem extra)
+2. Atestado de Comparecimento / Liberação Meio Expediente → isenta metade da jornada:
+   se horas trabalhadas ≥ metade da jornada do dia → sem desconto
+   se horas trabalhadas < metade da jornada do dia → faltante = metade da jornada − horas trabalhadas
+3. Há horas trabalhadas e é feriado/DSR marcado → 100% das horas viram hora extra 100%
+4. Há horas trabalhadas e é dia normal:
+   horas > jornada do dia → excedente vira hora extra (ver regra de 50%/100% abaixo)
+   horas < jornada do dia → faltante = jornada do dia − horas trabalhadas (em horas, não gera falta em dias)
+5. Sem horas e sem atestado, conforme o seletor manual:
+   "Folga" → sem impacto em totais
+   "Falta" → soma 1 em Faltas (dias) — nunca soma em horas faltantes
+   "Compensação" → faltante = jornada inteira do dia (a compensar depois)
+   sem seletor e sem férias importada → "Sem Registro" (alerta visual, sem impacto em totais)
+   sem seletor e com férias importada → badge "Férias", sem impacto em totais</div>
+  <p>Jornada do dia (antes de aplicar as regras acima):</p>
+  <div class="manual-formula">Sábado: "Sábado sempre extra" ativo → 0 (tudo vira extra)
+         senão, "Jornada diferenciada de Sábado" ativa → valor configurado (ex. 04:00)
+         senão → jornada diária padrão
+Sexta: "Jornada diferenciada de Sexta" ativa → valor configurado (ex. 04:00)
+       senão → jornada diária padrão
+Demais dias: jornada diária padrão</div>
+  <p>Regra de hora extra 50%/100% em dia normal (excedente de jornada):</p>
+  <div class="manual-formula">Checkbox "Aplicar Hora Extra 100% a partir da 3ª hora" DESMARCADO (padrão):
+   toda a hora excedente = 50%
+Checkbox MARCADO:
+   primeiras 2h (120 min) de excedente = 50%
+   a partir da 3ª hora = 100%
+Feriado/DSR trabalhado: sempre 100%, independente do checkbox.</div>
+  <p>Adicional noturno: intervalo das 22h00 às 05h00, somado em minutos corridos de cada turno (1º, 2º e, se ativo, 3º turno). O total em minutos noturnos é convertido para "hora noturna reduzida" para fins de rubrica:</p>
+  <div class="manual-formula">Minutos noturnos convertidos = arredondar(minutos noturnos ÷ 0,875)</div>
+  <p>Horas Devidas (compensação entre horas faltantes e horas extras, usada como padrão ao gerar o TXT — pode ser desativada com "Não compensar horas extras"):</p>
+  <div class="manual-formula">1. Abate primeiro da Hora Extra 50%: se 50% ≥ faltante, some o saldo; senão zera o 50% e sobra faltante
+2. Se ainda sobrar faltante, abate da Hora Extra 100% da mesma forma
+3. O que sobrar de faltante depois dos dois abates = Horas Devidas final</div>
+  <p>Falta em dias nunca entra nesse abatimento — só as horas faltantes (dias com jornada parcial, atestado de comparecimento/liberação abaixo da metade, ou compensação) participam da compensação com extras.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Por que o dia aparece como "Sem Registro" mesmo sem eu ter feito nada?</dt>
+    <dd>É o estado padrão de um dia sem batida de ponto e sem nenhuma opção marcada no seletor Folga/Falta — é só um alerta visual para o operador decidir o que fazer (marcar folga, falta, atestado etc.); não afeta nenhum total até ser marcado.</dd>
+    <dt>Marcar "Falta" desconta horas do total de horas faltantes?</dt>
+    <dd>Não. "Falta" soma 1 dia inteiro no contador de Faltas (usado para gerar a rubrica de falta em dias e o desconto automático de DSR); Horas Faltantes é um contador separado, só para dias com jornada parcial.</dd>
+    <dt>Ativar "Sábado sempre extra" e "Jornada diferenciada de Sábado" ao mesmo tempo é possível?</dt>
+    <dd>Não — são mutuamente exclusivos. Marcar um desmarca automaticamente o outro, tanto na tela de edição quanto no modal de Configuração de Rubricas por Empresa.</dd>
+    <dt>O badge "FÉRIAS" impede o operador de marcar Falta nesse dia?</dt>
+    <dd>Não. É só informativo. Se o operador marcar Falta manualmente no mesmo dia, o cálculo de falta prevalece normalmente — o badge de férias continua aparecendo como alerta adicional.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="configuracoes-por-empresa">
+  <h2>Configurações por Empresa</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>No menu lateral, abra <strong>"⚙️ Configurações"</strong>.</li>
+    <li>Busque a empresa pelo nome ou código — os campos são preenchidos automaticamente se já houver configuração salva; caso contrário, ficam vazios.</li>
+    <li>Preencha o <strong>código de rubrica</strong> e o <strong>tipo de valor</strong> (Horas, Monetário ou Dias) para cada evento: Horas Trabalhadas, Horas Extras 50%, Horas Extras 100%, Adicional Noturno, Atraso e Falta (em dias).</li>
+    <li>Ajuste a <strong>Jornada de Trabalho</strong> (diária, sexta e sábado diferenciados, sábado sempre extra), a opção de <strong>excluir feriados nacionais</strong> do cálculo de dias em "Gerar Benefícios", as <strong>Regras de Horas Extras e Turnos</strong> (extra 100% a partir da 3ª hora, 3 turnos, não compensar por padrão) e as <strong>Observações</strong> da empresa.</li>
+    <li>Clique <strong>"💾 Salvar"</strong>. Use <strong>"🗑 Limpar Empresa"</strong> para apagar toda a configuração daquela empresa (pede confirmação).</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Configuração central por empresa, reaproveitada automaticamente ao selecionar a empresa na tela inicial e ao abrir os modais de geração de TXT (rubricas, jornada, regras de extra/turno e "não compensar" já vêm pré-marcados).</li>
+    <li>Campo de Observações em texto livre, exibido como banner fixo assim que a empresa é selecionada.</li>
+    <li>Todos os campos continuam editáveis manualmente na sessão — a configuração salva é só o ponto de partida, não trava o operador.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Prioridade de preenchimento ao selecionar a empresa ou abrir os modais de TXT:</p>
+  <div class="manual-formula">1. Configuração salva no Supabase para aquela empresa (sobrescreve tudo)
+2. Se a empresa nunca foi configurada: valor do último uso salvo no navegador (localStorage)
+3. Se nada dos dois existir: campo em branco / valor padrão do sistema</div>
+  <p>Cada campo é salvo como um "evento" independente vinculado ao código da empresa (rubricas, tipo de valor, jornada, sexta/sábado, sábado sempre extra, hora extra 100% opcional, 3 turnos, não compensar por padrão, observações). Salvar a empresa grava todos os eventos de uma vez, mesmo os deixados vazios — por isso, uma vez que a empresa tem qualquer configuração salva, campos vazios permanecem vazios (não voltam a usar o valor do navegador). Rubricas com código vazio simplesmente não são incluídas ao gerar o TXT.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Se eu deixar o código de uma rubrica em branco na configuração da empresa, o que acontece ao gerar o TXT?</dt>
+    <dd>Aquele evento não entra no arquivo — a linha correspondente não é gerada. O operador ainda pode digitar o código manualmente no momento de gerar o TXT, só não vem pré-preenchido.</dd>
+    <dt>Configurar a jornada aqui muda os lançamentos que já foram processados e salvos?</dt>
+    <dd>Não. A configuração por empresa só define o valor inicial da próxima folha aberta para essa empresa; folhas já processadas mantêm os valores de jornada gravados no momento em que foram salvas.</dd>
+    <dt>"Limpar Empresa" apaga também as observações e os valores de VT/VA?</dt>
+    <dd>Apaga rubricas, jornada, regras de extra/turno e observações (tudo que fica na tela de Configurações). Os valores individuais de VT/VA por empregado ficam em uma tela separada ("Valores VT/VA") e não são afetados.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="geracao-txt">
+  <h2>Geração de TXT para a Folha de Pagamento</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li><strong>Individual</strong> (a partir de uma folha já processada): na tela de Resultados, clique <strong>"📄 Gerar TXT"</strong>. Confira/ajuste as rubricas, marque ou não "Não compensar horas extras", escolha o Tipo do Processo e, se precisar, adicione Lançamentos Adicionais (ex.: VT/VA avulso vinculado a um empregado específico). Clique <strong>"👁 Pré-visualizar"</strong> para conferir e depois <strong>"📄 Baixar TXT"</strong>.</li>
+    <li><strong>Em lote</strong> (sem precisar processar cada folha na tela): na tela inicial, clique <strong>"Exportar dados para lançamento na Folha (TXT)"</strong>, informe a competência e clique <strong>"Buscar"</strong> — lista todas as empresas com folha já salva naquela competência. Marque as desejadas, ajuste rubricas/tipo de processo e gere o TXT do mesmo jeito.</li>
+    <li>Antes de baixar, se houver empregados com falta ou atestado médico no período (que geram desconto de VT/VA), o sistema mostra um aviso com a lista de empregados, dias e valores antes de liberar o download.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Rubricas configuráveis por evento (Horas Trabalhadas, Extra 50%, Extra 100%, Noturno, Atraso/Horas Faltantes, Falta em dias, Desconto de VT, Desconto de VA), cada uma com tipo de valor independente (Horas, Monetário ou Dias).</li>
+    <li>Checkbox "Não compensar horas extras com horas faltantes": gera as horas extras e as horas faltantes cheias, sem abater uma da outra (o rótulo do campo muda de "Atraso" para "Horas Faltantes" quando marcado).</li>
+    <li>Cálculo automático de DSR por falta (checkbox "Calcular DSR automaticamente", marcado por padrão), disponível nas duas telas de geração de TXT.</li>
+    <li>Tipo do Processo selecionável: 11-Folha Mensal, 41-Adiantamento Salarial, 42-Folha Complementar, 51-Adiantamento de 13º, 52-13º Salário, 70-PLR.</li>
+    <li>Lançamentos Adicionais (só no modal individual): linhas extras de rubrica vinculadas a um empregado específico, adicionadas ao final do TXT.</li>
+    <li>Aviso automático de descontos de VT/VA antes do download, com a lista de empregados/dias/valores a descontar.</li>
+    <li>Prévia do conteúdo do TXT (primeiras linhas + contagem total) antes de baixar.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Cada linha de rubrica segue o mesmo layout de posições fixas usado no restante do RH:</p>
+  <div class="manual-formula">"10" + código do empregado (10 díg.) + competência AAAAMM (6 díg.)
++ código da rubrica (9 díg.) + tipo do processo (2 díg.)
++ valor (9 díg.) + código da empresa (10 díg.)
+Rubricas com valor final zero/negativo não geram linha.</div>
+  <p>Codificação do valor por tipo:</p>
+  <div class="manual-formula">Horas (HH:MM): "01:30" → 1×100 + 30 = 130
+Dias: número inteiro de dias (arredondado)
+Monetário: dias × valor diário × 100 (centavos), arredondado</div>
+  <p>Cálculo automático de DSR por falta (rubrica resolvida pelo nome "DIAS FALTAS DSR" no catálogo de rubricas da empresa, mesma lógica do Lançamentos):</p>
+  <div class="manual-formula">Semana de referência: segunda a sábado.
+Cada falta gera perda de DSR no domingo seguinte à semana em que ocorreu.
+Duas ou mais faltas do mesmo empregado na mesma semana → 1 única linha de desconto
+para aquele domingo (deduplicado).
+O desconto (linha "10...") é sempre lançado na competência atual sendo processada,
+mesmo quando o domingo cai no mês seguinte — só a linha informativa "11..." carrega
+a data real do domingo.
+Empresa sem a rubrica "DIAS FALTAS DSR" cadastrada no catálogo: o cálculo de DSR é
+pulado só para essa empresa (o resto do TXT é gerado normalmente), com aviso na
+mensagem final.</div>
+  <p>Dias que entram no aviso/desconto de VT e VA antes do download: dias marcados como <strong>Falta</strong> ou <strong>Atestado Médico</strong> — Atestado de Comparecimento, Liberação Meio Expediente e Férias importadas não entram nessa contagem.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Qual a diferença entre gerar o TXT "individual" e "em lote"?</dt>
+    <dd>O individual parte da folha que acabou de ser processada na tela (uma empresa por vez). O em lote busca direto no banco todas as folhas já salvas para a competência informada, permitindo gerar o TXT de várias empresas de uma vez sem reabrir cada uma na tela de edição.</dd>
+    <dt>Marcar "Não compensar horas extras" muda o cálculo de Horas Devidas mostrado na tela de Resultados?</dt>
+    <dd>Não. Esse checkbox só afeta como os valores são lançados no TXT (compensados ou brutos). Os totais mostrados na tela de Resultados continuam sempre com a compensação aplicada.</dd>
+    <dt>Por que apareceu um aviso dizendo que uma empresa não tem a rubrica de DSR cadastrada?</dt>
+    <dd>Significa que não há, no catálogo de rubricas dessa empresa, nenhuma rubrica cujo nome contenha "DIAS FALTAS" e "DSR". O desconto automático de DSR é pulado só para os empregados dela; cadastre a rubrica no catálogo da empresa para habilitar.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="grupos-de-empresas">
+  <h2>Grupos de Empresas e Processamento em Lote</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>No menu lateral, abra <strong>"👥 Grupos de Empresas"</strong> e clique <strong>"➕ Novo Grupo"</strong>, ou selecione um grupo já existente na lista à esquerda.</li>
+    <li>Dê um nome ao grupo e adicione as empresas que fazem parte dele (busca por nome/código), depois <strong>"💾 Salvar"</strong>.</li>
+    <li>Informe a <strong>competência</strong> e use as ações em lote: <strong>"📥 Baixar Modelos (.zip)"</strong> gera um Excel modelo por empresa do grupo, compactado num único arquivo.</li>
+    <li>Preencha os modelos baixados (fora do sistema) e volte para <strong>"📤 Processar em Lote"</strong>, selecionando todos os arquivos preenchidos de uma vez.</li>
+    <li>O sistema valida cada arquivo (nome, competência, empresa pertencente ao grupo, duplicidade) e, para os válidos, abre a tela de edição normal já carregada com os dados da 1ª empresa da fila — revise/marque Folga/Falta/Atestado/DSR como faria manualmente e clique <strong>"✅ Processar e Salvar Folha"</strong>.</li>
+    <li>Depois de salvar, clique <strong>"▶️ Próxima Empresa do Grupo"</strong> no banner do topo para avançar para a próxima empresa da fila, repetindo até a última. <strong>"✖ Cancelar Lote"</strong> interrompe a qualquer momento (empresas já salvas permanecem salvas).</li>
+    <li>Ao final, um resumo mostra o status de cada empresa do grupo. Use <strong>"📄 Exportar TXT do Grupo"</strong> para gerar o TXT de todas as empresas processadas de uma vez, com a lista já pré-marcada.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Grupos nomeados e persistidos, reutilizáveis competência após competência.</li>
+    <li>Download de modelos Excel de todas as empresas do grupo num único .zip, já considerando 2 ou 3 turnos conforme a configuração de cada empresa.</li>
+    <li>Processamento em lote reaproveitando 100% da tela de edição individual (fila sequencial) — mesma lógica de cálculo, salvamento e assinatura do responsável do fluxo normal, sem duplicar comportamento.</li>
+    <li>Aplicação automática, por empresa, da configuração salva (jornada, sexta/sábado diferenciados, sábado sempre extra, extra 100% opcional, 3 turnos) ao entrar na fila — sem precisar reconfigurar manualmente.</li>
+    <li>Exportação de TXT do grupo inteiro, reaproveitando o mesmo modal e regras (rubricas, DSR automático, não compensar) da exportação em lote comum.</li>
+    <li>Resumo final por empresa: processada com sucesso, erro, sem arquivo enviado ou cancelada.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Validação de cada arquivo antes de entrar na fila de revisão:</p>
+  <div class="manual-formula">Nome do arquivo fora do padrão "Modelo_FolhaPonto_{empresa}_{mm}-{aaaa}.xlsx" → rejeitado
+Competência do arquivo diferente da informada no grupo → rejeitado
+Código de empresa não pertence ao grupo selecionado → rejeitado
+Mais de um arquivo para a mesma empresa → mantém o primeiro, rejeita os demais
+Empresa sem empregados cadastrados, ou sem nenhuma aba do Excel correspondendo
+a um empregado dela → entra no resumo como erro, não entra na fila</div>
+  <p>Flags manuais de dia (Folga/Falta/Atestado/Compensação/DSR) não vêm do Excel importado em lote — são sempre revisadas na tela de edição, empresa por empresa, exatamente como no fluxo individual. O cálculo de horas (jornada, extras, noturno, faltante) é idêntico ao processamento individual; a única diferença é a fila automática entre empresas.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Preciso marcar Falta/Atestado para todo mundo antes de processar o lote?</dt>
+    <dd>Não. Se um dia não tiver batida nem flag marcado, ele fica como "Sem Registro" (sem impacto nos totais), igual ao fluxo individual — o operador revisa e marca só o que for necessário em cada empresa da fila.</dd>
+    <dt>O que acontece com as empresas do grupo que não tiveram arquivo enviado?</dt>
+    <dd>Aparecem no resumo final como "Sem arquivo enviado" — não bloqueiam o processamento das demais empresas do grupo.</dd>
+    <dt>Cancelar o lote no meio desfaz o que já foi processado?</dt>
+    <dd>Não. Empresas já salvas antes do cancelamento continuam salvas normalmente; só as que ainda estavam na fila entram como "canceladas" no resumo.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="gerar-escala">
+  <h2>Gerar Escala</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>No sidebar do Controle de Frequência, abra <strong>"Gerar Escala"</strong>.</li>
+    <li>Escolha a competência e a(s) empresa(s). O sistema lista os empregados com um resumo de dias de trabalho x folga no mês.</li>
+    <li>Expanda a linha de um empregado para configurar a escala dele: <strong>Fixa</strong> (marcar os dias da semana que são trabalho), <strong>Variável — datas de folga</strong> (trabalha todos os dias, exceto as datas específicas marcadas como folga) ou <strong>Variável — padrão de repetição</strong> (ciclo de blocos, ex.: 5 dias trabalho, 1 folga, 2 trabalho, 2 folga, repetindo indefinidamente a partir de uma data de referência).</li>
+    <li>Salve — a configuração fica gravada por empregado e vale para os meses seguintes até ser alterada de novo.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Mini-calendário por empregado mostrando trabalho, folga e período de férias.</li>
+    <li>Badge indicando o período de férias do empregado quando aplicável.</li>
+    <li>Só visualização/configuração nesta tela — não tem exportação (Excel/PDF).</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Escala de trabalho é um conceito <strong>separado</strong> da jornada: a jornada (em "Configurações"/Administração) define horário de entrada e saída; a escala define só quais dias do mês são trabalho ou folga. As duas convivem lado a lado — configurar uma não altera a outra, e a Folha de Ponto em si não é alimentada pela escala.</p>
+  <div class="manual-formula">Empregado sem escala configurada → padrão 5x2 (segunda a sexta trabalho, sábado e domingo folga), aplicado automaticamente.
+
+Feriados nacionais NÃO entram neste cálculo — mesmo um feriado em dia útil aparece
+como "trabalho" na escala, a não ser que o próprio padrão configurado já o exclua.
+
+Dia dentro de um período de férias do empregado → sempre vira folga no resumo,
+mesmo que a escala configurada diga "trabalho" naquele dia (mesmo critério usado em "Gerar Benefícios").
+
+"Gerar Benefícios" usa esta escala (+ férias) para calcular "Dias a Trabalhar" no lugar
+da estimativa fixa 5x2 antiga — ver seção de Benefícios.</div>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Configurar a escala de um empregado muda a jornada dele (horário de entrada/saída)?</dt>
+    <dd>Não. São tabelas e telas independentes — a escala só decide quais dias são trabalho ou folga, não o horário.</dd>
+    <dt>A escala afeta o cálculo da Folha de Ponto (apuração de horas)?</dt>
+    <dd>Não diretamente. Hoje ela alimenta apenas a tela "Gerar Benefícios"; a apuração de ponto continua baseada nas batidas e flags lançados na própria Folha de Ponto.</dd>
+  </dl>
+</section>
