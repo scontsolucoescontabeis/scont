@@ -3,7 +3,6 @@
 
     let _urlsAutorizadas = [];
     let _grupoAtivo = null;
-    const _cacheConteudo = {};
 
     function normalizarUrl(u) {
         return decodeURIComponent(u || '').replace(/\\/g, '/').toLowerCase();
@@ -61,18 +60,12 @@
         header.textContent = `${grupo.icone} ${grupo.nome}`;
 
         const corpo = document.getElementById('manualCorpo');
-        corpo.innerHTML = '<div class="manual-vazio"><div class="icone">⏳</div><p>Carregando…</p></div>';
-
-        try {
-            if (!_cacheConteudo[grupo.slug]) {
-                const resp = await fetch(`content/${grupo.slug}.html`);
-                if (!resp.ok) throw new Error('não encontrado');
-                _cacheConteudo[grupo.slug] = await resp.text();
-            }
-            corpo.innerHTML = _cacheConteudo[grupo.slug];
-        } catch (err) {
-            console.error('Erro ao carregar conteúdo do manual:', err);
-            corpo.innerHTML = '<div class="manual-erro"><div class="icone">⚠️</div><p>Não foi possível carregar este conteúdo. Tente novamente em instantes.</p></div>';
+        const html = window.MANUAL_CONTENT && window.MANUAL_CONTENT[grupo.slug];
+        if (html) {
+            corpo.innerHTML = html;
+        } else {
+            console.error('Conteúdo não encontrado para o grupo:', grupo.slug);
+            corpo.innerHTML = '<div class="manual-erro"><div class="icone">⚠️</div><p>Não foi possível carregar este conteúdo.</p></div>';
         }
     }
 
