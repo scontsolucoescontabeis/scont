@@ -481,6 +481,12 @@
                                 <option value="monetario">Monetário (R$)</option>
                             </select>
                         </div>
+                        <div style="padding: 8px 14px; border-top: 1px solid #eee; display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="expCalcularDsrAutomatico" checked>
+                            <label for="expCalcularDsrAutomatico" style="font-size: 12px; margin: 0; cursor: pointer; color: var(--text-secondary);">
+                                Calcular DSR automaticamente (domingo seguinte à semana da falta, segunda a sábado) — detecta a rubrica "DIAS FALTAS DSR" no catálogo de cada empresa
+                            </label>
+                        </div>
                         <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
                             <span style="font-size: 13px; font-weight: 500;">Desconto de VT (em dias)</span>
                             <input type="text" id="expRubDescontoVT" maxlength="9" placeholder="Ex: 000520" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
@@ -757,6 +763,12 @@
                                 <option value="horas">Horas (HHMM)</option>
                                 <option value="monetario">Monetário (R$)</option>
                             </select>
+                        </div>
+                        <div style="padding: 8px 14px; border-top: 1px solid #eee; display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="resCalcularDsrAutomatico" checked>
+                            <label for="resCalcularDsrAutomatico" style="font-size: 12px; margin: 0; cursor: pointer; color: var(--text-secondary);">
+                                Calcular DSR automaticamente (domingo seguinte à semana da falta, segunda a sábado) — detecta a rubrica "DIAS FALTAS DSR" no catálogo da empresa
+                            </label>
                         </div>
                         <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
                             <span style="font-size: 13px; font-weight: 500;">Desconto de VT (em dias)</span>

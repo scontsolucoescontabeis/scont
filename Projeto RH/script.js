@@ -2927,13 +2927,12 @@ function _encMinutosParaTipo(mins, tipo) {
 function _encDias(count) {
     return count > 0 ? Math.round(count) : 0;
 }
-function _linhasFaltas(diasFalta) {
-    // diasFalta: array de objetos { data: 'DD/MM/AAAA', flagDSR: bool }
+function _linhasFaltas(diasFalta, flagChar = '1') {
+    // diasFalta: array de objetos { data: 'DD/MM/AAAA' }
     return diasFalta.map(dia => {
         const p = dia.data.split('/');
         const dataFmt = p[2] + p[1] + p[0]; // AAAAMMDD
-        const tipo = dia.flagDSR ? '2' : '1';
-        return `11${dataFmt}${tipo}\n`;
+        return `11${dataFmt}${flagChar}\n`;
     }).join('');
 }
 
@@ -2943,7 +2942,63 @@ function _toggleNaoCompensar(prefix) {
     if (label) label.textContent = checked ? 'Horas Faltantes' : 'Atraso';
 }
 
-function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null, diasFaltaDetalhes = []) {
+// --- Cálculo automático de DSR (domingo seguinte à semana da falta, segunda a sábado) ---
+
+function _normalizarDescricaoRubrica(descricao) {
+    return String(descricao || '').toUpperCase().trim().replace(/\.+$/, '').trim();
+}
+
+function detectarFaltaTipo(descricao) {
+    const norm = _normalizarDescricaoRubrica(descricao);
+    if (!norm.includes('DIAS FALTAS')) return null;
+    return norm.includes('DSR') ? 'dsr' : 'normal';
+}
+
+function proximoDomingo(data) {
+    const dow = data.getDay(); // 0 = domingo
+    const diasAteDomingo = dow === 0 ? 7 : (7 - dow);
+    const resultado = new Date(data.getTime());
+    resultado.setDate(resultado.getDate() + diasAteDomingo);
+    return resultado;
+}
+
+function _resolverCodigoRubricaDsr(catalogo) {
+    const achado = (catalogo || []).find(r => detectarFaltaTipo(r.descricao_rubrica) === 'dsr');
+    return achado ? achado.codigo_rubrica : null;
+}
+
+// Domingo seguinte de cada falta (semana segunda-sábado), deduplicado por empregado.
+function _calcularDomingosDSR(diasFaltaDetalhes) {
+    const mapa = new Map(); // 'AAAA-M-D' -> Date
+    (diasFaltaDetalhes || []).forEach(dia => {
+        const [d, m, a] = dia.data.split('/').map(Number);
+        const domingo = proximoDomingo(new Date(a, m - 1, d));
+        const chave = `${domingo.getFullYear()}-${domingo.getMonth()}-${domingo.getDate()}`;
+        if (!mapa.has(chave)) mapa.set(chave, domingo);
+    });
+    return [...mapa.values()].sort((a, b) => a - b);
+}
+
+function _formatarDataBR(data) {
+    return `${String(data.getDate()).padStart(2, '0')}/${String(data.getMonth() + 1).padStart(2, '0')}/${data.getFullYear()}`;
+}
+
+// Linha "10..." da rubrica DIAS FALTAS DSR (quantidade = nº de domingos únicos) seguida
+// das linhas informativas "11..." (uma por domingo, flag 2), sempre na competência atual
+// mesmo quando o domingo cai no mês seguinte — só a data informada reflete o mês real.
+function _linhaRubricaFaltaDSR(rubricaDSR, tipoProcesso, codEmp, compFmt, codEmpresa, domingos) {
+    if (!rubricaDSR || !domingos || domingos.length === 0) return '';
+    const tp = String(tipoProcesso).padStart(2, '0');
+    const empFmt = String(codEmp).padStart(10, '0');
+    const empFmt2 = String(codEmpresa).padStart(10, '0');
+    const rub = String(rubricaDSR).replace(/\D/g, '').padStart(9, '0');
+    const valFormatado = String(domingos.length).padStart(9, '0');
+    let linha = `10${empFmt}${compFmt}${rub}${tp}${valFormatado}${empFmt2}\n`;
+    linha += _linhasFaltas(domingos.map(d => ({ data: _formatarDataBR(d) })), '2');
+    return linha;
+}
+
+function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null, diasFaltaDetalhes = [], rubricaFaltaDSR = null) {
     const tp = String(config.tipoProcesso).padStart(2, '0');
     const empFmt = String(codEmp).padStart(10, '0');
     const empFmt2 = String(codEmpresa).padStart(10, '0');
@@ -2968,6 +3023,7 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, m
         linha(config.rubAtraso,    _encMinutosParaTipo(mins_atr,   config.tipoAtraso)),
         linha(config.rubFalta,     encDiasOuHoras(config.tipoFalta, dias_falta)),
         _linhasFaltas(diasFaltaDetalhes),
+        _linhaRubricaFaltaDSR(rubricaFaltaDSR, config.tipoProcesso, codEmp, compFmt, codEmpresa, _calcularDomingosDSR(diasFaltaDetalhes)),
         linha(config.rubDescontoVT, encDescontoVaVt(config.tipoDescontoVT, valoresVT)),
         linha(config.rubDescontoVA, encDescontoVaVt(config.tipoDescontoVA, valoresVA)),
     ].join('');
@@ -3061,6 +3117,15 @@ async function _construirConteudoTXTExportacao() {
     const compFmt = compParts[1] + compParts[0]; // AAAAMM
     let conteudoTXT = '';
     const naoCompensar = document.getElementById('expNaoCompensar')?.checked ?? false;
+    const calcularDsrAuto = document.getElementById('expCalcularDsrAutomatico')?.checked ?? false;
+
+    const catalogosPorEmpresa = {};
+    if (calcularDsrAuto) {
+        await Promise.all(empresasSelecionadas.map(async cod => {
+            catalogosPorEmpresa[cod] = await _buscarCatalogoRubricas(cod);
+        }));
+    }
+    const empresasSemRubricaDsr = new Set();
 
     Object.values(ultimasVersoes).forEach(save => {
         const empCodigo = save.empresa_codigo;
@@ -3135,7 +3200,7 @@ async function _construirConteudoTXTExportacao() {
                 if (flag === 'falta') {
                     tFaltaDias++;
                     tDiasDescontoVAVT++;
-                    diasFaltaDetalhes.push({ data: dia.data, flagDSR: isDSR });
+                    diasFaltaDetalhes.push({ data: dia.data });
                 } else if (flag === 'compensacao') {
                     dev = jornadaMinEfetiva;
                 }
@@ -3158,6 +3223,12 @@ async function _construirConteudoTXTExportacao() {
             }
         }
 
+        let rubricaFaltaDSR = null;
+        if (calcularDsrAuto && diasFaltaDetalhes.length > 0) {
+            rubricaFaltaDSR = _resolverCodigoRubricaDsr(catalogosPorEmpresa[empCodigo]);
+            if (!rubricaFaltaDSR) empresasSemRubricaDsr.add(empCodigo);
+        }
+
         const tNorm = Math.max(0, tTrab - tEx50 - tEx100);
         conteudoTXT += _linhasTxt(
             config,
@@ -3172,12 +3243,13 @@ async function _construirConteudoTXTExportacao() {
             tFaltaDias,
             tDiasDescontoVAVT,
             valoresVaVtMapa[`${empCodigo}_${empInfo.codigo_empregado}`],
-            diasFaltaDetalhes
+            diasFaltaDetalhes,
+            rubricaFaltaDSR
         );
     });
 
     localStorage.setItem(TXT_RUBRICAS_KEY, JSON.stringify(_lerCamposConfig('exp', 'exportTipoProcesso')));
-    return { conteudoTXT, compFmt, comp };
+    return { conteudoTXT, compFmt, comp, empresasSemRubricaDsr };
 }
 
 async function gerarPreviewTXTExportacao() {
@@ -3195,7 +3267,7 @@ async function gerarPreviewTXTExportacao() {
 async function gerarArquivoTXT() {
     mostrarMensagem('Aguarde', 'Gerando arquivo TXT...');
     try {
-        const { conteudoTXT, compFmt } = await _construirConteudoTXTExportacao();
+        const { conteudoTXT, compFmt, empresasSemRubricaDsr } = await _construirConteudoTXTExportacao();
         fecharModalMensagem();
         if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor positivo encontrado para as rubricas configuradas.'); return; }
         const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
@@ -3206,7 +3278,12 @@ async function gerarArquivoTXT() {
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
         fecharModalExportacaoTXT();
-        mostrarMensagem('Sucesso', 'Arquivo TXT gerado e baixado com sucesso!');
+        let msg = 'Arquivo TXT gerado e baixado com sucesso!';
+        if (empresasSemRubricaDsr && empresasSemRubricaDsr.size > 0) {
+            const nomes = [...empresasSemRubricaDsr].map(cod => state.empresas.find(e => e.codigo_empresa === cod)?.nome_empresa || cod).join(', ');
+            msg += `\nAviso: DSR automático não gerado para empresa(s) sem "DIAS FALTAS DSR" cadastrada no catálogo: ${nomes}`;
+        }
+        mostrarMensagem('Sucesso', msg);
     } catch (erro) {
         fecharModalMensagem();
         console.error('Erro ao gerar TXT:', erro);
@@ -4936,6 +5013,10 @@ async function _construirConteudoTXTResultados(salvar = false) {
     const naoCompensar = document.getElementById('resNaoCompensar')?.checked ?? false;
     const valoresVaVtMapa = await _buscarValoresVaVtEmpresa(codEmpresa);
 
+    const calcularDsrAuto = document.getElementById('resCalcularDsrAutomatico')?.checked ?? false;
+    const rubricaFaltaDSR = calcularDsrAuto ? _resolverCodigoRubricaDsr(_catalogoRubricasAtual) : null;
+    let avisoDsrSemRubrica = false;
+
     state.resultados.forEach(res => {
         let he50 = converterHoraParaMinutos(res.totais.extra50);
         let he100 = converterHoraParaMinutos(res.totais.extra100);
@@ -4951,6 +5032,7 @@ async function _construirConteudoTXTResultados(salvar = false) {
         const minsNorm = Math.max(0, converterHoraParaMinutos(res.totais.trabalhado) - he50 - he100);
         const diasFaltaRes = res.dias.filter(d => d.flagFalta);
         const diasDescontoVAVT = res.dias.filter(d => d.flagFalta || d.flagAtestado).length;
+        if (calcularDsrAuto && diasFaltaRes.length > 0 && !rubricaFaltaDSR) avisoDsrSemRubrica = true;
         conteudoTXT += _linhasTxt(
             config,
             res.empregadoId,
@@ -4964,13 +5046,14 @@ async function _construirConteudoTXTResultados(salvar = false) {
             diasFaltaRes.length,
             diasDescontoVAVT,
             valoresVaVtMapa[res.empregadoId],
-            diasFaltaRes
+            diasFaltaRes,
+            rubricaFaltaDSR
         );
     });
 
     conteudoTXT += _construirLinhasAdicionais(compFmt, codEmpresa, config.tipoProcesso);
 
-    return { conteudoTXT, compFmt };
+    return { conteudoTXT, compFmt, avisoDsrSemRubrica };
 }
 
 function _mostrarPrevia(previaId, previaConteudoId, previaInfoId, modalBodySelector, conteudoTXT) {
@@ -5035,7 +5118,7 @@ function _continuarDownloadAposAviso() {
 
 async function _efetivarDownloadTXTResultados() {
     try {
-        const { conteudoTXT } = await _construirConteudoTXTResultados(true);
+        const { conteudoTXT, avisoDsrSemRubrica } = await _construirConteudoTXTResultados(true);
         if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor positivo encontrado para as rubricas configuradas.'); return; }
         const [mm, aaaa] = state.competencia.split('/');
         const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
@@ -5046,7 +5129,11 @@ async function _efetivarDownloadTXTResultados() {
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
         fecharModalTxtResultados();
-        mostrarMensagem('Sucesso', 'Arquivo TXT gerado com sucesso!');
+        let msg = 'Arquivo TXT gerado com sucesso!';
+        if (avisoDsrSemRubrica) {
+            msg += '\nAviso: DSR automático não gerado — a empresa não tem "DIAS FALTAS DSR" cadastrada no catálogo.';
+        }
+        mostrarMensagem('Sucesso', msg);
     } catch (erro) {
         mostrarMensagem('Aviso', erro.message);
     }
