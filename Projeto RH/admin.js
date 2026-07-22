@@ -1537,16 +1537,12 @@ async function importarEmpresas(file) {
         setProgresso(ENT, 50);
         setStatusImport(ENT, `Salvando ${rows.length} empresa(s)...`, 'info');
 
-        if (modo === 'substituir') {
-            const codigos = [...new Set(rows.map(r => r.codigo_empresa))];
-            const { error: delErr } = await supabaseClient.from('rh_empresas').delete().in('codigo_empresa', codigos);
-            if (delErr) throw delErr;
-            const { error } = await supabaseClient.from('rh_empresas').insert(rows);
-            if (error) throw error;
-        } else {
-            const { error } = await supabaseClient.from('rh_empresas').upsert(rows, { onConflict: 'codigo_empresa' });
-            if (error) throw error;
-        }
+        // codigo_empresa é UNIQUE em rh_empresas (uma linha por empresa), então "substituir"
+        // e "acrescentar" resultam na mesma linha final — não há necessidade de delete antes
+        // do insert (que quebraria FKs de outras tabelas, ex.: contabil_onboardings.codigo_empresa).
+        // A única diferença entre os modos é o tratamento de UF quando a busca falha (abaixo).
+        const { error } = await supabaseClient.from('rh_empresas').upsert(rows, { onConflict: 'codigo_empresa' });
+        if (error) throw error;
 
         setProgresso(ENT, null);
         setStatusImport(ENT, `✅ ${rows.length} empresa(s) importada(s) com sucesso!`, 'success');
