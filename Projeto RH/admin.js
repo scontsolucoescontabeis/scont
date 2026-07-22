@@ -1281,14 +1281,14 @@ function setStatusImport(entidade, msg, tipo) {
     mostrarStatus('statusImportar' + entidade, msg, tipo);
 }
 
-function lerPlanilha(file, colunas) {
+function lerPlanilha(file, colunas, range = 1) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = e => {
             try {
                 const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
                 const sheet = wb.Sheets[wb.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(sheet, { header: colunas, defval: '', range: 1 });
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: colunas, defval: '', range });
                 resolve(rows);
             } catch (err) { reject(err); }
         };
@@ -1303,18 +1303,6 @@ function limparInput(id) {
 }
 
 // ── EMPRESAS ─────────────────────────────────────────────────
-
-function baixarModeloEmpresas() {
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([[
-        'Cód.', 'Empresa', 'CNPJ', 'Regime Enquadramento',
-        'Inscrição Estadual', 'Inscrição Municipal', 'Municipio',
-        'Status/Situação', 'Data de Cadastro', 'Endereço', 'CEP', 'Cidade'
-    ]]);
-    ws['!cols'] = [8,30,18,22,18,18,20,14,16,30,10,20].map(w => ({ wch: w }));
-    XLSX.utils.book_append_sheet(wb, ws, 'Empresas');
-    XLSX.writeFile(wb, 'modelo_empresas.xlsx');
-}
 
 // ── MODAL MODO IMPORTAÇÃO ─────────────────────────────────────
 
@@ -1491,11 +1479,19 @@ async function importarEmpresas(file) {
         setStatusImport(ENT, 'Lendo arquivo...', 'info');
         setProgresso(ENT, 10);
 
-        const colunas = ['codigo_empresa','nome_empresa','cnpj','regime_enquadramento',
-                         'inscricao_estadual','inscricao_municipal','municipio',
-                         'status_situacao','data_cadastro','endereco','cep','cidade'];
+        // Relatório "Relação de Empresas" exportado do ERP: 7 linhas de título/paginação
+        // antes dos dados, colunas intercaladas com colunas em branco (resquício de
+        // células mescladas do relatório). Mapeamento posicional validado contra o arquivo real.
+        const colunas = [
+            'codigo_empresa','_s1','nome_empresa','_s3','cnpj','regime_enquadramento',
+            'inscricao_estadual','inscricao_municipal','municipio','status_situacao','_s10',
+            'data_cadastro','_s12','_s13','_s14','endereco','_s16','cep','_s18','cidade','_s20',
+            '_s21_data_encerramento','_s22','_s23_codigo_interno','_s24','_s25_codigo_interno','_s26',
+            'razao_social','_s28','_s29','email','_s31'
+        ];
 
-        const rows = (await lerPlanilha(file, colunas))
+        const rows = (await lerPlanilha(file, colunas, 7))
+            .map(r => ({ ...r, nome_empresa: r.razao_social || r.nome_empresa }))
             .filter(r => r.codigo_empresa && r.nome_empresa)
             .map(r => ({
                 codigo_empresa:       String(r.codigo_empresa).trim(),
@@ -1512,6 +1508,7 @@ async function importarEmpresas(file) {
                 endereco:             r.endereco ? String(r.endereco).trim() : null,
                 cep:                  r.cep ? String(r.cep).trim() : null,
                 cidade:               r.cidade ? String(r.cidade).trim() : null,
+                email:                r.email ? String(r.email).trim() : null,
             }));
 
         if (!rows.length) throw new Error('Nenhuma linha válida encontrada. Verifique se o arquivo segue o modelo.');
