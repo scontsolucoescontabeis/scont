@@ -116,3 +116,23 @@ Isso garante que a(s) linha(s) informativa(s) do empregado fiquem imediatamente 
 - Sem calendário visual — entrada continua sendo texto livre (lista de dias separados por vírgula).
 - Não altera o Controle de Frequência (`script.js`) nem a Administração.
 - Não cobre o caso de código manual cujo código não bate com nenhuma descrição já carregada no lote (nesse caso a rubrica se comporta como antes, sem detalhamento de dias).
+
+## Extensão: cálculo automático do DSR a partir da "DIAS FALTAS" normal
+
+Adicionado na mesma leva de trabalho, a pedido do usuário.
+
+### Regra de negócio (confirmada com o usuário)
+
+- Semana de referência: segunda a sábado. O DSR perdido por falta nessa semana cai sempre no domingo que segue.
+- Se mais de uma falta da mesma coluna "DIAS FALTAS" cair na mesma semana, gera **só uma** linha de DSR para aquele domingo (deduplicado por empregado).
+- O desconto (linha `10...`) é sempre lançado na **competência atual** sendo processada — mesmo quando o domingo correspondente cai no mês seguinte. Só a linha informativa `11...` carrega a data real do domingo (podendo estar no mês/ano seguinte).
+- Se alguma empresa do lote não tiver a rubrica "DIAS FALTAS DSR" cadastrada no catálogo (`rh_rubricas`), os empregados dela são pulados do cálculo automático (não bloqueia a geração das demais) e um aviso lista as empresas afetadas.
+- Ativação via checkbox "Calcular desconto de DSR automaticamente..." na tela de grade (`#calcularDsrAutomatico`), marcado por padrão — o usuário pode desmarcar por leva.
+
+### Implementação
+
+- `proximoDomingo(data)`: dado um `Date`, retorna o `Date` do próximo domingo estritamente após ele.
+- `resolverCodigoRubricaDsrPorEmpresa(codEmpresa)`: busca em `catalogoRubricasLote` a rubrica da empresa cuja descrição é detectada como `detectarFaltaTipo(...) === 'dsr'`.
+- `calcularParametrizacaoDsrAutomatica(comp, tipoProcesso, itensFaltaNormal)`: a partir dos itens já validados de uma coluna "DIAS FALTAS" (normal), calcula por empregado o conjunto de domingos únicos, monta as linhas `10...`/`11...` (mesmo layout das rubricas de falta manuais, mas com a data real do domingo em vez de um dia dentro do mês da competência) e retorna também o conjunto de empresas sem rubrica DSR cadastrada.
+- `gerarParametrizacoes()`: para cada coluna com `faltaTipo === 'normal'`, se o checkbox estiver marcado, chama o cálculo automático logo após montar a parametrização manual da coluna e — se houver itens — adiciona mais uma parametrização à leva, rotulada `"<rubrica> → DSR (automático)"`. Avisos de empresas sem rubrica DSR cadastrada são agregados e exibidos na mensagem final de sucesso.
+- Este cálculo automático é independente de qualquer coluna "DIAS FALTAS DSR" adicionada manualmente pelo usuário na mesma leva — os dois mecanismos não se cruzam nem se sobrescrevem; se o usuário usar os dois ao mesmo tempo para o mesmo domingo, pode gerar desconto em duplicidade (limitação conhecida, não tratada).

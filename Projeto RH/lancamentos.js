@@ -437,6 +437,87 @@ function onCodigoManualInput() {
     _aplicarTravaFaltaNoFormulario(faltaTipo);
 }
 
+// --- Cálculo automático de DSR (domingo seguinte à semana da falta) ---
+
+function proximoDomingo(data) {
+    const dow = data.getDay(); // 0 = domingo
+    const diasAteDomingo = dow === 0 ? 7 : (7 - dow);
+    const resultado = new Date(data.getTime());
+    resultado.setDate(resultado.getDate() + diasAteDomingo);
+    return resultado;
+}
+
+function resolverCodigoRubricaDsrPorEmpresa(codEmpresa) {
+    const achado = catalogoRubricasLote.find(r => r.codigo_empresa === codEmpresa && detectarFaltaTipo(r.descricao_rubrica) === 'dsr');
+    return achado ? achado.codigo_rubrica : null;
+}
+
+// A partir dos itens já validados de uma rubrica "DIAS FALTAS" (normal), calcula o
+// domingo seguinte de cada falta (semana segunda-sábado), deduplica por empregado e
+// monta a parametrização de "DIAS FALTAS DSR" correspondente. O desconto é lançado na
+// competência atual mesmo quando o domingo cai no mês seguinte — só a data informada na
+// linha "11..." reflete o mês/ano real do domingo.
+function calcularParametrizacaoDsrAutomatica(comp, tipoProcesso, itensFaltaNormal) {
+    const compParts = comp.split('/');
+    const compFormatada = compParts[1] + compParts[0]; // AAAAMM da competência atual
+    const tipoProcFormatado = String(tipoProcesso).padStart(2, '0');
+    const mes = Number(compParts[0]);
+    const ano = Number(compParts[1]);
+    const fixo = '10';
+
+    const itensDsr = [];
+    const empresasSemRubricaDsr = new Set();
+
+    itensFaltaNormal.forEach(item => {
+        const [codEmpresa] = item.empregado.split('|');
+        const codigoDsr = resolverCodigoRubricaDsrPorEmpresa(codEmpresa);
+        if (!codigoDsr) { empresasSemRubricaDsr.add(codEmpresa); return; }
+
+        const domingosUnicos = new Map(); // 'AAAA-MM-DD' -> Date
+        parseDiasFalta(item.valor).forEach(dia => {
+            const domingo = proximoDomingo(new Date(ano, mes - 1, dia));
+            const chave = `${domingo.getFullYear()}-${domingo.getMonth()}-${domingo.getDate()}`;
+            if (!domingosUnicos.has(chave)) domingosUnicos.set(chave, domingo);
+        });
+
+        if (domingosUnicos.size === 0) return;
+
+        itensDsr.push({
+            empregado: item.empregado,
+            nomeEmpregado: item.nomeEmpregado,
+            codigo: codigoDsr,
+            domingos: [...domingosUnicos.values()].sort((a, b) => a - b)
+        });
+    });
+
+    if (itensDsr.length === 0) {
+        return { conteudoTXT: '', itens: [], empresasSemRubricaDsr };
+    }
+
+    let conteudo = '';
+    itensDsr.forEach(item => {
+        const [codEmpresa, codEmpregado] = item.empregado.split('|');
+        const rubFormatada = String(item.codigo).padStart(9, '0');
+        const codEmpregadoFormatado = String(codEmpregado).padStart(10, '0');
+        const codEmpresaFormatada = String(codEmpresa).padStart(10, '0');
+        const valFormatado = String(item.domingos.length).padStart(9, '0');
+        conteudo += `${fixo}${codEmpregadoFormatado}${compFormatada}${rubFormatada}${tipoProcFormatado}${valFormatado}${codEmpresaFormatada}\n`;
+
+        item.domingos.forEach(domingo => {
+            const dataFmt = `${domingo.getFullYear()}${String(domingo.getMonth() + 1).padStart(2, '0')}${String(domingo.getDate()).padStart(2, '0')}`;
+            conteudo += `11${dataFmt}2\n`;
+        });
+    });
+
+    const itensParaExibicao = itensDsr.map(i => ({
+        empregado: i.empregado,
+        nomeEmpregado: i.nomeEmpregado,
+        valor: i.domingos.map(d => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`).join(', ')
+    }));
+
+    return { conteudoTXT: conteudo, itens: itensParaExibicao, empresasSemRubricaDsr };
+}
+
 function atualizarPlaceholderValorPadrao() {
     const tipo = document.getElementById('gradeRubricaTipoValor').value;
     const input = document.getElementById('gradeRubricaValorPadrao');
@@ -715,8 +796,10 @@ function gerarParametrizacoes() {
         return;
     }
 
+    const calcularDsrAuto = document.getElementById('calcularDsrAutomatico')?.checked ?? false;
     const novasParametrizacoes = [];
     const rubricasIgnoradas = [];
+    const empresasSemRubricaDsrTotal = new Set();
 
     for (const r of rubricasGrid) {
         const valoresColuna = valoresGrid[r.id] || {};
@@ -773,6 +856,24 @@ function gerarParametrizacoes() {
             conteudoTXT: conteudoTXT,
             dataHora: new Date().toLocaleString('pt-BR')
         });
+
+        if (calcularDsrAuto && r.faltaTipo === 'normal') {
+            const dsr = calcularParametrizacaoDsrAutomatica(comp, tipoProcesso, itens);
+            dsr.empresasSemRubricaDsr.forEach(cod => empresasSemRubricaDsrTotal.add(cod));
+
+            if (dsr.itens.length > 0) {
+                novasParametrizacoes.push({
+                    id: Date.now() + Math.random(),
+                    competencia: comp,
+                    tipoProcesso: tipoProcesso,
+                    rubrica: `${r.label} → DSR (automático)`,
+                    tipoValor: 'dias',
+                    itens: dsr.itens,
+                    conteudoTXT: dsr.conteudoTXT,
+                    dataHora: new Date().toLocaleString('pt-BR')
+                });
+            }
+        }
     }
 
     if (novasParametrizacoes.length === 0) {
@@ -794,6 +895,10 @@ function gerarParametrizacoes() {
     let msg = `${novasParametrizacoes.length} parametrização(ões) adicionada(s)! Total: ${parametrizacoesAcumuladas.length}`;
     if (rubricasIgnoradas.length > 0) {
         msg += `\nRubricas ignoradas (sem valores): ${rubricasIgnoradas.join(', ')}`;
+    }
+    if (empresasSemRubricaDsrTotal.size > 0) {
+        const nomes = [...empresasSemRubricaDsrTotal].map(cod => nomeEmpresaPorCodigo(cod)).join(', ');
+        msg += `\nAviso: DSR automático não gerado para empregado(s) de empresa(s) sem "DIAS FALTAS DSR" cadastrada no catálogo: ${nomes}`;
     }
     mostrarMensagem('Sucesso', msg);
 }
