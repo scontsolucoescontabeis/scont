@@ -203,10 +203,23 @@ function parseHoras(s) {
     return Math.floor(totalMin / 60) * 100 + (totalMin % 60);
 }
 
-// Converte número de dias (texto) → inteiro
+// Converte a célula da rubrica de Faltas em dias: pode vir como quantidade
+// ("3") ou como a(s) data(s) da falta ("05/07/2026" ou "05/07/2026, 12/07/2026")
+// — nesse caso a quantidade de dias é a contagem de datas informadas.
 function parseDias(s) {
     if (!s && s !== 0) return 0;
-    const n = parseInt(String(s).trim(), 10);
+    const str = String(s).trim();
+    if (!str) return 0;
+
+    if (/^\d+$/.test(str)) {
+        const n = parseInt(str, 10);
+        return isNaN(n) || n <= 0 ? 0 : n;
+    }
+
+    const datas = str.split(/[,;\n]/).map(p => p.trim()).filter(p => /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(p));
+    if (datas.length) return datas.length;
+
+    const n = parseInt(str, 10);
     return isNaN(n) || n <= 0 ? 0 : n;
 }
 
