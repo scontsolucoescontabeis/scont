@@ -111,11 +111,33 @@ function calcularDomingosDsr(datasFalta) {
     return [...domingos].sort((a, b) => parseDataBR(a) - parseDataBR(b));
 }
 
+// Quando a rubrica de Faltas DSR vem como booleana, o valor indica se o
+// desconto deve ou não ser feito. Só NÃO se aplica quando vem a negativa
+// explícita — qualquer outro valor (inclusive vazio) mantém o desconto.
+function ehNegativoBooleano(bruto) {
+    return ['nao', 'n', '0', 'false'].includes(normalizarNome(String(bruto ?? '')));
+}
+
+// Se a rubrica de Faltas DSR está bloqueada para este empregado (booleana + negativa)
+function dsrBloqueado(codEmpregado) {
+    const linhaDsr = linhasRelatorio.find(l => l.codEmpregado === codEmpregado && isColunaFaltaDsr(l.coluna));
+    return !!linhaDsr && linhaDsr.tipoValor === 'booleano' && ehNegativoBooleano(linhaDsr.bruto);
+}
+
+// Domingos de DSR já considerando o bloqueio booleano, para um empregado
+function obterDomingosDsr(codEmpregado) {
+    return dsrBloqueado(codEmpregado) ? [] : calcularDomingosDsr(obterDatasFaltaNormal(codEmpregado));
+}
+
 function atualizarDsrAuto(codEmpregado) {
-    const el = document.querySelector(`[data-dsr-auto="${codEmpregado}"]`);
-    if (!el) return;
-    const domingos = calcularDomingosDsr(obterDatasFaltaNormal(codEmpregado));
-    el.textContent = domingos.length ? domingos.join(', ') : '—';
+    const bloqueado = dsrBloqueado(codEmpregado);
+    const domingos  = bloqueado ? [] : calcularDomingosDsr(obterDatasFaltaNormal(codEmpregado));
+
+    const elDatas = document.querySelector(`[data-dsr-auto-datas="${codEmpregado}"]`);
+    if (elDatas) elDatas.textContent = bloqueado ? 'bloqueado — rubrica informada como "Não"' : (domingos.length ? domingos.join(', ') : '—');
+
+    const elQtd = document.querySelector(`[data-dsr-auto-qtd="${codEmpregado}"]`);
+    if (elQtd) elQtd.textContent = bloqueado ? 'bloqueado (Não)' : (domingos.length ? domingos.length + ' dias' : '–');
 }
 
 function normalizarNome(s) {
@@ -505,13 +527,31 @@ function construirRelatorio(comp) {
         if (!codEmpregado) temSemMatch = true;
 
         colunasRubrica.forEach(({ header, resolucao }) => {
-            const bruto = func.colunas[header] || '';
-            if (!bruto) return; // célula vazia — ignorar
+            const bruto  = func.colunas[header] || '';
+            const dsrCol = isColunaFaltaDsr(header);
+
+            if (!bruto) {
+                if (dsrCol) {
+                    // A célula de DSR pode ficar vazia mesmo quando há falta normal —
+                    // o desconto é sempre calculado a partir das datas de Faltas normais,
+                    // então a linha ainda precisa existir para isso acontecer.
+                    const colFaltaNormal   = colunasRubrica.find(c => isColunaFalta(c.header) && !isColunaFaltaDsr(c.header));
+                    const brutoFaltaNormal = colFaltaNormal ? (func.colunas[colFaltaNormal.header] || '') : '';
+                    if (!brutoFaltaNormal) return;
+                } else {
+                    return; // célula vazia — ignorar
+                }
+            }
 
             const tipoValor = resolucao.tipo_valor;
             const valorCota = resolucao.valor_cota;
             let valorInt;
-            if (tipoValor === 'booleano') {
+            if (dsrCol) {
+                // DSR nunca vem pronto da célula: em dias/valor é sempre calculado a
+                // partir das datas de Faltas normais; em booleano a célula só indica
+                // se o desconto deve ou não ocorrer (ver dsrBloqueado/obterDomingosDsr).
+                valorInt = 0;
+            } else if (tipoValor === 'booleano') {
                 valorInt = String(bruto).trim().toLowerCase() === 'sim' && valorCota
                     ? Math.round(parseFloat(valorCota) * 100)
                     : 0;
@@ -564,14 +604,25 @@ function renderizarRelatorio(linhas) {
               </select>`
             : '<span class="badge" style="background:#eee;color:#999;">?</span>';
 
-        const _valorFmt = l.tipoValor === 'minutos'
-            ? String(l.valorInt).padStart(4, '0')
-            : formatarValorExibicao(l.valorInt, l.tipoValor);
-        const valorTxtDisplay = ignorada
-            ? '<span style="color:#999;font-size:11px;">ignorada</span>'
-            : l.valorInt > 0
-                ? `<span style="font-family:monospace;font-weight:600;">${_valorFmt}</span>`
-                : (semRubrica ? '<span style="color:#999;font-size:11px;">sem config</span>' : '–');
+        let valorTxtDisplay;
+        if (!semRubrica && isColunaFaltaDsr(l.coluna) && l.codEmpregado) {
+            const _bloqueado = dsrBloqueado(l.codEmpregado);
+            const _domingos  = _bloqueado ? [] : calcularDomingosDsr(obterDatasFaltaNormal(l.codEmpregado));
+            valorTxtDisplay = ignorada
+                ? '<span style="color:#999;font-size:11px;">ignorada</span>'
+                : `<span data-dsr-auto-qtd="${l.codEmpregado}" style="font-family:monospace;font-weight:600;${_bloqueado ? 'color:#999;font-weight:400;' : ''}">${
+                    _bloqueado ? 'bloqueado (Não)' : (_domingos.length ? _domingos.length + ' dias' : '–')
+                  }</span>`;
+        } else {
+            const _valorFmt = l.tipoValor === 'minutos'
+                ? String(l.valorInt).padStart(4, '0')
+                : formatarValorExibicao(l.valorInt, l.tipoValor);
+            valorTxtDisplay = ignorada
+                ? '<span style="color:#999;font-size:11px;">ignorada</span>'
+                : l.valorInt > 0
+                    ? `<span style="font-family:monospace;font-weight:600;">${_valorFmt}</span>`
+                    : (semRubrica ? '<span style="color:#999;font-size:11px;">sem config</span>' : '–');
+        }
 
         const rubricaCell = semRubrica
             ? '<span class="sem-match">sem rubrica</span>'
@@ -677,22 +728,28 @@ function renderizarRelatorio(linhas) {
             trFaltaDatas.style.background = '#EFF6FF';
 
             if (isColunaFaltaDsr(l.coluna)) {
-                // DSR não é digitado: cai no domingo da semana de cada falta normal, sem sobreposição
-                const _domingos = calcularDomingosDsr(obterDatasFaltaNormal(l.codEmpregado));
+                // DSR não é digitado: cai no domingo da semana de cada falta normal, sem sobreposição.
+                // Quando a rubrica é booleana, a célula da planilha só indica se o desconto se aplica.
+                const _bloqueado = dsrBloqueado(l.codEmpregado);
+                const _domingos  = _bloqueado ? [] : calcularDomingosDsr(obterDatasFaltaNormal(l.codEmpregado));
+                const _textoDatas = _bloqueado
+                    ? 'bloqueado — rubrica informada como "Não"'
+                    : (_domingos.length ? _domingos.join(', ') : '—');
                 trFaltaDatas.innerHTML = `
                     <td colspan="10">
                         <div style="padding:5px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                             <span style="font-size:11px;font-weight:600;color:#1D4ED8;white-space:nowrap;">
                                 📅 Domingo(s) de DSR — ${l.nome}:
                             </span>
-                            <span data-dsr-auto="${l.codEmpregado}" style="font-size:12px;font-family:monospace;color:#1D4ED8;">${_domingos.length ? _domingos.join(', ') : '—'}</span>
-                            <span style="font-size:11px;color:#6B7280;">calculado automaticamente a partir das Datas falta Normal — 1 domingo por semana</span>
+                            <span data-dsr-auto-datas="${l.codEmpregado}" style="font-size:12px;font-family:monospace;color:${_bloqueado ? '#999' : '#1D4ED8'};">${_textoDatas}</span>
+                            <span style="font-size:11px;color:#6B7280;">${_bloqueado ? 'desconto de DSR desativado para este empregado' : 'calculado automaticamente a partir das Datas falta Normal — 1 domingo por semana'}</span>
                         </div>
                     </td>
                 `;
             } else {
                 const _faltaKey = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
                 const _valAtual = (faltaDatasMap[_faltaKey] || '').replace(/"/g, '&quot;');
+                const _semData  = l.valorInt > 0 && !_valAtual;
                 trFaltaDatas.innerHTML = `
                     <td colspan="10">
                         <div style="padding:5px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -707,6 +764,7 @@ function renderizarRelatorio(linhas) {
                                 value="${_valAtual}"
                                 style="flex:1;min-width:240px;padding:4px 8px;border:1px solid #93C5FD;border-radius:4px;font-size:12px;font-family:monospace;">
                             <span style="font-size:11px;color:#6B7280;">separadas por vírgula · o domingo de DSR é calculado automaticamente</span>
+                            ${_semData ? '<span style="font-size:11px;color:#E67E22;">⚠️ informe a(s) data(s) para calcular o DSR</span>' : ''}
                         </div>
                     </td>
                 `;
@@ -995,20 +1053,34 @@ function confirmarTipoProcesso() {
             _ordCods.push(l.codEmpregado);
         }
         const _ign = rubricasIgnoradas.has(normalizarNome(l.coluna));
-        if (!_ign && l.valorInt > 0) {
+        if (_ign) return;
+
+        if (isColunaFaltaDsr(l.coluna)) {
+            // Quantidade e datas do DSR sempre calculadas a partir das Faltas normais
+            // (a célula da planilha nunca fornece a quantidade — só bloqueia, se booleana e negativa)
+            if (!l.codigoRubrica) return;
+            const _domingos = obterDomingosDsr(l.codEmpregado);
+            if (!_domingos.length) return;
+            _empData[l.codEmpregado].rubricas.push(
+                gerarLinhaTxt(l.codEmpregado, comp, l.codigoRubrica, tipoProcesso, _domingos.length, empresaAtiva)
+            );
+            _domingos.forEach(d => {
+                const _m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+                if (_m) _empData[l.codEmpregado].rubricas.push(`11${_m[3]}${_m[2]}${_m[1]}2`);
+            });
+            return;
+        }
+
+        if (l.valorInt > 0) {
             _empData[l.codEmpregado].rubricas.push(
                 gerarLinhaTxt(l.codEmpregado, comp, l.codigoRubrica, tipoProcesso, l.valorInt, empresaAtiva)
             );
         }
-        if (!_ign && isColunaFalta(l.coluna)) {
-            const _tipoDsr = isColunaFaltaDsr(l.coluna);
-            const _tipo    = _tipoDsr ? '2' : '1';
-            const _datas   = _tipoDsr
-                ? calcularDomingosDsr(obterDatasFaltaNormal(l.codEmpregado))
-                : (faltaDatasMap[`${l.codEmpregado}::${normalizarNome(l.coluna)}`] || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
+        if (isColunaFalta(l.coluna)) {
+            const _datas = (faltaDatasMap[`${l.codEmpregado}::${normalizarNome(l.coluna)}`] || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
             _datas.forEach(d => {
                 const _m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-                if (_m) _empData[l.codEmpregado].rubricas.push(`11${_m[3]}${_m[2]}${_m[1]}${_tipo}`);
+                if (_m) _empData[l.codEmpregado].rubricas.push(`11${_m[3]}${_m[2]}${_m[1]}1`);
             });
         }
     });
