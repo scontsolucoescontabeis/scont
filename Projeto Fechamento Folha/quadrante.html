@@ -27,7 +27,7 @@
     <div class="sidebar-brand">
         <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
         <h2>Fechamento Folha</h2>
-        <p>Quadrante Etiquetas · 453</p>
+        <p id="sidebarEmpresaLabel">Quadrante Etiquetas · 453</p>
     </div>
 
     <nav class="sidebar-nav">
@@ -90,8 +90,8 @@
 
     <div class="sidebar-footer">
         <div class="sidebar-footer-info">
-            <strong>Código 453</strong>
-            Quadrante Etiquetas
+            <strong id="sidebarFooterCodigo">Código 453</strong>
+            <span id="sidebarFooterNome">Quadrante Etiquetas</span>
         </div>
     </div>
 </aside>
@@ -102,7 +102,7 @@
     <!-- PAGE HEADER -->
     <div class="page-header">
         <div>
-            <h1>Fechamento Folha · Quadrante Etiquetas</h1>
+            <h1 id="pageMainTitle">Fechamento Folha · Quadrante Etiquetas</h1>
             <div class="page-header-sub" id="headerSubtitle">Código 453 · Upload e processamento da planilha</div>
         </div>
     </div>
@@ -119,6 +119,9 @@
                 <button onclick="carregarEnvios()" style="margin-left:auto;font-size:12px;padding:5px 12px;border:1px solid var(--border-color);border-radius:6px;background:#fff;cursor:pointer;color:var(--text-primary);">↻ Atualizar</button>
                 <a href="formulario_quadrante.html" class="btn btn-primary btn-small" style="text-decoration:none;margin-left:8px;">✏ Abrir Formulário</a>
             </div>
+            <div id="avisoFormularioEmpresa" class="alert alert-warning" style="display:none;font-size:12px;margin-top:8px;">
+                ⚠️ O Formulário manual está disponível apenas para a empresa 453 – Quadrante Etiquetas por enquanto.
+            </div>
             <div id="listaEnvios">
                 <div style="color:var(--text-secondary);font-size:13px;padding:10px 0;">Carregando envios...</div>
             </div>
@@ -131,10 +134,20 @@
                 Upload da Planilha de Fechamento
             </div>
 
-            <div class="form-group" style="max-width: 280px;">
-                <label for="competencia">Competência *</label>
-                <input type="text" id="competencia" placeholder="MM/AAAA" maxlength="7">
-                <small>Mês e ano do fechamento</small>
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                <div class="form-group" style="max-width: 280px;">
+                    <label for="competencia">Competência *</label>
+                    <input type="text" id="competencia" placeholder="MM/AAAA" maxlength="7">
+                    <small>Mês e ano do fechamento</small>
+                </div>
+                <div class="form-group" style="max-width: 280px;">
+                    <label for="selectEmpresaAtiva">Empresa *</label>
+                    <select id="selectEmpresaAtiva" onchange="onEmpresaAtivaAlterada()">
+                        <option value="453">453 – Quadrante Etiquetas</option>
+                        <option value="457">457 – Quadrante Rótulos</option>
+                    </select>
+                    <small>Empresa para a qual o fechamento será processado</small>
+                </div>
             </div>
 
             <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">

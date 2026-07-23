@@ -1,9 +1,11 @@
 /**
  * SCONT – Fechamento Folha de Pagamento
- * Empresa: Quadrante Etiquetas (código 453)
+ * Empresa: Quadrante (código 453 – Quadrante Etiquetas, ou 457 – Quadrante Rótulos)
  */
 
-const CODIGO_EMPRESA = '453';
+const CODIGO_EMPRESA = '453'; // padrão usado pelas telas de Configurações e Relatório Líquido
+const EMPRESAS_QUADRANTE = { '453': 'Quadrante Etiquetas', '457': 'Quadrante Rótulos' };
+let empresaAtiva = CODIGO_EMPRESA; // empresa selecionada no Step 1 do fluxo de planilha
 const LINHA_CABECALHO = 4; // linha do Excel (1-based) com os nomes das colunas
 const LINHA_DADOS_INI = 5; // primeira linha de dados
 
@@ -60,8 +62,60 @@ function isColunaFalta(coluna) {
     return normalizarNome(coluna).includes('falta');
 }
 
+function isColunaFaltaDsr(coluna) {
+    return isColunaFalta(coluna) && normalizarNome(coluna).includes('dsr');
+}
+
 function registrarFaltaDatas(key, valor) {
     faltaDatasMap[key] = valor;
+}
+
+function parseDataBR(str) {
+    const m = String(str || '').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return null;
+    const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+    return isNaN(d.getTime()) ? null : d;
+}
+
+function formatarDataBR(date) {
+    const dd   = String(date.getDate()).padStart(2, '0');
+    const mm   = String(date.getMonth() + 1).padStart(2, '0');
+    const aaaa = date.getFullYear();
+    return `${dd}/${mm}/${aaaa}`;
+}
+
+// Domingo em que cai o DSR perdido pela falta: o domingo da mesma semana
+// (a própria data, se já for domingo, senão o domingo seguinte)
+function proximoDomingo(date) {
+    const d = new Date(date);
+    d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+    return d;
+}
+
+// Datas de "Faltas (Dias)" (não-DSR) já digitadas para um empregado
+function obterDatasFaltaNormal(codEmpregado) {
+    const linhaFalta = linhasRelatorio.find(l =>
+        l.codEmpregado === codEmpregado && isColunaFalta(l.coluna) && !isColunaFaltaDsr(l.coluna));
+    if (!linhaFalta) return [];
+    const key = `${codEmpregado}::${normalizarNome(linhaFalta.coluna)}`;
+    return (faltaDatasMap[key] || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
+}
+
+// Domingos de DSR perdidos: um por semana, sem sobreposição, derivados das datas de falta normal
+function calcularDomingosDsr(datasFalta) {
+    const domingos = new Set();
+    datasFalta.forEach(str => {
+        const d = parseDataBR(str);
+        if (d) domingos.add(formatarDataBR(proximoDomingo(d)));
+    });
+    return [...domingos].sort((a, b) => parseDataBR(a) - parseDataBR(b));
+}
+
+function atualizarDsrAuto(codEmpregado) {
+    const el = document.querySelector(`[data-dsr-auto="${codEmpregado}"]`);
+    if (!el) return;
+    const domingos = calcularDomingosDsr(obterDatasFaltaNormal(codEmpregado));
+    el.textContent = domingos.length ? domingos.join(', ') : '—';
 }
 
 function normalizarNome(s) {
@@ -199,7 +253,7 @@ async function carregarFuncionarios() {
     const { data, error } = await supabaseClient
         .from('rh_empregados')
         .select('nome_empregado, codigo_empregado')
-        .eq('codigo_empresa', CODIGO_EMPRESA);
+        .eq('codigo_empresa', empresaAtiva);
     if (error) throw error;
     funcionariosMap = {};
     (data || []).forEach(f => {
@@ -211,7 +265,7 @@ async function carregarEmpregadosConfig() {
     const { data, error } = await supabaseClient
         .from('fechamento_empregados_config')
         .select('nome_planilha, codigo_empregado')
-        .eq('codigo_empresa', CODIGO_EMPRESA);
+        .eq('codigo_empresa', empresaAtiva);
     if (error) throw error;
     empregadosConfig = {};
     (data || []).forEach(e => {
@@ -223,7 +277,7 @@ async function carregarRubricasIgnoradas() {
     const { data, error } = await supabaseClient
         .from('fechamento_rubricas_ignoradas')
         .select('coluna_planilha')
-        .eq('codigo_empresa', CODIGO_EMPRESA);
+        .eq('codigo_empresa', empresaAtiva);
     if (error) throw error;
     rubricasIgnoradas = new Set((data || []).map(r => normalizarNome(r.coluna_planilha)));
 }
@@ -233,7 +287,7 @@ async function carregarRubricas() {
     const { data: cfgData, error: cfgErr } = await supabaseClient
         .from('fechamento_rubricas_config')
         .select('coluna_planilha, codigo_rubrica, tipo_processo, tipo_valor, descricao, valor_cota')
-        .eq('codigo_empresa', CODIGO_EMPRESA)
+        .eq('codigo_empresa', empresaAtiva)
         .eq('ativo', true);
     if (cfgErr) throw cfgErr;
     rubricasConfig = cfgData || [];
@@ -288,9 +342,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Upload área – relatório líquido (etiquetas bancárias)
     configurarUploadArea('uploadAreaLiquido', 'inputLiquido', 'filenameLiquido', onLiquidoSelecionado);
 
+    // Seletor de empresa ativa (453 · Quadrante Etiquetas / 457 · Quadrante Rótulos)
+    document.getElementById('selectEmpresaAtiva').value = empresaAtiva;
+    atualizarTextosEmpresa();
+
     // Painel de envios do formulário
     carregarEnvios();
 });
+
+function onEmpresaAtivaAlterada() {
+    empresaAtiva = document.getElementById('selectEmpresaAtiva').value;
+    atualizarTextosEmpresa();
+    carregarEnvios();
+}
+
+function atualizarTextosEmpresa() {
+    const nome  = EMPRESAS_QUADRANTE[empresaAtiva] || '';
+    const label = `${empresaAtiva} · ${nome}`;
+
+    document.getElementById('pageMainTitle').textContent = `Fechamento Folha · ${nome}`;
+    document.getElementById('headerSubtitle').textContent = `Código ${label} · Upload e processamento da planilha`;
+    document.getElementById('sidebarEmpresaLabel').textContent = label;
+    document.getElementById('sidebarFooterCodigo').textContent = `Código ${empresaAtiva}`;
+    document.getElementById('sidebarFooterNome').textContent = nome;
+
+    const aviso = document.getElementById('avisoFormularioEmpresa');
+    if (aviso) aviso.style.display = empresaAtiva === '453' ? 'none' : 'block';
+}
 
 function configurarUploadArea(areaId, inputId, filenameId, callback) {
     const area  = document.getElementById(areaId);
@@ -328,6 +406,9 @@ async function processarPlanilha() {
         mostrarMensagem('Atenção', 'Selecione a planilha de fechamento.');
         return;
     }
+
+    empresaAtiva = document.getElementById('selectEmpresaAtiva').value;
+    atualizarTextosEmpresa();
 
     try {
         // Carregar dados do Supabase em paralelo
@@ -372,7 +453,7 @@ async function processarPlanilha() {
 
         // Salvar histórico fire-and-forget
         supabaseClient.from('quadrante_folha_envios').insert({
-            empresa_codigo: CODIGO_EMPRESA,
+            empresa_codigo: empresaAtiva,
             competencia:    comp,
             tipo_folha:     tipoFolhaAtual,
             dados:          { fonte: 'planilha', competencia: comp, tipo_folha: tipoFolhaAtual, linhas: linhasRelatorio },
@@ -513,7 +594,7 @@ function renderizarRelatorio(linhas) {
 
         tr.innerHTML = `
             <td>${i + 1}</td>
-            <td style="font-family:monospace;font-weight:600;">${CODIGO_EMPRESA}</td>
+            <td style="font-family:monospace;font-weight:600;">${empresaAtiva}</td>
             <td>${l.nome}${semFuncionario ? ' <span class="sem-match">sem cadastro</span>' : ''}</td>
             <td>${l.codEmpregado || '–'}</td>
             <td>${l.descricao}</td>
@@ -579,29 +660,44 @@ function renderizarRelatorio(linhas) {
 
         // Input de datas para rubricas de falta
         if (!semRubrica && !ignorada && isColunaFalta(l.coluna) && l.codEmpregado) {
-            const _tipo     = normalizarNome(l.coluna).includes('dsr') ? '2' : '1';
-            const _faltaKey = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
-            const _valAtual = (faltaDatasMap[_faltaKey] || '').replace(/"/g, '&quot;');
-            const _tipoLabel = _tipo === '2' ? 'DSR' : 'Normal';
-
             const trFaltaDatas = document.createElement('tr');
             trFaltaDatas.style.background = '#EFF6FF';
-            trFaltaDatas.innerHTML = `
-                <td colspan="10">
-                    <div style="padding:5px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                        <span style="font-size:11px;font-weight:600;color:#1D4ED8;white-space:nowrap;">
-                            📅 Datas falta ${_tipoLabel} — ${l.nome}:
-                        </span>
-                        <input type="text"
-                            data-falta-key="${_faltaKey.replace(/"/g, '&quot;')}"
-                            oninput="registrarFaltaDatas(this.dataset.faltaKey, this.value)"
-                            placeholder="DD/MM/AAAA, DD/MM/AAAA, ..."
-                            value="${_valAtual}"
-                            style="flex:1;min-width:240px;padding:4px 8px;border:1px solid #93C5FD;border-radius:4px;font-size:12px;font-family:monospace;">
-                        <span style="font-size:11px;color:#6B7280;">separadas por vírgula</span>
-                    </div>
-                </td>
-            `;
+
+            if (isColunaFaltaDsr(l.coluna)) {
+                // DSR não é digitado: cai no domingo da semana de cada falta normal, sem sobreposição
+                const _domingos = calcularDomingosDsr(obterDatasFaltaNormal(l.codEmpregado));
+                trFaltaDatas.innerHTML = `
+                    <td colspan="10">
+                        <div style="padding:5px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:11px;font-weight:600;color:#1D4ED8;white-space:nowrap;">
+                                📅 Domingo(s) de DSR — ${l.nome}:
+                            </span>
+                            <span data-dsr-auto="${l.codEmpregado}" style="font-size:12px;font-family:monospace;color:#1D4ED8;">${_domingos.length ? _domingos.join(', ') : '—'}</span>
+                            <span style="font-size:11px;color:#6B7280;">calculado automaticamente a partir das Datas falta Normal — 1 domingo por semana</span>
+                        </div>
+                    </td>
+                `;
+            } else {
+                const _faltaKey = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
+                const _valAtual = (faltaDatasMap[_faltaKey] || '').replace(/"/g, '&quot;');
+                trFaltaDatas.innerHTML = `
+                    <td colspan="10">
+                        <div style="padding:5px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:11px;font-weight:600;color:#1D4ED8;white-space:nowrap;">
+                                📅 Datas falta Normal — ${l.nome}:
+                            </span>
+                            <input type="text"
+                                data-falta-key="${_faltaKey.replace(/"/g, '&quot;')}"
+                                data-falta-emp="${String(l.codEmpregado).replace(/"/g, '&quot;')}"
+                                oninput="registrarFaltaDatas(this.dataset.faltaKey, this.value); atualizarDsrAuto(this.dataset.faltaEmp);"
+                                placeholder="DD/MM/AAAA, DD/MM/AAAA, ..."
+                                value="${_valAtual}"
+                                style="flex:1;min-width:240px;padding:4px 8px;border:1px solid #93C5FD;border-radius:4px;font-size:12px;font-family:monospace;">
+                            <span style="font-size:11px;color:#6B7280;">separadas por vírgula · o domingo de DSR é calculado automaticamente</span>
+                        </div>
+                    </td>
+                `;
+            }
             tbody.appendChild(trFaltaDatas);
         }
     });
@@ -635,7 +731,7 @@ async function salvarEmpregadoInline(idx) {
         const { error } = await supabaseClient
             .from('fechamento_empregados_config')
             .upsert([{
-                codigo_empresa:   CODIGO_EMPRESA,
+                codigo_empresa:   empresaAtiva,
                 nome_planilha:    nome,
                 codigo_empregado: codigo,
             }], { onConflict: 'codigo_empresa,nome_planilha' });
@@ -692,7 +788,7 @@ async function salvarRubricaInline(idx) {
         const { error } = await supabaseClient
             .from('fechamento_rubricas_config')
             .insert([{
-                codigo_empresa:  CODIGO_EMPRESA,
+                codigo_empresa:  empresaAtiva,
                 coluna_planilha: coluna,
                 descricao:       coluna,
                 codigo_rubrica:  codigo,
@@ -740,7 +836,7 @@ async function ignorarRubrica(idx) {
     const l = linhasRelatorio[idx];
     const { error } = await supabaseClient
         .from('fechamento_rubricas_ignoradas')
-        .upsert({ codigo_empresa: CODIGO_EMPRESA, coluna_planilha: l.coluna },
+        .upsert({ codigo_empresa: empresaAtiva, coluna_planilha: l.coluna },
                  { onConflict: 'codigo_empresa,coluna_planilha' });
     if (error) { mostrarMensagem('Erro', 'Não foi possível ignorar a rubrica: ' + error.message); return; }
     rubricasIgnoradas.add(normalizarNome(l.coluna));
@@ -753,7 +849,7 @@ async function reativarRubrica(idx) {
     const { error } = await supabaseClient
         .from('fechamento_rubricas_ignoradas')
         .delete()
-        .eq('codigo_empresa', CODIGO_EMPRESA)
+        .eq('codigo_empresa', empresaAtiva)
         .eq('coluna_planilha', l.coluna);
     if (error) { mostrarMensagem('Erro', 'Não foi possível reativar a rubrica: ' + error.message); return; }
     rubricasIgnoradas.delete(normalizarNome(l.coluna));
@@ -771,7 +867,7 @@ async function alterarTipoRubrica(idx, novoTipo) {
         const { error } = await supabaseClient
             .from('fechamento_rubricas_config')
             .upsert([{
-                codigo_empresa:  CODIGO_EMPRESA,
+                codigo_empresa:  empresaAtiva,
                 coluna_planilha: coluna,
                 descricao:       linhasRelatorio[idx].descricao || coluna,
                 codigo_rubrica:  codigo,
@@ -888,13 +984,16 @@ function confirmarTipoProcesso() {
         const _ign = rubricasIgnoradas.has(normalizarNome(l.coluna));
         if (!_ign && l.valorInt > 0) {
             _empData[l.codEmpregado].rubricas.push(
-                gerarLinhaTxt(l.codEmpregado, comp, l.codigoRubrica, tipoProcesso, l.valorInt, CODIGO_EMPRESA)
+                gerarLinhaTxt(l.codEmpregado, comp, l.codigoRubrica, tipoProcesso, l.valorInt, empresaAtiva)
             );
         }
         if (!_ign && isColunaFalta(l.coluna)) {
-            const _tipo = normalizarNome(l.coluna).includes('dsr') ? '2' : '1';
-            const _key  = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
-            (faltaDatasMap[_key] || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean).forEach(d => {
+            const _tipoDsr = isColunaFaltaDsr(l.coluna);
+            const _tipo    = _tipoDsr ? '2' : '1';
+            const _datas   = _tipoDsr
+                ? calcularDomingosDsr(obterDatasFaltaNormal(l.codEmpregado))
+                : (faltaDatasMap[`${l.codEmpregado}::${normalizarNome(l.coluna)}`] || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
+            _datas.forEach(d => {
                 const _m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
                 if (_m) _empData[l.codEmpregado].rubricas.push(`11${_m[3]}${_m[2]}${_m[1]}${_tipo}`);
             });
@@ -1458,7 +1557,7 @@ async function carregarEnvios() {
     const { data, error } = await supabaseClient
         .from('quadrante_folha_envios')
         .select('id, competencia, tipo_folha, enviado_em, processado, dados')
-        .eq('empresa_codigo', CODIGO_EMPRESA)
+        .eq('empresa_codigo', empresaAtiva)
         .order('enviado_em', { ascending: false })
         .limit(20);
 
@@ -1482,7 +1581,7 @@ async function carregarEnvios() {
             ${badge}
             <div class="envio-info">
                 <div class="envio-info-title">Competência ${env.competencia} · ${env.tipo_folha} – ${tipoLabel}</div>
-                <div class="envio-info-sub">Fonte: ${fonteLabel} · Enviado em ${enviadoEm} · Quadrante Etiquetas 453</div>
+                <div class="envio-info-sub">Fonte: ${fonteLabel} · Enviado em ${enviadoEm} · ${EMPRESAS_QUADRANTE[empresaAtiva] || ''} ${empresaAtiva}</div>
             </div>
             <div class="envio-actions">
                 <button class="btn-processar-envio ${proc || isPlanilha ? 'processado' : ''}"
@@ -1502,6 +1601,12 @@ async function processarEnvio(id) {
         .single();
 
     if (error || !data) { mostrarMensagem('Erro', 'Não foi possível carregar o envio.'); return; }
+
+    if (data.empresa_codigo && data.empresa_codigo !== empresaAtiva) {
+        empresaAtiva = data.empresa_codigo;
+        document.getElementById('selectEmpresaAtiva').value = empresaAtiva;
+        atualizarTextosEmpresa();
+    }
 
     try {
         await Promise.all([carregarFuncionarios(), carregarRubricas(), carregarEmpregadosConfig(), carregarRubricasIgnoradas()]);
@@ -1524,7 +1629,7 @@ async function recarregarPlanilha(envioRow) {
 
     tipoFolhaAtual = tipoFolha;
     document.getElementById('competencia').value = competencia;
-    document.getElementById('headerSubtitle').textContent = `Código 453 · ${label} · via Planilha`;
+    document.getElementById('headerSubtitle').textContent = `Código ${empresaAtiva} · ${label} · via Planilha`;
     document.getElementById('labelCompetencia2').textContent = 'Competência: ' + label;
     document.getElementById('labelCompetencia3').textContent = 'Competência: ' + label;
 
@@ -1547,7 +1652,7 @@ async function processarDadosFormulario(envioRow) {
     tipoFolhaAtual = tipoFolha; // pré-seleciona no modal de TXT
     document.getElementById('competencia').value = competencia;
     document.getElementById('headerSubtitle').textContent =
-        `Código 453 · ${label} · via Formulário`;
+        `Código ${empresaAtiva} · ${label} · via Formulário`;
     document.getElementById('labelCompetencia2').textContent = 'Competência: ' + label;
     document.getElementById('labelCompetencia3').textContent = 'Competência: ' + label;
 
