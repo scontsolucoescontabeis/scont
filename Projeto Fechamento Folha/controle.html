@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Fechamento – SCONT</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="../supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../portal-auth-guard.js"></script>
+    <style>
+        #telaDashboardCF, #telaConfigCF { display: none; }
+        #telaDashboardCF.active, #telaConfigCF.active { display: block; }
+
+        .badge-nao-iniciada { background: #eceff1; color: #455a64; }
+        .badge-em-execucao  { background: #fff3e0; color: #e65100; }
+        .badge-fechada      { background: #e8f5e9; color: #2e7d32; }
+
+        .expand-toggle { cursor: pointer; display: inline-block; margin-right: 6px; user-select: none; }
+
+        .fase-lista { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; }
+        .fase-item {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; padding: 8px 12px; background: var(--background-color);
+            border-radius: 6px; font-size: 13px;
+        }
+        .fase-nome { font-weight: 600; }
+        .fase-config-acoes { display: flex; gap: 6px; }
+        .config-add-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 16px 0; }
+        .config-add-row .form-group { margin-bottom: 0; flex: 1; min-width: 220px; }
+    </style>
+</head>
+<body>
+
+<!-- HAMBURGER (mobile) -->
+<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- SIDEBAR ESTÁTICO -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+        <h2>Fechamento Folha</h2>
+        <p>Controle de Fechamento</p>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="sidebar-section">Controle de Fechamento</div>
+
+        <button class="sidebar-item active" id="navDashboardCF" onclick="navegarPara('dashboard')">
+            <span class="sidebar-item-icon">📊</span> Dashboard
+        </button>
+        <button class="sidebar-item" id="navConfigCF" onclick="navegarPara('config')" style="display:none;">
+            <span class="sidebar-item-icon">⚙️</span> Configuração
+        </button>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">Navegação</div>
+        <a href="index.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🏠</span> Início
+        </a>
+        <a href="../portal.html" class="sidebar-item">
+            <span class="sidebar-item-icon">🌐</span> Portal SCONT
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-footer-info">
+            <strong>Fechamento Folha</strong>
+            SCONT · Módulo de Folha
+        </div>
+    </div>
+</aside>
+
+<!-- CONTEÚDO PRINCIPAL -->
+<div class="main-content">
+
+    <div class="page-header">
+        <div>
+            <h1>Controle de Fechamento</h1>
+            <div class="page-header-sub">Acompanhe o fechamento da folha por empresa, fase e responsável</div>
+        </div>
+    </div>
+
+    <!-- TELA DASHBOARD -->
+    <div id="telaDashboardCF" class="active">
+        <div class="container">
+            <div class="section-header">
+                <h2>Empresas</h2>
+                <p>Status do fechamento da competência aberta de cada empresa configurada</p>
+            </div>
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Empresa</th>
+                            <th>Competência</th>
+                            <th>Status</th>
+                            <th>Responsável</th>
+                            <th>Progresso</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoDashboard">
+                        <tr><td colspan="6">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- TELA CONFIGURAÇÃO -->
+    <div id="telaConfigCF">
+        <div class="container">
+            <div class="section-header">
+                <h2>Configuração do fluxo por empresa</h2>
+                <p>Escolha as fases e a ordem do processo de fechamento de cada empresa</p>
+            </div>
+
+            <div class="form-group" style="max-width:320px;">
+                <label for="selectEmpresaConfig">Empresa</label>
+                <select id="selectEmpresaConfig" onchange="onEmpresaConfigChange()">
+                    <option value="">Selecione a empresa...</option>
+                </select>
+            </div>
+
+            <div id="listaFasesConfig">
+                <em>Selecione uma empresa para configurar.</em>
+            </div>
+
+            <div class="config-add-row">
+                <div class="form-group">
+                    <label for="selectCatalogoAdd">Adicionar fase do catálogo</label>
+                    <select id="selectCatalogoAdd">
+                        <option value="">Selecione uma fase do catálogo...</option>
+                    </select>
+                </div>
+                <button class="btn btn-secondary" onclick="adicionarFaseCatalogo()">+ Adicionar</button>
+            </div>
+
+            <div class="config-add-row">
+                <div class="form-group">
+                    <label for="inputNovaFase">Nova fase personalizada</label>
+                    <input type="text" id="inputNovaFase" placeholder="Nome da fase">
+                </div>
+                <button class="btn btn-secondary" onclick="adicionarFaseCustom()">+ Nova fase</button>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="salvarConfig()">💾 Salvar configuração</button>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /main-content -->
+
+<!-- MODAL MENSAGEM -->
+<div class="modal" id="messageModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="messageTitle">Aviso</h3>
+            <button class="modal-close" onclick="fecharModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <p id="messageText"></p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-primary btn-small" onclick="fecharModal()">OK</button>
+        </div>
+    </div>
+</div>
+
+<script src="controle.js"></script>
+</body>
+</html>
