@@ -1081,8 +1081,9 @@ async function abrirModalGuiaSindicato() {
 
     if (linhasRelatorio.length) {
         const total = calcularTotalCotaSindicato(linhasRelatorio);
-        await exibirInfoGuiaSindicato(comp, total, false);
+        await exibirInfoGuiaSindicato(empresaAtiva, comp, total, false);
     } else {
+        document.getElementById('guiaSindicatoEmpresaSelect').value = empresaAtiva;
         document.getElementById('guiaSindicatoCompetencia').value = comp;
         document.getElementById('guiaSindicatoBuscaStatus').textContent = '';
         document.getElementById('guiaSindicatoBuscaComp').style.display = 'block';
@@ -1094,8 +1095,9 @@ function fecharModalGuiaSindicato() {
 }
 
 async function buscarGuiaSindicatoPorCompetencia() {
-    const comp   = document.getElementById('guiaSindicatoCompetencia').value.trim();
-    const status = document.getElementById('guiaSindicatoBuscaStatus');
+    const codEmpresa = document.getElementById('guiaSindicatoEmpresaSelect').value;
+    const comp        = document.getElementById('guiaSindicatoCompetencia').value.trim();
+    const status       = document.getElementById('guiaSindicatoBuscaStatus');
 
     if (!/^\d{2}\/\d{4}$/.test(comp)) {
         status.textContent = '⚠ Informe a competência no formato MM/AAAA.';
@@ -1108,7 +1110,7 @@ async function buscarGuiaSindicatoPorCompetencia() {
     const { data, error } = await supabaseClient
         .from('quadrante_folha_envios')
         .select('dados, enviado_em')
-        .eq('empresa_codigo', empresaAtiva)
+        .eq('empresa_codigo', codEmpresa)
         .eq('competencia', comp)
         .order('enviado_em', { ascending: false })
         .limit(1);
@@ -1123,25 +1125,25 @@ async function buscarGuiaSindicatoPorCompetencia() {
     document.getElementById('guiaSindicatoBuscaComp').style.display = 'none';
 
     if (!registro || !registro.dados || !registro.dados.linhas) {
-        await exibirInfoGuiaSindicato(comp, 0, true);
+        await exibirInfoGuiaSindicato(codEmpresa, comp, 0, true);
         return;
     }
 
     const total = calcularTotalCotaSindicato(registro.dados.linhas);
-    await exibirInfoGuiaSindicato(comp, total, false);
+    await exibirInfoGuiaSindicato(codEmpresa, comp, total, false);
 }
 
-async function exibirInfoGuiaSindicato(comp, totalCentavos, semProcessamento) {
+async function exibirInfoGuiaSindicato(codEmpresa, comp, totalCentavos, semProcessamento) {
     const { data, error } = await supabaseClient
         .from('rh_empresas')
         .select('nome_empresa, cnpj')
-        .eq('codigo_empresa', empresaAtiva)
+        .eq('codigo_empresa', codEmpresa)
         .maybeSingle();
 
-    const nome = (!error && data && data.nome_empresa) || EMPRESAS_QUADRANTE[empresaAtiva] || '';
+    const nome = (!error && data && data.nome_empresa) || EMPRESAS_QUADRANTE[codEmpresa] || '';
     const cnpj = (!error && data && data.cnpj) || '—';
 
-    document.getElementById('guiaSindicatoEmpresa').textContent = `${empresaAtiva} — ${nome}`;
+    document.getElementById('guiaSindicatoEmpresa').textContent = `${codEmpresa} — ${nome}`;
     document.getElementById('guiaSindicatoCnpj').textContent = cnpj;
     document.getElementById('guiaSindicatoCompetenciaLabel').textContent = comp || '—';
     document.getElementById('guiaSindicatoValor').textContent =

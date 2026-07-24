@@ -589,11 +589,20 @@
         <div class="modal-body">
             <div id="guiaSindicatoBuscaComp" style="display:none;">
                 <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
-                    O relatório desta competência ainda não foi processado nesta sessão. Informe a competência para buscar o valor no histórico:
+                    O relatório desta competência ainda não foi processado nesta sessão. Informe a empresa e a competência para buscar o valor no histórico:
                 </p>
-                <div class="form-group" style="max-width:160px;">
-                    <label for="guiaSindicatoCompetencia">Competência *</label>
-                    <input type="text" id="guiaSindicatoCompetencia" placeholder="MM/AAAA" maxlength="7">
+                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                    <div class="form-group" style="max-width:200px;">
+                        <label for="guiaSindicatoEmpresaSelect">Empresa *</label>
+                        <select id="guiaSindicatoEmpresaSelect">
+                            <option value="453">453 — Quadrante Etiquetas</option>
+                            <option value="457">457 — Quadrante Rótulos</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="max-width:160px;">
+                        <label for="guiaSindicatoCompetencia">Competência *</label>
+                        <input type="text" id="guiaSindicatoCompetencia" placeholder="MM/AAAA" maxlength="7">
+                    </div>
                 </div>
                 <div id="guiaSindicatoBuscaStatus" style="font-size:12px;margin-top:6px;"></div>
                 <div class="btn-group" style="margin-top:12px;">
