@@ -39,6 +39,9 @@
         <button class="sidebar-item sidebar-subitem" id="navLiquido" onclick="navegarPara('liquido')">
             <span class="sidebar-item-icon">🏷️</span> Relatório Líquido
         </button>
+        <button class="sidebar-item sidebar-subitem" id="navGuiaSindicato" onclick="abrirModalGuiaSindicato()">
+            <span class="sidebar-item-icon">🧾</span> Gerar Guia Sindicato
+        </button>
         <div class="sidebar-section" style="padding-top:10px;">Configurações</div>
         <button class="sidebar-item sidebar-subitem" id="navConfigRubricas" onclick="navegarPara('config-rubricas')">
             <span class="sidebar-item-icon">📋</span> Rubricas
@@ -217,6 +220,7 @@
                 <button class="btn btn-primary" onclick="irStep3()">▶ Gerar TXT</button>
                 <button class="btn btn-info" onclick="window.location.href='ferias.html'">📅 Programação de Férias</button>
                 <button class="btn btn-info" onclick="navegarPara('liquido')">🏷️ Etiquetas Bancárias</button>
+                <button class="btn btn-info" onclick="abrirModalGuiaSindicato()">🧾 Gerar Guia Sindicato</button>
             </div>
         </div>
 
@@ -571,6 +575,47 @@
         <div class="modal-footer">
             <button class="btn btn-secondary btn-small" onclick="fecharModalTipoProcesso()">Cancelar</button>
             <button class="btn btn-primary btn-small" onclick="confirmarTipoProcesso()">▶ Gerar TXT</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL GUIA SINDICATO -->
+<div class="modal" id="modalGuiaSindicato">
+    <div class="modal-content" style="max-width:420px;">
+        <div class="modal-header">
+            <h3>🧾 Gerar Guia Sindicato</h3>
+            <button class="modal-close" onclick="fecharModalGuiaSindicato()">×</button>
+        </div>
+        <div class="modal-body">
+            <div id="guiaSindicatoBuscaComp" style="display:none;">
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+                    O relatório desta competência ainda não foi processado nesta sessão. Informe a competência para buscar o valor no histórico:
+                </p>
+                <div class="form-group" style="max-width:160px;">
+                    <label for="guiaSindicatoCompetencia">Competência *</label>
+                    <input type="text" id="guiaSindicatoCompetencia" placeholder="MM/AAAA" maxlength="7">
+                </div>
+                <div id="guiaSindicatoBuscaStatus" style="font-size:12px;margin-top:6px;"></div>
+                <div class="btn-group" style="margin-top:12px;">
+                    <button class="btn btn-primary btn-small" onclick="buscarGuiaSindicatoPorCompetencia()">🔍 Buscar</button>
+                </div>
+            </div>
+
+            <div id="guiaSindicatoInfo" style="display:none;">
+                <div style="font-size:13px; line-height:1.9;">
+                    <div><strong>Empresa:</strong> <span id="guiaSindicatoEmpresa"></span></div>
+                    <div><strong>CNPJ:</strong> <span id="guiaSindicatoCnpj"></span></div>
+                    <div><strong>Competência:</strong> <span id="guiaSindicatoCompetenciaLabel"></span></div>
+                    <div style="margin-top:8px;font-size:16px;"><strong>Valor da Guia:</strong>
+                        <span id="guiaSindicatoValor" style="color:var(--primary-color);font-weight:700;"></span>
+                    </div>
+                </div>
+                <div id="guiaSindicatoAlerta" style="display:none; margin-top:12px; font-size:12px; color:#B45309; background:#FEF3C7; padding:8px 10px; border-radius:6px;"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary btn-small" onclick="fecharModalGuiaSindicato()">Cancelar</button>
+            <button class="btn btn-primary btn-small" id="btnContinuarGuiaSindicato" style="display:none;" onclick="continuarParaSiteSindicato()">▶ Continuar</button>
         </div>
     </div>
 </div>

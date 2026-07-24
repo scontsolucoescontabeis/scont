@@ -5,6 +5,7 @@
 
 const CODIGO_EMPRESA = '453'; // padrão usado pelas telas de Configurações e Relatório Líquido
 const EMPRESAS_QUADRANTE = { '453': 'Quadrante Etiquetas', '457': 'Quadrante Rótulos' };
+const SINDICATO_BOLETOS_URL = 'http://sindicatograficos.dyndns.org:8200/boletos/';
 let empresaAtiva = CODIGO_EMPRESA; // empresa selecionada no Step 1 do fluxo de planilha
 const LINHA_CABECALHO = 4; // linha do Excel (1-based) com os nomes das colunas
 const LINHA_DADOS_INI = 5; // primeira linha de dados
@@ -64,6 +65,22 @@ function isColunaFalta(coluna) {
 
 function isColunaFaltaDsr(coluna) {
     return isColunaFalta(coluna) && normalizarNome(coluna).includes('dsr');
+}
+
+function isColunaSindicato(coluna) {
+    return normalizarNome(coluna).includes('sindicato');
+}
+
+// Soma o valor da rubrica de Cota Sindicato num conjunto de linhas (relatório
+// em memória ou snapshot salvo em quadrante_folha_envios.dados.linhas)
+function calcularTotalCotaSindicato(linhas) {
+    let soma = 0;
+    (linhas || []).forEach(l => {
+        if (rubricasIgnoradas.has(normalizarNome(l.coluna))) return;
+        if (!isColunaSindicato(l.coluna)) return;
+        soma += l.valorInt || 0;
+    });
+    return soma;
 }
 
 function registrarFaltaDatas(key, valor) {
@@ -1047,6 +1064,104 @@ function filtrarRelatorio() {
             normalizarNome(l.descricao).includes(termo))
         : linhasRelatorio;
     renderizarRelatorio(filtradas);
+}
+
+// ──────────────────────────────────────────────
+// MODAL GUIA SINDICATO
+// ──────────────────────────────────────────────
+
+async function abrirModalGuiaSindicato() {
+    document.getElementById('modalGuiaSindicato').classList.add('active');
+    document.getElementById('guiaSindicatoBuscaComp').style.display = 'none';
+    document.getElementById('guiaSindicatoInfo').style.display = 'none';
+    document.getElementById('guiaSindicatoAlerta').style.display = 'none';
+    document.getElementById('btnContinuarGuiaSindicato').style.display = 'none';
+
+    const comp = (document.getElementById('competencia')?.value || '').trim();
+
+    if (linhasRelatorio.length) {
+        const total = calcularTotalCotaSindicato(linhasRelatorio);
+        await exibirInfoGuiaSindicato(comp, total, false);
+    } else {
+        document.getElementById('guiaSindicatoCompetencia').value = comp;
+        document.getElementById('guiaSindicatoBuscaStatus').textContent = '';
+        document.getElementById('guiaSindicatoBuscaComp').style.display = 'block';
+    }
+}
+
+function fecharModalGuiaSindicato() {
+    document.getElementById('modalGuiaSindicato').classList.remove('active');
+}
+
+async function buscarGuiaSindicatoPorCompetencia() {
+    const comp   = document.getElementById('guiaSindicatoCompetencia').value.trim();
+    const status = document.getElementById('guiaSindicatoBuscaStatus');
+
+    if (!/^\d{2}\/\d{4}$/.test(comp)) {
+        status.textContent = '⚠ Informe a competência no formato MM/AAAA.';
+        status.style.color = '#B91C1C';
+        return;
+    }
+    status.textContent = 'Buscando...';
+    status.style.color = 'var(--text-secondary)';
+
+    const { data, error } = await supabaseClient
+        .from('quadrante_folha_envios')
+        .select('dados, enviado_em')
+        .eq('empresa_codigo', empresaAtiva)
+        .eq('competencia', comp)
+        .order('enviado_em', { ascending: false })
+        .limit(1);
+
+    if (error) {
+        status.textContent = 'Erro ao buscar: ' + error.message;
+        status.style.color = '#B91C1C';
+        return;
+    }
+
+    const registro = data && data[0];
+    document.getElementById('guiaSindicatoBuscaComp').style.display = 'none';
+
+    if (!registro || !registro.dados || !registro.dados.linhas) {
+        await exibirInfoGuiaSindicato(comp, 0, true);
+        return;
+    }
+
+    const total = calcularTotalCotaSindicato(registro.dados.linhas);
+    await exibirInfoGuiaSindicato(comp, total, false);
+}
+
+async function exibirInfoGuiaSindicato(comp, totalCentavos, semProcessamento) {
+    const { data, error } = await supabaseClient
+        .from('rh_empresas')
+        .select('nome_empresa, cnpj')
+        .eq('codigo_empresa', empresaAtiva)
+        .maybeSingle();
+
+    const nome = (!error && data && data.nome_empresa) || EMPRESAS_QUADRANTE[empresaAtiva] || '';
+    const cnpj = (!error && data && data.cnpj) || '—';
+
+    document.getElementById('guiaSindicatoEmpresa').textContent = `${empresaAtiva} — ${nome}`;
+    document.getElementById('guiaSindicatoCnpj').textContent = cnpj;
+    document.getElementById('guiaSindicatoCompetenciaLabel').textContent = comp || '—';
+    document.getElementById('guiaSindicatoValor').textContent =
+        'R$ ' + (totalCentavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+    const alerta = document.getElementById('guiaSindicatoAlerta');
+    if (semProcessamento) {
+        alerta.textContent = '⚠ Não existe processamento de folha registrado para essa competência. Confira o valor manualmente antes de gerar a guia no site do sindicato.';
+        alerta.style.display = 'block';
+    } else {
+        alerta.style.display = 'none';
+    }
+
+    document.getElementById('guiaSindicatoInfo').style.display = 'block';
+    document.getElementById('btnContinuarGuiaSindicato').style.display = '';
+}
+
+function continuarParaSiteSindicato() {
+    window.open(SINDICATO_BOLETOS_URL, '_blank');
+    fecharModalGuiaSindicato();
 }
 
 // ──────────────────────────────────────────────
