@@ -13,6 +13,8 @@ let ciclosCache = {};
 let expandido = {};
 let configFasesAtual = [];
 let empresaConfigSelecionada = '';
+let editandoIndexConfig = null;
+let editandoCatalogoId = null;
 
 const STATUS_CICLO_LABEL = { nao_iniciada: 'Não iniciada', em_execucao: 'Em execução', fechada: 'Fechada' };
 const STATUS_CICLO_BADGE = { nao_iniciada: 'badge-nao-iniciada', em_execucao: 'badge-em-execucao', fechada: 'badge-fechada' };
@@ -287,6 +289,7 @@ async function iniciarConfig() {
         return;
     }
     await carregarCatalogo();
+    renderListaCatalogoConfig();
     popularSelectEmpresaConfig();
     renderListaFasesConfig();
 }
@@ -301,6 +304,58 @@ async function carregarCatalogo() {
     catalogoCache = data || [];
 }
 
+function renderListaCatalogoConfig() {
+    const div = document.getElementById('listaCatalogoConfig');
+    if (!catalogoCache.length) { div.innerHTML = '<em>Nenhuma fase cadastrada no catálogo.</em>'; return; }
+
+    div.innerHTML = `<div class="fase-lista">${catalogoCache.map(c => {
+        if (editandoCatalogoId === c.id) {
+            return `
+                <div class="fase-item">
+                    <input type="text" id="inputEditCatalogo" value="${c.nome}" style="flex:1;">
+                    <span class="fase-config-acoes">
+                        <button class="btn btn-primary btn-small" onclick="salvarEdicaoFaseCatalogo('${c.id}')">Salvar</button>
+                        <button class="btn btn-secondary btn-small" onclick="cancelarEdicaoFaseCatalogo()">Cancelar</button>
+                    </span>
+                </div>`;
+        }
+        return `
+            <div class="fase-item">
+                <span class="fase-nome">${c.nome}</span>
+                <span class="fase-config-acoes">
+                    <button class="btn btn-secondary btn-small" onclick="editarFaseCatalogo('${c.id}')">Editar</button>
+                </span>
+            </div>`;
+    }).join('')}</div>`;
+}
+
+function editarFaseCatalogo(id) {
+    editandoCatalogoId = id;
+    renderListaCatalogoConfig();
+}
+
+function cancelarEdicaoFaseCatalogo() {
+    editandoCatalogoId = null;
+    renderListaCatalogoConfig();
+}
+
+async function salvarEdicaoFaseCatalogo(id) {
+    const input = document.getElementById('inputEditCatalogo');
+    const novoNome = input.value.trim();
+    if (!novoNome) { mostrarMensagem('Atenção', 'O nome da fase não pode ficar vazio.'); return; }
+
+    const { error } = await supabaseClient
+        .from('fechamento_fases_catalogo')
+        .update({ nome: novoNome })
+        .eq('id', id);
+    if (error) { mostrarMensagem('Erro', 'Falha ao editar fase do catálogo: ' + error.message); return; }
+
+    editandoCatalogoId = null;
+    await carregarCatalogo();
+    renderListaCatalogoConfig();
+    popularSelectCatalogoAdd();
+}
+
 function popularSelectEmpresaConfig() {
     const select = document.getElementById('selectEmpresaConfig');
     select.innerHTML = '<option value="">Selecione a empresa...</option>' +
@@ -310,6 +365,7 @@ function popularSelectEmpresaConfig() {
 async function onEmpresaConfigChange() {
     empresaConfigSelecionada = document.getElementById('selectEmpresaConfig').value;
     configFasesAtual = [];
+    editandoIndexConfig = null;
 
     if (!empresaConfigSelecionada) {
         renderListaFasesConfig();
@@ -335,16 +391,48 @@ function renderListaFasesConfig() {
     if (!empresaConfigSelecionada) { div.innerHTML = '<em>Selecione uma empresa para configurar.</em>'; return; }
     if (!configFasesAtual.length) { div.innerHTML = '<em>Nenhuma fase adicionada ainda.</em>'; return; }
 
-    div.innerHTML = `<div class="fase-lista">${configFasesAtual.map((f, i) => `
-        <div class="fase-item">
-            <span class="fase-nome">${i + 1}. ${f.nome_fase}</span>
-            <span class="fase-config-acoes">
-                <button class="btn btn-secondary btn-small" onclick="moverFaseConfig(${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
-                <button class="btn btn-secondary btn-small" onclick="moverFaseConfig(${i}, 1)" ${i === configFasesAtual.length - 1 ? 'disabled' : ''}>↓</button>
-                <button class="btn btn-secondary btn-small" onclick="removerFaseConfig(${i})">Remover</button>
-            </span>
-        </div>
-    `).join('')}</div>`;
+    div.innerHTML = `<div class="fase-lista">${configFasesAtual.map((f, i) => {
+        if (editandoIndexConfig === i) {
+            return `
+                <div class="fase-item">
+                    <input type="text" id="inputEditFaseConfig" value="${f.nome_fase}" style="flex:1;">
+                    <span class="fase-config-acoes">
+                        <button class="btn btn-primary btn-small" onclick="salvarEdicaoFaseConfig(${i})">Salvar</button>
+                        <button class="btn btn-secondary btn-small" onclick="cancelarEdicaoFaseConfig()">Cancelar</button>
+                    </span>
+                </div>`;
+        }
+        return `
+            <div class="fase-item">
+                <span class="fase-nome">${i + 1}. ${f.nome_fase}</span>
+                <span class="fase-config-acoes">
+                    <button class="btn btn-secondary btn-small" onclick="editarFaseConfig(${i})">Editar</button>
+                    <button class="btn btn-secondary btn-small" onclick="moverFaseConfig(${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+                    <button class="btn btn-secondary btn-small" onclick="moverFaseConfig(${i}, 1)" ${i === configFasesAtual.length - 1 ? 'disabled' : ''}>↓</button>
+                    <button class="btn btn-secondary btn-small" onclick="removerFaseConfig(${i})">Remover</button>
+                </span>
+            </div>`;
+    }).join('')}</div>`;
+}
+
+function editarFaseConfig(i) {
+    editandoIndexConfig = i;
+    renderListaFasesConfig();
+}
+
+function cancelarEdicaoFaseConfig() {
+    editandoIndexConfig = null;
+    renderListaFasesConfig();
+}
+
+function salvarEdicaoFaseConfig(i) {
+    const input = document.getElementById('inputEditFaseConfig');
+    const novoNome = input.value.trim();
+    if (!novoNome) { mostrarMensagem('Atenção', 'O nome da fase não pode ficar vazio.'); return; }
+    configFasesAtual[i].nome_fase = novoNome;
+    editandoIndexConfig = null;
+    renderListaFasesConfig();
+    popularSelectCatalogoAdd();
 }
 
 function popularSelectCatalogoAdd() {
