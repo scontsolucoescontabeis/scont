@@ -140,6 +140,32 @@ function atualizarDsrAuto(codEmpregado) {
     if (elQtd) elQtd.textContent = bloqueado ? 'bloqueado (Não)' : (domingos.length ? domingos.length + ' dias' : '–');
 }
 
+// Quantidade de dias da rubrica de Faltas, ajustada dinamicamente pelas datas
+// digitadas pelo usuário. Sem datas informadas (ou nenhuma válida), mantém o
+// valor já processado a partir da planilha (l.valorInt).
+function valorAjustadoFalta(l) {
+    if (isColunaFaltaDsr(l.coluna)) return obterDomingosDsr(l.codEmpregado).length;
+    if (!isColunaFalta(l.coluna)) return l.valorInt;
+    const key = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
+    const datas = (faltaDatasMap[key] || '').split(/[,;\n]/).map(s => s.trim()).filter(d => parseDataBR(d));
+    return datas.length ? datas.length : l.valorInt;
+}
+
+// Atualiza, em tempo real, o campo de quantidade de Faltas normais, o
+// bloco de DSR e o quadro resumo (Totais por Rubrica), conforme o usuário
+// digita as datas de falta.
+function atualizarFaltaAuto(faltaKey) {
+    const codEmpregado = faltaKey.split('::')[0];
+    const linha = linhasRelatorio.find(l => `${l.codEmpregado}::${normalizarNome(l.coluna)}` === faltaKey);
+    if (linha) {
+        const qtd = valorAjustadoFalta(linha);
+        const el = document.querySelector(`[data-falta-auto-qtd="${faltaKey}"]`);
+        if (el) el.textContent = qtd > 0 ? qtd + ' dias' : '–';
+    }
+    atualizarDsrAuto(codEmpregado);
+    construirTotais(linhasRelatorio);
+}
+
 function normalizarNome(s) {
     return (s || '').trim().toLowerCase()
         .normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -613,6 +639,12 @@ function renderizarRelatorio(linhas) {
                 : `<span data-dsr-auto-qtd="${l.codEmpregado}" style="font-family:monospace;font-weight:600;${_bloqueado ? 'color:#999;font-weight:400;' : ''}">${
                     _bloqueado ? 'bloqueado (Não)' : (_domingos.length ? _domingos.length + ' dias' : '–')
                   }</span>`;
+        } else if (!semRubrica && isColunaFalta(l.coluna) && l.codEmpregado) {
+            const _qtdFalta = valorAjustadoFalta(l);
+            const _faltaKeyQtd = `${l.codEmpregado}::${normalizarNome(l.coluna)}`;
+            valorTxtDisplay = ignorada
+                ? '<span style="color:#999;font-size:11px;">ignorada</span>'
+                : `<span data-falta-auto-qtd="${_faltaKeyQtd}" style="font-family:monospace;font-weight:600;">${_qtdFalta > 0 ? _qtdFalta + ' dias' : '–'}</span>`;
         } else {
             const _valorFmt = l.tipoValor === 'minutos'
                 ? String(l.valorInt).padStart(4, '0')
@@ -758,8 +790,7 @@ function renderizarRelatorio(linhas) {
                             </span>
                             <input type="text"
                                 data-falta-key="${_faltaKey.replace(/"/g, '&quot;')}"
-                                data-falta-emp="${String(l.codEmpregado).replace(/"/g, '&quot;')}"
-                                oninput="registrarFaltaDatas(this.dataset.faltaKey, this.value); atualizarDsrAuto(this.dataset.faltaEmp);"
+                                oninput="registrarFaltaDatas(this.dataset.faltaKey, this.value); atualizarFaltaAuto(this.dataset.faltaKey);"
                                 placeholder="DD/MM/AAAA, DD/MM/AAAA, ..."
                                 value="${_valAtual}"
                                 style="flex:1;min-width:240px;padding:4px 8px;border:1px solid #93C5FD;border-radius:4px;font-size:12px;font-family:monospace;">
@@ -977,11 +1008,17 @@ function construirTotais(linhas) {
     const totais = {};
     linhas.forEach(l => {
         if (rubricasIgnoradas.has(normalizarNome(l.coluna))) return;
-        if (!totais[l.descricao]) totais[l.descricao] = { tipo: l.tipoValor, soma: 0 };
+        // Faltas (normal e DSR) usam a quantidade ajustada dinamicamente pelas datas
+        // digitadas, sempre exibida como "dias" (independente do tipo_valor configurado,
+        // que em DSR pode ser 'booleano' — usado só como gatilho, não como formato de exibição)
+        const ehFalta     = isColunaFalta(l.coluna);
+        const valor       = ehFalta ? valorAjustadoFalta(l) : l.valorInt;
+        const tipoDisplay = ehFalta ? 'dias' : l.tipoValor;
+        if (!totais[l.descricao]) totais[l.descricao] = { tipo: tipoDisplay, soma: 0 };
         // Horas são armazenadas em HHMM (ex: 130 = 1h30). Acumular em minutos reais para somar corretamente.
-        totais[l.descricao].soma += l.tipoValor === 'minutos'
-            ? Math.floor(l.valorInt / 100) * 60 + (l.valorInt % 100)
-            : l.valorInt;
+        totais[l.descricao].soma += tipoDisplay === 'minutos'
+            ? Math.floor(valor / 100) * 60 + (valor % 100)
+            : valor;
     });
 
     let html = '<div style="margin-top:15px;">'
@@ -1071,9 +1108,12 @@ function confirmarTipoProcesso() {
             return;
         }
 
-        if (l.valorInt > 0) {
+        // Faltas normais: quantidade ajustada dinamicamente pelas datas digitadas
+        // (sem datas informadas, mantém o valor já processado a partir da planilha)
+        const _qtd = isColunaFalta(l.coluna) ? valorAjustadoFalta(l) : l.valorInt;
+        if (_qtd > 0) {
             _empData[l.codEmpregado].rubricas.push(
-                gerarLinhaTxt(l.codEmpregado, comp, l.codigoRubrica, tipoProcesso, l.valorInt, empresaAtiva)
+                gerarLinhaTxt(l.codEmpregado, comp, l.codigoRubrica, tipoProcesso, _qtd, empresaAtiva)
             );
         }
         if (isColunaFalta(l.coluna)) {
