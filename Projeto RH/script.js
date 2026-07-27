@@ -3921,9 +3921,10 @@ async function gerarRecibosBeneficios() {
     const [mes, ano] = comp.split('/').map(Number);
     const mesPag = mes === 12 ? 1 : mes + 1;
     const anoPag = mes === 12 ? ano + 1 : ano;
-    const ultimoDia = new Date(anoPag, mesPag, 0).getDate();
     const mesPagFmt = String(mesPag).padStart(2, '0');
-    const periodoTexto = `01/${mesPagFmt}/${anoPag} a ${String(ultimoDia).padStart(2, '0')}/${mesPagFmt}/${anoPag}`;
+    const ultimoDiaRef = new Date(ano, mes, 0).getDate();
+    const mesFmt = String(mes).padStart(2, '0');
+    const periodoTexto = `01/${mesFmt}/${ano} a ${String(ultimoDiaRef).padStart(2, '0')}/${mesFmt}/${ano}`;
 
     const porEmpresa = new Map();
     linhas.forEach(l => {
