@@ -2998,16 +2998,19 @@ function _linhaRubricaFaltaDSR(rubricaDSR, tipoProcesso, codEmp, compFmt, codEmp
     return linha;
 }
 
-function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null, diasFaltaDetalhes = [], rubricaFaltaDSR = null) {
-    const tp = String(config.tipoProcesso).padStart(2, '0');
+// Formato fixo de 1 linha de lançamento: "10" + código do empregado (10 díg.) + competência
+// AAAAMM (6) + rubrica (9) + tipo de processo (2) + valor em centavos (9) + código da empresa (10).
+function _montarLinhaTxt(codEmp, compFmt, codEmpresa, rubrica, tipoProcesso, valorInt) {
+    if (!rubrica || valorInt <= 0) return '';
+    const tp = String(tipoProcesso).padStart(2, '0');
     const empFmt = String(codEmp).padStart(10, '0');
     const empFmt2 = String(codEmpresa).padStart(10, '0');
-    const base = `10${empFmt}${compFmt}`;
-    const rub = r => String(r).replace(/\D/g, '').padStart(9, '0');
-    const linha = (rubrica, valorInt) => {
-        if (!rubrica || valorInt <= 0) return '';
-        return `${base}${rub(rubrica)}${tp}${String(valorInt).padStart(9,'0')}${empFmt2}\n`;
-    };
+    const rub = String(rubrica).replace(/\D/g, '').padStart(9, '0');
+    return `10${empFmt}${compFmt}${rub}${tp}${String(valorInt).padStart(9, '0')}${empFmt2}\n`;
+}
+
+function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null, diasFaltaDetalhes = [], rubricaFaltaDSR = null) {
+    const linha = (rubrica, valorInt) => _montarLinhaTxt(codEmp, compFmt, codEmpresa, rubrica, config.tipoProcesso, valorInt);
     const encDiasOuHoras = (tipo, dias) => tipo === 'dias' ? _encDias(dias) : _encMinutosParaTipo(dias * 480, tipo);
     const encDescontoVaVt = (tipo, valorDiario) => {
         if (tipo === 'monetario') return Math.round(dias_desconto_vavt * (valorDiario || 0) * 100);
@@ -3906,6 +3909,18 @@ async function gerarRecibosBeneficios() {
     if (linhas.length === 0) { mostrarMensagem('Aviso', 'Selecione ao menos um empregado antes de gerar os recibos.'); return; }
 
     const comp = document.getElementById('beneficiosCompetencia').value;
+
+    const linhasITC = linhas.filter(l => l.codigo_empresa === '350');
+    if (linhasITC.length > 0 && !(await _ajudaCustoITCJaGerado(comp))) {
+        state._ajudaCustoITCLinhasPendentes = linhas;
+        _abrirModalAjudaCustoITC(linhasITC, comp);
+        return;
+    }
+
+    await _gerarPdfsRecibosBeneficios(linhas, comp);
+}
+
+async function _gerarPdfsRecibosBeneficios(linhas, comp) {
     const [mes, ano] = comp.split('/').map(Number);
     const ultimoDiaRef = new Date(ano, mes, 0).getDate();
     const mesFmt = String(mes).padStart(2, '0');
@@ -3945,6 +3960,128 @@ async function gerarRecibosBeneficios() {
         fecharModalMensagem();
         mostrarMensagem('Erro', 'Falha ao gerar os recibos: ' + erro.message);
     }
+}
+
+// ===== AJUDA DE CUSTO — EMPRESA 350 (ITC BRASIL TECNOLOGIAS LTDA), RUBRICA 201 =====
+// Regra fixa (só para essa empresa): ajudaCusto = max(0, 1000 - (VTmensal + VAmensal)).
+// Controle de "já gerado" por (empresa, competência) em rh_ajuda_custo_lancamentos.
+
+async function _ajudaCustoITCJaGerado(comp) {
+    try {
+        const { data, error } = await supabaseClient.from('rh_ajuda_custo_lancamentos')
+            .select('id').eq('codigo_empresa', '350').eq('competencia', comp).maybeSingle();
+        if (error) throw error;
+        return !!data;
+    } catch (erro) {
+        console.error('Erro ao verificar lançamento de ajuda de custo (ITC):', erro);
+        return false;
+    }
+}
+
+async function _registrarAjudaCustoITCGerado(comp) {
+    try {
+        const { error } = await supabaseClient.from('rh_ajuda_custo_lancamentos')
+            .upsert({ codigo_empresa: '350', competencia: comp }, { onConflict: 'codigo_empresa,competencia' });
+        if (error) throw error;
+    } catch (erro) {
+        console.error('Erro ao registrar lançamento de ajuda de custo (ITC):', erro);
+    }
+}
+
+function _calcularItensAjudaCustoITC(linhasITC) {
+    return linhasITC.map(l => {
+        const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
+        const vtMensal = diasPagar * (l.vtDiario || 0);
+        const vaMensal = diasPagar * (l.vaDiario || 0);
+        const soma = vtMensal + vaMensal;
+        return {
+            codigo_empregado: l.codigo_empregado,
+            nome_empregado: l.nome_empregado,
+            vtMensal, vaMensal, soma,
+            ajudaCusto: Math.max(0, 1000 - soma),
+        };
+    }).sort((a, b) => a.nome_empregado.localeCompare(b.nome_empregado));
+}
+
+function _renderizarTabelaAjudaCustoITC(itens) {
+    document.getElementById('ajudaCustoITCTbody').innerHTML = itens.map(it => `
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">${it.codigo_empregado} - ${it.nome_empregado}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(it.vtMensal)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(it.vaMensal)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(it.soma)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right; font-weight: 600;">${_formatarMoeda(it.ajudaCusto)}</td>
+        </tr>
+    `).join('');
+}
+
+function _abrirModalAjudaCustoITC(linhasITC, comp) {
+    const itens = _calcularItensAjudaCustoITC(linhasITC);
+    state._ajudaCustoITCComp = comp;
+    state._ajudaCustoITCItens = itens;
+
+    const temPendencia = itens.some(it => it.ajudaCusto > 0);
+    state._ajudaCustoITCSemPendencia = !temPendencia;
+
+    _renderizarTabelaAjudaCustoITC(itens);
+    document.getElementById('ajudaCustoITCPergunta').style.display = temPendencia ? 'flex' : 'none';
+    document.getElementById('ajudaCustoITCSemPendencia').style.display = temPendencia ? 'none' : 'block';
+    document.getElementById('ajudaCustoITCPrevia').style.display = 'none';
+    document.getElementById('btnBaixarTxtAjudaCustoITC').style.display = 'none';
+
+    document.getElementById('ajudaCustoITCModal').classList.add('active');
+}
+
+function _construirTxtAjudaCustoITC() {
+    const comp = state._ajudaCustoITCComp;
+    const [mes, ano] = comp.split('/');
+    const compFmt = ano + mes;
+    return (state._ajudaCustoITCItens || [])
+        .filter(it => it.ajudaCusto > 0)
+        .map(it => _montarLinhaTxt(it.codigo_empregado, compFmt, '350', '201', '11', Math.round(it.ajudaCusto * 100)))
+        .join('');
+}
+
+function _previewTxtAjudaCustoITC() {
+    const conteudoTXT = _construirTxtAjudaCustoITC();
+    _mostrarPrevia('ajudaCustoITCPrevia', 'ajudaCustoITCPreviaConteudo', 'ajudaCustoITCPreviaInfo', '#ajudaCustoITCModal', conteudoTXT);
+    document.getElementById('btnBaixarTxtAjudaCustoITC').style.display = 'inline-flex';
+}
+
+async function _baixarTxtAjudaCustoITC() {
+    const conteudoTXT = _construirTxtAjudaCustoITC();
+    if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor de ajuda de custo a lançar.'); return; }
+
+    const comp = state._ajudaCustoITCComp;
+    const [mm, aaaa] = comp.split('/');
+    const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Lancamentos_AjudaCusto_350_${mm}-${aaaa}.txt`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    await _registrarAjudaCustoITCGerado(comp);
+    state._ajudaCustoITCSemPendencia = false;
+    await _fecharModalAjudaCustoITC();
+}
+
+async function _fecharModalAjudaCustoITC() {
+    document.getElementById('ajudaCustoITCModal').classList.remove('active');
+
+    if (state._ajudaCustoITCSemPendencia) {
+        await _registrarAjudaCustoITCGerado(state._ajudaCustoITCComp);
+    }
+
+    const linhas = state._ajudaCustoITCLinhasPendentes;
+    const comp = state._ajudaCustoITCComp;
+    state._ajudaCustoITCLinhasPendentes = null;
+    state._ajudaCustoITCItens = null;
+    state._ajudaCustoITCComp = null;
+    state._ajudaCustoITCSemPendencia = false;
+
+    if (linhas) await _gerarPdfsRecibosBeneficios(linhas, comp);
 }
 
 // ===== GERAR ESCALA =====
