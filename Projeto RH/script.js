@@ -3293,17 +3293,6 @@ async function gerarArquivoTXT() {
 
 // ===== GERAR BENEFÍCIOS (VT/VA) =====
 
-function _atualizarLabelMesPagamentoBeneficios() {
-    const comp = document.getElementById('beneficiosCompetencia').value;
-    const info = document.getElementById('beneficiosMesPagamentoInfo');
-    if (!info) return;
-    if (!validarCompetencia(comp)) { info.textContent = ''; return; }
-    const [mes, ano] = comp.split('/').map(Number);
-    const mesPag = mes === 12 ? 1 : mes + 1;
-    const anoPag = mes === 12 ? ano + 1 : ano;
-    info.textContent = `O benefício correspondente é pago em ${String(mesPag).padStart(2, '0')}/${anoPag}.`;
-}
-
 // Fonte única da seleção de empresas: sobrevive a filtros/re-renderizações da lista
 // (checkboxes de empresas fora do filtro atual não existem no DOM, então não podem
 // guardar o estado marcado/desmarcado sozinhos).
@@ -3314,7 +3303,6 @@ function _iniciarTelaBeneficios() {
     document.getElementById('beneficiosPreviaBody').innerHTML = '';
     document.getElementById('beneficiosBuscaEmpresa').value = '';
     _beneficiosEmpresasSelecionadas = new Set();
-    _atualizarLabelMesPagamentoBeneficios();
     _renderizarListaEmpresasBeneficios(state.empresas);
     _atualizarResumoEmpresasSelecionadasBeneficios();
     _carregarGruposParaBeneficios();
