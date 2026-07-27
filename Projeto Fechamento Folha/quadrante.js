@@ -20,6 +20,9 @@ if (window.pdfjsLib) {
 let planilhaData      = []; // [{nome, funcao, colunas: {colNome: valorBruto}}]
 let funcionariosMap   = {}; // nome_normalizado → codigo_empregado
 let rubricasConfig    = []; // [{coluna_planilha, codigo_rubrica, tipo_processo, tipo_valor, descricao}]
+let historicoCotaPorConfigId = {}; // rubrica_config_id → [{valor_cota, competencia_vigencia}] (agendamentos de mudança de cota)
+let cfgHistoricoCota  = {}; // idem, mas para a tela Configurações · Rubricas (não é filtrado por empresaAtiva)
+let cfgRubricaBaseValor = {}; // rubrica_config_id → valor_cota base, para a tela Configurações · Rubricas
 let linhasTxt         = []; // linhas válidas para o TXT
 let tipoFolhaAtual    = '11'; // tipo_folha pré-selecionado no modal de TXT
 let empregadosConfig  = {}; // nome_normalizado → codigo_empregado (config desta ferramenta)
@@ -364,16 +367,112 @@ async function carregarRubricas() {
     // Fonte primária: fechamento_rubricas_config
     const { data: cfgData, error: cfgErr } = await supabaseClient
         .from('fechamento_rubricas_config')
-        .select('coluna_planilha, codigo_rubrica, tipo_processo, tipo_valor, descricao, valor_cota')
+        .select('id, coluna_planilha, codigo_rubrica, tipo_processo, tipo_valor, descricao, valor_cota')
         .eq('codigo_empresa', empresaAtiva)
         .eq('ativo', true);
     if (cfgErr) throw cfgErr;
     rubricasConfig = cfgData || [];
+
+    historicoCotaPorConfigId = {};
+    const idsBooleano = rubricasConfig.filter(c => c.tipo_valor === 'booleano').map(c => c.id);
+    if (idsBooleano.length) {
+        const { data: histData, error: histErr } = await supabaseClient
+            .from('fechamento_rubricas_cota_historico')
+            .select('rubrica_config_id, valor_cota, competencia_vigencia')
+            .in('rubrica_config_id', idsBooleano);
+        if (histErr) throw histErr;
+        (histData || []).forEach(h => {
+            (historicoCotaPorConfigId[h.rubrica_config_id] ||= []).push(h);
+        });
+    }
+}
+
+// ──────────────────────────────────────────────
+// AGENDAMENTO DE MUDANÇA DE VALOR DA COTA (rubricas Booleano)
+// ──────────────────────────────────────────────
+
+// 'MM/AAAA' → inteiro comparável (ano*12 + mes). null se inválido.
+function competenciaParaNumero(comp) {
+    const m = /^(\d{2})\/(\d{4})$/.exec((comp || '').trim());
+    if (!m) return null;
+    return parseInt(m[2], 10) * 12 + parseInt(m[1], 10);
+}
+
+// Inverso de competenciaParaNumero
+function numeroParaCompetencia(v) {
+    const ano = Math.floor((v - 1) / 12);
+    const mes = v - ano * 12;
+    return String(mes).padStart(2, '0') + '/' + ano;
+}
+
+function competenciaAnterior(comp) {
+    const n = competenciaParaNumero(comp);
+    return n === null ? null : numeroParaCompetencia(n - 1);
+}
+
+function competenciaHoje() {
+    const d = new Date();
+    return String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+}
+
+// Dado um histórico de agendamentos [{valor_cota, competencia_vigencia}], resolve
+// qual valor vale numa competência: o agendamento mais recente com vigência <= comp,
+// ou o valorBase se nenhum agendamento já vigorava nessa competência.
+function resolverValorCotaEmLista(historicoList, valorBase, comp) {
+    const alvo = competenciaParaNumero(comp);
+    if (alvo === null || !historicoList || !historicoList.length) return valorBase;
+
+    let melhor = null, melhorNum = -Infinity;
+    historicoList.forEach(h => {
+        const n = competenciaParaNumero(h.competencia_vigencia);
+        if (n !== null && n <= alvo && n > melhorNum) { melhorNum = n; melhor = h; }
+    });
+    return melhor ? melhor.valor_cota : valorBase;
+}
+
+// Usado no fluxo de processamento (planilha/formulário), com historicoCotaPorConfigId já carregado
+function valorCotaEmCompetencia(rubricaConfigId, comp) {
+    const cfg = rubricasConfig.find(c => c.id === rubricaConfigId);
+    if (!cfg) return null;
+    return resolverValorCotaEmLista(historicoCotaPorConfigId[rubricaConfigId] || [], cfg.valor_cota || null, comp);
+}
+
+// Detecta rubricas Booleano cujo valor de cota mudou nesta competência em relação à
+// competência anterior, e exibe/oculta o banner de alerta correspondente.
+function aplicarAlertaMudancaCota(colunasRubrica, comp) {
+    const el = document.getElementById('alertaMudancaCota');
+    if (!el) return;
+
+    const compAnterior = competenciaAnterior(comp);
+    const mudancas = [];
+    const vistos = new Set();
+
+    (colunasRubrica || []).forEach(({ resolucao }) => {
+        if (!resolucao || resolucao.tipo_valor !== 'booleano' || !resolucao.rubricaConfigId) return;
+        if (vistos.has(resolucao.rubricaConfigId)) return;
+        vistos.add(resolucao.rubricaConfigId);
+
+        const atual    = parseFloat(valorCotaEmCompetencia(resolucao.rubricaConfigId, comp));
+        const anterior = compAnterior ? parseFloat(valorCotaEmCompetencia(resolucao.rubricaConfigId, compAnterior)) : NaN;
+        if (!isNaN(atual) && !isNaN(anterior) && atual !== anterior) {
+            mudancas.push({ descricao: resolucao.descricao, de: anterior, para: atual });
+        }
+    });
+
+    if (mudancas.length) {
+        el.innerHTML = mudancas.map(m =>
+            `⚠️ O valor da cota de <strong>${m.descricao}</strong> mudou de R$ ${m.de.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para R$ ${m.para.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} nesta competência.`
+        ).join('<br>');
+        el.style.display = 'block';
+    } else {
+        el.style.display = 'none';
+    }
 }
 
 // Resolve rubrica para um cabeçalho de coluna do Excel
-function resolverColuna(header) {
+function resolverColuna(header, competencia) {
     const normH = normalizarNome(header);
+    const comp = competencia || document.getElementById('competencia')?.value || '';
 
     // 1. Exact match em fechamento_rubricas_config (coluna_planilha ou descricao)
     const exato = rubricasConfig.find(c =>
@@ -381,7 +480,8 @@ function resolverColuna(header) {
         normalizarNome(c.descricao || '') === normH
     );
     if (exato) {
-        return { codigo_rubrica: exato.codigo_rubrica, tipo_valor: exato.tipo_valor, descricao: exato.descricao || header, fonte: 'config', valor_cota: exato.valor_cota || null };
+        const valorCota = exato.tipo_valor === 'booleano' ? valorCotaEmCompetencia(exato.id, comp) : null;
+        return { codigo_rubrica: exato.codigo_rubrica, tipo_valor: exato.tipo_valor, descricao: exato.descricao || header, fonte: 'config', valor_cota: valorCota, rubricaConfigId: exato.id };
     }
 
     // 2. Fuzzy match em fechamento_rubricas_config
@@ -393,10 +493,11 @@ function resolverColuna(header) {
         if (s > melhorScore) { melhorScore = s; melhorCfg = c; }
     }
     if (melhorScore >= 0.80 && melhorCfg) {
-        return { codigo_rubrica: melhorCfg.codigo_rubrica, tipo_valor: melhorCfg.tipo_valor, descricao: melhorCfg.descricao || header, fonte: 'config', valor_cota: melhorCfg.valor_cota || null };
+        const valorCota = melhorCfg.tipo_valor === 'booleano' ? valorCotaEmCompetencia(melhorCfg.id, comp) : null;
+        return { codigo_rubrica: melhorCfg.codigo_rubrica, tipo_valor: melhorCfg.tipo_valor, descricao: melhorCfg.descricao || header, fonte: 'config', valor_cota: valorCota, rubricaConfigId: melhorCfg.id };
     }
 
-    return { codigo_rubrica: null, tipo_valor: null, descricao: header, fonte: null, valor_cota: null };
+    return { codigo_rubrica: null, tipo_valor: null, descricao: header, fonte: null, valor_cota: null, rubricaConfigId: null };
 }
 
 // ──────────────────────────────────────────────
@@ -507,7 +608,7 @@ async function processarPlanilha() {
             if (i < 2) return;
             const header = String(h || '').trim();
             if (!header) return;
-            colunasRubrica.push({ idx: i, header, resolucao: resolverColuna(header) });
+            colunasRubrica.push({ idx: i, header, resolucao: resolverColuna(header, comp) });
         });
 
         // Linhas de dados: a partir da linha 5 até linha vazia (sem nome)
@@ -619,6 +720,7 @@ function construirRelatorio(comp) {
     });
 
     document.getElementById('alertaSemMatch').style.display = temSemMatch ? 'block' : 'none';
+    aplicarAlertaMudancaCota(colunasRubrica, comp);
     renderizarRelatorio(linhasRelatorio);
 }
 
@@ -1414,11 +1516,37 @@ async function carregarRubricasConfig() {
             return;
         }
 
+        // Histórico de agendamentos de cota das rubricas Booleano exibidas
+        cfgHistoricoCota = {};
+        cfgRubricaBaseValor = {};
+        lista.forEach(r => { cfgRubricaBaseValor[r.id] = r.valor_cota || null; });
+        const idsBooleano = lista.filter(r => r.tipo_valor === 'booleano').map(r => r.id);
+        if (idsBooleano.length) {
+            const { data: hist, error: histErr } = await supabaseClient
+                .from('fechamento_rubricas_cota_historico')
+                .select('id, rubrica_config_id, valor_cota, competencia_vigencia')
+                .in('rubrica_config_id', idsBooleano);
+            if (histErr) throw histErr;
+            (hist || []).forEach(h => {
+                (cfgHistoricoCota[h.rubrica_config_id] ||= []).push(h);
+            });
+        }
+
+        const hoje = competenciaHoje();
         const tipoLabel = { monetario: 'Monetário', minutos: 'Horas', dias: 'Dias', booleano: 'Booleano' };
         tbody.innerHTML = lista.map(r => {
-            const cotaInfo = r.tipo_valor === 'booleano' && r.valor_cota
-                ? `<br><small style="color:#555;font-size:11px;">Cota: R$ ${parseFloat(r.valor_cota).toLocaleString('pt-BR',{minimumFractionDigits:2})}</small>`
+            const hist = (cfgHistoricoCota[r.id] || []).slice()
+                .sort((a, b) => competenciaParaNumero(a.competencia_vigencia) - competenciaParaNumero(b.competencia_vigencia));
+            const futuros = hist.filter(h => competenciaParaNumero(h.competencia_vigencia) > competenciaParaNumero(hoje));
+            const valorAtual = resolverValorCotaEmLista(hist, r.valor_cota || null, hoje);
+            const proximo = futuros[0];
+
+            const cotaInfo = r.tipo_valor === 'booleano'
+                ? `<br><small style="color:#555;font-size:11px;">Cota vigente: R$ ${parseFloat(valorAtual || 0).toLocaleString('pt-BR',{minimumFractionDigits:2})}` +
+                  (proximo ? ` <span style="color:#E67E22;">→ R$ ${parseFloat(proximo.valor_cota).toLocaleString('pt-BR',{minimumFractionDigits:2})} a partir de ${proximo.competencia_vigencia}</span>` : '') +
+                  `</small>`
                 : '';
+
             return `
             <tr>
                 <td><strong>${r.codigo_empresa}</strong></td>
@@ -1429,7 +1557,7 @@ async function carregarRubricasConfig() {
                 <td style="white-space:nowrap;">
                     <button class="btn btn-secondary btn-small" onclick="toggleAtivoRubrica('${r.id}',${r.ativo})"
                         style="margin-right:4px;">${r.ativo ? 'Desativar' : 'Ativar'}</button>
-                    ${r.tipo_valor === 'booleano' ? `<button class="btn btn-secondary btn-small" onclick="abrirEditarCota('${r.id}', ${r.valor_cota || 0})"
+                    ${r.tipo_valor === 'booleano' ? `<button class="btn btn-secondary btn-small" onclick="abrirEditarCota('${r.id}')"
                         style="margin-right:4px;">💰 Cota</button>` : ''}
                     <button class="btn btn-secondary btn-small" style="background:#E74C3C;border-color:#E74C3C;color:white;"
                         onclick="deletarRubricaConfig('${r.id}')">Excluir</button>
@@ -1438,13 +1566,25 @@ async function carregarRubricasConfig() {
             ${r.tipo_valor === 'booleano' ? `
             <tr id="editCotaRow-${r.id}" style="display:none;background:#fafafa;">
                 <td colspan="6">
-                    <div class="inline-register-form">
-                        <span style="font-weight:600;font-size:12px;color:var(--primary-color);">Valor da Cota (R$) para <em>${r.descricao || r.codigo_rubrica}</em></span>
-                        <input type="number" id="editCotaInput-${r.id}" value="${r.valor_cota || ''}" placeholder="Ex: 25.00" step="0.01" min="0"
-                            style="width:160px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
-                        <button class="btn btn-primary btn-small" onclick="salvarValorCota('${r.id}')">💾 Salvar</button>
-                        <button class="btn btn-secondary btn-small" onclick="fecharEditarCota('${r.id}')">Cancelar</button>
-                        <span id="editCotaStatus-${r.id}" style="font-size:12px;"></span>
+                    <div class="inline-register-form" style="flex-direction:column;align-items:flex-start;gap:8px;">
+                        <span style="font-weight:600;font-size:12px;color:var(--primary-color);">Agendar mudança de valor da cota — <em>${r.descricao || r.codigo_rubrica}</em></span>
+                        ${futuros.length ? `
+                        <div style="font-size:12px;">
+                            <strong>Agendamentos futuros:</strong><br>
+                            ${futuros.map(h => `
+                                R$ ${parseFloat(h.valor_cota).toLocaleString('pt-BR',{minimumFractionDigits:2})} a partir de ${h.competencia_vigencia}
+                                <button class="btn btn-secondary btn-small" style="padding:2px 8px;margin-left:6px;" onclick="excluirAgendamentoCota('${h.id}')">Excluir</button><br>
+                            `).join('')}
+                        </div>` : ''}
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                            <input type="number" id="editCotaInput-${r.id}" placeholder="Novo valor (R$)" step="0.01" min="0"
+                                style="width:150px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                            <input type="text" id="editCotaComp-${r.id}" placeholder="MM/AAAA" maxlength="7"
+                                style="width:100px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                            <button class="btn btn-primary btn-small" onclick="agendarValorCota('${r.id}')">💾 Agendar</button>
+                            <button class="btn btn-secondary btn-small" onclick="fecharEditarCota('${r.id}')">Cancelar</button>
+                            <span id="editCotaStatus-${r.id}" style="font-size:12px;"></span>
+                        </div>
                     </div>
                 </td>
             </tr>` : ''}
@@ -1538,39 +1678,70 @@ function toggleInlineValorCota(idx) {
     if (wrap) wrap.style.display = tipo === 'booleano' ? '' : 'none';
 }
 
-function abrirEditarCota(id, valorAtual) {
+function abrirEditarCota(id) {
     document.getElementById(`editCotaRow-${id}`).style.display = '';
     const inp = document.getElementById(`editCotaInput-${id}`);
-    if (inp) { inp.value = valorAtual > 0 ? valorAtual : ''; inp.focus(); }
+    if (inp) inp.focus();
 }
 
 function fecharEditarCota(id) {
     document.getElementById(`editCotaRow-${id}`).style.display = 'none';
 }
 
-async function salvarValorCota(id) {
-    const inp    = document.getElementById(`editCotaInput-${id}`);
-    const status = document.getElementById(`editCotaStatus-${id}`);
-    const valor  = parseFloat(inp.value);
+// Agenda uma mudança de valor da cota a partir de uma competência (insere no
+// histórico, sem sobrescrever o valor base). Alerta o usuário do de/para antes de confirmar.
+async function agendarValorCota(id) {
+    const inpValor = document.getElementById(`editCotaInput-${id}`);
+    const inpComp  = document.getElementById(`editCotaComp-${id}`);
+    const status   = document.getElementById(`editCotaStatus-${id}`);
+
+    const valor = parseFloat(inpValor.value);
+    const comp  = inpComp.value.trim();
 
     if (!valor || valor <= 0) {
         status.textContent = '⚠ Informe um valor válido.';
         status.style.color = '#E74C3C';
         return;
     }
+    if (!/^\d{2}\/\d{4}$/.test(comp)) {
+        status.textContent = '⚠ Informe a competência no formato MM/AAAA.';
+        status.style.color = '#E74C3C';
+        return;
+    }
+
+    const historico  = cfgHistoricoCota[id] || [];
+    const valorAtual = resolverValorCotaEmLista(historico, cfgRubricaBaseValor[id], comp);
+    const confirmado = confirm(
+        `O valor da cota vai mudar de R$ ${parseFloat(valorAtual || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ` +
+        `para R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} a partir da competência ${comp}. Confirmar agendamento?`
+    );
+    if (!confirmado) return;
 
     try {
         const { error } = await supabaseClient
-            .from('fechamento_rubricas_config')
-            .update({ valor_cota: valor })
-            .eq('id', id);
+            .from('fechamento_rubricas_cota_historico')
+            .upsert([{ rubrica_config_id: id, valor_cota: valor, competencia_vigencia: comp }],
+                    { onConflict: 'rubrica_config_id,competencia_vigencia' });
         if (error) throw error;
-        mostrarStatusConfig('✅ Valor da cota atualizado!', 'success');
+        mostrarStatusConfig('✅ Mudança de valor da cota agendada!', 'success');
         fecharEditarCota(id);
         carregarRubricasConfig();
     } catch (err) {
         status.textContent = '❌ Erro: ' + err.message;
         status.style.color = '#E74C3C';
+    }
+}
+
+async function excluirAgendamentoCota(historicoId) {
+    if (!confirm('Excluir este agendamento futuro?')) return;
+    try {
+        const { error } = await supabaseClient
+            .from('fechamento_rubricas_cota_historico')
+            .delete().eq('id', historicoId);
+        if (error) throw error;
+        carregarRubricasConfig();
+    } catch (err) {
+        mostrarStatusConfig('❌ Erro: ' + err.message, 'error');
     }
 }
 
@@ -1880,6 +2051,7 @@ async function recarregarPlanilha(envioRow) {
 
     const temSemMatch = linhasRelatorio.some(l => !l.codEmpregado);
     document.getElementById('alertaSemMatch').style.display = temSemMatch ? 'block' : 'none';
+    document.getElementById('alertaMudancaCota').style.display = 'none'; // snapshot salvo já reflete o valor da época
     renderizarRelatorio(linhasRelatorio);
     mostrarStep(2);
 }
@@ -1917,11 +2089,11 @@ async function processarDadosFormulario(envioRow) {
     const colunasRubrica = Object.entries(campoParaHeader).map(([campo, header]) => ({
         campo,
         header,
-        resolucao: resolverColuna(header) || { codigo_rubrica: null, tipo_valor: null, descricao: header, fonte: null },
+        resolucao: resolverColuna(header, competencia) || { codigo_rubrica: null, tipo_valor: null, descricao: header, fonte: null },
     }));
 
     // Resolver rubrica do plano Unimed uma vez
-    const resUnimed = resolverColuna('DESCONTO PLANO DE SAUDE');
+    const resUnimed = resolverColuna('DESCONTO PLANO DE SAUDE', competencia);
 
     // Diagnóstico: logar nomes normalizados vs mapa de funcionários
     console.group('🔍 Diagnóstico — nomes do formulário vs rh_empregados');
@@ -2005,6 +2177,7 @@ async function processarDadosFormulario(envioRow) {
 
     console.groupEnd();
     document.getElementById('alertaSemMatch').style.display = temSemMatch ? 'block' : 'none';
+    aplicarAlertaMudancaCota(colunasRubrica, competencia);
 
     // Marcar como processado
     await supabaseClient.from('quadrante_folha_envios')
