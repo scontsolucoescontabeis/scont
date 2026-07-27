@@ -3919,9 +3919,6 @@ async function gerarRecibosBeneficios() {
 
     const comp = document.getElementById('beneficiosCompetencia').value;
     const [mes, ano] = comp.split('/').map(Number);
-    const mesPag = mes === 12 ? 1 : mes + 1;
-    const anoPag = mes === 12 ? ano + 1 : ano;
-    const mesPagFmt = String(mesPag).padStart(2, '0');
     const ultimoDiaRef = new Date(ano, mes, 0).getDate();
     const mesFmt = String(mes).padStart(2, '0');
     const periodoTexto = `01/${mesFmt}/${ano} a ${String(ultimoDiaRef).padStart(2, '0')}/${mesFmt}/${ano}`;
@@ -3951,7 +3948,7 @@ async function gerarRecibosBeneficios() {
         for (const grupo of grupos) {
             const sheetsHtml = grupo.elegiveis.map(l => _reciboSheetHTML(grupo.tipo, l, periodoTexto)).join('');
             const nomeEmpresaArquivo = grupo.nomeEmpresa.replace(/[^\p{L}\p{N}]+/gu, '_');
-            const nomeArquivo = `Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesPagFmt}${anoPag}.pdf`;
+            const nomeArquivo = `Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesFmt}${ano}.pdf`;
             await _gerarPdfRecibos(nomeArquivo, sheetsHtml);
         }
         fecharModalMensagem();
