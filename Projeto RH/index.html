@@ -312,6 +312,7 @@
                     <span id="beneficiosPreviaInfo" style="font-size:13px; color: var(--text-secondary);"></span>
                     <div style="display:flex; gap:10px;">
                         <button type="button" class="btn btn-secondary" onclick="gerarRecibosBeneficios()">🧾 Gerar Recibo</button>
+                        <button type="button" class="btn btn-secondary" onclick="abrirModalLancamentoVaVt()">📄 Gerar Lançamentos na Folha</button>
                         <button type="button" class="btn btn-primary" onclick="exportarBeneficiosExcel()">📥 Gerar Excel</button>
                     </div>
                 </div>
@@ -921,6 +922,48 @@
             <div class="modal-footer" style="display: flex; gap: 10px; justify-content: flex-end; padding: 15px 20px; border-top: 1px solid #eee;">
                 <button type="button" class="btn btn-secondary" id="btnFecharAjudaCustoITC" onclick="_fecharModalAjudaCustoITC()">Fechar</button>
                 <button type="button" class="btn btn-primary" id="btnBaixarTxtAjudaCustoITC" onclick="_baixarTxtAjudaCustoITC()" style="display:none;">📄 Baixar TXT</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: GERAR LANÇAMENTOS NA FOLHA (VT/VA) -->
+    <div id="lancamentoVaVtModal" class="modal">
+        <div class="modal-content" style="max-width: 720px;">
+            <div class="modal-header">
+                <h3 style="margin: 0;">📄 Gerar Lançamentos na Folha (VT/VA)</h3>
+                <button type="button" class="modal-close" onclick="fecharModalLancamentoVaVt()">×</button>
+            </div>
+            <div class="modal-body" style="padding: 20px; max-height: 75vh; overflow-y: auto;">
+                <p style="margin-bottom: 14px; font-size: 14px; color: var(--text-primary);">
+                    Informe a rubrica de VT e de VA de cada empresa para lançar na folha os valores mensais já calculados na prévia.
+                </p>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead>
+                            <tr style="background: #f8f9fa; color: var(--text-primary); text-align: left;">
+                                <th style="padding: 8px; border-bottom: 2px solid #dee2e6; font-weight: 700;">Empresa</th>
+                                <th style="padding: 8px; border-bottom: 2px solid #dee2e6; font-weight: 700;">Rubrica VT</th>
+                                <th style="padding: 8px; border-bottom: 2px solid #dee2e6; font-weight: 700;">Rubrica VA</th>
+                            </tr>
+                        </thead>
+                        <tbody id="lancVaVtTbody"></tbody>
+                    </table>
+                </div>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">As rubricas informadas ficam salvas por empresa e são reaproveitadas na próxima geração.</p>
+
+                <!-- Prévia do TXT -->
+                <div id="lancVaVtPrevia" style="display:none; margin-top: 18px;">
+                    <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 6px; color: var(--text-primary);">Prévia do Arquivo</label>
+                    <pre id="lancVaVtPreviaConteudo" style="background:#1e1e1e;color:#d4d4d4;padding:14px;border-radius:6px;font-size:11px;font-family:monospace;max-height:200px;overflow-y:auto;white-space:pre;line-height:1.6;margin:0;"></pre>
+                    <div id="lancVaVtPreviaInfo" style="font-size:11px;color:var(--text-secondary);margin-top:5px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-top: 1px solid #eee;">
+                <button type="button" class="btn btn-secondary btn-small" onclick="gerarPreviewLancamentoVaVt()" style="font-size: 12px;">👁 Pré-visualizar</button>
+                <div style="display:flex; gap:10px;">
+                    <button type="button" class="btn btn-secondary" onclick="fecharModalLancamentoVaVt()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnBaixarLancVaVt" onclick="baixarLancamentoVaVt()" style="display:none;">📄 Baixar TXT</button>
+                </div>
             </div>
         </div>
     </div>

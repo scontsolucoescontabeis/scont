@@ -4032,9 +4032,9 @@ function _abrirModalAjudaCustoITC(linhasITC, comp) {
     document.getElementById('ajudaCustoITCModal').classList.add('active');
 }
 
-// A competência do recibo é o mês trabalhado; a rubrica 201 é lançada na
-// competência anterior a essa (comp - 1 mês) — regra confirmada pelo usuário.
-function _competenciaTxtAjudaCustoITC(comp) {
+// competência ("MM/AAAA") - 1 mês, usada nos TXTs de lançamento cuja competência
+// interna é a competência do recibo (mês trabalhado) menos 1 mês.
+function _mesAnterior(comp) {
     const [mes, ano] = comp.split('/').map(Number);
     const mesTxt = mes === 1 ? 12 : mes - 1;
     const anoTxt = mes === 1 ? ano - 1 : ano;
@@ -4042,7 +4042,7 @@ function _competenciaTxtAjudaCustoITC(comp) {
 }
 
 function _construirTxtAjudaCustoITC() {
-    const { mes, ano } = _competenciaTxtAjudaCustoITC(state._ajudaCustoITCComp);
+    const { mes, ano } = _mesAnterior(state._ajudaCustoITCComp);
     const compFmt = String(ano) + String(mes).padStart(2, '0');
     return (state._ajudaCustoITCItens || [])
         .filter(it => it.ajudaCusto > 0)
@@ -4061,7 +4061,7 @@ async function _baixarTxtAjudaCustoITC() {
     if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor de ajuda de custo a lançar.'); return; }
 
     const comp = state._ajudaCustoITCComp;
-    const { mes: mesTxt, ano: anoTxt } = _competenciaTxtAjudaCustoITC(comp);
+    const { mes: mesTxt, ano: anoTxt } = _mesAnterior(comp);
     const mm = String(mesTxt).padStart(2, '0');
     const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -4091,6 +4091,127 @@ async function _fecharModalAjudaCustoITC() {
     state._ajudaCustoITCSemPendencia = false;
 
     if (linhas) await _gerarPdfsRecibosBeneficios(linhas, comp);
+}
+
+// ===== GERAR LANÇAMENTOS NA FOLHA (VT/VA) =====
+// Uma rubrica de VT e uma de VA por empresa presente na prévia (podem ser diferentes
+// por empresa — ver docs/rubricas-por-empresa.md), salvas em rh_config_rubricas_txt
+// (eventos beneficios_rub_vt/beneficios_rub_va) para reaproveitar na próxima geração.
+
+async function abrirModalLancamentoVaVt() {
+    if ((state._beneficiosLinhas || []).length === 0) { mostrarMensagem('Aviso', 'Gere a prévia antes de gerar os lançamentos.'); return; }
+    const linhas = state._beneficiosLinhas.filter(l => l.selecionado !== false);
+    if (linhas.length === 0) { mostrarMensagem('Aviso', 'Selecione ao menos um empregado antes de gerar os lançamentos.'); return; }
+
+    const empresasMapa = new Map();
+    linhas.forEach(l => { if (!empresasMapa.has(l.codigo_empresa)) empresasMapa.set(l.codigo_empresa, l.nome_empresa); });
+    const empresas = Array.from(empresasMapa, ([codigo_empresa, nome_empresa]) => ({ codigo_empresa, nome_empresa }))
+        .sort((a, b) => a.nome_empresa.localeCompare(b.nome_empresa));
+
+    const configs = await Promise.all(empresas.map(e => _buscarConfigRubricas(e.codigo_empresa)));
+
+    document.getElementById('lancVaVtTbody').innerHTML = empresas.map((e, i) => {
+        const cfg = configs[i];
+        const rubVT = cfg?.['beneficios_rub_vt']?.cod || '';
+        const rubVA = cfg?.['beneficios_rub_va']?.cod || '';
+        return `
+        <tr data-codigo-empresa="${e.codigo_empresa}">
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">${e.codigo_empresa} - ${e.nome_empresa}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;"><input type="text" class="lanc-rub-vt" maxlength="9" value="${rubVT}" placeholder="Ex: 000201" style="width:110px; padding:5px 8px; border:1px solid #ced4da; border-radius:4px; font-family:monospace;"></td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;"><input type="text" class="lanc-rub-va" maxlength="9" value="${rubVA}" placeholder="Ex: 000202" style="width:110px; padding:5px 8px; border:1px solid #ced4da; border-radius:4px; font-family:monospace;"></td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('lancVaVtPrevia').style.display = 'none';
+    document.getElementById('btnBaixarLancVaVt').style.display = 'none';
+    document.getElementById('lancamentoVaVtModal').classList.add('active');
+}
+
+function fecharModalLancamentoVaVt() {
+    document.getElementById('lancamentoVaVtModal').classList.remove('active');
+}
+
+function _lerRubricasVaVtPorEmpresa() {
+    const mapa = {};
+    document.querySelectorAll('#lancVaVtTbody tr').forEach(tr => {
+        const codigo = tr.dataset.codigoEmpresa;
+        mapa[codigo] = {
+            vt: (tr.querySelector('.lanc-rub-vt')?.value || '').trim(),
+            va: (tr.querySelector('.lanc-rub-va')?.value || '').trim(),
+        };
+    });
+    return mapa;
+}
+
+function _rubricasVaVtIncompletas() {
+    const mapa = _lerRubricasVaVtPorEmpresa();
+    return Object.keys(mapa).length === 0 || Object.values(mapa).some(r => !r.vt || !r.va);
+}
+
+function _construirTxtLancamentoVaVt() {
+    const comp = document.getElementById('beneficiosCompetencia').value;
+    const { mes, ano } = _mesAnterior(comp);
+    const compFmt = String(ano) + String(mes).padStart(2, '0');
+    const rubricasPorEmpresa = _lerRubricasVaVtPorEmpresa();
+    const linhas = (state._beneficiosLinhas || []).filter(l => l.selecionado !== false);
+
+    let conteudo = '';
+    linhas.forEach(l => {
+        const rub = rubricasPorEmpresa[l.codigo_empresa];
+        if (!rub) return;
+        const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
+        const vtMensal = diasPagar * (l.vtDiario || 0);
+        const vaMensal = diasPagar * (l.vaDiario || 0);
+        conteudo += _montarLinhaTxt(l.codigo_empregado, compFmt, l.codigo_empresa, rub.vt, '11', Math.round(vtMensal * 100));
+        conteudo += _montarLinhaTxt(l.codigo_empregado, compFmt, l.codigo_empresa, rub.va, '11', Math.round(vaMensal * 100));
+    });
+    return conteudo;
+}
+
+function gerarPreviewLancamentoVaVt() {
+    if (_rubricasVaVtIncompletas()) { mostrarMensagem('Aviso', 'Preencha a rubrica de VT e VA para todas as empresas.'); return; }
+    const conteudoTXT = _construirTxtLancamentoVaVt();
+    _mostrarPrevia('lancVaVtPrevia', 'lancVaVtPreviaConteudo', 'lancVaVtPreviaInfo', '#lancamentoVaVtModal', conteudoTXT);
+    document.getElementById('btnBaixarLancVaVt').style.display = 'inline-flex';
+}
+
+async function _salvarRubricasVaVtPorEmpresa() {
+    const mapa = _lerRubricasVaVtPorEmpresa();
+    const rows = [];
+    Object.entries(mapa).forEach(([codigo_empresa, r]) => {
+        rows.push({ codigo_empresa, evento: 'beneficios_rub_vt', codigo_rubrica: r.vt, tipo_valor: 'monetario' });
+        rows.push({ codigo_empresa, evento: 'beneficios_rub_va', codigo_rubrica: r.va, tipo_valor: 'monetario' });
+    });
+    if (rows.length === 0) return;
+    try {
+        const { error } = await supabaseClient.from('rh_config_rubricas_txt').upsert(rows, { onConflict: 'codigo_empresa,evento' });
+        if (error) throw error;
+        Object.keys(mapa).forEach(codigo => { delete _cacheConfigRubricas[codigo]; });
+    } catch (erro) {
+        console.error('Erro ao salvar rubricas de VT/VA por empresa:', erro);
+    }
+}
+
+async function baixarLancamentoVaVt() {
+    if (_rubricasVaVtIncompletas()) { mostrarMensagem('Aviso', 'Preencha a rubrica de VT e VA para todas as empresas.'); return; }
+    const conteudoTXT = _construirTxtLancamentoVaVt();
+    if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor de VT/VA a lançar.'); return; }
+
+    const comp = document.getElementById('beneficiosCompetencia').value;
+    const { mes, ano } = _mesAnterior(comp);
+    const mm = String(mes).padStart(2, '0');
+
+    const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Lancamentos_VT_VA_${mm}-${ano}.txt`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    await _salvarRubricasVaVtPorEmpresa();
+    fecharModalLancamentoVaVt();
+    mostrarMensagem('Sucesso', 'Arquivo TXT gerado com sucesso!');
 }
 
 // ===== GERAR ESCALA =====
