@@ -4032,10 +4032,18 @@ function _abrirModalAjudaCustoITC(linhasITC, comp) {
     document.getElementById('ajudaCustoITCModal').classList.add('active');
 }
 
+// A competência do recibo é o mês trabalhado; a rubrica 201 é lançada na
+// competência anterior a essa (comp - 1 mês) — regra confirmada pelo usuário.
+function _competenciaTxtAjudaCustoITC(comp) {
+    const [mes, ano] = comp.split('/').map(Number);
+    const mesTxt = mes === 1 ? 12 : mes - 1;
+    const anoTxt = mes === 1 ? ano - 1 : ano;
+    return { mes: mesTxt, ano: anoTxt };
+}
+
 function _construirTxtAjudaCustoITC() {
-    const comp = state._ajudaCustoITCComp;
-    const [mes, ano] = comp.split('/');
-    const compFmt = ano + mes;
+    const { mes, ano } = _competenciaTxtAjudaCustoITC(state._ajudaCustoITCComp);
+    const compFmt = String(ano) + String(mes).padStart(2, '0');
     return (state._ajudaCustoITCItens || [])
         .filter(it => it.ajudaCusto > 0)
         .map(it => _montarLinhaTxt(it.codigo_empregado, compFmt, '350', '201', '11', Math.round(it.ajudaCusto * 100)))
@@ -4053,12 +4061,13 @@ async function _baixarTxtAjudaCustoITC() {
     if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor de ajuda de custo a lançar.'); return; }
 
     const comp = state._ajudaCustoITCComp;
-    const [mm, aaaa] = comp.split('/');
+    const { mes: mesTxt, ano: anoTxt } = _competenciaTxtAjudaCustoITC(comp);
+    const mm = String(mesTxt).padStart(2, '0');
     const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Lancamentos_AjudaCusto_350_${mm}-${aaaa}.txt`;
+    a.download = `Lancamentos_AjudaCusto_350_${mm}-${anoTxt}.txt`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
 

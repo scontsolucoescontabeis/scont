@@ -32,7 +32,7 @@ Mesmo layout de `_linhasTxt` (script.js:3001), reaproveitando o helper de montag
      + valor em centavos (9 díg., zero-pad) + codigo_empresa (10 díg., zero-pad) + "\n"
 ```
 
-Uma linha por empregado com `ajudaCusto > 0`. Nome do arquivo: `Lancamentos_AjudaCusto_350_MM-AAAA.txt`. Mesmo `Blob(text/plain;charset=utf-8)` e download via link temporário já usados em `_efetivarDownloadTXTResultados`.
+Uma linha por empregado com `ajudaCusto > 0`. **Competência usada dentro do TXT e no nome do arquivo é a competência do recibo menos 1 mês** (confirmado pelo usuário — `_competenciaTxtAjudaCustoITC`), diferente da competência usada para o controle de "já gerado" (`rh_ajuda_custo_lancamentos.competencia`), que continua sendo a competência do recibo (mês trabalhado) tal como digitada na tela. Nome do arquivo: `Lancamentos_AjudaCusto_350_MM-AAAA.txt` (MM/AAAA já ajustados -1 mês). Mesmo `Blob(text/plain;charset=utf-8)` e download via link temporário já usados em `_efetivarDownloadTXTResultados`.
 
 ## Persistência — `rh_ajuda_custo_lancamentos`
 
