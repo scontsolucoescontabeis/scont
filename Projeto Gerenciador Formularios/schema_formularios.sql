@@ -123,6 +123,8 @@ CREATE TABLE IF NOT EXISTS public.empregados (
     contrato_experiencia        TEXT,
     vale_transporte             BOOLEAN DEFAULT FALSE,
     desconto_vt                 BOOLEAN DEFAULT FALSE,
+    valor_diario_vt             NUMERIC(15,2),
+    valor_diario_va             NUMERIC(15,2),
 
     -- Dados pessoais
     nome_completo               TEXT,
@@ -700,6 +702,16 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                    WHERE table_schema='public' AND table_name='empregados' AND column_name='email') THEN
         ALTER TABLE public.empregados ADD COLUMN email TEXT;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_schema='public' AND table_name='empregados' AND column_name='valor_diario_vt') THEN
+        ALTER TABLE public.empregados ADD COLUMN valor_diario_vt NUMERIC(15,2);
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_schema='public' AND table_name='empregados' AND column_name='valor_diario_va') THEN
+        ALTER TABLE public.empregados ADD COLUMN valor_diario_va NUMERIC(15,2);
     END IF;
 
     -- ── Converter salario_contratual para NUMERIC se ainda for TEXT ──

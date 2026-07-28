@@ -661,6 +661,14 @@ function createDetailContent(form, sociosDoBanco = [], dependentesDoBanco = []) 
                         <span class="detail-label">Descontar 6% para Transporte?</span>
                         <div class="detail-value">${form.desconto_vt ? 'Sim' : 'Não'}</div>
                     </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Valor Diário do Vale Transporte</span>
+                        <div class="detail-value">${form.valor_diario_vt != null ? 'R$ ' + Number(form.valor_diario_vt).toFixed(2) : '-'}</div>
+                    </div>
+                    <div class="detail-field">
+                        <span class="detail-label">Valor Diário do Vale Alimentação</span>
+                        <div class="detail-value">${form.valor_diario_va != null ? 'R$ ' + Number(form.valor_diario_va).toFixed(2) : '-'}</div>
+                    </div>
                 </div>
             </div>
 
@@ -1180,6 +1188,10 @@ function createEditForm(form, sociosDoBanco = [], dependentesDoBanco = []) {
                         </select>
                     </div>
                 </div>
+                <div class="detail-row">
+                    <div class="detail-field"><label class="detail-label">Valor Diário do Vale Transporte (R$)</label><input type="number" id="editValorDiarioVT" class="search-input" style="padding: var(--spacing-md);" value="${form.valor_diario_vt ?? ''}" step="0.01" min="0"></div>
+                    <div class="detail-field"><label class="detail-label">Valor Diário do Vale Alimentação (R$)</label><input type="number" id="editValorDiarioVA" class="search-input" style="padding: var(--spacing-md);" value="${form.valor_diario_va ?? ''}" step="0.01" min="0"></div>
+                </div>
             </div>
         `;
     }
@@ -1498,6 +1510,8 @@ async function saveChanges() {
             if (_ge('editHorarioTrabalho')) updateData.horario_trabalho = _ge('editHorarioTrabalho').value;
             if (_ge('editValeTransporte')) updateData.vale_transporte = _ge('editValeTransporte').value === 'true';
             if (_ge('editDescontoVT')) updateData.desconto_vt = _ge('editDescontoVT').value === 'true';
+            if (_ge('editValorDiarioVT')) updateData.valor_diario_vt = _ge('editValorDiarioVT').value ? parseFloat(_ge('editValorDiarioVT').value) : null;
+            if (_ge('editValorDiarioVA')) updateData.valor_diario_va = _ge('editValorDiarioVA').value ? parseFloat(_ge('editValorDiarioVA').value) : null;
             const diasMarcados = Array.from(document.querySelectorAll('input[name="editDiasTrabalho"]:checked')).map(el => el.value);
             if (diasMarcados.length > 0) updateData.dias_trabalho = diasMarcados;
         }
