@@ -4108,17 +4108,29 @@ async function abrirModalLancamentoVaVt() {
     const empresas = Array.from(empresasMapa, ([codigo_empresa, nome_empresa]) => ({ codigo_empresa, nome_empresa }))
         .sort((a, b) => a.nome_empresa.localeCompare(b.nome_empresa));
 
-    const configs = await Promise.all(empresas.map(e => _buscarConfigRubricas(e.codigo_empresa)));
+    const [configs, catalogos] = await Promise.all([
+        Promise.all(empresas.map(e => _buscarConfigRubricas(e.codigo_empresa))),
+        Promise.all(empresas.map(e => _buscarCatalogoRubricas(e.codigo_empresa))),
+    ]);
 
     document.getElementById('lancVaVtTbody').innerHTML = empresas.map((e, i) => {
         const cfg = configs[i];
-        const rubVT = cfg?.['beneficios_rub_vt']?.cod || '';
-        const rubVA = cfg?.['beneficios_rub_va']?.cod || '';
+        const catalogo = catalogos[i];
+        const rubVTSalva = cfg?.['beneficios_rub_vt']?.cod || '';
+        const rubVASalva = cfg?.['beneficios_rub_va']?.cod || '';
+        const optsVT = _optionsRubricaCatalogo(catalogo, 'transporte', rubVTSalva);
+        const optsVA = _optionsRubricaCatalogo(catalogo, 'aliment', rubVASalva);
         return `
         <tr data-codigo-empresa="${e.codigo_empresa}">
             <td style="padding: 8px; border-bottom: 1px solid #eee;">${e.codigo_empresa} - ${e.nome_empresa}</td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;"><input type="text" class="lanc-rub-vt" maxlength="9" value="${rubVT}" placeholder="Ex: 000201" style="width:110px; padding:5px 8px; border:1px solid #ced4da; border-radius:4px; font-family:monospace;"></td>
-            <td style="padding: 8px; border-bottom: 1px solid #eee;"><input type="text" class="lanc-rub-va" maxlength="9" value="${rubVA}" placeholder="Ex: 000202" style="width:110px; padding:5px 8px; border:1px solid #ced4da; border-radius:4px; font-family:monospace;"></td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">
+                <select class="lanc-rub-vt" style="width:100%; min-width:200px; padding:5px 6px; border:1px solid #ced4da; border-radius:4px; font-size:12px;" onchange="_toggleRubricaManualLancVaVt(this)">${optsVT.html}</select>
+                <input type="text" class="lanc-rub-vt-manual" maxlength="9" value="${optsVT.usarManual ? rubVTSalva : ''}" placeholder="Ex: 000201" oninput="this.value=this.value.replace(/\\D/g,'')" style="display:${optsVT.usarManual ? 'block' : 'none'}; margin-top:6px; width:100%; box-sizing:border-box; padding:5px 8px; border:1px solid #ced4da; border-radius:4px; font-family:monospace;">
+            </td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">
+                <select class="lanc-rub-va" style="width:100%; min-width:200px; padding:5px 6px; border:1px solid #ced4da; border-radius:4px; font-size:12px;" onchange="_toggleRubricaManualLancVaVt(this)">${optsVA.html}</select>
+                <input type="text" class="lanc-rub-va-manual" maxlength="9" value="${optsVA.usarManual ? rubVASalva : ''}" placeholder="Ex: 000202" oninput="this.value=this.value.replace(/\\D/g,'')" style="display:${optsVA.usarManual ? 'block' : 'none'}; margin-top:6px; width:100%; box-sizing:border-box; padding:5px 8px; border:1px solid #ced4da; border-radius:4px; font-family:monospace;">
+            </td>
         </tr>`;
     }).join('');
 
@@ -4131,13 +4143,44 @@ function fecharModalLancamentoVaVt() {
     document.getElementById('lancamentoVaVtModal').classList.remove('active');
 }
 
+const _REGEX_DIACRITICOS = new RegExp(String.fromCharCode(0x5b, 0x5c, 0x75, 0x30, 0x33, 0x30, 0x30, 0x2d, 0x5c, 0x75, 0x30, 0x33, 0x36, 0x66, 0x5d), 'g');
+function _normalizarTexto(s) {
+    return (s || '').normalize('NFD').replace(_REGEX_DIACRITICOS, '').toLowerCase();
+}
+
+// Monta as <option> do <select> de rubrica filtradas pela descrição (ex: "transporte",
+// "aliment"), sempre com uma opção final "Outra rubrica" para código fora do catálogo.
+function _optionsRubricaCatalogo(catalogo, filtroDescricao, valorSalvo) {
+    const filtrados = (catalogo || []).filter(r => _normalizarTexto(r.descricao_rubrica).includes(filtroDescricao));
+    const codigos = filtrados.map(r => r.codigo_rubrica);
+    const usarManual = !!valorSalvo && !codigos.includes(valorSalvo);
+    let html = '<option value="">Selecione...</option>';
+    filtrados.forEach(r => {
+        const desc = r.descricao_rubrica || '(sem descrição)';
+        const tipo = r.tipo ? ` — ${r.tipo}` : '';
+        const sel = r.codigo_rubrica === valorSalvo ? ' selected' : '';
+        html += `<option value="${r.codigo_rubrica}"${sel}>${desc}${tipo} (${r.codigo_rubrica})</option>`;
+    });
+    html += `<option value="__manual__"${usarManual ? ' selected' : ''}>Outra rubrica (digitar código)</option>`;
+    return { html, usarManual };
+}
+
+function _toggleRubricaManualLancVaVt(selectEl) {
+    const manualInput = selectEl.nextElementSibling;
+    if (manualInput) manualInput.style.display = selectEl.value === '__manual__' ? 'block' : 'none';
+}
+
 function _lerRubricasVaVtPorEmpresa() {
     const mapa = {};
+    const lerCampo = (tr, selectClass, manualClass) => {
+        const valor = tr.querySelector(`.${selectClass}`)?.value || '';
+        return valor === '__manual__' ? (tr.querySelector(`.${manualClass}`)?.value || '').trim() : valor;
+    };
     document.querySelectorAll('#lancVaVtTbody tr').forEach(tr => {
         const codigo = tr.dataset.codigoEmpresa;
         mapa[codigo] = {
-            vt: (tr.querySelector('.lanc-rub-vt')?.value || '').trim(),
-            va: (tr.querySelector('.lanc-rub-va')?.value || '').trim(),
+            vt: lerCampo(tr, 'lanc-rub-vt', 'lanc-rub-vt-manual'),
+            va: lerCampo(tr, 'lanc-rub-va', 'lanc-rub-va-manual'),
         };
     });
     return mapa;

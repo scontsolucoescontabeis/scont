@@ -16,7 +16,7 @@ A tela "Gerar Benefícios" já tinha "Gerar Recibo" e "Gerar Excel". Este design
 
 ## Fluxo
 
-1. `abrirModalLancamentoVaVt()`: valida que há prévia com empregados selecionados; agrupa por `codigo_empresa`; busca config salva de cada empresa (`_buscarConfigRubricas`); renderiza a tabela de rubricas (pré-preenchida) e abre `#lancamentoVaVtModal`.
+1. `abrirModalLancamentoVaVt()`: valida que há prévia com empregados selecionados; agrupa por `codigo_empresa`; busca config salva (`_buscarConfigRubricas`) e o catálogo de rubricas (`_buscarCatalogoRubricas`, tabela `rh_rubricas`) de cada empresa; renderiza a tabela com **listas suspensas** de rubrica VT/VA (`_optionsRubricaCatalogo`, filtrando a descrição por "transporte"/"aliment", acentos ignorados) e abre `#lancamentoVaVtModal`. Cada select tem uma opção final "Outra rubrica (digitar código)" que revela um campo manual — mesmo padrão já usado no select de rubrica dos "Lançamentos Adicionais" — usada automaticamente quando o valor salvo não está no catálogo filtrado.
 2. "Pré-visualizar" (`gerarPreviewLancamentoVaVt`): valida que todas as empresas têm VT e VA preenchidos; monta o TXT (`_construirTxtLancamentoVaVt`) e mostra a prévia (`_mostrarPrevia`, mesmo padrão dos outros TXTs).
 3. "Baixar TXT" (`baixarLancamentoVaVt`): revalida, baixa o arquivo (`Lancamentos_VT_VA_MM-AAAA.txt`, MM/AAAA já como competência -1 mês) e só então grava as rubricas em `rh_config_rubricas_txt` (`_salvarRubricasVaVtPorEmpresa`, invalidando o cache por empresa).
 
