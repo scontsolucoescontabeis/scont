@@ -4124,11 +4124,11 @@ async function abrirModalLancamentoVaVt() {
         <tr data-codigo-empresa="${e.codigo_empresa}">
             <td style="padding: 8px; border-bottom: 1px solid #eee;">${e.codigo_empresa} - ${e.nome_empresa}</td>
             <td style="padding: 8px; border-bottom: 1px solid #eee;">
-                <select class="lanc-rub-vt" style="width:100%; min-width:200px; padding:5px 6px; border:1px solid #ced4da; border-radius:4px; font-size:12px;" onchange="_toggleRubricaManualLancVaVt(this)">${optsVT.html}</select>
+                <select class="lanc-rub-vt" style="width:100%; box-sizing:border-box; padding:5px 6px; border:1px solid #ced4da; border-radius:4px; font-size:12px;" onchange="_toggleRubricaManualLancVaVt(this)">${optsVT.html}</select>
                 <input type="text" class="lanc-rub-vt-manual" maxlength="9" value="${optsVT.usarManual ? rubVTSalva : ''}" placeholder="Ex: 000201" oninput="this.value=this.value.replace(/\\D/g,'')" style="display:${optsVT.usarManual ? 'block' : 'none'}; margin-top:6px; width:100%; box-sizing:border-box; padding:5px 8px; border:1px solid #ced4da; border-radius:4px; font-family:monospace;">
             </td>
             <td style="padding: 8px; border-bottom: 1px solid #eee;">
-                <select class="lanc-rub-va" style="width:100%; min-width:200px; padding:5px 6px; border:1px solid #ced4da; border-radius:4px; font-size:12px;" onchange="_toggleRubricaManualLancVaVt(this)">${optsVA.html}</select>
+                <select class="lanc-rub-va" style="width:100%; box-sizing:border-box; padding:5px 6px; border:1px solid #ced4da; border-radius:4px; font-size:12px;" onchange="_toggleRubricaManualLancVaVt(this)">${optsVA.html}</select>
                 <input type="text" class="lanc-rub-va-manual" maxlength="9" value="${optsVA.usarManual ? rubVASalva : ''}" placeholder="Ex: 000202" oninput="this.value=this.value.replace(/\\D/g,'')" style="display:${optsVA.usarManual ? 'block' : 'none'}; margin-top:6px; width:100%; box-sizing:border-box; padding:5px 8px; border:1px solid #ced4da; border-radius:4px; font-family:monospace;">
             </td>
         </tr>`;
