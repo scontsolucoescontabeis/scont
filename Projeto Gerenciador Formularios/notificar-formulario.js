@@ -12,7 +12,7 @@ function _iconeNotificacaoFormulario(tipo) {
 window.notificarNovoFormulario = async function notificarNovoFormulario(tipo, titulo, campos) {
     try {
         const config = {
-            empregado: { destinatario: 'pessoal@contatodf.com.br', nomeDestinatario: 'Equipe Pessoal', rotulo: 'Formulário de Empregado' },
+            empregado: { destinatario: 'pessoal@scontdf.com.br', nomeDestinatario: 'Equipe Pessoal', rotulo: 'Formulário de Empregado' },
             registro:  { destinatario: 'contato@scontdf.com.br',  nomeDestinatario: 'Equipe Administrativo', rotulo: 'Formulário de Registro de Empresa' },
             alteracao: { destinatario: 'contato@scontdf.com.br',  nomeDestinatario: 'Equipe Administrativo', rotulo: 'Formulário de Alteração de Empresa' },
         }[tipo];
