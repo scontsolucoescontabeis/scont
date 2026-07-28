@@ -8,6 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="rascunho-temp.js"></script>
+    <script src="notificar-formulario.js"></script>
     <style>
         /* ===== RESET E VARIÁVEIS ===== */
         * {
@@ -1590,6 +1591,17 @@ const { data: empregadoData, error: empregadoError } = await supabase
             }
 
             console.log('✅ Formulário enviado com sucesso!');
+
+            await window.notificarNovoFormulario('empregado', `${formData.nomeCompleto} (${formData.nomeEmpresa})`, [
+                { label: 'Nome completo', valor: formData.nomeCompleto },
+                { label: 'CPF', valor: formData.cpf },
+                { label: 'Empresa', valor: formData.nomeEmpresa },
+                { label: 'Cargo', valor: formData.cargo },
+                { label: 'Data de Admissão', valor: formData.dataAdmissao },
+                { label: 'E-mail', valor: formData.email },
+                { label: 'Telefone/Celular', valor: formData.telefone || formData.celular },
+                { label: 'Data/hora de preenchimento', valor: `${formData.dataPreenchimento} ${formData.horaPreenchimento}` },
+            ]);
 
             document.getElementById('submissionId').textContent = empregadoId;
             document.getElementById('submissionName').textContent = formData.nomeCompleto;

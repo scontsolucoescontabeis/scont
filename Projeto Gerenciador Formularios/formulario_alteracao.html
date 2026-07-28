@@ -8,6 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="rascunho-temp.js"></script>
+    <script src="notificar-formulario.js"></script>
     <style>
         /* ===== RESET E VARIÁVEIS ===== */
         * {
@@ -1272,6 +1273,20 @@ async function handleFormSubmit(e) {
             console.error('❌ Sócios (fluxo continua):', sociosError);
             alert('Empresa salva, sócios com erro. Verifique console.');
         }
+
+        const alteracoesSolicitadas = [];
+        if (formData.alterarNome === 'sim') alteracoesSolicitadas.push(`Nome (opções: ${[formData.nomeOpcao1, formData.nomeOpcao2, formData.nomeOpcao3].filter(Boolean).join(', ')})`);
+        if (formData.alterarFantasia === 'sim') alteracoesSolicitadas.push(`Nome Fantasia (novo: ${formData.novoNomeFantasia || '-'})`);
+        if (formData.alterarCapital === 'sim') alteracoesSolicitadas.push(`Capital Social (novo: ${formData.capitalNovo || '-'})`);
+        if (formData.alterardados === 'sim') alteracoesSolicitadas.push(`Endereço (novo: ${formData.enderecoNovo || '-'})`);
+        if (formData.alterarAtividades === 'sim') alteracoesSolicitadas.push('Atividades (CNAEs)');
+        if (document.querySelector('input[name="alterarQuadroSocietario"]:checked')?.value === 'sim') alteracoesSolicitadas.push('Quadro Societário');
+
+        await window.notificarNovoFormulario('alteracao', formData.nomeEmpresa, [
+            { label: 'Empresa', valor: formData.nomeEmpresa },
+            { label: 'Alterações solicitadas', valor: alteracoesSolicitadas.join('; ') },
+            { label: 'Data/hora de preenchimento', valor: `${formData.dataPreenchimento} ${formData.horaPreenchimento}` },
+        ]);
 
         showModal();  // Sucesso
         await window.RascunhoTemp.deleteOnSubmit();

@@ -7,6 +7,7 @@
     <script src="../supabase-config.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="notificar-formulario.js"></script>
     <style>
         /* ===== RESET E VARIÁVEIS ===== */
         * {
@@ -941,7 +942,19 @@ try {
     alert('Dados da empresa salvos, mas houve erro ao salvar sócios. Verifique logs e contate suporte.');
 }
 
-            // 7. Mostrar modal
+            // 7. Notificar equipe por e-mail (best-effort)
+            await window.notificarNovoFormulario('registro', formData.nomeEmpresa, [
+                { label: 'Nome da Empresa', valor: formData.nomeEmpresa },
+                { label: 'Nome Fantasia', valor: formData.nomeFantasia },
+                { label: 'Porte', valor: formData.porteEmpresa },
+                { label: 'Capital Social', valor: formData.capitalSocial },
+                { label: 'E-mail Comercial', valor: formData.emailComercial },
+                { label: 'Telefone Comercial', valor: formData.telefoneComercial },
+                { label: 'Nº de sócios informados', valor: getSociosCount() },
+                { label: 'Data/hora de preenchimento', valor: `${formData.dataPreenchimento} ${formData.horaPreenchimento}` },
+            ]);
+
+            // 8. Mostrar modal
             showModal();
 
         } catch (error) {
