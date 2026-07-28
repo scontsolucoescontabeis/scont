@@ -1008,8 +1008,9 @@ try {
                     doc.setFont(undefined, 'bold');
                     doc.text(label, margin, yPosition);
                     doc.setFont(undefined, 'normal');
-                    doc.text(String(value || '-'), margin + 50, yPosition);
-                    yPosition += 6;
+                    const wrappedText = doc.splitTextToSize(String(value || '-'), contentWidth - 55);
+                    doc.text(wrappedText, pageWidth - margin, yPosition, { align: 'right' });
+                    yPosition += Math.max(6, wrappedText.length * 4) + 2;
                 };
 
                 // CABEÇALHO

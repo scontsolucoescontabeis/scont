@@ -1355,8 +1355,8 @@ async function handleFormSubmit(e) {
                         doc.setFont('helvetica', 'bold');
                         doc.text(label, margin, yPosition);
                         doc.setFont('helvetica', 'normal');
-                        const wrappedText = doc.splitTextToSize(String(value || '-'), contentWidth - 50);
-                        doc.text(wrappedText, margin + 50, yPosition);
+                        const wrappedText = doc.splitTextToSize(String(value || '-'), contentWidth - 55);
+                        doc.text(wrappedText, pageWidth - margin, yPosition, { align: 'right' });
                         yPosition += Math.max(5, wrappedText.length * 4) + 2;
                     };
 
