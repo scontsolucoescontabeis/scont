@@ -150,13 +150,14 @@
           <div class="card">
             <div class="card-title">Selecione as Empresas</div>
             <div class="card-body">
-              <p style="font-size:13px;color:var(--text-light);margin-bottom:14px">Selecione uma ou mais empresas. Os registros das etapas seguintes serão filtrados por estas empresas.</p>
+              <p style="font-size:13px;color:var(--text-light);margin-bottom:14px">Selecione uma ou mais empresas. Os registros das etapas seguintes serão filtrados por estas empresas. Você também pode anexar a logo de cada empresa — ela passa a aparecer no cabeçalho dos documentos gerados para ela.</p>
               <div class="search-bar" style="margin-bottom:12px">
                 <input type="text" id="filtro-empresas" placeholder="Filtrar empresas…" oninput="renderEmpresasWizard()">
               </div>
               <div class="empresa-list" id="empresas-wizard-list">
                 <div class="empresa-item"><span style="color:var(--muted);font-size:13px">Carregando…</span></div>
               </div>
+              <input type="file" id="input-logo-empresa" accept="image/*" style="display:none" onchange="handleLogoFileChange(event)">
               <div style="margin-top:10px;font-size:12px;color:var(--muted)" id="empresas-selected-count">Nenhuma empresa selecionada</div>
             </div>
           </div>

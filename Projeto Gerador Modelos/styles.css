@@ -321,15 +321,29 @@ textarea.form-control { min-height: 120px; resize: vertical; }
     border: 1px solid var(--border); border-radius: var(--radius-sm);
 }
 .empresa-item {
-    display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: 11px 14px; border-bottom: 1px solid var(--border-light);
-    cursor: pointer; transition: var(--transition);
+    transition: var(--transition);
 }
 .empresa-item:last-child { border-bottom: none; }
 .empresa-item:hover { background: var(--bg-light); }
-.empresa-item input[type=checkbox] { accent-color: var(--primary); width: 16px; height: 16px; flex-shrink: 0; }
+.empresa-checkbox-wrap { display: flex; align-items: center; gap: 12px; cursor: pointer; flex: 1; min-width: 0; }
+.empresa-checkbox-wrap input[type=checkbox] { accent-color: var(--primary); width: 16px; height: 16px; flex-shrink: 0; }
 .empresa-info strong { font-size: 13px; font-weight: 600; display: block; }
 .empresa-info span { font-size: 11px; color: var(--muted); }
+
+.empresa-logo-widget { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.empresa-logo-thumb {
+    width: 32px; height: 32px; object-fit: contain;
+    border: 1px solid var(--border); border-radius: 6px; background: #fff;
+}
+.btn-logo-add, .btn-logo-link {
+    font-size: 11px; font-weight: 600; color: var(--primary);
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 10px; cursor: pointer; transition: var(--transition); white-space: nowrap;
+}
+.btn-logo-add:hover, .btn-logo-link:hover { background: var(--bg-light); }
+.btn-logo-remove { color: var(--danger); }
 
 /* ── PREVIEW ──────────────────────────────────────────────── */
 .preview-area {

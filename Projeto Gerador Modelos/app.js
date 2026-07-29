@@ -980,16 +980,27 @@ function renderEmpresasWizard() {
     return;
   }
   div.innerHTML = lista.map(e => `
-    <label class="empresa-item">
-      <input type="checkbox" value="${esc(e.codigo_empresa)}"
-        style="accent-color:var(--primary);width:16px;height:16px;flex-shrink:0"
-        ${wizardEmpresasSelecionadas.includes(e.codigo_empresa) ? 'checked' : ''}
-        onchange="toggleEmpresaWizard('${esc(e.codigo_empresa)}', this.checked)">
-      <div class="empresa-info">
-        <strong>${esc(e.nome_empresa)}</strong>
-        <span>${esc(e.codigo_empresa)}${e.cnpj ? ' · ' + esc(e.cnpj) : ''}</span>
+    <div class="empresa-item">
+      <label class="empresa-checkbox-wrap">
+        <input type="checkbox" value="${esc(e.codigo_empresa)}"
+          style="accent-color:var(--primary);width:16px;height:16px;flex-shrink:0"
+          ${wizardEmpresasSelecionadas.includes(e.codigo_empresa) ? 'checked' : ''}
+          onchange="toggleEmpresaWizard('${esc(e.codigo_empresa)}', this.checked)">
+        <div class="empresa-info">
+          <strong>${esc(e.nome_empresa)}</strong>
+          <span>${esc(e.codigo_empresa)}${e.cnpj ? ' · ' + esc(e.cnpj) : ''}</span>
+        </div>
+      </label>
+      <div class="empresa-logo-widget">
+        ${e.logo_base64 ? `
+          <img class="empresa-logo-thumb" src="${e.logo_base64}" alt="Logo de ${esc(e.nome_empresa)}">
+          <button type="button" class="btn-logo-link" onclick="abrirUploadLogo('${esc(e.codigo_empresa)}')">Trocar</button>
+          <button type="button" class="btn-logo-link btn-logo-remove" onclick="removerLogoEmpresa('${esc(e.codigo_empresa)}')">Remover</button>
+        ` : `
+          <button type="button" class="btn-logo-add" onclick="abrirUploadLogo('${esc(e.codigo_empresa)}')">+ Logo</button>
+        `}
       </div>
-    </label>
+    </div>
   `).join('');
   atualizarContador('empresas-selected-count', wizardEmpresasSelecionadas.length, 'empresa');
 }
@@ -998,6 +1009,91 @@ function toggleEmpresaWizard(codigo, checked) {
   if (checked) { if (!wizardEmpresasSelecionadas.includes(codigo)) wizardEmpresasSelecionadas.push(codigo); }
   else wizardEmpresasSelecionadas = wizardEmpresasSelecionadas.filter(c => c !== codigo);
   atualizarContador('empresas-selected-count', wizardEmpresasSelecionadas.length, 'empresa');
+}
+
+// ── Logo da empresa (aparece no cabeçalho dos documentos gerados) ─
+let _logoUploadCodigoAlvo = null;
+
+function abrirUploadLogo(codigoEmpresa) {
+  _logoUploadCodigoAlvo = codigoEmpresa;
+  document.getElementById('input-logo-empresa').click();
+}
+
+// Reduz a imagem antes de gravar (data URI direto em rh_empresas, sem
+// bucket de storage) — os PDFs são impressos a partir de uma janela local
+// (window.print), então uma imagem embutida evita qualquer dependência de
+// rede/CORS na hora de imprimir.
+function _redimensionarLogo(file, maxLargura = 320, qualidade = 0.82) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Arquivo de imagem inválido.'));
+      img.onload = () => {
+        const escala  = Math.min(1, maxLargura / img.width);
+        const largura = Math.round(img.width * escala);
+        const altura  = Math.round(img.height * escala);
+        const canvas  = document.createElement('canvas');
+        canvas.width = largura; canvas.height = altura;
+        canvas.getContext('2d').drawImage(img, 0, 0, largura, altura);
+        const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+        resolve(canvas.toDataURL(mime, qualidade));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleLogoFileChange(event) {
+  const file   = event.target.files[0];
+  const codigo = _logoUploadCodigoAlvo;
+  event.target.value = ''; // permite selecionar o mesmo arquivo de novo depois
+
+  if (!file || !codigo) return;
+  if (!file.type.startsWith('image/')) {
+    toast('Selecione um arquivo de imagem.', 'error');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    toast('Imagem muito grande (máximo 5MB).', 'error');
+    return;
+  }
+
+  try {
+    const dataUrl = await _redimensionarLogo(file);
+    const { error } = await sb.from('rh_empresas')
+      .update({ logo_base64: dataUrl })
+      .eq('codigo_empresa', codigo);
+    if (error) throw error;
+
+    const emp = empresas.find(e => e.codigo_empresa === codigo);
+    if (emp) emp.logo_base64 = dataUrl;
+    renderEmpresasWizard();
+    toast('Logo atualizada.', 'success');
+  } catch (err) {
+    console.error(err);
+    toast('Não foi possível salvar a logo.', 'error');
+  }
+}
+
+async function removerLogoEmpresa(codigoEmpresa) {
+  if (!confirm('Remover a logo desta empresa?')) return;
+  try {
+    const { error } = await sb.from('rh_empresas')
+      .update({ logo_base64: null })
+      .eq('codigo_empresa', codigoEmpresa);
+    if (error) throw error;
+
+    const emp = empresas.find(e => e.codigo_empresa === codigoEmpresa);
+    if (emp) emp.logo_base64 = null;
+    renderEmpresasWizard();
+    toast('Logo removida.', 'success');
+  } catch (err) {
+    console.error(err);
+    toast('Não foi possível remover a logo.', 'error');
+  }
 }
 
 // ── Carrega dados ao confirmar empresas ───────────────────────
@@ -1276,31 +1372,49 @@ function substituirVars(template, varMap, highlight = false) {
 
 // ── Preview ───────────────────────────────────────────────────
 // Cabeçalho compartilhado por preview, exportação em PDF e prévia do editor.
-// 'completo': Logo SCONT + nome da empresa cliente + título do modelo.
-// 'neutro':   nome da empresa cliente + título do modelo, com
-//             "SCONT Soluções Contábeis" no canto inferior direito do cabeçalho.
+// 'completo': logo da empresa cliente (ou "SCONT" se ela não tiver logo
+//             cadastrada) + nome da empresa cliente + título do modelo.
+// 'neutro':   idem, com "SCONT Soluções Contábeis" no canto inferior
+//             direito do cabeçalho.
 // 'nenhum'/outro: sem cabeçalho.
-function _gerarCabecalhoModelo(modo, nomeEmpresaCliente, tituloModelo) {
-  const hdr   = 'background:#8B3A3A;color:white;padding:12px 18px;display:flex;align-items:center;gap:14px;position:relative;';
-  const logo  = 'font-size:18px;font-weight:900;letter-spacing:2px;color:white;border:2px solid rgba(255,255,255,.6);padding:2px 7px;border-radius:3px;flex-shrink:0';
-  const sep   = 'width:1px;background:rgba(255,255,255,.4);height:30px;flex-shrink:0';
-  const title = 'font-size:12px;font-weight:700;color:white;display:block;line-height:1.2';
-  const sub   = 'font-size:10px;color:rgba(255,255,255,.8);display:block;margin-top:2px';
-  const canto = 'position:absolute;right:18px;bottom:9px;font-size:9px;color:rgba(255,255,255,.75);letter-spacing:.3px;';
+function _gerarCabecalhoModelo(modo, nomeEmpresaCliente, tituloModelo, logoBase64) {
+  const hdr      = 'background:#8B3A3A;color:white;padding:12px 18px;display:flex;align-items:center;gap:14px;position:relative;';
+  const logoTxt  = 'font-size:18px;font-weight:900;letter-spacing:2px;color:white;border:2px solid rgba(255,255,255,.6);padding:2px 7px;border-radius:3px;flex-shrink:0';
+  const logoImg  = 'height:34px;max-width:120px;object-fit:contain;flex-shrink:0;background:#fff;border-radius:3px;padding:2px;';
+  const sep      = 'width:1px;background:rgba(255,255,255,.4);height:30px;flex-shrink:0';
+  const title    = 'font-size:12px;font-weight:700;color:white;display:block;line-height:1.2';
+  const sub      = 'font-size:10px;color:rgba(255,255,255,.8);display:block;margin-top:2px';
+  const canto    = 'position:absolute;right:18px;bottom:9px;font-size:9px;color:rgba(255,255,255,.75);letter-spacing:.3px;';
+
+  const logoHtml = logoBase64
+    ? `<img src="${esc(logoBase64)}" alt="Logo" style="${logoImg}">`
+    : `<span style="${logoTxt}">SCONT</span>`;
 
   if (modo === 'completo') {
     return `<div style="${hdr}">
-      <span style="${logo}">SCONT</span><div style="${sep}"></div>
+      ${logoHtml}<div style="${sep}"></div>
       <div><strong style="${title}">${esc(nomeEmpresaCliente)}</strong>
       <span style="${sub}">${esc(tituloModelo)}</span></div></div>`;
   }
   if (modo === 'neutro') {
     return `<div style="${hdr}">
+      ${logoBase64 ? logoHtml : ''}
       <div><strong style="${title}">${esc(nomeEmpresaCliente)}</strong>
       <span style="${sub}">${esc(tituloModelo)}</span></div>
       <span style="${canto}">SCONT Soluções Contábeis</span></div>`;
   }
   return '';
+}
+
+// Resolve a logo cadastrada para a empresa do registro (varMap), com
+// fallback por nome quando não há código de empresa (ex.: fonte Excel).
+function _logoEmpresaDe(varMap) {
+  const codigo = varMap['empresa.codigo_empresa'];
+  const nome   = varMap['empresa.nome_empresa'];
+  const emp = codigo
+    ? empresas.find(e => e.codigo_empresa === codigo)
+    : empresas.find(e => e.nome_empresa === nome);
+  return emp?.logo_base64 || null;
 }
 
 function renderPreview() {
@@ -1320,12 +1434,12 @@ function renderPreview() {
   if (wizardEventoAtivo) {
     // Um cabeçalho por modelo do evento, cada um com seu próprio título.
     conteudo = wizardEventoAtivo.modelosOrdenados.map(m => {
-      const hdr   = _gerarCabecalhoModelo(wizardCabecalho, nomeEmp, m.nome);
+      const hdr   = _gerarCabecalhoModelo(wizardCabecalho, nomeEmp, m.nome, _logoEmpresaDe(varMap));
       const corpo = substituirVars(m.template || '', varMap, true);
       return `${hdr}<div style="${bodyStyle}">${corpo}</div>`;
     }).join('<hr style="margin:18px 0;border:none;border-top:2px dashed #ddd;">');
   } else {
-    const hdr   = _gerarCabecalhoModelo(wizardCabecalho, nomeEmp, wizardModeloSelecionado.nome);
+    const hdr   = _gerarCabecalhoModelo(wizardCabecalho, nomeEmp, wizardModeloSelecionado.nome, _logoEmpresaDe(varMap));
     const corpo = substituirVars(wizardModeloSelecionado.template, varMap, true);
     conteudo = `${hdr}<div style="${bodyStyle}">${corpo}</div>`;
   }
@@ -1423,7 +1537,7 @@ function _montarPaginasPDF(modelo, registros) {
     const blocos = [];
     registros.forEach((varMap) => {
       modelosEvento.forEach((m) => {
-        const hdr   = _gerarCabecalhoModelo(wizardCabecalho, _nomeEmpDe(varMap), m.nome);
+        const hdr   = _gerarCabecalhoModelo(wizardCabecalho, _nomeEmpDe(varMap), m.nome, _logoEmpresaDe(varMap));
         const corpo = substituirVars(m.template || '', varMap, false);
         blocos.push(`${hdr}<div style="${bodyStyle}">${corpo}</div>`);
       });
@@ -1436,7 +1550,7 @@ function _montarPaginasPDF(modelo, registros) {
   } else {
     const porRegistro = modelo.tipo === 'por_registro';
     paginas = registros.map((varMap, idx) => {
-      const hdr      = _gerarCabecalhoModelo(wizardCabecalho, _nomeEmpDe(varMap), modelo.nome);
+      const hdr      = _gerarCabecalhoModelo(wizardCabecalho, _nomeEmpDe(varMap), modelo.nome, _logoEmpresaDe(varMap));
       const corpo    = substituirVars(modelo.template, varMap, false);
       const isUltimo = idx === registros.length - 1;
       const pageBreak = porRegistro && !isUltimo
