@@ -1126,13 +1126,14 @@ function renderEmpregadosWizard() {
   }
   div.innerHTML = lista.map(e => `
     <label class="empresa-item">
-      <input type="checkbox" value="${e.id}"
-        style="accent-color:var(--primary);width:16px;height:16px;flex-shrink:0"
-        ${wizardEmpregadosSelecionados.includes(e.id) ? 'checked' : ''}
-        onchange="toggleItem(wizardEmpregadosSelecionados,'${e.id}',this.checked,'empregados-selected-count','empregado')">
-      <div class="empresa-info">
-        <strong>${esc(e.nome_empregado)}</strong>
-        <span>${esc(e.codigo_empresa)} · ${esc(e.codigo_empregado)}${e.desc_cargo ? ' · ' + esc(e.desc_cargo) : ''}</span>
+      <div class="empresa-checkbox-wrap">
+        <input type="checkbox" value="${e.id}"
+          ${wizardEmpregadosSelecionados.includes(e.id) ? 'checked' : ''}
+          onchange="toggleItem(wizardEmpregadosSelecionados,'${e.id}',this.checked,'empregados-selected-count','empregado')">
+        <div class="empresa-info">
+          <strong>${esc(e.nome_empregado)}</strong>
+          <span>${esc(e.codigo_empresa)} · ${esc(e.codigo_empregado)}${e.desc_cargo ? ' · ' + esc(e.desc_cargo) : ''}</span>
+        </div>
       </div>
     </label>
   `).join('');
@@ -1155,13 +1156,14 @@ function renderSociosWizard() {
   }
   div.innerHTML = lista.map(s => `
     <label class="empresa-item">
-      <input type="checkbox" value="${s.id}"
-        style="accent-color:var(--primary);width:16px;height:16px;flex-shrink:0"
-        ${wizardSociosSelecionados.includes(s.id) ? 'checked' : ''}
-        onchange="toggleItem(wizardSociosSelecionados,'${s.id}',this.checked,'socios-selected-count','sócio')">
-      <div class="empresa-info">
-        <strong>${esc(s.nome_socio)}</strong>
-        <span>${esc(s.codigo_empresa)}${s.cargo ? ' · ' + esc(s.cargo) : ''}${s.participacao != null ? ' · ' + s.participacao + '%' : ''}</span>
+      <div class="empresa-checkbox-wrap">
+        <input type="checkbox" value="${s.id}"
+          ${wizardSociosSelecionados.includes(s.id) ? 'checked' : ''}
+          onchange="toggleItem(wizardSociosSelecionados,'${s.id}',this.checked,'socios-selected-count','sócio')">
+        <div class="empresa-info">
+          <strong>${esc(s.nome_socio)}</strong>
+          <span>${esc(s.codigo_empresa)}${s.cargo ? ' · ' + esc(s.cargo) : ''}${s.participacao != null ? ' · ' + s.participacao + '%' : ''}</span>
+        </div>
       </div>
     </label>
   `).join('');
@@ -1186,13 +1188,14 @@ function renderRubricasWizard() {
   }
   div.innerHTML = lista.map(r => `
     <label class="empresa-item">
-      <input type="checkbox" value="${r.id}"
-        style="accent-color:var(--primary);width:16px;height:16px;flex-shrink:0"
-        ${wizardRubricasSelecionados.includes(r.id) ? 'checked' : ''}
-        onchange="toggleItem(wizardRubricasSelecionados,'${r.id}',this.checked,'rubricas-selected-count','rubrica')">
-      <div class="empresa-info">
-        <strong>${esc(r.descricao_rubrica || r.evento || '')}</strong>
-        <span>${esc(r.codigo_empresa)} · Cód. ${esc(r.codigo_rubrica)}</span>
+      <div class="empresa-checkbox-wrap">
+        <input type="checkbox" value="${r.id}"
+          ${wizardRubricasSelecionados.includes(r.id) ? 'checked' : ''}
+          onchange="toggleItem(wizardRubricasSelecionados,'${r.id}',this.checked,'rubricas-selected-count','rubrica')">
+        <div class="empresa-info">
+          <strong>${esc(r.descricao_rubrica || r.evento || '')}</strong>
+          <span>${esc(r.codigo_empresa)} · Cód. ${esc(r.codigo_rubrica)}</span>
+        </div>
       </div>
     </label>
   `).join('');
