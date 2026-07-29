@@ -635,7 +635,7 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="valorDiarioVT">Valor Diário do Vale Transporte (R$) *</label>
+                        <label for="valorDiarioVT">Valor Diário do Vale Transporte (R$)</label>
                         <input type="number" id="valorDiarioVT" name="valorDiarioVT" placeholder="0.00" step="0.01" min="0">
                     </div>
                 </div>
@@ -1140,7 +1140,9 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
                 addDataLine('Vale Transporte:', formData.valeTransporte ? 'Sim' : 'Não');
                 if (formData.valeTransporte) {
                     addDataLine('Desconto 6%:', formData.descontoVT ? 'Sim' : 'Não');
-                    addDataLine('Valor Diário do Vale Transporte:', 'R$ ' + parseFloat(formData.valorDiarioVT).toFixed(2));
+                    if (formData.valorDiarioVT) {
+                        addDataLine('Valor Diário do Vale Transporte:', 'R$ ' + parseFloat(formData.valorDiarioVT).toFixed(2));
+                    }
                 }
                 if (formData.valorDiarioVA) {
                     addDataLine('Valor Diário do Vale Alimentação:', 'R$ ' + parseFloat(formData.valorDiarioVA).toFixed(2));
@@ -1361,16 +1363,6 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
             } else if (!element.value) {
                 alert('Por favor, preencha o campo obrigatório: ' + (element.labels ? element.labels[0].textContent : field));
                 element.focus();
-                return false;
-            }
-        }
-
-        const valeTransporteChecked = document.querySelector('input[name="valeTransporte"]:checked');
-        if (valeTransporteChecked && valeTransporteChecked.value === 'sim') {
-            const valorVT = form.elements['valorDiarioVT'];
-            if (!valorVT.value) {
-                alert('Por favor, preencha o campo obrigatório: Valor Diário do Vale Transporte (R$)');
-                valorVT.focus();
                 return false;
             }
         }
