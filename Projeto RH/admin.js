@@ -944,9 +944,10 @@ let _paginaRubricas = 1;
 let _totalRubricas = 0;
 let _filtroRubricasEmpresa = '';
 let _filtroRubricasTexto = '';
+let _filtroRubricasTipo = '';
 
 async function carregarRubricas() {
-    await Promise.all([carregarFiltroEmpresasRubricas(), buscarRubricas()]);
+    await Promise.all([carregarFiltroEmpresasRubricas(), carregarFiltroTiposRubricas(), buscarRubricas()]);
 }
 
 async function carregarFiltroEmpresasRubricas() {
@@ -961,6 +962,25 @@ async function carregarFiltroEmpresasRubricas() {
             const opt = document.createElement('option');
             opt.value = e.codigo_empresa;
             opt.textContent = `${e.codigo_empresa} – ${e.nome_empresa || e.codigo_empresa}`;
+            sel.appendChild(opt);
+        });
+    } catch (_) {}
+}
+
+async function carregarFiltroTiposRubricas() {
+    const sel = document.getElementById('filtroRubricasTipo');
+    if (!sel || sel.options.length > 1) return;
+    try {
+        const { data } = await supabaseClient
+            .from('rh_rubricas')
+            .select('tipo')
+            .not('tipo', 'is', null)
+            .not('tipo', 'eq', '');
+        const tipos = [...new Set((data || []).map(r => r.tipo).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        tipos.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
             sel.appendChild(opt);
         });
     } catch (_) {}
@@ -983,6 +1003,7 @@ async function buscarRubricas() {
 
         if (_filtroRubricasEmpresa) q = q.eq('codigo_empresa', _filtroRubricasEmpresa);
         if (_filtroRubricasTexto)   q = q.or(`codigo_rubrica.ilike.%${_filtroRubricasTexto}%,descricao_rubrica.ilike.%${_filtroRubricasTexto}%,empresa.ilike.%${_filtroRubricasTexto}%`);
+        if (_filtroRubricasTipo)    q = q.eq('tipo', _filtroRubricasTipo);
 
         const { data, error, count } = await q;
         if (error) throw error;
@@ -999,8 +1020,44 @@ async function buscarRubricas() {
 function filtrarRubricas() {
     _filtroRubricasEmpresa = document.getElementById('filtroRubricasEmpresa')?.value || '';
     _filtroRubricasTexto   = (document.getElementById('filtroRubricasTexto')?.value || '').trim();
+    _filtroRubricasTipo    = document.getElementById('filtroRubricasTipo')?.value || '';
     _paginaRubricas = 1;
     buscarRubricas();
+}
+
+async function exportarRubricasExcel() {
+    try {
+        let q = supabaseClient
+            .from('rh_rubricas')
+            .select('*')
+            .order('codigo_empresa', { ascending: true })
+            .order('codigo_rubrica', { ascending: true });
+
+        if (_filtroRubricasEmpresa) q = q.eq('codigo_empresa', _filtroRubricasEmpresa);
+        if (_filtroRubricasTexto)   q = q.or(`codigo_rubrica.ilike.%${_filtroRubricasTexto}%,descricao_rubrica.ilike.%${_filtroRubricasTexto}%,empresa.ilike.%${_filtroRubricasTexto}%`);
+        if (_filtroRubricasTipo)    q = q.eq('tipo', _filtroRubricasTipo);
+
+        const { data, error } = await q;
+        if (error) throw error;
+        if (!data || !data.length) { mostrarStatus('statusRubricas', 'Nenhuma rubrica para exportar com os filtros atuais.', 'error'); return; }
+
+        const headers = ['Cód. Empresa', 'Empresa', 'Cód. Rubrica', 'Descrição Rubrica', 'Tipo'];
+        const rows = data.map(r => [
+            r.codigo_empresa,
+            r.empresa || '',
+            r.codigo_rubrica,
+            r.descricao_rubrica || '',
+            r.tipo || '',
+        ]);
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        ws['!cols'] = headers.map(() => ({ wch: 22 }));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Rubricas');
+        const hoje = new Date().toISOString().slice(0, 10);
+        XLSX.writeFile(wb, `rubricas_export_${hoje}.xlsx`);
+    } catch (erro) {
+        mostrarStatus('statusRubricas', 'Erro ao exportar: ' + erro.message, 'error');
+    }
 }
 
 function renderizarPaginacaoRubricas() {

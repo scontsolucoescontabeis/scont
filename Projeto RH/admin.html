@@ -416,8 +416,15 @@
                         <label>Buscar por código ou descrição</label>
                         <input type="text" id="filtroRubricasTexto" placeholder="Digite para filtrar..." oninput="filtrarRubricas()">
                     </div>
+                    <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px;">
+                        <label>Tipo</label>
+                        <select id="filtroRubricasTipo" onchange="filtrarRubricas()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
                     <div style="flex:0 0 auto;display:flex;gap:8px;align-items:flex-end;">
-                        <button type="button" onclick="document.getElementById('filtroRubricasEmpresa').value='';document.getElementById('filtroRubricasTexto').value='';filtrarRubricas();" style="padding:9px 16px;border:1px solid #C0C0C0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-weight:600;">✕ Limpar</button>
+                        <button type="button" onclick="document.getElementById('filtroRubricasEmpresa').value='';document.getElementById('filtroRubricasTexto').value='';document.getElementById('filtroRubricasTipo').value='';filtrarRubricas();" style="padding:9px 16px;border:1px solid #C0C0C0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-weight:600;">✕ Limpar</button>
+                        <button type="button" onclick="exportarRubricasExcel()" style="padding:9px 18px;border:1px solid #1E7E34;border-radius:6px;background:white;color:#1E7E34;cursor:pointer;font-size:13px;font-weight:600;">📊 Exportar Excel</button>
                         <button type="button" class="btn-save" style="padding:9px 18px;" onclick="document.getElementById('fileRubricasTab').click()">📥 Importar Excel</button>
                         <button type="button" onclick="baixarModeloRubricas()" style="padding:9px 18px;border:1px solid #8B3A3A;border-radius:6px;background:white;color:#8B3A3A;cursor:pointer;font-size:13px;font-weight:600;">⬇️ Modelo</button>
                         <input type="file" id="fileRubricasTab" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportarRubricas(event)">
