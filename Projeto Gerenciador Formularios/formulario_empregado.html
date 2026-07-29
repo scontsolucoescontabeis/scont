@@ -641,8 +641,8 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="valorDiarioVA">Valor Diário do Vale Alimentação (R$) *</label>
-                        <input type="number" id="valorDiarioVA" name="valorDiarioVA" placeholder="0.00" step="0.01" min="0" required>
+                        <label for="valorDiarioVA">Valor Diário do Vale Alimentação (R$)</label>
+                        <input type="number" id="valorDiarioVA" name="valorDiarioVA" placeholder="0.00" step="0.01" min="0">
                     </div>
                 </div>
             </section>
@@ -1142,7 +1142,9 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
                     addDataLine('Desconto 6%:', formData.descontoVT ? 'Sim' : 'Não');
                     addDataLine('Valor Diário do Vale Transporte:', 'R$ ' + parseFloat(formData.valorDiarioVT).toFixed(2));
                 }
-                addDataLine('Valor Diário do Vale Alimentação:', 'R$ ' + parseFloat(formData.valorDiarioVA).toFixed(2));
+                if (formData.valorDiarioVA) {
+                    addDataLine('Valor Diário do Vale Alimentação:', 'R$ ' + parseFloat(formData.valorDiarioVA).toFixed(2));
+                }
                 addSeparator();
 
                 // ===== DADOS CONTRATUAIS =====
@@ -1344,7 +1346,7 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
 
     // ===== VALIDAR FORMULÁRIO =====
    window.validateForm = function() {
-    const requiredFields = ['nomeCompleto', 'cpf', 'email', 'celular', 'estadoCivil', 'dataNascimento', 'naturalidade', 'grauEscolaridade', 'raca', 'endereco', 'cep', 'nomeEmpresa', 'dataAdmissao', 'salarioContratual', 'contratoExperiencia', 'horarioTrabalho', 'valeTransporte', 'temFilhos', 'valorDiarioVA'];
+    const requiredFields = ['nomeCompleto', 'cpf', 'email', 'celular', 'estadoCivil', 'dataNascimento', 'naturalidade', 'grauEscolaridade', 'raca', 'endereco', 'cep', 'nomeEmpresa', 'dataAdmissao', 'salarioContratual', 'contratoExperiencia', 'horarioTrabalho', 'valeTransporte', 'temFilhos'];
 
         for (let field of requiredFields) {
             const element = form.elements[field];
@@ -1434,7 +1436,7 @@ const formData = {
     valeTransporte: form.elements['valeTransporte'].value === 'sim',
     		descontoVT: form.elements['descontoVT'] ? form.elements['descontoVT'].value === 'sim' : false,
     		valorDiarioVT: form.elements['valorDiarioVT'].value ? parseFloat(form.elements['valorDiarioVT'].value) : null,
-    		valorDiarioVA: parseFloat(form.elements['valorDiarioVA'].value),
+    		valorDiarioVA: form.elements['valorDiarioVA'].value ? parseFloat(form.elements['valorDiarioVA'].value) : null,
     		nomeEmpresa: form.elements['nomeEmpresa'].value,
     		cargo: form.elements['cargo'].value || null,
    		departamento: form.elements['departamento'].value || null,
