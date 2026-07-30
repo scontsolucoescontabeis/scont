@@ -1993,6 +1993,21 @@ function _resolverPeriodoBeneficios(cfg) {
     };
 }
 
+// Em Gerar Benefícios, a competência digitada é o mês que consta no TXT da folha. Para o
+// período de apuração customizado, o intervalo vai do dia de início NO MÊS DA COMPETÊNCIA até
+// o dia de fim no mês SEGUINTE (ex.: competência 08/2026, início=5/fim=5 → 05/08/2026 a
+// 05/09/2026) — o inverso da convenção de gerarDiasDoMes (mês anterior → mês da competência).
+// Por isso, resolvemos o intervalo passando o mês SEGUINTE ao da competência para
+// gerarDiasDoMes/calcularResumoMes: assim "mês anterior" (do ponto de vista da função) cai
+// exatamente no mês da competência original, e "mês da competência" (da função) cai no mês
+// seguinte, sem duplicar a lógica de geração de dias.
+function _competenciaMesSeguinte(comp) {
+    const [mes, ano] = comp.split('/').map(Number);
+    const mesSeg = mes === 12 ? 1 : mes + 1;
+    const anoSeg = mes === 12 ? ano + 1 : ano;
+    return `${String(mesSeg).padStart(2, '0')}/${anoSeg}`;
+}
+
 function atualizarExemploBeneficiosPeriodo() {
     const el = document.getElementById('cfgBeneficiosPeriodoExemplo');
     if (!el) return;
@@ -2003,11 +2018,10 @@ function atualizarExemploBeneficiosPeriodo() {
         return;
     }
     const hoje = new Date();
-    const mesStr = String(hoje.getMonth() + 1).padStart(2, '0');
-    const anoStr = String(hoje.getFullYear());
-    const dias = gerarDiasDoMes(`${mesStr}/${anoStr}`, diaInicio, diaFim);
+    const comp = `${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`;
+    const dias = gerarDiasDoMes(_competenciaMesSeguinte(comp), diaInicio, diaFim);
     if (dias.length === 0) { el.textContent = ''; return; }
-    el.textContent = `Ex.: para competência ${mesStr}/${anoStr} → ${dias[0].data} a ${dias.at(-1).data}`;
+    el.textContent = `Ex.: para competência ${comp} → ${dias[0].data} a ${dias.at(-1).data}`;
 }
 
 function _textoPeriodoApuracao(competencia, diaInicio, diaFim) {
@@ -3650,6 +3664,10 @@ async function gerarPreviaBeneficios() {
         // Config por empresa: se deve excluir feriados nacionais do cálculo de "Dias a Trabalhar"
         // (a escala em si não considera feriados — ver [[project_rh_escala_trabalho]]), e se a
         // empresa apura "Dias a Trabalhar" sobre um período customizado (fora do mês calendário).
+        // Quando ativo, o intervalo vai do dia de início NO MÊS DA COMPETÊNCIA ao dia de fim no
+        // mês SEGUINTE — por isso passamos compMesSeguinte para gerarDiasDoMes/calcularResumoMes
+        // (ver comentário em _competenciaMesSeguinte).
+        const compMesSeguinte = _competenciaMesSeguinte(comp);
         const excluirFeriadosPorEmpresa = {};
         const periodoBeneficiosPorEmpresa = {};
         const observacoesPorEmpresa = [];
@@ -3662,7 +3680,7 @@ async function gerarPreviaBeneficios() {
             const observacao = (cfg?.['observacoes']?.cod || '').trim();
             if (observacao) observacoesPorEmpresa.push({ codigo_empresa: cod, observacao });
             if (periodo.diaInicio !== null && periodo.diaFim !== null) {
-                const dias = gerarDiasDoMes(comp, periodo.diaInicio, periodo.diaFim);
+                const dias = gerarDiasDoMes(compMesSeguinte, periodo.diaInicio, periodo.diaFim);
                 if (dias.length > 0) periodosCustomPorEmpresa.push({ codigo_empresa: cod, texto: `${dias[0].data} a ${dias.at(-1).data}` });
             }
         }));
@@ -3686,7 +3704,9 @@ async function gerarPreviaBeneficios() {
             const escala = escalasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || null;
             const excluirFeriados = excluirFeriadosPorEmpresa[emp.codigo_empresa];
             const { diaInicio, diaFim } = periodoBeneficiosPorEmpresa[emp.codigo_empresa] || { diaInicio: null, diaFim: null };
-            const resumoEscala = calcularResumoMes(escala, comp, periodos, diaInicio, diaFim);
+            const periodoAtivo = diaInicio !== null && diaFim !== null;
+            const compParaDias = periodoAtivo ? compMesSeguinte : comp;
+            const resumoEscala = calcularResumoMes(escala, compParaDias, periodos, diaInicio, diaFim);
             const diasTrabalhar = resumoEscala.dias.filter(d =>
                 d.tipo === 'trabalho' && !(excluirFeriados && _isFeriadoNoDia(d.data))
             ).length;
@@ -3700,7 +3720,7 @@ async function gerarPreviaBeneficios() {
                 codigo_empregado: emp.codigo_empregado,
                 nome_empregado: emp.nome_empregado,
                 desc_cargo: emp.desc_cargo || '',
-                feriasTexto: _periodosFeriasNoMesTexto(periodos, comp, diaInicio, diaFim),
+                feriasTexto: _periodosFeriasNoMesTexto(periodos, compParaDias, diaInicio, diaFim),
                 diasTrabalhar,
                 diasDescontar,
                 vtDiario: valores.vt,
