@@ -1945,6 +1945,34 @@ async function _buscarConfigRubricas(codigoEmpresa) {
     }
 }
 
+// diaInicio: dia do mês anterior à competência; diaFim: dia do mês da competência.
+// Retorna {diaInicio:null, diaFim:null} quando a empresa não tem período customizado ativo.
+function _resolverPeriodoApuracao(cfg) {
+    if (!cfg || cfg['periodo_apuracao_ativo']?.cod !== '1') return { diaInicio: null, diaFim: null };
+    const diaInicio = parseInt(cfg['periodo_apuracao_dia_inicio']?.cod, 10);
+    const diaFim = parseInt(cfg['periodo_apuracao_dia_fim']?.cod, 10);
+    return {
+        diaInicio: Number.isInteger(diaInicio) ? diaInicio : null,
+        diaFim: Number.isInteger(diaFim) ? diaFim : null
+    };
+}
+
+function atualizarExemploPeriodoApuracao() {
+    const el = document.getElementById('cfgPeriodoApuracaoExemplo');
+    if (!el) return;
+    const diaInicio = parseInt(document.getElementById('cfgPeriodoApuracaoDiaInicio')?.value, 10);
+    const diaFim = parseInt(document.getElementById('cfgPeriodoApuracaoDiaFim')?.value, 10);
+    if (!Number.isInteger(diaInicio) || !Number.isInteger(diaFim) || diaInicio < 1 || diaInicio > 31 || diaFim < 1 || diaFim > 31) {
+        el.textContent = 'Informe o dia de início e o dia de fim para ver um exemplo.';
+        return;
+    }
+    const comp = document.getElementById('competencia')?.value;
+    const [mesStr, anoStr] = validarCompetencia(comp) ? comp.split('/') : ['07', String(new Date().getFullYear())];
+    const dias = gerarDiasDoMes(`${mesStr}/${anoStr}`, diaInicio, diaFim);
+    if (dias.length === 0) { el.textContent = ''; return; }
+    el.textContent = `Ex.: para competência ${mesStr}/${anoStr} → ${dias[0].data} a ${dias.at(-1).data}`;
+}
+
 let _cacheValoresVaVt = {};
 
 async function _buscarValoresVaVtEmpresa(codigoEmpresa) {
@@ -2014,6 +2042,16 @@ function _preencherCamposConfigRubricas(cfg) {
     if (cNaoComp)      cNaoComp.checked      = cfg['nao_compensar_extras']?.cod === '1';
     const cBenExcluirFeriados = document.getElementById('cfgBeneficiosExcluirFeriados');
     if (cBenExcluirFeriados) cBenExcluirFeriados.checked = cfg['beneficios_excluir_feriados']?.cod !== '0'; // default: excluir (true)
+    const cPeriodoAtivo   = document.getElementById('cfgPeriodoApuracaoAtivo');
+    const cPeriodoCont    = document.getElementById('cfgPeriodoApuracaoContainer');
+    const cPeriodoInicio  = document.getElementById('cfgPeriodoApuracaoDiaInicio');
+    const cPeriodoFim     = document.getElementById('cfgPeriodoApuracaoDiaFim');
+    const periodoAtivo    = cfg['periodo_apuracao_ativo']?.cod === '1';
+    if (cPeriodoAtivo)  cPeriodoAtivo.checked = periodoAtivo;
+    if (cPeriodoCont)   cPeriodoCont.style.display = periodoAtivo ? 'block' : 'none';
+    if (cPeriodoInicio) cPeriodoInicio.value = cfg['periodo_apuracao_dia_inicio']?.cod || '';
+    if (cPeriodoFim)    cPeriodoFim.value = cfg['periodo_apuracao_dia_fim']?.cod || '';
+    atualizarExemploPeriodoApuracao();
 }
 
 function _limparCamposConfigRubricas() {
@@ -2049,6 +2087,15 @@ function _limparCamposConfigRubricas() {
     if (cNaoComp)      cNaoComp.checked      = false;
     const cBenExcluirFeriados = document.getElementById('cfgBeneficiosExcluirFeriados');
     if (cBenExcluirFeriados) cBenExcluirFeriados.checked = true; // default: excluir feriados
+    const cPeriodoAtivo2  = document.getElementById('cfgPeriodoApuracaoAtivo');
+    const cPeriodoCont2   = document.getElementById('cfgPeriodoApuracaoContainer');
+    const cPeriodoInicio2 = document.getElementById('cfgPeriodoApuracaoDiaInicio');
+    const cPeriodoFim2    = document.getElementById('cfgPeriodoApuracaoDiaFim');
+    if (cPeriodoAtivo2)  cPeriodoAtivo2.checked = false;
+    if (cPeriodoCont2)   cPeriodoCont2.style.display = 'none';
+    if (cPeriodoInicio2) cPeriodoInicio2.value = '';
+    if (cPeriodoFim2)    cPeriodoFim2.value = '';
+    atualizarExemploPeriodoApuracao();
 }
 
 // --- GRUPOS DE EMPRESAS ---
@@ -2708,6 +2755,9 @@ async function salvarConfigRubricas() {
         { codigo_empresa: codigoEmpresa, evento: 'terceiro_turno',          codigo_rubrica: document.getElementById('cfgTerceiroTurno')?.checked ? '1' : '0',         tipo_valor: 'config' },
         { codigo_empresa: codigoEmpresa, evento: 'nao_compensar_extras',    codigo_rubrica: document.getElementById('cfgNaoCompensarDefault')?.checked ? '1' : '0',   tipo_valor: 'config' },
         { codigo_empresa: codigoEmpresa, evento: 'beneficios_excluir_feriados', codigo_rubrica: document.getElementById('cfgBeneficiosExcluirFeriados')?.checked ? '1' : '0', tipo_valor: 'config' },
+        { codigo_empresa: codigoEmpresa, evento: 'periodo_apuracao_ativo',      codigo_rubrica: document.getElementById('cfgPeriodoApuracaoAtivo')?.checked ? '1' : '0', tipo_valor: 'config' },
+        { codigo_empresa: codigoEmpresa, evento: 'periodo_apuracao_dia_inicio', codigo_rubrica: (document.getElementById('cfgPeriodoApuracaoDiaInicio')?.value || '').trim(), tipo_valor: 'config' },
+        { codigo_empresa: codigoEmpresa, evento: 'periodo_apuracao_dia_fim',    codigo_rubrica: (document.getElementById('cfgPeriodoApuracaoDiaFim')?.value || '').trim(), tipo_valor: 'config' },
     ];
 
     try {
