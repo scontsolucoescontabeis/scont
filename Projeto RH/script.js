@@ -1774,7 +1774,8 @@ function exportarParaExcel() {
 
     const wb = XLSX.utils.book_new();
     const compFormatada = state.competencia.replace('/', '-');
-    const infoCabecalho = `Empresa: ${state.empresaSelecionada.codigo_empresa} - ${state.empresaSelecionada.nome_empresa} | Competência: ${state.competencia}`;
+    const textoPeriodoExport = _textoPeriodoApuracao(state.competencia, state.periodoApuracaoInicio, state.periodoApuracaoFim);
+    const infoCabecalho = `Empresa: ${state.empresaSelecionada.codigo_empresa} - ${state.empresaSelecionada.nome_empresa} | Competência: ${state.competencia}${textoPeriodoExport}`;
 
 // 1. Criar array para o Consolidado Geral
 const dadosConsolidadoGeral = [];
@@ -1977,6 +1978,13 @@ function atualizarExemploPeriodoApuracao() {
     const dias = gerarDiasDoMes(`${mesStr}/${anoStr}`, diaInicio, diaFim);
     if (dias.length === 0) { el.textContent = ''; return; }
     el.textContent = `Ex.: para competência ${mesStr}/${anoStr} → ${dias[0].data} a ${dias.at(-1).data}`;
+}
+
+function _textoPeriodoApuracao(competencia, diaInicio, diaFim) {
+    if (!Number.isInteger(diaInicio) || !Number.isInteger(diaFim) || !validarCompetencia(competencia)) return '';
+    const dias = gerarDiasDoMes(competencia, diaInicio, diaFim);
+    if (dias.length === 0) return '';
+    return ` (período: ${dias[0].data} a ${dias.at(-1).data})`;
 }
 
 let _cacheValoresVaVt = {};
@@ -4911,7 +4919,8 @@ function mostrarTela(telaId) {
     const sub = document.getElementById('pageHeaderSub');
     if (sub) {
         if (!telasSemHeaderPadrao.includes(telaId) && state.empresaSelecionada) {
-            sub.textContent = `🏢 ${state.empresaSelecionada.codigo_empresa} — ${state.empresaSelecionada.nome_empresa}  ·  📅 ${state.competencia}`;
+            const textoPeriodo = _textoPeriodoApuracao(state.competencia, state.periodoApuracaoInicio, state.periodoApuracaoFim);
+            sub.textContent = `🏢 ${state.empresaSelecionada.codigo_empresa} — ${state.empresaSelecionada.nome_empresa}  ·  📅 ${state.competencia}${textoPeriodo}`;
         } else {
             sub.textContent = 'Selecione a competência e empresa para começar';
         }
