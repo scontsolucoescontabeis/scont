@@ -2341,7 +2341,6 @@ async function baixarModelosGrupo() {
     mostrarMensagem('Aguarde', 'Gerando modelos do grupo...');
     const zip = new JSZip();
     const avisos = [];
-    const diasDoMes = gerarDiasDoMes(comp);
     const [mm, aaaa] = comp.split('/');
 
     for (const empresa of _grupoAtual.empresas) {
@@ -2359,6 +2358,8 @@ async function baixarModelosGrupo() {
             }
             const cfg = await _buscarConfigRubricas(empresa.codigo_empresa);
             const comTerceiroTurno = cfg?.['terceiro_turno']?.cod === '1';
+            const { diaInicio: diGrupo, diaFim: dfGrupo } = _resolverPeriodoApuracao(cfg);
+            const diasDoMes = gerarDiasDoMes(comp, diGrupo, dfGrupo);
 
             const wb = XLSX.utils.book_new();
             empregados.forEach(emp => {
@@ -2439,7 +2440,7 @@ async function abrirExportacaoTxtGrupo() {
 }
 
 // --- AÇÕES EM LOTE: PROCESSAMENTO (fila de revisão) ---
-function _parseExcelParaFolhas(wb, empregados, comTerceiroTurno, competencia) {
+function _parseExcelParaFolhas(wb, empregados, comTerceiroTurno, competencia, diaInicio = null, diaFim = null) {
     const normalizeHora = (v) => {
         if (v === null || v === undefined || v === '') return '';
         if (typeof v === 'number') {
@@ -2459,7 +2460,7 @@ function _parseExcelParaFolhas(wb, empregados, comTerceiroTurno, competencia) {
         const empregado = empregados.find(e => e.codigo_empregado === codEmpregado);
         if (!empregado) { avisosAbas.push(`aba "${sheetName}" sem correspondência`); return; }
 
-        const folha = { empregadoId: empregado.codigo_empregado, nome: empregado.nome_empregado, dados: gerarDiasDoMes(competencia), dsrDias: [], flagsFolga: {} };
+        const folha = { empregadoId: empregado.codigo_empregado, nome: empregado.nome_empregado, dados: gerarDiasDoMes(competencia, diaInicio, diaFim), dsrDias: [], flagsFolga: {} };
         const linhas = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
         for (let r = 1; r < linhas.length; r++) {
             const row = linhas[r];
@@ -2541,11 +2542,12 @@ async function processarLoteGrupo(fileList) {
 
             const cfg = await _buscarConfigRubricas(codigo);
             const comTerceiroTurno = cfg?.['terceiro_turno']?.cod === '1';
+            const { diaInicio: diLote, diaFim: dfLote } = _resolverPeriodoApuracao(cfg);
             const feriasCalculadas = await carregarFeriasCalculadas(codigo);
 
             const buffer = await file.arrayBuffer();
             const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
-            const { folhas, avisosAbas } = _parseExcelParaFolhas(wb, empregados, comTerceiroTurno, comp);
+            const { folhas, avisosAbas } = _parseExcelParaFolhas(wb, empregados, comTerceiroTurno, comp, diLote, dfLote);
 
             if (folhas.length === 0) {
                 resultadosIniciais.push({ codigo, status: 'erro', detalhe: 'Nenhum empregado correspondente encontrado no arquivo.' });
@@ -5128,7 +5130,9 @@ async function gerarModeloExcel(comTerceiroTurno = false) {
             return;
         }
 
-        const diasDoMes = gerarDiasDoMes(comp);
+        const cfgModelo = await _buscarConfigRubricas(codEmp);
+        const { diaInicio: diModelo, diaFim: dfModelo } = _resolverPeriodoApuracao(cfgModelo);
+        const diasDoMes = gerarDiasDoMes(comp, diModelo, dfModelo);
         const wb = XLSX.utils.book_new();
 
         empregados.forEach(emp => {
