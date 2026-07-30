@@ -182,6 +182,51 @@ teste('calcularResumoMes: sem períodos de férias, totalFerias é 0 e nada muda
     assert.strictEqual(resumo.totalFerias, 0);
 });
 
+// ===== período de apuração customizado (diaInicio/diaFim) =====
+
+teste('_gerarDiasDoMes: com diaInicio/diaFim válidos, apura de um mês a outro', () => {
+    const dias = _gerarDiasDoMes('07/2026', 5, 5); // 05/06/2026 a 05/07/2026
+    assert.strictEqual(dias[0].data, '05/06/2026');
+    assert.strictEqual(dias.at(-1).data, '05/07/2026');
+    assert.strictEqual(dias.length, 31); // junho tem 30 dias: 26 dias (05-30) + 5 dias de julho (01-05)
+});
+
+teste('_gerarDiasDoMes: diaInicio/diaFim ausentes mantém comportamento padrão (mês calendário)', () => {
+    const dias = _gerarDiasDoMes('07/2026');
+    assert.strictEqual(dias.length, 31);
+    assert.strictEqual(dias[0].data, '01/07/2026');
+});
+
+teste('_gerarDiasDoMes: diaInicio (mês anterior) maior que diaFim (mês da competência) é um intervalo curto válido, não inverte', () => {
+    // início=20 (junho) é cronologicamente anterior a fim=5 (julho), mesmo com 20 > 5 como número de dia
+    const dias = _gerarDiasDoMes('07/2026', 20, 5);
+    assert.strictEqual(dias[0].data, '20/06/2026');
+    assert.strictEqual(dias.at(-1).data, '05/07/2026');
+    assert.strictEqual(dias.length, 16);
+});
+
+teste('_gerarDiasDoMes: valores fora de 1-31 ignoram o período customizado e usam o mês calendário', () => {
+    const dias = _gerarDiasDoMes('07/2026', 0, 40);
+    assert.strictEqual(dias.length, 31);
+    assert.strictEqual(dias[0].data, '01/07/2026');
+    assert.strictEqual(dias.at(-1).data, '31/07/2026');
+});
+
+teste('_gerarDiasDoMes: dia inexistente no mês usa o último dia real como fallback', () => {
+    const dias = _gerarDiasDoMes('03/2026', 31, 31); // fevereiro/2026 tem 28 dias
+    assert.strictEqual(dias[0].data, '28/02/2026');
+});
+
+teste('calcularResumoMes: com diaInicio/diaFim, totaliza sobre o intervalo customizado, não o mês calendário', () => {
+    const escala = { tipo_escala: 'fixa', dias_semana: ['segunda', 'terca', 'quarta', 'quinta', 'sexta'] };
+    const resumoCustom = calcularResumoMes(escala, '07/2026', null, 20, 5); // 20/06 a 05/07, 16 dias
+    const resumoPadrao = calcularResumoMes(escala, '07/2026'); // mês calendário, 31 dias
+    assert.strictEqual(resumoCustom.dias[0].data, '20/06/2026');
+    assert.strictEqual(resumoCustom.dias.at(-1).data, '05/07/2026');
+    assert.strictEqual(resumoCustom.totalDias, 16);
+    assert.notStrictEqual(resumoCustom.totalDias, resumoPadrao.totalDias);
+});
+
 // ===== validarConfigEscala =====
 
 teste('validarConfigEscala: fixa sem dias selecionados é inválida', () => {

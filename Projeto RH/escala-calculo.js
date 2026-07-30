@@ -20,24 +20,63 @@ function _brParaIso(dataBR) {
     return `${a}-${m}-${d}`;
 }
 
+const _DIAS_SEMANA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+
+function _diaResumo(dataObj) {
+    const d = String(dataObj.getDate()).padStart(2, '0');
+    const m = String(dataObj.getMonth() + 1).padStart(2, '0');
+    const a = String(dataObj.getFullYear());
+    return { data: `${d}/${m}/${a}`, diaSemana: _DIAS_SEMANA_ABREV[dataObj.getDay()] };
+}
+
 // Duplica a lógica de gerarDiasDoMes (script.js) para manter este módulo
 // autocontido e testável em Node, sem depender de DOM/estado global.
-function _gerarDiasDoMes(competencia) {
+//
+// diaInicio/diaFim (opcionais): quando ambos válidos (1-31), apura de diaInicio do
+// mês ANTERIOR ao da competência até diaFim do mês DA competência, em vez do mês
+// calendário completo. Usado tanto pelo período de apuração da Frequência quanto
+// pelo período de apuração de Benefícios (configs independentes, mesma mecânica).
+function _gerarDiasDoMes(competencia, diaInicio = null, diaFim = null) {
     if (!competencia) return [];
     const [mes, ano] = competencia.split('/');
     const mesInt = parseInt(mes, 10);
     const anoInt = parseInt(ano, 10);
-    const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-    const mesStr = String(mesInt).padStart(2, '0');
-    const anoStr = String(anoInt);
-    const ultimoDia = new Date(anoInt, mesInt, 0).getDate();
+
+    const inicioValido = Number.isInteger(diaInicio) && diaInicio >= 1 && diaInicio <= 31;
+    const fimValido = Number.isInteger(diaFim) && diaFim >= 1 && diaFim <= 31;
+
+    if (!inicioValido || !fimValido) {
+        const ultimoDia = new Date(anoInt, mesInt, 0).getDate();
+        const dias = [];
+        for (let i = 1; i <= ultimoDia; i++) {
+            dias.push(_diaResumo(new Date(anoInt, mesInt - 1, i)));
+        }
+        return dias;
+    }
+
+    // Mês anterior: clampa o dia de início ao último dia real desse mês
+    const ultimoDiaMesAnterior = new Date(anoInt, mesInt - 1, 0).getDate();
+    const inicioClamp = Math.min(diaInicio, ultimoDiaMesAnterior);
+    const dataInicio = new Date(anoInt, mesInt - 2, inicioClamp);
+
+    // Mês da competência: clampa o dia de fim ao último dia real desse mês
+    const ultimoDiaCompetencia = new Date(anoInt, mesInt, 0).getDate();
+    const fimClamp = Math.min(diaFim, ultimoDiaCompetencia);
+    const dataFim = new Date(anoInt, mesInt - 1, fimClamp);
+
+    if (dataInicio > dataFim) {
+        const dias = [];
+        for (let i = 1; i <= ultimoDiaCompetencia; i++) {
+            dias.push(_diaResumo(new Date(anoInt, mesInt - 1, i)));
+        }
+        return dias;
+    }
+
     const dias = [];
-    for (let i = 1; i <= ultimoDia; i++) {
-        const data = new Date(anoInt, mesInt - 1, i);
-        dias.push({
-            data: `${String(i).padStart(2, '0')}/${mesStr}/${anoStr}`,
-            diaSemana: diasSemana[data.getDay()]
-        });
+    const cursor = new Date(dataInicio.getTime());
+    while (cursor <= dataFim) {
+        dias.push(_diaResumo(cursor));
+        cursor.setDate(cursor.getDate() + 1);
     }
     return dias;
 }
@@ -104,8 +143,10 @@ function _dataEmPeriodo(dataIso, periodos) {
 // periodosFerias (opcional): [{inicio: 'AAAA-MM-DD', fim: 'AAAA-MM-DD'}, ...]. Dia que cai em
 // algum período de férias sempre vira folga, independente do que a escala diga para aquele dia
 // (mesmo critério usado em "Gerar Benefícios": férias sempre sai do cálculo de dias a trabalhar).
-function calcularResumoMes(escala, competencia, periodosFerias) {
-    const diasDoMes = _gerarDiasDoMes(competencia);
+// diaInicio/diaFim (opcionais): ver _gerarDiasDoMes — apura um intervalo customizado em vez do
+// mês calendário completo.
+function calcularResumoMes(escala, competencia, periodosFerias, diaInicio = null, diaFim = null) {
+    const diasDoMes = _gerarDiasDoMes(competencia, diaInicio, diaFim);
     const dias = diasDoMes.map(d => {
         const emFerias = _dataEmPeriodo(_brParaIso(d.data), periodosFerias);
         return {

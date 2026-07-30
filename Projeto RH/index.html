@@ -308,6 +308,7 @@
             </div>
 
             <div id="beneficiosPreviaContainer" style="display:none;">
+                <div id="beneficiosPeriodosContainer" style="display:none;"></div>
                 <div id="beneficiosObservacoesContainer" style="display:none;"></div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
                     <span id="beneficiosPreviaInfo" style="font-size:13px; color: var(--text-secondary);"></span>
@@ -1156,6 +1157,26 @@
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <input type="checkbox" id="cfgBeneficiosExcluirFeriados" checked style="width: 16px; height: 16px; cursor: pointer;">
                             <label for="cfgBeneficiosExcluirFeriados" style="font-size: 13px; cursor: pointer; margin: 0;">Excluir feriados nacionais do cálculo de "Dias a Trabalhar" em Gerar Benefícios</label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 14px;">
+                            <input type="checkbox" id="cfgBeneficiosPeriodoAtivo" style="width: 16px; height: 16px; cursor: pointer;"
+                                onchange="document.getElementById('cfgBeneficiosPeriodoContainer').style.display = this.checked ? 'block' : 'none'; atualizarExemploBeneficiosPeriodo();">
+                            <label for="cfgBeneficiosPeriodoAtivo" style="font-size: 13px; cursor: pointer; margin: 0;">Usar período customizado para "Dias a Trabalhar" (fora do mês calendário)</label>
+                        </div>
+                        <div id="cfgBeneficiosPeriodoContainer" style="display: none; padding-left: 24px; margin-top: 8px;">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 190px;">Dia de início (mês anterior)</label>
+                                <input type="number" id="cfgBeneficiosPeriodoDiaInicio" min="1" max="31" placeholder="5" oninput="atualizarExemploBeneficiosPeriodo()"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 70px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 190px;">Dia de fim (mês da competência)</label>
+                                <input type="number" id="cfgBeneficiosPeriodoDiaFim" min="1" max="31" placeholder="5" oninput="atualizarExemploBeneficiosPeriodo()"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 70px;">
+                            </div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">
+                                <span id="cfgBeneficiosPeriodoExemplo">Informe o dia de início e o dia de fim para ver um exemplo.</span>
+                            </div>
                         </div>
                     </div>
                 </div>

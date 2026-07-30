@@ -1980,6 +1980,36 @@ function atualizarExemploPeriodoApuracao() {
     el.textContent = `Ex.: para competência ${mesStr}/${anoStr} → ${dias[0].data} a ${dias.at(-1).data}`;
 }
 
+// diaInicio: dia do mês anterior à competência; diaFim: dia do mês da competência.
+// Independente do período de apuração da Frequência ([[_resolverPeriodoApuracao]]) — ver
+// docs/superpowers/specs/2026-07-30-beneficios-periodo-apuracao-design.md.
+function _resolverPeriodoBeneficios(cfg) {
+    if (!cfg || cfg['beneficios_periodo_ativo']?.cod !== '1') return { diaInicio: null, diaFim: null };
+    const diaInicio = parseInt(cfg['beneficios_periodo_dia_inicio']?.cod, 10);
+    const diaFim = parseInt(cfg['beneficios_periodo_dia_fim']?.cod, 10);
+    return {
+        diaInicio: Number.isInteger(diaInicio) ? diaInicio : null,
+        diaFim: Number.isInteger(diaFim) ? diaFim : null
+    };
+}
+
+function atualizarExemploBeneficiosPeriodo() {
+    const el = document.getElementById('cfgBeneficiosPeriodoExemplo');
+    if (!el) return;
+    const diaInicio = parseInt(document.getElementById('cfgBeneficiosPeriodoDiaInicio')?.value, 10);
+    const diaFim = parseInt(document.getElementById('cfgBeneficiosPeriodoDiaFim')?.value, 10);
+    if (!Number.isInteger(diaInicio) || !Number.isInteger(diaFim) || diaInicio < 1 || diaInicio > 31 || diaFim < 1 || diaFim > 31) {
+        el.textContent = 'Informe o dia de início e o dia de fim para ver um exemplo.';
+        return;
+    }
+    const hoje = new Date();
+    const mesStr = String(hoje.getMonth() + 1).padStart(2, '0');
+    const anoStr = String(hoje.getFullYear());
+    const dias = gerarDiasDoMes(`${mesStr}/${anoStr}`, diaInicio, diaFim);
+    if (dias.length === 0) { el.textContent = ''; return; }
+    el.textContent = `Ex.: para competência ${mesStr}/${anoStr} → ${dias[0].data} a ${dias.at(-1).data}`;
+}
+
 function _textoPeriodoApuracao(competencia, diaInicio, diaFim) {
     if (!Number.isInteger(diaInicio) || !Number.isInteger(diaFim) || !validarCompetencia(competencia)) return '';
     const dias = gerarDiasDoMes(competencia, diaInicio, diaFim);
@@ -2066,6 +2096,16 @@ function _preencherCamposConfigRubricas(cfg) {
     if (cPeriodoInicio) cPeriodoInicio.value = cfg['periodo_apuracao_dia_inicio']?.cod || '';
     if (cPeriodoFim)    cPeriodoFim.value = cfg['periodo_apuracao_dia_fim']?.cod || '';
     atualizarExemploPeriodoApuracao();
+    const cBenPeriodoAtivo  = document.getElementById('cfgBeneficiosPeriodoAtivo');
+    const cBenPeriodoCont   = document.getElementById('cfgBeneficiosPeriodoContainer');
+    const cBenPeriodoInicio = document.getElementById('cfgBeneficiosPeriodoDiaInicio');
+    const cBenPeriodoFim    = document.getElementById('cfgBeneficiosPeriodoDiaFim');
+    const benPeriodoAtivo   = cfg['beneficios_periodo_ativo']?.cod === '1';
+    if (cBenPeriodoAtivo)  cBenPeriodoAtivo.checked = benPeriodoAtivo;
+    if (cBenPeriodoCont)   cBenPeriodoCont.style.display = benPeriodoAtivo ? 'block' : 'none';
+    if (cBenPeriodoInicio) cBenPeriodoInicio.value = cfg['beneficios_periodo_dia_inicio']?.cod || '';
+    if (cBenPeriodoFim)    cBenPeriodoFim.value = cfg['beneficios_periodo_dia_fim']?.cod || '';
+    atualizarExemploBeneficiosPeriodo();
 }
 
 function _limparCamposConfigRubricas() {
@@ -2110,6 +2150,15 @@ function _limparCamposConfigRubricas() {
     if (cPeriodoInicio2) cPeriodoInicio2.value = '';
     if (cPeriodoFim2)    cPeriodoFim2.value = '';
     atualizarExemploPeriodoApuracao();
+    const cBenPeriodoAtivo2  = document.getElementById('cfgBeneficiosPeriodoAtivo');
+    const cBenPeriodoCont2   = document.getElementById('cfgBeneficiosPeriodoContainer');
+    const cBenPeriodoInicio2 = document.getElementById('cfgBeneficiosPeriodoDiaInicio');
+    const cBenPeriodoFim2    = document.getElementById('cfgBeneficiosPeriodoDiaFim');
+    if (cBenPeriodoAtivo2)  cBenPeriodoAtivo2.checked = false;
+    if (cBenPeriodoCont2)   cBenPeriodoCont2.style.display = 'none';
+    if (cBenPeriodoInicio2) cBenPeriodoInicio2.value = '';
+    if (cBenPeriodoFim2)    cBenPeriodoFim2.value = '';
+    atualizarExemploBeneficiosPeriodo();
 }
 
 // --- GRUPOS DE EMPRESAS ---
@@ -2774,6 +2823,9 @@ async function salvarConfigRubricas() {
         { codigo_empresa: codigoEmpresa, evento: 'periodo_apuracao_ativo',      codigo_rubrica: document.getElementById('cfgPeriodoApuracaoAtivo')?.checked ? '1' : '0', tipo_valor: 'config' },
         { codigo_empresa: codigoEmpresa, evento: 'periodo_apuracao_dia_inicio', codigo_rubrica: (document.getElementById('cfgPeriodoApuracaoDiaInicio')?.value || '').trim(), tipo_valor: 'config' },
         { codigo_empresa: codigoEmpresa, evento: 'periodo_apuracao_dia_fim',    codigo_rubrica: (document.getElementById('cfgPeriodoApuracaoDiaFim')?.value || '').trim(), tipo_valor: 'config' },
+        { codigo_empresa: codigoEmpresa, evento: 'beneficios_periodo_ativo',      codigo_rubrica: document.getElementById('cfgBeneficiosPeriodoAtivo')?.checked ? '1' : '0', tipo_valor: 'config' },
+        { codigo_empresa: codigoEmpresa, evento: 'beneficios_periodo_dia_inicio', codigo_rubrica: (document.getElementById('cfgBeneficiosPeriodoDiaInicio')?.value || '').trim(), tipo_valor: 'config' },
+        { codigo_empresa: codigoEmpresa, evento: 'beneficios_periodo_dia_fim',    codigo_rubrica: (document.getElementById('cfgBeneficiosPeriodoDiaFim')?.value || '').trim(), tipo_valor: 'config' },
     ];
 
     try {
@@ -3516,12 +3568,15 @@ function _isoParaBR(iso) {
 }
 
 // Retorna o texto do(s) período(s) de férias que sobrepõem a competência ('' se nenhum).
-function _periodosFeriasNoMesTexto(periodos, competencia) {
+// diaInicio/diaFim (opcionais): quando o período de apuração de Benefícios está ativo para a
+// empresa, usa o intervalo real (primeiro/último dia de gerarDiasDoMes) em vez dos limites do
+// mês calendário, para ficar coerente com o que calcularResumoMes usou no cálculo de dias.
+function _periodosFeriasNoMesTexto(periodos, competencia, diaInicio = null, diaFim = null) {
     if (!periodos || periodos.length === 0) return '';
-    const [mes, ano] = competencia.split('/');
-    const inicioMes = `${ano}-${mes}-01`;
-    const ultimoDia = new Date(Number(ano), Number(mes), 0).getDate();
-    const fimMes = `${ano}-${mes}-${String(ultimoDia).padStart(2, '0')}`;
+    const dias = gerarDiasDoMes(competencia, diaInicio, diaFim);
+    if (dias.length === 0) return '';
+    const inicioMes = _brParaIso(dias[0].data);
+    const fimMes = _brParaIso(dias.at(-1).data);
     return periodos
         .filter(p => p.inicio <= fimMes && p.fim >= inicioMes)
         .map(p => `${_isoParaBR(p.inicio)} a ${_isoParaBR(p.fim)}`)
@@ -3593,14 +3648,23 @@ async function gerarPreviaBeneficios() {
         (escalasData || []).forEach(e => { escalasMapa[`${e.codigo_empresa}_${e.codigo_empregado}`] = _parsearCamposEscala(e); });
 
         // Config por empresa: se deve excluir feriados nacionais do cálculo de "Dias a Trabalhar"
-        // (a escala em si não considera feriados — ver [[project_rh_escala_trabalho]]).
+        // (a escala em si não considera feriados — ver [[project_rh_escala_trabalho]]), e se a
+        // empresa apura "Dias a Trabalhar" sobre um período customizado (fora do mês calendário).
         const excluirFeriadosPorEmpresa = {};
+        const periodoBeneficiosPorEmpresa = {};
         const observacoesPorEmpresa = [];
+        const periodosCustomPorEmpresa = [];
         await Promise.all(codigosEmpresas.map(async cod => {
             const cfg = await _buscarConfigRubricas(cod);
             excluirFeriadosPorEmpresa[cod] = cfg?.['beneficios_excluir_feriados']?.cod !== '0'; // default: excluir (true)
+            const periodo = _resolverPeriodoBeneficios(cfg);
+            periodoBeneficiosPorEmpresa[cod] = periodo;
             const observacao = (cfg?.['observacoes']?.cod || '').trim();
             if (observacao) observacoesPorEmpresa.push({ codigo_empresa: cod, observacao });
+            if (periodo.diaInicio !== null && periodo.diaFim !== null) {
+                const dias = gerarDiasDoMes(comp, periodo.diaInicio, periodo.diaFim);
+                if (dias.length > 0) periodosCustomPorEmpresa.push({ codigo_empresa: cod, texto: `${dias[0].data} a ${dias.at(-1).data}` });
+            }
         }));
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
@@ -3612,6 +3676,7 @@ async function gerarPreviaBeneficios() {
             mostrarMensagem('Aviso', 'Nenhum empregado (situação "Trabalhando") encontrado para as empresas selecionadas.');
             document.getElementById('beneficiosPreviaContainer').style.display = 'none';
             _renderizarObservacoesBeneficios([]);
+            _renderizarPeriodosBeneficios([]);
             return;
         }
 
@@ -3620,7 +3685,8 @@ async function gerarPreviaBeneficios() {
             const periodos = feriasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`];
             const escala = escalasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || null;
             const excluirFeriados = excluirFeriadosPorEmpresa[emp.codigo_empresa];
-            const resumoEscala = calcularResumoMes(escala, comp, periodos);
+            const { diaInicio, diaFim } = periodoBeneficiosPorEmpresa[emp.codigo_empresa] || { diaInicio: null, diaFim: null };
+            const resumoEscala = calcularResumoMes(escala, comp, periodos, diaInicio, diaFim);
             const diasTrabalhar = resumoEscala.dias.filter(d =>
                 d.tipo === 'trabalho' && !(excluirFeriados && _isFeriadoNoDia(d.data))
             ).length;
@@ -3634,7 +3700,7 @@ async function gerarPreviaBeneficios() {
                 codigo_empregado: emp.codigo_empregado,
                 nome_empregado: emp.nome_empregado,
                 desc_cargo: emp.desc_cargo || '',
-                feriasTexto: _periodosFeriasNoMesTexto(periodos, comp),
+                feriasTexto: _periodosFeriasNoMesTexto(periodos, comp, diaInicio, diaFim),
                 diasTrabalhar,
                 diasDescontar,
                 vtDiario: valores.vt,
@@ -3648,10 +3714,14 @@ async function gerarPreviaBeneficios() {
         observacoesPorEmpresa.forEach(o => { o.nome_empresa = (empresasMapa[o.codigo_empresa] || {}).nome_empresa || o.codigo_empresa; });
         observacoesPorEmpresa.sort((a, b) => a.nome_empresa.localeCompare(b.nome_empresa));
 
+        periodosCustomPorEmpresa.forEach(p => { p.nome_empresa = (empresasMapa[p.codigo_empresa] || {}).nome_empresa || p.codigo_empresa; });
+        periodosCustomPorEmpresa.sort((a, b) => a.nome_empresa.localeCompare(b.nome_empresa));
+
         fecharModalMensagem();
         state._beneficiosLinhas = linhas;
         _renderizarPreviaBeneficios(linhas);
         _renderizarObservacoesBeneficios(observacoesPorEmpresa);
+        _renderizarPeriodosBeneficios(periodosCustomPorEmpresa);
     } catch (erro) {
         console.error('Erro ao gerar prévia de benefícios:', erro);
         fecharModalMensagem();
@@ -3700,6 +3770,26 @@ function _renderizarObservacoesBeneficios(observacoesPorEmpresa) {
             <div>
                 ${multiplas ? `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px;">${o.codigo_empresa} - ${o.nome_empresa}</div>` : ''}
                 <span style="font-size:13px; white-space:pre-wrap; line-height:1.5;">${String(o.observacao).replace(/</g, '&lt;')}</span>
+            </div>
+        </div>`).join('');
+    div.style.display = 'block';
+}
+
+function _renderizarPeriodosBeneficios(periodosPorEmpresa) {
+    const div = document.getElementById('beneficiosPeriodosContainer');
+    if (!div) return;
+    if (!periodosPorEmpresa || periodosPorEmpresa.length === 0) {
+        div.style.display = 'none';
+        div.innerHTML = '';
+        return;
+    }
+    const multiplas = periodosPorEmpresa.length > 1;
+    div.innerHTML = periodosPorEmpresa.map(p => `
+        <div style="display:flex; gap:10px; align-items:flex-start; background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; border-radius:8px; padding:12px 16px; margin-bottom:8px;">
+            <span style="font-size:16px; line-height:1;">📅</span>
+            <div>
+                ${multiplas ? `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px;">${p.codigo_empresa} - ${p.nome_empresa}</div>` : ''}
+                <span style="font-size:13px; line-height:1.5;">Período de apuração (Dias a Trabalhar): ${p.texto}</span>
             </div>
         </div>`).join('');
     div.style.display = 'block';
