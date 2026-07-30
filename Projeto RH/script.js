@@ -3529,9 +3529,12 @@ async function gerarPreviaBeneficios() {
         // Config por empresa: se deve excluir feriados nacionais do cálculo de "Dias a Trabalhar"
         // (a escala em si não considera feriados — ver [[project_rh_escala_trabalho]]).
         const excluirFeriadosPorEmpresa = {};
+        const observacoesPorEmpresa = [];
         await Promise.all(codigosEmpresas.map(async cod => {
             const cfg = await _buscarConfigRubricas(cod);
             excluirFeriadosPorEmpresa[cod] = cfg?.['beneficios_excluir_feriados']?.cod !== '0'; // default: excluir (true)
+            const observacao = (cfg?.['observacoes']?.cod || '').trim();
+            if (observacao) observacoesPorEmpresa.push({ codigo_empresa: cod, observacao });
         }));
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
@@ -3542,6 +3545,7 @@ async function gerarPreviaBeneficios() {
             fecharModalMensagem();
             mostrarMensagem('Aviso', 'Nenhum empregado (situação "Trabalhando") encontrado para as empresas selecionadas.');
             document.getElementById('beneficiosPreviaContainer').style.display = 'none';
+            _renderizarObservacoesBeneficios([]);
             return;
         }
 
@@ -3575,9 +3579,13 @@ async function gerarPreviaBeneficios() {
 
         linhas.sort((a, b) => (a.nome_empresa + a.nome_empregado).localeCompare(b.nome_empresa + b.nome_empregado));
 
+        observacoesPorEmpresa.forEach(o => { o.nome_empresa = (empresasMapa[o.codigo_empresa] || {}).nome_empresa || o.codigo_empresa; });
+        observacoesPorEmpresa.sort((a, b) => a.nome_empresa.localeCompare(b.nome_empresa));
+
         fecharModalMensagem();
         state._beneficiosLinhas = linhas;
         _renderizarPreviaBeneficios(linhas);
+        _renderizarObservacoesBeneficios(observacoesPorEmpresa);
     } catch (erro) {
         console.error('Erro ao gerar prévia de benefícios:', erro);
         fecharModalMensagem();
@@ -3609,6 +3617,26 @@ function _renderizarPreviaBeneficios(linhas) {
     }).join('');
     container.style.display = 'block';
     _atualizarInfoBeneficios();
+}
+
+function _renderizarObservacoesBeneficios(observacoesPorEmpresa) {
+    const div = document.getElementById('beneficiosObservacoesContainer');
+    if (!div) return;
+    if (!observacoesPorEmpresa || observacoesPorEmpresa.length === 0) {
+        div.style.display = 'none';
+        div.innerHTML = '';
+        return;
+    }
+    const multiplas = observacoesPorEmpresa.length > 1;
+    div.innerHTML = observacoesPorEmpresa.map(o => `
+        <div style="display:flex; gap:10px; align-items:flex-start; background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; border-radius:8px; padding:12px 16px; margin-bottom:8px;">
+            <span style="font-size:16px; line-height:1;">📝</span>
+            <div>
+                ${multiplas ? `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px;">${o.codigo_empresa} - ${o.nome_empresa}</div>` : ''}
+                <span style="font-size:13px; white-space:pre-wrap; line-height:1.5;">${String(o.observacao).replace(/</g, '&lt;')}</span>
+            </div>
+        </div>`).join('');
+    div.style.display = 'block';
 }
 
 function _atualizarInfoBeneficios() {
