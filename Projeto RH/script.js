@@ -4956,28 +4956,68 @@ function _dataEmFerias(dataBR, empregadoId) {
     return periodos.some(p => iso >= p.inicio && iso <= p.fim);
 }
 
-function gerarDiasDoMes(competencia) {
+function _diaObjeto(dataObj) {
+    const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+    const d = String(dataObj.getDate()).padStart(2, '0');
+    const m = String(dataObj.getMonth() + 1).padStart(2, '0');
+    const a = String(dataObj.getFullYear());
+    return {
+        data: `${d}/${m}/${a}`,
+        diaSemana: diasSemana[dataObj.getDay()],
+        entrada1: '',
+        saida1: '',
+        entrada2: '',
+        saida2: '',
+        entrada3: '',
+        saida3: ''
+    };
+}
+
+// diaInicio/diaFim (opcionais): período de apuração customizado da empresa. diaInicio é o
+// dia do mês ANTERIOR à competência e diaFim é o dia do mês DA competência (ex: 28/06 a
+// 28/07 para competência 07/2026). Quando ausentes ou inválidos, mantém o comportamento
+// padrão (mês calendário completo da competência).
+function gerarDiasDoMes(competencia, diaInicio = null, diaFim = null) {
     if (!competencia) return [];
     const [mes, ano] = competencia.split('/');
     const mesInt = parseInt(mes);
     const anoInt = parseInt(ano);
-    const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
-    const mesStr = String(mesInt).padStart(2, '0');
-    const anoStr = String(anoInt);
-    const ultimoDia = new Date(anoInt, mesInt, 0).getDate();
+
+    const inicioValido = Number.isInteger(diaInicio) && diaInicio >= 1 && diaInicio <= 31;
+    const fimValido = Number.isInteger(diaFim) && diaFim >= 1 && diaFim <= 31;
+
+    if (!inicioValido || !fimValido) {
+        const ultimoDia = new Date(anoInt, mesInt, 0).getDate();
+        const dias = [];
+        for (let i = 1; i <= ultimoDia; i++) {
+            dias.push(_diaObjeto(new Date(anoInt, mesInt - 1, i)));
+        }
+        return dias;
+    }
+
+    // Mês anterior: clampa o dia de início ao último dia real desse mês
+    const ultimoDiaMesAnterior = new Date(anoInt, mesInt - 1, 0).getDate();
+    const inicioClamp = Math.min(diaInicio, ultimoDiaMesAnterior);
+    const dataInicio = new Date(anoInt, mesInt - 2, inicioClamp);
+
+    // Mês da competência: clampa o dia de fim ao último dia real desse mês
+    const ultimoDiaCompetencia = new Date(anoInt, mesInt, 0).getDate();
+    const fimClamp = Math.min(diaFim, ultimoDiaCompetencia);
+    const dataFim = new Date(anoInt, mesInt - 1, fimClamp);
+
+    if (dataInicio > dataFim) {
+        const dias = [];
+        for (let i = 1; i <= ultimoDiaCompetencia; i++) {
+            dias.push(_diaObjeto(new Date(anoInt, mesInt - 1, i)));
+        }
+        return dias;
+    }
+
     const dias = [];
-    for (let i = 1; i <= ultimoDia; i++) {
-        const data = new Date(anoInt, mesInt - 1, i);
-        dias.push({
-            data: `${String(i).padStart(2, '0')}/${mesStr}/${anoStr}`,
-            diaSemana: diasSemana[data.getDay()],
-            entrada1: '',
-            saida1: '',
-            entrada2: '',
-            saida2: '',
-            entrada3: '',
-            saida3: ''
-        });
+    const cursor = new Date(dataInicio.getTime());
+    while (cursor <= dataFim) {
+        dias.push(_diaObjeto(cursor));
+        cursor.setDate(cursor.getDate() + 1);
     }
     return dias;
 }
