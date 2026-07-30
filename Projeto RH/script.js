@@ -13,6 +13,8 @@ const state = {
     empregadosDisponiveis: [],
     empresaSelecionada: null,
     competencia: '',
+    periodoApuracaoInicio: null, // dia do mês anterior à competência (período customizado da empresa)
+    periodoApuracaoFim: null,    // dia do mês da competência (período customizado da empresa)
     folhas: [], // Array de objetos: { empregadoId, nome, dados: [], dsrDias: [], flagsFolga: {} }
     abaAtivaIndex: 0,
     feriados: [],
@@ -273,6 +275,10 @@ function inicializarEventos() {
         }
         state.competencia = comp;
         state.empresaSelecionada = state.empresas.find(emp => emp.codigo_empresa === codEmp);
+        const cfgPeriodo = await _buscarConfigRubricas(codEmp);
+        const { diaInicio, diaFim } = _resolverPeriodoApuracao(cfgPeriodo);
+        state.periodoApuracaoInicio = diaInicio;
+        state.periodoApuracaoFim = diaFim;
         await carregarEmpregados(codEmp);
         if (state.empregadosDisponiveis.length === 0) {
             mostrarMensagem('Aviso', 'Esta empresa não possui empregados cadastrados.');
@@ -670,7 +676,7 @@ function adicionarNovaFolha() {
     const novaFolha = {
         empregadoId: '',
         nome: 'Novo Empregado',
-        dados: gerarDiasDoMes(state.competencia),
+        dados: gerarDiasDoMes(state.competencia, state.periodoApuracaoInicio, state.periodoApuracaoFim),
         dsrDias: [], // ✅ CORRIGIDO: Inicializar como ARRAY vazio
         flagsFolga: {} // ✅ CORRIGIDO: Inicializar como OBJETO vazio
     };
@@ -5198,7 +5204,7 @@ async function importarExcel(file) {
                 state.folhas.push({
                     empregadoId: empregado.codigo_empregado,
                     nome: empregado.nome_empregado,
-                    dados: gerarDiasDoMes(state.competencia),
+                    dados: gerarDiasDoMes(state.competencia, state.periodoApuracaoInicio, state.periodoApuracaoFim),
                     dsrDias: [],
                     flagsFolga: {}
                 });
