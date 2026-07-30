@@ -209,15 +209,21 @@ document.addEventListener('click', e => {
     }
 });
 
+// Empregados do tipo "Contribuinte" (sócios/pró-labore) não entram em parametrização
+// nem geração de Controle de Frequência, Escala, Benefícios ou Fechamento da Folha.
+function _excluirContribuinte(lista) {
+    return (lista || []).filter(e => (e.tipo_empregado || '').trim() !== 'Contribuinte');
+}
+
 async function carregarEmpregados(codigoEmpresa) {
     try {
         const { data, error } = await supabaseClient
             .from('rh_empregados')
-            .select('codigo_empregado, nome_empregado')
+            .select('codigo_empregado, nome_empregado, tipo_empregado')
             .eq('codigo_empresa', codigoEmpresa)
             .order('nome_empregado', { ascending: true });
         if (error) throw error;
-        state.empregadosDisponiveis = data || [];
+        state.empregadosDisponiveis = _excluirContribuinte(data);
     } catch (erro) {
         console.error('Erro ao carregar empregados:', erro);
         mostrarMensagem('Erro', 'Falha ao carregar a lista de empregados.');
@@ -2287,12 +2293,13 @@ async function baixarModelosGrupo() {
 
     for (const empresa of _grupoAtual.empresas) {
         try {
-            const { data: empregados, error } = await supabaseClient
+            const { data, error } = await supabaseClient
                 .from('rh_empregados')
-                .select('codigo_empregado, nome_empregado')
+                .select('codigo_empregado, nome_empregado, tipo_empregado')
                 .eq('codigo_empresa', empresa.codigo_empresa)
                 .order('nome_empregado', { ascending: true });
             if (error) throw error;
+            const empregados = _excluirContribuinte(data);
             if (!empregados || empregados.length === 0) {
                 avisos.push(`${empresa.codigo_empresa} - ${empresa.nome_empresa}: sem empregados cadastrados.`);
                 continue;
@@ -2468,11 +2475,12 @@ async function processarLoteGrupo(fileList) {
     const itensFila = [];
     for (const { codigo, file } of arquivosValidos) {
         try {
-            const { data: empregados, error: errEmp } = await supabaseClient
+            const { data: empregadosData, error: errEmp } = await supabaseClient
                 .from('rh_empregados')
-                .select('codigo_empregado, nome_empregado')
+                .select('codigo_empregado, nome_empregado, tipo_empregado')
                 .eq('codigo_empresa', codigo);
             if (errEmp) throw errEmp;
+            const empregados = _excluirContribuinte(empregadosData);
             if (!empregados || empregados.length === 0) {
                 resultadosIniciais.push({ codigo, status: 'erro', detalhe: 'Empresa sem empregados cadastrados.' });
                 continue;
@@ -2798,9 +2806,9 @@ async function _carregarTabelaValoresVaVt(codigoEmpresa) {
     tabela.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-secondary);font-size:13px;">Carregando...</div>';
 
     try {
-        const [{ data: empregados, error: errEmp }, { data: valores, error: errVal }] = await Promise.all([
+        const [{ data: empregadosData, error: errEmp }, { data: valores, error: errVal }] = await Promise.all([
             supabaseClient.from('rh_empregados')
-                .select('codigo_empregado, nome_empregado')
+                .select('codigo_empregado, nome_empregado, tipo_empregado')
                 .eq('codigo_empresa', codigoEmpresa)
                 .order('nome_empregado', { ascending: true }),
             supabaseClient.from('rh_valores_va_vt')
@@ -2809,6 +2817,7 @@ async function _carregarTabelaValoresVaVt(codigoEmpresa) {
         ]);
         if (errEmp) throw errEmp;
         if (errVal) throw errVal;
+        const empregados = _excluirContribuinte(empregadosData);
 
         if (!empregados || empregados.length === 0) {
             tabela.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-secondary);font-size:13px;">Esta empresa não possui empregados cadastrados.</div>';
@@ -3102,10 +3111,11 @@ async function _construirConteudoTXTExportacao() {
         if (!ultimasVersoes[chave]) ultimasVersoes[chave] = reg;
     });
 
-    const { data: empregadosData, error: errEmpregados } = await supabaseClient
-        .from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado')
+    const { data: empregadosBrutos, error: errEmpregados } = await supabaseClient
+        .from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, tipo_empregado')
         .in('codigo_empresa', empresasSelecionadas);
     if (errEmpregados) throw errEmpregados;
+    const empregadosData = _excluirContribuinte(empregadosBrutos);
 
     const { data: valoresVaVtData, error: errValoresVaVt } = await supabaseClient
         .from('rh_valores_va_vt').select('codigo_empresa, codigo_empregado, valor_vt, valor_va')
@@ -3910,14 +3920,20 @@ async function gerarRecibosBeneficios() {
 
     const comp = document.getElementById('beneficiosCompetencia').value;
 
-    const linhasITC = linhas.filter(l => l.codigo_empresa === '350');
-    if (linhasITC.length > 0 && !(await _ajudaCustoITCJaGerado(comp))) {
-        state._ajudaCustoITCLinhasPendentes = linhas;
-        _abrirModalAjudaCustoITC(linhasITC, comp);
-        return;
-    }
+    if (await _verificarPendenciaAjudaCustoITC(linhas, comp, () => _gerarPdfsRecibosBeneficios(linhas, comp))) return;
 
     await _gerarPdfsRecibosBeneficios(linhas, comp);
+}
+
+// Se houver empregados da empresa 350 (ITC) entre as linhas e a ajuda de custo daquela
+// competência ainda não foi gerada, abre o modal de Ajuda de Custo e guarda `continuacao`
+// para retomar o fluxo original (recibo ou lançamento) ao fechar. Retorna true se interrompeu.
+async function _verificarPendenciaAjudaCustoITC(linhas, comp, continuacao) {
+    const linhasITC = linhas.filter(l => l.codigo_empresa === '350');
+    if (linhasITC.length === 0 || await _ajudaCustoITCJaGerado(comp)) return false;
+    state._ajudaCustoITCContinuacao = continuacao;
+    _abrirModalAjudaCustoITC(linhasITC, comp);
+    return true;
 }
 
 async function _gerarPdfsRecibosBeneficios(linhas, comp) {
@@ -4083,14 +4099,13 @@ async function _fecharModalAjudaCustoITC() {
         await _registrarAjudaCustoITCGerado(state._ajudaCustoITCComp);
     }
 
-    const linhas = state._ajudaCustoITCLinhasPendentes;
-    const comp = state._ajudaCustoITCComp;
-    state._ajudaCustoITCLinhasPendentes = null;
+    const continuacao = state._ajudaCustoITCContinuacao;
+    state._ajudaCustoITCContinuacao = null;
     state._ajudaCustoITCItens = null;
     state._ajudaCustoITCComp = null;
     state._ajudaCustoITCSemPendencia = false;
 
-    if (linhas) await _gerarPdfsRecibosBeneficios(linhas, comp);
+    if (continuacao) await continuacao();
 }
 
 // ===== GERAR LANÇAMENTOS NA FOLHA (VT/VA) =====
@@ -4103,6 +4118,13 @@ async function abrirModalLancamentoVaVt() {
     const linhas = state._beneficiosLinhas.filter(l => l.selecionado !== false);
     if (linhas.length === 0) { mostrarMensagem('Aviso', 'Selecione ao menos um empregado antes de gerar os lançamentos.'); return; }
 
+    const comp = document.getElementById('beneficiosCompetencia').value;
+    if (await _verificarPendenciaAjudaCustoITC(linhas, comp, () => _abrirModalLancamentoVaVtConteudo(linhas))) return;
+
+    await _abrirModalLancamentoVaVtConteudo(linhas);
+}
+
+async function _abrirModalLancamentoVaVtConteudo(linhas) {
     const empresasMapa = new Map();
     linhas.forEach(l => { if (!empresasMapa.has(l.codigo_empresa)) empresasMapa.set(l.codigo_empresa, l.nome_empresa); });
     const empresas = Array.from(empresasMapa, ([codigo_empresa, nome_empresa]) => ({ codigo_empresa, nome_empresa }))
@@ -4243,12 +4265,13 @@ async function baixarLancamentoVaVt() {
     const comp = document.getElementById('beneficiosCompetencia').value;
     const { mes, ano } = _mesAnterior(comp);
     const mm = String(mes).padStart(2, '0');
+    const codigosEmpresas = Object.keys(_lerRubricasVaVtPorEmpresa()).join('_');
 
     const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Lancamentos_VT_VA_${mm}-${ano}.txt`;
+    a.download = `${codigosEmpresas}_Lancamentos_VT_VA_${mm}-${ano}.txt`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
@@ -4967,13 +4990,14 @@ async function gerarModeloExcel(comTerceiroTurno = false) {
     mostrarMensagem('Aguarde', 'Gerando modelo Excel...');
 
     try {
-        const { data: empregados, error } = await supabaseClient
+        const { data: empregadosData, error } = await supabaseClient
             .from('rh_empregados')
-            .select('codigo_empregado, nome_empregado')
+            .select('codigo_empregado, nome_empregado, tipo_empregado')
             .eq('codigo_empresa', codEmp)
             .order('nome_empregado', { ascending: true });
 
         if (error) throw error;
+        const empregados = _excluirContribuinte(empregadosData);
         if (!empregados || empregados.length === 0) {
             fecharModalMensagem();
             mostrarMensagem('Aviso', 'Esta empresa não possui empregados cadastrados.');

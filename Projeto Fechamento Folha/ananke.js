@@ -194,11 +194,12 @@ function gerarLinhaTxt(codEmpregado, competencia, codigoRubrica, tipoProcesso, v
 async function carregarFuncionarios() {
     const { data, error } = await supabaseClient
         .from('rh_empregados')
-        .select('nome_empregado, codigo_empregado')
+        .select('nome_empregado, codigo_empregado, tipo_empregado')
         .eq('codigo_empresa', CODIGO_EMPRESA);
     if (error) throw error;
     funcionariosMap = {};
     (data || []).forEach(f => {
+        if ((f.tipo_empregado || '').trim() === 'Contribuinte') return;
         funcionariosMap[normalizarNome(f.nome_empregado)] = f.codigo_empregado;
     });
 }
