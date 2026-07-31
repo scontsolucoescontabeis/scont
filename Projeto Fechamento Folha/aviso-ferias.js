@@ -205,7 +205,6 @@ const A4_ALTURA = 841.89;
 const FAIXA_CABECALHO = 50;
 const FAIXA_RODAPE = 24;
 
-const COR_SECUNDARIA = PDFLib.rgb(0x2C / 255, 0x3E / 255, 0x50 / 255);
 const COR_PRIMARIA = PDFLib.rgb(0x8B / 255, 0x3A / 255, 0x3A / 255);
 const COR_BRANCA = PDFLib.rgb(1, 1, 1);
 
@@ -249,7 +248,7 @@ async function gerarPdfEmpresa(grupo, pdfOriginalDoc, logoBytes) {
         pagina.drawPage(embutida, { x: offsetX, y: offsetY, width: larguraFinal, height: alturaFinal });
 
         // Faixa de cabeçalho
-        pagina.drawRectangle({ x: 0, y: A4_ALTURA - FAIXA_CABECALHO, width: A4_LARGURA, height: FAIXA_CABECALHO, color: COR_SECUNDARIA });
+        pagina.drawRectangle({ x: 0, y: A4_ALTURA - FAIXA_CABECALHO, width: A4_LARGURA, height: FAIXA_CABECALHO, color: COR_PRIMARIA });
         let cursorX = 16;
         if (logoEmbutido) {
             const alturaLogo = 28;
@@ -267,9 +266,6 @@ async function gerarPdfEmpresa(grupo, pdfOriginalDoc, logoBytes) {
         // Faixa de rodapé
         pagina.drawRectangle({ x: 0, y: 0, width: A4_LARGURA, height: FAIXA_RODAPE, color: COR_PRIMARIA });
         pagina.drawText(`SCONT · Fechamento de Folha · Intervalo: ${state.intervalo}`, { x: 12, y: 8, size: 8, font: fontRegular, color: COR_BRANCA });
-        const textoPagina = `Página ${idx + 1} de ${totalPaginas}`;
-        const larguraTexto = fontRegular.widthOfTextAtSize(textoPagina, 8);
-        pagina.drawText(textoPagina, { x: A4_LARGURA - larguraTexto - 12, y: 8, size: 8, font: fontRegular, color: COR_BRANCA });
     }
 
     return novoDoc.save();
