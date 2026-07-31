@@ -8,6 +8,7 @@
   const REGIME_LABELS = { simples_nacional: 'Simples Nacional', lucro_presumido: 'Lucro Presumido', lucro_real: 'Lucro Real', mei: 'MEI' };
   const SITUACAO_LABELS = { regularizado: 'Regularizado', em_regularizacao: 'Em Regularização', pendente: 'Pendente', critico: 'Crítico' };
   const FINANCEIRO_LABELS = { interno: 'Interno', bpo_scont: 'BPO Scont', bpo_terceiro: 'BPO Terceiro', nao_possui: 'Não possui' };
+  const PERIODICIDADE_LABELS = { mensal: 'Mensal', trimestral: 'Trimestral', anual: 'Anual' };
 
   const BANCOS_SUGERIDOS = ['Itaú', 'Bradesco', 'Banco do Brasil', 'Caixa', 'Santander', 'Sicoob', 'Sicredi', 'Inter', 'Nubank'];
   const SISTEMAS_SUGERIDOS = ['Domínio', 'Alterdata', 'Bling', 'Omie', 'Contmatic', 'SAP', 'Totvs'];
@@ -212,7 +213,12 @@
     const m = mapeamentoAtual;
 
     main.innerHTML = `
-      <div class="onboarding-header"><div><h2>${escapeHtml(empresaNome(m.codigo_empresa))}</h2></div></div>
+      <div class="onboarding-header">
+        <div><h2>${escapeHtml(empresaNome(m.codigo_empresa))}</h2></div>
+        <div class="onboarding-header-actions">
+          <button type="button" class="btn btn-primary" id="btnRelatorioPDF">📄 Gerar Relatório PDF</button>
+        </div>
+      </div>
 
       <div class="mapa-secao">
         <div class="mapa-secao-header">Execução</div>
@@ -307,6 +313,8 @@
         renderPerfil();
       });
     });
+
+    document.getElementById('btnRelatorioPDF').addEventListener('click', gerarRelatorioPDF);
 
     renderNivelAtencao();
     renderPendencias();
@@ -530,5 +538,115 @@
       ]);
       renderRelacionadas();
     });
+  }
+
+  // ─── RELATÓRIO PDF ──────────────────────────────────────────
+
+  function secaoTabelaPdf(doc, titulo, linhas, startY, pageW, margem) {
+    if (startY > 260) { doc.addPage(); startY = margem; }
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(139, 58, 58);
+    doc.text(titulo, margem, startY);
+    doc.autoTable({
+      body: linhas,
+      startY: startY + 3,
+      margin: { left: margem, right: margem },
+      styles: { fontSize: 8.5, cellPadding: 1.8, textColor: [44, 62, 80] },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 } },
+      theme: 'plain',
+    });
+    return doc.lastAutoTable.finalY + 8;
+  }
+
+  async function gerarRelatorioPDF() {
+    const m = mapeamentoAtual;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const MARGEM = 10;
+    const pageW = doc.internal.pageSize.getWidth();
+    const nomeEmpresa = empresaNome(m.codigo_empresa);
+
+    const texto = (v) => (v == null || v === '' ? '—' : String(v));
+    const tags = (arr) => (arr && arr.length ? arr.join(', ') : '—');
+
+    doc.setFillColor(139, 58, 58);
+    doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, 20, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+    doc.text(nomeEmpresa, MARGEM + 4, MARGEM + 8);
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    doc.text('Mapeamento Estratégico — Departamento Contábil', MARGEM + 4, MARGEM + 15);
+    doc.setFontSize(8);
+    doc.text('Gerado em ' + new Date().toLocaleDateString('pt-BR'), pageW - MARGEM - 4, MARGEM + 8, { align: 'right' });
+    doc.text('Nível de atenção: ' + NIVEL_LABELS[m.nivel_atencao || 'baixo'], pageW - MARGEM - 4, MARGEM + 15, { align: 'right' });
+
+    let y = MARGEM + 28;
+
+    y = secaoTabelaPdf(doc, 'Execução', [
+      ['Periodicidade', m.periodicidade ? PERIODICIDADE_LABELS[m.periodicidade] : '—'],
+      ['Regime Tributário', m.regime_tributario ? REGIME_LABELS[m.regime_tributario] : '—'],
+      ['Responsável pela Execução', texto(m.responsavel_execucao)],
+      ['Contato', [m.contato_nome, m.contato_telefone, m.contato_email].filter(Boolean).join(' • ') || '—'],
+    ], y, pageW, MARGEM);
+
+    y = secaoTabelaPdf(doc, 'Situação de Fechamento', [
+      ['Último Mês Fechado', m.ultimo_mes_fechado ? formatarMesAno(m.ultimo_mes_fechado) : '—'],
+      ['Situação 2025', (m.situacao_2025_status ? SITUACAO_LABELS[m.situacao_2025_status] : '—') + (m.situacao_2025_obs ? ' — ' + m.situacao_2025_obs : '')],
+      ['Situação 2026', (m.situacao_2026_status ? SITUACAO_LABELS[m.situacao_2026_status] : '—') + (m.situacao_2026_obs ? ' — ' + m.situacao_2026_obs : '')],
+    ], y, pageW, MARGEM);
+
+    y = secaoTabelaPdf(doc, 'Operação / Financeiro', [
+      ['Financeiro Interno ou BPO', m.financeiro_interno_bpo ? FINANCEIRO_LABELS[m.financeiro_interno_bpo] : '—'],
+      ['Acesso Bancário de Leitura', m.acesso_bancario_leitura ? 'Sim' : 'Não'],
+      ['Forma de Envio dos Documentos', tags(m.forma_envio_documentos)],
+      ['Bancos Utilizados', tags(m.bancos_utilizados)],
+      ['Sistemas Utilizados', tags(m.sistemas_utilizados)],
+    ], y, pageW, MARGEM);
+
+    y = secaoTabelaPdf(doc, 'Entregáveis & Particularidades', [
+      ['Entregáveis Esperados', tags(m.entregaveis_esperados)],
+      ['Obrigações Acessórias', tags(m.obrigacoes_acessorias)],
+      ['Particularidades Contábeis', texto(m.particularidades_contabeis)],
+      ['Particularidades Fiscais', texto(m.particularidades_fiscais)],
+      ['Particularidades Societárias', texto(m.particularidades_societarias)],
+    ], y, pageW, MARGEM);
+
+    const pendencias = pendenciasPorMapeamento[m.id] || [];
+    if (y > 250) { doc.addPage(); y = MARGEM; }
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(139, 58, 58);
+    doc.text('Pendências', MARGEM, y);
+    y += 3;
+    if (pendencias.length) {
+      doc.autoTable({
+        head: [['Descrição', 'Responsável', 'Prazo', 'Status']],
+        body: pendencias.map((p) => [p.descricao, p.responsavel || '—', p.prazo ? formatarData(p.prazo) : '—', p.status === 'aberta' ? 'Aberta' : 'Resolvida']),
+        startY: y,
+        margin: { left: MARGEM, right: MARGEM },
+        styles: { fontSize: 8, cellPadding: 1.6 },
+        headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+      });
+      y = doc.lastAutoTable.finalY + 8;
+    } else {
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 108, 125);
+      doc.text('Nenhuma pendência registrada.', MARGEM, y + 3);
+      y += 12;
+    }
+
+    const { data: relData, error: relErr } = await supabaseClient
+      .from('contabil_mapeamento_relacionadas')
+      .select('codigo_empresa_relacionada')
+      .eq('codigo_empresa', m.codigo_empresa);
+    if (relErr) console.error(relErr);
+    const relacionadas = (relData || []).map((r) => empresaNome(r.codigo_empresa_relacionada));
+
+    if (y > 270) { doc.addPage(); y = MARGEM; }
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(139, 58, 58);
+    doc.text('Empresas Relacionadas', MARGEM, y);
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(44, 62, 80);
+    doc.text(relacionadas.length ? relacionadas.join(', ') : 'Nenhuma empresa relacionada.', MARGEM, y + 6, { maxWidth: pageW - MARGEM * 2 });
+
+    const nomeArquivoSeguro = nomeEmpresa
+      .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    doc.save(`Mapeamento_Estrategico_${nomeArquivoSeguro}.pdf`);
   }
 })();
