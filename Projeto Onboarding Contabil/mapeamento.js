@@ -429,7 +429,7 @@
           </span>
         </div>
       `;
-    }).join('') || '<p class="nav-empty">Nenhuma pendência registrada.</p>';
+    }).join('') || '<p class="mapa-empty">Nenhuma pendência registrada.</p>';
 
     el.innerHTML = `
       <div class="mapa-secao">
@@ -508,7 +508,7 @@
           <div class="full">
             ${relacionadas.length
               ? `<div class="mapa-tags">${relacionadas.map((cod) => `<span class="mapa-tag">${escapeHtml(empresaNome(cod))}<button type="button" data-desvincular="${cod}">×</button></span>`).join('')}</div>`
-              : '<p class="nav-empty">Nenhuma empresa relacionada.</p>'}
+              : '<p class="mapa-empty">Nenhuma empresa relacionada.</p>'}
           </div>
           <div class="full">
             <select id="selectRelacionada">
@@ -543,7 +543,8 @@
   // ─── RELATÓRIO PDF ──────────────────────────────────────────
 
   function secaoTabelaPdf(doc, titulo, linhas, startY, pageW, margem) {
-    if (startY > 260) { doc.addPage(); startY = margem; }
+    const pageH = doc.internal.pageSize.getHeight();
+    if (startY > pageH - 35) { doc.addPage(); startY = margem; }
     doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(139, 58, 58);
     doc.text(titulo, margem, startY);
     doc.autoTable({
@@ -560,9 +561,10 @@
   async function gerarRelatorioPDF() {
     const m = mapeamentoAtual;
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
     const MARGEM = 10;
     const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
     const nomeEmpresa = empresaNome(m.codigo_empresa);
 
     const texto = (v) => (v == null || v === '' ? '—' : String(v));
@@ -611,7 +613,7 @@
     ], y, pageW, MARGEM);
 
     const pendencias = pendenciasPorMapeamento[m.id] || [];
-    if (y > 250) { doc.addPage(); y = MARGEM; }
+    if (y > pageH - 45) { doc.addPage(); y = MARGEM; }
     doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(139, 58, 58);
     doc.text('Pendências', MARGEM, y);
     y += 3;
@@ -639,7 +641,7 @@
     if (relErr) console.error(relErr);
     const relacionadas = (relData || []).map((r) => empresaNome(r.codigo_empresa_relacionada));
 
-    if (y > 270) { doc.addPage(); y = MARGEM; }
+    if (y > pageH - 25) { doc.addPage(); y = MARGEM; }
     doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(139, 58, 58);
     doc.text('Empresas Relacionadas', MARGEM, y);
     doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(44, 62, 80);
