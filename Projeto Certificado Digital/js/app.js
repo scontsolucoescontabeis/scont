@@ -175,6 +175,7 @@ function renderCertTable() {
         <td style="white-space:nowrap;">
           <button class="btn btn-ghost" onclick="openDetails('${c.id}')"    style="padding:5px 10px;font-size:12px;margin-right:3px;">👁 Ver</button>
           <button class="btn btn-ghost" onclick="openCertModal('${c.id}')"  style="padding:5px 10px;font-size:12px;margin-right:3px;">✏ Editar</button>
+          <button class="btn btn-ghost" onclick="openScheduleModal('${c.id}')" style="padding:5px 10px;font-size:12px;margin-right:3px;">📅 ${c.data_renovacao_agendada ? 'Reagendar' : 'Agendar'}</button>
           <button class="btn btn-ghost" onclick="removeCert('${c.id}')"    style="padding:5px 10px;font-size:12px;color:var(--danger);">🗑</button>
         </td>
       </tr>`;
@@ -333,7 +334,7 @@ function renderAgendaPage() {
       <td>${fmt(c.data_vencimento)}</td>
       <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
       <td>${c.responsavel_nome || '—'}</td>
-      <td><button class="btn btn-ghost" onclick="openCertModal('${c.id}')" style="padding:5px 10px;font-size:12px;">✏ Editar</button></td>
+      <td><button class="btn btn-ghost" onclick="openScheduleModal('${c.id}')" style="padding:5px 10px;font-size:12px;">📅 Reagendar</button></td>
     </tr>`).join('')
     : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Nenhum agendamento registrado</td></tr>';
 
@@ -348,7 +349,7 @@ function renderAgendaPage() {
       <td>${fmt(c.data_vencimento)}</td>
       <td><span style="color:${color};font-weight:700;">${text}</span></td>
       <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
-      <td><button class="btn btn-primary" onclick="openCertModal('${c.id}')" style="padding:5px 10px;font-size:12px;">📅 Agendar</button></td>
+      <td><button class="btn btn-primary" onclick="openScheduleModal('${c.id}')" style="padding:5px 10px;font-size:12px;">📅 Agendar</button></td>
     </tr>`;
   }).join('')
     : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Sem vencimentos próximos sem agendamento</td></tr>';
@@ -664,7 +665,6 @@ function openCertModal(id = null) {
       q('#vencimento').value   = toISODate(cert.data_vencimento);
       q('#senha').value        = cert.senha_hash || '';
       q('#situacao').value     = cert.situacao;
-      q('#agendamento').value  = toISODateTime(cert.data_renovacao_agendada);
       q('#responsavel').value  = cert.responsavel_nome || '';
       q('#email').value        = cert.responsavel_email || '';
       q('#telefone').value     = cert.responsavel_telefone || '';
@@ -694,6 +694,80 @@ function openCertModal(id = null) {
 
 function closeCertModal() {
   q('#certModal').classList.remove('active');
+}
+
+// ============================================
+// MODAL — AGENDAR RENOVAÇÃO
+// ============================================
+
+function openScheduleModal(id) {
+  const cert = APP_STATE._allCertificates.find(c => c.id === id);
+  if (!cert) return;
+
+  const hasSchedule = !!cert.data_renovacao_agendada;
+  q('#scheduleModalTitle').textContent = hasSchedule ? 'Reagendar renovação' : 'Agendar renovação';
+  q('#scheduleCertId').value = cert.id;
+  q('#scheduleDateTime').value = toISODateTime(cert.data_renovacao_agendada);
+  q('#scheduleModalInfo').innerHTML = `<strong>${cert.empresa_id}</strong> — ${cert.tipo_id || '—'} • Vencimento: ${fmt(cert.data_vencimento)}`;
+  q('#btnRemoveSchedule').style.display = hasSchedule ? 'inline-flex' : 'none';
+
+  q('#scheduleModal').classList.add('active');
+}
+
+function closeScheduleModal() {
+  q('#scheduleModal').classList.remove('active');
+}
+
+async function saveSchedule() {
+  const id = q('#scheduleCertId').value;
+  const dateTime = q('#scheduleDateTime').value;
+  if (!id || !dateTime) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from(TABLE_NAMES.CERTIFICADOS)
+      .update({
+        data_renovacao_agendada: dateTime,
+        situacao: 'Agendado',
+        atualizado_por: APP_STATE.currentUser?.usuario_id
+      })
+      .eq('id', id);
+    if (error) throw error;
+    showToast('Renovação agendada com sucesso!');
+    closeScheduleModal();
+    await fetchCertificates();
+    if (q('#page-agenda')?.classList.contains('active')) renderAgendaPage();
+  } catch (err) {
+    showToast('Erro ao agendar: ' + err.message, 'error');
+  }
+}
+
+async function removeSchedule() {
+  const id = q('#scheduleCertId').value;
+  if (!id) return;
+  if (!confirm('Remover o agendamento de renovação deste certificado?')) return;
+
+  const cert = APP_STATE._allCertificates.find(c => c.id === id);
+  const d = cert ? daysLeft(cert.data_vencimento) : null;
+  const situacao = d !== null && d < 0 ? 'Vencido' : 'Ativo';
+
+  try {
+    const { error } = await supabaseClient
+      .from(TABLE_NAMES.CERTIFICADOS)
+      .update({
+        data_renovacao_agendada: null,
+        situacao,
+        atualizado_por: APP_STATE.currentUser?.usuario_id
+      })
+      .eq('id', id);
+    if (error) throw error;
+    showToast('Agendamento removido.');
+    closeScheduleModal();
+    await fetchCertificates();
+    if (q('#page-agenda')?.classList.contains('active')) renderAgendaPage();
+  } catch (err) {
+    showToast('Erro ao remover agendamento: ' + err.message, 'error');
+  }
 }
 
 function openDetails(id) {
@@ -786,7 +860,6 @@ async function saveCertificate(formData) {
       data_vencimento:          formData.get('vencimento'),
       senha_hash:               formData.get('senha')      || null,
       situacao:                 formData.get('situacao'),
-      data_renovacao_agendada:  formData.get('agendamento') || null,
       responsavel_nome:         formData.get('responsavel') || null,
       responsavel_email:        formData.get('email')       || null,
       responsavel_telefone:     formData.get('telefone')    || null,
@@ -1125,6 +1198,14 @@ function setupAppListeners() {
 
   q('#closeDetailsModal')?.addEventListener('click', closeDetailsModal);
 
+  q('#closeScheduleModal')?.addEventListener('click', closeScheduleModal);
+  q('#cancelScheduleForm')?.addEventListener('click', closeScheduleModal);
+  q('#btnRemoveSchedule')?.addEventListener('click', removeSchedule);
+  q('#scheduleForm')?.addEventListener('submit', e => {
+    e.preventDefault();
+    saveSchedule();
+  });
+
   q('#userMenuBtn')?.addEventListener('click', () => q('#userDropdown').classList.toggle('active'));
   document.addEventListener('click', e => {
     if (!e.target.closest('.user-menu')) q('#userDropdown')?.classList.remove('active');
@@ -1145,6 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Expor funções globais (chamadas via onclick no HTML)
 window.openDetails              = openDetails;
 window.openCertModal            = openCertModal;
+window.openScheduleModal        = openScheduleModal;
 window.removeCert               = removeCert;
 window.exportCSV                = exportCSV;
 window.filterRelatorio          = filterRelatorio;

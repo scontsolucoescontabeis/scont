@@ -486,10 +486,6 @@
             </div>
           </div>
           <div class="field">
-            <label>Data de agendamento</label>
-            <input id="agendamento" name="agendamento" type="datetime-local">
-          </div>
-          <div class="field">
             <label>Responsável interno</label>
             <input id="responsavel" name="responsavel" type="text">
           </div>
@@ -537,6 +533,31 @@
           <div style="display: flex; gap: 8px; margin-top: 24px;">
             <button type="button" class="btn btn-secondary" id="cancelCertForm" style="flex: 1;">Cancelar</button>
             <button type="submit" class="btn btn-primary" style="flex: 1;">Salvar certificado</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL AGENDAR RENOVAÇÃO -->
+  <div class="modal" id="scheduleModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="scheduleModalTitle">Agendar renovação</h3>
+        <button class="modal-close" id="closeScheduleModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="scheduleForm">
+          <input id="scheduleCertId" type="hidden">
+          <div id="scheduleModalInfo" style="margin-bottom:16px;font-size:13px;color:var(--text-muted);"></div>
+          <div class="field">
+            <label>Data e hora do agendamento *</label>
+            <input id="scheduleDateTime" type="datetime-local" required>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 24px;">
+            <button type="button" class="btn btn-danger" id="btnRemoveSchedule" style="display:none;">Remover agendamento</button>
+            <button type="button" class="btn btn-secondary" id="cancelScheduleForm" style="flex: 1;">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex: 1;">Salvar agendamento</button>
           </div>
         </form>
       </div>
