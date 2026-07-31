@@ -139,21 +139,27 @@ function _dataEmPeriodo(dataIso, periodos) {
     return (periodos || []).some(p => dataIso >= p.inicio && dataIso <= p.fim);
 }
 
-// Retorna { dias: [{data, diaSemana, tipo, ferias}], totalTrabalho, totalFolga, totalFerias, totalDias }
+// Retorna { dias: [{data, diaSemana, tipo, ferias, excecao}], totalTrabalho, totalFolga, totalFerias, totalDias }
 // periodosFerias (opcional): [{inicio: 'AAAA-MM-DD', fim: 'AAAA-MM-DD'}, ...]. Dia que cai em
 // algum período de férias sempre vira folga, independente do que a escala diga para aquele dia
 // (mesmo critério usado em "Gerar Benefícios": férias sempre sai do cálculo de dias a trabalhar).
 // diaInicio/diaFim (opcionais): ver _gerarDiasDoMes — apura um intervalo customizado em vez do
 // mês calendário completo.
-function calcularResumoMes(escala, competencia, periodosFerias, diaInicio = null, diaFim = null) {
+// datasExcecaoFolga (opcional): array de datas 'AAAA-MM-DD' marcadas manualmente como folga
+// pontual (tela "Gerar Escala", sem alterar a escala configurada). Prioridade: férias > exceção
+// > escala — um dia em férias nunca vira "exceção" mesmo que também esteja na lista.
+function calcularResumoMes(escala, competencia, periodosFerias, diaInicio = null, diaFim = null, datasExcecaoFolga = null) {
     const diasDoMes = _gerarDiasDoMes(competencia, diaInicio, diaFim);
     const dias = diasDoMes.map(d => {
-        const emFerias = _dataEmPeriodo(_brParaIso(d.data), periodosFerias);
+        const iso = _brParaIso(d.data);
+        const emFerias = _dataEmPeriodo(iso, periodosFerias);
+        const emExcecao = !emFerias && (datasExcecaoFolga || []).includes(iso);
         return {
             data: d.data,
             diaSemana: d.diaSemana,
-            tipo: emFerias ? 'folga' : calcularTipoDia(escala, d.data, d.diaSemana),
-            ferias: emFerias
+            tipo: (emFerias || emExcecao) ? 'folga' : calcularTipoDia(escala, d.data, d.diaSemana),
+            ferias: emFerias,
+            excecao: emExcecao
         };
     });
     const totalTrabalho = dias.filter(d => d.tipo === 'trabalho').length;

@@ -227,6 +227,41 @@ teste('calcularResumoMes: com diaInicio/diaFim, totaliza sobre o intervalo custo
     assert.notStrictEqual(resumoCustom.totalDias, resumoPadrao.totalDias);
 });
 
+// ===== exceção de folga pontual (datasExcecaoFolga) =====
+
+teste('calcularResumoMes: dia em datasExcecaoFolga vira folga mesmo em dia de trabalho da escala', () => {
+    const escalaFixa = { tipo_escala: 'fixa', dias_semana: ['segunda', 'terca', 'quarta', 'quinta', 'sexta'] };
+    const resumo = calcularResumoMes(escalaFixa, '07/2026', null, null, null, ['2026-07-15']); // quarta, dia de trabalho
+    const dia = resumo.dias.find(d => d.data === '15/07/2026');
+    assert.strictEqual(dia.tipo, 'folga');
+    assert.strictEqual(dia.excecao, true);
+    assert.strictEqual(dia.ferias, false);
+
+    const resumoSemExcecao = calcularResumoMes(escalaFixa, '07/2026');
+    assert.strictEqual(resumoSemExcecao.totalTrabalho - resumo.totalTrabalho, 1);
+});
+
+teste('calcularResumoMes: dias fora de datasExcecaoFolga não ganham o flag excecao', () => {
+    const resumo = calcularResumoMes(null, '07/2026', null, null, null, ['2026-07-15']);
+    const outroDia = resumo.dias.find(d => d.data === '16/07/2026');
+    assert.strictEqual(outroDia.excecao, false);
+});
+
+teste('calcularResumoMes: férias tem prioridade sobre exceção (dia não fica marcado como excecao)', () => {
+    const escalaFixa = { tipo_escala: 'fixa', dias_semana: ['segunda', 'terca', 'quarta', 'quinta', 'sexta'] };
+    const periodos = [{ inicio: '2026-07-15', fim: '2026-07-15' }];
+    const resumo = calcularResumoMes(escalaFixa, '07/2026', periodos, null, null, ['2026-07-15']);
+    const dia = resumo.dias.find(d => d.data === '15/07/2026');
+    assert.strictEqual(dia.tipo, 'folga');
+    assert.strictEqual(dia.ferias, true);
+    assert.strictEqual(dia.excecao, false);
+});
+
+teste('calcularResumoMes: sem datasExcecaoFolga, nenhum dia fica marcado como excecao', () => {
+    const resumo = calcularResumoMes(null, '07/2026');
+    assert.strictEqual(resumo.dias.every(d => d.excecao === false), true);
+});
+
 // ===== validarConfigEscala =====
 
 teste('validarConfigEscala: fixa sem dias selecionados é inválida', () => {

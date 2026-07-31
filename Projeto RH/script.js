@@ -3622,6 +3622,7 @@ async function gerarPreviaBeneficios() {
             { data: feriasData, error: errFer },
             { data: savesData, error: errSaves },
             { data: escalasData, error: errEsc },
+            { data: excecoesData, error: errExc },
         ] = await Promise.all([
             supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, cnpj').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, situacao, tipo_empregado').in('codigo_empresa', codigosEmpresas),
@@ -3629,6 +3630,7 @@ async function gerarPreviaBeneficios() {
             supabaseClient.from('rh_ferias_calculadas').select('codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_saves').select('*').in('empresa_codigo', codigosEmpresas).eq('competencia', comp).order('data_criacao', { ascending: false }),
             supabaseClient.from('rh_escala_trabalho').select('*').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_escala_excecoes').select('codigo_empresa, codigo_empregado, data').in('codigo_empresa', codigosEmpresas),
         ]);
         if (errEmp) throw errEmp;
         if (errFunc) throw errFunc;
@@ -3636,6 +3638,7 @@ async function gerarPreviaBeneficios() {
         if (errFer) throw errFer;
         if (errSaves) throw errSaves;
         if (errEsc) throw errEsc;
+        if (errExc) throw errExc;
 
         const empresasMapa = {};
         (empresasData || []).forEach(e => { empresasMapa[e.codigo_empresa] = e; });
@@ -3660,6 +3663,12 @@ async function gerarPreviaBeneficios() {
 
         const escalasMapa = {};
         (escalasData || []).forEach(e => { escalasMapa[`${e.codigo_empresa}_${e.codigo_empregado}`] = _parsearCamposEscala(e); });
+
+        const excecoesMapa = {};
+        (excecoesData || []).forEach(e => {
+            const chave = `${e.codigo_empresa}_${e.codigo_empregado}`;
+            (excecoesMapa[chave] ??= []).push(e.data);
+        });
 
         // Config por empresa: se deve excluir feriados nacionais do cálculo de "Dias a Trabalhar"
         // (a escala em si não considera feriados — ver [[project_rh_escala_trabalho]]), e se a
@@ -3702,11 +3711,12 @@ async function gerarPreviaBeneficios() {
             const save = savesMapa[`${emp.codigo_empresa}_${emp.nome_empregado}`];
             const periodos = feriasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`];
             const escala = escalasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || null;
+            const excecoesFolga = excecoesMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || [];
             const excluirFeriados = excluirFeriadosPorEmpresa[emp.codigo_empresa];
             const { diaInicio, diaFim } = periodoBeneficiosPorEmpresa[emp.codigo_empresa] || { diaInicio: null, diaFim: null };
             const periodoAtivo = diaInicio !== null && diaFim !== null;
             const compParaDias = periodoAtivo ? compMesSeguinte : comp;
-            const resumoEscala = calcularResumoMes(escala, compParaDias, periodos, diaInicio, diaFim);
+            const resumoEscala = calcularResumoMes(escala, compParaDias, periodos, diaInicio, diaFim, excecoesFolga);
             const diasTrabalhar = resumoEscala.dias.filter(d =>
                 d.tipo === 'trabalho' && !(excluirFeriados && _isFeriadoNoDia(d.data))
             ).length;
@@ -4648,14 +4658,17 @@ async function gerarEscala() {
             { data: empregadosData, error: errFunc },
             { data: escalasData, error: errEsc },
             { data: feriasData, error: errFer },
+            { data: excecoesData, error: errExc },
         ] = await Promise.all([
             supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, situacao, tipo_empregado').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_escala_trabalho').select('*').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_ferias_calculadas').select('codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_escala_excecoes').select('codigo_empresa, codigo_empregado, data').in('codigo_empresa', codigosEmpresas),
         ]);
         if (errFunc) throw errFunc;
         if (errEsc) throw errEsc;
         if (errFer) throw errFer;
+        if (errExc) throw errExc;
 
         const escalasMapa = {};
         (escalasData || []).forEach(e => { escalasMapa[`${e.codigo_empresa}_${e.codigo_empregado}`] = _parsearCamposEscala(e); });
@@ -4664,6 +4677,12 @@ async function gerarEscala() {
         (feriasData || []).forEach(f => {
             const chave = `${f.codigo_empresa}_${f.codigo_empregado}`;
             (feriasMapa[chave] ??= []).push({ inicio: f.ferias_inicio, fim: f.ferias_fim });
+        });
+
+        const excecoesMapa = {};
+        (excecoesData || []).forEach(e => {
+            const chave = `${e.codigo_empresa}_${e.codigo_empregado}`;
+            (excecoesMapa[chave] ??= []).push(e.data);
         });
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
@@ -4681,6 +4700,7 @@ async function gerarEscala() {
             const escala = escalasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || null;
             const empresa = state.empresas.find(e => e.codigo_empresa === emp.codigo_empresa);
             const periodosFerias = feriasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`];
+            const excecoesFolga = excecoesMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || [];
             return {
                 codigo_empresa: emp.codigo_empresa,
                 nome_empresa: empresa?.nome_empresa || emp.codigo_empresa,
@@ -4688,8 +4708,9 @@ async function gerarEscala() {
                 nome_empregado: emp.nome_empregado,
                 escala,
                 periodosFerias,
+                excecoesFolga,
                 feriasTexto: _periodosFeriasNoMesTexto(periodosFerias, comp),
-                resumo: calcularResumoMes(escala, comp, periodosFerias),
+                resumo: calcularResumoMes(escala, comp, periodosFerias, null, null, excecoesFolga),
                 expandido: false
             };
         });
@@ -4786,20 +4807,30 @@ function _renderizarDetalheEscala(linha, idx) {
             </div>
             <div>
                 <h4 style="margin:0 0 10px; font-size:13px; color:var(--text-primary);">Calendário — ${state._escalaCompetencia}</h4>
-                ${_renderizarMiniCalendarioEscala(linha)}
+                <p style="margin:0 0 8px; font-size:11px; color:var(--text-secondary);">Clique num dia de trabalho para marcar folga pontual (sem alterar a escala); clique de novo para desfazer.</p>
+                ${_renderizarMiniCalendarioEscala(linha, idx)}
             </div>
         </div>
     `;
 }
 
-function _renderizarMiniCalendarioEscala(linha) {
+function _renderizarMiniCalendarioEscala(linha, idx) {
     const primeiroDiaSemana = { Dom: 0, Seg: 1, Ter: 2, Qua: 3, Qui: 4, Sex: 5, Sab: 6 }[linha.resumo.dias[0].diaSemana];
     const celulasVazias = Array.from({ length: primeiroDiaSemana }, () => '<div></div>').join('');
     const celulasDias = linha.resumo.dias.map(d => {
-        const cor = d.ferias ? '#2C7BE5' : (d.tipo === 'trabalho' ? '#27AE60' : '#B8860B');
-        const rotulo = d.ferias ? 'férias' : d.tipo;
+        const cor = d.ferias ? '#2C7BE5' : d.excecao ? '#8B5CF6' : (d.tipo === 'trabalho' ? '#27AE60' : '#B8860B');
+        const clicavel = !d.ferias && (d.excecao || d.tipo === 'trabalho');
+        const rotulo = d.ferias
+            ? 'férias'
+            : d.excecao
+                ? 'folga marcada manualmente (clique para desfazer)'
+                : d.tipo === 'trabalho'
+                    ? 'trabalho (clique para marcar folga pontual)'
+                    : d.tipo;
         const dia = d.data.split('/')[0];
-        return `<div title="${d.data} — ${rotulo}" style="text-align:center; padding:4px 2px; border-radius:4px; background:${cor}22; color:${cor}; font-weight:600; font-size:12px;">${dia}</div>`;
+        const onclick = clicavel ? ` onclick="_toggleExcecaoFolgaEscala(${idx}, '${d.data}')"` : '';
+        const cursor = clicavel ? 'cursor:pointer;' : '';
+        return `<div title="${d.data} — ${rotulo}" style="text-align:center; padding:4px 2px; border-radius:4px; background:${cor}22; color:${cor}; font-weight:600; font-size:12px; ${cursor}"${onclick}>${dia}</div>`;
     }).join('');
     return `
         <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:3px; font-size:11px;">
@@ -4813,6 +4844,39 @@ function _renderizarMiniCalendarioEscala(linha) {
             ${celulasVazias}${celulasDias}
         </div>
     `;
+}
+
+// Marca/desmarca um dia como folga pontual (rh_escala_excecoes), sem alterar a escala
+// configurada do empregado (rh_escala_trabalho). Salva imediatamente no Supabase.
+async function _toggleExcecaoFolgaEscala(idx, dataBR) {
+    const linha = state._escalaLinhas?.[idx];
+    if (!linha) return;
+    const iso = _brParaIso(dataBR);
+    const jaExcecao = (linha.excecoesFolga || []).includes(iso);
+    try {
+        if (jaExcecao) {
+            const { error } = await supabaseClient.from('rh_escala_excecoes')
+                .delete()
+                .eq('codigo_empresa', linha.codigo_empresa)
+                .eq('codigo_empregado', linha.codigo_empregado)
+                .eq('data', iso);
+            if (error) throw error;
+            linha.excecoesFolga = linha.excecoesFolga.filter(d => d !== iso);
+        } else {
+            const { error } = await supabaseClient.from('rh_escala_excecoes')
+                .upsert(
+                    { codigo_empresa: linha.codigo_empresa, codigo_empregado: linha.codigo_empregado, data: iso },
+                    { onConflict: 'codigo_empresa,codigo_empregado,data' }
+                );
+            if (error) throw error;
+            linha.excecoesFolga = [...(linha.excecoesFolga || []), iso];
+        }
+        linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia, linha.periodosFerias, null, null, linha.excecoesFolga);
+        _renderizarListaEscala();
+    } catch (erro) {
+        console.error('Erro ao marcar/desmarcar folga pontual:', erro);
+        mostrarMensagem('Erro', 'Falha ao salvar a folga pontual: ' + erro.message);
+    }
 }
 
 function _renderizarFormConfigEscala(linha, idx) {
@@ -4987,7 +5051,7 @@ async function _salvarEscalaEmpregado(idx) {
         if (error) throw error;
 
         linha.escala = _parsearCamposEscala(data);
-        linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia, linha.periodosFerias);
+        linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia, linha.periodosFerias, null, null, linha.excecoesFolga);
         // A linha pode continuar expandida após salvar — o form precisa refletir
         // o que acabou de ir para o banco, por isso forcar=true aqui.
         _inicializarFormEscala(linha, true);
