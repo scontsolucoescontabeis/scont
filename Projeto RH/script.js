@@ -4153,14 +4153,14 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
     });
 
     const grupos = [];
-    porEmpresa.forEach(grupo => {
+    porEmpresa.forEach((grupo, codigoEmpresa) => {
         [['va', 'Vale Alimentação'], ['vt', 'Vale Transporte']].forEach(([tipo, label]) => {
             const elegiveis = grupo.linhas.filter(l => {
                 const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
                 const diario = tipo === 'va' ? l.vaDiario : l.vtDiario;
                 return diasPagar * (diario || 0) > 0;
             });
-            if (elegiveis.length > 0) grupos.push({ nomeEmpresa: grupo.nomeEmpresa, tipo, label, elegiveis });
+            if (elegiveis.length > 0) grupos.push({ codigoEmpresa, nomeEmpresa: grupo.nomeEmpresa, tipo, label, elegiveis });
         });
     });
 
@@ -4171,7 +4171,7 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
         for (const grupo of grupos) {
             const sheetsHtml = grupo.elegiveis.map(l => _reciboSheetHTML(grupo.tipo, l, periodoTexto)).join('');
             const nomeEmpresaArquivo = grupo.nomeEmpresa.replace(/[^\p{L}\p{N}]+/gu, '_');
-            const nomeArquivo = `Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesFmt}${ano}.pdf`;
+            const nomeArquivo = `${grupo.codigoEmpresa}_Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesFmt}${ano}.pdf`;
             await _gerarPdfRecibos(nomeArquivo, sheetsHtml);
         }
         fecharModalMensagem();
