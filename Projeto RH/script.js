@@ -4202,7 +4202,7 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
 // jsPDF + autoTable) — ver Projeto Fechamento Folha → quadrante.js → gerarPDFLiquido.
 function _relatorioLiquidoBeneficiosPDF(grupo, comp, periodoTexto, mesFmt, ano) {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
     const MARGEM = 10;
     const pageW = doc.internal.pageSize.getWidth();
     const cnpj = grupo.linhas[0]?.cnpj || '';
