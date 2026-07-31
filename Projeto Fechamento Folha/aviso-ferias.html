@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aviso de Férias – SCONT</title>
+<link rel="stylesheet" href="styles.css">
+<script src="../supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../portal-auth-guard.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+.steps-bar { display: flex; align-items: center; margin: 0 0 24px; padding: 0; }
+.step-node { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.step-circle {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px;
+    border: 2px solid #D0D0D0; background: #fff; color: #AAAAAA;
+    transition: all .25s;
+}
+.step-circle.active { background: var(--primary-color); border-color: var(--primary-color); color: #fff; }
+.step-circle.done   { background: var(--primary-color); border-color: var(--primary-color); color: #fff; }
+.step-text { font-size: 12px; font-weight: 600; color: #AAAAAA; white-space: nowrap; transition: color .25s; }
+.step-text.active, .step-text.done { color: var(--primary-color); }
+.step-line { flex: 1; height: 2px; background: #D0D0D0; margin: 0 10px; transition: background .25s; min-width: 20px; }
+.step-line.done { background: var(--primary-color); }
+
+.upload-area {
+    border: 2px dashed var(--border-color); border-radius: 12px;
+    padding: 40px 24px; text-align: center; cursor: pointer;
+    transition: border-color .2s, background .2s; background: #FAFAFA; display: block;
+}
+.upload-area:hover, .upload-area.drag-over { border-color: var(--primary-color); background: #FBF3F3; }
+.upload-area input[type=file] { display: none; }
+.upload-icon { font-size: 44px; margin-bottom: 10px; }
+.upload-label { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+.upload-filename {
+    margin-top: 12px; font-size: 13px; color: var(--primary-color);
+    font-weight: 600; background: #EFDADA;
+    border-radius: 6px; padding: 8px 14px; display: inline-block;
+}
+.campo-intervalo { margin-top: 22px; max-width: 420px; }
+.campo-intervalo label { display: block; font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+.campo-intervalo input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px;
+}
+
+.tabela-empresas { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface-color); }
+.tabela-empresas th, .tabela-empresas td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); text-align: left; }
+.tabela-empresas select { padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; min-width: 220px; }
+.badge-ok { background: #E8F6EC; color: var(--success-color); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; margin-right: 6px; }
+.badge-pendente { background: #FDECEA; color: var(--danger-color); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; margin-right: 6px; }
+.avisos-parsing { background: #FFF8E1; border: 1px solid #F0D98C; border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-bottom: 16px; }
+
+.cartao-empresa-gerada {
+    display: flex; justify-content: space-between; align-items: center;
+    border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 16px; margin-bottom: 10px;
+    background: var(--surface-color);
+}
+</style>
+</head>
+<body>
+
+<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+        <h2>Fechamento Folha</h2>
+        <p>Processamento de Folha</p>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="sidebar-section">Empresas</div>
+
+        <button class="sidebar-item sidebar-group-toggle" id="grupoBtn-quadrante" onclick="toggleEmpresaGroup('quadrante')">
+            <span class="sidebar-item-icon">🏭</span> Quadrante Etiquetas
+            <span class="sidebar-group-chevron">▸</span>
+        </button>
+        <div class="sidebar-subgroup" id="grupo-quadrante">
+            <a href="quadrante.html" class="sidebar-item sidebar-subitem"><span class="sidebar-item-icon">📊</span> Planilha</a>
+            <a href="formulario_quadrante.html" class="sidebar-item sidebar-subitem"><span class="sidebar-item-icon">📄</span> Formulário</a>
+            <a href="quadrante.html?tela=liquido" class="sidebar-item sidebar-subitem"><span class="sidebar-item-icon">🏷️</span> Relatório Líquido</a>
+            <a href="quadrante.html?tela=config-rubricas" class="sidebar-item sidebar-subitem"><span class="sidebar-item-icon">⚙️</span> Configurações</a>
+        </div>
+
+        <button class="sidebar-item sidebar-group-toggle" id="grupoBtn-trackfield" onclick="toggleEmpresaGroup('trackfield')">
+            <span class="sidebar-item-icon">🏃</span> Track &amp; Field
+            <span class="sidebar-group-chevron">▸</span>
+        </button>
+        <div class="sidebar-subgroup" id="grupo-trackfield">
+            <a href="trackfield.html" class="sidebar-item sidebar-subitem"><span class="sidebar-item-icon">📊</span> Planilha</a>
+            <a href="formulario_trackfield.html" class="sidebar-item sidebar-subitem"><span class="sidebar-item-icon">📄</span> Formulário</a>
+            <a href="trackfield.html?tela=config" class="sidebar-item sidebar-subitem"><span class="sidebar-item-icon">⚙️</span> Configurações</a>
+        </div>
+
+        <button class="sidebar-item sidebar-group-toggle" id="grupoBtn-ananke" onclick="toggleEmpresaGroup('ananke')">
+            <span class="sidebar-item-icon">🏥</span> Anankê
+            <span class="sidebar-group-chevron">▸</span>
+        </button>
+        <div class="sidebar-subgroup" id="grupo-ananke">
+            <a href="ananke.html" class="sidebar-item sidebar-subitem"><span class="sidebar-item-icon">📊</span> Planilha</a>
+            <a href="formulario_ananke.html" class="sidebar-item sidebar-subitem"><span class="sidebar-item-icon">📄</span> Formulário</a>
+            <a href="ananke.html?tela=config" class="sidebar-item sidebar-subitem"><span class="sidebar-item-icon">⚙️</span> Configurações</a>
+        </div>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-section">Ferramentas</div>
+        <a href="fluxo.html" class="sidebar-item"><span class="sidebar-item-icon">📋</span> Fluxo de Fechamento</a>
+        <a href="ferias.html" class="sidebar-item"><span class="sidebar-item-icon">🏖️</span> Programação de Férias</a>
+        <a href="aviso-ferias.html" class="sidebar-item active"><span class="sidebar-item-icon">📨</span> Aviso de Férias</a>
+        <a href="controle.html" class="sidebar-item"><span class="sidebar-item-icon">🗂️</span> Controle de Fechamento</a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <a href="index.html" class="sidebar-item" style="margin-bottom:10px;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
+            <span class="sidebar-item-icon">🏠</span> Voltar
+        </a>
+        <div class="sidebar-footer-info">
+            <strong>Fechamento Folha</strong>
+            SCONT · Módulo de Folha
+        </div>
+    </div>
+</aside>
+
+<div class="main-content">
+
+    <div class="page-header">
+        <div>
+            <h1>Aviso de Férias</h1>
+            <div class="page-header-sub">Separe e gere os avisos de férias por empresa a partir do PDF do sistema de folha</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="steps-bar">
+            <div class="step-node"><div class="step-circle active" id="circle1">1</div><span class="step-text active" id="text1">Upload</span></div>
+            <div class="step-line" id="line1"></div>
+            <div class="step-node"><div class="step-circle" id="circle2">2</div><span class="step-text" id="text2">Revisão</span></div>
+            <div class="step-line" id="line2"></div>
+            <div class="step-node"><div class="step-circle" id="circle3">3</div><span class="step-text" id="text3">Geração</span></div>
+        </div>
+
+        <!-- PASSO 1 -->
+        <section id="step1">
+            <label class="upload-area" id="dropzone">
+                <input type="file" id="inputPdf" accept="application/pdf">
+                <div class="upload-icon">📄</div>
+                <div class="upload-label">Arraste o PDF de Aviso de Férias aqui<br>ou clique para selecionar</div>
+                <div class="upload-filename" id="nomeArquivoSelecionado" style="display:none"></div>
+            </label>
+            <div class="campo-intervalo">
+                <label for="inputIntervalo">Intervalo (usado no nome dos arquivos gerados)</label>
+                <input type="text" id="inputIntervalo" placeholder="Ex.: 03/08 a 07/09/2026">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-primary" id="btnProcessar" disabled>Processar PDF</button>
+            </div>
+        </section>
+
+        <!-- PASSO 2 -->
+        <section id="step2" style="display:none">
+            <div id="avisosParsing" class="avisos-parsing" style="display:none"></div>
+            <table class="tabela-empresas">
+                <thead>
+                    <tr>
+                        <th>Empresa (no PDF)</th>
+                        <th>CNPJ</th>
+                        <th>Empregados</th>
+                        <th>Páginas</th>
+                        <th>Código da empresa</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaEmpresasBody"></tbody>
+            </table>
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="btnVoltarStep1">Voltar</button>
+                <button class="btn btn-primary" id="btnGerarPdfs" disabled>Gerar PDFs</button>
+            </div>
+        </section>
+
+        <!-- PASSO 3 -->
+        <section id="step3" style="display:none">
+            <div id="resultadoGeracao"></div>
+            <div class="btn-group">
+                <button class="btn btn-primary" id="btnBaixarZip">⬇️ Baixar todos (.zip)</button>
+                <button class="btn btn-secondary" id="btnNovoLote">Processar novo lote</button>
+            </div>
+        </section>
+    </div>
+</div>
+
+<script src="aviso-ferias-parser.js"></script>
+<script src="aviso-ferias.js"></script>
+<script>
+window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+
+const hamburger = document.getElementById('hamburger');
+const sidebar   = document.getElementById('sidebar');
+const overlay   = document.getElementById('sidebarOverlay');
+hamburger.addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); });
+overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); });
+
+function toggleEmpresaGroup(nome) {
+    document.getElementById('grupoBtn-' + nome).classList.toggle('open');
+    document.getElementById('grupo-' + nome).classList.toggle('open');
+}
+</script>
+
+</body>
+</html>
