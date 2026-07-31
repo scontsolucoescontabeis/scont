@@ -4176,7 +4176,8 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
 
     if (grupos.length === 0) { mostrarMensagem('Aviso', 'Nenhum recibo gerado — todos os valores de VT/VA estão zerados ou em branco.'); return; }
 
-    mostrarMensagem('Aguarde', `Gerando ${grupos.length} PDF(s) de recibos...`);
+    const totalPdfs = grupos.length + porEmpresa.size;
+    mostrarMensagem('Aguarde', `Gerando ${totalPdfs} PDF(s) de recibos e relatórios líquidos...`);
     try {
         for (const grupo of grupos) {
             const sheetsHtml = grupo.elegiveis.map(l => _reciboSheetHTML(grupo.tipo, l, periodoTexto)).join('');
@@ -4184,12 +4185,81 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
             const nomeArquivo = `${grupo.codigoEmpresa}_Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesFmt}${ano}.pdf`;
             await _gerarPdfRecibos(nomeArquivo, sheetsHtml);
         }
+        porEmpresa.forEach((grupo, codigoEmpresa) => {
+            _relatorioLiquidoBeneficiosPDF({ codigoEmpresa, nomeEmpresa: grupo.nomeEmpresa, linhas: grupo.linhas }, comp, periodoTexto, mesFmt, ano);
+        });
         fecharModalMensagem();
     } catch (erro) {
         console.error('Erro ao gerar recibos em PDF:', erro);
         fecharModalMensagem();
         mostrarMensagem('Erro', 'Falha ao gerar os recibos: ' + erro.message);
     }
+}
+
+// Relatório Líquido de Benefícios (1 PDF por empresa): detalhamento do cálculo e o
+// somatório dos benefícios por empregado, mais o somatório da empresa. Mesma
+// identidade visual dos relatórios tabulares do portal (barra bordô --primary,
+// jsPDF + autoTable) — ver Projeto Fechamento Folha → quadrante.js → gerarPDFLiquido.
+function _relatorioLiquidoBeneficiosPDF(grupo, comp, periodoTexto, mesFmt, ano) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const MARGEM = 10;
+    const pageW = doc.internal.pageSize.getWidth();
+    const cnpj = grupo.linhas[0]?.cnpj || '';
+
+    const linhasCabecalho = [{ texto: grupo.nomeEmpresa, tamanho: 11, negrito: true }];
+    if (cnpj) linhasCabecalho.push({ texto: 'CNPJ: ' + cnpj, tamanho: 7, negrito: false });
+    linhasCabecalho.push({ texto: `Período de pagamento: ${periodoTexto}`, tamanho: 7, negrito: false });
+
+    const alturaBarra = 6 + linhasCabecalho.length * 5;
+    doc.setFillColor(139, 58, 58);
+    doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, alturaBarra, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    linhasCabecalho.forEach((linha, i) => {
+        doc.setFontSize(linha.tamanho);
+        doc.setFont('helvetica', linha.negrito ? 'bold' : 'normal');
+        doc.text(linha.texto, MARGEM + 4, MARGEM + 6 + i * 5);
+    });
+
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+    doc.text('Relatório Líquido de Benefícios', pageW - MARGEM - 4, MARGEM + 8, { align: 'right' });
+    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+    doc.text('Gerado em ' + new Date().toLocaleDateString('pt-BR'), pageW - MARGEM - 4, MARGEM + 13, { align: 'right' });
+
+    let totalVt = 0, totalVa = 0, totalGeral = 0;
+    const body = grupo.linhas.map(l => {
+        const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
+        const vtMensal = diasPagar * (l.vtDiario || 0);
+        const vaMensal = diasPagar * (l.vaDiario || 0);
+        totalVt += vtMensal; totalVa += vaMensal; totalGeral += vtMensal + vaMensal;
+        return [
+            l.codigo_empregado, l.nome_empregado, l.desc_cargo,
+            l.diasTrabalhar, l.diasDescontar, diasPagar,
+            l.vtDiario ? _fmtMoedaRecibo(l.vtDiario) : '',
+            l.vaDiario ? _fmtMoedaRecibo(l.vaDiario) : '',
+            _fmtMoedaRecibo(vtMensal), _fmtMoedaRecibo(vaMensal), _fmtMoedaRecibo(vtMensal + vaMensal),
+        ];
+    });
+    body.push([
+        { content: 'Total Geral:', colSpan: 8, styles: { fontStyle: 'bold', halign: 'right' } },
+        { content: _fmtMoedaRecibo(totalVt), styles: { fontStyle: 'bold' } },
+        { content: _fmtMoedaRecibo(totalVa), styles: { fontStyle: 'bold' } },
+        { content: _fmtMoedaRecibo(totalGeral), styles: { fontStyle: 'bold' } },
+    ]);
+
+    doc.autoTable({
+        head: [['Código', 'Empregado', 'Cargo', 'Dias Trab.', 'Descontar', 'A Pagar', 'VT Diário', 'VA Diário', 'VT Mensal', 'VA Mensal', 'Total']],
+        body,
+        startY: MARGEM + alturaBarra + 4,
+        margin: { left: MARGEM, right: MARGEM },
+        styles: { fontSize: 7.5, cellPadding: 1.8, valign: 'middle' },
+        headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: { 1: { cellWidth: 'auto' }, 2: { cellWidth: 'auto' } },
+    });
+
+    const nomeEmpresaArquivo = grupo.nomeEmpresa.replace(/[^\p{L}\p{N}]+/gu, '_');
+    doc.save(`${grupo.codigoEmpresa}_Relatorio_Liquido_Beneficios_${nomeEmpresaArquivo}_${mesFmt}${ano}.pdf`);
 }
 
 // ===== AJUDA DE CUSTO — EMPRESA 350 (ITC BRASIL TECNOLOGIAS LTDA), RUBRICA 201 =====
