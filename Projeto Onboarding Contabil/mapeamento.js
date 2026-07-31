@@ -21,7 +21,7 @@
   let relacionadasPorEmpresa = {};  // cache simples { codigo_empresa: [codigo_empresa_relacionada, ...] }
   let mapeamentoAtualId = null;     // codigo_empresa selecionado (null = dashboard)
   let mapeamentoAtual = null;       // linha de contabil_mapeamento selecionada
-  let filtro = { nivel: null, regime: '', financeiro: '', termo: '' };
+  let filtro = { nivel: null, regime: '', financeiro: '' };
 
   document.addEventListener('DOMContentLoaded', iniciar);
 
@@ -33,14 +33,16 @@
     document.getElementById('btnDashboard').addEventListener('click', () => {
       mapeamentoAtualId = null;
       mapeamentoAtual = null;
+      document.getElementById('seletorEmpresa').value = '';
       renderDashboard();
-      renderListaEmpresas();
     });
-    document.getElementById('buscaEmpresa').addEventListener('input', renderListaEmpresas);
+    document.getElementById('seletorEmpresa').addEventListener('change', (ev) => {
+      if (ev.target.value) selecionarEmpresa(ev.target.value);
+    });
 
     await carregarDados();
     renderDashboard();
-    renderListaEmpresas();
+    renderSeletorEmpresas();
   }
 
   async function carregarDados() {
@@ -111,7 +113,6 @@
       if (filtro.nivel && nivelDe(e.codigo_empresa) !== filtro.nivel) return false;
       if (filtro.regime && (!m || m.regime_tributario !== filtro.regime)) return false;
       if (filtro.financeiro && (!m || m.financeiro_interno_bpo !== filtro.financeiro)) return false;
-      if (filtro.termo && !e.nome_empresa.toLowerCase().includes(filtro.termo)) return false;
       return true;
     });
   }
@@ -176,31 +177,21 @@
     });
   }
 
-  // ─── SIDEBAR: LISTA DE EMPRESAS ─────────────────────────────
+  // ─── SIDEBAR: SELETOR DE EMPRESA ─────────────────────────────
 
-  function renderListaEmpresas() {
-    const nav = document.getElementById('listaEmpresas');
-    const termo = (document.getElementById('buscaEmpresa').value || '').toLowerCase().trim();
-    filtro.termo = termo;
-
-    const filtradas = termo ? empresas.filter((e) => e.nome_empresa.toLowerCase().includes(termo)) : empresas;
-    if (!filtradas.length) { nav.innerHTML = '<p class="nav-empty">Nenhuma empresa encontrada.</p>'; return; }
-
-    nav.innerHTML = '';
-    filtradas.forEach((e) => {
-      const nivel = nivelDe(e.codigo_empresa);
-      const btn = document.createElement('button');
-      btn.className = 'nav-onboarding-btn' + (e.codigo_empresa === mapeamentoAtualId ? ' active' : '');
-      btn.innerHTML = `<span class="nav-onboarding-empresa">${escapeHtml(e.nome_empresa)}</span><span class="badge-nivel nivel-${nivel}">${NIVEL_LABELS[nivel]}</span>`;
-      btn.addEventListener('click', () => selecionarEmpresa(e.codigo_empresa));
-      nav.appendChild(btn);
-    });
+  function renderSeletorEmpresas() {
+    const select = document.getElementById('seletorEmpresa');
+    const atual = select.value;
+    select.innerHTML = '<option value="">Selecionar empresa...</option>' +
+      empresas.map((e) => `<option value="${escapeHtml(e.codigo_empresa)}">${escapeHtml(e.nome_empresa)}</option>`).join('');
+    select.value = atual;
   }
 
   // ─── PERFIL DA EMPRESA ──────────────────────────────────────
 
   async function selecionarEmpresa(codigoEmpresa) {
     mapeamentoAtualId = codigoEmpresa;
+    document.getElementById('seletorEmpresa').value = codigoEmpresa;
     let m = mapeamentoDe(codigoEmpresa);
     if (!m) {
       const { data, error } = await supabaseClient
@@ -213,7 +204,6 @@
       mapeamentos.push(m);
     }
     mapeamentoAtual = m;
-    renderListaEmpresas();
     renderPerfil();
   }
 
@@ -398,7 +388,6 @@
       mapeamentoAtual.nivel_atencao_travado = travado;
       const { error } = await supabaseClient.from('contabil_mapeamento').update({ nivel_atencao: novoNivel, nivel_atencao_travado: travado }).eq('id', mapeamentoAtual.id);
       if (error) console.error(error);
-      renderListaEmpresas();
     });
   }
 
@@ -411,7 +400,6 @@
       supabaseClient.from('contabil_mapeamento').update({ nivel_atencao: sugestao }).eq('id', mapeamentoAtual.id).then(({ error }) => { if (error) console.error(error); });
     }
     renderNivelAtencao();
-    renderListaEmpresas();
   }
 
   // ─── PENDÊNCIAS ─────────────────────────────────────────────
@@ -427,7 +415,10 @@
       return `
         <div class="mapa-pendencia-item ${vencida ? 'vencida' : ''} ${p.status === 'resolvida' ? 'resolvida' : ''}">
           <span class="desc">${escapeHtml(p.descricao)}${p.responsavel ? ` — <em>${escapeHtml(p.responsavel)}</em>` : ''}${p.prazo ? ` (prazo: ${formatarData(p.prazo)})` : ''}</span>
-          ${p.status === 'aberta' ? `<button type="button" data-resolver="${p.id}">Resolver</button>` : ''}
+          <span class="acoes">
+            ${p.status === 'aberta' ? `<button type="button" data-resolver="${p.id}">Resolver</button>` : ''}
+            <button type="button" class="btn-excluir-pendencia" data-excluir="${p.id}">Excluir</button>
+          </span>
         </div>
       `;
     }).join('') || '<p class="nav-empty">Nenhuma pendência registrada.</p>';
@@ -437,8 +428,8 @@
         <div class="mapa-secao-header">Pendências</div>
         <div class="mapa-secao-body">
           <div class="full">${itensHtml}</div>
-          <div><label>Descrição</label><input type="text" id="novaPendenciaDesc"></div>
-          <div><label>Responsável</label><input type="text" id="novaPendenciaResp"></div>
+          <div><label>Descrição</label><input type="text" id="novaPendenciaDesc" placeholder="Ex: Enviar guia DAS de junho"></div>
+          <div><label>Responsável</label><input type="text" id="novaPendenciaResp" placeholder="Nome do responsável"></div>
           <div><label>Prazo</label><input type="date" id="novaPendenciaPrazo"></div>
           <div style="align-self:end;"><button type="button" id="btnAddPendencia" class="btn-novo">+ Adicionar Pendência</button></div>
         </div>
@@ -452,6 +443,18 @@
         if (error) { console.error(error); return; }
         const item = (pendenciasPorMapeamento[m.id] || []).find((p) => p.id === id);
         if (item) { item.status = 'resolvida'; item.resolvido_em = new Date().toISOString(); }
+        atualizarSugestaoNivel();
+        renderPendencias();
+      });
+    });
+
+    el.querySelectorAll('[data-excluir]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-excluir');
+        if (!window.confirm('Excluir esta pendência? Essa ação não pode ser desfeita.')) return;
+        const { error } = await supabaseClient.from('contabil_mapeamento_pendencias').delete().eq('id', id);
+        if (error) { console.error(error); return; }
+        pendenciasPorMapeamento[m.id] = (pendenciasPorMapeamento[m.id] || []).filter((p) => p.id !== id);
         atualizarSugestaoNivel();
         renderPendencias();
       });

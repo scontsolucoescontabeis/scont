@@ -2,55 +2,9 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="refresh" content="0; url=onboarding.html" />
   <title>Departamento Contábil — Scont</title>
-  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico" />
-  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css" />
-  <script src="../supabase-config.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../portal-auth-guard.js"></script>
+  <script>window.location.replace('onboarding.html');</script>
 </head>
-<body>
-<!-- AUTH OVERLAY -->
-<div id="authOverlay" style="position:fixed;inset:0;background:#F0F2F5;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
-  <div style="font-size:40px;">🔐</div>
-  <p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p>
-</div>
-
-<div class="hub-container">
-  <div class="hub-header">
-    <div class="brand-mark">🧾</div>
-    <h1>Central do Departamento Contábil</h1>
-    <p>Escolha uma ferramenta para continuar.</p>
-  </div>
-
-  <div class="hub-cards">
-    <a class="hub-card" href="onboarding.html">
-      <div class="hub-card-icon">📋</div>
-      <h2>Onboarding</h2>
-      <p>Levantamento e checklist de documentos para empresas novas.</p>
-    </a>
-    <a class="hub-card" href="mapeamento.html">
-      <div class="hub-card-icon">🗺️</div>
-      <h2>Mapeamento Estratégico</h2>
-      <p>Perfil operacional, fiscal e de risco de cada empresa da carteira.</p>
-    </a>
-  </div>
-
-  <button class="btn-voltar-portal" onclick="window.location.href='../portal.html'">
-    🏠 Voltar ao Portal
-  </button>
-</div>
-
-<script>
-  document.addEventListener('DOMContentLoaded', async () => {
-    const auth = await window.PortalAuthGuard.init(1);
-    if (!auth) return;
-    document.getElementById('authOverlay')?.remove();
-  });
-</script>
-</body>
+<body></body>
 </html>

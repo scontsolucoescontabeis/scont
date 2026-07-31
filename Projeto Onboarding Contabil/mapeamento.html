@@ -26,21 +26,27 @@
       <div class="brand-mark">🗺️</div>
       <div>
         <h1>SCONT</h1>
-        <p>Mapeamento Estratégico</p>
+        <p>Departamento Contábil</p>
       </div>
     </div>
 
+    <nav class="ferramentas-switch">
+      <a class="ferramenta-btn" href="onboarding.html">📋 <span>Onboarding</span></a>
+      <a class="ferramenta-btn active" href="mapeamento.html">🗺️ <span>Mapeamento Estratégico</span></a>
+    </nav>
+
     <button class="btn-novo" id="btnDashboard">📊 Visão Geral</button>
 
-    <input type="text" class="busca-onboarding" id="buscaEmpresa" placeholder="Buscar empresa..." />
-
-    <div class="nav-tree" id="listaEmpresas">
-      <p class="nav-loading">Carregando...</p>
+    <div class="seletor-empresa-wrap">
+      <label for="seletorEmpresa">Empresa</label>
+      <select id="seletorEmpresa">
+        <option value="">Selecionar empresa...</option>
+      </select>
     </div>
 
     <div class="sidebar-footer">
-      <button class="btn-voltar" onclick="window.location.href='index.html'">
-        🏠 <span>Central Contábil</span>
+      <button class="btn-voltar" onclick="window.location.href='../portal.html'">
+        🏠 <span>Voltar ao Portal</span>
       </button>
     </div>
   </aside>
@@ -49,7 +55,7 @@
     <div class="empty-state">
       <div class="emoji">🗺️</div>
       <h2>Mapeamento Estratégico</h2>
-      <p>Selecione uma empresa na lista ao lado, ou veja a Visão Geral da carteira.</p>
+      <p>Selecione uma empresa no seletor ao lado, ou veja a Visão Geral da carteira.</p>
     </div>
   </main>
 </div>
