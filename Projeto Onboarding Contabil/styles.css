@@ -512,6 +512,67 @@ input,select,textarea{font:inherit}
 .modal.active{ display:flex; }
 .modal-content{ background:#fff; border-radius:16px; box-shadow:0 10px 40px rgba(0,0,0,.2); max-width:640px; width:100%; max-height:88vh; overflow-y:auto; }
 .modal-content.large{max-width:900px}
+
+/* ─── HUB (Central do Departamento Contábil) ─────────────── */
+.hub-container{ max-width:720px; margin:0 auto; padding:64px 24px; text-align:center; }
+.hub-header .brand-mark{ font-size:48px; }
+.hub-header h1{ font-size:24px; margin:8px 0 4px; color:var(--text); }
+.hub-header p{ color:var(--muted); margin-bottom:32px; }
+.hub-cards{ display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:20px; }
+.hub-card{ display:block; padding:28px 20px; border:1px solid var(--line); border-radius:var(--radius-sm); text-decoration:none; color:inherit; background:var(--surface); transition:box-shadow .15s, transform .15s; }
+.hub-card:hover{ box-shadow:var(--shadow-soft); transform:translateY(-2px); }
+.hub-card-icon{ font-size:32px; margin-bottom:8px; }
+.hub-card h2{ font-size:17px; margin:0 0 6px; color:var(--brand); }
+.hub-card p{ font-size:13px; color:var(--muted); margin:0; }
+.btn-voltar-portal{ margin-top:40px; background:none; border:1px solid var(--line); border-radius:10px; padding:10px 18px; cursor:pointer; color:var(--muted); font-size:14px; }
+.btn-voltar-portal:hover{ background:var(--surface-2); }
+
+/* ─── MAPEAMENTO ESTRATÉGICO ──────────────────────────────── */
+.mapa-dashboard-cards{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:24px; }
+.mapa-count-card{ border-radius:var(--radius-sm); padding:16px; cursor:pointer; border:2px solid transparent; text-align:center; }
+.mapa-count-card.active{ border-color:currentColor; }
+.mapa-count-card .num{ font-size:26px; font-weight:700; }
+.mapa-count-card .label{ font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+.mapa-count-card.nivel-baixo{ background:var(--success-soft); color:var(--success); }
+.mapa-count-card.nivel-medio{ background:var(--warning-soft); color:var(--warning); }
+.mapa-count-card.nivel-alto{ background:var(--warning-soft); color:#C0530E; }
+.mapa-count-card.nivel-critico{ background:var(--danger-soft); color:var(--danger); }
+
+.badge-nivel{ display:inline-block; padding:2px 10px; border-radius:999px; font-size:11px; font-weight:600; white-space:nowrap; }
+.badge-nivel.nivel-baixo{ background:var(--success-soft); color:var(--success); }
+.badge-nivel.nivel-medio{ background:var(--warning-soft); color:var(--warning); }
+.badge-nivel.nivel-alto{ background:var(--warning-soft); color:#C0530E; }
+.badge-nivel.nivel-critico{ background:var(--danger-soft); color:var(--danger); }
+
+.mapa-table{ width:100%; border-collapse:collapse; background:var(--surface); border-radius:var(--radius-sm); overflow:hidden; }
+.mapa-table th, .mapa-table td{ text-align:left; padding:10px 12px; border-bottom:1px solid var(--line-soft); font-size:13px; }
+.mapa-table tbody tr{ cursor:pointer; }
+.mapa-table tbody tr:hover{ background:var(--surface-2); }
+
+.mapa-filtros{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+.mapa-filtros select, .mapa-filtros input{ padding:6px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; }
+
+.mapa-secao{ border:1px solid var(--line-soft); border-radius:var(--radius-sm); margin-bottom:14px; overflow:hidden; background:var(--surface); }
+.mapa-secao-header{ background:var(--surface-2); padding:10px 16px; font-weight:600; font-size:13px; color:var(--brand); }
+.mapa-secao-body{ padding:16px; display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; }
+.mapa-secao-body .full{ grid-column:1 / -1; }
+.mapa-secao-body label{ display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+.mapa-secao-body input, .mapa-secao-body select, .mapa-secao-body textarea{ width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; font-family:inherit; }
+
+.mapa-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+.mapa-tag{ background:var(--surface-2); border-radius:999px; padding:3px 10px; font-size:12px; display:flex; align-items:center; gap:6px; }
+.mapa-tag button{ border:none; background:none; cursor:pointer; color:var(--muted); font-size:13px; line-height:1; }
+
+.mapa-pendencia-item{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line-soft); font-size:13px; }
+.mapa-pendencia-item.vencida{ color:var(--danger); }
+.mapa-pendencia-item .desc{ flex:1; }
+.mapa-pendencia-item.resolvida{ text-decoration:line-through; color:var(--muted); }
+.mapa-pendencia-item button{ border:1px solid var(--line); background:var(--surface-2); border-radius:8px; padding:4px 10px; cursor:pointer; font-size:12px; }
+
+@media (max-width: 900px){
+  .mapa-dashboard-cards{ grid-template-columns:repeat(2, 1fr); }
+  .mapa-secao-body{ grid-template-columns:1fr; }
+}
 .modal-header{ padding:20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
 .modal-header h3{margin:0;font-size:1.1rem}
 .modal-close{border:none;background:transparent;font-size:1.3rem;cursor:pointer;color:var(--muted)}
