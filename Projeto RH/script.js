@@ -4988,7 +4988,7 @@ function _renderizarListaFolhaPonto(avisos) {
 // pronta para .save() ou .output('blob').
 function _construirPdfEmpresaFolhaPonto(empresaDados) {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
     const MARGEM = 8;
     const pageW = doc.internal.pageSize.getWidth();
 
@@ -5019,19 +5019,20 @@ function _construirPdfEmpresaFolhaPonto(empresaDados) {
 
         const body = emp.linhas.map(l => {
             if (l.ferias) {
-                return [`${l.data.slice(0, 2)} ${l.diaSemana}`, l.horarioPrevisto, 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', ''];
+                return [`${l.data.slice(0, 2)} ${l.diaSemana}`, 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', ''];
             }
-            return [`${l.data.slice(0, 2)} ${l.diaSemana}`, l.horarioPrevisto, '', '', '', '', '', '', '', ''];
+            return [`${l.data.slice(0, 2)} ${l.diaSemana}`, '', '', '', '', '', '', '', ''];
         });
 
         doc.autoTable({
-            head: [['Dia', 'Horário Previsto', 'Entrada', 'Saída', 'Interv. Entrada', 'Interv. Saída', 'H.Extra Entrada', 'H.Extra Saída', 'N° Horas', 'Assinatura']],
+            head: [['Dia', 'Entrada', 'Saída', 'Interv. Entrada', 'Interv. Saída', 'H.Extra Entrada', 'H.Extra Saída', 'N° Horas', 'Assinatura']],
             body,
             startY: y,
             margin: { left: MARGEM, right: MARGEM },
-            styles: { fontSize: 7, cellPadding: 1.3, valign: 'middle', halign: 'center' },
-            headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 7 },
-            columnStyles: { 0: { halign: 'left', cellWidth: 16 }, 9: { cellWidth: 30 } },
+            theme: 'grid',
+            styles: { fontSize: 7, cellPadding: 1.3, valign: 'middle', halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
+            headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 7, lineWidth: 0.1, lineColor: [0, 0, 0] },
+            columnStyles: { 0: { halign: 'left', cellWidth: 16 }, 8: { cellWidth: 30 } },
             didParseCell: (data) => {
                 if (data.section !== 'body') return;
                 const linha = emp.linhas[data.row.index];
