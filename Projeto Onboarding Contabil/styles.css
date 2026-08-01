@@ -59,22 +59,18 @@ input,select,textarea{font:inherit}
 }
 .brand{
   display:flex;
+  flex-direction:column;
   align-items:center;
-  gap:12px;
+  text-align:center;
   margin-bottom:18px;
   padding-bottom:18px;
   border-bottom:1px solid rgba(255,255,255,.15);
 }
-.brand-mark{
-  width:44px;
-  height:44px;
-  flex:none;
-  border-radius:12px;
-  background: linear-gradient(135deg, var(--brand-2), var(--brand));
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:1.3rem;
+.brand img{
+  max-width:140px;
+  height:auto;
+  margin:0 auto 12px;
+  display:block;
 }
 .brand h1{
   margin:0;
@@ -171,7 +167,7 @@ input,select,textarea{font:inherit}
 .nav-onboarding-btn.status-concluido .nav-onboarding-bar-fill{background:var(--success)}
 
 .sidebar-footer{
-  margin-top:16px;
+  margin-top:auto;
   padding-top:16px;
   border-top:1px solid rgba(255,255,255,.15);
 }
@@ -215,11 +211,17 @@ input,select,textarea{font:inherit}
   gap:16px;
   margin-bottom:18px;
   flex-wrap:wrap;
+  background:var(--surface);
+  padding:20px 24px;
+  border-radius:var(--radius-sm);
+  border-left:4px solid var(--brand);
+  box-shadow:var(--shadow-soft);
 }
 .onboarding-header h2{
   margin:0 0 6px;
   font-size:1.5rem;
   letter-spacing:-.02em;
+  color:var(--brand);
 }
 .onboarding-header .tag{
   display:inline-block;
@@ -515,8 +517,15 @@ input,select,textarea{font:inherit}
 
 /* ─── HUB (tela inicial da Central do Departamento Contábil) ─ */
 .tool-picker{ max-width:840px; margin:40px auto 0; }
-.tool-picker-header{ margin-bottom:28px; }
-.tool-picker-header h2{ font-size:1.6rem; color:var(--text); margin:0 0 6px; }
+.tool-picker-header{
+  margin-bottom:28px;
+  background:var(--surface);
+  padding:20px 24px;
+  border-radius:var(--radius-sm);
+  border-left:4px solid var(--brand);
+  box-shadow:var(--shadow-soft);
+}
+.tool-picker-header h2{ font-size:1.6rem; color:var(--brand); margin:0 0 6px; }
 .tool-picker-header p{ color:var(--muted); margin:0; }
 .tool-cards{ display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:20px; }
 .tool-card{
