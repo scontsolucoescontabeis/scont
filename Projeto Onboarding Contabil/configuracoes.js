@@ -5,6 +5,8 @@
 
   let empresas = []; // [{ codigo_empresa, nome_empresa }]
   let configPorEmpresa = {}; // { codigo_empresa: boolean } — espelha o que já está salvo no banco
+  let usuariosAprovados = []; // [{ id, nome, email, empresa }]
+  let responsaveisPorEmpresa = {}; // { codigo_empresa: Set<usuario_id> }
 
   document.addEventListener('DOMContentLoaded', iniciar);
 
@@ -18,22 +20,45 @@
   }
 
   async function carregarDados() {
-    const [{ data: dataEmpresas, error: errEmpresas }, { data: dataConfig, error: errConfig }] = await Promise.all([
+    const [
+      { data: dataEmpresas, error: errEmpresas },
+      { data: dataConfig, error: errConfig },
+      { data: dataUsuarios, error: errUsuarios },
+      { data: dataResponsaveis, error: errResponsaveis },
+    ] = await Promise.all([
       supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, status_situacao').order('nome_empresa', { ascending: true }),
       supabaseClient.from('contabil_empresas_config').select('codigo_empresa, possui_contabil'),
+      supabaseClient.rpc('contabil_listar_usuarios_aprovados'),
+      supabaseClient.from('contabil_empresas_responsaveis').select('codigo_empresa, usuario_id'),
     ]);
     if (errEmpresas) console.error(errEmpresas);
     if (errConfig) console.error(errConfig);
+    if (errUsuarios) console.error(errUsuarios);
+    if (errResponsaveis) console.error(errResponsaveis);
 
     const ativa = (s) => !s || String(s).trim().toLowerCase().startsWith('ativ');
     empresas = (dataEmpresas || []).filter((e) => ativa(e.status_situacao));
 
     configPorEmpresa = {};
     (dataConfig || []).forEach((c) => { configPorEmpresa[c.codigo_empresa] = c.possui_contabil; });
+
+    usuariosAprovados = dataUsuarios || [];
+
+    responsaveisPorEmpresa = {};
+    (dataResponsaveis || []).forEach((r) => {
+      if (!responsaveisPorEmpresa[r.codigo_empresa]) responsaveisPorEmpresa[r.codigo_empresa] = new Set();
+      responsaveisPorEmpresa[r.codigo_empresa].add(r.usuario_id);
+    });
   }
 
   function possuiContabil(codigoEmpresa) {
     return configPorEmpresa[codigoEmpresa] !== false;
+  }
+
+  function responsaveisDe(codigoEmpresa) {
+    const ids = responsaveisPorEmpresa[codigoEmpresa];
+    if (!ids || !ids.size) return [];
+    return usuariosAprovados.filter((u) => ids.has(u.id));
   }
 
   // ─── PERSISTÊNCIA ───────────────────────────────────────────
@@ -45,6 +70,26 @@
       .upsert(registros, { onConflict: 'codigo_empresa' });
     if (!error) registros.forEach((r) => { configPorEmpresa[r.codigo_empresa] = r.possui_contabil; });
     return { error };
+  }
+
+  async function salvarResponsavel(codigoEmpresa, usuarioId, marcado) {
+    if (marcado) {
+      const { error } = await supabaseClient
+        .from('contabil_empresas_responsaveis')
+        .insert([{ codigo_empresa: codigoEmpresa, usuario_id: usuarioId }]);
+      if (error) return { error };
+      if (!responsaveisPorEmpresa[codigoEmpresa]) responsaveisPorEmpresa[codigoEmpresa] = new Set();
+      responsaveisPorEmpresa[codigoEmpresa].add(usuarioId);
+    } else {
+      const { error } = await supabaseClient
+        .from('contabil_empresas_responsaveis')
+        .delete()
+        .eq('codigo_empresa', codigoEmpresa)
+        .eq('usuario_id', usuarioId);
+      if (error) return { error };
+      responsaveisPorEmpresa[codigoEmpresa]?.delete(usuarioId);
+    }
+    return { error: null };
   }
 
   // ─── TELA ───────────────────────────────────────────────────
@@ -67,7 +112,7 @@
           </div>
           <p class="full mapa-empty" id="contadorEmpresasConfig"></p>
           <table class="mapa-table full">
-            <thead><tr><th>Código Empresa</th><th>Nome Empresa</th><th>Contabilidade</th></tr></thead>
+            <thead><tr><th>Código Empresa</th><th>Nome Empresa</th><th>Contabilidade</th><th>Responsável(is)</th></tr></thead>
             <tbody id="corpoTabelaConfig"></tbody>
           </table>
         </div>
@@ -94,6 +139,16 @@
     return `<button type="button" class="contabil-toggle ${sim ? 'contabil-sim' : 'contabil-nao'}" data-empresa-codigo="${escapeAttr(codigoEmpresa)}" data-value="${sim}">${sim ? 'Sim' : 'Não'}</button>`;
   }
 
+  function responsavelHtml(codigoEmpresa) {
+    const nomes = responsaveisDe(codigoEmpresa).map((u) => u.nome).join(', ');
+    return `
+      <div class="responsavel-cel">
+        <span class="responsavel-nomes">${nomes ? escapeHtml(nomes) : '—'}</span>
+        <button type="button" class="btn-editar-responsavel" data-empresa-codigo="${escapeAttr(codigoEmpresa)}" title="Editar responsável(is)">✎</button>
+      </div>
+    `;
+  }
+
   function renderTabela() {
     const corpo = document.getElementById('corpoTabelaConfig');
     const visiveis = empresasVisiveis();
@@ -104,15 +159,87 @@
           <td>${escapeHtml(e.codigo_empresa)}</td>
           <td>${escapeHtml(e.nome_empresa)}</td>
           <td>${toggleHtml(e.codigo_empresa)}</td>
+          <td>${responsavelHtml(e.codigo_empresa)}</td>
         </tr>
       `).join('')
-      : '<tr><td colspan="3">Nenhuma empresa encontrada.</td></tr>';
+      : '<tr><td colspan="4">Nenhuma empresa encontrada.</td></tr>';
 
     corpo.querySelectorAll('.contabil-toggle').forEach((btn) => {
       btn.addEventListener('click', () => alternarUma(btn));
     });
+    corpo.querySelectorAll('.btn-editar-responsavel').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const codigo = btn.getAttribute('data-empresa-codigo');
+        const empresa = empresas.find((e) => e.codigo_empresa === codigo);
+        abrirModalResponsaveis(codigo, empresa ? empresa.nome_empresa : codigo);
+      });
+    });
 
     atualizarContador();
+  }
+
+  // ─── MODAL: RESPONSÁVEIS ────────────────────────────────────
+
+  function abrirModalResponsaveis(codigoEmpresa, nomeEmpresa) {
+    let modal = document.getElementById('modalResponsaveis');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalResponsaveis';
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3 id="modalResponsaveisTitulo">Responsável(is)</h3>
+            <button class="modal-close" id="fecharModalResponsaveis">✕</button>
+          </div>
+          <div class="modal-body" id="modalResponsaveisBody"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="fecharModalResponsaveis2">Fechar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      const fechar = () => modal.classList.remove('active');
+      document.getElementById('fecharModalResponsaveis').addEventListener('click', fechar);
+      document.getElementById('fecharModalResponsaveis2').addEventListener('click', fechar);
+      modal.addEventListener('click', (ev) => { if (ev.target === modal) fechar(); });
+    }
+
+    document.getElementById('modalResponsaveisTitulo').textContent = `Responsável(is) — ${nomeEmpresa}`;
+    renderCorpoModalResponsaveis(codigoEmpresa);
+    modal.classList.add('active');
+  }
+
+  function renderCorpoModalResponsaveis(codigoEmpresa) {
+    const body = document.getElementById('modalResponsaveisBody');
+    if (!usuariosAprovados.length) {
+      body.innerHTML = '<p class="mapa-empty">Nenhum usuário aprovado no portal.</p>';
+      return;
+    }
+    const atuais = responsaveisPorEmpresa[codigoEmpresa] || new Set();
+    body.innerHTML = usuariosAprovados.map((u) => `
+      <label class="responsavel-check-item">
+        <input type="checkbox" class="chk-responsavel" value="${escapeAttr(u.id)}" ${atuais.has(u.id) ? 'checked' : ''}>
+        <span>${escapeHtml(u.nome)}${u.empresa ? ` <small>(${escapeHtml(u.empresa)})</small>` : ''}</span>
+      </label>
+    `).join('');
+
+    body.querySelectorAll('.chk-responsavel').forEach((chk) => {
+      chk.addEventListener('change', async () => {
+        const usuarioId = chk.value;
+        const marcado = chk.checked;
+        chk.disabled = true;
+        const { error } = await salvarResponsavel(codigoEmpresa, usuarioId, marcado);
+        chk.disabled = false;
+        if (error) {
+          console.error(error);
+          chk.checked = !marcado;
+          mostrarToast('Erro ao salvar. Alteração desfeita.', 'erro');
+          return;
+        }
+        renderTabela();
+      });
+    });
   }
 
   function definirValor(btn, valor) {

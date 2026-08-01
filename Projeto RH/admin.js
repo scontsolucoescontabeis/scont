@@ -6,7 +6,50 @@
 // SUPABASE_URL e SUPABASE_KEY carregados de ../supabase-config.js via admin.html
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-document.addEventListener('DOMContentLoaded', () => {
+// --- ESCOPO POR RESPONSÁVEL ---
+// Usuários vinculados à empresa "Prestador de Serviço" (ver
+// EMPRESA_OPTIONS em admin-dashboard.html) só devem enxergar, neste
+// painel, as empresas atribuídas a eles em contabil_empresas_responsaveis
+// (tela de Configurações do Departamento Contábil). Super-admins do
+// portal (isAdmin=true) e usuários da SCONT Soluções Contábeis continuam
+// vendo tudo, sem restrição — mesmo comportamento de hoje.
+let _empresasPermitidas = null; // null = sem restrição (vê todas as empresas)
+
+async function _resolverEscopoUsuario() {
+    let auth = null;
+    try { auth = JSON.parse(sessionStorage.getItem('userAuth') || 'null'); } catch (_) { auth = null; }
+    if (!auth || auth.isAdmin) return; // super-admin do portal vê tudo
+
+    const empresaUsuario = (auth.userData?.empresa || '').trim().toLowerCase();
+    if (empresaUsuario !== 'prestador de serviço') return; // SCONT (ou sem empresa vinculada) vê tudo
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('contabil_empresas_responsaveis')
+            .select('codigo_empresa')
+            .eq('usuario_id', auth.userId);
+        if (error) throw error;
+        _empresasPermitidas = new Set((data || []).map(r => r.codigo_empresa));
+    } catch (erro) {
+        console.error('Erro ao resolver empresas do responsável:', erro);
+        _empresasPermitidas = new Set(); // falha ao carregar escopo: não mostra nenhuma empresa (mais seguro)
+    }
+}
+
+/** Filtra uma lista de linhas com campo codigo_empresa pelo escopo do usuário atual. */
+function _filtrarPorEscopo(linhas) {
+    if (!_empresasPermitidas) return linhas || [];
+    return (linhas || []).filter(l => _empresasPermitidas.has(l.codigo_empresa));
+}
+
+/** Aplica o escopo a uma query Supabase paginada/filtrada por codigo_empresa (usado em Rubricas). */
+function _aplicarEscopoQuery(query) {
+    if (!_empresasPermitidas) return query;
+    return query.in('codigo_empresa', [..._empresasPermitidas]);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await _resolverEscopoUsuario();
     carregarEmpresas();
     carregarEmpregados();
     carregarFeriasInfo();
@@ -39,7 +82,7 @@ async function carregarEmpresas() {
     try {
         const { data, error } = await supabaseClient.from('rh_empresas').select('*').order('nome_empresa', { ascending: true });
         if (error) throw error;
-        _todasEmpresas = data || [];
+        _todasEmpresas = _filtrarPorEscopo(data);
         _empresasFiltradas = [..._todasEmpresas];
         _paginaEmpresas = 1;
         renderizarTabelaEmpresas();
@@ -243,7 +286,7 @@ async function carregarEmpregados() {
             if (!data || data.length < PAGE) break;
             from += PAGE;
         }
-        _todosEmpregados = todos;
+        _todosEmpregados = _filtrarPorEscopo(todos);
         _empregadosFiltrados = [..._todosEmpregados];
         _paginaEmpregados = 1;
         _inicializarSeletorCampos();
@@ -671,7 +714,7 @@ async function carregarFeriasInfo() {
             .order('codigo_empresa', { ascending: true })
             .order('ferias_inicio', { ascending: false });
         if (error) throw error;
-        _todasFeriasInfo = data || [];
+        _todasFeriasInfo = _filtrarPorEscopo(data);
         _feriasInfoFiltradas = [..._todasFeriasInfo];
         _paginaFeriasInfo = 1;
         renderizarTabelaFeriasInfo();
@@ -762,7 +805,7 @@ async function carregarSocios() {
             .select('*')
             .order('nome_socio', { ascending: true });
         if (error) throw error;
-        _todosSocios = data || [];
+        _todosSocios = _filtrarPorEscopo(data);
 
         // Popula selects de empresa nos filtros e formulário
         const empresas = [...new Set(_todosSocios.map(s => s.codigo_empresa))].sort();
@@ -777,7 +820,7 @@ async function carregarSocios() {
                 }).join('');
         }
         if (formSelect) {
-            const emps = _todasEmpresas.length ? _todasEmpresas : (await supabaseClient.from('rh_empresas').select('codigo_empresa,nome_empresa').order('nome_empresa')).data || [];
+            const emps = _todasEmpresas.length ? _todasEmpresas : _filtrarPorEscopo((await supabaseClient.from('rh_empresas').select('codigo_empresa,nome_empresa').order('nome_empresa')).data || []);
             formSelect.innerHTML = '<option value="">Selecione a empresa…</option>' +
                 emps.map(e => `<option value="${e.codigo_empresa}">${e.nome_empresa} (${e.codigo_empresa})</option>`).join('');
         }
@@ -958,7 +1001,7 @@ async function carregarFiltroEmpresasRubricas() {
             .from('rh_empresas')
             .select('codigo_empresa, nome_empresa')
             .order('codigo_empresa', { ascending: true });
-        (data || []).forEach(e => {
+        _filtrarPorEscopo(data).forEach(e => {
             const opt = document.createElement('option');
             opt.value = e.codigo_empresa;
             opt.textContent = `${e.codigo_empresa} – ${e.nome_empresa || e.codigo_empresa}`;
@@ -990,6 +1033,14 @@ async function buscarRubricas() {
     const tbody = document.getElementById('rubricasTableBody');
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;">Carregando...</td></tr>';
 
+    if (_empresasPermitidas && !_empresasPermitidas.size) {
+        _totalRubricas = 0;
+        document.getElementById('infoRubricas').textContent = '0 rubrica(s)';
+        renderizarTabelaRubricas([]);
+        renderizarPaginacaoRubricas();
+        return;
+    }
+
     const ini = (_paginaRubricas - 1) * RUBRICAS_POR_PAG;
     const fim = ini + RUBRICAS_POR_PAG - 1;
 
@@ -1004,6 +1055,7 @@ async function buscarRubricas() {
         if (_filtroRubricasEmpresa) q = q.eq('codigo_empresa', _filtroRubricasEmpresa);
         if (_filtroRubricasTexto)   q = q.or(`codigo_rubrica.ilike.%${_filtroRubricasTexto}%,descricao_rubrica.ilike.%${_filtroRubricasTexto}%,empresa.ilike.%${_filtroRubricasTexto}%`);
         if (_filtroRubricasTipo)    q = q.eq('tipo', _filtroRubricasTipo);
+        q = _aplicarEscopoQuery(q);
 
         const { data, error, count } = await q;
         if (error) throw error;
@@ -1026,6 +1078,10 @@ function filtrarRubricas() {
 }
 
 async function exportarRubricasExcel() {
+    if (_empresasPermitidas && !_empresasPermitidas.size) {
+        mostrarStatus('statusRubricas', 'Nenhuma rubrica para exportar com os filtros atuais.', 'error');
+        return;
+    }
     try {
         let q = supabaseClient
             .from('rh_rubricas')
@@ -1036,6 +1092,7 @@ async function exportarRubricasExcel() {
         if (_filtroRubricasEmpresa) q = q.eq('codigo_empresa', _filtroRubricasEmpresa);
         if (_filtroRubricasTexto)   q = q.or(`codigo_rubrica.ilike.%${_filtroRubricasTexto}%,descricao_rubrica.ilike.%${_filtroRubricasTexto}%,empresa.ilike.%${_filtroRubricasTexto}%`);
         if (_filtroRubricasTipo)    q = q.eq('tipo', _filtroRubricasTipo);
+        q = _aplicarEscopoQuery(q);
 
         const { data, error } = await q;
         if (error) throw error;
@@ -1860,7 +1917,7 @@ async function carregarJornadaInfo() {
             a.codigo_empresa.localeCompare(b.codigo_empresa, 'pt-BR', { numeric: true }) ||
             (a.nome_empregado || '').localeCompare(b.nome_empregado || '', 'pt-BR')
         );
-        _todaJornadaInfo = agrupados;
+        _todaJornadaInfo = _filtrarPorEscopo(agrupados);
         _jornadaInfoFiltrada = [..._todaJornadaInfo];
         _paginaJornadaInfo = 1;
         renderizarTabelaJornadaInfo();

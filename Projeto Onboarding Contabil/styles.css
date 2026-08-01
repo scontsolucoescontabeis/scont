@@ -615,6 +615,14 @@ input,select,textarea{font:inherit}
 .contabil-toggle.contabil-sim{ background:var(--success-soft); color:var(--success); }
 .contabil-toggle.contabil-nao{ background:var(--danger-soft); color:var(--danger); }
 
+.responsavel-cel{ display:flex; align-items:center; gap:8px; }
+.responsavel-nomes{ color:var(--text); flex:1; }
+.btn-editar-responsavel{ border:1px solid var(--line); background:var(--surface); color:var(--muted); border-radius:6px; padding:2px 8px; cursor:pointer; font-size:12px; flex-shrink:0; }
+.btn-editar-responsavel:hover{ border-color:var(--brand); color:var(--brand); }
+.responsavel-check-item{ display:flex; align-items:center; gap:8px; padding:8px 4px; border-bottom:1px solid var(--line-soft); font-size:13px; cursor:pointer; }
+.responsavel-check-item:last-child{ border-bottom:none; }
+.responsavel-check-item small{ color:var(--muted); }
+
 .main.main-full{ max-width:none; }
 
 .mapa-mini-grade{ display:inline-flex; gap:2px; }
