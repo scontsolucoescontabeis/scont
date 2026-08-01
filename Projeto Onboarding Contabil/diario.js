@@ -386,24 +386,21 @@
           <div><label>Data</label><input type="date" id="novoLancamentoData" value="${new Date().toISOString().slice(0, 10)}"></div>
           <div class="full"><label>Registro</label><textarea id="novoLancamentoTexto" rows="2" placeholder="Ex: Enviado SPED Fiscal de junho, pendente confirmação do cliente."></textarea></div>
           <div><button type="button" class="btn-novo" id="btnAddLancamento">+ Adicionar Lançamento</button></div>
-          <div class="full mapa-filtros" style="margin-top:10px;border-top:1px solid var(--line-soft);padding-top:14px;">
-            <div><label>Filtrar de</label><input type="date" id="filtroLancamentoDe"></div>
-            <div><label>até</label><input type="date" id="filtroLancamentoAte"></div>
-            <button type="button" class="btn btn-secondary" id="btnFiltrarLancamentos">Filtrar</button>
-            <button type="button" class="btn btn-secondary" id="btnLimparFiltroLancamentos">Limpar</button>
-          </div>
-          <div class="full mapa-filtros" style="padding-top:2px;">
+          <div class="full mapa-filtros mapa-filtros-lancamentos" style="margin-top:10px;border-top:1px solid var(--line-soft);padding-top:14px;">
+            <div><label>De</label><input type="date" id="filtroLancamentoDe"></div>
+            <div><label>Até</label><input type="date" id="filtroLancamentoAte"></div>
             <div>
-              <label>Filtro rápido</label>
+              <label>Mês</label>
               <select id="filtroLancamentoMes">
-                <option value="">Mês (todos)</option>
+                <option value="">Todos</option>
                 ${window.ContabilDiarioUtil.MESES_LABELS.map((l, idx) => `<option value="${idx + 1}">${l}</option>`).join('')}
               </select>
             </div>
-            <div><label>&nbsp;</label><input type="number" id="filtroLancamentoAno" placeholder="Ano" style="width:90px;"></div>
-            <button type="button" class="btn btn-secondary" id="btnFiltrarMesAno">Aplicar</button>
+            <div><label>Ano</label><input type="number" id="filtroLancamentoAno" placeholder="Ano" style="width:80px;"></div>
             <button type="button" class="btn btn-secondary" id="btnFiltroMesAtual">Mês atual</button>
             <button type="button" class="btn btn-secondary" id="btnFiltroAnoAtual">Ano atual</button>
+            <button type="button" class="btn btn-secondary" id="btnFiltrarLancamentos">Filtrar</button>
+            <button type="button" class="btn btn-secondary" id="btnLimparFiltroLancamentos">Limpar</button>
           </div>
           <div class="full" id="listaLancamentos"><p class="mapa-empty">Carregando...</p></div>
         </div>
@@ -427,7 +424,12 @@
       carregarListaLancamentos();
     });
 
-    el.querySelector('#btnFiltrarLancamentos').addEventListener('click', () => carregarListaLancamentos());
+    el.querySelector('#btnFiltrarLancamentos').addEventListener('click', () => {
+      const mes = document.getElementById('filtroLancamentoMes').value;
+      const ano = document.getElementById('filtroLancamentoAno').value;
+      if (ano) aplicarFiltroMesAno();
+      else carregarListaLancamentos();
+    });
     el.querySelector('#btnLimparFiltroLancamentos').addEventListener('click', () => {
       document.getElementById('filtroLancamentoDe').value = '';
       document.getElementById('filtroLancamentoAte').value = '';
@@ -435,8 +437,6 @@
       document.getElementById('filtroLancamentoAno').value = '';
       carregarListaLancamentos();
     });
-
-    el.querySelector('#btnFiltrarMesAno').addEventListener('click', aplicarFiltroMesAno);
     el.querySelector('#btnFiltroMesAtual').addEventListener('click', () => {
       const hoje = new Date();
       document.getElementById('filtroLancamentoMes').value = String(hoje.getMonth() + 1);

@@ -640,6 +640,11 @@ input,select,textarea{font:inherit}
 .mapa-filtros{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
 .mapa-filtros select, .mapa-filtros input{ padding:6px 10px; border:1px solid var(--line); background:var(--surface); color:var(--text); border-radius:8px; font-size:13px; }
 
+.mapa-filtros-lancamentos{ flex-wrap:nowrap; align-items:flex-end; overflow-x:auto; padding-bottom:2px; }
+.mapa-filtros-lancamentos > div{ flex-shrink:0; }
+.mapa-filtros-lancamentos label{ display:block; font-size:11px; color:var(--muted); margin-bottom:4px; white-space:nowrap; }
+.mapa-filtros-lancamentos button{ flex-shrink:0; white-space:nowrap; }
+
 .mapa-secao{ border:1px solid var(--line-soft); border-radius:var(--radius-sm); margin-bottom:14px; overflow:hidden; background:var(--surface); }
 .mapa-secao-header{ background:var(--surface-2); padding:10px 16px; font-weight:600; font-size:13px; color:var(--brand); }
 .mapa-secao-body{ padding:16px; display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; }
