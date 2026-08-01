@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCONT - Redefinir Senha</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+    <script src="supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #8B3A3A; --primary-hover: #6B2A2A; --secondary: #2C3E50;
+            --success: #27AE60; --danger: #E74C3C; --info: #3498DB;
+            --card: #FFFFFF; --text: #2C3E50; --muted: #7F8C8D;
+            --border: #E0E6ED; --bg: #F8F9FA;
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.12); --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
+            --radius: 10px; --transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px;
+        }
+        .login-container { width:100%; max-width:450px; }
+        .login-card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow-lg); overflow:hidden; }
+        .login-header { background:white; padding:36px 32px; text-align:center; border-bottom:2px solid var(--border); }
+        .login-header img { max-width:260px; height:auto; margin:0 auto; display:block; }
+        .login-body { padding:36px 32px; }
+        .login-body h1 { font-size:18px; color:var(--text); margin-bottom:6px; }
+        .login-body p.subtitle { font-size:13px; color:var(--muted); margin-bottom:24px; }
+        .form-group { margin-bottom:18px; }
+        .form-group label { display:block; margin-bottom:7px; font-weight:600; font-size:12px; color:var(--text); text-transform:uppercase; letter-spacing:0.5px; }
+        .form-group input {
+            width:100%; padding:11px 13px; border:1px solid var(--border);
+            border-radius:6px; font-size:14px; font-family:inherit; transition:var(--transition);
+        }
+        .form-group input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(139,58,58,0.1); }
+        .btn-primary {
+            width:100%; padding:12px;
+            background:linear-gradient(135deg, var(--primary), var(--primary-hover));
+            color:white; border:none; border-radius:6px; cursor:pointer;
+            font-weight:600; font-size:14px; transition:var(--transition); margin-top:8px;
+        }
+        .btn-primary:hover { transform:translateY(-2px); box-shadow:var(--shadow-md); }
+        .btn-primary:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
+        .btn-secondary {
+            display:block; width:100%; text-align:center; margin-top:14px;
+            color:var(--primary); font-size:13px; font-weight:600; text-decoration:none;
+        }
+        .btn-secondary:hover { text-decoration:underline; }
+        .alert { padding:11px 15px; border-radius:6px; margin-bottom:18px; font-size:13px; display:none; border-left:4px solid; font-weight:500; }
+        .alert.show { display:block; animation:slideIn 0.3s ease; }
+        .alert-success { background:rgba(39,174,96,.12); color:var(--success); border-left-color:var(--success); }
+        .alert-error   { background:rgba(231,76,60,.12);  color:var(--danger);  border-left-color:var(--danger); }
+        .alert-info    { background:rgba(52,152,219,.12); color:var(--info);    border-left-color:var(--info); }
+        .loading { display:inline-block; width:14px; height:14px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; margin-right:7px; vertical-align:middle; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        @keyframes slideIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+        .login-footer { padding:18px 32px; background:var(--bg); text-align:center; font-size:12px; color:var(--muted); }
+        .checking { text-align:center; color:var(--muted); font-size:13px; padding:20px 0; }
+        @media (max-width:480px) { .login-header,.login-body { padding:24px 18px; } }
+    </style>
+</head>
+<body>
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-header">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+    </div>
+    <div class="login-body">
+        <div id="alertBox" class="alert"></div>
+
+        <div id="checkingState" class="checking">Verificando link de recuperação...</div>
+
+        <div id="formState" style="display:none;">
+            <h1>Definir nova senha</h1>
+            <p class="subtitle">Escolha uma nova senha para acessar o Portal SCONT.</p>
+            <form id="resetForm">
+                <div class="form-group"><label>Nova Senha</label>
+                    <input type="password" id="novaSenha" placeholder="Mínimo 6 caracteres" required minlength="6" autocomplete="new-password"></div>
+                <div class="form-group"><label>Confirmar Nova Senha</label>
+                    <input type="password" id="confirmarSenha" placeholder="Confirme a nova senha" required minlength="6" autocomplete="new-password"></div>
+                <button type="submit" class="btn-primary" id="btnSalvar">Salvar Nova Senha</button>
+            </form>
+        </div>
+
+        <div id="invalidState" style="display:none;">
+            <p style="font-size:13px;color:var(--muted);line-height:1.6;">
+                Este link não é mais válido. Links de redefinição de senha expiram em 1 hora e só podem
+                ser usados uma vez. Peça ao administrador para enviar um novo e-mail de recuperação.
+            </p>
+            <a href="login.html" class="btn-secondary">← Voltar para o login</a>
+        </div>
+
+        <div id="successState" style="display:none;">
+            <p style="font-size:13px;color:var(--muted);line-height:1.6;">
+                Senha alterada com sucesso! Você já pode entrar com a nova senha.
+            </p>
+            <a href="login.html" class="btn-secondary">Ir para o login →</a>
+        </div>
+    </div>
+    <div class="login-footer">© 2026 SCONT. Todos os direitos reservados.</div>
+  </div>
+</div>
+
+<script>
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function sanitize(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
+function showAlert(msg, type) {
+    const el = document.getElementById('alertBox');
+    el.textContent = msg;
+    el.className = `alert alert-${type} show`;
+}
+function showState(id) {
+    ['checkingState', 'formState', 'invalidState', 'successState'].forEach(s =>
+        document.getElementById(s).style.display = (s === id) ? '' : 'none');
+}
+
+// O Supabase JS detecta o token de recuperação na URL automaticamente
+// (detectSessionInUrl, ligado por padrão) e dispara o evento PASSWORD_RECOVERY.
+let sessaoRecuperacaoValida = false;
+
+sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY' && session) {
+        sessaoRecuperacaoValida = true;
+        showState('formState');
+    }
+});
+
+async function _verificarLink() {
+    // Supabase anexa erro na própria URL quando o link expirou ou já foi usado
+    const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const query = new URLSearchParams(location.search);
+    const erro = hash.get('error') || query.get('error');
+    if (erro) {
+        showState('invalidState');
+        return;
+    }
+
+    // Dá um instante para o listener PASSWORD_RECOVERY disparar após o parse da URL
+    await new Promise(r => setTimeout(r, 400));
+    if (sessaoRecuperacaoValida) return;
+
+    // Fallback: já existe sessão válida mas o evento não foi PASSWORD_RECOVERY
+    // (ex.: usuário atualizou a página) — ainda assim permite trocar a senha
+    // apenas se a URL trouxe explicitamente type=recovery.
+    const tipo = hash.get('type') || query.get('type');
+    const { data: { session } } = await sb.auth.getSession();
+    if (tipo === 'recovery' && session) {
+        showState('formState');
+        return;
+    }
+
+    showState('invalidState');
+}
+document.addEventListener('DOMContentLoaded', _verificarLink);
+
+document.getElementById('resetForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const novaSenha = document.getElementById('novaSenha').value;
+    const confirmarSenha = document.getElementById('confirmarSenha').value;
+    const btn = document.getElementById('btnSalvar');
+
+    if (novaSenha !== confirmarSenha) { showAlert('❌ As senhas não conferem', 'error'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading"></span>Salvando...';
+
+    try {
+        const { error } = await sb.auth.updateUser({ password: novaSenha });
+        if (error) throw error;
+        await sb.auth.signOut();
+        showState('successState');
+    } catch (err) {
+        showAlert('❌ ' + sanitize(err.message), 'error');
+        btn.disabled = false;
+        btn.innerHTML = 'Salvar Nova Senha';
+    }
+});
+</script>
+</body>
+</html>
