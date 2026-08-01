@@ -4988,7 +4988,7 @@ function _tabelaFolhaPontoPreviaHtml(emp) {
             <table style="width:100%; border-collapse:collapse; font-size:11px; white-space:nowrap;">
                 <thead>
                     <tr style="background:#8B3A3A; color:white;">
-                        <th style="padding:5px 6px; text-align:left; border:1px solid var(--border-color);">Dia</th>
+                        <th style="padding:5px 6px; width:56px; text-align:center; border:1px solid var(--border-color);">Dia</th>
                         <th style="padding:5px 6px; border:1px solid var(--border-color);">Entrada 1</th>
                         <th style="padding:5px 6px; border:1px solid var(--border-color);">Saída 1</th>
                         <th style="padding:5px 6px; border:1px solid var(--border-color);">Entrada 2</th>
@@ -5106,8 +5106,12 @@ function _construirPdfEmpresaFolhaPonto(empresaDados) {
             theme: 'grid',
             styles: { fontSize: 8, cellPadding: 1.6, valign: 'middle', halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
             headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 8, lineWidth: 0.1, lineColor: [0, 0, 0] },
-            columnStyles: { 0: { halign: 'left', cellWidth: 20 }, 5: { cellWidth: 34 }, 6: { cellWidth: 34 } },
+            columnStyles: { 0: { halign: 'left', cellWidth: 14 }, 5: { cellWidth: 34 }, 6: { cellWidth: 34 } },
             didParseCell: (data) => {
+                if (data.section === 'head') {
+                    data.cell.styles.halign = 'center';
+                    return;
+                }
                 if (data.section !== 'body') return;
                 const linha = emp.linhas[data.row.index];
                 if (linha && linha.tipo === 'folga' && !linha.ferias) {
