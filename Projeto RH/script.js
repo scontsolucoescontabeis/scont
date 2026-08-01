@@ -4698,6 +4698,140 @@ function _atualizarResumoEmpresasSelecionadasEscala() {
     info.textContent = `${marcados.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
 }
 
+// ===== GERAR FOLHAS DE PONTO =====
+
+function _iniciarTelaFolhaPonto() {
+    document.getElementById('folhaPontoResultadoContainer').style.display = 'none';
+    document.getElementById('folhaPontoListaEmpregados').innerHTML = '';
+    document.getElementById('folhaPontoBuscaEmpresa').value = '';
+    _renderizarListaEmpresasFolhaPonto(state.empresas);
+    _atualizarResumoEmpresasSelecionadasFolhaPonto();
+    _carregarGruposParaFolhaPonto();
+}
+
+let _gruposFolhaPontoCache = [];
+let _itensGruposFolhaPontoCache = {};
+
+async function _carregarGruposParaFolhaPonto() {
+    try {
+        const [{ data: grupos, error: errG }, { data: itens, error: errI }] = await Promise.all([
+            supabaseClient.from('rh_grupos_empresas').select('id, nome_grupo').order('nome_grupo', { ascending: true }),
+            supabaseClient.from('rh_grupos_empresas_itens').select('grupo_id, codigo_empresa'),
+        ]);
+        if (errG) throw errG;
+        if (errI) throw errI;
+
+        _itensGruposFolhaPontoCache = {};
+        (itens || []).forEach(it => {
+            (_itensGruposFolhaPontoCache[it.grupo_id] ??= new Set()).add(it.codigo_empresa);
+        });
+        _gruposFolhaPontoCache = (grupos || []).map(g => ({
+            id: g.id,
+            nome_grupo: g.nome_grupo,
+            qtdEmpresas: _itensGruposFolhaPontoCache[g.id]?.size || 0,
+        }));
+
+        document.getElementById('folhaPontoBuscaGrupo').value = '';
+        _renderizarListaGruposFolhaPonto(_gruposFolhaPontoCache);
+    } catch (erro) {
+        console.error('Erro ao carregar grupos de empresas:', erro);
+    }
+}
+
+function _renderizarListaGruposFolhaPonto(grupos) {
+    const container = document.getElementById('folhaPontoListaGrupos');
+    if (!container) return;
+    if (!grupos || grupos.length === 0) {
+        container.innerHTML = '<span style="font-size:12px;color:var(--text-secondary);">Nenhum grupo encontrado.</span>';
+        return;
+    }
+    container.innerHTML = grupos.map(g => `
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+            <input type="checkbox" class="folhaPonto-grupo-check" value="${g.id}" onchange="_aplicarGruposFolhaPonto()">
+            ${g.nome_grupo} <span style="color: var(--text-secondary);">(${g.qtdEmpresas})</span>
+        </label>
+    `).join('');
+}
+
+function _filtrarListaGruposFolhaPonto() {
+    const termo = (document.getElementById('folhaPontoBuscaGrupo').value || '').toLowerCase().trim();
+    const marcados = new Set(Array.from(document.querySelectorAll('.folhaPonto-grupo-check:checked')).map(cb => cb.value));
+    const lista = termo
+        ? _gruposFolhaPontoCache.filter(g => g.nome_grupo.toLowerCase().includes(termo))
+        : _gruposFolhaPontoCache;
+    _renderizarListaGruposFolhaPonto(lista);
+    marcados.forEach(id => {
+        const cb = document.querySelector(`.folhaPonto-grupo-check[value="${id}"]`);
+        if (cb) cb.checked = true;
+    });
+}
+
+function _aplicarGruposFolhaPonto() {
+    const idsMarcados = Array.from(document.querySelectorAll('.folhaPonto-grupo-check:checked')).map(cb => cb.value);
+    if (idsMarcados.length === 0) return;
+
+    const codigosParaMarcar = new Set(
+        Array.from(document.querySelectorAll('.folhaPonto-emp-check:checked')).map(cb => cb.value)
+    );
+    idsMarcados.forEach(id => {
+        (_itensGruposFolhaPontoCache[id] || new Set()).forEach(codigo => codigosParaMarcar.add(codigo));
+    });
+
+    document.getElementById('folhaPontoBuscaEmpresa').value = '';
+    _renderizarListaEmpresasFolhaPonto(state.empresas);
+    document.querySelectorAll('.folhaPonto-emp-check').forEach(cb => {
+        cb.checked = codigosParaMarcar.has(cb.value);
+    });
+    _atualizarResumoEmpresasSelecionadasFolhaPonto();
+}
+
+function _renderizarListaEmpresasFolhaPonto(empresas) {
+    const container = document.getElementById('folhaPontoListaEmpresas');
+    if (!empresas || empresas.length === 0) {
+        container.innerHTML = '<span style="font-size:12px;color:var(--text-secondary);">Nenhuma empresa encontrada.</span>';
+        return;
+    }
+    container.innerHTML = empresas.map(e => `
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+            <input type="checkbox" class="folhaPonto-emp-check" value="${e.codigo_empresa}" onchange="_atualizarResumoEmpresasSelecionadasFolhaPonto()">
+            <span style="font-family:monospace; color:var(--primary-color); font-weight:600;">${e.codigo_empresa}</span> ${e.nome_empresa}
+        </label>
+    `).join('');
+}
+
+function _filtrarListaEmpresasFolhaPonto() {
+    const termo = (document.getElementById('folhaPontoBuscaEmpresa').value || '').toLowerCase().trim();
+    const marcados = new Set(Array.from(document.querySelectorAll('.folhaPonto-emp-check:checked')).map(cb => cb.value));
+    const lista = termo
+        ? state.empresas.filter(e => e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo))
+        : state.empresas;
+    _renderizarListaEmpresasFolhaPonto(lista);
+    marcados.forEach(codigo => {
+        const cb = document.querySelector(`.folhaPonto-emp-check[value="${codigo}"]`);
+        if (cb) cb.checked = true;
+    });
+}
+
+function _selecionarTodasEmpresasFolhaPonto(marcar) {
+    document.querySelectorAll('.folhaPonto-emp-check').forEach(cb => { cb.checked = marcar; });
+    _atualizarResumoEmpresasSelecionadasFolhaPonto();
+}
+
+function _atualizarResumoEmpresasSelecionadasFolhaPonto() {
+    const info = document.getElementById('folhaPontoEmpresasSelecionadasInfo');
+    if (!info) return;
+    const marcados = Array.from(document.querySelectorAll('.folhaPonto-emp-check:checked'));
+    if (marcados.length === 0) {
+        info.textContent = 'Nenhuma empresa selecionada.';
+        return;
+    }
+    const nomes = marcados.map(cb => {
+        const emp = state.empresas.find(e => e.codigo_empresa === cb.value);
+        return `${cb.value} - ${emp?.nome_empresa || cb.value}`;
+    });
+    info.textContent = `${marcados.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
+}
+
 // Os campos JSONB de rh_escala_trabalho são gravados via JSON.stringify (mesmo
 // padrão de rh_saves.flags_folga/dsr_dias) e por isso precisam de JSON.parse na leitura.
 function _parsearCamposEscala(row) {
@@ -5150,12 +5284,14 @@ function mostrarTela(telaId) {
     document.getElementById('gruposScreen').style.display = 'none';
     document.getElementById('beneficiosScreen').style.display = 'none';
     document.getElementById('escalaScreen').style.display = 'none';
+    document.getElementById('folhaPontoScreen').style.display = 'none';
     document.getElementById(telaId).style.display = 'block';
     if (telaId === 'gruposScreen') carregarGrupos();
     if (telaId === 'beneficiosScreen') _iniciarTelaBeneficios();
     if (telaId === 'escalaScreen') _iniciarTelaEscala();
+    if (telaId === 'folhaPontoScreen') _iniciarTelaFolhaPonto();
 
-    const telasSemHeaderPadrao = ['selectionScreen', 'gruposScreen', 'beneficiosScreen', 'escalaScreen'];
+    const telasSemHeaderPadrao = ['selectionScreen', 'gruposScreen', 'beneficiosScreen', 'escalaScreen', 'folhaPontoScreen'];
 
     const pageHeader = document.getElementById('pageHeader');
     if (pageHeader) pageHeader.style.display = telasSemHeaderPadrao.includes(telaId) ? 'none' : 'block';
