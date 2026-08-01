@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Importar Excel Legado — Diário Contábil — Scont</title>
+  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <script src="../supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../portal-auth-guard.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+<!-- AUTH OVERLAY -->
+<div id="authOverlay" style="position:fixed;inset:0;background:#F0F2F5;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="font-size:40px;">🔐</div>
+  <p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+      <h1>Departamento Contábil</h1>
+      <p>Importar Excel Legado</p>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="btn-voltar" onclick="window.location.href='diario.html'">
+        🏠 <span>Diário Contábil</span>
+      </button>
+    </div>
+  </aside>
+
+  <main class="main main-full" id="main">
+    <p class="nav-loading">Carregando...</p>
+  </main>
+</div>
+
+<script src="migrar-diario-excel.js"></script>
+</body>
+</html>
