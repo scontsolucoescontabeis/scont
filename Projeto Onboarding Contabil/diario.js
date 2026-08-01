@@ -200,6 +200,9 @@
     }).join('');
 
     main.innerHTML = `
+      <div class="onboarding-header">
+        <div><h2>Visão Geral</h2></div>
+      </div>
       <table class="mapa-table">
         <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Nível</th><th>Pendências</th><th>Últimos 6 meses</th></tr></thead>
         <tbody>${linhas || '<tr><td colspan="6">Nenhuma empresa encontrada.</td></tr>'}</tbody>
