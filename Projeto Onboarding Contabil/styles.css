@@ -99,6 +99,30 @@ input,select,textarea{font:inherit}
 }
 .btn-novo:hover{background:rgba(255,255,255,.9)}
 
+/* Identidade visual dos botões de navegação do sidebar do Fechamento Folha
+   (.sidebar-item lá) — usada aqui só no Onboarding e no Diário Contábil. */
+.sidebar-item{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:calc(100% + 36px);
+  margin:0 -18px 6px;
+  padding:11px 18px;
+  color:rgba(255,255,255,.75);
+  cursor:pointer;
+  border:none;
+  border-left:3px solid transparent;
+  background:none;
+  text-align:left;
+  font-size:14px;
+  font-weight:500;
+  text-decoration:none;
+  transition:all .2s ease;
+}
+.sidebar-item:hover{ background:rgba(255,255,255,.09); color:#fff; border-left-color:rgba(255,255,255,.3); }
+.sidebar-item.active{ background:rgba(255,255,255,.15); color:#fff; border-left-color:#fff; font-weight:600; }
+.sidebar-item-icon{ font-size:17px; width:22px; text-align:center; flex-shrink:0; }
+
 .busca-onboarding{
   width:100%;
   background:rgba(255,255,255,.1);
@@ -124,23 +148,26 @@ input,select,textarea{font:inherit}
   padding:10px 4px;
 }
 .nav-onboarding-btn{
-  width:100%;
+  width:calc(100% + 36px);
+  margin:0 -18px;
   display:flex;
   flex-direction:column;
   gap:6px;
-  border:1px solid transparent;
-  background:rgba(255,255,255,.06);
-  color:#fff;
-  padding:12px 14px;
-  border-radius:14px;
+  border:none;
+  border-left:3px solid transparent;
+  background:none;
+  color:rgba(255,255,255,.85);
+  padding:10px 18px;
+  border-radius:0;
   cursor:pointer;
   text-align:left;
-  transition:.15s ease;
+  transition:all .2s ease;
 }
-.nav-onboarding-btn:hover{background:rgba(255,255,255,.1)}
+.nav-onboarding-btn:hover{ background:rgba(255,255,255,.09); color:#fff; border-left-color:rgba(255,255,255,.3); }
 .nav-onboarding-btn.active{
-  background: rgba(255,255,255,.18);
-  border-color: rgba(255,255,255,.15);
+  background: rgba(255,255,255,.15);
+  color:#fff;
+  border-left-color:#fff;
 }
 .nav-onboarding-empresa{
   font-weight:700;
