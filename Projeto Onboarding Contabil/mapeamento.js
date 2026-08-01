@@ -45,6 +45,11 @@
     await carregarDados();
     renderDashboard();
     renderSeletorEmpresas();
+
+    const empresaNaUrl = new URLSearchParams(window.location.search).get('empresa');
+    if (empresaNaUrl && empresas.some((e) => e.codigo_empresa === empresaNaUrl)) {
+      selecionarEmpresa(empresaNaUrl);
+    }
   }
 
   async function carregarDados() {
