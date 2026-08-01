@@ -4967,13 +4967,17 @@ function _linhaFolhaPontoPreviaHtml(l) {
     if (l.ferias) {
         return `<tr style="${estiloFolga}">
             <td style="padding:4px 6px; text-align:left; border:1px solid var(--border-color);">${l.data.slice(0, 2)} ${l.diaSemana}</td>
-            <td colspan="7" style="padding:4px 6px; text-align:center; border:1px solid var(--border-color); color:#2C7BE5; font-weight:600;">FÉRIAS</td>
+            <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
+            <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
+            <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
+            <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
+            <td style="padding:4px 6px; text-align:center; border:1px solid var(--border-color); color:#2C7BE5; font-weight:600;">FÉRIAS</td>
             <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
         </tr>`;
     }
     return `<tr style="${estiloFolga}">
         <td style="padding:4px 6px; text-align:left; border:1px solid var(--border-color);">${l.data.slice(0, 2)} ${l.diaSemana}</td>
-        ${Array(8).fill('<td style="padding:4px 6px; border:1px solid var(--border-color);"></td>').join('')}
+        ${Array(6).fill('<td style="padding:4px 6px; border:1px solid var(--border-color);"></td>').join('')}
     </tr>`;
 }
 
@@ -4985,13 +4989,11 @@ function _tabelaFolhaPontoPreviaHtml(emp) {
                 <thead>
                     <tr style="background:#8B3A3A; color:white;">
                         <th style="padding:5px 6px; text-align:left; border:1px solid var(--border-color);">Dia</th>
-                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Entrada</th>
-                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Saída</th>
-                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Interv. Entrada</th>
-                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Interv. Saída</th>
-                        <th style="padding:5px 6px; border:1px solid var(--border-color);">H.Extra Entrada</th>
-                        <th style="padding:5px 6px; border:1px solid var(--border-color);">H.Extra Saída</th>
-                        <th style="padding:5px 6px; border:1px solid var(--border-color);">N° Horas</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Entrada 1</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Saída 1</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Entrada 2</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Saída 2</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Observações</th>
                         <th style="padding:5px 6px; border:1px solid var(--border-color);">Assinatura</th>
                     </tr>
                 </thead>
@@ -5091,20 +5093,20 @@ function _construirPdfEmpresaFolhaPonto(empresaDados) {
 
         const body = emp.linhas.map(l => {
             if (l.ferias) {
-                return [`${l.data.slice(0, 2)} ${l.diaSemana}`, 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', ''];
+                return [`${l.data.slice(0, 2)} ${l.diaSemana}`, '', '', '', '', 'FÉRIAS', ''];
             }
-            return [`${l.data.slice(0, 2)} ${l.diaSemana}`, '', '', '', '', '', '', '', ''];
+            return [`${l.data.slice(0, 2)} ${l.diaSemana}`, '', '', '', '', '', ''];
         });
 
         doc.autoTable({
-            head: [['Dia', 'Entrada', 'Saída', 'Interv. Entrada', 'Interv. Saída', 'H.Extra Entrada', 'H.Extra Saída', 'N° Horas', 'Assinatura']],
+            head: [['Dia', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Observações', 'Assinatura']],
             body,
             startY: y,
             margin: { left: MARGEM, right: MARGEM },
             theme: 'grid',
-            styles: { fontSize: 7, cellPadding: 1.3, valign: 'middle', halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
-            headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 7, lineWidth: 0.1, lineColor: [0, 0, 0] },
-            columnStyles: { 0: { halign: 'left', cellWidth: 16 }, 8: { cellWidth: 30 } },
+            styles: { fontSize: 8, cellPadding: 1.6, valign: 'middle', halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
+            headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 8, lineWidth: 0.1, lineColor: [0, 0, 0] },
+            columnStyles: { 0: { halign: 'left', cellWidth: 20 }, 5: { cellWidth: 34 }, 6: { cellWidth: 34 } },
             didParseCell: (data) => {
                 if (data.section !== 'body') return;
                 const linha = emp.linhas[data.row.index];
