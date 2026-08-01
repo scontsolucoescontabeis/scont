@@ -262,7 +262,7 @@
               ${Object.entries(FINANCEIRO_LABELS).map(([v, l]) => `<option value="${v}" ${m.financeiro_interno_bpo === v ? 'selected' : ''}>${l}</option>`).join('')}
             </select>
           </div>
-          <div class="full" style="display:flex;align-items:center;gap:8px;"><label style="margin:0;"><input type="checkbox" data-campo="acesso_bancario_leitura" ${m.acesso_bancario_leitura ? 'checked' : ''}> Possui acesso bancário de leitura</label></div>
+          <div class="full"><label><input type="checkbox" data-campo="acesso_bancario_leitura" ${m.acesso_bancario_leitura ? 'checked' : ''}> Possui acesso bancário de leitura</label></div>
           <div class="full">${renderTagsInput('forma_envio_documentos', 'Forma de Envio dos Documentos', m.forma_envio_documentos, FORMA_ENVIO_SUGERIDA)}</div>
           <div class="full">${renderTagsInput('bancos_utilizados', 'Bancos Utilizados', m.bancos_utilizados, BANCOS_SUGERIDOS)}</div>
           <div class="full">${renderTagsInput('sistemas_utilizados', 'Sistemas Utilizados', m.sistemas_utilizados, SISTEMAS_SUGERIDOS)}</div>

@@ -577,6 +577,8 @@ input,select,textarea{font:inherit}
 .mapa-secao-body input, .mapa-secao-body select, .mapa-secao-body textarea{ width:100%; padding:7px 10px; border:1px solid var(--line); background:var(--surface-2); color:var(--text); border-radius:8px; font-size:13px; font-family:inherit; }
 .mapa-secao-body input:focus, .mapa-secao-body select:focus, .mapa-secao-body textarea:focus{ outline:none; border-color:var(--brand); background:var(--surface); }
 .mapa-secao-body input::placeholder, .mapa-secao-body textarea::placeholder{ color:var(--muted); opacity:1; }
+.mapa-secao-body input[type="checkbox"]{ width:auto; padding:0; flex-shrink:0; }
+.mapa-secao-body label:has(input[type="checkbox"]){ display:flex; align-items:center; gap:8px; }
 
 .mapa-empty{ color:var(--muted); font-size:.86rem; padding:4px 0; margin:0; }
 
