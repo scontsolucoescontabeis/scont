@@ -79,6 +79,8 @@
         .btn-reject:hover  { background:#C0392B; }
         .btn-edit    { background:var(--warning); color:white; }
         .btn-edit:hover    { background:#D68910; }
+        .btn-info    { background:var(--info); color:white; }
+        .btn-info:hover    { background:#2980B9; }
         .btn-primary-sm { background:var(--primary); color:white; padding:8px 14px; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; transition:var(--transition); }
         .btn-primary-sm:hover { background:var(--primary-hover); }
 
@@ -748,15 +750,35 @@ function renderUsuarios(data) {
         btn.textContent = '✎ Editar Acesso';
         btn.onclick = () => abrirModalEditar(u);
 
+        const btnSenha = document.createElement('button');
+        btnSenha.className = 'btn-sm btn-info';
+        btnSenha.textContent = '🔑 Redefinir Senha';
+        btnSenha.onclick = () => enviarResetSenha(u);
+
         const btnDel = document.createElement('button');
         btnDel.className = 'btn-sm btn-reject';
         btnDel.textContent = '🗑️ Excluir';
         btnDel.onclick = () => excluirUsuario(u);
 
-        tr.querySelector('.acts').append(btn, btnDel);
+        tr.querySelector('.acts').append(btn, btnSenha, btnDel);
 
         tbody.appendChild(tr);
     });
+}
+
+// ─── ENVIAR E-MAIL DE REDEFINIÇÃO DE SENHA ──────────────────
+async function enviarResetSenha(u) {
+    const confirmado = confirm(`Enviar e-mail de redefinição de senha para "${u.nome}" (${u.email})?`);
+    if (!confirmado) return;
+
+    try {
+        const redirectTo = new URL('redefinir-senha.html', window.location.href).href;
+        const { error } = await sb.auth.resetPasswordForEmail(u.email, { redirectTo });
+        if (error) throw error;
+        alert('✅ E-mail de redefinição de senha enviado para ' + u.email + '.');
+    } catch (err) {
+        alert('Erro ao enviar e-mail de redefinição: ' + err.message);
+    }
 }
 
 // ─── EXCLUIR USUÁRIO ────────────────────────────────────────
