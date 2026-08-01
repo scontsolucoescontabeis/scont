@@ -32,11 +32,10 @@
 
     <button class="btn-novo" id="btnDashboard">📊 Visão Geral</button>
 
-    <div class="seletor-empresa-wrap">
-      <label for="seletorEmpresa">Empresa</label>
-      <select id="seletorEmpresa">
-        <option value="">Selecionar empresa...</option>
-      </select>
+    <div class="seletor-empresa-wrap" id="wrapBuscaEmpresa">
+      <label for="buscaEmpresa">Empresa</label>
+      <input type="text" id="buscaEmpresa" placeholder="Buscar empresa..." autocomplete="off">
+      <div id="listaBuscaEmpresa" class="combobox-lista"></div>
     </div>
 
     <div class="sidebar-footer">

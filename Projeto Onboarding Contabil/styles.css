@@ -535,14 +535,22 @@ input,select,textarea{font:inherit}
 .tool-card p{ font-size:.88rem; color:var(--muted); margin:0; line-height:1.5; }
 
 /* ─── SELETOR DE EMPRESA (sidebar do Mapeamento) ──────────── */
-.seletor-empresa-wrap{ margin-bottom:14px; }
+.seletor-empresa-wrap{ margin-bottom:14px; position:relative; }
 .seletor-empresa-wrap label{ display:block; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:rgba(255,255,255,.6); margin-bottom:6px; }
-.seletor-empresa-wrap select{
+.seletor-empresa-wrap select, .seletor-empresa-wrap input[type="text"]{
   width:100%; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);
-  color:#fff; padding:10px 12px; border-radius:12px; font-size:.85rem;
+  color:#fff; padding:10px 12px; border-radius:12px; font-size:.85rem; font-family:inherit;
 }
-.seletor-empresa-wrap select:focus{ outline:none; border-color:rgba(255,255,255,.5); }
+.seletor-empresa-wrap select:focus, .seletor-empresa-wrap input[type="text"]:focus{ outline:none; border-color:rgba(255,255,255,.5); }
 .seletor-empresa-wrap select option{ color:#2C3E50; }
+.seletor-empresa-wrap input[type="text"]::placeholder{ color:rgba(255,255,255,.5); }
+
+.combobox-lista{ display:none; position:absolute; top:100%; left:0; right:0; z-index:20; max-height:260px; overflow-y:auto; background:#fff; border:1px solid var(--line); border-radius:8px; margin-top:4px; box-shadow:var(--shadow-soft); }
+.combobox-lista.aberta{ display:block; }
+.combobox-item{ padding:8px 12px; font-size:13px; color:var(--text); cursor:pointer; }
+.combobox-item:hover{ background:var(--surface-2); }
+.combobox-item.combobox-vazio{ color:var(--muted); cursor:default; }
+.combobox-item.combobox-vazio:hover{ background:none; }
 
 /* ─── MAPEAMENTO ESTRATÉGICO ──────────────────────────────── */
 .mapa-dashboard-cards{ display:grid; grid-template-columns:repeat(4, 1fr); gap:16px; margin-bottom:24px; }

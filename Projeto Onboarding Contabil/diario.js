@@ -33,15 +33,12 @@
 
     document.getElementById('btnDashboard').addEventListener('click', () => {
       empresaAtualCodigo = null;
-      document.getElementById('seletorEmpresa').value = '';
+      document.getElementById('buscaEmpresa').value = '';
       renderDashboardDiario();
     });
-    document.getElementById('seletorEmpresa').addEventListener('change', (ev) => {
-      if (ev.target.value) selecionarEmpresaDiario(ev.target.value);
-    });
+    inicializarBuscaEmpresa();
 
     await carregarDadosDiario();
-    renderSeletorEmpresasDiario();
 
     const empresaNaUrl = new URLSearchParams(window.location.search).get('empresa');
     if (empresaNaUrl && empresas.some((e) => e.codigo_empresa === empresaNaUrl)) {
@@ -90,6 +87,17 @@
       const bucket = (statusMensalPorEmpresa[s.codigo_empresa] = statusMensalPorEmpresa[s.codigo_empresa] || {});
       bucket[`${s.ano}-${s.mes}`] = s.status;
     });
+
+    window.__diarioContext = {
+      supabaseClient,
+      empresas,
+      mapeamentos,
+      bancosPorMapeamento,
+      statusMensalPorEmpresa,
+      NIVEL_LABELS, REGIME_LABELS, SITUACAO_LABELS, FINANCEIRO_LABELS, PERIODICIDADE_LABELS,
+      mapeamentoDe,
+      escapeHtml,
+    };
   }
 
   function mapeamentoDe(codigoEmpresa) {
@@ -121,12 +129,40 @@
     return e ? e.nome_empresa : codigoEmpresa;
   }
 
-  function renderSeletorEmpresasDiario() {
-    const select = document.getElementById('seletorEmpresa');
-    const atual = select.value;
-    select.innerHTML = '<option value="">Selecionar empresa...</option>' +
-      empresas.map((e) => `<option value="${escapeHtml(e.codigo_empresa)}">${escapeHtml(e.nome_empresa)}</option>`).join('');
-    select.value = atual;
+  function inicializarBuscaEmpresa() {
+    const input = document.getElementById('buscaEmpresa');
+    const lista = document.getElementById('listaBuscaEmpresa');
+
+    input.addEventListener('input', () => {
+      const termo = input.value.trim().toLowerCase();
+      if (!termo) { lista.innerHTML = ''; lista.classList.remove('aberta'); return; }
+      const resultados = empresas.filter((e) => e.nome_empresa.toLowerCase().includes(termo)).slice(0, 20);
+      if (!resultados.length) {
+        lista.innerHTML = '<div class="combobox-item combobox-vazio">Nenhuma empresa encontrada.</div>';
+      } else {
+        lista.innerHTML = resultados.map((e) => `<div class="combobox-item" data-codigo="${escapeHtml(e.codigo_empresa)}">${escapeHtml(e.nome_empresa)}</div>`).join('');
+      }
+      lista.classList.add('aberta');
+    });
+
+    lista.addEventListener('click', (ev) => {
+      const item = ev.target.closest('.combobox-item[data-codigo]');
+      if (!item) return;
+      lista.innerHTML = '';
+      lista.classList.remove('aberta');
+      selecionarEmpresaDiario(item.getAttribute('data-codigo'));
+    });
+
+    document.addEventListener('click', (ev) => {
+      if (!ev.target.closest('#wrapBuscaEmpresa')) {
+        lista.innerHTML = '';
+        lista.classList.remove('aberta');
+      }
+    });
+
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') { lista.innerHTML = ''; lista.classList.remove('aberta'); }
+    });
   }
 
   // ─── DASHBOARD ──────────────────────────────────────────────
@@ -174,7 +210,7 @@
 
   function selecionarEmpresaDiario(codigoEmpresa) {
     empresaAtualCodigo = codigoEmpresa;
-    document.getElementById('seletorEmpresa').value = codigoEmpresa;
+    document.getElementById('buscaEmpresa').value = empresaNome(codigoEmpresa);
     anoGradeAtual = new Date().getFullYear();
     renderPaginaEmpresa();
   }
