@@ -4960,6 +4960,77 @@ async function gerarPreviaFolhaPonto() {
     }
 }
 
+// Uma linha da prévia (mesmo formato de dado exibido no PDF): dia em branco para
+// preenchimento, ou "FÉRIAS" nas colunas preenchíveis quando o dia é de férias.
+function _linhaFolhaPontoPreviaHtml(l) {
+    const estiloFolga = (l.tipo === 'folga' && !l.ferias) ? 'background:#EDEDED;' : '';
+    if (l.ferias) {
+        return `<tr style="${estiloFolga}">
+            <td style="padding:4px 6px; text-align:left; border:1px solid var(--border-color);">${l.data.slice(0, 2)} ${l.diaSemana}</td>
+            <td colspan="7" style="padding:4px 6px; text-align:center; border:1px solid var(--border-color); color:#2C7BE5; font-weight:600;">FÉRIAS</td>
+            <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
+        </tr>`;
+    }
+    return `<tr style="${estiloFolga}">
+        <td style="padding:4px 6px; text-align:left; border:1px solid var(--border-color);">${l.data.slice(0, 2)} ${l.diaSemana}</td>
+        ${Array(8).fill('<td style="padding:4px 6px; border:1px solid var(--border-color);"></td>').join('')}
+    </tr>`;
+}
+
+// Tabela de prévia de um empregado — mesmas colunas e marcações do PDF gerado.
+function _tabelaFolhaPontoPreviaHtml(emp) {
+    return `
+        <div style="overflow-x:auto; border:1px solid var(--border-color); border-radius:6px;">
+            <table style="width:100%; border-collapse:collapse; font-size:11px; white-space:nowrap;">
+                <thead>
+                    <tr style="background:#8B3A3A; color:white;">
+                        <th style="padding:5px 6px; text-align:left; border:1px solid var(--border-color);">Dia</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Entrada</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Saída</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Interv. Entrada</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Interv. Saída</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">H.Extra Entrada</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">H.Extra Saída</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">N° Horas</th>
+                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Assinatura</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${emp.linhas.map(_linhaFolhaPontoPreviaHtml).join('')}
+                </tbody>
+            </table>
+        </div>`;
+}
+
+// Card colapsável de um empregado — cabeçalho sempre visível, tabela some/aparece ao clicar.
+function _cardEmpregadoFolhaPontoHtml(emp) {
+    const totalFerias = emp.linhas.filter(l => l.ferias).length;
+    return `
+        <div style="border:1px solid var(--border-color); border-radius:8px; margin-bottom:8px; overflow:hidden;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; cursor:pointer; flex-wrap:wrap; gap:6px;" onclick="_toggleFolhaPontoEmpregado(this)">
+                <div>
+                    <strong>${emp.codigo_empregado} - ${emp.nome_empregado}</strong>
+                    <div style="font-size:11px; color:var(--text-secondary);">${emp.desc_cargo || '—'}${emp.desc_dpto ? ' · ' + emp.desc_dpto : ''}</div>
+                </div>
+                <div style="display:flex; align-items:center; gap:10px; font-size:12px;">
+                    ${totalFerias ? `<span style="color:#2C7BE5;">🏖️ ${totalFerias} dia(s) de férias</span>` : ''}
+                    <span class="folha-ponto-toggle-icon">▼</span>
+                </div>
+            </div>
+            <div class="folha-ponto-detalhe" style="display:none; padding:0 12px 12px;">
+                ${_tabelaFolhaPontoPreviaHtml(emp)}
+            </div>
+        </div>`;
+}
+
+function _toggleFolhaPontoEmpregado(headerEl) {
+    const detalhe = headerEl.nextElementSibling;
+    const icon = headerEl.querySelector('.folha-ponto-toggle-icon');
+    const aberto = detalhe.style.display !== 'none';
+    detalhe.style.display = aberto ? 'none' : 'block';
+    if (icon) icon.textContent = aberto ? '▼' : '▲';
+}
+
 function _renderizarListaFolhaPonto(avisos) {
     const dados = state._folhaPontoDados;
     const totalEmpregados = dados.empresas.reduce((soma, e) => soma + e.empregados.length, 0);
@@ -4969,11 +5040,12 @@ function _renderizarListaFolhaPonto(avisos) {
 
     const container = document.getElementById('folhaPontoListaEmpregados');
     container.innerHTML = dados.empresas.map(emp => `
-        <div style="border:1px solid var(--border-color); border-radius:8px; margin-bottom:10px; padding:12px 14px;">
+        <div style="border:1px solid var(--border-color); border-radius:8px; margin-bottom:14px; padding:12px 14px;">
             <strong>${emp.codigo_empresa} - ${emp.nome_empresa}</strong>
-            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px; margin-bottom:10px;">
                 ${emp.empregados.length} empregado(s) · Período: ${emp.periodoTexto}
             </div>
+            ${emp.empregados.map(e => _cardEmpregadoFolhaPontoHtml(e)).join('')}
         </div>
     `).join('') + (avisos && avisos.length ? `
         <div style="font-size:12px; color:#B8860B; margin-top:6px;">
