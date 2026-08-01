@@ -12,6 +12,9 @@
   <script src="../supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../portal-auth-guard.js"></script>
+  <!-- jsPDF + AutoTable (Relatorios) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <!-- AUTH OVERLAY -->
@@ -31,6 +34,7 @@
     </div>
 
     <button class="btn-novo" id="btnDashboard">📊 Visão Geral</button>
+    <button class="btn-novo" id="btnRelatorios">📄 Relatórios</button>
 
     <div class="seletor-empresa-wrap" id="wrapBuscaEmpresa">
       <label for="buscaEmpresa">Empresa</label>
@@ -56,5 +60,6 @@
 
 <script src="contabil-diario-util.js"></script>
 <script src="diario.js"></script>
+<script src="diario-relatorios.js"></script>
 </body>
 </html>

@@ -36,6 +36,11 @@
       document.getElementById('buscaEmpresa').value = '';
       renderDashboardDiario();
     });
+    document.getElementById('btnRelatorios').addEventListener('click', () => {
+      empresaAtualCodigo = null;
+      document.getElementById('buscaEmpresa').value = '';
+      window.DiarioRelatorios.render(document.getElementById('main'));
+    });
     inicializarBuscaEmpresa();
 
     await carregarDadosDiario();
