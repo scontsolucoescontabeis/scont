@@ -747,10 +747,54 @@ function renderUsuarios(data) {
         btn.className = 'btn-sm btn-edit';
         btn.textContent = '✎ Editar Acesso';
         btn.onclick = () => abrirModalEditar(u);
-        tr.querySelector('.acts').appendChild(btn);
+
+        const btnDel = document.createElement('button');
+        btnDel.className = 'btn-sm btn-reject';
+        btnDel.textContent = '🗑️ Excluir';
+        btnDel.onclick = () => excluirUsuario(u);
+
+        tr.querySelector('.acts').append(btn, btnDel);
 
         tbody.appendChild(tr);
     });
+}
+
+// ─── EXCLUIR USUÁRIO ────────────────────────────────────────
+async function excluirUsuario(u) {
+    const auth = JSON.parse(sessionStorage.getItem('adminAuth') || 'null');
+    if (auth?.email && auth.email.toLowerCase() === u.email.toLowerCase()) {
+        alert('Você não pode excluir sua própria conta.');
+        return;
+    }
+    const confirmado = confirm(
+        `Excluir permanentemente "${u.nome}" (${u.email})?\n\n` +
+        'Isso remove o acesso ao portal e tenta apagar a conta de login. Esta ação não pode ser desfeita.'
+    );
+    if (!confirmado) return;
+
+    try {
+        const { data: { session } } = await sb.auth.getSession();
+        if (!session) throw new Error('Sessão expirada.');
+
+        const resp = await fetch(`${SUPABASE_URL}/functions/v1/excluir-usuario`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+                'apikey': SUPABASE_KEY,
+            },
+            body: JSON.stringify({ email: u.email }),
+        });
+        const json = await resp.json();
+        if (!json.ok) throw new Error(json.error || 'Erro desconhecido.');
+
+        alert(json.message);
+        loadSolicitacoes();
+        loadUsuarios();
+        loadAcessos();
+    } catch (err) {
+        alert('Erro ao excluir usuário: ' + err.message);
+    }
 }
 
 // ─── RENDERIZAR FERRAMENTAS ────────────────────────────────
