@@ -692,7 +692,7 @@
       ['Financeiro Interno ou BPO', m.financeiro_interno_bpo ? FINANCEIRO_LABELS[m.financeiro_interno_bpo] : '—'],
       ['Acesso Bancário de Leitura', m.acesso_bancario_leitura ? 'Sim' : 'Não'],
       ['Forma de Envio dos Documentos', tags(m.forma_envio_documentos)],
-      ['Bancos Utilizados', tags(m.bancos_utilizados)],
+      ['Bancos Utilizados', tags((bancosPorMapeamento[m.id] || []).map((b) => b.banco))],
       ['Sistemas Utilizados', tags(m.sistemas_utilizados)],
     ], y, pageW, MARGEM);
 
