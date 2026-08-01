@@ -58,6 +58,9 @@
         <button class="sidebar-item" onclick="mostrarTela('escalaScreen')">
             <span class="sidebar-item-icon">🗓️</span> Gerar Escala
         </button>
+        <button class="sidebar-item" onclick="mostrarTela('folhaPontoScreen')">
+            <span class="sidebar-item-icon">🖨️</span> Gerar Folhas de Ponto
+        </button>
         <a class="sidebar-item" href="conversor.html" style="text-decoration:none;">
             <span class="sidebar-item-icon">📄</span> Conversor de Folha
         </a>
@@ -389,6 +392,55 @@
                     <span id="escalaResultadoInfo" style="font-size:13px; color: var(--text-secondary);"></span>
                 </div>
                 <div id="escalaListaEmpregados"></div>
+            </div>
+        </div>
+
+        <!-- TELA DE GERAR FOLHAS DE PONTO -->
+        <div id="folhaPontoScreen" style="display: none;">
+            <div style="margin-bottom:20px;">
+                <h2 style="color: var(--primary-color); margin:0;">🖨️ Gerar Folhas de Ponto</h2>
+                <p style="color: var(--text-secondary); font-size:13px; margin-top:6px;">
+                    Gera a Folha Individual de Ponto em branco (uma página por empregado, pronta para
+                    assinatura) da competência ou do período de apuração customizado da empresa. Dias de
+                    folga (pela escala configurada em "Gerar Escala") aparecem sombreados; dias de férias
+                    já vêm marcados como "FÉRIAS". O horário previsto de cada dia trabalhado vem da jornada
+                    cadastrada em Administração RH.
+                </p>
+            </div>
+
+            <div style="border:1px solid var(--border-color); border-radius:8px; padding:16px; margin-bottom:16px;">
+                <div class="form-group" style="max-width:220px;">
+                    <label for="folhaPontoCompetencia">Competência (MM/AAAA)</label>
+                    <input type="text" id="folhaPontoCompetencia" placeholder="MM/AAAA" maxlength="7"
+                        oninput="this.value = formatarCompetencia(this.value);">
+                </div>
+
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+                    <label style="font-weight:600; font-size:13px; color: var(--text-primary); margin:0;">Grupos de Empresas (opcional)</label>
+                    <input type="text" id="folhaPontoBuscaGrupo" placeholder="🔍 Buscar grupo..." style="flex:1; min-width:160px;"
+                        oninput="_filtrarListaGruposFolhaPonto()">
+                </div>
+                <div id="folhaPontoListaGrupos" style="max-height:120px; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px; padding:8px 12px; margin-bottom:16px; display:flex; flex-direction:column; gap:4px;"></div>
+
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+                    <label style="font-weight:600; font-size:13px; color: var(--text-primary); margin:0;">Empresas</label>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="_selecionarTodasEmpresasFolhaPonto(true)">Todas</button>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="_selecionarTodasEmpresasFolhaPonto(false)">Nenhuma</button>
+                    <input type="text" id="folhaPontoBuscaEmpresa" placeholder="🔍 Buscar empresa..." style="flex:1; min-width:180px;"
+                        oninput="_filtrarListaEmpresasFolhaPonto()">
+                </div>
+                <div id="folhaPontoListaEmpresas" style="max-height:180px; overflow-y:auto; border:1px solid var(--border-color); border-radius:8px; padding:8px 12px; display:flex; flex-direction:column; gap:4px;"></div>
+                <p id="folhaPontoEmpresasSelecionadasInfo" style="font-size:12px; color: var(--text-secondary); margin:8px 0 0;">Nenhuma empresa selecionada.</p>
+
+                <button type="button" class="btn btn-primary" style="margin-top:16px;" onclick="gerarPreviaFolhaPonto()">🔎 Gerar Prévia</button>
+            </div>
+
+            <div id="folhaPontoResultadoContainer" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
+                    <span id="folhaPontoResultadoInfo" style="font-size:13px; color: var(--text-secondary);"></span>
+                    <button type="button" class="btn btn-primary" id="folhaPontoBtnBaixar" onclick="baixarPdfsFolhaPonto()">📥 Baixar PDF(s)</button>
+                </div>
+                <div id="folhaPontoListaEmpregados"></div>
             </div>
         </div>
 
@@ -1337,6 +1389,7 @@
     "></div>
 
     <script src="escala-calculo.js"></script>
+    <script src="folha-ponto-calculo.js"></script>
     <script src="script.js"></script>
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
     <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
