@@ -41,6 +41,11 @@
       document.getElementById('buscaEmpresa').value = '';
       window.DiarioRelatorios.render(document.getElementById('main'));
     });
+    document.getElementById('btnHistorico').addEventListener('click', () => {
+      empresaAtualCodigo = null;
+      document.getElementById('buscaEmpresa').value = '';
+      window.DiarioHistorico.render(document.getElementById('main'));
+    });
     inicializarBuscaEmpresa();
 
     await carregarDadosDiario();
@@ -286,6 +291,23 @@
     `;
   }
 
+  // ─── AUDITORIA ──────────────────────────────────────────────
+
+  const STATUS_GRADE_LABELS = { sem_documentacao: 'Sem Documentação', pendencias: 'Pendências', concluido: 'Concluído' };
+
+  async function registrarAuditoria(codigoEmpresa, campo, valorAnterior, valorNovo) {
+    const auth = window.__contabilAuth || {};
+    const { error } = await supabaseClient.from('contabil_diario_auditoria').insert({
+      codigo_empresa: codigoEmpresa,
+      campo,
+      valor_anterior: valorAnterior,
+      valor_novo: valorNovo,
+      usuario_nome: auth.userData?.nome || null,
+      usuario_email: auth.email || null,
+    });
+    if (error) console.error(error);
+  }
+
   // ─── GRADE MENSAL ───────────────────────────────────────────
 
   async function alternarStatusMes(codigoEmpresa, ano, mes) {
@@ -307,6 +329,10 @@
       if (error) { console.error(error); return; }
       bucket[`${ano}-${mes}`] = proximo;
     }
+
+    const campo = `Status Mensal — ${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+    registrarAuditoria(codigoEmpresa, campo, STATUS_GRADE_LABELS[atual] || 'Sem Documentação', STATUS_GRADE_LABELS[proximo] || 'Sem Documentação');
+
     renderGradeMensal();
   }
 
