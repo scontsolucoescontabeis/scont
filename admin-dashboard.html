@@ -457,7 +457,7 @@
     <form id="formAprovar">
         <div class="form-group"><label>Nome</label><input id="apNome" type="text" readonly></div>
         <div class="form-group"><label>E-mail</label><input id="apEmail" type="email" readonly></div>
-        <div class="form-group"><label>Empresa</label><input id="apEmpresa" type="text" readonly></div>
+        <div class="form-group"><label>Empresa</label><select id="apEmpresa"></select></div>
         <div class="form-group"><label>Cargo</label><input id="apCargo" type="text" readonly></div>
         <div class="form-group">
             <label>Ferramentas de Acesso</label>
@@ -520,6 +520,7 @@
     <form id="formEditar">
         <div class="form-group"><label>Usuário</label><input id="edNome" type="text" readonly></div>
         <div class="form-group"><label>E-mail</label><input id="edEmail" type="email" readonly></div>
+        <div class="form-group"><label>Empresa</label><select id="edEmpresa"></select></div>
         <div class="form-group">
             <label>Ferramentas Autorizadas</label>
             <div class="checkbox-group" id="edFerramentas"></div>
@@ -886,6 +887,16 @@ function updateStats() {
             solicitacoes.filter(x => x.status === s).length);
 }
 
+// ─── HELPER: OPÇÕES DE EMPRESA ──────────────────────────────
+const EMPRESA_OPTIONS = ['SCONT Soluções Contábeis', 'Prestador de Serviço'];
+function setEmpresaOptions(selectEl, valorAtual) {
+    const opcoes = EMPRESA_OPTIONS.includes(valorAtual) || !valorAtual
+        ? EMPRESA_OPTIONS
+        : [...EMPRESA_OPTIONS, valorAtual];
+    selectEl.innerHTML = opcoes.map(o => `<option value="${sanitize(o)}">${sanitize(o)}</option>`).join('');
+    selectEl.value = valorAtual || EMPRESA_OPTIONS[0];
+}
+
 // ─── HELPER: CHECKBOXES DE FERRAMENTAS COM SUB-PERMISSÕES ──
 function buildFerCheckboxes(containerId, idsAtuais, permAtuais, cbClass, cbSubClass) {
     const cont = document.getElementById(containerId);
@@ -952,7 +963,7 @@ async function abrirModalAprovar(sol) {
     currentSolTelefone = sol.telefone || null;
     document.getElementById('apNome').value    = sol.nome;
     document.getElementById('apEmail').value   = sol.email;
-    document.getElementById('apEmpresa').value = sol.empresa || '';
+    setEmpresaOptions(document.getElementById('apEmpresa'), sol.empresa);
     document.getElementById('apCargo').value   = sol.cargo || '';
     await loadFerramentas(); // garante lista atualizada independente de qual aba foi visitada
     buildFerCheckboxes('apFerramentas', new Set(), {}, 'cb-aprovar', 'cb-sub-aprovar');
@@ -974,7 +985,8 @@ document.getElementById('formAprovar').addEventListener('submit', async (e) => {
         const { data: updated, error: updErr } = await sb.from('solicitacoes_acesso').update({
             status: 'aprovado',
             data_avaliacao: new Date().toISOString(),
-            avaliado_por: auth.email
+            avaliado_por: auth.email,
+            empresa: document.getElementById('apEmpresa').value
         }).eq('id', currentSolId).select('id');
         if (updErr) throw updErr;
         if (!updated || updated.length === 0)
@@ -1155,6 +1167,7 @@ async function abrirModalEditar(user) {
     currentSolId = user.id;
     document.getElementById('edNome').value  = user.nome;
     document.getElementById('edEmail').value = user.email;
+    setEmpresaOptions(document.getElementById('edEmpresa'), user.empresa);
 
     // Buscar acessos atuais do usuário (incluindo sub-permissões) e lista fresca de ferramentas
     const [{ data: atuais }] = await Promise.all([
@@ -1204,6 +1217,12 @@ document.getElementById('formEditar').addEventListener('submit', async (e) => {
             .update({ is_admin: document.getElementById('edIsAdmin').checked })
             .eq('email', document.getElementById('edEmail').value);
         if (admErr) throw admErr;
+
+        // Atualizar empresa
+        const { error: empErr } = await sb.from('solicitacoes_acesso')
+            .update({ empresa: document.getElementById('edEmpresa').value })
+            .eq('id', currentSolId);
+        if (empErr) throw empErr;
 
         closeModal('modalEditar');
 
