@@ -362,8 +362,7 @@ async function carregarHistorico() {
     try {
         const { data, error } = await db
             .from('apresentacoes')
-            .select('id, razao_social, cnpj, nome_contato, email_cliente, telefone, criado_em, acessos')
-            .eq('ativo', true)
+            .select('id, razao_social, cnpj, nome_contato, email_cliente, telefone, criado_em, acessos, ativo')
             .order('criado_em', { ascending: false })
             .limit(50);
 
@@ -371,7 +370,7 @@ async function carregarHistorico() {
 
         _historicoCache = data || [];
         atualizarEstatisticas(_historicoCache);
-        renderizarHistorico(_historicoCache);
+        filtrarHistorico();
 
     } catch (err) {
         console.error(err);
@@ -381,28 +380,37 @@ async function carregarHistorico() {
 }
 
 function atualizarEstatisticas(lista) {
+    const ativas = lista.filter(i => i.ativo);
     const agora = new Date();
-    const noMes = lista.filter(i => {
+    const noMes = ativas.filter(i => {
         const d = new Date(i.criado_em);
         return d.getMonth() === agora.getMonth() && d.getFullYear() === agora.getFullYear();
     }).length;
-    const acessos = lista.reduce((soma, i) => soma + (i.acessos || 0), 0);
+    const acessos = ativas.reduce((soma, i) => soma + (i.acessos || 0), 0);
 
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    set('statTotal', lista.length);
+    set('statTotal', ativas.length);
     set('statAcessos', acessos);
     set('statMes', noMes);
 }
 
 function filtrarHistorico() {
     const termo = (document.getElementById('buscaHistorico')?.value || '').toLowerCase().trim();
-    if (!termo) { renderizarHistorico(_historicoCache); return; }
-    renderizarHistorico(_historicoCache.filter(i =>
-        (i.razao_social || '').toLowerCase().includes(termo) ||
-        (i.nome_contato || '').toLowerCase().includes(termo) ||
-        (i.email_cliente || '').toLowerCase().includes(termo) ||
-        (i.cnpj || '').toLowerCase().includes(termo)
-    ));
+    const status = document.getElementById('filtroStatusHistorico')?.value || 'ativas';
+
+    let lista = _historicoCache;
+    if (status === 'ativas') lista = lista.filter(i => i.ativo);
+    else if (status === 'desativadas') lista = lista.filter(i => !i.ativo);
+
+    if (termo) {
+        lista = lista.filter(i =>
+            (i.razao_social || '').toLowerCase().includes(termo) ||
+            (i.nome_contato || '').toLowerCase().includes(termo) ||
+            (i.email_cliente || '').toLowerCase().includes(termo) ||
+            (i.cnpj || '').toLowerCase().includes(termo)
+        );
+    }
+    renderizarHistorico(lista);
 }
 
 function renderizarHistorico(lista) {
@@ -411,9 +419,12 @@ function renderizarHistorico(lista) {
 
     if (!lista.length) {
         const temBusca = (document.getElementById('buscaHistorico')?.value || '').trim();
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center">${
-            temBusca ? 'Nenhuma apresentação corresponde à busca' : 'Nenhuma apresentação criada ainda'
-        }</td></tr>`;
+        const status = document.getElementById('filtroStatusHistorico')?.value || 'ativas';
+        let msg = 'Nenhuma apresentação criada ainda';
+        if (temBusca) msg = 'Nenhuma apresentação corresponde à busca';
+        else if (status === 'desativadas') msg = 'Nenhuma apresentação desativada';
+        else if (status === 'ativas' && _historicoCache.length) msg = 'Nenhuma apresentação ativa';
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center">${msg}</td></tr>`;
         return;
     }
 
@@ -423,15 +434,44 @@ function renderizarHistorico(lista) {
         const acessos = item.acessos || 0;
         const badgeClasse = acessos > 0 ? 'badge-acessos ativo' : 'badge-acessos';
         const iconeAcessos = acessos > 0 ? 'fa-eye' : 'fa-eye-slash';
-        const btnWhats = item.telefone
-            ? `<button onclick="enviarWhatsAppHistorico('${item.id}')" class="btn btn-success btn-sm" title="Enviar por WhatsApp">
-                   <i class="fab fa-whatsapp"></i>
-               </button>`
-            : '';
+        const statusBadge = item.ativo ? '' : '<span class="badge-status-inativa">Desativada</span>';
+
+        let acoes;
+        if (item.ativo) {
+            const btnWhats = item.telefone
+                ? `<button onclick="enviarWhatsAppHistorico('${item.id}')" class="btn btn-success btn-sm" title="Enviar por WhatsApp">
+                       <i class="fab fa-whatsapp"></i>
+                   </button>`
+                : '';
+            acoes = `
+                <a href="${link}" target="_blank" class="btn btn-info btn-sm" title="Visualizar">
+                    <i class="fas fa-eye"></i>
+                </a>
+                <button onclick="copiarLinkHistorico('${link}')" class="btn btn-secondary btn-sm" title="Copiar link">
+                    <i class="fas fa-copy"></i>
+                </button>
+                ${btnWhats}
+                <button onclick="desativarApresentacao('${item.id}')" class="btn btn-warning btn-sm" title="Desativar">
+                    <i class="fas fa-ban"></i>
+                </button>
+                <button onclick="excluirApresentacao('${item.id}')" class="btn btn-danger btn-sm" title="Excluir">
+                    <i class="fas fa-trash"></i>
+                </button>`;
+        } else {
+            acoes = `
+                <button onclick="reativarApresentacao('${item.id}')" class="btn btn-success btn-sm" title="Reativar">
+                    <i class="fas fa-rotate-left"></i>
+                </button>
+                <button onclick="excluirApresentacao('${item.id}')" class="btn btn-danger btn-sm" title="Excluir">
+                    <i class="fas fa-trash"></i>
+                </button>`;
+        }
+
         return `<tr>
             <td class="celula-empresa">
                 <strong>${item.razao_social}</strong>
                 <small>${item.cnpj || ''}</small>
+                ${statusBadge}
             </td>
             <td class="celula-contato">
                 <span>${item.nome_contato}</span>
@@ -441,17 +481,65 @@ function renderizarHistorico(lista) {
             <td><span class="${badgeClasse}"><i class="fas ${iconeAcessos}"></i> ${acessos}</span></td>
             <td>
                 <div class="acoes-tabela">
-                    <a href="${link}" target="_blank" class="btn btn-info btn-sm" title="Visualizar">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                    <button onclick="copiarLinkHistorico('${link}')" class="btn btn-secondary btn-sm" title="Copiar link">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                    ${btnWhats}
+                    ${acoes}
                 </div>
             </td>
         </tr>`;
     }).join('');
+}
+
+// ===== DESATIVAR / REATIVAR / EXCLUIR =====
+async function desativarApresentacao(id) {
+    const item = _historicoCache.find(i => i.id === id);
+    if (!item) return;
+    if (!confirm(`Desativar a apresentação de ${item.razao_social}? O link do cliente para de funcionar até você reativar.`)) return;
+
+    try {
+        const { error } = await db.from('apresentacoes').update({ ativo: false }).eq('id', id);
+        if (error) throw error;
+        item.ativo = false;
+        atualizarEstatisticas(_historicoCache);
+        filtrarHistorico();
+        showToast('Apresentação desativada', 'success');
+    } catch (err) {
+        console.error(err);
+        showToast('Erro ao desativar apresentação', 'error');
+    }
+}
+
+async function reativarApresentacao(id) {
+    const item = _historicoCache.find(i => i.id === id);
+    if (!item) return;
+
+    try {
+        const { error } = await db.from('apresentacoes').update({ ativo: true }).eq('id', id);
+        if (error) throw error;
+        item.ativo = true;
+        atualizarEstatisticas(_historicoCache);
+        filtrarHistorico();
+        showToast('Apresentação reativada', 'success');
+    } catch (err) {
+        console.error(err);
+        showToast('Erro ao reativar apresentação', 'error');
+    }
+}
+
+async function excluirApresentacao(id) {
+    const item = _historicoCache.find(i => i.id === id);
+    if (!item) return;
+    if (!confirm(`Excluir permanentemente a apresentação de ${item.razao_social}? Essa ação não pode ser desfeita.`)) return;
+
+    try {
+        const { error } = await db.from('apresentacoes').delete().eq('id', id);
+        if (error) throw error;
+        _historicoCache = _historicoCache.filter(i => i.id !== id);
+        atualizarEstatisticas(_historicoCache);
+        filtrarHistorico();
+        showToast('Apresentação excluída', 'success');
+    } catch (err) {
+        console.error(err);
+        showToast('Erro ao excluir apresentação', 'error');
+    }
 }
 
 // ===== WHATSAPP A PARTIR DO HISTÓRICO =====

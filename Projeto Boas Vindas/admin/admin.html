@@ -371,14 +371,21 @@
                 </div>
 
                 <!-- BUSCA -->
-                <div class="historico-busca">
-                    <i class="fas fa-magnifying-glass"></i>
-                    <input
-                        type="search"
-                        id="buscaHistorico"
-                        placeholder="Buscar por empresa, contato ou e-mail..."
-                        oninput="filtrarHistorico()"
-                    >
+                <div class="historico-filtros">
+                    <div class="historico-busca">
+                        <i class="fas fa-magnifying-glass"></i>
+                        <input
+                            type="search"
+                            id="buscaHistorico"
+                            placeholder="Buscar por empresa, contato ou e-mail..."
+                            oninput="filtrarHistorico()"
+                        >
+                    </div>
+                    <select id="filtroStatusHistorico" class="historico-filtro-status" onchange="filtrarHistorico()">
+                        <option value="ativas" selected>Ativas</option>
+                        <option value="desativadas">Desativadas</option>
+                        <option value="todas">Todas</option>
+                    </select>
                 </div>
 
                 <div class="tabela-container">
