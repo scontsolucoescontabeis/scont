@@ -54,15 +54,21 @@
   }
 
   async function carregarDadosDiario() {
-    const [{ data: dataEmpresas, error: errEmpresas }, { data: dataMapeamentos, error: errMapeamentos }] = await Promise.all([
+    const [{ data: dataEmpresas, error: errEmpresas }, { data: dataMapeamentos, error: errMapeamentos }, { data: dataConfig, error: errConfig }] = await Promise.all([
       supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, status_situacao').order('nome_empresa', { ascending: true }),
       supabaseClient.from('contabil_mapeamento').select('*'),
+      supabaseClient.from('contabil_empresas_config').select('codigo_empresa, possui_contabil'),
     ]);
     if (errEmpresas) console.error(errEmpresas);
     if (errMapeamentos) console.error(errMapeamentos);
+    if (errConfig) console.error(errConfig);
+
+    const configPorEmpresa = {};
+    (dataConfig || []).forEach((c) => { configPorEmpresa[c.codigo_empresa] = c.possui_contabil; });
+    const possuiContabil = (codigo) => configPorEmpresa[codigo] !== false;
 
     const ativa = (s) => !s || String(s).trim().toLowerCase().startsWith('ativ');
-    empresas = (dataEmpresas || []).filter((e) => ativa(e.status_situacao));
+    empresas = (dataEmpresas || []).filter((e) => ativa(e.status_situacao) && possuiContabil(e.codigo_empresa));
     mapeamentos = dataMapeamentos || [];
 
     const ids = mapeamentos.map((m) => m.id);

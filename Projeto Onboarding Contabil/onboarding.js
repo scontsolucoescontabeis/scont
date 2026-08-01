@@ -54,13 +54,22 @@
   // ─── CARREGAMENTO ───────────────────────────────────────────
 
   async function carregarEmpresas() {
-    const { data, error } = await supabaseClient
-      .from('rh_empresas')
-      .select('codigo_empresa, nome_empresa, cnpj, status_situacao')
-      .order('nome_empresa', { ascending: true });
+    const [{ data, error }, { data: dataConfig, error: errConfig }] = await Promise.all([
+      supabaseClient
+        .from('rh_empresas')
+        .select('codigo_empresa, nome_empresa, cnpj, status_situacao')
+        .order('nome_empresa', { ascending: true }),
+      supabaseClient.from('contabil_empresas_config').select('codigo_empresa, possui_contabil'),
+    ]);
     if (error) { console.error(error); return; }
+    if (errConfig) console.error(errConfig);
+
+    const configPorEmpresa = {};
+    (dataConfig || []).forEach((c) => { configPorEmpresa[c.codigo_empresa] = c.possui_contabil; });
+    const possuiContabil = (codigo) => configPorEmpresa[codigo] !== false;
+
     const ativa = (s) => !s || String(s).trim().toLowerCase().startsWith('ativ');
-    empresas = (data || []).filter((e) => ativa(e.status_situacao));
+    empresas = (data || []).filter((e) => ativa(e.status_situacao) && possuiContabil(e.codigo_empresa));
   }
 
   async function carregarOnboardings() {
