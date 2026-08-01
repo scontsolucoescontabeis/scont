@@ -4984,6 +4984,112 @@ function _renderizarListaFolhaPonto(avisos) {
     document.getElementById('folhaPontoResultadoContainer').style.display = 'block';
 }
 
+// Constrói o PDF de uma empresa (uma página por empregado) e devolve a instância jsPDF
+// pronta para .save() ou .output('blob').
+function _construirPdfEmpresaFolhaPonto(empresaDados) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+    const MARGEM = 8;
+    const pageW = doc.internal.pageSize.getWidth();
+
+    empresaDados.empregados.forEach((emp, idx) => {
+        if (idx > 0) doc.addPage();
+
+        doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+        doc.text('FOLHA INDIVIDUAL DE PONTO', MARGEM, MARGEM + 4);
+        doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+        doc.text(`Período: ${empresaDados.periodoTexto}`, pageW - MARGEM, MARGEM + 4, { align: 'right' });
+
+        const linhaCabecalho = (y, esquerda, direita) => {
+            doc.setFontSize(8.5); doc.setFont('helvetica', 'normal');
+            doc.text(esquerda, MARGEM, y);
+            if (direita) doc.text(direita, pageW / 2 + 4, y);
+        };
+        let y = MARGEM + 10;
+        linhaCabecalho(y, `Empresa: ${empresaDados.codigo_empresa} - ${empresaDados.nome_empresa}`, `CNPJ: ${empresaDados.cnpj || ''}`);
+        y += 5;
+        linhaCabecalho(y, `Endereço: ${empresaDados.endereco || ''}`, `Bairro: ${empresaDados.municipio || ''}`);
+        y += 5;
+        linhaCabecalho(y, `Cidade: ${empresaDados.cidade || ''}`, `UF: ${empresaDados.uf || ''}   CEP: ${empresaDados.cep || ''}`);
+        y += 5;
+        linhaCabecalho(y, `Nome: ${emp.codigo_empregado} - ${emp.nome_empregado}`, `Departamento: ${emp.desc_dpto || ''}`);
+        y += 5;
+        linhaCabecalho(y, `Função: ${emp.desc_cargo || ''}`, '');
+        y += 4;
+
+        const body = emp.linhas.map(l => {
+            if (l.ferias) {
+                return [`${l.data.slice(0, 2)} ${l.diaSemana}`, l.horarioPrevisto, 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', 'FÉRIAS', ''];
+            }
+            return [`${l.data.slice(0, 2)} ${l.diaSemana}`, l.horarioPrevisto, '', '', '', '', '', '', '', ''];
+        });
+
+        doc.autoTable({
+            head: [['Dia', 'Horário Previsto', 'Entrada', 'Saída', 'Interv. Entrada', 'Interv. Saída', 'H.Extra Entrada', 'H.Extra Saída', 'N° Horas', 'Assinatura']],
+            body,
+            startY: y,
+            margin: { left: MARGEM, right: MARGEM },
+            styles: { fontSize: 7, cellPadding: 1.3, valign: 'middle', halign: 'center' },
+            headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+            columnStyles: { 0: { halign: 'left', cellWidth: 16 }, 9: { cellWidth: 30 } },
+            didParseCell: (data) => {
+                if (data.section !== 'body') return;
+                const linha = emp.linhas[data.row.index];
+                if (linha && linha.tipo === 'folga' && !linha.ferias) {
+                    data.cell.styles.fillColor = [230, 230, 230];
+                }
+            },
+        });
+
+        const finalY = doc.lastAutoTable.finalY + 6;
+        doc.setFontSize(7); doc.setFont('helvetica', 'italic');
+        doc.text('Obs.: Substitui o Quadro de Horário de Trabalho, de acordo com o disposto na Portaria Ministerial nº 3162 de 08/09/1982', MARGEM, finalY);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Reconheço a exatidão destas anotações. Data: ___/___/______', MARGEM, finalY + 5);
+        doc.text('_______________________________', MARGEM, finalY + 18);
+        doc.text('Visto chefia', MARGEM + 12, finalY + 22);
+        doc.text('_______________________________', pageW / 2 + 10, finalY + 18);
+        doc.text('Visto funcionário', pageW / 2 + 22, finalY + 22);
+    });
+
+    return doc;
+}
+
+async function baixarPdfsFolhaPonto() {
+    const dados = state._folhaPontoDados;
+    if (!dados || dados.empresas.length === 0) return;
+    const [mm, aaaa] = dados.competencia.split('/');
+
+    if (dados.empresas.length === 1) {
+        const empresaDados = dados.empresas[0];
+        const doc = _construirPdfEmpresaFolhaPonto(empresaDados);
+        doc.save(`FolhaDePonto_${empresaDados.codigo_empresa}_${mm}-${aaaa}.pdf`);
+        return;
+    }
+
+    mostrarMensagem('Aguarde', 'Gerando arquivo zip com as folhas de ponto...');
+    try {
+        const zip = new JSZip();
+        for (const empresaDados of dados.empresas) {
+            const doc = _construirPdfEmpresaFolhaPonto(empresaDados);
+            const blob = doc.output('blob');
+            zip.file(`FolhaDePonto_${empresaDados.codigo_empresa}_${mm}-${aaaa}.pdf`, blob);
+        }
+        const blobZip = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(blobZip);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `FolhasDePonto_${mm}-${aaaa}.zip`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        fecharModalMensagem();
+    } catch (erro) {
+        console.error('Erro ao gerar zip de folhas de ponto:', erro);
+        fecharModalMensagem();
+        mostrarMensagem('Erro', 'Falha ao gerar o arquivo zip: ' + erro.message);
+    }
+}
+
 // Os campos JSONB de rh_escala_trabalho são gravados via JSON.stringify (mesmo
 // padrão de rh_saves.flags_folga/dsr_dias) e por isso precisam de JSON.parse na leitura.
 function _parsearCamposEscala(row) {
