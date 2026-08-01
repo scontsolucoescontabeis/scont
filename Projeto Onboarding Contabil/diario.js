@@ -386,6 +386,12 @@
           <div><label>Data</label><input type="date" id="novoLancamentoData" value="${new Date().toISOString().slice(0, 10)}"></div>
           <div class="full"><label>Registro</label><textarea id="novoLancamentoTexto" rows="2" placeholder="Ex: Enviado SPED Fiscal de junho, pendente confirmação do cliente."></textarea></div>
           <div><button type="button" class="btn-novo" id="btnAddLancamento">+ Adicionar Lançamento</button></div>
+          <div class="full mapa-filtros" style="margin-top:10px;border-top:1px solid var(--line-soft);padding-top:14px;">
+            <div><label>Filtrar de</label><input type="date" id="filtroLancamentoDe"></div>
+            <div><label>até</label><input type="date" id="filtroLancamentoAte"></div>
+            <button type="button" class="btn btn-secondary" id="btnFiltrarLancamentos">Filtrar</button>
+            <button type="button" class="btn btn-secondary" id="btnLimparFiltroLancamentos">Limpar</button>
+          </div>
           <div class="full" id="listaLancamentos"><p class="mapa-empty">Carregando...</p></div>
         </div>
       </div>
@@ -408,15 +414,29 @@
       carregarListaLancamentos();
     });
 
+    el.querySelector('#btnFiltrarLancamentos').addEventListener('click', () => carregarListaLancamentos());
+    el.querySelector('#btnLimparFiltroLancamentos').addEventListener('click', () => {
+      document.getElementById('filtroLancamentoDe').value = '';
+      document.getElementById('filtroLancamentoAte').value = '';
+      carregarListaLancamentos();
+    });
+
     carregarListaLancamentos();
   }
 
   async function carregarListaLancamentos() {
     const container = document.getElementById('listaLancamentos');
-    const { data, error } = await supabaseClient
+    const de = document.getElementById('filtroLancamentoDe')?.value || null;
+    const ate = document.getElementById('filtroLancamentoAte')?.value || null;
+
+    let query = supabaseClient
       .from('contabil_diario_lancamentos')
       .select('*')
-      .eq('codigo_empresa', empresaAtualCodigo)
+      .eq('codigo_empresa', empresaAtualCodigo);
+    if (de) query = query.gte('data', de);
+    if (ate) query = query.lte('data', ate);
+
+    const { data, error } = await query
       .order('data', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) { console.error(error); container.innerHTML = '<p class="mapa-empty">Erro ao carregar lançamentos.</p>'; return; }
