@@ -4,7 +4,7 @@
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   let empresas = []; // [{ codigo_empresa, nome_empresa }]
-  let configPorEmpresa = {}; // { codigo_empresa: boolean } — estado atual da tela (não salvo ainda)
+  let configPorEmpresa = {}; // { codigo_empresa: boolean } — espelha o que já está salvo no banco
 
   document.addEventListener('DOMContentLoaded', iniciar);
 
@@ -36,6 +36,17 @@
     return configPorEmpresa[codigoEmpresa] !== false;
   }
 
+  // ─── PERSISTÊNCIA ───────────────────────────────────────────
+
+  async function salvarLote(registros) {
+    if (!registros.length) return { error: null };
+    const { error } = await supabaseClient
+      .from('contabil_empresas_config')
+      .upsert(registros, { onConflict: 'codigo_empresa' });
+    if (!error) registros.forEach((r) => { configPorEmpresa[r.codigo_empresa] = r.possui_contabil; });
+    return { error };
+  }
+
   // ─── TELA ───────────────────────────────────────────────────
 
   function renderTela() {
@@ -46,7 +57,7 @@
       <div class="mapa-secao">
         <div class="mapa-secao-header">Empresas com Contábil</div>
         <div class="mapa-secao-body">
-          <p class="full mapa-empty" style="margin-bottom:4px;">Marque as empresas que possuem contábil na Scont. Somente as marcadas aqui aparecem nos seletores e filtros do Onboarding e do Diário Contábil.</p>
+          <p class="full mapa-empty" style="margin-bottom:4px;">Marque as empresas que possuem contábil na Scont. Somente as marcadas aqui aparecem nos seletores e filtros do Onboarding e do Diário Contábil. As alterações são salvas automaticamente.</p>
           <div class="full mapa-filtros">
             <input type="text" id="buscaEmpresaConfig" placeholder="Buscar empresa...">
             <button type="button" class="btn btn-secondary" id="btnMarcarTodas">Marcar todas</button>
@@ -59,7 +70,6 @@
             <thead><tr><th>Código Empresa</th><th>Nome Empresa</th><th>Contabilidade</th></tr></thead>
             <tbody id="corpoTabelaConfig"></tbody>
           </table>
-          <div class="full"><button type="button" class="btn-novo" id="btnSalvarConfig">Salvar</button></div>
         </div>
       </div>
     `;
@@ -67,7 +77,6 @@
     document.getElementById('buscaEmpresaConfig').addEventListener('input', renderTabela);
     document.getElementById('btnMarcarTodas').addEventListener('click', () => alternarVisiveis(true));
     document.getElementById('btnDesmarcarTodas').addEventListener('click', () => alternarVisiveis(false));
-    document.getElementById('btnSalvarConfig').addEventListener('click', salvarConfig);
     document.getElementById('btnImportarPlanilha').addEventListener('click', () => document.getElementById('fileImportarConfig').click());
     document.getElementById('fileImportarConfig').addEventListener('change', handleImportarPlanilha);
 
@@ -100,10 +109,7 @@
       : '<tr><td colspan="3">Nenhuma empresa encontrada.</td></tr>';
 
     corpo.querySelectorAll('.contabil-toggle').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        definirValor(btn, btn.getAttribute('data-value') !== 'true');
-        atualizarContador();
-      });
+      btn.addEventListener('click', () => alternarUma(btn));
     });
 
     atualizarContador();
@@ -116,14 +122,51 @@
     btn.classList.toggle('contabil-nao', !valor);
   }
 
+  async function alternarUma(btn) {
+    const codigo = btn.getAttribute('data-empresa-codigo');
+    const anterior = btn.getAttribute('data-value') === 'true';
+    const novo = !anterior;
+
+    definirValor(btn, novo);
+    btn.disabled = true;
+    atualizarContador();
+
+    const { error } = await salvarLote([{ codigo_empresa: codigo, possui_contabil: novo }]);
+
+    btn.disabled = false;
+    if (error) {
+      console.error(error);
+      definirValor(btn, anterior);
+      atualizarContador();
+      mostrarToast('Erro ao salvar. Alteração desfeita.', 'erro');
+    }
+  }
+
   function atualizarContador() {
     const todos = document.querySelectorAll('#corpoTabelaConfig .contabil-toggle');
     const marcados = document.querySelectorAll('#corpoTabelaConfig .contabil-toggle[data-value="true"]');
     document.getElementById('contadorEmpresasConfig').textContent = `${marcados.length} de ${todos.length} com contábil (${empresas.length} no total)`;
   }
 
-  function alternarVisiveis(marcar) {
-    document.querySelectorAll('#corpoTabelaConfig .contabil-toggle').forEach((btn) => definirValor(btn, marcar));
+  async function alternarVisiveis(marcar) {
+    const botoes = Array.from(document.querySelectorAll('#corpoTabelaConfig .contabil-toggle'));
+    const paraSalvar = botoes.filter((b) => (b.getAttribute('data-value') === 'true') !== marcar);
+    if (!paraSalvar.length) return;
+
+    paraSalvar.forEach((b) => { b.disabled = true; });
+
+    const registros = paraSalvar.map((b) => ({ codigo_empresa: b.getAttribute('data-empresa-codigo'), possui_contabil: marcar }));
+    const { error } = await salvarLote(registros);
+
+    paraSalvar.forEach((b) => { b.disabled = false; });
+
+    if (error) {
+      console.error(error);
+      mostrarToast('Erro ao salvar as alterações.', 'erro');
+      return;
+    }
+
+    paraSalvar.forEach((b) => definirValor(b, marcar));
     atualizarContador();
   }
 
@@ -193,7 +236,7 @@
     const empresasPorCodigo = {};
     empresas.forEach((e) => { empresasPorCodigo[e.codigo_empresa] = e; });
 
-    let atualizadas = 0;
+    const registrosPorCodigo = {};
     let naoEncontradas = 0;
     let ignoradas = 0;
 
@@ -206,48 +249,40 @@
 
       if (!empresasPorCodigo[codigo]) { naoEncontradas++; return; }
 
-      configPorEmpresa[codigo] = valor;
-      atualizadas++;
+      registrosPorCodigo[codigo] = valor; // linha repetida: prevalece a última ocorrência
     });
 
-    renderTabela();
+    const registros = Object.entries(registrosPorCodigo).map(([codigo_empresa, possui_contabil]) => ({ codigo_empresa, possui_contabil }));
 
-    const partes = [`${atualizadas} empresa(s) atualizada(s) na tela — clique em Salvar para gravar.`];
-    if (naoEncontradas) partes.push(`${naoEncontradas} código(s) não encontrado(s) na base.`);
-    if (ignoradas) partes.push(`${ignoradas} linha(s) com valor de contabilidade inválido.`);
-    mostrarToast(partes.join(' '), atualizadas ? 'sucesso' : 'erro');
-  }
-
-  // ─── SALVAR ─────────────────────────────────────────────────
-
-  async function salvarConfig() {
-    const btn = document.getElementById('btnSalvarConfig');
-    const botoes = Array.from(document.querySelectorAll('#corpoTabelaConfig .contabil-toggle'));
-    if (!botoes.length) return;
-
-    btn.disabled = true;
-    btn.textContent = 'Salvando...';
-
-    const registros = botoes.map((b) => ({
-      codigo_empresa: b.getAttribute('data-empresa-codigo'),
-      possui_contabil: b.getAttribute('data-value') === 'true',
-    }));
-
-    const { error } = await supabaseClient
-      .from('contabil_empresas_config')
-      .upsert(registros, { onConflict: 'codigo_empresa' });
-
-    btn.disabled = false;
-    btn.textContent = 'Salvar';
-
-    if (error) {
-      console.error(error);
-      mostrarToast('Erro ao salvar configurações.', 'erro');
+    if (!registros.length) {
+      const partes = ['Nenhuma alteração aplicável encontrada na planilha.'];
+      if (naoEncontradas) partes.push(`${naoEncontradas} código(s) não encontrado(s) na base.`);
+      if (ignoradas) partes.push(`${ignoradas} linha(s) com valor de contabilidade inválido.`);
+      mostrarToast(partes.join(' '), 'erro');
       return;
     }
 
-    registros.forEach((r) => { configPorEmpresa[r.codigo_empresa] = r.possui_contabil; });
-    mostrarToast('Configurações salvas.', 'sucesso');
+    const btnImportar = document.getElementById('btnImportarPlanilha');
+    btnImportar.disabled = true;
+    btnImportar.textContent = 'Importando...';
+
+    const { error } = await salvarLote(registros);
+
+    btnImportar.disabled = false;
+    btnImportar.textContent = '📊 Importar planilha';
+
+    if (error) {
+      console.error(error);
+      mostrarToast('Erro ao salvar as alterações importadas.', 'erro');
+      return;
+    }
+
+    renderTabela();
+
+    const partes = [`${registros.length} empresa(s) salva(s) no banco.`];
+    if (naoEncontradas) partes.push(`${naoEncontradas} código(s) não encontrado(s) na base.`);
+    if (ignoradas) partes.push(`${ignoradas} linha(s) com valor de contabilidade inválido.`);
+    mostrarToast(partes.join(' '), 'sucesso');
   }
 
   function escapeHtml(str) {
