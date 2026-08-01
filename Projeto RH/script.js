@@ -2031,6 +2031,15 @@ function _textoPeriodoApuracao(competencia, diaInicio, diaFim) {
     return ` (período: ${dias[0].data} a ${dias.at(-1).data})`;
 }
 
+// Rótulo de período para o cabeçalho da Folha de Ponto: "MM/AAAA" no padrão, ou o
+// intervalo completo quando a empresa usa período de apuração customizado.
+function _labelPeriodoFolhaPonto(competencia, diaInicio, diaFim) {
+    if (!Number.isInteger(diaInicio) || !Number.isInteger(diaFim)) return competencia;
+    const dias = gerarDiasDoMes(competencia, diaInicio, diaFim);
+    if (dias.length === 0) return competencia;
+    return `${dias[0].data} a ${dias.at(-1).data}`;
+}
+
 let _cacheValoresVaVt = {};
 
 async function _buscarValoresVaVtEmpresa(codigoEmpresa) {
@@ -4830,6 +4839,149 @@ function _atualizarResumoEmpresasSelecionadasFolhaPonto() {
         return `${cb.value} - ${emp?.nome_empresa || cb.value}`;
     });
     info.textContent = `${marcados.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
+}
+
+async function gerarPreviaFolhaPonto() {
+    const comp = document.getElementById('folhaPontoCompetencia').value;
+    if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe uma competência válida (MM/AAAA).'); return; }
+    const codigosEmpresas = Array.from(document.querySelectorAll('.folhaPonto-emp-check:checked')).map(cb => cb.value);
+    if (codigosEmpresas.length === 0) { mostrarMensagem('Aviso', 'Selecione pelo menos uma empresa.'); return; }
+
+    mostrarMensagem('Aguarde', 'Montando as folhas de ponto...');
+    try {
+        const [
+            { data: empresasData, error: errEmp },
+            { data: empregadosData, error: errFunc },
+            { data: escalasData, error: errEsc },
+            { data: feriasData, error: errFer },
+            { data: excecoesData, error: errExc },
+            { data: jornadaData, error: errJor },
+        ] = await Promise.all([
+            supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, cnpj, endereco, municipio, cidade, uf, cep').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, situacao, tipo_empregado, desc_cargo, desc_dpto').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_escala_trabalho').select('*').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_ferias_calculadas').select('codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_escala_excecoes').select('codigo_empresa, codigo_empregado, data').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_jornada_trabalho').select('codigo_empresa, codigo_empregado, dia_semana, entrada, intervalo_inicio, intervalo_fim, saida').in('codigo_empresa', codigosEmpresas),
+        ]);
+        if (errEmp) throw errEmp;
+        if (errFunc) throw errFunc;
+        if (errEsc) throw errEsc;
+        if (errFer) throw errFer;
+        if (errExc) throw errExc;
+        if (errJor) throw errJor;
+
+        const escalasMapa = {};
+        (escalasData || []).forEach(e => { escalasMapa[`${e.codigo_empresa}_${e.codigo_empregado}`] = _parsearCamposEscala(e); });
+
+        const feriasMapa = {};
+        (feriasData || []).forEach(f => {
+            const chave = `${f.codigo_empresa}_${f.codigo_empregado}`;
+            (feriasMapa[chave] ??= []).push({ inicio: f.ferias_inicio, fim: f.ferias_fim });
+        });
+
+        const excecoesMapa = {};
+        (excecoesData || []).forEach(e => {
+            const chave = `${e.codigo_empresa}_${e.codigo_empregado}`;
+            (excecoesMapa[chave] ??= []).push(e.data);
+        });
+
+        const jornadaMapa = {};
+        (jornadaData || []).forEach(j => {
+            const chave = `${j.codigo_empresa}_${j.codigo_empregado}`;
+            (jornadaMapa[chave] ??= []).push(j);
+        });
+
+        const empregadosFiltrados = (empregadosData || []).filter(e =>
+            (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() === 'Empregado'
+        );
+
+        const empresasComEmpregados = [];
+        const avisos = [];
+
+        for (const codigoEmpresa of codigosEmpresas) {
+            const empresaInfo = (empresasData || []).find(e => e.codigo_empresa === codigoEmpresa);
+            const nomeEmpresa = empresaInfo?.nome_empresa || state.empresas.find(e => e.codigo_empresa === codigoEmpresa)?.nome_empresa || codigoEmpresa;
+            const empregadosEmpresa = empregadosFiltrados.filter(e => e.codigo_empresa === codigoEmpresa);
+
+            if (empregadosEmpresa.length === 0) {
+                avisos.push(`${codigoEmpresa} - ${nomeEmpresa}: sem empregado (situação "Trabalhando") encontrado.`);
+                continue;
+            }
+
+            const cfg = await _buscarConfigRubricas(codigoEmpresa);
+            const { diaInicio, diaFim } = _resolverPeriodoApuracao(cfg);
+            const periodoTexto = _labelPeriodoFolhaPonto(comp, diaInicio, diaFim);
+
+            const empregados = empregadosEmpresa.map(emp => {
+                const chave = `${emp.codigo_empresa}_${emp.codigo_empregado}`;
+                const escala = escalasMapa[chave] || null;
+                const periodosFerias = feriasMapa[chave];
+                const excecoesFolga = excecoesMapa[chave] || [];
+                const resumo = calcularResumoMes(escala, comp, periodosFerias, diaInicio, diaFim, excecoesFolga);
+                const jornadaPorDiaSemana = agruparJornadaPorDiaSemana(jornadaMapa[chave] || []);
+                return {
+                    codigo_empregado: emp.codigo_empregado,
+                    nome_empregado: emp.nome_empregado,
+                    desc_cargo: emp.desc_cargo || '',
+                    desc_dpto: emp.desc_dpto || '',
+                    linhas: montarLinhasFolhaPonto(resumo.dias, jornadaPorDiaSemana),
+                };
+            }).sort((a, b) => a.nome_empregado.localeCompare(b.nome_empregado));
+
+            empresasComEmpregados.push({
+                codigo_empresa: codigoEmpresa,
+                nome_empresa: nomeEmpresa,
+                cnpj: empresaInfo?.cnpj || '',
+                endereco: empresaInfo?.endereco || '',
+                municipio: empresaInfo?.municipio || '',
+                cidade: empresaInfo?.cidade || '',
+                uf: empresaInfo?.uf || '',
+                cep: empresaInfo?.cep || '',
+                periodoTexto,
+                empregados,
+            });
+        }
+
+        fecharModalMensagem();
+
+        if (empresasComEmpregados.length === 0) {
+            document.getElementById('folhaPontoResultadoContainer').style.display = 'none';
+            mostrarMensagem('Aviso', 'Nenhum empregado encontrado para as empresas selecionadas.\n' + avisos.join('\n'));
+            return;
+        }
+
+        state._folhaPontoDados = { competencia: comp, empresas: empresasComEmpregados };
+        _renderizarListaFolhaPonto(avisos);
+    } catch (erro) {
+        console.error('Erro ao montar folhas de ponto:', erro);
+        fecharModalMensagem();
+        mostrarMensagem('Erro', 'Falha ao montar as folhas de ponto: ' + erro.message);
+    }
+}
+
+function _renderizarListaFolhaPonto(avisos) {
+    const dados = state._folhaPontoDados;
+    const totalEmpregados = dados.empresas.reduce((soma, e) => soma + e.empregados.length, 0);
+    const info = document.getElementById('folhaPontoResultadoInfo');
+    info.textContent = `${dados.empresas.length} empresa(s), ${totalEmpregados} empregado(s)` +
+        (avisos && avisos.length ? ` — ${avisos.length} empresa(s) pulada(s)` : '');
+
+    const container = document.getElementById('folhaPontoListaEmpregados');
+    container.innerHTML = dados.empresas.map(emp => `
+        <div style="border:1px solid var(--border-color); border-radius:8px; margin-bottom:10px; padding:12px 14px;">
+            <strong>${emp.codigo_empresa} - ${emp.nome_empresa}</strong>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:2px;">
+                ${emp.empregados.length} empregado(s) · Período: ${emp.periodoTexto}
+            </div>
+        </div>
+    `).join('') + (avisos && avisos.length ? `
+        <div style="font-size:12px; color:#B8860B; margin-top:6px;">
+            ⚠️ ${avisos.join('<br>')}
+        </div>
+    ` : '');
+
+    document.getElementById('folhaPontoResultadoContainer').style.display = 'block';
 }
 
 // Os campos JSONB de rh_escala_trabalho são gravados via JSON.stringify (mesmo
