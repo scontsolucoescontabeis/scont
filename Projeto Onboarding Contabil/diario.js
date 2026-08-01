@@ -392,6 +392,19 @@
             <button type="button" class="btn btn-secondary" id="btnFiltrarLancamentos">Filtrar</button>
             <button type="button" class="btn btn-secondary" id="btnLimparFiltroLancamentos">Limpar</button>
           </div>
+          <div class="full mapa-filtros" style="padding-top:2px;">
+            <div>
+              <label>Filtro rápido</label>
+              <select id="filtroLancamentoMes">
+                <option value="">Mês (todos)</option>
+                ${window.ContabilDiarioUtil.MESES_LABELS.map((l, idx) => `<option value="${idx + 1}">${l}</option>`).join('')}
+              </select>
+            </div>
+            <div><label>&nbsp;</label><input type="number" id="filtroLancamentoAno" placeholder="Ano" style="width:90px;"></div>
+            <button type="button" class="btn btn-secondary" id="btnFiltrarMesAno">Aplicar</button>
+            <button type="button" class="btn btn-secondary" id="btnFiltroMesAtual">Mês atual</button>
+            <button type="button" class="btn btn-secondary" id="btnFiltroAnoAtual">Ano atual</button>
+          </div>
           <div class="full" id="listaLancamentos"><p class="mapa-empty">Carregando...</p></div>
         </div>
       </div>
@@ -418,8 +431,43 @@
     el.querySelector('#btnLimparFiltroLancamentos').addEventListener('click', () => {
       document.getElementById('filtroLancamentoDe').value = '';
       document.getElementById('filtroLancamentoAte').value = '';
+      document.getElementById('filtroLancamentoMes').value = '';
+      document.getElementById('filtroLancamentoAno').value = '';
       carregarListaLancamentos();
     });
+
+    el.querySelector('#btnFiltrarMesAno').addEventListener('click', aplicarFiltroMesAno);
+    el.querySelector('#btnFiltroMesAtual').addEventListener('click', () => {
+      const hoje = new Date();
+      document.getElementById('filtroLancamentoMes').value = String(hoje.getMonth() + 1);
+      document.getElementById('filtroLancamentoAno').value = String(hoje.getFullYear());
+      aplicarFiltroMesAno();
+    });
+    el.querySelector('#btnFiltroAnoAtual').addEventListener('click', () => {
+      const hoje = new Date();
+      document.getElementById('filtroLancamentoMes').value = '';
+      document.getElementById('filtroLancamentoAno').value = String(hoje.getFullYear());
+      aplicarFiltroMesAno();
+    });
+
+    carregarListaLancamentos();
+  }
+
+  function aplicarFiltroMesAno() {
+    const mes = document.getElementById('filtroLancamentoMes').value;
+    const ano = document.getElementById('filtroLancamentoAno').value;
+    if (!ano) return;
+    const anoNum = Number(ano);
+
+    if (mes) {
+      const mesNum = Number(mes);
+      const ultimoDia = new Date(anoNum, mesNum, 0).getDate();
+      document.getElementById('filtroLancamentoDe').value = `${anoNum}-${String(mesNum).padStart(2, '0')}-01`;
+      document.getElementById('filtroLancamentoAte').value = `${anoNum}-${String(mesNum).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`;
+    } else {
+      document.getElementById('filtroLancamentoDe').value = `${anoNum}-01-01`;
+      document.getElementById('filtroLancamentoAte').value = `${anoNum}-12-31`;
+    }
 
     carregarListaLancamentos();
   }
