@@ -4,7 +4,7 @@
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   let empresas = []; // [{ codigo_empresa, nome_empresa }]
-  let configPorEmpresa = {}; // { codigo_empresa: boolean }
+  let configPorEmpresa = {}; // { codigo_empresa: boolean } — estado atual da tela (não salvo ainda)
 
   document.addEventListener('DOMContentLoaded', iniciar);
 
@@ -33,85 +33,204 @@
   }
 
   function possuiContabil(codigoEmpresa) {
-    const v = configPorEmpresa[codigoEmpresa];
-    return v !== false;
+    return configPorEmpresa[codigoEmpresa] !== false;
   }
+
+  // ─── TELA ───────────────────────────────────────────────────
 
   function renderTela() {
     const main = document.getElementById('main');
+    main.classList.add('main-full');
     main.innerHTML = `
       <div class="onboarding-header"><div><h2>Configurações</h2></div></div>
       <div class="mapa-secao">
         <div class="mapa-secao-header">Empresas com Contábil</div>
         <div class="mapa-secao-body">
-          <p class="full mapa-empty" style="margin-bottom:4px;">Selecione as empresas que possuem contábil na Scont. Somente as marcadas aqui aparecem nos seletores e filtros do Onboarding e do Diário Contábil.</p>
+          <p class="full mapa-empty" style="margin-bottom:4px;">Marque as empresas que possuem contábil na Scont. Somente as marcadas aqui aparecem nos seletores e filtros do Onboarding e do Diário Contábil.</p>
           <div class="full mapa-filtros">
             <input type="text" id="buscaEmpresaConfig" placeholder="Buscar empresa...">
             <button type="button" class="btn btn-secondary" id="btnMarcarTodas">Marcar todas</button>
             <button type="button" class="btn btn-secondary" id="btnDesmarcarTodas">Desmarcar todas</button>
+            <button type="button" class="btn btn-secondary" id="btnImportarPlanilha">📊 Importar planilha</button>
+            <input type="file" id="fileImportarConfig" accept=".xlsx,.xls,.csv" style="display:none">
           </div>
           <p class="full mapa-empty" id="contadorEmpresasConfig"></p>
-          <div class="full mapa-checkbox-grupo" id="listaEmpresasConfig"></div>
+          <table class="mapa-table full">
+            <thead><tr><th>Código Empresa</th><th>Nome Empresa</th><th>Contabilidade</th></tr></thead>
+            <tbody id="corpoTabelaConfig"></tbody>
+          </table>
           <div class="full"><button type="button" class="btn-novo" id="btnSalvarConfig">Salvar</button></div>
         </div>
       </div>
     `;
 
-    document.getElementById('buscaEmpresaConfig').addEventListener('input', renderLista);
+    document.getElementById('buscaEmpresaConfig').addEventListener('input', renderTabela);
     document.getElementById('btnMarcarTodas').addEventListener('click', () => alternarVisiveis(true));
     document.getElementById('btnDesmarcarTodas').addEventListener('click', () => alternarVisiveis(false));
     document.getElementById('btnSalvarConfig').addEventListener('click', salvarConfig);
+    document.getElementById('btnImportarPlanilha').addEventListener('click', () => document.getElementById('fileImportarConfig').click());
+    document.getElementById('fileImportarConfig').addEventListener('change', handleImportarPlanilha);
 
-    renderLista();
+    renderTabela();
   }
 
   function empresasVisiveis() {
     const termo = (document.getElementById('buscaEmpresaConfig').value || '').trim().toLowerCase();
     if (!termo) return empresas;
-    return empresas.filter((e) => e.nome_empresa.toLowerCase().includes(termo));
+    return empresas.filter((e) => e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo));
   }
 
-  function renderLista() {
-    const lista = document.getElementById('listaEmpresasConfig');
+  function toggleHtml(codigoEmpresa) {
+    const sim = possuiContabil(codigoEmpresa);
+    return `<button type="button" class="contabil-toggle ${sim ? 'contabil-sim' : 'contabil-nao'}" data-empresa-codigo="${escapeAttr(codigoEmpresa)}" data-value="${sim}">${sim ? 'Sim' : 'Não'}</button>`;
+  }
+
+  function renderTabela() {
+    const corpo = document.getElementById('corpoTabelaConfig');
     const visiveis = empresasVisiveis();
 
-    lista.innerHTML = visiveis.length
+    corpo.innerHTML = visiveis.length
       ? visiveis.map((e) => `
-        <label class="mapa-checkbox-item">
-          <input type="checkbox" data-empresa-codigo="${escapeAttr(e.codigo_empresa)}" ${possuiContabil(e.codigo_empresa) ? 'checked' : ''}> ${escapeHtml(e.nome_empresa)}
-        </label>
+        <tr>
+          <td>${escapeHtml(e.codigo_empresa)}</td>
+          <td>${escapeHtml(e.nome_empresa)}</td>
+          <td>${toggleHtml(e.codigo_empresa)}</td>
+        </tr>
       `).join('')
-      : '<p class="mapa-empty full">Nenhuma empresa encontrada.</p>';
+      : '<tr><td colspan="3">Nenhuma empresa encontrada.</td></tr>';
 
-    lista.querySelectorAll('[data-empresa-codigo]').forEach((chk) => {
-      chk.addEventListener('change', atualizarContador);
+    corpo.querySelectorAll('.contabil-toggle').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        definirValor(btn, btn.getAttribute('data-value') !== 'true');
+        atualizarContador();
+      });
     });
 
     atualizarContador();
   }
 
+  function definirValor(btn, valor) {
+    btn.setAttribute('data-value', String(valor));
+    btn.textContent = valor ? 'Sim' : 'Não';
+    btn.classList.toggle('contabil-sim', valor);
+    btn.classList.toggle('contabil-nao', !valor);
+  }
+
   function atualizarContador() {
-    const todos = document.querySelectorAll('#listaEmpresasConfig [data-empresa-codigo]');
-    const marcados = document.querySelectorAll('#listaEmpresasConfig [data-empresa-codigo]:checked');
-    document.getElementById('contadorEmpresasConfig').textContent = `${marcados.length} de ${todos.length} selecionadas (${empresas.length} no total)`;
+    const todos = document.querySelectorAll('#corpoTabelaConfig .contabil-toggle');
+    const marcados = document.querySelectorAll('#corpoTabelaConfig .contabil-toggle[data-value="true"]');
+    document.getElementById('contadorEmpresasConfig').textContent = `${marcados.length} de ${todos.length} com contábil (${empresas.length} no total)`;
   }
 
   function alternarVisiveis(marcar) {
-    document.querySelectorAll('#listaEmpresasConfig [data-empresa-codigo]').forEach((chk) => { chk.checked = marcar; });
+    document.querySelectorAll('#corpoTabelaConfig .contabil-toggle').forEach((btn) => definirValor(btn, marcar));
     atualizarContador();
   }
 
+  // ─── IMPORTAÇÃO EM MASSA ────────────────────────────────────
+
+  function normalizarChave(str) {
+    return String(str ?? '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  const ALIASES_CODIGO = ['codigoempresa', 'codigo', 'codempresa', 'codemp'];
+  const ALIASES_CONTABILIDADE = ['contabilidade', 'possuicontabil', 'contabil', 'temcontabilidade'];
+
+  function interpretarSimNao(valor) {
+    if (valor === null || valor === undefined) return null;
+    const v = normalizarChave(valor);
+    if (!v) return null;
+    if (['sim', 's', 'true', '1', 'yes', 'y'].includes(v)) return true;
+    if (['nao', 'n', 'false', '0', 'no'].includes(v)) return false;
+    return null;
+  }
+
+  function lerPlanilhaConfig(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          if (!sheet) throw new Error('Não foi possível ler o conteúdo deste arquivo.');
+          const linhas = XLSX.utils.sheet_to_json(sheet, { defval: null });
+          resolve(linhas);
+        } catch (err) { reject(err); }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function handleImportarPlanilha(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    let linhas;
+    try {
+      linhas = await lerPlanilhaConfig(file);
+    } catch (err) {
+      console.error(err);
+      mostrarToast('Erro ao ler a planilha.', 'erro');
+      return;
+    }
+
+    if (!linhas.length) { mostrarToast('Planilha vazia.', 'erro'); return; }
+
+    const cabecalhos = Object.keys(linhas[0]);
+    const chaveCodigo = cabecalhos.find((h) => ALIASES_CODIGO.includes(normalizarChave(h)));
+    const chaveContabilidade = cabecalhos.find((h) => ALIASES_CONTABILIDADE.includes(normalizarChave(h)));
+
+    if (!chaveCodigo || !chaveContabilidade) {
+      mostrarToast('Planilha inválida: são necessárias as colunas "Código Empresa" e "Contabilidade".', 'erro');
+      return;
+    }
+
+    const empresasPorCodigo = {};
+    empresas.forEach((e) => { empresasPorCodigo[e.codigo_empresa] = e; });
+
+    let atualizadas = 0;
+    let naoEncontradas = 0;
+    let ignoradas = 0;
+
+    linhas.forEach((linha) => {
+      const codigo = String(linha[chaveCodigo] ?? '').trim();
+      if (!codigo) return;
+
+      const valor = interpretarSimNao(linha[chaveContabilidade]);
+      if (valor === null) { ignoradas++; return; }
+
+      if (!empresasPorCodigo[codigo]) { naoEncontradas++; return; }
+
+      configPorEmpresa[codigo] = valor;
+      atualizadas++;
+    });
+
+    renderTabela();
+
+    const partes = [`${atualizadas} empresa(s) atualizada(s) na tela — clique em Salvar para gravar.`];
+    if (naoEncontradas) partes.push(`${naoEncontradas} código(s) não encontrado(s) na base.`);
+    if (ignoradas) partes.push(`${ignoradas} linha(s) com valor de contabilidade inválido.`);
+    mostrarToast(partes.join(' '), atualizadas ? 'sucesso' : 'erro');
+  }
+
+  // ─── SALVAR ─────────────────────────────────────────────────
+
   async function salvarConfig() {
     const btn = document.getElementById('btnSalvarConfig');
-    const checkboxes = Array.from(document.querySelectorAll('#listaEmpresasConfig [data-empresa-codigo]'));
-    if (!checkboxes.length) return;
+    const botoes = Array.from(document.querySelectorAll('#corpoTabelaConfig .contabil-toggle'));
+    if (!botoes.length) return;
 
     btn.disabled = true;
     btn.textContent = 'Salvando...';
 
-    const registros = checkboxes.map((chk) => ({
-      codigo_empresa: chk.getAttribute('data-empresa-codigo'),
-      possui_contabil: chk.checked,
+    const registros = botoes.map((b) => ({
+      codigo_empresa: b.getAttribute('data-empresa-codigo'),
+      possui_contabil: b.getAttribute('data-value') === 'true',
     }));
 
     const { error } = await supabaseClient

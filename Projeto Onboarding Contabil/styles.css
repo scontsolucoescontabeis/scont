@@ -582,6 +582,13 @@ input,select,textarea{font:inherit}
 .mapa-table th, .mapa-table td{ text-align:left; padding:10px 12px; border-bottom:1px solid var(--line-soft); font-size:13px; }
 .mapa-table tbody tr{ cursor:pointer; }
 .mapa-table tbody tr:hover{ background:var(--surface-2); }
+#corpoTabelaConfig tr{ cursor:default; }
+
+.contabil-toggle{ border:none; border-radius:999px; padding:4px 14px; font-size:12px; font-weight:700; cursor:pointer; min-width:52px; }
+.contabil-toggle.contabil-sim{ background:var(--success-soft); color:var(--success); }
+.contabil-toggle.contabil-nao{ background:var(--danger-soft); color:var(--danger); }
+
+.main.main-full{ max-width:none; }
 
 .mapa-mini-grade{ display:inline-flex; gap:2px; }
 .mini-quad{ width:10px; height:10px; border-radius:2px; display:inline-block; background:var(--line-soft); }
