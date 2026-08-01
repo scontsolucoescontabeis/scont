@@ -19,6 +19,7 @@
   let empresas = [];          // [{ codigo_empresa, nome_empresa }]
   let mapeamentos = [];       // linhas de contabil_mapeamento
   let pendenciasPorMapeamento = {}; // { mapeamento_id: [pendencias] }
+  let bancosPorMapeamento = {};     // { mapeamento_id: [bancos] }
   let relacionadasPorEmpresa = {};  // cache simples { codigo_empresa: [codigo_empresa_relacionada, ...] }
   let mapeamentoAtualId = null;     // codigo_empresa selecionado (null = dashboard)
   let mapeamentoAtual = null;       // linha de contabil_mapeamento selecionada
@@ -68,6 +69,18 @@
       if (errPend) console.error(errPend);
       (pendencias || []).forEach((p) => {
         (pendenciasPorMapeamento[p.mapeamento_id] = pendenciasPorMapeamento[p.mapeamento_id] || []).push(p);
+      });
+    }
+
+    bancosPorMapeamento = {};
+    if (ids.length) {
+      const { data: bancos, error: errBancos } = await supabaseClient
+        .from('contabil_mapeamento_bancos')
+        .select('*')
+        .in('mapeamento_id', ids);
+      if (errBancos) console.error(errBancos);
+      (bancos || []).forEach((b) => {
+        (bancosPorMapeamento[b.mapeamento_id] = bancosPorMapeamento[b.mapeamento_id] || []).push(b);
       });
     }
   }
@@ -264,7 +277,7 @@
           </div>
           <div class="full"><label><input type="checkbox" data-campo="acesso_bancario_leitura" ${m.acesso_bancario_leitura ? 'checked' : ''}> Possui acesso bancário de leitura</label></div>
           <div class="full">${renderTagsInput('forma_envio_documentos', 'Forma de Envio dos Documentos', m.forma_envio_documentos, FORMA_ENVIO_SUGERIDA)}</div>
-          <div class="full">${renderTagsInput('bancos_utilizados', 'Bancos Utilizados', m.bancos_utilizados, BANCOS_SUGERIDOS)}</div>
+          <div class="full" id="secaoBancos"></div>
           <div class="full">${renderTagsInput('sistemas_utilizados', 'Sistemas Utilizados', m.sistemas_utilizados, SISTEMAS_SUGERIDOS)}</div>
         </div>
       </div>
@@ -316,6 +329,7 @@
 
     document.getElementById('btnRelatorioPDF').addEventListener('click', gerarRelatorioPDF);
 
+    renderBancos();
     renderNivelAtencao();
     renderPendencias();
     renderRelacionadas();
@@ -345,6 +359,84 @@
       <input type="text" list="${datalistId}" placeholder="Adicionar e pressionar Enter" data-tag-input="${campo}">
       <datalist id="${datalistId}">${sugestoes.map((s) => `<option value="${escapeHtml(s)}">`).join('')}</datalist>
     `;
+  }
+
+  function renderBancos() {
+    const el = document.getElementById('secaoBancos');
+    const m = mapeamentoAtual;
+    const bancos = bancosPorMapeamento[m.id] || [];
+    const datalistId = 'dl_bancos_utilizados';
+
+    const linhasHtml = bancos.map((b) => `
+      <tr data-banco-id="${b.id}">
+        <td>${escapeHtml(b.banco)}</td>
+        <td><input type="text" data-banco-campo="agencia" value="${escapeHtml(b.agencia || '')}"></td>
+        <td><input type="text" data-banco-campo="conta_corrente" value="${escapeHtml(b.conta_corrente || '')}"></td>
+        <td><input type="text" data-banco-campo="operador_login" value="${escapeHtml(b.operador_login || '')}"></td>
+        <td class="mapa-banco-senha">
+          <input type="password" data-banco-campo="senha" value="${escapeHtml(b.senha || '')}">
+          <button type="button" class="mapa-banco-olho" data-toggle-senha>👁</button>
+        </td>
+        <td><input type="text" data-banco-campo="observacoes" value="${escapeHtml(b.observacoes || '')}"></td>
+        <td><button type="button" class="mapa-remover-banco" data-remover-banco="${b.id}">×</button></td>
+      </tr>
+    `).join('');
+
+    el.innerHTML = `
+      <label>Bancos Utilizados</label>
+      <input type="text" list="${datalistId}" placeholder="Adicionar banco e pressionar Enter" id="inputNovoBanco">
+      <datalist id="${datalistId}">${BANCOS_SUGERIDOS.map((s) => `<option value="${escapeHtml(s)}">`).join('')}</datalist>
+      ${bancos.length ? `
+        <table class="mapa-bancos-table">
+          <thead><tr><th>Banco</th><th>Agência</th><th>Conta Corrente</th><th>Operador/Login</th><th>Senha</th><th>Observações</th><th></th></tr></thead>
+          <tbody>${linhasHtml}</tbody>
+        </table>
+      ` : '<p class="mapa-empty">Nenhum banco cadastrado.</p>'}
+    `;
+
+    el.querySelector('#inputNovoBanco').addEventListener('keydown', async (ev) => {
+      if (ev.key !== 'Enter' || !ev.target.value.trim()) return;
+      ev.preventDefault();
+      const banco = ev.target.value.trim();
+      const { data, error } = await supabaseClient
+        .from('contabil_mapeamento_bancos')
+        .insert({ mapeamento_id: m.id, banco })
+        .select()
+        .single();
+      if (error) { console.error(error); return; }
+      (bancosPorMapeamento[m.id] = bancosPorMapeamento[m.id] || []).push(data);
+      renderBancos();
+    });
+
+    el.querySelectorAll('[data-toggle-senha]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const input = btn.previousElementSibling;
+        input.type = input.type === 'password' ? 'text' : 'password';
+      });
+    });
+
+    el.querySelectorAll('[data-banco-campo]').forEach((input) => {
+      input.addEventListener('blur', async () => {
+        const tr = input.closest('tr');
+        const bancoId = tr.getAttribute('data-banco-id');
+        const campo = input.getAttribute('data-banco-campo');
+        const valor = input.value.trim() || null;
+        const { error } = await supabaseClient.from('contabil_mapeamento_bancos').update({ [campo]: valor }).eq('id', bancoId);
+        if (error) { console.error(error); return; }
+        const banco = (bancosPorMapeamento[m.id] || []).find((b) => b.id === bancoId);
+        if (banco) banco[campo] = valor;
+      });
+    });
+
+    el.querySelectorAll('[data-remover-banco]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const bancoId = btn.getAttribute('data-remover-banco');
+        const { error } = await supabaseClient.from('contabil_mapeamento_bancos').delete().eq('id', bancoId);
+        if (error) { console.error(error); return; }
+        bancosPorMapeamento[m.id] = (bancosPorMapeamento[m.id] || []).filter((b) => b.id !== bancoId);
+        renderBancos();
+      });
+    });
   }
 
   async function salvarCampo(el) {

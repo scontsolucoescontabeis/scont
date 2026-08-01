@@ -584,6 +584,15 @@ input,select,textarea{font:inherit}
 
 .mapa-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
 .mapa-tag{ background:var(--surface-2); border-radius:999px; padding:3px 10px; font-size:12px; display:flex; align-items:center; gap:6px; }
+
+.mapa-bancos-table{ width:100%; border-collapse:collapse; margin-top:8px; font-size:12.5px; }
+.mapa-bancos-table th{ text-align:left; padding:6px 8px; background:var(--surface-2); font-weight:600; color:var(--muted); font-size:11px; text-transform:uppercase; }
+.mapa-bancos-table td{ padding:4px 8px; border-top:1px solid var(--line-soft); vertical-align:middle; }
+.mapa-bancos-table input{ width:100%; padding:5px 8px; border:1px solid var(--line); background:var(--surface-2); color:var(--text); border-radius:6px; font-size:12.5px; font-family:inherit; }
+.mapa-banco-senha{ display:flex; align-items:center; gap:4px; }
+.mapa-banco-olho{ background:none; border:none; cursor:pointer; font-size:13px; padding:2px; }
+.mapa-remover-banco{ background:none; border:none; color:var(--muted); cursor:pointer; font-size:16px; line-height:1; padding:0 4px; }
+.mapa-remover-banco:hover{ color:#c0392b; }
 .mapa-tag button{ border:none; background:none; cursor:pointer; color:var(--muted); font-size:13px; line-height:1; }
 
 .mapa-pendencia-item{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line-soft); font-size:13px; }
