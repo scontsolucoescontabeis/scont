@@ -2567,63 +2567,6 @@ function _parseExcelParaFolhas(wb, empregados, comTerceiroTurno, competencia, di
     return { folhas, avisosAbas };
 }
 
-function _identificarEmpresaPorConteudo(wb, empregadosPorEmpresa) {
-    const abas = wb.SheetNames.map(sheetName => {
-        const cod = sheetName.split(' ')[0].trim();
-        const resto = sheetName.slice(cod.length).trim().toLowerCase();
-        return { cod, resto };
-    });
-
-    const cobertura = {};
-    Object.keys(empregadosPorEmpresa).forEach(codigoEmpresa => {
-        const empregados = empregadosPorEmpresa[codigoEmpresa] || [];
-        if (empregados.length === 0) { cobertura[codigoEmpresa] = 0; return; }
-        let correspondencias = 0;
-        empregados.forEach(emp => {
-            const nomeEmp = (emp.nome_empregado || '').trim().toLowerCase();
-            const achou = abas.some(aba => {
-                if (aba.cod !== emp.codigo_empregado) return false;
-                if (!aba.resto) return true;
-                return nomeEmp.startsWith(aba.resto) || aba.resto.startsWith(nomeEmp);
-            });
-            if (achou) correspondencias++;
-        });
-        cobertura[codigoEmpresa] = correspondencias / empregados.length;
-    });
-
-    const candidatas = Object.keys(cobertura).filter(codigo => cobertura[codigo] >= 0.8);
-
-    if (candidatas.length === 0) return { codigo: null, motivo: 'nao-identificado', candidatas: [] };
-    if (candidatas.length > 1) return { codigo: null, motivo: 'ambiguo', candidatas };
-    return { codigo: candidatas[0], motivo: 'ok', candidatas };
-}
-
-function _validarCompatibilidadeModelo(wb, comTerceiroTurno, diasEsperados) {
-    const headerEsperado = comTerceiroTurno
-        ? ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Entrada 3', 'Saída 3']
-        : ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2'];
-    const datasValidas = new Set(diasEsperados.map(d => d.data));
-
-    for (const sheetName of wb.SheetNames) {
-        const linhas = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
-        if (linhas.length === 0) continue;
-        const header = (linhas[0] || []).map(v => String(v).trim());
-        const headerBate = headerEsperado.every((col, i) => header[i] === col) && header.length <= headerEsperado.length + 1;
-        if (!headerBate) {
-            return `colunas não correspondem ao modelo esperado (3º turno ${comTerceiroTurno ? 'ativo' : 'inativo'}).`;
-        }
-        for (let r = 1; r < linhas.length; r++) {
-            const dataStr = String(linhas[r][0] || '').trim();
-            if (!dataStr) continue;
-            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)) continue;
-            if (!datasValidas.has(dataStr)) {
-                return `contém datas fora do período de apuração da competência informada (ex: ${dataStr}).`;
-            }
-        }
-    }
-    return null;
-}
-
 let _filaLoteGrupo = null;
 
 async function processarLoteGrupo(fileList) {
@@ -2633,84 +2576,61 @@ async function processarLoteGrupo(fileList) {
     const arquivos = Array.from(fileList || []);
     if (arquivos.length === 0) return;
 
+    const [compMM, compAAAA] = comp.split('/');
     const codigosGrupo = _grupoAtual.empresas.map(e => e.codigo_empresa);
     const nomesEmpresas = {};
     _grupoAtual.empresas.forEach(e => { nomesEmpresas[e.codigo_empresa] = e.nome_empresa; });
 
-    mostrarMensagem('Preparando', `Lendo ${arquivos.length} arquivo(s)...`);
-
-    const { data: empregadosBrutos, error: errEmpGrupo } = await supabaseClient
-        .from('rh_empregados')
-        .select('codigo_empresa, codigo_empregado, nome_empregado, tipo_empregado, situacao')
-        .in('codigo_empresa', codigosGrupo);
-    if (errEmpGrupo) {
-        fecharModalMensagem();
-        mostrarMensagem('Erro', 'Falha ao buscar empregados do grupo: ' + errEmpGrupo.message);
-        return;
-    }
-    const empregadosPorEmpresa = {};
-    codigosGrupo.forEach(codigo => { empregadosPorEmpresa[codigo] = []; });
-    _excluirContribuinte(empregadosBrutos || []).forEach(emp => {
-        if (empregadosPorEmpresa[emp.codigo_empresa]) empregadosPorEmpresa[emp.codigo_empresa].push(emp);
-    });
-
     const resultadosIniciais = [];
-    const identificados = []; // { file, wb, codigo }
+    const arquivosValidos = [];
+    const codigosComArquivo = new Set();
 
-    for (const file of arquivos) {
-        try {
-            const buffer = await file.arrayBuffer();
-            const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
-            const { codigo, motivo, candidatas } = _identificarEmpresaPorConteudo(wb, empregadosPorEmpresa);
-            if (motivo === 'nao-identificado') {
-                resultadosIniciais.push({ codigo: file.name, status: 'erro', detalhe: `Arquivo "${file.name}": não foi possível identificar a empresa pelo conteúdo (nenhuma empresa do grupo atingiu 80% de correspondência de empregados).` });
-                continue;
-            }
-            if (motivo === 'ambiguo') {
-                resultadosIniciais.push({ codigo: file.name, status: 'erro', detalhe: `Arquivo "${file.name}": conteúdo ambíguo — corresponde a mais de uma empresa do grupo (${candidatas.join(', ')}).` });
-                continue;
-            }
-            identificados.push({ file, wb, codigo });
-        } catch (erro) {
-            console.error('Erro ao ler arquivo do lote', file.name, erro);
-            resultadosIniciais.push({ codigo: file.name, status: 'erro', detalhe: `Arquivo "${file.name}": erro ao ler o arquivo (${erro.message}).` });
-        }
-    }
-
-    const porEmpresa = {};
-    identificados.forEach(item => {
-        if (!porEmpresa[item.codigo]) porEmpresa[item.codigo] = [];
-        porEmpresa[item.codigo].push(item);
-    });
-
-    const validos = [];
-    Object.keys(porEmpresa).forEach(codigo => {
-        const itens = porEmpresa[codigo];
-        if (itens.length > 1) {
-            itens.forEach(item => {
-                resultadosIniciais.push({ codigo, status: 'erro', detalhe: `Arquivo "${item.file.name}": duplicidade — mais de um arquivo do lote corresponde à empresa ${codigo}. Nenhum foi processado; revise e reenvie.` });
-            });
+    arquivos.forEach(file => {
+        const m = file.name.match(/^Modelo_FolhaPonto_(.+)_(\d{2})-(\d{4})\.xlsx$/i);
+        if (!m) {
+            resultadosIniciais.push({ codigo: file.name, status: 'erro', detalhe: 'Nome de arquivo inválido.' });
             return;
         }
-        validos.push(itens[0]);
+        const [, codEmp, mm, aaaa] = m;
+        if (mm !== compMM || aaaa !== compAAAA) {
+            resultadosIniciais.push({ codigo: codEmp, status: 'erro', detalhe: `Competência do arquivo (${mm}/${aaaa}) não confere com ${comp}.` });
+            return;
+        }
+        if (!codigosGrupo.includes(codEmp)) {
+            resultadosIniciais.push({ codigo: codEmp, status: 'erro', detalhe: 'Empresa não pertence ao grupo.' });
+            return;
+        }
+        if (codigosComArquivo.has(codEmp)) {
+            resultadosIniciais.push({ codigo: codEmp, status: 'erro', detalhe: 'Arquivo duplicado para esta empresa (ignorado).' });
+            return;
+        }
+        codigosComArquivo.add(codEmp);
+        arquivosValidos.push({ codigo: codEmp, file });
     });
 
+    mostrarMensagem('Preparando', `Lendo ${arquivosValidos.length} arquivo(s)...`);
+
     const itensFila = [];
-    for (const { file, wb, codigo } of validos) {
+    for (const { codigo, file } of arquivosValidos) {
         try {
+            const { data: empregadosData, error: errEmp } = await supabaseClient
+                .from('rh_empregados')
+                .select('codigo_empregado, nome_empregado, tipo_empregado, situacao')
+                .eq('codigo_empresa', codigo);
+            if (errEmp) throw errEmp;
+            const empregados = _excluirContribuinte(empregadosData);
+            if (!empregados || empregados.length === 0) {
+                resultadosIniciais.push({ codigo, status: 'erro', detalhe: 'Empresa sem empregados cadastrados.' });
+                continue;
+            }
+
             const cfg = await _buscarConfigRubricas(codigo);
             const comTerceiroTurno = cfg?.['terceiro_turno']?.cod === '1';
             const { diaInicio: diLote, diaFim: dfLote } = _resolverPeriodoApuracao(cfg);
-            const diasEsperados = gerarDiasDoMes(comp, diLote, dfLote);
-
-            const erroCompat = _validarCompatibilidadeModelo(wb, comTerceiroTurno, diasEsperados);
-            if (erroCompat) {
-                resultadosIniciais.push({ codigo, status: 'erro', detalhe: `Arquivo "${file.name}": ${erroCompat}` });
-                continue;
-            }
-
-            const empregados = empregadosPorEmpresa[codigo] || [];
             const feriasCalculadas = await carregarFeriasCalculadas(codigo);
+
+            const buffer = await file.arrayBuffer();
+            const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
             const { folhas, avisosAbas } = _parseExcelParaFolhas(wb, empregados, comTerceiroTurno, comp, diLote, dfLote);
 
             if (folhas.length === 0) {
@@ -2725,9 +2645,8 @@ async function processarLoteGrupo(fileList) {
         }
     }
 
-    const codigosProcessados = new Set(itensFila.map(i => i.codigo_empresa));
     codigosGrupo.forEach(codigo => {
-        if (!codigosProcessados.has(codigo) && !resultadosIniciais.some(r => r.codigo === codigo)) {
+        if (!codigosComArquivo.has(codigo)) {
             resultadosIniciais.push({ codigo, status: 'sem-arquivo', detalhe: '—' });
         }
     });
