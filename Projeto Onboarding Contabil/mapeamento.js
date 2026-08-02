@@ -109,8 +109,10 @@
       });
     }
 
+    // Prestador de Serviço não pode ver dados bancários (nem em memória no
+    // navegador) — só busca essa tabela para quem pode editar o Mapeamento.
     bancosPorMapeamento = {};
-    if (ids.length) {
+    if (ids.length && _podeEditar) {
       const { data: bancos, error: errBancos } = await supabaseClient
         .from('contabil_mapeamento_bancos')
         .select('*')
@@ -154,6 +156,39 @@
   function formatarData(dataStr) {
     const d = window.parseDataLocal(dataStr);
     return d.toLocaleDateString('pt-BR');
+  }
+
+  function mostrarToast(msg, tipo) {
+    let toast = document.getElementById('toastMsg');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'toastMsg';
+      toast.className = 'toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.className = `toast show ${tipo === 'erro' ? 'erro' : tipo === 'sucesso' ? 'sucesso' : ''}`;
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => toast.classList.remove('show'), 3500);
+  }
+
+  // Isola cada seção do perfil: se uma seção falhar ao renderizar (exceção
+  // por dado inesperado), as demais continuam aparecendo em vez de o perfil
+  // inteiro ficar com seções em branco sem nenhum aviso.
+  function avisarErroSecao(nomeSecao, err) {
+    console.error(`Erro ao renderizar a seção "${nomeSecao}" do Mapeamento Estratégico:`, err);
+    mostrarToast(`Erro ao carregar "${nomeSecao}". Veja o console (F12) para detalhes.`, 'erro');
+  }
+
+  function renderizarSecaoComIsolamento(nomeSecao, fn) {
+    try {
+      const resultado = fn();
+      if (resultado && typeof resultado.catch === 'function') {
+        resultado.catch((err) => avisarErroSecao(nomeSecao, err));
+      }
+    } catch (err) {
+      avisarErroSecao(nomeSecao, err);
+    }
   }
 
   // ─── DASHBOARD ──────────────────────────────────────────────
@@ -245,12 +280,15 @@
     document.getElementById('seletorEmpresa').value = codigoEmpresa;
     let m = mapeamentoDe(codigoEmpresa);
     if (!m && _podeEditar) {
+      // upsert (não insert puro): evita erro de chave duplicada se o
+      // registro desta empresa já tiver sido criado nesse meio-tempo por
+      // outra sessão (ex.: sincronização automática da tela de Configurações).
       const { data, error } = await supabaseClient
         .from('contabil_mapeamento')
-        .insert({ codigo_empresa: codigoEmpresa })
+        .upsert({ codigo_empresa: codigoEmpresa }, { onConflict: 'codigo_empresa' })
         .select()
         .single();
-      if (error) { console.error(error); return; }
+      if (error) { console.error(error); mostrarToast('Erro ao carregar o perfil desta empresa. Veja o console (F12) para detalhes.', 'erro'); return; }
       m = data;
       mapeamentos.push(m);
     }
@@ -341,6 +379,13 @@
       <div id="secaoNivelAtencao"></div>
       <div id="secaoPendencias"></div>
       <div id="secaoRelacionadas"></div>
+
+      <div class="mapa-secao">
+        <div class="mapa-secao-header">Observações Gerais</div>
+        <div class="mapa-secao-body">
+          <div class="full"><textarea data-campo="observacoes_gerais" rows="4" placeholder="Observações gerais sobre a empresa...">${escapeHtml(m.observacoes_gerais || '')}</textarea></div>
+        </div>
+      </div>
     `;
 
     main.querySelectorAll('[data-campo]').forEach((el) => {
@@ -377,10 +422,10 @@
 
     document.getElementById('btnRelatorioPDF').addEventListener('click', gerarRelatorioPDF);
 
-    renderBancos();
-    renderNivelAtencao();
-    renderPendencias();
-    renderRelacionadas();
+    renderizarSecaoComIsolamento('Acessos Bancários', renderBancos);
+    renderizarSecaoComIsolamento('Nível de Atenção', renderNivelAtencao);
+    renderizarSecaoComIsolamento('Pendências', renderPendencias);
+    renderizarSecaoComIsolamento('Empresas Relacionadas', renderRelacionadas);
   }
 
   function renderSituacaoAno(ano, m) {
@@ -413,30 +458,36 @@
     const el = document.getElementById('secaoBancos');
     const m = mapeamentoAtual;
     const RO = !_podeEditar;
+
+    // Dados bancários (incluindo senha em texto puro) são restritos à
+    // equipe Scont — Prestador de Serviço não vê nem em modo leitura.
+    if (RO) {
+      el.innerHTML = `<label>Bancos Utilizados</label><p class="mapa-empty">🔒 Informações bancárias visíveis apenas para a equipe Scont.</p>`;
+      return;
+    }
+
     const bancos = bancosPorMapeamento[m.id] || [];
     const datalistId = 'dl_bancos_utilizados';
 
     const linhasHtml = bancos.map((b) => `
       <tr data-banco-id="${b.id}">
         <td>${escapeHtml(b.banco)}</td>
-        <td><input type="text" data-banco-campo="agencia" value="${escapeHtml(b.agencia || '')}" ${RO ? 'disabled' : ''}></td>
-        <td><input type="text" data-banco-campo="conta_corrente" value="${escapeHtml(b.conta_corrente || '')}" ${RO ? 'disabled' : ''}></td>
-        <td><input type="text" data-banco-campo="operador_login" value="${escapeHtml(b.operador_login || '')}" ${RO ? 'disabled' : ''}></td>
+        <td><input type="text" data-banco-campo="agencia" value="${escapeHtml(b.agencia || '')}"></td>
+        <td><input type="text" data-banco-campo="conta_corrente" value="${escapeHtml(b.conta_corrente || '')}"></td>
+        <td><input type="text" data-banco-campo="operador_login" value="${escapeHtml(b.operador_login || '')}"></td>
         <td class="mapa-banco-senha">
-          <input type="password" data-banco-campo="senha" value="${escapeHtml(b.senha || '')}" ${RO ? 'disabled' : ''}>
+          <input type="password" data-banco-campo="senha" value="${escapeHtml(b.senha || '')}">
           <button type="button" class="mapa-banco-olho" data-toggle-senha>👁</button>
         </td>
-        <td><input type="text" data-banco-campo="observacoes" value="${escapeHtml(b.observacoes || '')}" ${RO ? 'disabled' : ''}></td>
-        <td>${RO ? '' : `<button type="button" class="mapa-remover-banco" data-remover-banco="${b.id}">×</button>`}</td>
+        <td><input type="text" data-banco-campo="observacoes" value="${escapeHtml(b.observacoes || '')}"></td>
+        <td><button type="button" class="mapa-remover-banco" data-remover-banco="${b.id}">×</button></td>
       </tr>
     `).join('');
 
     el.innerHTML = `
       <label>Bancos Utilizados</label>
-      ${RO ? '' : `
-        <input type="text" list="${datalistId}" placeholder="Adicionar banco e pressionar Enter" id="inputNovoBanco">
-        <datalist id="${datalistId}">${BANCOS_SUGERIDOS.map((s) => `<option value="${escapeHtml(s)}">`).join('')}</datalist>
-      `}
+      <input type="text" list="${datalistId}" placeholder="Adicionar banco e pressionar Enter" id="inputNovoBanco">
+      <datalist id="${datalistId}">${BANCOS_SUGERIDOS.map((s) => `<option value="${escapeHtml(s)}">`).join('')}</datalist>
       ${bancos.length ? `
         <table class="mapa-bancos-table">
           <thead><tr><th>Banco</th><th>Agência</th><th>Conta Corrente</th><th>Operador/Login</th><th>Senha</th><th>Observações</th><th></th></tr></thead>
@@ -445,21 +496,19 @@
       ` : '<p class="mapa-empty">Nenhum banco cadastrado.</p>'}
     `;
 
-    if (!RO) {
-      el.querySelector('#inputNovoBanco').addEventListener('keydown', async (ev) => {
-        if (ev.key !== 'Enter' || !ev.target.value.trim()) return;
-        ev.preventDefault();
-        const banco = ev.target.value.trim();
-        const { data, error } = await supabaseClient
-          .from('contabil_mapeamento_bancos')
-          .insert({ mapeamento_id: m.id, banco })
-          .select()
-          .single();
-        if (error) { console.error(error); return; }
-        (bancosPorMapeamento[m.id] = bancosPorMapeamento[m.id] || []).push(data);
-        renderBancos();
-      });
-    }
+    el.querySelector('#inputNovoBanco').addEventListener('keydown', async (ev) => {
+      if (ev.key !== 'Enter' || !ev.target.value.trim()) return;
+      ev.preventDefault();
+      const banco = ev.target.value.trim();
+      const { data, error } = await supabaseClient
+        .from('contabil_mapeamento_bancos')
+        .insert({ mapeamento_id: m.id, banco })
+        .select()
+        .single();
+      if (error) { console.error(error); mostrarToast('Erro ao adicionar o banco. Veja o console (F12) para detalhes.', 'erro'); return; }
+      (bancosPorMapeamento[m.id] = bancosPorMapeamento[m.id] || []).push(data);
+      renderBancos();
+    });
 
     el.querySelectorAll('[data-toggle-senha]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -468,30 +517,28 @@
       });
     });
 
-    if (!RO) {
-      el.querySelectorAll('[data-banco-campo]').forEach((input) => {
-        input.addEventListener('blur', async () => {
-          const tr = input.closest('tr');
-          const bancoId = tr.getAttribute('data-banco-id');
-          const campo = input.getAttribute('data-banco-campo');
-          const valor = input.value.trim() || null;
-          const { error } = await supabaseClient.from('contabil_mapeamento_bancos').update({ [campo]: valor }).eq('id', bancoId);
-          if (error) { console.error(error); return; }
-          const banco = (bancosPorMapeamento[m.id] || []).find((b) => b.id === bancoId);
-          if (banco) banco[campo] = valor;
-        });
+    el.querySelectorAll('[data-banco-campo]').forEach((input) => {
+      input.addEventListener('blur', async () => {
+        const tr = input.closest('tr');
+        const bancoId = tr.getAttribute('data-banco-id');
+        const campo = input.getAttribute('data-banco-campo');
+        const valor = input.value.trim() || null;
+        const { error } = await supabaseClient.from('contabil_mapeamento_bancos').update({ [campo]: valor }).eq('id', bancoId);
+        if (error) { console.error(error); mostrarToast('Erro ao salvar o dado do banco. Veja o console (F12) para detalhes.', 'erro'); return; }
+        const banco = (bancosPorMapeamento[m.id] || []).find((b) => b.id === bancoId);
+        if (banco) banco[campo] = valor;
       });
+    });
 
-      el.querySelectorAll('[data-remover-banco]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const bancoId = btn.getAttribute('data-remover-banco');
-          const { error } = await supabaseClient.from('contabil_mapeamento_bancos').delete().eq('id', bancoId);
-          if (error) { console.error(error); return; }
-          bancosPorMapeamento[m.id] = (bancosPorMapeamento[m.id] || []).filter((b) => b.id !== bancoId);
-          renderBancos();
-        });
+    el.querySelectorAll('[data-remover-banco]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const bancoId = btn.getAttribute('data-remover-banco');
+        const { error } = await supabaseClient.from('contabil_mapeamento_bancos').delete().eq('id', bancoId);
+        if (error) { console.error(error); mostrarToast('Erro ao excluir o banco. Veja o console (F12) para detalhes.', 'erro'); return; }
+        bancosPorMapeamento[m.id] = (bancosPorMapeamento[m.id] || []).filter((b) => b.id !== bancoId);
+        renderBancos();
       });
-    }
+    });
   }
 
   async function salvarCampo(el) {
@@ -502,7 +549,7 @@
 
     mapeamentoAtual[campo] = valor;
     const { error } = await supabaseClient.from('contabil_mapeamento').update({ [campo]: valor }).eq('id', mapeamentoAtual.id);
-    if (error) console.error(error);
+    if (error) { console.error(error); mostrarToast('Erro ao salvar. Veja o console (F12) para detalhes.', 'erro'); }
     if (campo.startsWith('situacao_') || campo === 'ultimo_mes_fechado' || campo === 'periodicidade') {
       atualizarSugestaoNivel();
     }
@@ -511,7 +558,7 @@
   async function salvarTags(campo, novaLista) {
     mapeamentoAtual[campo] = novaLista;
     const { error } = await supabaseClient.from('contabil_mapeamento').update({ [campo]: novaLista }).eq('id', mapeamentoAtual.id);
-    if (error) console.error(error);
+    if (error) { console.error(error); mostrarToast('Erro ao salvar. Veja o console (F12) para detalhes.', 'erro'); }
   }
 
   // ─── NÍVEL DE ATENÇÃO ───────────────────────────────────────
@@ -544,7 +591,7 @@
         mapeamentoAtual.nivel_atencao = novoNivel;
         mapeamentoAtual.nivel_atencao_travado = travado;
         const { error } = await supabaseClient.from('contabil_mapeamento').update({ nivel_atencao: novoNivel, nivel_atencao_travado: travado }).eq('id', mapeamentoAtual.id);
-        if (error) console.error(error);
+        if (error) { console.error(error); mostrarToast('Erro ao salvar o nível de atenção. Veja o console (F12) para detalhes.', 'erro'); }
       });
     }
   }
@@ -605,7 +652,7 @@
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-resolver');
         const { error } = await supabaseClient.from('contabil_mapeamento_pendencias').update({ status: 'resolvida', resolvido_em: new Date().toISOString() }).eq('id', id);
-        if (error) { console.error(error); return; }
+        if (error) { console.error(error); mostrarToast('Erro ao resolver a pendência. Veja o console (F12) para detalhes.', 'erro'); return; }
         const item = (pendenciasPorMapeamento[m.id] || []).find((p) => p.id === id);
         if (item) { item.status = 'resolvida'; item.resolvido_em = new Date().toISOString(); }
         atualizarSugestaoNivel();
@@ -618,7 +665,7 @@
         const id = btn.getAttribute('data-excluir');
         if (!window.confirm('Excluir esta pendência? Essa ação não pode ser desfeita.')) return;
         const { error } = await supabaseClient.from('contabil_mapeamento_pendencias').delete().eq('id', id);
-        if (error) { console.error(error); return; }
+        if (error) { console.error(error); mostrarToast('Erro ao excluir a pendência. Veja o console (F12) para detalhes.', 'erro'); return; }
         pendenciasPorMapeamento[m.id] = (pendenciasPorMapeamento[m.id] || []).filter((p) => p.id !== id);
         atualizarSugestaoNivel();
         renderPendencias();
@@ -635,7 +682,7 @@
         .insert({ mapeamento_id: m.id, descricao, responsavel, prazo, status: 'aberta' })
         .select()
         .single();
-      if (error) { console.error(error); return; }
+      if (error) { console.error(error); mostrarToast('Erro ao adicionar a pendência. Veja o console (F12) para detalhes.', 'erro'); return; }
       (pendenciasPorMapeamento[m.id] = pendenciasPorMapeamento[m.id] || []).push(data);
       atualizarSugestaoNivel();
       renderPendencias();
@@ -653,7 +700,7 @@
       .from('contabil_mapeamento_relacionadas')
       .select('codigo_empresa_relacionada')
       .eq('codigo_empresa', m.codigo_empresa);
-    if (error) console.error(error);
+    if (error) { console.error(error); mostrarToast('Erro ao carregar empresas relacionadas. Veja o console (F12) para detalhes.', 'erro'); }
     const relacionadas = (data || []).map((r) => r.codigo_empresa_relacionada);
     relacionadasPorEmpresa[m.codigo_empresa] = relacionadas;
 
@@ -685,8 +732,9 @@
     el.querySelectorAll('[data-desvincular]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const codRelacionada = btn.getAttribute('data-desvincular');
-        await supabaseClient.from('contabil_mapeamento_relacionadas').delete().eq('codigo_empresa', m.codigo_empresa).eq('codigo_empresa_relacionada', codRelacionada);
-        await supabaseClient.from('contabil_mapeamento_relacionadas').delete().eq('codigo_empresa', codRelacionada).eq('codigo_empresa_relacionada', m.codigo_empresa);
+        const { error: err1 } = await supabaseClient.from('contabil_mapeamento_relacionadas').delete().eq('codigo_empresa', m.codigo_empresa).eq('codigo_empresa_relacionada', codRelacionada);
+        const { error: err2 } = await supabaseClient.from('contabil_mapeamento_relacionadas').delete().eq('codigo_empresa', codRelacionada).eq('codigo_empresa_relacionada', m.codigo_empresa);
+        if (err1 || err2) { console.error(err1 || err2); mostrarToast('Erro ao desvincular a empresa. Veja o console (F12) para detalhes.', 'erro'); return; }
         renderRelacionadas();
       });
     });
@@ -694,10 +742,11 @@
     el.querySelector('#selectRelacionada').addEventListener('change', async (ev) => {
       const codRelacionada = ev.target.value;
       if (!codRelacionada) return;
-      await supabaseClient.from('contabil_mapeamento_relacionadas').insert([
+      const { error } = await supabaseClient.from('contabil_mapeamento_relacionadas').insert([
         { codigo_empresa: m.codigo_empresa, codigo_empresa_relacionada: codRelacionada },
         { codigo_empresa: codRelacionada, codigo_empresa_relacionada: m.codigo_empresa },
       ]);
+      if (error) { console.error(error); mostrarToast('Erro ao vincular a empresa. Veja o console (F12) para detalhes.', 'erro'); return; }
       renderRelacionadas();
     });
   }
@@ -758,13 +807,16 @@
       ['Situação 2026', (m.situacao_2026_status ? SITUACAO_LABELS[m.situacao_2026_status] : '—') + (m.situacao_2026_obs ? ' — ' + m.situacao_2026_obs : '')],
     ], y, pageW, MARGEM);
 
-    y = secaoTabelaPdf(doc, 'Operação / Financeiro', [
+    const linhasOperacao = [
       ['Financeiro Interno ou BPO', m.financeiro_interno_bpo ? FINANCEIRO_LABELS[m.financeiro_interno_bpo] : '—'],
       ['Acesso Bancário de Leitura', m.acesso_bancario_leitura ? 'Sim' : 'Não'],
       ['Forma de Envio dos Documentos', tags(m.forma_envio_documentos)],
-      ['Bancos Utilizados', tags((bancosPorMapeamento[m.id] || []).map((b) => b.banco))],
-      ['Sistemas Utilizados', tags(m.sistemas_utilizados)],
-    ], y, pageW, MARGEM);
+    ];
+    // Dados bancários não entram no PDF para quem não pode editar o
+    // Mapeamento (Prestador de Serviço) — mesma restrição da tela.
+    if (_podeEditar) linhasOperacao.push(['Bancos Utilizados', tags((bancosPorMapeamento[m.id] || []).map((b) => b.banco))]);
+    linhasOperacao.push(['Sistemas Utilizados', tags(m.sistemas_utilizados)]);
+    y = secaoTabelaPdf(doc, 'Operação / Financeiro', linhasOperacao, y, pageW, MARGEM);
 
     y = secaoTabelaPdf(doc, 'Entregáveis & Particularidades', [
       ['Entregáveis Esperados', tags(m.entregaveis_esperados)],
