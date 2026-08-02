@@ -702,6 +702,8 @@ input,select,textarea{font:inherit}
 .modal-header h3{margin:0;font-size:1.1rem}
 .modal-close{border:none;background:transparent;font-size:1.3rem;cursor:pointer;color:var(--muted)}
 .modal-body{padding:20px}
+.modal-body select#selectUsuarioResponsavel{ width:100%; padding:7px 10px; border:1px solid var(--line); background:var(--surface-2); color:var(--text); border-radius:8px; font-size:13px; font-family:inherit; }
+#modalResponsavelUsuarioBody{ max-height:320px; overflow-y:auto; border:1px solid var(--line-soft); border-radius:8px; padding:4px 10px; }
 .modal-footer{padding:16px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:10px}
 
 .toast{

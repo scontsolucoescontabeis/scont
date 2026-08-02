@@ -108,6 +108,7 @@
             <button type="button" class="btn btn-secondary" id="btnMarcarTodas">Marcar todas</button>
             <button type="button" class="btn btn-secondary" id="btnDesmarcarTodas">Desmarcar todas</button>
             <button type="button" class="btn btn-secondary" id="btnImportarPlanilha">📊 Importar planilha</button>
+            <button type="button" class="btn btn-secondary" id="btnResponsavelPorUsuario">👤 Atribuir por usuário</button>
             <input type="file" id="fileImportarConfig" accept=".xlsx,.xls,.csv" style="display:none">
           </div>
           <p class="full mapa-empty" id="contadorEmpresasConfig"></p>
@@ -124,6 +125,7 @@
     document.getElementById('btnDesmarcarTodas').addEventListener('click', () => alternarVisiveis(false));
     document.getElementById('btnImportarPlanilha').addEventListener('click', () => document.getElementById('fileImportarConfig').click());
     document.getElementById('fileImportarConfig').addEventListener('change', handleImportarPlanilha);
+    document.getElementById('btnResponsavelPorUsuario').addEventListener('click', abrirModalResponsavelPorUsuario);
 
     renderTabela();
   }
@@ -240,6 +242,145 @@
         renderTabela();
       });
     });
+  }
+
+  // ─── MODAL: RESPONSÁVEL POR USUÁRIO (várias empresas de uma vez) ──
+
+  function abrirModalResponsavelPorUsuario() {
+    if (!usuariosAprovados.length) {
+      mostrarToast('Nenhum usuário aprovado no portal.', 'erro');
+      return;
+    }
+
+    let modal = document.getElementById('modalResponsavelUsuario');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalResponsavelUsuario';
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content large">
+          <div class="modal-header">
+            <h3>Atribuir responsável a várias empresas</h3>
+            <button class="modal-close" id="fecharModalResponsavelUsuario">✕</button>
+          </div>
+          <div class="modal-body">
+            <p class="mapa-empty" style="margin-bottom:8px;">Escolha um usuário e marque todas as empresas pelas quais ele é responsável. As alterações são salvas automaticamente.</p>
+            <select id="selectUsuarioResponsavel" class="full" style="margin-bottom:10px;"></select>
+            <div class="mapa-filtros" style="margin-bottom:8px;">
+              <input type="text" id="buscaEmpresaModalUsuario" placeholder="Buscar empresa...">
+              <button type="button" class="btn btn-secondary" id="btnMarcarTodasModalUsuario">Marcar visíveis</button>
+              <button type="button" class="btn btn-secondary" id="btnDesmarcarTodasModalUsuario">Desmarcar visíveis</button>
+            </div>
+            <div id="modalResponsavelUsuarioBody"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="fecharModalResponsavelUsuario2">Fechar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      const fechar = () => modal.classList.remove('active');
+      document.getElementById('fecharModalResponsavelUsuario').addEventListener('click', fechar);
+      document.getElementById('fecharModalResponsavelUsuario2').addEventListener('click', fechar);
+      modal.addEventListener('click', (ev) => { if (ev.target === modal) fechar(); });
+
+      document.getElementById('selectUsuarioResponsavel').addEventListener('change', () => renderCorpoModalResponsavelUsuario());
+      document.getElementById('buscaEmpresaModalUsuario').addEventListener('input', () => renderCorpoModalResponsavelUsuario());
+      document.getElementById('btnMarcarTodasModalUsuario').addEventListener('click', () => alternarTodasModalUsuario(true));
+      document.getElementById('btnDesmarcarTodasModalUsuario').addEventListener('click', () => alternarTodasModalUsuario(false));
+    }
+
+    const select = document.getElementById('selectUsuarioResponsavel');
+    const usuarioAtual = select.value;
+    select.innerHTML = usuariosAprovados.map((u) => `<option value="${escapeAttr(u.id)}">${escapeHtml(u.nome)}${u.empresa ? ` (${escapeHtml(u.empresa)})` : ''}</option>`).join('');
+    if (usuarioAtual && usuariosAprovados.some((u) => u.id === usuarioAtual)) select.value = usuarioAtual;
+
+    document.getElementById('buscaEmpresaModalUsuario').value = '';
+    renderCorpoModalResponsavelUsuario();
+    modal.classList.add('active');
+  }
+
+  function empresasVisiveisModalUsuario() {
+    const termo = (document.getElementById('buscaEmpresaModalUsuario').value || '').trim().toLowerCase();
+    if (!termo) return empresas;
+    return empresas.filter((e) => e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo));
+  }
+
+  function renderCorpoModalResponsavelUsuario() {
+    const usuarioId = document.getElementById('selectUsuarioResponsavel').value;
+    const body = document.getElementById('modalResponsavelUsuarioBody');
+    const visiveis = empresasVisiveisModalUsuario();
+
+    if (!visiveis.length) {
+      body.innerHTML = '<p class="mapa-empty">Nenhuma empresa encontrada.</p>';
+      return;
+    }
+
+    body.innerHTML = visiveis.map((e) => {
+      const marcado = (responsaveisPorEmpresa[e.codigo_empresa] || new Set()).has(usuarioId);
+      return `
+        <label class="responsavel-check-item">
+          <input type="checkbox" class="chk-responsavel-usuario" value="${escapeAttr(e.codigo_empresa)}" ${marcado ? 'checked' : ''}>
+          <span>${escapeHtml(e.nome_empresa)} <small>(${escapeHtml(e.codigo_empresa)})</small></span>
+        </label>
+      `;
+    }).join('');
+
+    body.querySelectorAll('.chk-responsavel-usuario').forEach((chk) => {
+      chk.addEventListener('change', async () => {
+        const codigo = chk.value;
+        const marcado = chk.checked;
+        chk.disabled = true;
+        const { error } = await salvarResponsavel(codigo, usuarioId, marcado);
+        chk.disabled = false;
+        if (error) {
+          console.error(error);
+          chk.checked = !marcado;
+          mostrarToast('Erro ao salvar. Alteração desfeita.', 'erro');
+          return;
+        }
+        renderTabela();
+      });
+    });
+  }
+
+  async function alternarTodasModalUsuario(marcar) {
+    const usuarioId = document.getElementById('selectUsuarioResponsavel').value;
+    const checkboxes = Array.from(document.querySelectorAll('#modalResponsavelUsuarioBody .chk-responsavel-usuario'));
+    const paraSalvar = checkboxes.filter((chk) => chk.checked !== marcar);
+    if (!paraSalvar.length) return;
+
+    paraSalvar.forEach((chk) => { chk.disabled = true; });
+    const codigos = paraSalvar.map((chk) => chk.value);
+
+    let error;
+    if (marcar) {
+      ({ error } = await supabaseClient
+        .from('contabil_empresas_responsaveis')
+        .insert(codigos.map((codigo_empresa) => ({ codigo_empresa, usuario_id: usuarioId }))));
+    } else {
+      ({ error } = await supabaseClient
+        .from('contabil_empresas_responsaveis')
+        .delete()
+        .eq('usuario_id', usuarioId)
+        .in('codigo_empresa', codigos));
+    }
+
+    paraSalvar.forEach((chk) => { chk.disabled = false; });
+
+    if (error) {
+      console.error(error);
+      mostrarToast('Erro ao salvar as alterações.', 'erro');
+      return;
+    }
+
+    codigos.forEach((codigo) => {
+      if (!responsaveisPorEmpresa[codigo]) responsaveisPorEmpresa[codigo] = new Set();
+      if (marcar) responsaveisPorEmpresa[codigo].add(usuarioId);
+      else responsaveisPorEmpresa[codigo].delete(usuarioId);
+    });
+    paraSalvar.forEach((chk) => { chk.checked = marcar; });
+    renderTabela();
   }
 
   function definirValor(btn, valor) {
