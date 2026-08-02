@@ -191,7 +191,10 @@ async function buscarEmpregados() {
             throw error;
         }
 
-        if (!data || data.length === 0) {
+        // Empregados demitidos nunca entram no lançamento da folha.
+        const empregadosAtivos = (data || []).filter(e => (e.situacao || '').trim() !== 'Demitido');
+
+        if (empregadosAtivos.length === 0) {
             container.innerHTML = `<div style="padding: 10px; text-align: center; color: #666;">
                 Nenhum empregado encontrado para as empresas selecionadas.
                 <br><small style="color: #999;">Empresas buscadas: ${empresasSelecionadas.join(', ')}</small>
@@ -200,10 +203,10 @@ async function buscarEmpregados() {
             return;
         }
 
-        console.log('Empregados encontrados:', data.length);
+        console.log('Empregados encontrados:', empregadosAtivos.length);
         let htmlContent = '';
 
-        data.forEach((emp, index) => {
+        empregadosAtivos.forEach((emp, index) => {
             const codEmpresa = emp.codigo_empresa;
             const codEmpregado = emp.codigo_empregado;
             const nomeEmpregado = emp.nome_empregado;
@@ -240,7 +243,7 @@ async function buscarEmpregados() {
 
         // ✅ NOVO: Ativar step2 APÓS carregar os empregados com sucesso
         ativarStep('step2');
-        console.log('HTML renderizado com sucesso. Total de itens:', data.length);
+        console.log('HTML renderizado com sucesso. Total de itens:', empregadosAtivos.length);
 
     } catch (erro) {
         console.error('Erro ao buscar empregados:', erro);

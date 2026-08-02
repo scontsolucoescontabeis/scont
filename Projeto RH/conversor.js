@@ -181,11 +181,11 @@ async function carregarEmpregados(codigoEmpresa) {
     try {
         const { data, error } = await state.sb
             .from('rh_empregados')
-            .select('codigo_empregado, nome_empregado')
+            .select('codigo_empregado, nome_empregado, situacao')
             .eq('codigo_empresa', codigoEmpresa)
             .order('nome_empregado', { ascending: true });
         if (error) throw error;
-        state.empregados = data || [];
+        state.empregados = (data || []).filter(e => (e.situacao || '').trim() !== 'Demitido');
     } catch (e) {
         console.warn('Erro ao carregar empregados:', e.message);
         state.empregados = [];

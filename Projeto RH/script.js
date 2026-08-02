@@ -213,15 +213,19 @@ document.addEventListener('click', e => {
 
 // Empregados do tipo "Contribuinte" (sócios/pró-labore) não entram em parametrização
 // nem geração de Controle de Frequência, Escala, Benefícios ou Fechamento da Folha.
+// Empregados com situação "Demitido" também nunca entram nessas ferramentas.
 function _excluirContribuinte(lista) {
-    return (lista || []).filter(e => (e.tipo_empregado || '').trim() !== 'Contribuinte');
+    return (lista || []).filter(e =>
+        (e.tipo_empregado || '').trim() !== 'Contribuinte' &&
+        (e.situacao || '').trim() !== 'Demitido'
+    );
 }
 
 async function carregarEmpregados(codigoEmpresa) {
     try {
         const { data, error } = await supabaseClient
             .from('rh_empregados')
-            .select('codigo_empregado, nome_empregado, tipo_empregado')
+            .select('codigo_empregado, nome_empregado, tipo_empregado, situacao')
             .eq('codigo_empresa', codigoEmpresa)
             .order('nome_empregado', { ascending: true });
         if (error) throw error;
@@ -2427,7 +2431,7 @@ async function baixarModelosGrupo() {
         try {
             const { data, error } = await supabaseClient
                 .from('rh_empregados')
-                .select('codigo_empregado, nome_empregado, tipo_empregado')
+                .select('codigo_empregado, nome_empregado, tipo_empregado, situacao')
                 .eq('codigo_empresa', empresa.codigo_empresa)
                 .order('nome_empregado', { ascending: true });
             if (error) throw error;
@@ -2611,7 +2615,7 @@ async function processarLoteGrupo(fileList) {
         try {
             const { data: empregadosData, error: errEmp } = await supabaseClient
                 .from('rh_empregados')
-                .select('codigo_empregado, nome_empregado, tipo_empregado')
+                .select('codigo_empregado, nome_empregado, tipo_empregado, situacao')
                 .eq('codigo_empresa', codigo);
             if (errEmp) throw errEmp;
             const empregados = _excluirContribuinte(empregadosData);
@@ -2949,7 +2953,7 @@ async function _carregarTabelaValoresVaVt(codigoEmpresa) {
     try {
         const [{ data: empregadosData, error: errEmp }, { data: valores, error: errVal }] = await Promise.all([
             supabaseClient.from('rh_empregados')
-                .select('codigo_empregado, nome_empregado, tipo_empregado')
+                .select('codigo_empregado, nome_empregado, tipo_empregado, situacao')
                 .eq('codigo_empresa', codigoEmpresa)
                 .order('nome_empregado', { ascending: true }),
             supabaseClient.from('rh_valores_va_vt')
@@ -3253,7 +3257,7 @@ async function _construirConteudoTXTExportacao() {
     });
 
     const { data: empregadosBrutos, error: errEmpregados } = await supabaseClient
-        .from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, tipo_empregado')
+        .from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, tipo_empregado, situacao')
         .in('codigo_empresa', empresasSelecionadas);
     if (errEmpregados) throw errEmpregados;
     const empregadosData = _excluirContribuinte(empregadosBrutos);
@@ -3704,12 +3708,12 @@ async function gerarPreviaBeneficios() {
         }));
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
-            (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() === 'Empregado'
+            (e.situacao || '').trim() !== 'Demitido' && (e.tipo_empregado || '').trim() === 'Empregado'
         );
 
         if (empregadosFiltrados.length === 0) {
             fecharModalMensagem();
-            mostrarMensagem('Aviso', 'Nenhum empregado (situação "Trabalhando") encontrado para as empresas selecionadas.');
+            mostrarMensagem('Aviso', 'Nenhum empregado ativo encontrado para as empresas selecionadas.');
             document.getElementById('beneficiosPreviaContainer').style.display = 'none';
             _renderizarObservacoesBeneficios([]);
             _renderizarPeriodosBeneficios([]);
@@ -4893,7 +4897,7 @@ async function gerarPreviaFolhaPonto() {
         });
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
-            (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() === 'Empregado'
+            (e.situacao || '').trim() !== 'Demitido' && (e.tipo_empregado || '').trim() === 'Empregado'
         );
 
         const empresasComEmpregados = [];
@@ -4905,7 +4909,7 @@ async function gerarPreviaFolhaPonto() {
             const empregadosEmpresa = empregadosFiltrados.filter(e => e.codigo_empresa === codigoEmpresa);
 
             if (empregadosEmpresa.length === 0) {
-                avisos.push(`${codigoEmpresa} - ${nomeEmpresa}: sem empregado (situação "Trabalhando") encontrado.`);
+                avisos.push(`${codigoEmpresa} - ${nomeEmpresa}: sem empregado ativo encontrado.`);
                 continue;
             }
 
@@ -5227,12 +5231,12 @@ async function gerarEscala() {
         });
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
-            (e.situacao || '').trim() === 'Trabalhando' && (e.tipo_empregado || '').trim() === 'Empregado'
+            (e.situacao || '').trim() !== 'Demitido' && (e.tipo_empregado || '').trim() === 'Empregado'
         );
 
         if (empregadosFiltrados.length === 0) {
             fecharModalMensagem();
-            mostrarMensagem('Aviso', 'Nenhum empregado (situação "Trabalhando") encontrado para as empresas selecionadas.');
+            mostrarMensagem('Aviso', 'Nenhum empregado ativo encontrado para as empresas selecionadas.');
             document.getElementById('escalaResultadoContainer').style.display = 'none';
             return;
         }
@@ -5844,7 +5848,7 @@ async function gerarModeloExcel(comTerceiroTurno = false) {
     try {
         const { data: empregadosData, error } = await supabaseClient
             .from('rh_empregados')
-            .select('codigo_empregado, nome_empregado, tipo_empregado')
+            .select('codigo_empregado, nome_empregado, tipo_empregado, situacao')
             .eq('codigo_empresa', codEmp)
             .order('nome_empregado', { ascending: true });
 
