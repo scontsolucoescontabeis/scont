@@ -154,7 +154,17 @@ Campo de competência (reaproveita `state.competencia` da tela do grupo) + `<inp
 
 ### Validação por arquivo (antes de processar)
 
-**Superada pela spec [`2026-08-02-lote-grupo-validacao-conteudo-design.md`](2026-08-02-lote-grupo-validacao-conteudo-design.md):** a identificação da empresa e a validação de compatibilidade passaram a ser feitas pelo conteúdo da planilha (código+nome do empregado nas abas, cabeçalho de colunas, datas dentro do período), não mais pelo nome do arquivo.
+Para cada arquivo selecionado, extrair `codEmp`, `mm`, `aaaa` do nome via regex:
+
+```js
+const m = file.name.match(/^Modelo_FolhaPonto_(.+)_(\d{2})-(\d{4})\.xlsx$/i);
+```
+
+Erros que impedem o processamento **daquele arquivo específico** (os demais continuam):
+- Nome fora do padrão → "Nome de arquivo inválido".
+- `mm/aaaa` diferente da competência informada → "Competência do arquivo não confere".
+- `codEmp` não pertence ao grupo selecionado → "Empresa não pertence ao grupo".
+- Mais de um arquivo para o mesmo `codEmp` → "Arquivo duplicado para esta empresa" (mantém o primeiro, rejeita os demais).
 
 ### Processamento por empresa (arquivos válidos)
 
