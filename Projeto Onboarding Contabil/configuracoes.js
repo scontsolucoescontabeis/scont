@@ -7,12 +7,22 @@
   let configPorEmpresa = {}; // { codigo_empresa: boolean } — espelha o que já está salvo no banco
   let usuariosAprovados = []; // [{ id, nome, email, empresa }]
   let responsaveisPorEmpresa = {}; // { codigo_empresa: Set<usuario_id> }
+  let emailAlertaValidacao = '';
 
   document.addEventListener('DOMContentLoaded', iniciar);
 
   async function iniciar() {
     const auth = await window.PortalAuthGuard.init(1);
     if (!auth) return;
+
+    // Tela de Configurações não é visível para "Prestador de Serviço" —
+    // mesma convenção de enforcement client-side do restante do módulo.
+    const empresaUsuario = (auth.userData?.empresa || '').trim().toLowerCase();
+    if (!auth.isAdmin && empresaUsuario === 'prestador de serviço') {
+      window.location.href = 'index.html';
+      return;
+    }
+
     document.getElementById('authOverlay')?.remove();
 
     await carregarDados();
@@ -25,16 +35,19 @@
       { data: dataConfig, error: errConfig },
       { data: dataUsuarios, error: errUsuarios },
       { data: dataResponsaveis, error: errResponsaveis },
+      { data: dataConfigGeral, error: errConfigGeral },
     ] = await Promise.all([
       supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, status_situacao').order('nome_empresa', { ascending: true }),
       supabaseClient.from('contabil_empresas_config').select('codigo_empresa, possui_contabil'),
       supabaseClient.rpc('contabil_listar_usuarios_aprovados'),
       supabaseClient.from('contabil_empresas_responsaveis').select('codigo_empresa, usuario_id'),
+      supabaseClient.from('contabil_config_geral').select('email_alerta_validacao').eq('id', 1).maybeSingle(),
     ]);
     if (errEmpresas) console.error(errEmpresas);
     if (errConfig) console.error(errConfig);
     if (errUsuarios) console.error(errUsuarios);
     if (errResponsaveis) console.error(errResponsaveis);
+    if (errConfigGeral) console.error(errConfigGeral);
 
     const ativa = (s) => !s || String(s).trim().toLowerCase().startsWith('ativ');
     empresas = (dataEmpresas || []).filter((e) => ativa(e.status_situacao));
@@ -49,6 +62,16 @@
       if (!responsaveisPorEmpresa[r.codigo_empresa]) responsaveisPorEmpresa[r.codigo_empresa] = new Set();
       responsaveisPorEmpresa[r.codigo_empresa].add(r.usuario_id);
     });
+
+    emailAlertaValidacao = dataConfigGeral?.email_alerta_validacao || '';
+  }
+
+  async function salvarEmailAlertaValidacao(valor) {
+    const { error } = await supabaseClient
+      .from('contabil_config_geral')
+      .upsert({ id: 1, email_alerta_validacao: valor, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    if (!error) emailAlertaValidacao = valor;
+    return { error };
   }
 
   function possuiContabil(codigoEmpresa) {
@@ -100,6 +123,16 @@
     main.innerHTML = `
       <div class="onboarding-header"><div><h2>Configurações</h2></div></div>
       <div class="mapa-secao">
+        <div class="mapa-secao-header">Alertas por E-mail</div>
+        <div class="mapa-secao-body">
+          <p class="full mapa-empty" style="margin-bottom:4px;">E-mail(is) que recebem um alerta sempre que um fechamento mensal é enviado para validação no Diário Contábil. Separe vários e-mails por vírgula.</p>
+          <div class="full mapa-filtros">
+            <input type="text" id="inputEmailAlertaValidacao" placeholder="ex: herbertscont@gmail.com" style="flex:1;min-width:260px;" value="${escapeAttr(emailAlertaValidacao)}">
+            <button type="button" class="btn btn-primary" id="btnSalvarEmailAlerta">Salvar</button>
+          </div>
+        </div>
+      </div>
+      <div class="mapa-secao">
         <div class="mapa-secao-header">Empresas com Contábil</div>
         <div class="mapa-secao-body">
           <p class="full mapa-empty" style="margin-bottom:4px;">Marque as empresas que possuem contábil na Scont. Somente as marcadas aqui aparecem nos seletores e filtros do Onboarding e do Diário Contábil. As alterações são salvas automaticamente.</p>
@@ -119,6 +152,16 @@
         </div>
       </div>
     `;
+
+    document.getElementById('btnSalvarEmailAlerta').addEventListener('click', async () => {
+      const btn = document.getElementById('btnSalvarEmailAlerta');
+      const valor = document.getElementById('inputEmailAlertaValidacao').value.trim();
+      btn.disabled = true;
+      const { error } = await salvarEmailAlertaValidacao(valor);
+      btn.disabled = false;
+      if (error) { console.error(error); mostrarToast('Erro ao salvar o e-mail de alerta.', 'erro'); return; }
+      mostrarToast('E-mail de alerta salvo.', 'sucesso');
+    });
 
     document.getElementById('buscaEmpresaConfig').addEventListener('input', renderTabela);
     document.getElementById('btnMarcarTodas').addEventListener('click', () => alternarVisiveis(true));

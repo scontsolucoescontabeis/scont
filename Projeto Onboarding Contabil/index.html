@@ -53,7 +53,7 @@
           <h3>Diário Contábil</h3>
           <p>Andamento mensal, resumo e registros de cada empresa da carteira.</p>
         </a>
-        <a class="tool-card" href="configuracoes.html">
+        <a class="tool-card" href="configuracoes.html" id="cardConfiguracoes">
           <div class="tool-card-icon">⚙️</div>
           <h3>Configurações</h3>
           <p>Selecione as empresas que possuem contábil e entram nos filtros e buscas.</p>
@@ -68,6 +68,13 @@
     const auth = await window.PortalAuthGuard.init(1);
     if (!auth) return;
     document.getElementById('authOverlay')?.remove();
+
+    // Configurações não é visível para "Prestador de Serviço" — mesma
+    // convenção de enforcement client-side do restante do módulo.
+    const empresaUsuario = (auth.userData?.empresa || '').trim().toLowerCase();
+    if (!auth.isAdmin && empresaUsuario === 'prestador de serviço') {
+      document.getElementById('cardConfiguracoes')?.remove();
+    }
   });
 </script>
 </body>
