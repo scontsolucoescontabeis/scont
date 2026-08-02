@@ -21,6 +21,7 @@
   // Ver docs/superpowers/specs/2026-08-01-diario-fechamento-validacao-design.md
   let _isAdmin = false;
   let _isScontTeam = false;
+  let _podeEditarMapeamento = false; // edição do Mapeamento Estratégico é exclusiva da equipe Scont
   let _restringirSeletor = false; // true = "Prestador de Serviço" não-admin
   let _meusResponsaveisSet = new Set(); // empresas onde o usuário logado é responsável atribuído
   let fechamentos = []; // linhas cruas de contabil_diario_fechamentos
@@ -87,6 +88,7 @@
     _isAdmin = !!auth.isAdmin;
     const empresaUsuario = (auth.userData?.empresa || '').trim().toLowerCase();
     _isScontTeam = empresaUsuario === 'scont soluções contábeis';
+    _podeEditarMapeamento = _isAdmin || _isScontTeam;
     _restringirSeletor = !_isAdmin && empresaUsuario === 'prestador de serviço';
 
     if (!auth.userId) { _meusResponsaveisSet = new Set(); return; }
@@ -230,7 +232,10 @@
     if (errCfg) { console.error(errCfg); return; }
 
     const destinatarios = (cfg?.email_alerta_validacao || '').split(',').map((s) => s.trim()).filter(Boolean);
-    if (!destinatarios.length) return;
+    if (!destinatarios.length) {
+      mostrarToast('Fechamento enviado, mas nenhum e-mail de alerta está configurado (Configurações → Alertas por E-mail).', 'erro');
+      return;
+    }
 
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return;
@@ -430,7 +435,10 @@
   function renderResumoMapeamento() {
     const el = document.getElementById('secaoResumoMapeamento');
     const m = mapeamentoDe(empresaAtualCodigo);
-    const linkEditar = `<a class="btn btn-primary" href="mapeamento.html?empresa=${encodeURIComponent(empresaAtualCodigo)}">✏️ Editar no Mapeamento Estratégico</a>`;
+    const hrefMapeamento = `mapeamento.html?empresa=${encodeURIComponent(empresaAtualCodigo)}&origem=diario`;
+    const linkEditar = _podeEditarMapeamento
+      ? `<a class="btn btn-primary" href="${hrefMapeamento}">✏️ Editar no Mapeamento Estratégico</a>`
+      : `<a class="btn btn-secondary" href="${hrefMapeamento}">👁️ Ver Mapeamento Estratégico</a>`;
 
     if (!m) {
       el.innerHTML = `

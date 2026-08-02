@@ -25,12 +25,41 @@
   let mapeamentoAtual = null;       // linha de contabil_mapeamento selecionada
   let filtro = { nivel: null, regime: '', financeiro: '' };
 
+  // ─── ESCOPO: "Prestador de Serviço" só vê empresas onde é responsável ──
+  // Mesma convenção client-side já usada no Diário Contábil (diario.js).
+  // A edição do Mapeamento Estratégico é exclusiva da equipe Scont; demais
+  // usuários (Prestador de Serviço) têm acesso somente de leitura.
+  let _isAdmin = false;
+  let _isScontTeam = false;
+  let _podeEditar = false;
+  let _restringirSeletor = false;
+  let _meusResponsaveisSet = new Set();
+  let _origemDiarioEmpresa = null; // codigo_empresa quando a navegação veio do Diário Contábil
+
   document.addEventListener('DOMContentLoaded', iniciar);
+
+  async function _resolverEscopoUsuario(auth) {
+    _isAdmin = !!auth.isAdmin;
+    const empresaUsuario = (auth.userData?.empresa || '').trim().toLowerCase();
+    _isScontTeam = empresaUsuario === 'scont soluções contábeis';
+    _podeEditar = _isAdmin || _isScontTeam;
+    _restringirSeletor = !_isAdmin && empresaUsuario === 'prestador de serviço';
+
+    if (!auth.userId) { _meusResponsaveisSet = new Set(); return; }
+    const { data, error } = await supabaseClient
+      .from('contabil_empresas_responsaveis')
+      .select('codigo_empresa')
+      .eq('usuario_id', auth.userId);
+    if (error) { console.error(error); _meusResponsaveisSet = new Set(); return; }
+    _meusResponsaveisSet = new Set((data || []).map((r) => r.codigo_empresa));
+  }
 
   async function iniciar() {
     const auth = await window.PortalAuthGuard.init(1);
     if (!auth) return;
     document.getElementById('authOverlay')?.remove();
+
+    await _resolverEscopoUsuario(auth);
 
     document.getElementById('btnDashboard').addEventListener('click', () => {
       mapeamentoAtualId = null;
@@ -46,7 +75,9 @@
     renderDashboard();
     renderSeletorEmpresas();
 
-    const empresaNaUrl = new URLSearchParams(window.location.search).get('empresa');
+    const params = new URLSearchParams(window.location.search);
+    const empresaNaUrl = params.get('empresa');
+    if (params.get('origem') === 'diario' && empresaNaUrl) _origemDiarioEmpresa = empresaNaUrl;
     if (empresaNaUrl && empresas.some((e) => e.codigo_empresa === empresaNaUrl)) {
       selecionarEmpresa(empresaNaUrl);
     }
@@ -62,6 +93,7 @@
 
     const ativa = (s) => !s || String(s).trim().toLowerCase().startsWith('ativ');
     empresas = (dataEmpresas || []).filter((e) => ativa(e.status_situacao));
+    if (_restringirSeletor) empresas = empresas.filter((e) => _meusResponsaveisSet.has(e.codigo_empresa));
     mapeamentos = dataMapeamentos || [];
 
     const ids = mapeamentos.map((m) => m.id);
@@ -212,7 +244,7 @@
     mapeamentoAtualId = codigoEmpresa;
     document.getElementById('seletorEmpresa').value = codigoEmpresa;
     let m = mapeamentoDe(codigoEmpresa);
-    if (!m) {
+    if (!m && _podeEditar) {
       const { data, error } = await supabaseClient
         .from('contabil_mapeamento')
         .insert({ codigo_empresa: codigoEmpresa })
@@ -222,21 +254,29 @@
       m = data;
       mapeamentos.push(m);
     }
-    mapeamentoAtual = m;
+    // Usuário somente-leitura sem mapeamento ainda cadastrado: exibe um
+    // perfil vazio sem persistir nada no banco.
+    mapeamentoAtual = m || { codigo_empresa: codigoEmpresa };
     renderPerfil();
   }
 
   function renderPerfil() {
     const main = document.getElementById('main');
     const m = mapeamentoAtual;
+    const RO = !_podeEditar;
+    const voltarDiarioHtml = m.codigo_empresa === _origemDiarioEmpresa
+      ? `<a class="btn btn-secondary" href="diario.html?empresa=${encodeURIComponent(m.codigo_empresa)}">← Voltar ao Diário</a>`
+      : '';
 
     main.innerHTML = `
       <div class="onboarding-header">
         <div><h2>${escapeHtml(empresaNome(m.codigo_empresa))}</h2></div>
         <div class="onboarding-header-actions">
+          ${voltarDiarioHtml}
           <button type="button" class="btn btn-primary" id="btnRelatorioPDF">📄 Gerar Relatório PDF</button>
         </div>
       </div>
+      ${RO ? '<p class="mapa-somente-leitura-aviso">🔒 Somente leitura — a edição do Mapeamento Estratégico é exclusiva da equipe Scont.</p>' : ''}
 
       <div class="mapa-secao">
         <div class="mapa-secao-header">Execução</div>
@@ -304,11 +344,13 @@
     `;
 
     main.querySelectorAll('[data-campo]').forEach((el) => {
+      el.disabled = RO;
       const evento = el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'blur';
       el.addEventListener(evento, () => salvarCampo(el));
     });
 
     main.querySelectorAll('[data-tag-input]').forEach((input) => {
+      if (RO) { input.style.display = 'none'; return; }
       input.addEventListener('keydown', async (ev) => {
         if (ev.key !== 'Enter' || !input.value.trim()) return;
         ev.preventDefault();
@@ -323,6 +365,7 @@
       });
     });
     main.querySelectorAll('[data-remover-tag]').forEach((btn) => {
+      if (RO) { btn.style.display = 'none'; return; }
       btn.addEventListener('click', async () => {
         const campo = btn.getAttribute('data-remover-tag');
         const valor = btn.getAttribute('data-valor');
@@ -369,28 +412,31 @@
   function renderBancos() {
     const el = document.getElementById('secaoBancos');
     const m = mapeamentoAtual;
+    const RO = !_podeEditar;
     const bancos = bancosPorMapeamento[m.id] || [];
     const datalistId = 'dl_bancos_utilizados';
 
     const linhasHtml = bancos.map((b) => `
       <tr data-banco-id="${b.id}">
         <td>${escapeHtml(b.banco)}</td>
-        <td><input type="text" data-banco-campo="agencia" value="${escapeHtml(b.agencia || '')}"></td>
-        <td><input type="text" data-banco-campo="conta_corrente" value="${escapeHtml(b.conta_corrente || '')}"></td>
-        <td><input type="text" data-banco-campo="operador_login" value="${escapeHtml(b.operador_login || '')}"></td>
+        <td><input type="text" data-banco-campo="agencia" value="${escapeHtml(b.agencia || '')}" ${RO ? 'disabled' : ''}></td>
+        <td><input type="text" data-banco-campo="conta_corrente" value="${escapeHtml(b.conta_corrente || '')}" ${RO ? 'disabled' : ''}></td>
+        <td><input type="text" data-banco-campo="operador_login" value="${escapeHtml(b.operador_login || '')}" ${RO ? 'disabled' : ''}></td>
         <td class="mapa-banco-senha">
-          <input type="password" data-banco-campo="senha" value="${escapeHtml(b.senha || '')}">
+          <input type="password" data-banco-campo="senha" value="${escapeHtml(b.senha || '')}" ${RO ? 'disabled' : ''}>
           <button type="button" class="mapa-banco-olho" data-toggle-senha>👁</button>
         </td>
-        <td><input type="text" data-banco-campo="observacoes" value="${escapeHtml(b.observacoes || '')}"></td>
-        <td><button type="button" class="mapa-remover-banco" data-remover-banco="${b.id}">×</button></td>
+        <td><input type="text" data-banco-campo="observacoes" value="${escapeHtml(b.observacoes || '')}" ${RO ? 'disabled' : ''}></td>
+        <td>${RO ? '' : `<button type="button" class="mapa-remover-banco" data-remover-banco="${b.id}">×</button>`}</td>
       </tr>
     `).join('');
 
     el.innerHTML = `
       <label>Bancos Utilizados</label>
-      <input type="text" list="${datalistId}" placeholder="Adicionar banco e pressionar Enter" id="inputNovoBanco">
-      <datalist id="${datalistId}">${BANCOS_SUGERIDOS.map((s) => `<option value="${escapeHtml(s)}">`).join('')}</datalist>
+      ${RO ? '' : `
+        <input type="text" list="${datalistId}" placeholder="Adicionar banco e pressionar Enter" id="inputNovoBanco">
+        <datalist id="${datalistId}">${BANCOS_SUGERIDOS.map((s) => `<option value="${escapeHtml(s)}">`).join('')}</datalist>
+      `}
       ${bancos.length ? `
         <table class="mapa-bancos-table">
           <thead><tr><th>Banco</th><th>Agência</th><th>Conta Corrente</th><th>Operador/Login</th><th>Senha</th><th>Observações</th><th></th></tr></thead>
@@ -399,19 +445,21 @@
       ` : '<p class="mapa-empty">Nenhum banco cadastrado.</p>'}
     `;
 
-    el.querySelector('#inputNovoBanco').addEventListener('keydown', async (ev) => {
-      if (ev.key !== 'Enter' || !ev.target.value.trim()) return;
-      ev.preventDefault();
-      const banco = ev.target.value.trim();
-      const { data, error } = await supabaseClient
-        .from('contabil_mapeamento_bancos')
-        .insert({ mapeamento_id: m.id, banco })
-        .select()
-        .single();
-      if (error) { console.error(error); return; }
-      (bancosPorMapeamento[m.id] = bancosPorMapeamento[m.id] || []).push(data);
-      renderBancos();
-    });
+    if (!RO) {
+      el.querySelector('#inputNovoBanco').addEventListener('keydown', async (ev) => {
+        if (ev.key !== 'Enter' || !ev.target.value.trim()) return;
+        ev.preventDefault();
+        const banco = ev.target.value.trim();
+        const { data, error } = await supabaseClient
+          .from('contabil_mapeamento_bancos')
+          .insert({ mapeamento_id: m.id, banco })
+          .select()
+          .single();
+        if (error) { console.error(error); return; }
+        (bancosPorMapeamento[m.id] = bancosPorMapeamento[m.id] || []).push(data);
+        renderBancos();
+      });
+    }
 
     el.querySelectorAll('[data-toggle-senha]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -420,28 +468,30 @@
       });
     });
 
-    el.querySelectorAll('[data-banco-campo]').forEach((input) => {
-      input.addEventListener('blur', async () => {
-        const tr = input.closest('tr');
-        const bancoId = tr.getAttribute('data-banco-id');
-        const campo = input.getAttribute('data-banco-campo');
-        const valor = input.value.trim() || null;
-        const { error } = await supabaseClient.from('contabil_mapeamento_bancos').update({ [campo]: valor }).eq('id', bancoId);
-        if (error) { console.error(error); return; }
-        const banco = (bancosPorMapeamento[m.id] || []).find((b) => b.id === bancoId);
-        if (banco) banco[campo] = valor;
+    if (!RO) {
+      el.querySelectorAll('[data-banco-campo]').forEach((input) => {
+        input.addEventListener('blur', async () => {
+          const tr = input.closest('tr');
+          const bancoId = tr.getAttribute('data-banco-id');
+          const campo = input.getAttribute('data-banco-campo');
+          const valor = input.value.trim() || null;
+          const { error } = await supabaseClient.from('contabil_mapeamento_bancos').update({ [campo]: valor }).eq('id', bancoId);
+          if (error) { console.error(error); return; }
+          const banco = (bancosPorMapeamento[m.id] || []).find((b) => b.id === bancoId);
+          if (banco) banco[campo] = valor;
+        });
       });
-    });
 
-    el.querySelectorAll('[data-remover-banco]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const bancoId = btn.getAttribute('data-remover-banco');
-        const { error } = await supabaseClient.from('contabil_mapeamento_bancos').delete().eq('id', bancoId);
-        if (error) { console.error(error); return; }
-        bancosPorMapeamento[m.id] = (bancosPorMapeamento[m.id] || []).filter((b) => b.id !== bancoId);
-        renderBancos();
+      el.querySelectorAll('[data-remover-banco]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const bancoId = btn.getAttribute('data-remover-banco');
+          const { error } = await supabaseClient.from('contabil_mapeamento_bancos').delete().eq('id', bancoId);
+          if (error) { console.error(error); return; }
+          bancosPorMapeamento[m.id] = (bancosPorMapeamento[m.id] || []).filter((b) => b.id !== bancoId);
+          renderBancos();
+        });
       });
-    });
+    }
   }
 
   async function salvarCampo(el) {
@@ -469,6 +519,7 @@
   function renderNivelAtencao() {
     const el = document.getElementById('secaoNivelAtencao');
     const m = mapeamentoAtual;
+    const RO = !_podeEditar;
     const pendencias = pendenciasPorMapeamento[m.id] || [];
     const sugestao = window.calcularNivelSugerido(m, pendencias, new Date());
 
@@ -477,7 +528,7 @@
         <div class="mapa-secao-header">Nível de Atenção</div>
         <div class="mapa-secao-body">
           <div><label>Nível Atual</label>
-            <select data-manual-nivel="1">
+            <select data-manual-nivel="1" ${RO ? 'disabled' : ''}>
               ${NIVEIS.map((n) => `<option value="${n}" ${m.nivel_atencao === n ? 'selected' : ''}>${NIVEL_LABELS[n]}</option>`).join('')}
             </select>
           </div>
@@ -486,14 +537,16 @@
       </div>
     `;
 
-    el.querySelector('[data-manual-nivel]').addEventListener('change', async (ev) => {
-      const novoNivel = ev.target.value;
-      const travado = novoNivel !== sugestao;
-      mapeamentoAtual.nivel_atencao = novoNivel;
-      mapeamentoAtual.nivel_atencao_travado = travado;
-      const { error } = await supabaseClient.from('contabil_mapeamento').update({ nivel_atencao: novoNivel, nivel_atencao_travado: travado }).eq('id', mapeamentoAtual.id);
-      if (error) console.error(error);
-    });
+    if (!RO) {
+      el.querySelector('[data-manual-nivel]').addEventListener('change', async (ev) => {
+        const novoNivel = ev.target.value;
+        const travado = novoNivel !== sugestao;
+        mapeamentoAtual.nivel_atencao = novoNivel;
+        mapeamentoAtual.nivel_atencao_travado = travado;
+        const { error } = await supabaseClient.from('contabil_mapeamento').update({ nivel_atencao: novoNivel, nivel_atencao_travado: travado }).eq('id', mapeamentoAtual.id);
+        if (error) console.error(error);
+      });
+    }
   }
 
   function atualizarSugestaoNivel() {
@@ -512,6 +565,7 @@
   function renderPendencias() {
     const el = document.getElementById('secaoPendencias');
     const m = mapeamentoAtual;
+    const RO = !_podeEditar;
     const pendencias = (pendenciasPorMapeamento[m.id] || []).slice().sort((a, b) => (a.status === b.status ? 0 : a.status === 'aberta' ? -1 : 1));
     const hoje = new Date();
 
@@ -520,10 +574,12 @@
       return `
         <div class="mapa-pendencia-item ${vencida ? 'vencida' : ''} ${p.status === 'resolvida' ? 'resolvida' : ''}">
           <span class="desc">${escapeHtml(p.descricao)}${p.responsavel ? ` — <em>${escapeHtml(p.responsavel)}</em>` : ''}${p.prazo ? ` (prazo: ${formatarData(p.prazo)})` : ''}</span>
-          <span class="acoes">
-            ${p.status === 'aberta' ? `<button type="button" data-resolver="${p.id}">Resolver</button>` : ''}
-            <button type="button" class="btn-excluir-pendencia" data-excluir="${p.id}">Excluir</button>
-          </span>
+          ${RO ? '' : `
+            <span class="acoes">
+              ${p.status === 'aberta' ? `<button type="button" data-resolver="${p.id}">Resolver</button>` : ''}
+              <button type="button" class="btn-excluir-pendencia" data-excluir="${p.id}">Excluir</button>
+            </span>
+          `}
         </div>
       `;
     }).join('') || '<p class="mapa-empty">Nenhuma pendência registrada.</p>';
@@ -533,13 +589,17 @@
         <div class="mapa-secao-header">Pendências</div>
         <div class="mapa-secao-body">
           <div class="full">${itensHtml}</div>
-          <div><label>Descrição</label><input type="text" id="novaPendenciaDesc" placeholder="Ex: Enviar guia DAS de junho"></div>
-          <div><label>Responsável</label><input type="text" id="novaPendenciaResp" placeholder="Nome do responsável"></div>
-          <div><label>Prazo</label><input type="date" id="novaPendenciaPrazo"></div>
-          <div style="align-self:end;"><button type="button" id="btnAddPendencia" class="btn-novo">+ Adicionar Pendência</button></div>
+          ${RO ? '' : `
+            <div><label>Descrição</label><input type="text" id="novaPendenciaDesc" placeholder="Ex: Enviar guia DAS de junho"></div>
+            <div><label>Responsável</label><input type="text" id="novaPendenciaResp" placeholder="Nome do responsável"></div>
+            <div><label>Prazo</label><input type="date" id="novaPendenciaPrazo"></div>
+            <div style="align-self:end;"><button type="button" id="btnAddPendencia" class="btn-novo">+ Adicionar Pendência</button></div>
+          `}
         </div>
       </div>
     `;
+
+    if (RO) return;
 
     el.querySelectorAll('[data-resolver]').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -587,6 +647,7 @@
   async function renderRelacionadas() {
     const el = document.getElementById('secaoRelacionadas');
     const m = mapeamentoAtual;
+    const RO = !_podeEditar;
 
     const { data, error } = await supabaseClient
       .from('contabil_mapeamento_relacionadas')
@@ -604,18 +665,22 @@
         <div class="mapa-secao-body">
           <div class="full">
             ${relacionadas.length
-              ? `<div class="mapa-tags">${relacionadas.map((cod) => `<span class="mapa-tag">${escapeHtml(empresaNome(cod))}<button type="button" data-desvincular="${cod}">×</button></span>`).join('')}</div>`
+              ? `<div class="mapa-tags">${relacionadas.map((cod) => `<span class="mapa-tag">${escapeHtml(empresaNome(cod))}${RO ? '' : `<button type="button" data-desvincular="${cod}">×</button>`}</span>`).join('')}</div>`
               : '<p class="mapa-empty">Nenhuma empresa relacionada.</p>'}
           </div>
-          <div class="full">
-            <select id="selectRelacionada">
-              <option value="">Vincular empresa...</option>
-              ${opcoesDisponiveis.map((e) => `<option value="${e.codigo_empresa}">${escapeHtml(e.nome_empresa)}</option>`).join('')}
-            </select>
-          </div>
+          ${RO ? '' : `
+            <div class="full">
+              <select id="selectRelacionada">
+                <option value="">Vincular empresa...</option>
+                ${opcoesDisponiveis.map((e) => `<option value="${e.codigo_empresa}">${escapeHtml(e.nome_empresa)}</option>`).join('')}
+              </select>
+            </div>
+          `}
         </div>
       </div>
     `;
+
+    if (RO) return;
 
     el.querySelectorAll('[data-desvincular]').forEach((btn) => {
       btn.addEventListener('click', async () => {

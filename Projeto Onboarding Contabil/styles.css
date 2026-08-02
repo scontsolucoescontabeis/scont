@@ -685,6 +685,9 @@ input,select,textarea{font:inherit}
 .mapa-secao-body input::placeholder, .mapa-secao-body textarea::placeholder{ color:var(--muted); opacity:1; }
 .mapa-secao-body input[type="checkbox"]{ width:auto; padding:0; flex-shrink:0; }
 .mapa-secao-body label:has(input[type="checkbox"]){ display:flex; align-items:center; gap:8px; }
+.mapa-secao-body input:disabled, .mapa-secao-body select:disabled, .mapa-secao-body textarea:disabled{ background:var(--line-soft); color:var(--muted); cursor:not-allowed; opacity:1; }
+
+.mapa-somente-leitura-aviso{ background:var(--brand-soft); color:var(--brand-strong); border-radius:var(--radius-sm); padding:10px 16px; font-size:.86rem; font-weight:600; margin-bottom:14px; }
 
 .mapa-empty{ color:var(--muted); font-size:.86rem; padding:4px 0; margin:0; }
 
