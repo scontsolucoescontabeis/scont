@@ -124,6 +124,57 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
         ` + _rodape(nomeRemetente) + _fechamento();
     }
 
+    // ── Fechamento aprovado pela equipe Scont (Diário Contábil) ──
+    if (tipo === 'fechamento_aprovado') {
+        const empresaNome = (params.empresa as string)    || '';
+        const mesAno      = (params.mes_ano as string)    || '';
+        const portalUrl   = (params.portal_url as string) || '';
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#4e1820;margin:0 0 8px;font-size:20px;">✅ Fechamento aprovado</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            O fechamento de <strong>${mesAno}</strong> da empresa <strong>${empresaNome}</strong>
+            foi <strong style="color:#33aa23;">aprovado</strong> pela equipe Scont.
+          </p>
+
+          ${portalUrl ? `
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
+            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+              📔 Acessar o Diário Contábil
+            </a>
+          </td></tr></table>` : ''}
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
+    // ── Fechamento rejeitado pela equipe Scont (Diário Contábil) ──
+    if (tipo === 'fechamento_rejeitado') {
+        const empresaNome = (params.empresa as string)    || '';
+        const mesAno      = (params.mes_ano as string)    || '';
+        const motivo      = (params.motivo as string)     || '';
+        const portalUrl   = (params.portal_url as string) || '';
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#4e1820;margin:0 0 8px;font-size:20px;">❌ Fechamento rejeitado</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            O fechamento de <strong>${mesAno}</strong> da empresa <strong>${empresaNome}</strong>
+            foi <strong style="color:#E74C3C;">rejeitado</strong> pela equipe Scont e voltou para aberto.
+          </p>
+
+          ${motivo ? `
+          <div style="background:#FFF1F2;border-left:4px solid #E74C3C;border-radius:0 6px 6px 0;padding:14px 18px;margin-bottom:20px;">
+            <p style="margin:0;font-size:13px;color:#991B1B;font-weight:600;">Motivo:</p>
+            <p style="margin:6px 0 0;font-size:13px;color:#434343;line-height:1.6;">${motivo}</p>
+          </div>` : ''}
+
+          ${portalUrl ? `
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
+            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+              📔 Acessar o Diário Contábil
+            </a>
+          </td></tr></table>` : ''}
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
     // ── Template padrão (apresentação) ────────────────────────
     const empresa          = (params.empresa as string)           || '';
     const mensagem         = (params.mensagem as string)          || 'Preparamos uma apresentação personalizada para sua empresa. Acesse o link abaixo!';
@@ -204,20 +255,41 @@ Deno.serve(async (req) => {
         if (!req.headers.get('Authorization')) throw new Error('Não autorizado.');
 
         const body = await req.json() as {
-            destinatario: string;
+            destinatario?: string;
+            usuarioId?: string;
             nomeDestinatario?: string;
             assunto?: string;
             params?: Record<string, unknown>;
         };
-        const { destinatario, nomeDestinatario, assunto } = body;
+        const { usuarioId, assunto } = body;
+        let { destinatario, nomeDestinatario } = body;
         const params: Record<string, unknown> = body.params ?? {};
-        if (!destinatario) throw new Error('Campo "destinatario" é obrigatório.');
 
         // Buscar config no banco usando service role (nunca exposto ao browser)
         const adminDb = createClient(
             Deno.env.get('SUPABASE_URL')!,
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
         );
+
+        // Quando o chamador só tem o usuario_id (ex.: equipe Scont notificando
+        // um Prestador de Serviço que não é dono da sessão), resolve o e-mail
+        // pelo cadastro em solicitacoes_acesso via service role — contorna a
+        // RLS que só permite ao próprio usuário ou a um admin do portal ler
+        // essa tabela, e garante que o destino é sempre o e-mail do pedido de
+        // acesso, nunca um valor arbitrário vindo do cliente.
+        if (usuarioId) {
+            const { data: solicitacao, error: solErr } = await adminDb
+                .from('solicitacoes_acesso')
+                .select('email, nome')
+                .eq('id', usuarioId)
+                .maybeSingle();
+            if (solErr) throw new Error('Erro ao localizar e-mail do usuário: ' + solErr.message);
+            if (!solicitacao) throw new Error('Usuário não encontrado em solicitacoes_acesso.');
+            destinatario = solicitacao.email;
+            if (!nomeDestinatario) nomeDestinatario = solicitacao.nome;
+        }
+
+        if (!destinatario) throw new Error('Campo "destinatario" ou "usuarioId" é obrigatório.');
 
         const { data: cfgRows, error: cfgErr } = await adminDb
             .from('configuracoes_scont')

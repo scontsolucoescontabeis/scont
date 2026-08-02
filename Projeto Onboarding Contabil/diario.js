@@ -199,6 +199,13 @@
 
   async function criarEventoFechamento(codigoEmpresa, ano, mes, tipoEvento, mensagem) {
     const auth = window.__contabilAuth || {};
+    // Capturado ANTES do insert: quem enviou para validação é o autor do
+    // evento 'enviado' mais recente (o que está prestes a ser substituído
+    // por este aprovado/rejeitado), para notificá-lo por e-mail depois.
+    const eventoEnviadoAnterior = tipoEvento !== 'enviado'
+      ? (fechamentosPorChave[`${codigoEmpresa}|${ano}|${mes}`] || []).find((e) => e.tipo_evento === 'enviado')
+      : null;
+
     const registro = {
       codigo_empresa: codigoEmpresa,
       ano,
@@ -218,6 +225,8 @@
 
     if (tipoEvento === 'enviado') {
       enviarAlertaValidacao(codigoEmpresa, ano, mes, auth).catch((e) => console.error('Erro ao enviar alerta de validação:', e));
+    } else if ((tipoEvento === 'aprovado' || tipoEvento === 'rejeitado') && eventoEnviadoAnterior) {
+      enviarNotificacaoPrestador(codigoEmpresa, ano, mes, tipoEvento, mensagem, eventoEnviadoAnterior).catch((e) => console.error('Erro ao notificar prestador:', e));
     }
     atualizarBadgeValidacoes();
     return { error: null };
@@ -261,6 +270,44 @@
 
     if (resultados.some((r) => !r.ok)) {
       mostrarToast('Fechamento enviado, mas houve falha ao notificar por e-mail a equipe Scont.', 'erro');
+    }
+  }
+
+  // Notifica quem enviou o fechamento (Prestador de Serviço) quando a
+  // equipe Scont aprova ou rejeita. O e-mail é resolvido no servidor
+  // (Edge Function, service role) a partir de solicitacoes_acesso pelo
+  // usuario_id de quem enviou — nunca o e-mail informado neste
+  // navegador — garantindo que vai sempre para o endereço cadastrado no
+  // pedido de acesso ao Portal Scont, mesmo sem o aprovador ter permissão
+  // de leitura direta sobre a solicitação de outro usuário (RLS).
+  async function enviarNotificacaoPrestador(codigoEmpresa, ano, mes, tipoEvento, mensagem, eventoEnviadoAnterior) {
+    if (!eventoEnviadoAnterior?.usuario_id) return; // evento sem autor identificável (ex.: importação legada)
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    const nomeEmp = empresaNome(codigoEmpresa);
+    const mesAno = `${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+    const aprovado = tipoEvento === 'aprovado';
+    const assunto = aprovado
+      ? `✅ Fechamento aprovado — ${nomeEmp} — ${mesAno}`
+      : `❌ Fechamento rejeitado — ${nomeEmp} — ${mesAno}`;
+    const params = {
+      tipo: aprovado ? 'fechamento_aprovado' : 'fechamento_rejeitado',
+      empresa: nomeEmp,
+      mes_ano: mesAno,
+      motivo: mensagem || '',
+      portal_url: window.location.origin + window.location.pathname,
+    };
+
+    const resultado = await fetch(`${SUPABASE_URL}/functions/v1/enviar-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_KEY },
+      body: JSON.stringify({ usuarioId: eventoEnviadoAnterior.usuario_id, nomeDestinatario: eventoEnviadoAnterior.usuario_nome || undefined, assunto, params }),
+    }).then((r) => r.json()).catch((e) => ({ ok: false, error: e.message }));
+
+    if (!resultado.ok) {
+      mostrarToast(`Ação registrada, mas houve falha ao notificar o prestador por e-mail (${resultado.error || 'erro desconhecido'}).`, 'erro');
     }
   }
 
