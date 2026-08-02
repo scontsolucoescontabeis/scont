@@ -27,6 +27,7 @@
 
     await carregarDados();
     renderTela();
+    sincronizarMapeamentoTodasEmpresas();
   }
 
   async function carregarDados() {
@@ -37,7 +38,7 @@
       { data: dataResponsaveis, error: errResponsaveis },
       { data: dataConfigGeral, error: errConfigGeral },
     ] = await Promise.all([
-      supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, status_situacao').order('nome_empresa', { ascending: true }),
+      supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, status_situacao, regime_enquadramento').order('nome_empresa', { ascending: true }),
       supabaseClient.from('contabil_empresas_config').select('codigo_empresa, possui_contabil'),
       supabaseClient.rpc('contabil_listar_usuarios_aprovados'),
       supabaseClient.from('contabil_empresas_responsaveis').select('codigo_empresa, usuario_id'),
@@ -84,6 +85,63 @@
     return usuariosAprovados.filter((u) => ids.has(u.id));
   }
 
+  function nomesResponsaveisTexto(codigoEmpresa) {
+    return responsaveisDe(codigoEmpresa).map((u) => u.nome).join(', ');
+  }
+
+  // ─── SINCRONIZAÇÃO COM O MAPEAMENTO ESTRATÉGICO ─────────────
+  // O responsável (daqui) e o regime tributário (de rh_empresas) são
+  // replicados para contabil_mapeamento.responsavel_execucao /
+  // .regime_tributario, sempre sobrescrevendo — Configurações é a fonte da
+  // verdade para os dois campos. Se alguém editar esses 2 campos direto no
+  // Mapeamento Estratégico, a próxima sincronização (responsável mudar aqui,
+  // ou esta tela recarregar) sobrescreve de novo — comportamento esperado,
+  // não um bug.
+
+  function normalizarRegimeTributario(textoLivre) {
+    const v = String(textoLivre ?? '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase();
+    if (!v) return null;
+    if (v.includes('simples')) return 'simples_nacional';
+    if (v.includes('presumido')) return 'lucro_presumido';
+    if (v.includes('real')) return 'lucro_real';
+    // Nesta base, MEI costuma estar cadastrado em rh_empresas como "Microempresa".
+    if (v.includes('mei') || v.includes('microempresa')) return 'mei';
+    return null;
+  }
+
+  async function syncMapeamentoEmpresa(codigoEmpresa) {
+    const empresa = empresas.find((e) => e.codigo_empresa === codigoEmpresa);
+    const payload = { codigo_empresa: codigoEmpresa, responsavel_execucao: nomesResponsaveisTexto(codigoEmpresa) };
+    const regime = normalizarRegimeTributario(empresa?.regime_enquadramento);
+    if (regime) payload.regime_tributario = regime;
+    const { error } = await supabaseClient
+      .from('contabil_mapeamento')
+      .upsert(payload, { onConflict: 'codigo_empresa' });
+    if (error) console.error('Erro ao sincronizar Mapeamento Estratégico:', error);
+  }
+
+  async function sincronizarMapeamentoTodasEmpresas() {
+    const comRegime = [];
+    const semRegime = [];
+    empresas.forEach((e) => {
+      const regime = normalizarRegimeTributario(e.regime_enquadramento);
+      const responsavel_execucao = nomesResponsaveisTexto(e.codigo_empresa);
+      if (regime) comRegime.push({ codigo_empresa: e.codigo_empresa, regime_tributario: regime, responsavel_execucao });
+      else semRegime.push({ codigo_empresa: e.codigo_empresa, responsavel_execucao });
+    });
+
+    if (comRegime.length) {
+      const { error } = await supabaseClient.from('contabil_mapeamento').upsert(comRegime, { onConflict: 'codigo_empresa' });
+      if (error) console.error('Erro ao sincronizar regime tributário no Mapeamento Estratégico:', error);
+    }
+    if (semRegime.length) {
+      const { error } = await supabaseClient.from('contabil_mapeamento').upsert(semRegime, { onConflict: 'codigo_empresa' });
+      if (error) console.error('Erro ao sincronizar responsável de execução no Mapeamento Estratégico:', error);
+    }
+  }
+
   // ─── PERSISTÊNCIA ───────────────────────────────────────────
 
   async function salvarLote(registros) {
@@ -112,6 +170,7 @@
       if (error) return { error };
       responsaveisPorEmpresa[codigoEmpresa]?.delete(usuarioId);
     }
+    syncMapeamentoEmpresa(codigoEmpresa);
     return { error: null };
   }
 
@@ -422,6 +481,7 @@
       if (marcar) responsaveisPorEmpresa[codigo].add(usuarioId);
       else responsaveisPorEmpresa[codigo].delete(usuarioId);
     });
+    codigos.forEach((codigo) => syncMapeamentoEmpresa(codigo));
     paraSalvar.forEach((chk) => { chk.checked = marcar; });
     renderTabela();
   }
