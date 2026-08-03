@@ -48,5 +48,6 @@
     module.exports = api;
   } else {
     root.calcularNivelSugerido = calcularNivelSugerido;
+    root.parseDataLocal = parseDataLocal;
   }
 })(typeof window !== 'undefined' ? window : globalThis);
