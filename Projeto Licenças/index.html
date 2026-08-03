@@ -1723,7 +1723,7 @@ async function loadDashboardTable() {
           row.innerHTML = `
             <td>${processo.numero_processo}</td>
             <td>${processo.estabelecimento || '-'}</td>
-            <td>${processo.tipo_documento || '-'}</td>
+            <td>${processo.tipo_documento === 'licencas' ? 'Licença' : processo.tipo_documento === 'alvaras' ? 'Alvará' : (processo.tipo_documento || '-')}</td>
             <td><span class="status ${statusBadge}"><span class="dot"></span>${statusTexto}</span></td>
             <td>${formatDate(processo.data_abertura)}</td>
             <td>${formatDate(processo.data_prevista_conclusao)}</td>
@@ -2802,6 +2802,18 @@ function exportReports(format) {
     // CRUD - PROCESSOS
     // ============================================
 
+    let _processoDocsById = {};
+
+    function situacaoDocumento(doc) {
+      if (doc.tipo_operacao === 'emissao') return 'Em emissão';
+      if (!doc.data_validade) return 'Sem validade';
+      const hoje = new Date();
+      const validade = new Date(doc.data_validade);
+      if (validade < hoje) return 'Vencida';
+      if (validade <= new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000)) return 'Próximo vencimento';
+      return 'Ativa';
+    }
+
     async function openNewProcesso() {
       const modal = document.getElementById('recordModal');
       const modalTitle = document.getElementById('modalTitle');
@@ -2818,29 +2830,17 @@ function exportReports(format) {
       try {
         const { data: licencas } = await supabaseClient
           .from('licencas')
-          .select('id, numero, tipo, estabelecimento')
+          .select('id, numero, tipo, estabelecimento, empresa_id, data_validade, tipo_operacao')
           .order('estabelecimento', { ascending: true });
 
         const { data: alvaras } = await supabaseClient
           .from('alvaras')
-          .select('id, numero, tipo, estabelecimento')
+          .select('id, numero, tipo, estabelecimento, empresa_id, data_validade, tipo_operacao')
           .order('estabelecimento', { ascending: true });
 
         const allDocs = [
-          ...(licencas || []).map(d => ({
-            id: d.id,
-            numero: d.numero,
-            tipo: d.tipo,
-            estabelecimento: d.estabelecimento,
-            tipo_tabela: 'licencas'
-          })),
-          ...(alvaras || []).map(d => ({
-            id: d.id,
-            numero: d.numero,
-            tipo: d.tipo,
-            estabelecimento: d.estabelecimento,
-            tipo_tabela: 'alvaras'
-          }))
+          ...(licencas || []).map(d => ({ ...d, tipo_tabela: 'licencas' })),
+          ...(alvaras || []).map(d => ({ ...d, tipo_tabela: 'alvaras' }))
         ];
 
         if (allDocs.length === 0) {
@@ -2854,11 +2854,24 @@ function exportReports(format) {
           return;
         }
 
-        const optionsDocHtml = allDocs.map(doc =>
-          `<option value="${doc.id}|${doc.tipo_tabela}|${doc.tipo}|${doc.estabelecimento}">
-            ${doc.estabelecimento} - ${doc.tipo} (${doc.numero})
-          </option>`
-        ).join('');
+        // Resolve nomes de empresa (rh_empresas) em lote para o rótulo do dropdown
+        const empresaIds = [...new Set(allDocs.map(d => d.empresa_id).filter(Boolean))];
+        let empresaNomes = {};
+        if (empresaIds.length) {
+          try {
+            const { data: emps } = await supabaseClient.from('rh_empresas').select('id, nome_empresa').in('id', empresaIds);
+            (emps || []).forEach(e => { empresaNomes[e.id] = e.nome_empresa; });
+          } catch (_) {}
+        }
+
+        _processoDocsById = {};
+        allDocs.forEach(doc => { _processoDocsById[doc.id] = doc; });
+
+        const optionsDocHtml = allDocs.map(doc => {
+          const empresaLabel = doc.empresa_id ? (empresaNomes[doc.empresa_id] || 'Empresa') : 'Sem empresa';
+          const label = `${empresaLabel}_${doc.estabelecimento}_${doc.tipo} (${situacaoDocumento(doc)})`;
+          return `<option value="${doc.id}|${doc.tipo_tabela}">${label}</option>`;
+        }).join('');
 
         modalBody.innerHTML = `
           <form onsubmit="saveProcesso(event)">
@@ -2941,8 +2954,8 @@ function exportReports(format) {
         return;
       }
 
-      const [documentoId, tipoTabela, tipoDocumento] = documentoVinculado.split('|');
-      tipoDocumentoInput.value = tipoDocumento;
+      const [, tipoTabela] = documentoVinculado.split('|');
+      tipoDocumentoInput.value = tipoTabela === 'licencas' ? 'Licença' : 'Alvará';
     }
 
     async function saveProcesso(event) {
@@ -2979,9 +2992,12 @@ function exportReports(format) {
         return;
       }
 
+      const docSelecionado = _processoDocsById[documentoId] || {};
+
       const data = {
         documento_id: documentoId,
-        tipo_documento: document.getElementById('tipoDocumento').value,
+        tipo_documento: tipoTabela,
+        estabelecimento: docSelecionado.estabelecimento || null,
         numero_processo: numeroProcesso,
         status: document.getElementById('statusProcesso').value,
         data_abertura: dataAbertura,
@@ -3320,7 +3336,7 @@ function exportReports(format) {
         modalBody.innerHTML = `
           <div style="padding:10px;">
             <p><strong>Número:</strong> ${data.numero_processo}</p>
-            <p><strong>Tipo de Documento:</strong> ${data.tipo_documento}</p>
+            <p><strong>Tipo de Documento:</strong> ${data.tipo_documento === 'licencas' ? 'Licença' : data.tipo_documento === 'alvaras' ? 'Alvará' : (data.tipo_documento || '-')}</p>
             <p><strong>Status:</strong> ${data.status}</p>
             <p><strong>Data de Abertura:</strong> ${formatDate(data.data_abertura)}</p>
             <p><strong>Previsão de Conclusão:</strong> ${formatDate(data.data_prevista_conclusao)}</p>
