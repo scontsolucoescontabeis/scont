@@ -13,6 +13,8 @@
   <script src="../portal-auth-guard.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
   <style>
     :root{
       --bg:#F0F2F5;
@@ -2243,11 +2245,121 @@ function refreshReports() {
   loadReports();
 }
 
+const REPORT_SECTIONS = [
+  { id: 'tableSaude', title: 'Saúde Documental', headers: ['Status', 'Quantidade', 'Percentual'] },
+  { id: 'tableVencimentosConfiguravel', title: 'Vencimentos Próximos', headers: ['Estabelecimento', 'Tipo', 'Número', 'Data Vencimento', 'Dias Restantes', 'Status'] },
+  { id: 'tableTipo', title: 'Distribuição por Tipo', headers: ['Tipo', 'Total', 'Ativas', 'Vencidas'] },
+  { id: 'tableClientesVencidos', title: 'Clientes com Documentos Vencidos', headers: ['Cliente', 'Documentos Vencidos', 'Prioridade'] },
+  { id: 'tableConformidade', title: 'Conformidade por Órgão Emissor', headers: ['Órgão Emissor', 'Total', 'Conformes', 'Taxa Conformidade'] },
+  { id: 'tableProcessos', title: 'Relatório de Processos', headers: ['Status', 'Quantidade', 'Percentual'] }
+];
+
+// Lê as tabelas já renderizadas na tela (não refaz consultas) e descarta
+// linhas de placeholder ("Carregando...", "Nenhum...") e colunas de ação
+// (botões), mantendo só o texto das colunas de dado de cada seção.
+function getReportSectionsData() {
+  return REPORT_SECTIONS.map(section => {
+    const tbody = document.getElementById(section.id);
+    const rows = tbody ? Array.from(tbody.querySelectorAll('tr')) : [];
+    const data = rows
+      .map(tr => Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim()))
+      .filter(cells => cells.length >= section.headers.length)
+      .map(cells => cells.slice(0, section.headers.length));
+    return { ...section, rows: data };
+  });
+}
+
+function csvEscapeField(value) {
+  const str = String(value ?? '');
+  return /[",\r\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+}
+
+function buildReportsCsv(sections) {
+  const lines = [];
+  sections.forEach(section => {
+    lines.push(`## ${section.title}`);
+    lines.push(section.headers.map(csvEscapeField).join(','));
+    if (section.rows.length === 0) {
+      lines.push('(sem dados)');
+    } else {
+      section.rows.forEach(row => lines.push(row.map(csvEscapeField).join(',')));
+    }
+    lines.push('');
+  });
+  return lines.join('\r\n');
+}
+
+function exportReportsCsv(sections) {
+  const csv = '﻿' + buildReportsCsv(sections);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `relatorios-licencas-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportReportsPdf(sections) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  const MARGEM = 10;
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+
+  function drawBanner() {
+    doc.setFillColor(139, 58, 58);
+    doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, 16, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+    doc.text('Relatórios Gerenciais — Licenças e Alvarás', MARGEM + 4, MARGEM + 10);
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+    doc.text('Gerado em ' + new Date().toLocaleDateString('pt-BR'), pageW - MARGEM - 4, MARGEM + 10, { align: 'right' });
+  }
+
+  drawBanner();
+  let cursorY = MARGEM + 24;
+
+  sections.forEach(section => {
+    if (cursorY > pageH - 40) {
+      doc.addPage();
+      drawBanner();
+      cursorY = MARGEM + 24;
+    }
+
+    doc.setTextColor(44, 62, 80);
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+    doc.text(section.title, MARGEM, cursorY);
+    cursorY += 4;
+
+    if (section.rows.length === 0) {
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+      doc.text('Sem dados.', MARGEM, cursorY + 4);
+      cursorY += 14;
+      return;
+    }
+
+    doc.autoTable({
+      head: [section.headers],
+      body: section.rows,
+      startY: cursorY,
+      margin: { left: MARGEM, right: MARGEM },
+      styles: { fontSize: 8, cellPadding: 1.6, textColor: [44, 62, 80] },
+      headStyles: { fillColor: [139, 58, 58], textColor: 255 },
+      theme: 'striped',
+    });
+    cursorY = doc.lastAutoTable.finalY + 10;
+  });
+
+  doc.save(`relatorios-licencas-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
 function exportReports(format) {
+  const sections = getReportSectionsData();
   if (format === 'pdf') {
-    showAlert('Exportação em PDF será implementada com biblioteca jsPDF', 'info');
+    exportReportsPdf(sections);
   } else if (format === 'csv') {
-    showAlert('Exportação em CSV será implementada', 'info');
+    exportReportsCsv(sections);
   }
 }
 
