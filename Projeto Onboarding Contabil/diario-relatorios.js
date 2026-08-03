@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const STATUS_GRADE_LABELS = { sem_documentacao: 'Sem Documentação', pendencias: 'Pendências', concluido: 'Concluído' };
+  const STATUS_GRADE_LABELS = { nao_iniciado: 'Não Iniciado', em_andamento: 'Em Andamento', pendencia: 'Pendência', concluido: 'Concluído' };
 
   const COLUNAS = [
     { key: 'empresa', grupo: 'fixa', label: 'Empresa', padrao: true, fixa: true },
@@ -148,7 +148,7 @@
 
       if (filtros.statusGrade) {
         const bucket = ctx.statusMensalPorEmpresa[e.codigo_empresa];
-        const statusMes = (bucket && bucket[`${filtros.gradeAno}-${filtros.gradeMes}`]) || 'sem_documentacao';
+        const statusMes = (bucket && bucket[`${filtros.gradeAno}-${filtros.gradeMes}`]) || 'nao_iniciado';
         if (statusMes !== filtros.statusGrade) return false;
       }
 
@@ -275,7 +275,7 @@
           case 'particularidadesSocietarias': return m && m.particularidades_societarias ? m.particularidades_societarias : '—';
           case 'statusGrade': {
             const bucket = ctx.statusMensalPorEmpresa[codigo];
-            const status = (bucket && bucket[`${filtros.gradeAno}-${filtros.gradeMes}`]) || 'sem_documentacao';
+            const status = (bucket && bucket[`${filtros.gradeAno}-${filtros.gradeMes}`]) || 'nao_iniciado';
             return STATUS_GRADE_LABELS[status];
           }
           case 'qtdLancamentos': return lanc ? String(lanc.qtd) : '0';

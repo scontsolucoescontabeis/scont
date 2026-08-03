@@ -14,6 +14,7 @@
   let pendenciasPorMapeamento = {};
   let bancosPorMapeamento = {};
   let statusMensalPorEmpresa = {}; // { codigo_empresa: { 'ano-mes': status } }
+  let motivoPendenciaPorEmpresa = {}; // { codigo_empresa: { 'ano-mes': motivo|null } }
   let empresaAtualCodigo = null;
   let anoGradeAtual = new Date().getFullYear();
 
@@ -154,9 +155,12 @@
       .select('*');
     if (errStatus) console.error(errStatus);
     statusMensalPorEmpresa = {};
+    motivoPendenciaPorEmpresa = {};
     (statusMensal || []).forEach((s) => {
       const bucket = (statusMensalPorEmpresa[s.codigo_empresa] = statusMensalPorEmpresa[s.codigo_empresa] || {});
       bucket[`${s.ano}-${s.mes}`] = s.status;
+      const motivoBucket = (motivoPendenciaPorEmpresa[s.codigo_empresa] = motivoPendenciaPorEmpresa[s.codigo_empresa] || {});
+      motivoBucket[`${s.ano}-${s.mes}`] = s.motivo_pendencia || null;
     });
 
     window.__diarioContext = {
@@ -177,6 +181,7 @@
       selecionarEmpresaDiario,
       atualizarBadgeValidacoes,
       mostrarToast,
+      buscarEventosStatusGrade,
     };
   }
 
@@ -361,7 +366,12 @@
 
   function statusDoMes(codigoEmpresa, ano, mes) {
     const bucket = statusMensalPorEmpresa[codigoEmpresa];
-    return (bucket && bucket[`${ano}-${mes}`]) || 'sem_documentacao';
+    return (bucket && bucket[`${ano}-${mes}`]) || 'nao_iniciado';
+  }
+
+  function motivoPendenciaDoMes(codigoEmpresa, ano, mes) {
+    const bucket = motivoPendenciaPorEmpresa[codigoEmpresa];
+    return (bucket && bucket[`${ano}-${mes}`]) || null;
   }
 
   function escapeHtml(str) {
@@ -526,49 +536,141 @@
 
   // ─── AUDITORIA ──────────────────────────────────────────────
 
-  const STATUS_GRADE_LABELS = { sem_documentacao: 'Sem Documentação', pendencias: 'Pendências', concluido: 'Concluído' };
+  const STATUS_GRADE_LABELS = { nao_iniciado: 'Não Iniciado', em_andamento: 'Em Andamento', pendencia: 'Pendência', concluido: 'Concluído' };
 
-  async function registrarAuditoria(codigoEmpresa, campo, valorAnterior, valorNovo) {
+  async function registrarAuditoria(codigoEmpresa, campo, valorAnterior, valorNovo, observacao) {
     const auth = window.__contabilAuth || {};
     const { error } = await supabaseClient.from('contabil_diario_auditoria').insert({
       codigo_empresa: codigoEmpresa,
       campo,
       valor_anterior: valorAnterior,
       valor_novo: valorNovo,
+      observacao: observacao || null,
       usuario_nome: auth.userData?.nome || null,
       usuario_email: auth.email || null,
     });
     if (error) console.error(error);
   }
 
+  async function buscarEventosStatusGrade(codigoEmpresa, ano, mes) {
+    const campo = `Status Mensal — ${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+    const { data, error } = await supabaseClient
+      .from('contabil_diario_auditoria')
+      .select('valor_novo, created_at')
+      .eq('codigo_empresa', codigoEmpresa)
+      .eq('campo', campo)
+      .order('created_at', { ascending: true });
+    if (error) { console.error(error); return []; }
+    return data || [];
+  }
+
   // ─── GRADE MENSAL ───────────────────────────────────────────
+  // Máquina de estados: (sem linha) -> em_andamento -> pendencia <->
+  // em_andamento -> concluido. "pendencia" exige uma observação
+  // obrigatória (o motivo). Cada transição vai para contabil_diario_
+  // auditoria com created_at, o que permite calcular depois os tempos
+  // do fechamento (ver calcularTemposFechamento em contabil-diario-util.js).
 
-  async function alternarStatusMes(codigoEmpresa, ano, mes) {
-    if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return; // mês travado
+  async function transicionarStatusMes(codigoEmpresa, ano, mes, statusAtual, statusNovo, motivo) {
+    const { error } = await supabaseClient
+      .from('contabil_diario_status_mensal')
+      .upsert({ codigo_empresa: codigoEmpresa, ano, mes, status: statusNovo, motivo_pendencia: motivo || null, updated_at: new Date().toISOString() }, { onConflict: 'codigo_empresa,ano,mes' });
+    if (error) { console.error(error); mostrarToast('Erro ao atualizar o status do mês.', 'erro'); return; }
 
-    const atual = statusDoMes(codigoEmpresa, ano, mes);
-    const proximo = window.ContabilDiarioUtil.proximoStatus(atual);
     const bucket = (statusMensalPorEmpresa[codigoEmpresa] = statusMensalPorEmpresa[codigoEmpresa] || {});
-
-    if (proximo === 'sem_documentacao') {
-      const { error } = await supabaseClient
-        .from('contabil_diario_status_mensal')
-        .delete()
-        .eq('codigo_empresa', codigoEmpresa).eq('ano', ano).eq('mes', mes);
-      if (error) { console.error(error); return; }
-      delete bucket[`${ano}-${mes}`];
-    } else {
-      const { error } = await supabaseClient
-        .from('contabil_diario_status_mensal')
-        .upsert({ codigo_empresa: codigoEmpresa, ano, mes, status: proximo, updated_at: new Date().toISOString() }, { onConflict: 'codigo_empresa,ano,mes' });
-      if (error) { console.error(error); return; }
-      bucket[`${ano}-${mes}`] = proximo;
-    }
+    bucket[`${ano}-${mes}`] = statusNovo;
+    const motivoBucket = (motivoPendenciaPorEmpresa[codigoEmpresa] = motivoPendenciaPorEmpresa[codigoEmpresa] || {});
+    motivoBucket[`${ano}-${mes}`] = motivo || null;
 
     const campo = `Status Mensal — ${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
-    registrarAuditoria(codigoEmpresa, campo, STATUS_GRADE_LABELS[atual] || 'Sem Documentação', STATUS_GRADE_LABELS[proximo] || 'Sem Documentação');
+    await registrarAuditoria(codigoEmpresa, campo, STATUS_GRADE_LABELS[statusAtual], STATUS_GRADE_LABELS[statusNovo], motivo);
 
     renderGradeMensal();
+  }
+
+  async function iniciarMes(codigoEmpresa, ano, mes) {
+    if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
+    await transicionarStatusMes(codigoEmpresa, ano, mes, 'nao_iniciado', 'em_andamento', null);
+  }
+
+  async function marcarPendencia(codigoEmpresa, ano, mes, motivo) {
+    if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
+    await transicionarStatusMes(codigoEmpresa, ano, mes, 'em_andamento', 'pendencia', motivo);
+  }
+
+  async function resolverPendencia(codigoEmpresa, ano, mes) {
+    if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
+    await transicionarStatusMes(codigoEmpresa, ano, mes, 'pendencia', 'em_andamento', null);
+  }
+
+  async function marcarConcluido(codigoEmpresa, ano, mes) {
+    if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
+    await transicionarStatusMes(codigoEmpresa, ano, mes, 'em_andamento', 'concluido', null);
+  }
+
+  async function reabrirMes(codigoEmpresa, ano, mes) {
+    if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
+    if (!window.confirm('Reabrir este mês? Ele volta para "Em Andamento".')) return;
+    await transicionarStatusMes(codigoEmpresa, ano, mes, 'concluido', 'em_andamento', null);
+  }
+
+  // ─── POPOVER: escolha Pendência/Concluído a partir do amarelo ──
+
+  function fecharPopoverGrade() {
+    const pop = document.getElementById('popoverGrade');
+    if (pop) pop.remove();
+    document.removeEventListener('click', fecharPopoverGradeAoClicarFora);
+    window.removeEventListener('scroll', fecharPopoverGrade, true);
+  }
+
+  function fecharPopoverGradeAoClicarFora(ev) {
+    const pop = document.getElementById('popoverGrade');
+    if (pop && !pop.contains(ev.target)) fecharPopoverGrade();
+  }
+
+  function abrirFormPendenciaNoPopover(pop, codigoEmpresa, ano, mes) {
+    pop.innerHTML = `
+      <label>Motivo da pendência (obrigatório)</label>
+      <textarea id="popMotivoPendencia" rows="2" placeholder="Ex: falta disponibilização de documentação..."></textarea>
+      <button type="button" class="btn btn-primary" id="popBtnConfirmarPendencia">Confirmar</button>
+    `;
+    pop.addEventListener('click', (ev) => ev.stopPropagation());
+    pop.querySelector('#popBtnConfirmarPendencia').addEventListener('click', () => {
+      const motivo = pop.querySelector('#popMotivoPendencia').value.trim();
+      if (!motivo) { mostrarToast('Informe o motivo da pendência.', 'erro'); return; }
+      fecharPopoverGrade();
+      marcarPendencia(codigoEmpresa, ano, mes, motivo);
+    });
+  }
+
+  function abrirPopoverGrade(cel, codigoEmpresa, ano, mes) {
+    fecharPopoverGrade();
+    const pop = document.createElement('div');
+    pop.id = 'popoverGrade';
+    pop.className = 'popover-grade';
+    pop.innerHTML = `
+      <button type="button" class="btn btn-secondary" id="popBtnPendencia">🔴 Marcar Pendência</button>
+      <button type="button" class="btn btn-primary" id="popBtnConcluido">🟢 Marcar Concluído</button>
+    `;
+    pop.addEventListener('click', (ev) => ev.stopPropagation());
+    document.body.appendChild(pop);
+
+    const rect = cel.getBoundingClientRect();
+    pop.style.top = `${rect.bottom + 6}px`;
+    pop.style.left = `${Math.min(Math.max(rect.left + rect.width / 2 - 100, 8), window.innerWidth - 208)}px`;
+
+    pop.querySelector('#popBtnConcluido').addEventListener('click', () => {
+      fecharPopoverGrade();
+      marcarConcluido(codigoEmpresa, ano, mes);
+    });
+    pop.querySelector('#popBtnPendencia').addEventListener('click', () => {
+      abrirFormPendenciaNoPopover(pop, codigoEmpresa, ano, mes);
+    });
+
+    setTimeout(() => {
+      document.addEventListener('click', fecharPopoverGradeAoClicarFora);
+      window.addEventListener('scroll', fecharPopoverGrade, true);
+    }, 0);
   }
 
   const ICONE_FECHAMENTO = {
@@ -591,8 +693,10 @@
       const status = statusDoMes(empresaAtualCodigo, anoGradeAtual, mes);
       const statusFech = statusFechamentoDoMes(empresaAtualCodigo, anoGradeAtual, mes);
       const travada = statusFech === 'aprovado';
+      const motivo = motivoPendenciaDoMes(empresaAtualCodigo, anoGradeAtual, mes);
+      const titulo = `${label}/${anoGradeAtual} — ${STATUS_GRADE_LABELS[status]}${travada ? ' (fechamento aprovado — travado)' : ''}${motivo ? ` — ${motivo}` : ''}`;
       return `
-        <div class="mapa-grade-cel status-${status}${travada ? ' grade-travada' : ''}" data-mes="${mes}" title="${label}/${anoGradeAtual}${travada ? ' — fechamento aprovado (travado)' : ''}">
+        <div class="mapa-grade-cel status-${status}${travada ? ' grade-travada' : ''}" data-mes="${mes}" title="${escapeHtml(titulo)}">
           <span class="mapa-grade-mes">${label}</span>
           ${status === 'concluido' ? iconeFechamentoHtml(mes, statusFech) : ''}
         </div>
@@ -616,7 +720,15 @@
     el.querySelector('#btnAnoAnterior').addEventListener('click', () => { anoGradeAtual -= 1; renderGradeMensal(); });
     el.querySelector('#btnAnoSeguinte').addEventListener('click', () => { anoGradeAtual += 1; renderGradeMensal(); });
     el.querySelectorAll('.mapa-grade-cel').forEach((cel) => {
-      cel.addEventListener('click', () => alternarStatusMes(empresaAtualCodigo, anoGradeAtual, Number(cel.getAttribute('data-mes'))));
+      cel.addEventListener('click', () => {
+        const mes = Number(cel.getAttribute('data-mes'));
+        if (statusFechamentoDoMes(empresaAtualCodigo, anoGradeAtual, mes) === 'aprovado') return;
+        const status = statusDoMes(empresaAtualCodigo, anoGradeAtual, mes);
+        if (status === 'nao_iniciado') { iniciarMes(empresaAtualCodigo, anoGradeAtual, mes); return; }
+        if (status === 'em_andamento') { abrirPopoverGrade(cel, empresaAtualCodigo, anoGradeAtual, mes); return; }
+        if (status === 'pendencia') { resolverPendencia(empresaAtualCodigo, anoGradeAtual, mes); return; }
+        if (status === 'concluido') { reabrirMes(empresaAtualCodigo, anoGradeAtual, mes); return; }
+      });
     });
     el.querySelectorAll('.btn-icone-fechamento').forEach((btn) => {
       btn.addEventListener('click', (ev) => {
@@ -680,7 +792,20 @@
     modal.classList.add('active');
   }
 
-  function renderModalFechamentoBody(codigoEmpresa, ano, mes) {
+  function temposFechamentoHtml(tempos) {
+    if (!tempos) return '';
+    const fmt = window.ContabilDiarioUtil.formatarDuracaoHumana;
+    return `
+      <div class="mapa-secao-header" style="margin:0 -20px 12px;padding-left:20px;">Tempos do Fechamento</div>
+      <div class="mapa-secao-body" style="padding:0 0 16px;">
+        <div><label>Tempo total</label><span>${fmt(tempos.totalMs)}</span></div>
+        <div><label>Tempo em pendência</label><span>${fmt(tempos.pendenciaMs)}</span></div>
+        <div><label>Tempo efetivamente trabalhado</label><span>${fmt(tempos.efetivoMs)}</span></div>
+      </div>
+    `;
+  }
+
+  async function renderModalFechamentoBody(codigoEmpresa, ano, mes) {
     const body = document.getElementById('modalFechamentoBody');
     const statusFech = statusFechamentoDoMes(codigoEmpresa, ano, mes);
     const ultimo = eventosFechamentoDoMes(codigoEmpresa, ano, mes)[0];
@@ -709,8 +834,12 @@
       acaoHtml = '<p class="mapa-empty status-aprovado">Fechamento aprovado — mês travado.</p>';
     }
 
+    const eventosGrade = await buscarEventosStatusGrade(codigoEmpresa, ano, mes);
+    const tempos = window.ContabilDiarioUtil.calcularTemposFechamento(eventosGrade);
+
     body.innerHTML = `
       ${acaoHtml}
+      ${temposFechamentoHtml(tempos)}
       <div class="mapa-secao-header" style="margin:0 -20px 12px;padding-left:20px;">Linha do Tempo</div>
       <div id="fechTimeline">${timelineFechamentoHtml(codigoEmpresa, ano, mes)}</div>
     `;

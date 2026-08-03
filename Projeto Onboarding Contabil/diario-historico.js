@@ -40,7 +40,7 @@
       .limit(LIMITE);
     let queryAuditoria = ctx.supabaseClient
       .from('contabil_diario_auditoria')
-      .select('codigo_empresa, campo, valor_anterior, valor_novo, usuario_nome, usuario_email, created_at')
+      .select('codigo_empresa, campo, valor_anterior, valor_novo, observacao, usuario_nome, usuario_email, created_at')
       .order('created_at', { ascending: false })
       .limit(LIMITE);
 
@@ -64,7 +64,7 @@
         usuario: a.usuario_nome || a.usuario_email || 'desconhecido',
         created_at: a.created_at,
         campo: a.campo,
-        detalhe: `${a.valor_anterior || '—'} → ${a.valor_novo || '—'}`,
+        detalhe: `${a.valor_anterior || '—'} → ${a.valor_novo || '—'}${a.observacao ? ` (motivo: ${a.observacao})` : ''}`,
       })),
     ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 

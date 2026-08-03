@@ -74,7 +74,7 @@
     }
   }
 
-  function renderPendentesValidador(el, ctx, pendentes) {
+  async function renderPendentesValidador(el, ctx, pendentes) {
     if (!pendentes.length) {
       el.innerHTML = `
         <div class="mapa-secao">
@@ -85,16 +85,23 @@
       return;
     }
 
-    const linhasHtml = pendentes.map((t) => {
+    const temposPorTripla = await Promise.all(pendentes.map((t) =>
+      ctx.buscarEventosStatusGrade(t.codigo_empresa, t.ano, t.mes).then((eventos) => window.ContabilDiarioUtil.calcularTemposFechamento(eventos))
+    ));
+
+    const linhasHtml = pendentes.map((t, idx) => {
       const chave = `${t.codigo_empresa}|${t.ano}|${t.mes}`;
       const evento = ctx.eventosFechamentoDoMes(t.codigo_empresa, t.ano, t.mes)[0];
       const rejeicaoAberta = _chaveRejeicaoAberta === chave;
+      const tempos = temposPorTripla[idx];
+      const tempoTotal = tempos ? window.ContabilDiarioUtil.formatarDuracaoHumana(tempos.totalMs) : '—';
       return `
         <tr data-chave="${chave}">
           <td>${ctx.escapeHtml(nomeEmpresa(ctx, t.codigo_empresa))}</td>
           <td>${mesAno(t.ano, t.mes)}</td>
           <td>${ctx.escapeHtml(evento.usuario_nome || evento.usuario_email || '—')}</td>
           <td>${formatarDataHora(evento.created_at)}</td>
+          <td>${tempoTotal}</td>
           <td>
             <button type="button" class="btn btn-primary btn-aprovar-validacao" data-codigo="${ctx.escapeHtml(t.codigo_empresa)}" data-ano="${t.ano}" data-mes="${t.mes}">Aprovar</button>
             <button type="button" class="btn btn-secondary btn-toggle-rejeicao" data-chave="${chave}">${rejeicaoAberta ? 'Cancelar' : 'Rejeitar'}</button>
@@ -102,7 +109,7 @@
         </tr>
         ${rejeicaoAberta ? `
         <tr class="linha-rejeicao" data-chave-rejeicao="${chave}">
-          <td colspan="5">
+          <td colspan="6">
             <label>Motivo da rejeição (obrigatório)</label>
             <textarea class="txt-motivo-rejeicao" rows="2" placeholder="Explique o que precisa ser corrigido..."></textarea>
             <button type="button" class="btn btn-secondary btn-confirmar-rejeicao" data-codigo="${ctx.escapeHtml(t.codigo_empresa)}" data-ano="${t.ano}" data-mes="${t.mes}">Confirmar rejeição</button>
@@ -116,7 +123,7 @@
         <div class="mapa-secao-header">Pendentes para você (${pendentes.length})</div>
         <div class="mapa-secao-body">
           <table class="mapa-table full">
-            <thead><tr><th>Empresa</th><th>Mês/Ano</th><th>Enviado por</th><th>Enviado em</th><th>Ação</th></tr></thead>
+            <thead><tr><th>Empresa</th><th>Mês/Ano</th><th>Enviado por</th><th>Enviado em</th><th>Tempo total</th><th>Ação</th></tr></thead>
             <tbody>${linhasHtml}</tbody>
           </table>
         </div>
