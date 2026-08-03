@@ -848,7 +848,6 @@
       <button class="active" onclick="showSection('dashboard')">📊 Dashboard</button>
       <button onclick="showSection('documentos')">📄 Licenças</button>
       <button onclick="showSection('processos')">📋 Processos</button>
-      <button onclick="showSection('clientes')">👥 Clientes</button>
       <button onclick="showSection('relatorios')">📈 Relatórios</button>
       <button onclick="showSection('config')">⚙️ Configurações</button>
     </nav>
@@ -889,8 +888,8 @@
           <div class="trend">Atenção crítica</div>
         </div>
         <div class="card kpi">
-          <small>Clientes cadastrados</small>
-          <strong id="kpiClientes">0</strong>
+          <small>Empresas ativas</small>
+          <strong id="kpiEmpresasAtivas">0</strong>
           <div class="trend">Gestão centralizada</div>
         </div>
       </section>
@@ -1060,43 +1059,6 @@
             </thead>
             <tbody id="andamentoTable">
               <tr><td colspan="5" style="text-align:center;color:var(--muted);">Carregando histórico...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-
-    <!-- CLIENTES -->
-    <div id="clientes" class="section-view hidden">
-      <section class="card panel">
-        <div class="panel-header">
-          <div>
-            <h3>Cadastro de clientes e estabelecimentos</h3>
-            <p>Lista consolidada com informações de contato, unidades vinculadas e situação documental.</p>
-          </div>
-          <div class="top-actions">
-            <button class="btn btn-secondary" id="refreshClientes">Atualizar dados</button>
-            <button class="btn btn-soft" id="importClientesBtn">📥 Importar Excel</button>
-            <input type="file" id="importClientesFile" accept=".xlsx,.xls" style="display:none">
-            <button class="btn btn-soft" id="modeloClientesBtn" title="Baixar modelo de planilha">📄 Modelo</button>
-            <button class="btn btn-primary" id="newCliente">Novo cliente</button>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Cliente / Empresa</th>
-                <th>CNPJ / CPF</th>
-                <th>Contato</th>
-                <th>Email</th>
-                <th>Telefone</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="clientesTable">
-              <tr><td colspan="7" style="text-align:center;color:var(--muted);">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1356,6 +1318,22 @@
           ℹ️ As configurações são salvas localmente no seu navegador. Os alertas visuais no dashboard respeitarão o número de dias configurado.
         </div>
       </section>
+
+      <section class="card panel">
+        <div class="panel-header">
+          <div>
+            <h3>Tipos de Licença</h3>
+            <p>Catálogo usado no campo "Tipo de Licença" ao cadastrar uma licença. Compartilhado entre todos os usuários.</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;">
+          <input type="text" id="novoTipoLicencaNome" placeholder="Ex: Corpo de Bombeiros" style="flex:1;">
+          <button class="btn btn-primary" id="addTipoLicencaBtn">+ Adicionar tipo</button>
+        </div>
+        <div id="tiposLicencaList" style="display:flex;flex-wrap:wrap;gap:8px;">
+          <span style="color:var(--muted);">Carregando...</span>
+        </div>
+      </section>
     </div>
   </main>
 </div>
@@ -1368,6 +1346,18 @@
       <button class="modal-close" id="closeModalBtn">&times;</button>
     </div>
     <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- MODAL: SELECIONAR EMPRESA (rh_empresas) -->
+<div id="empresaPickerModal" class="modal">
+  <div class="modal-content" style="max-width:480px;">
+    <div class="modal-header">
+      <h2>Selecionar Empresa</h2>
+      <button class="modal-close" id="closeEmpresaPickerBtn">&times;</button>
+    </div>
+    <input type="text" id="empresaPickerSearch" placeholder="Buscar por nome, código ou CNPJ..." autocomplete="off" style="width:100%;margin-bottom:14px;">
+    <ul id="empresaPickerList" style="list-style:none;margin:0;padding:0;max-height:360px;overflow-y:auto;"></ul>
   </div>
 </div>
 
@@ -1433,8 +1423,9 @@ async function loadDashboard() {
   try {
     const { data: licencas } = await supabaseClient.from('licencas').select('*');
     const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
-    const { data: clientes } = await supabaseClient.from('empresas').select('*');
-    
+    const { data: empresasRh } = await supabaseClient.from('rh_empresas').select('status_situacao');
+    const empresasAtivas = (empresasRh || []).filter(e => !e.status_situacao || String(e.status_situacao).trim().toLowerCase().startsWith('ativ')).length;
+
     const today = new Date();
     const in30Days = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
 
@@ -1449,8 +1440,8 @@ async function loadDashboard() {
     document.getElementById('kpiAtivos').textContent = ativos;
     document.getElementById('kpiVencendo').textContent = vencendo;
     document.getElementById('kpiVencidos').textContent = vencidos;
-    document.getElementById('kpiClientes').textContent = clientes?.length || 0;
-    
+    document.getElementById('kpiEmpresasAtivas').textContent = empresasAtivas;
+
     await loadDashboardTable();
     await loadAlerts();
   } catch (error) {
@@ -1758,88 +1749,6 @@ async function loadDashboardTable() {
       } catch (error) {
         console.error('Erro ao carregar processos:', error);
         showAlert('Erro ao carregar processos', 'error');
-      }
-    }
-
-    // ============================================
-    // CLIENTES (EMPRESAS DO PROJETO B)
-    // ============================================
-
-    async function fetchClientes() {
-      try {
-        console.log('📥 Buscando empresas do Projeto B...');
-
-        const { data: empresas, error } = await supabaseClient
-          .from('empresas')
-          .select('*')
-          .order('nome', { ascending: true });
-
-        if (error) {
-          console.error('❌ Erro ao buscar empresas:', error);
-          throw error;
-        }
-
-        console.log('✓ Empresas recuperadas:', empresas);
-
-        const tbody = document.getElementById('clientesTable');
-        tbody.innerHTML = '';
-
-        if (!empresas || !empresas.length) {
-          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--muted);">Nenhuma empresa cadastrada</td></tr>';
-          return;
-        }
-
-        // Renderizar com campos dinâmicos
-        empresas.forEach(empresa => {
-          const row = document.createElement('tr');
-
-          // Detectar quais campos existem
-          const nome = empresa.nome || empresa.razao_social || empresa.empresa || empresa.company || 'N/A';
-          const cnpj = empresa.cnpj || empresa.cpf || empresa.document || '-';
-          const contato = empresa.contato || empresa.contact || empresa.responsavel || '-';
-          const email = empresa.email || empresa.mail || '-';
-          const telefone = empresa.telefone || empresa.phone || empresa.celular || '-';
-
-          row.innerHTML = `
-            <td>${nome}</td>
-            <td>${cnpj}</td>
-            <td>${contato}</td>
-            <td>${email}</td>
-            <td>${telefone}</td>
-            <td><span class="status active"><span class="dot"></span>Ativo</span></td>
-            <td class="actions">
-              <div class="btn-group">
-                <button class="btn-icon info" data-action="view" data-id="${empresa.id}" data-table="empresas">
-                  <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                </button>
-                <button class="btn-icon primary" data-action="edit" data-id="${empresa.id}" data-table="empresas">
-                  <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                </button>
-                <button class="btn-icon danger" data-action="delete" data-id="${empresa.id}" data-table="empresas">
-                  <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                </button>
-              </div>
-            </td>
-          `;
-          tbody.appendChild(row);
-        });
-
-        attachActionListeners();
-        console.log('✓ Tabela de empresas renderizada com sucesso');
-
-      } catch (error) {
-        console.error('❌ Erro ao buscar empresas:', error);
-        showAlert(`Erro ao carregar empresas: ${error.message}`, 'error');
-
-        const tbody = document.getElementById('clientesTable');
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="7" style="text-align: center; color: var(--danger); padding: 20px;">
-              <strong>❌ Erro ao carregar dados</strong><br>
-              <small>${error.message}</small>
-            </td>
-          </tr>
-        `;
       }
     }
 
@@ -2449,14 +2358,11 @@ function exportReports(format) {
         .subscribe();
       realtimeSubscriptions.push(processosChannel);
 
-      // Listener para Empresas
+      // Listener para Empresas (rh_empresas)
       const empresasChannel = supabaseClient
-        .channel('public:empresas')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'empresas' }, payload => {
+        .channel('public:rh_empresas')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rh_empresas' }, payload => {
           console.log('📡 Empresas atualizadas:', payload);
-          if (document.getElementById('clientesTable').closest('.section-view').classList.contains('active')) {
-            fetchClientes();
-          }
           loadDashboard();
         })
         .subscribe();
@@ -2512,15 +2418,13 @@ function exportReports(format) {
           console.log('📋 Carregando Processos...');
           loadAllAndamentos();
           fetchProcessos();
-        } else if (sectionId === 'clientes') {
-          console.log('👥 Carregando Clientes...');
-          fetchClientes();
         } else if (sectionId === 'relatorios') {
           console.log('📈 Carregando Relatórios...');
           loadReports();
         } else if (sectionId === 'config') {
           console.log('⚙️ Carregando Configurações...');
           loadConfig();
+          carregarTiposLicenca();
         }
       }, 100);
     }
@@ -2561,7 +2465,7 @@ function exportReports(format) {
     }
 
     function filterRows(type, searchTerm) {
-      const tableId = type === 'documento' ? 'documentosTable' : type === 'processo' ? 'processosTable' : 'clientesTable';
+      const tableId = type === 'processo' ? 'processosTable' : 'documentosTable';
       const table = document.getElementById(tableId);
       if (!table) return;
 
@@ -2573,7 +2477,7 @@ function exportReports(format) {
     }
 
     function filterStatus(type, status) {
-      const tableId = type === 'documento' ? 'documentosTable' : 'clientesTable';
+      const tableId = 'documentosTable';
       const table = document.getElementById(tableId);
       if (!table) return;
 
@@ -2618,22 +2522,17 @@ function exportReports(format) {
 
       modalTitle.textContent = 'Nova Licença';
 
-      // Carrega clientes para o autocomplete
-      let clientes = [];
-      try {
-        const { data } = await supabaseClient.from('empresas').select('id, nome').eq('ativo', true).order('nome');
-        clientes = data || [];
-      } catch (_) {}
+      const tiposLicenca = await fetchTiposLicencaAtivos();
 
       modalBody.innerHTML = `
         <form onsubmit="saveDocumento(event)">
           <div class="form-grid">
             <div class="field full">
-              <label>Cliente</label>
-              <div class="autocomplete-wrap">
-                <input type="text" id="clienteNome" placeholder="Buscar cliente (opcional)..." autocomplete="off">
-                <input type="hidden" id="clienteId">
-                <ul class="autocomplete-list" id="clienteDropdown"></ul>
+              <label>Empresa</label>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="empresaNome" placeholder="Nenhuma empresa selecionada (opcional)" readonly style="flex:1;cursor:pointer;" onclick="abrirSeletorEmpresaDocumento()">
+                <input type="hidden" id="empresaId">
+                <button type="button" class="btn btn-soft" onclick="abrirSeletorEmpresaDocumento()">🔍 Buscar empresa</button>
               </div>
             </div>
             <div class="field full">
@@ -2650,7 +2549,7 @@ function exportReports(format) {
             </div>
             <div class="field">
               <label>Tipo de Licença *</label>
-              <input type="text" id="tipo" placeholder="Ex: Licença Sanitária" required>
+              <select id="tipo" required>${tipoLicencaOptionsHtml(tiposLicenca)}</select>
             </div>
             <div class="field" id="campoNumero">
               <label>Número *</label>
@@ -2684,46 +2583,149 @@ function exportReports(format) {
       `;
 
       modal.classList.add('active');
-
-      // Inicializa autocomplete de clientes
-      initClienteAutocomplete(clientes);
     }
 
-    function initClienteAutocomplete(clientes) {
-      const input = document.getElementById('clienteNome');
-      const hiddenId = document.getElementById('clienteId');
-      const dropdown = document.getElementById('clienteDropdown');
-      if (!input) return;
+    // ============================================
+    // SELETOR DE EMPRESA (rh_empresas, via modal)
+    // ============================================
 
-      function renderList(filtrados) {
-        dropdown.innerHTML = '';
-        if (!filtrados.length) { dropdown.classList.remove('open'); return; }
-        filtrados.slice(0, 8).forEach(c => {
-          const li = document.createElement('li');
-          li.className = 'autocomplete-item';
-          li.textContent = c.nome;
-          li.addEventListener('mousedown', e => {
-            e.preventDefault();
-            input.value = c.nome;
-            hiddenId.value = c.id;
-            dropdown.classList.remove('open');
-          });
-          dropdown.appendChild(li);
-        });
-        dropdown.classList.add('open');
+    let _empresaPickerCallback = null;
+    let _empresaPickerData = [];
+
+    async function fetchEmpresasRhAtivas() {
+      try {
+        const { data } = await supabaseClient
+          .from('rh_empresas')
+          .select('id, codigo_empresa, nome_empresa, cnpj, status_situacao')
+          .order('nome_empresa');
+        return (data || []).filter(e => !e.status_situacao || String(e.status_situacao).trim().toLowerCase().startsWith('ativ'));
+      } catch (_) { return []; }
+    }
+
+    function abrirSeletorEmpresaDocumento() {
+      openEmpresaPicker(emp => {
+        document.getElementById('empresaNome').value = emp.nome_empresa;
+        document.getElementById('empresaId').value = emp.id;
+      });
+    }
+
+    async function openEmpresaPicker(onSelect) {
+      _empresaPickerCallback = onSelect;
+      const modal = document.getElementById('empresaPickerModal');
+      const list = document.getElementById('empresaPickerList');
+      const search = document.getElementById('empresaPickerSearch');
+      search.value = '';
+      list.innerHTML = '<li style="padding:10px;color:var(--muted);">Carregando...</li>';
+      modal.classList.add('active');
+      search.focus();
+
+      _empresaPickerData = await fetchEmpresasRhAtivas();
+      renderEmpresaPickerList(_empresaPickerData);
+    }
+
+    function renderEmpresaPickerList(empresas) {
+      const list = document.getElementById('empresaPickerList');
+      if (!empresas.length) {
+        list.innerHTML = '<li style="padding:10px;color:var(--muted);">Nenhuma empresa ativa encontrada</li>';
+        return;
       }
-
-      input.addEventListener('input', () => {
-        hiddenId.value = '';
-        const q = input.value.toLowerCase();
-        if (!q) { dropdown.classList.remove('open'); return; }
-        renderList(clientes.filter(c => c.nome.toLowerCase().includes(q)));
+      list.innerHTML = empresas.map(e => `
+        <li class="autocomplete-item" data-id="${e.id}" style="padding:10px;border-bottom:1px solid var(--line);cursor:pointer;">
+          <strong>${e.nome_empresa}</strong>
+          <div style="font-size:.8rem;color:var(--muted);">${e.codigo_empresa || ''}${e.cnpj ? ' — ' + e.cnpj : ''}</div>
+        </li>
+      `).join('');
+      list.querySelectorAll('li[data-id]').forEach(li => {
+        li.addEventListener('click', () => {
+          const empresa = empresas.find(e => e.id === li.dataset.id);
+          if (empresa && _empresaPickerCallback) _empresaPickerCallback(empresa);
+          closeEmpresaPicker();
+        });
       });
+    }
 
-      input.addEventListener('blur', () => setTimeout(() => dropdown.classList.remove('open'), 150));
-      input.addEventListener('focus', () => {
-        if (input.value) input.dispatchEvent(new Event('input'));
-      });
+    function closeEmpresaPicker() {
+      document.getElementById('empresaPickerModal').classList.remove('active');
+    }
+
+    // ============================================
+    // TIPOS DE LICENÇA (catálogo configurável)
+    // ============================================
+
+    async function fetchTiposLicencaAtivos() {
+      try {
+        const { data } = await supabaseClient.from('tipos_licenca').select('id, nome').eq('ativo', true).order('nome');
+        return data || [];
+      } catch (_) { return []; }
+    }
+
+    function tipoLicencaOptionsHtml(tipos, selecionado) {
+      if (!tipos.length) {
+        return '<option value="">Nenhum tipo cadastrado — cadastre em Configurações</option>';
+      }
+      const nomes = tipos.map(t => t.nome);
+      // valor gravado que não está (mais) ativo no catálogo: preserva como opção
+      // para não trocar o dado silenciosamente ao salvar sem editar o campo
+      const extra = selecionado && !nomes.includes(selecionado)
+        ? `<option value="${selecionado}" selected>${selecionado} (inativo)</option>`
+        : '';
+      const opts = tipos.map(t =>
+        `<option value="${t.nome}" ${t.nome === selecionado ? 'selected' : ''}>${t.nome}</option>`
+      ).join('');
+      return '<option value="">Selecione...</option>' + extra + opts;
+    }
+
+    async function carregarTiposLicenca() {
+      const container = document.getElementById('tiposLicencaList');
+      if (!container) return;
+      container.innerHTML = '<span style="color:var(--muted);">Carregando...</span>';
+      try {
+        const { data, error } = await supabaseClient.from('tipos_licenca').select('id, nome').eq('ativo', true).order('nome');
+        if (error) throw error;
+        if (!data || !data.length) {
+          container.innerHTML = '<span style="color:var(--muted);">Nenhum tipo cadastrado ainda.</span>';
+          return;
+        }
+        container.innerHTML = data.map(t => `
+          <span class="badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:20px;">
+            ${t.nome}
+            <button type="button" title="Remover" onclick="removerTipoLicenca('${t.id}')" style="border:none;background:none;cursor:pointer;color:var(--danger);font-weight:700;">&times;</button>
+          </span>
+        `).join('');
+      } catch (error) {
+        console.error('Erro ao carregar tipos de licença:', error);
+        container.innerHTML = '<span style="color:var(--danger);">Erro ao carregar tipos de licença.</span>';
+      }
+    }
+
+    async function adicionarTipoLicenca() {
+      const input = document.getElementById('novoTipoLicencaNome');
+      const nome = (input.value || '').trim();
+      if (!nome) { showAlert('❌ Informe o nome do tipo de licença', 'error'); return; }
+
+      try {
+        const { error } = await supabaseClient.from('tipos_licenca').insert([{ nome }]);
+        if (error) throw error;
+        input.value = '';
+        showAlert('✓ Tipo de licença adicionado!', 'success');
+        carregarTiposLicenca();
+      } catch (error) {
+        console.error('Erro ao adicionar tipo de licença:', error);
+        const msg = String(error.message || '').includes('duplicate') ? 'Esse tipo já existe' : error.message;
+        showAlert(`❌ Erro ao adicionar tipo: ${msg}`, 'error');
+      }
+    }
+
+    async function removerTipoLicenca(id) {
+      if (!confirm('Remover este tipo de licença? Ele deixará de aparecer para novas licenças.')) return;
+      try {
+        const { error } = await supabaseClient.from('tipos_licenca').update({ ativo: false }).eq('id', id);
+        if (error) throw error;
+        carregarTiposLicenca();
+      } catch (error) {
+        console.error('Erro ao remover tipo de licença:', error);
+        showAlert('❌ Erro ao remover tipo de licença', 'error');
+      }
     }
 
     function toggleCamposDocumento() {
@@ -2766,9 +2768,9 @@ function exportReports(format) {
         }
       }
 
-      const clienteIdVal = document.getElementById('clienteId')?.value || null;
+      const empresaIdVal = document.getElementById('empresaId')?.value || null;
       const data = {
-        empresa_id: clienteIdVal || null,
+        empresa_id: empresaIdVal || null,
         estabelecimento: document.getElementById('estabelecimento').value,
         tipo: document.getElementById('tipo').value,
         numero: tipoOperacao === 'emissao' ? 'PENDENTE' : document.getElementById('numero').value,
@@ -3138,82 +3140,6 @@ function exportReports(format) {
     }
 
     // ============================================
-    // CRUD - CLIENTES
-    // ============================================
-
-    async function openNewRecord(type) {
-      const modal = document.getElementById('recordModal');
-      const modalTitle = document.getElementById('modalTitle');
-      const modalBody = document.getElementById('modalBody');
-
-      modalTitle.textContent = `Novo ${type === 'cliente' ? 'Cliente' : 'Registro'}`;
-
-      if (type === 'cliente') {
-        modalBody.innerHTML = `
-          <form onsubmit="saveCliente(event)">
-            <div class="form-grid">
-              <div class="field full">
-                <label>Nome do cliente</label>
-                <input type="text" id="nome" required>
-              </div>
-              <div class="field">
-                <label>CNPJ</label>
-                <input type="text" id="cnpj" placeholder="00.000.000/0000-00">
-              </div>
-              <div class="field">
-                <label>Contato</label>
-                <input type="text" id="contato" required>
-              </div>
-              <div class="field">
-                <label>Email</label>
-                <input type="email" id="email" required>
-              </div>
-              <div class="field">
-                <label>Telefone</label>
-                <input type="text" id="telefone" placeholder="(00) 00000-0000">
-              </div>
-              <div class="field full">
-                <label>Estabelecimentos</label>
-                <textarea id="estabelecimentos" placeholder="Liste os estabelecimentos vinculados"></textarea>
-              </div>
-              <div class="field full">
-                <button type="submit" class="btn btn-primary">Salvar cliente</button>
-              </div>
-            </div>
-          </form>
-        `;
-      }
-
-      modal.classList.add('active');
-    }
-
-    async function saveCliente(event) {
-      event.preventDefault();
-
-      const data = {
-        nome: document.getElementById('nome').value,
-        cnpj: document.getElementById('cnpj').value || null,
-        contato: document.getElementById('contato').value,
-        email: document.getElementById('email').value,
-        telefone: document.getElementById('telefone').value || null,
-        estabelecimentos: document.getElementById('estabelecimentos').value
-      };
-
-      try {
-        const { error } = await supabaseClient.from('empresas').insert([data]);
-        if (error) throw error;
-
-        showAlert('Cliente salvo com sucesso!', 'success');
-        closeModal();
-        fetchClientes();
-        loadDashboard();
-      } catch (error) {
-        console.error('Erro ao salvar cliente:', error);
-        showAlert('Erro ao salvar cliente', 'error');
-      }
-    }
-
-    // ============================================
     // CRUD - VISUALIZAR/EDITAR/DELETAR
     // ============================================
 
@@ -3226,39 +3152,28 @@ function exportReports(format) {
         const modalTitle = document.getElementById('modalTitle');
         const modalBody = document.getElementById('modalBody');
 
-        modalTitle.textContent = `Visualizar ${table === 'licencas' ? 'Licença' : table === 'alvaras' ? 'Alvará' : table === 'empresas' ? 'Empresa' : 'Cliente'}`;
+        modalTitle.textContent = `Visualizar ${table === 'licencas' ? 'Licença' : 'Alvará'}`;
 
         let html = '<div style="padding:10px;">';
 
-        if (table === 'licencas' || table === 'alvaras') {
-          let nomeCliente = '-';
-          if (data.empresa_id) {
-            try {
-              const { data: emp } = await supabaseClient.from('empresas').select('nome').eq('id', data.empresa_id).single();
-              if (emp?.nome) nomeCliente = emp.nome;
-            } catch (_) {}
-          }
-          html += `
-            <p><strong>Cliente:</strong> ${nomeCliente}</p>
-            <p><strong>Estabelecimento:</strong> ${data.estabelecimento}</p>
-            <p><strong>Tipo:</strong> ${data.tipo}</p>
-            <p><strong>Número:</strong> ${data.numero}</p>
-            <p><strong>Data de emissão:</strong> ${formatDate(data.data_emissao)}</p>
-            <p><strong>Data de validade:</strong> ${formatDate(data.data_validade)}</p>
-            <p><strong>Órgão emissor:</strong> ${data.orgao_emissor}</p>
-            <p><strong>Responsável:</strong> ${data.responsavel}</p>
-            <p><strong>Observações:</strong> ${data.observacoes || '-'}</p>
-          `;
-        } else if (table === 'empresas') {
-          html += `
-            <p><strong>Nome:</strong> ${data.nome || '-'}</p>
-            <p><strong>CNPJ:</strong> ${data.cnpj || '-'}</p>
-            <p><strong>Contato:</strong> ${data.contato || '-'}</p>
-            <p><strong>Email:</strong> ${data.email || '-'}</p>
-            <p><strong>Telefone:</strong> ${data.telefone || '-'}</p>
-            <p><strong>Estabelecimentos:</strong> ${data.estabelecimentos || '-'}</p>
-          `;
+        let nomeEmpresa = '-';
+        if (data.empresa_id) {
+          try {
+            const { data: emp } = await supabaseClient.from('rh_empresas').select('nome_empresa').eq('id', data.empresa_id).single();
+            if (emp?.nome_empresa) nomeEmpresa = emp.nome_empresa;
+          } catch (_) {}
         }
+        html += `
+          <p><strong>Empresa:</strong> ${nomeEmpresa}</p>
+          <p><strong>Estabelecimento:</strong> ${data.estabelecimento}</p>
+          <p><strong>Tipo:</strong> ${data.tipo}</p>
+          <p><strong>Número:</strong> ${data.numero}</p>
+          <p><strong>Data de emissão:</strong> ${formatDate(data.data_emissao)}</p>
+          <p><strong>Data de validade:</strong> ${formatDate(data.data_validade)}</p>
+          <p><strong>Órgão emissor:</strong> ${data.orgao_emissor}</p>
+          <p><strong>Responsável:</strong> ${data.responsavel}</p>
+          <p><strong>Observações:</strong> ${data.observacoes || '-'}</p>
+        `;
 
         html += '</div>';
         modalBody.innerHTML = html;
@@ -3278,85 +3193,51 @@ function exportReports(format) {
         const modalTitle = document.getElementById('modalTitle');
         const modalBody = document.getElementById('modalBody');
 
-        modalTitle.textContent = `Editar ${table === 'licencas' ? 'Licença' : table === 'alvaras' ? 'Alvará' : 'Empresa'}`;
+        modalTitle.textContent = `Editar ${table === 'licencas' ? 'Licença' : 'Alvará'}`;
 
-        if (table === 'licencas' || table === 'alvaras') {
-          modalBody.innerHTML = `
-            <form onsubmit="updateRecord(event, '${id}', '${table}')">
-              <div class="form-grid">
-                <div class="field full">
-                  <label>Estabelecimento</label>
-                  <input type="text" id="estabelecimento" value="${data.estabelecimento}" required>
-                </div>
-                <div class="field">
-                  <label>Tipo</label>
-                  <input type="text" id="tipo" value="${data.tipo}" required>
-                </div>
-                <div class="field">
-                  <label>Número</label>
-                  <input type="text" id="numero" value="${data.numero}" required>
-                </div>
-                <div class="field">
-                  <label>Data de Emissão</label>
-                  <input type="date" id="dataEmissao" value="${data.data_emissao}" required>
-                </div>
-                <div class="field">
-                  <label>Data de Validade</label>
-                  <input type="date" id="dataValidade" value="${data.data_validade}" required>
-                </div>
-                <div class="field">
-                  <label>Órgão Emissor</label>
-                  <input type="text" id="orgaoEmissor" value="${data.orgao_emissor || ''}" required>
-                </div>
-                <div class="field">
-                  <label>Responsável</label>
-                  <input type="text" id="responsavel" value="${data.responsavel || ''}" required>
-                </div>
-                <div class="field full">
-                  <label>Observações</label>
-                  <textarea id="observacoes">${data.observacoes || ''}</textarea>
-                </div>
-                <div class="field full">
-                  <button type="submit" class="btn btn-primary">Atualizar</button>
-                </div>
+        const tiposLicenca = await fetchTiposLicencaAtivos();
+
+        modalBody.innerHTML = `
+          <form onsubmit="updateRecord(event, '${id}', '${table}')">
+            <div class="form-grid">
+              <div class="field full">
+                <label>Estabelecimento</label>
+                <input type="text" id="estabelecimento" value="${data.estabelecimento}" required>
               </div>
-            </form>
-          `;
-        } else if (table === 'empresas') {
-          modalBody.innerHTML = `
-            <form onsubmit="updateRecord(event, '${id}', '${table}')">
-              <div class="form-grid">
-                <div class="field full">
-                  <label>Nome</label>
-                  <input type="text" id="nome" value="${data.nome || ''}" required>
-                </div>
-                <div class="field">
-                  <label>CNPJ</label>
-                  <input type="text" id="cnpj" value="${data.cnpj || ''}">
-                </div>
-                <div class="field">
-                  <label>Contato</label>
-                  <input type="text" id="contato" value="${data.contato || ''}" required>
-                </div>
-                <div class="field">
-                  <label>Email</label>
-                  <input type="email" id="email" value="${data.email || ''}" required>
-                </div>
-                <div class="field">
-                  <label>Telefone</label>
-                  <input type="text" id="telefone" value="${data.telefone || ''}">
-                </div>
-                <div class="field full">
-                  <label>Estabelecimentos</label>
-                  <textarea id="estabelecimentos">${data.estabelecimentos || ''}</textarea>
-                </div>
-                <div class="field full">
-                  <button type="submit" class="btn btn-primary">Atualizar</button>
-                </div>
+              <div class="field">
+                <label>Tipo</label>
+                <select id="tipo" required>${tipoLicencaOptionsHtml(tiposLicenca, data.tipo)}</select>
               </div>
-            </form>
-          `;
-        }
+              <div class="field">
+                <label>Número</label>
+                <input type="text" id="numero" value="${data.numero}" required>
+              </div>
+              <div class="field">
+                <label>Data de Emissão</label>
+                <input type="date" id="dataEmissao" value="${data.data_emissao}" required>
+              </div>
+              <div class="field">
+                <label>Data de Validade</label>
+                <input type="date" id="dataValidade" value="${data.data_validade}" required>
+              </div>
+              <div class="field">
+                <label>Órgão Emissor</label>
+                <input type="text" id="orgaoEmissor" value="${data.orgao_emissor || ''}" required>
+              </div>
+              <div class="field">
+                <label>Responsável</label>
+                <input type="text" id="responsavel" value="${data.responsavel || ''}" required>
+              </div>
+              <div class="field full">
+                <label>Observações</label>
+                <textarea id="observacoes">${data.observacoes || ''}</textarea>
+              </div>
+              <div class="field full">
+                <button type="submit" class="btn btn-primary">Atualizar</button>
+              </div>
+            </div>
+          </form>
+        `;
 
         modal.classList.add('active');
       } catch (error) {
@@ -3368,29 +3249,16 @@ function exportReports(format) {
     async function updateRecord(event, id, table) {
       event.preventDefault();
 
-      let data = {};
-
-      if (table === 'licencas' || table === 'alvaras') {
-        data = {
-          estabelecimento: document.getElementById('estabelecimento').value,
-          tipo: document.getElementById('tipo').value,
-          numero: document.getElementById('numero').value,
-          data_emissao: document.getElementById('dataEmissao').value,
-          data_validade: document.getElementById('dataValidade').value,
-          orgao_emissor: document.getElementById('orgaoEmissor').value,
-          responsavel: document.getElementById('responsavel').value,
-          observacoes: document.getElementById('observacoes').value
-        };
-      } else if (table === 'empresas') {
-        data = {
-          nome: document.getElementById('nome').value,
-          cnpj: document.getElementById('cnpj').value || null,
-          contato: document.getElementById('contato').value,
-          email: document.getElementById('email').value,
-          telefone: document.getElementById('telefone').value || null,
-          estabelecimentos: document.getElementById('estabelecimentos').value
-        };
-      }
+      const data = {
+        estabelecimento: document.getElementById('estabelecimento').value,
+        tipo: document.getElementById('tipo').value,
+        numero: document.getElementById('numero').value,
+        data_emissao: document.getElementById('dataEmissao').value,
+        data_validade: document.getElementById('dataValidade').value,
+        orgao_emissor: document.getElementById('orgaoEmissor').value,
+        responsavel: document.getElementById('responsavel').value,
+        observacoes: document.getElementById('observacoes').value
+      };
 
       try {
         const { error } = await supabaseClient.from(table).update(data).eq('id', id);
@@ -3398,9 +3266,7 @@ function exportReports(format) {
 
         showAlert('Registro atualizado com sucesso!', 'success');
         closeModal();
-
-        if (table === 'licencas' || table === 'alvaras') fetchDocumentos();
-        if (table === 'empresas') fetchClientes();
+        fetchDocumentos();
         loadDashboard();
       } catch (error) {
         console.error('Erro ao atualizar registro:', error);
@@ -3416,9 +3282,7 @@ function exportReports(format) {
         if (error) throw error;
 
         showAlert('Registro excluído com sucesso!', 'success');
-
-        if (table === 'licencas' || table === 'alvaras') fetchDocumentos();
-        if (table === 'empresas') fetchClientes();
+        fetchDocumentos();
         loadDashboard();
       } catch (error) {
         console.error('Erro ao excluir registro:', error);
@@ -3639,25 +3503,12 @@ function exportReports(format) {
       const modeloLicencasBtn = safeGetElement('modeloLicencasBtn');
       if (modeloLicencasBtn) modeloLicencasBtn.addEventListener('click', baixarModeloLicencas);
 
-      // Importação Excel — Clientes
-      const importClientesBtn = safeGetElement('importClientesBtn');
-      const importClientesFile = safeGetElement('importClientesFile');
-      if (importClientesBtn && importClientesFile) {
-        importClientesBtn.addEventListener('click', () => importClientesFile.click());
-        importClientesFile.addEventListener('change', e => {
-          if (e.target.files[0]) importarExcelClientes(e.target.files[0]);
-          e.target.value = '';
-        });
-      }
-      const modeloClientesBtn = safeGetElement('modeloClientesBtn');
-      if (modeloClientesBtn) modeloClientesBtn.addEventListener('click', baixarModeloClientes);
-
       // Botões de ação principais
       const syncBtn = safeGetElement('syncBtn');
       if (syncBtn) syncBtn.addEventListener('click', syncFromSupabase);
 
       const newRecordBtn = safeGetElement('newRecordBtn');
-      if (newRecordBtn) newRecordBtn.addEventListener('click', () => openNewRecord('cliente'));
+      if (newRecordBtn) newRecordBtn.addEventListener('click', openNewDocumento);
 
       // Documentos
       const refreshDocumentos = safeGetElement('refreshDocumentos');
@@ -3678,16 +3529,6 @@ function exportReports(format) {
 
       const searchProcessos = safeGetElement('searchProcessos');
       if (searchProcessos) searchProcessos.addEventListener('input', (e) => filterRows('processo', e.target.value));
-
-      // Clientes
-      const refreshClientes = safeGetElement('refreshClientes');
-      if (refreshClientes) refreshClientes.addEventListener('click', fetchClientes);
-
-      const newCliente = safeGetElement('newCliente');
-      if (newCliente) newCliente.addEventListener('click', () => openNewRecord('cliente'));
-
-      const searchClientes = safeGetElement('searchClientes');
-      if (searchClientes) searchClientes.addEventListener('input', (e) => filterRows('cliente', e.target.value));
 
       // Relatórios
       const refreshReports = safeGetElement('refreshReports');
@@ -3714,6 +3555,40 @@ function exportReports(format) {
         });
       }
 
+      // Modal — seletor de empresa
+      const closeEmpresaPickerBtn = safeGetElement('closeEmpresaPickerBtn');
+      if (closeEmpresaPickerBtn) closeEmpresaPickerBtn.addEventListener('click', closeEmpresaPicker);
+
+      const empresaPickerModal = safeGetElement('empresaPickerModal');
+      if (empresaPickerModal) {
+        empresaPickerModal.addEventListener('click', (e) => {
+          if (e.target.id === 'empresaPickerModal') closeEmpresaPicker();
+        });
+      }
+
+      const empresaPickerSearch = safeGetElement('empresaPickerSearch');
+      if (empresaPickerSearch) {
+        empresaPickerSearch.addEventListener('input', (e) => {
+          const q = e.target.value.toLowerCase();
+          renderEmpresaPickerList(_empresaPickerData.filter(emp =>
+            (emp.nome_empresa || '').toLowerCase().includes(q) ||
+            (emp.codigo_empresa || '').toLowerCase().includes(q) ||
+            (emp.cnpj || '').toLowerCase().includes(q)
+          ));
+        });
+      }
+
+      // Tipos de Licença (Configurações)
+      const addTipoLicencaBtn = safeGetElement('addTipoLicencaBtn');
+      if (addTipoLicencaBtn) addTipoLicencaBtn.addEventListener('click', adicionarTipoLicenca);
+
+      const novoTipoLicencaNome = safeGetElement('novoTipoLicencaNome');
+      if (novoTipoLicencaNome) {
+        novoTipoLicencaNome.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); adicionarTipoLicenca(); }
+        });
+      }
+
       console.log('✓ Event listeners configurados com sucesso');
     }
 
@@ -3727,26 +3602,14 @@ function exportReports(format) {
 
     function baixarModeloLicencas() {
       const ws = XLSX.utils.aoa_to_sheet([
-        ['tipo_operacao','estabelecimento','tipo','numero','data_emissao','data_validade','orgao_emissor','responsavel','observacoes','cliente'],
-        ['renovacao','Unidade Centro','Licença Sanitária','LS-001','01/01/2024','01/01/2025','Vigilância Sanitária','João Silva','Renovação anual','Nome do Cliente'],
+        ['tipo_operacao','estabelecimento','tipo','numero','data_emissao','data_validade','orgao_emissor','responsavel','observacoes','empresa'],
+        ['renovacao','Unidade Centro','Licença Sanitária','LS-001','01/01/2024','01/01/2025','Vigilância Sanitária','João Silva','Renovação anual','Nome da Empresa (rh_empresas)'],
         ['emissao','Unidade Norte','Licença Ambiental','','','','IBAMA','Maria Souza','Em processo de emissão','']
       ]);
-      ws['!cols'] = [12,20,22,14,14,14,22,18,28,20].map(w => ({ wch: w }));
+      ws['!cols'] = [12,20,22,14,14,14,22,18,28,26].map(w => ({ wch: w }));
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, 'Licenças');
       XLSX.writeFile(wb, 'modelo_importacao_licencas.xlsx');
-    }
-
-    function baixarModeloClientes() {
-      const ws = XLSX.utils.aoa_to_sheet([
-        ['nome','cnpj','contato','email','telefone','estabelecimentos'],
-        ['Empresa Exemplo Ltda','12.345.678/0001-90','Ana Lima','ana@empresa.com','(11) 99999-0000','Unidade Centro; Unidade Norte'],
-        ['Comércio Silva ME','98.765.432/0001-10','Pedro Silva','pedro@comercio.com','(21) 98888-0000','Loja Principal']
-      ]);
-      ws['!cols'] = [26,22,18,26,18,30].map(w => ({ wch: w }));
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
-      XLSX.writeFile(wb, 'modelo_importacao_clientes.xlsx');
     }
 
     function parseDateExcel(val) {
@@ -3812,14 +3675,14 @@ function exportReports(format) {
 
         if (!rows.length) { showAlert('❌ Planilha vazia ou sem dados', 'error'); return; }
 
-        // Lookup de clientes para mapear nome → id
-        let clienteMap = {};
+        // Lookup de empresas (rh_empresas) para mapear nome → id
+        let empresaMap = {};
         try {
-          const { data: emps } = await supabaseClient.from('empresas').select('id, nome').eq('ativo', true);
-          (emps || []).forEach(e => { clienteMap[e.nome.toLowerCase()] = e.id; });
+          const empresasAtivas = await fetchEmpresasRhAtivas();
+          empresasAtivas.forEach(e => { empresaMap[e.nome_empresa.toLowerCase()] = e.id; });
         } catch (_) {}
 
-        const cols = ['tipo_operacao','estabelecimento','tipo','numero','data_emissao','data_validade','orgao_emissor','responsavel','observacoes','cliente'];
+        const cols = ['tipo_operacao','estabelecimento','tipo','numero','data_emissao','data_validade','orgao_emissor','responsavel','observacoes','empresa'];
         showImportPreview(rows, cols.filter(c => rows[0].hasOwnProperty(c)), async () => {
           let ok = 0, fail = 0;
           for (const r of rows) {
@@ -3830,8 +3693,8 @@ function exportReports(format) {
             const tipoOp = String(r['tipo_operacao'] || '').trim().toLowerCase();
             const isEmissao = tipoOp === 'emissao';
 
-            const nomeCliente = String(r['cliente'] || '').trim().toLowerCase();
-            const empresa_id = nomeCliente ? (clienteMap[nomeCliente] || null) : null;
+            const nomeEmpresa = String(r['empresa'] || '').trim().toLowerCase();
+            const empresa_id = nomeEmpresa ? (empresaMap[nomeEmpresa] || null) : null;
 
             const row = {
               empresa_id,
@@ -3859,47 +3722,6 @@ function exportReports(format) {
         });
       } catch (err) {
         console.error('Erro ao ler Excel de licenças:', err);
-        showAlert('❌ Erro ao ler o arquivo Excel', 'error');
-      }
-    }
-
-    async function importarExcelClientes(file) {
-      if (!window.XLSX) { showAlert('❌ Biblioteca de leitura Excel não carregada', 'error'); return; }
-      try {
-        const buf = await file.arrayBuffer();
-        const wb = XLSX.read(buf, { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
-        if (!rows.length) { showAlert('❌ Planilha vazia ou sem dados', 'error'); return; }
-
-        const cols = ['nome','cnpj','contato','email','telefone','estabelecimentos'];
-        showImportPreview(rows, cols.filter(c => rows[0].hasOwnProperty(c)), async () => {
-          let ok = 0, fail = 0;
-          for (const r of rows) {
-            const nome = String(r['nome'] || '').trim();
-            if (!nome) { fail++; continue; }
-            const row = {
-              nome,
-              cnpj: String(r['cnpj'] || '').trim() || null,
-              contato: String(r['contato'] || '').trim() || null,
-              email: String(r['email'] || '').trim() || null,
-              telefone: String(r['telefone'] || '').trim() || null,
-              estabelecimentos: String(r['estabelecimentos'] || '').trim() || null,
-            };
-            try {
-              const { error } = await supabaseClient.from('empresas').insert([row]);
-              if (error) throw error;
-              ok++;
-            } catch (_) { fail++; }
-          }
-          closeModal();
-          showAlert(`✓ ${ok} cliente(s) importado(s). ${fail ? fail + ' falharam — verifique o console.' : ''}`, ok ? 'success' : 'error');
-          fetchClientes();
-          loadDashboard();
-        });
-      } catch (err) {
-        console.error('Erro ao ler Excel de clientes:', err);
         showAlert('❌ Erro ao ler o arquivo Excel', 'error');
       }
     }
