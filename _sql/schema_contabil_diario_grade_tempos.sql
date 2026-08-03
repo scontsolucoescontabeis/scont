@@ -12,13 +12,16 @@
 -- nova para isso.
 -- ============================================================
 
--- 1. Normaliza dados existentes antes de trocar a CHECK constraint.
---    "sem_documentacao" nunca era persistido (o ciclo antigo apagava a
---    linha ao voltar pra esse estado), mas removemos por segurança.
+-- 1. Solta a CHECK constraint antiga ANTES de normalizar os dados — senão
+--    o UPDATE abaixo (que grava 'pendencia', valor que a constraint antiga
+--    não permitia) falha contra ela mesma.
+ALTER TABLE public.contabil_diario_status_mensal DROP CONSTRAINT IF EXISTS contabil_diario_status_mensal_status_check;
+
+-- "sem_documentacao" nunca era persistido (o ciclo antigo apagava a
+-- linha ao voltar pra esse estado), mas removemos por segurança.
 UPDATE public.contabil_diario_status_mensal SET status = 'pendencia' WHERE status = 'pendencias';
 DELETE FROM public.contabil_diario_status_mensal WHERE status = 'sem_documentacao';
 
-ALTER TABLE public.contabil_diario_status_mensal DROP CONSTRAINT IF EXISTS contabil_diario_status_mensal_status_check;
 ALTER TABLE public.contabil_diario_status_mensal
     ADD CONSTRAINT contabil_diario_status_mensal_status_check CHECK (status IN ('em_andamento', 'pendencia', 'concluido'));
 
