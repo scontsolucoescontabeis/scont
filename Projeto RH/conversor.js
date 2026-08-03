@@ -7,9 +7,21 @@ const state = {
     empregados: [],         // [{ codigo_empregado, nome_empregado }] da empresa selecionada
     colaboradoresPdf: [],   // [{ nome, cpf, admissao, funcao, codigo, competencia, dias:[...] }]
     vinculos: [],           // paralelo a colaboradoresPdf: { empregado: {codigo_empregado,nome_empregado}|null, ignorar: bool }
-    terceiroTurno: false,
+    maxPeriodos: 2,
     abaAtivaEtapa4: 0
 };
+
+// ===== HELPERS PERÍODOS DINÂMICOS =====
+function camposPeriodos(n) {
+    const campos = [];
+    for (let i = 1; i <= n; i++) campos.push(`entrada${i}`, `saida${i}`);
+    return campos;
+}
+function colunasPeriodos(n) {
+    const colunas = [];
+    for (let i = 1; i <= n; i++) colunas.push(`Entrada ${i}`, `Saída ${i}`);
+    return colunas;
+}
 
 // ===== HELPERS =====
 function mostrarMsg(elId, tipo, texto) {
@@ -75,6 +87,7 @@ window.handleArquivo = async function(file) {
         const buffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
 
+        const paginasItems = [];
         const paginasTexto = [];
         const colaboradores = [];
         const anoFallback = new Date().getFullYear();
@@ -83,21 +96,23 @@ window.handleArquivo = async function(file) {
             mostrarProgresso(5 + Math.round((p / pdf.numPages) * 85), `Lendo página ${p}/${pdf.numPages}...`);
             const page = await pdf.getPage(p);
             const content = await page.getTextContent();
-            const linhas = _linhasDaPagina(content.items);
-            paginasTexto.push(linhas.join('\n'));
+            paginasItems.push(content.items);
+            paginasTexto.push(_linhasDaPagina(content.items).join('\n'));
         }
 
         const textoCompleto = paginasTexto.join('\n');
-        if (!_pareceSolides(textoCompleto)) {
+        const formato = _pareceSolides(textoCompleto) ? 'solides' : (_pareceSmartPonto(textoCompleto) ? 'smartponto' : null);
+
+        if (!formato) {
             ocultarProgresso();
-            mostrarMsg('msgStep1', 'erro', 'Arquivo não reconhecido como Folha de Ponto do Sólides. Verifique se o PDF é o export correto (uma página por colaborador, com as seções "DADOS DO COLABORADOR" e "PONTOS").');
+            mostrarMsg('msgStep1', 'erro', 'Arquivo não reconhecido. Formatos aceitos: Folha de Ponto do Sólides ("DADOS DO COLABORADOR"/"PONTOS") ou Cartão de Ponto do SmartPonto ("CARTÃO DE PONTO"/"JORNADAS REALIZADAS"), um colaborador por página.');
             return;
         }
 
         for (let p = 0; p < pdf.numPages; p++) {
-            const page = await pdf.getPage(p + 1);
-            const content = await page.getTextContent();
-            const colaborador = _parsearPaginaColaborador(content.items, anoFallback);
+            const colaborador = formato === 'solides'
+                ? _parsearPaginaColaborador(paginasItems[p], anoFallback)
+                : _parsearPaginaColaboradorSmart(paginasItems[p], anoFallback);
             if (colaborador.nome) colaboradores.push(colaborador);
         }
 
@@ -290,9 +305,12 @@ function prepararEtapa4() {
             dias: item.colab.dias
         }));
 
-    state.terceiroTurno = state.colaboradoresConfirmados.some(c =>
-        c.dias.some(d => d.entrada3 || d.saida3)
-    );
+    state.maxPeriodos = 2;
+    state.colaboradoresConfirmados.forEach(c => c.dias.forEach(d => {
+        for (let n = 3; n <= 8; n++) {
+            if (d[`entrada${n}`] || d[`saida${n}`]) state.maxPeriodos = Math.max(state.maxPeriodos, n);
+        }
+    }));
 
     state.abaAtivaEtapa4 = 0;
     renderizarAbasColab();
@@ -319,14 +337,10 @@ function renderizarTabelaColab() {
     const colab = state.colaboradoresConfirmados[state.abaAtivaEtapa4];
     if (!colab) { thead.innerHTML = ''; tbody.innerHTML = ''; return; }
 
-    const colunas = state.terceiroTurno
-        ? ['Data', 'Dia', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Entrada 3', 'Saída 3', 'Ocorrência']
-        : ['Data', 'Dia', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Ocorrência'];
+    const colunas = ['Data', 'Dia', ...colunasPeriodos(state.maxPeriodos), 'Ocorrência'];
     thead.innerHTML = '<tr>' + colunas.map(c => `<th>${c}</th>`).join('') + '</tr>';
 
-    const campos = state.terceiroTurno
-        ? ['entrada1', 'saida1', 'entrada2', 'saida2', 'entrada3', 'saida3']
-        : ['entrada1', 'saida1', 'entrada2', 'saida2'];
+    const campos = camposPeriodos(state.maxPeriodos);
 
     tbody.innerHTML = colab.dias.map((dia, diaIdx) => {
         const camposHtml = campos.map(campo =>
@@ -356,12 +370,8 @@ window.gerarExcel = function() {
         return;
     }
 
-    const header = state.terceiroTurno
-        ? ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Entrada 3', 'Saída 3']
-        : ['Data', 'Dia da Semana', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2'];
-    const campos = state.terceiroTurno
-        ? ['entrada1', 'saida1', 'entrada2', 'saida2', 'entrada3', 'saida3']
-        : ['entrada1', 'saida1', 'entrada2', 'saida2'];
+    const header = ['Data', 'Dia da Semana', ...colunasPeriodos(state.maxPeriodos)];
+    const campos = camposPeriodos(state.maxPeriodos);
 
     const wb = XLSX.utils.book_new();
     const linhasOcorrencias = [['Código', 'Empregado', 'Data', 'Dia da Semana', 'Ocorrência']];
