@@ -3417,31 +3417,41 @@ function exportReports(format) {
     async function updateProcesso(event, id) {
       event.preventDefault();
 
-      const statusAnterior = (await supabaseClient.from('processos').select('status').eq('id', id).single()).data.status;
       const statusNovo = document.getElementById('statusProcesso').value;
 
       const data = {
         numero_processo: document.getElementById('numeroProcesso').value,
         status: statusNovo,
         data_abertura: document.getElementById('dataAbertura').value,
-        data_prevista_conclusao: document.getElementById('dataPrevista').value,
+        data_prevista_conclusao: document.getElementById('dataPrevista').value || null,
         responsavel: document.getElementById('responsavelProcesso').value,
-        descricao: document.getElementById('descricaoProcesso').value,
-        observacoes: document.getElementById('observacoesProcesso').value
+        descricao: document.getElementById('descricaoProcesso').value.trim() || null,
+        observacoes: document.getElementById('observacoesProcesso').value.trim() || null
       };
 
       try {
+        const { data: processoAtual, error: erroAtual } = await supabaseClient
+          .from('processos')
+          .select('status')
+          .eq('id', id)
+          .single();
+        if (erroAtual) throw erroAtual;
+        const statusAnterior = processoAtual.status;
+
         const { error } = await supabaseClient.from('processos').update(data).eq('id', id);
         if (error) throw error;
 
         if (statusAnterior !== statusNovo) {
-          await supabaseClient.from('andamento_processos').insert([{
+          const { error: erroAndamento } = await supabaseClient.from('andamento_processos').insert([{
             processo_id: id,
             status_anterior: statusAnterior,
             status_novo: statusNovo,
             responsavel: data.responsavel,
             observacao: data.observacoes
           }]);
+          if (erroAndamento) {
+            console.error('⚠️ Aviso ao registrar andamento:', erroAndamento);
+          }
         }
 
         showAlert('Processo atualizado com sucesso!', 'success');
@@ -3449,7 +3459,7 @@ function exportReports(format) {
         fetchProcessos();
       } catch (error) {
         console.error('Erro ao atualizar processo:', error);
-        showAlert('Erro ao atualizar processo', 'error');
+        showAlert('Erro ao atualizar processo: ' + error.message, 'error');
       }
     }
 
