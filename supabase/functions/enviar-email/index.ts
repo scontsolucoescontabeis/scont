@@ -175,6 +175,66 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
         ` + _rodape(nomeRemetente) + _fechamento();
     }
 
+    // ── Alerta: certificado digital entrou em limiar de vencimento ──
+    if (tipo === 'alerta_certificado_vencimento') {
+        const empresaNome   = (params.empresa as string)        || '';
+        const tipoCert      = (params.tipo_certificado as string) || '';
+        const nivel         = (params.nivel as string)          || '';
+        const dias          = params.dias as number;
+        const vencimento    = (params.vencimento as string)     || '';
+        const portalUrl     = (params.portal_url as string)     || '';
+
+        const nivelInfo: Record<string, { label: string; cor: string; emoji: string }> = {
+            atencao: { label: 'Atenção',  cor: '#F5A623', emoji: '🟡' },
+            urgente: { label: 'Urgente',  cor: '#E8890C', emoji: '🟠' },
+            critico: { label: 'Crítico',  cor: '#E74C3C', emoji: '🔴' },
+            vencido: { label: 'Vencido',  cor: '#B91C1C', emoji: '⛔' },
+        };
+        const info = nivelInfo[nivel] || { label: nivel, cor: '#4e1820', emoji: '🔔' };
+        const diasTexto = typeof dias === 'number'
+            ? (dias < 0 ? `vencido há ${Math.abs(dias)} dia(s)` : `${dias} dia(s) restante(s)`)
+            : '';
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:${info.cor};margin:0 0 8px;font-size:20px;">${info.emoji} Certificado digital — ${info.label}</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            O certificado ${tipoCert ? `<strong>${tipoCert}</strong> ` : ''}da empresa <strong>${empresaNome}</strong>
+            ${vencimento ? `vence em <strong>${vencimento}</strong>` : ''}${diasTexto ? ` (${diasTexto})` : ''}.
+          </p>
+
+          ${portalUrl ? `
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
+            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+              🔐 Acessar Certificados Digitais
+            </a>
+          </td></tr></table>` : ''}
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
+    // ── Certificado renovado enquanto estava em alerta ──────────
+    if (tipo === 'certificado_renovado_alerta_resolvido') {
+        const empresaNome    = (params.empresa as string)         || '';
+        const tipoCert       = (params.tipo_certificado as string) || '';
+        const novoVencimento = (params.novo_vencimento as string)  || '';
+        const portalUrl      = (params.portal_url as string)       || '';
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#33aa23;margin:0 0 8px;font-size:20px;">✅ Certificado renovado</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            O certificado ${tipoCert ? `<strong>${tipoCert}</strong> ` : ''}da empresa <strong>${empresaNome}</strong>
+            foi renovado${novoVencimento ? ` — novo vencimento em <strong>${novoVencimento}</strong>` : ''}.
+            O alerta de vencimento para este certificado foi encerrado.
+          </p>
+
+          ${portalUrl ? `
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
+            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+              🔐 Acessar Certificados Digitais
+            </a>
+          </td></tr></table>` : ''}
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
     // ── Template padrão (apresentação) ────────────────────────
     const empresa          = (params.empresa as string)           || '';
     const mensagem         = (params.mensagem as string)          || 'Preparamos uma apresentação personalizada para sua empresa. Acesse o link abaixo!';

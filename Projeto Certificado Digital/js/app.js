@@ -598,6 +598,25 @@ function renderConfigPage() {
         <button class="btn btn-primary" onclick="salvarConfig()" style="margin-top:8px;">💾 Salvar configurações</button>
       </div>
       <div>
+        <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--text-primary);">E-mails de Alerta</h3>
+        <div class="meta" style="margin-bottom:12px;">Recebem um e-mail sempre que um certificado entrar em um limiar de vencimento, e quando ele for renovado.</div>
+        <div class="field">
+          <label>Adicionar e-mail</label>
+          <div style="display:flex;gap:8px;">
+            <input type="email" id="newAlertEmail" placeholder="nome@empresa.com" style="flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault();addAlertEmail();}">
+            <button class="btn btn-secondary" onclick="addAlertEmail()">+ Adicionar</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin:12px 0;">
+          ${APP_STATE.alertEmails.length ? APP_STATE.alertEmails.map(email => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--radius-md);font-size:13px;">
+              <span>${email}</span>
+              <button class="btn btn-ghost" onclick="removeAlertEmail('${email}')" style="padding:2px 8px;font-size:12px;color:var(--danger);">✕</button>
+            </div>`).join('') : '<div style="color:var(--text-muted);font-size:13px;">Nenhum e-mail cadastrado</div>'}
+        </div>
+        <button class="btn btn-primary" onclick="saveAlertEmails()">💾 Salvar e-mails</button>
+      </div>
+      <div>
         <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;color:var(--text-primary);">Navegação</h3>
         <div style="display:flex;flex-direction:column;gap:10px;">
           <button class="btn btn-secondary" onclick="fetchCertificates()" style="width:100%;">🔄 Sincronizar dados</button>
@@ -637,13 +656,19 @@ async function loadConfiguracoes() {
       if (row.chave === 'pageSize') {
         APP_STATE.pageSize = parseInt(row.valor) || 10;
       }
+      if (row.chave === 'dias_critico') ALERT_CONFIG.dias_critico = parseInt(row.valor) || ALERT_CONFIG.dias_critico;
+      if (row.chave === 'dias_urgente') ALERT_CONFIG.dias_urgente = parseInt(row.valor) || ALERT_CONFIG.dias_urgente;
+      if (row.chave === 'dias_caution') ALERT_CONFIG.dias_caution = parseInt(row.valor) || ALERT_CONFIG.dias_caution;
+      if (row.chave === 'emails_alerta') {
+        APP_STATE.alertEmails = (row.valor || '').split(',').map(e => e.trim()).filter(Boolean);
+      }
     });
   } catch (e) {
     console.error('Erro ao carregar configurações:', e);
   }
 }
 
-function salvarConfig() {
+async function salvarConfig() {
   const critico = parseInt(q('#cfgCritico')?.value) || 7;
   const urgente = parseInt(q('#cfgUrgente')?.value) || 15;
   const caution = parseInt(q('#cfgCaution')?.value) || 30;
@@ -651,7 +676,65 @@ function salvarConfig() {
   ALERT_CONFIG.dias_urgente = urgente;
   ALERT_CONFIG.dias_caution = caution;
   setLocalStorage('alertConfig', { critico, urgente, caution });
-  showToast('Configurações salvas!');
+
+  try {
+    const now = new Date().toISOString();
+    await supabaseClient.from(TABLE_NAMES.CONFIG).upsert([
+      { chave: 'dias_critico', valor: String(critico), atualizado_em: now },
+      { chave: 'dias_urgente', valor: String(urgente), atualizado_em: now },
+      { chave: 'dias_caution', valor: String(caution), atualizado_em: now },
+    ], { onConflict: 'chave' });
+    showToast('Configurações salvas!');
+  } catch (e) {
+    showToast('Salvo localmente, mas houve erro ao sincronizar: ' + e.message, 'error');
+  }
+}
+
+// ============================================
+// ALERTAS POR E-MAIL — destinatários
+// ============================================
+
+function addAlertEmail() {
+  const input = q('#newAlertEmail');
+  const email = (input?.value || '').trim();
+  if (!email) return;
+  if (!validateEmail(email)) { showToast('E-mail inválido', 'error'); return; }
+  if (APP_STATE.alertEmails.includes(email)) { showToast('E-mail já cadastrado', 'error'); return; }
+  APP_STATE.alertEmails.push(email);
+  input.value = '';
+  renderConfigPage();
+}
+
+function removeAlertEmail(email) {
+  APP_STATE.alertEmails = APP_STATE.alertEmails.filter(e => e !== email);
+  renderConfigPage();
+}
+
+async function saveAlertEmails() {
+  try {
+    await supabaseClient.from(TABLE_NAMES.CONFIG).upsert([
+      { chave: 'emails_alerta', valor: APP_STATE.alertEmails.join(','), atualizado_em: new Date().toISOString() },
+    ], { onConflict: 'chave' });
+    showToast('E-mails de alerta salvos!');
+  } catch (e) {
+    showToast('Erro ao salvar e-mails: ' + e.message, 'error');
+  }
+}
+
+async function sendAlertEmail(tipo, params) {
+  if (!APP_STATE.alertEmails.length) return;
+  const assunto = tipo === 'certificado_renovado_alerta_resolvido'
+    ? `Certificado renovado — ${params.empresa}`
+    : `Certificado digital — ${params.empresa}`;
+  for (const destinatario of APP_STATE.alertEmails) {
+    try {
+      await supabaseClient.functions.invoke('enviar-email', {
+        body: { destinatario, assunto, params: { tipo, ...params } }
+      });
+    } catch (e) {
+      console.error('Falha ao enviar alerta para', destinatario, e);
+    }
+  }
 }
 
 // ============================================
@@ -808,10 +891,13 @@ async function saveRenewal() {
   if (!cert) return;
 
   try {
+    const tinhaAlertaAtivo = !!cert.ultimo_alerta_nivel;
+
     const update = {
       data_vencimento: novoVencimento,
       situacao: 'Ativo',
       data_renovacao_agendada: null,
+      ultimo_alerta_nivel: null,
       atualizado_por: APP_STATE.currentUser?.usuario_id
     };
     if (novaEmissao) update.data_emissao = novaEmissao;
@@ -821,6 +907,15 @@ async function saveRenewal() {
       .update(update)
       .eq('id', id);
     if (error) throw error;
+
+    if (tinhaAlertaAtivo) {
+      sendAlertEmail('certificado_renovado_alerta_resolvido', {
+        empresa: cert.empresa_id,
+        tipo_certificado: cert.tipo_id,
+        novo_vencimento: fmt(novoVencimento),
+        portal_url: window.location.origin + window.location.pathname
+      });
+    }
 
     const valorAnterior = `Emissão: ${fmt(cert.data_emissao) || '—'} • Vencimento: ${fmt(cert.data_vencimento) || '—'}`;
     const valorNovo      = `Emissão: ${novaEmissao ? fmt(novaEmissao) : fmt(cert.data_emissao) || '—'} • Vencimento: ${fmt(novoVencimento)}`;
@@ -1356,6 +1451,9 @@ window.revelarSenha             = revelarSenha;
 window.setTheme                 = setTheme;
 window.setPageSize              = setPageSize;
 window.salvarConfig             = salvarConfig;
+window.addAlertEmail            = addAlertEmail;
+window.removeAlertEmail         = removeAlertEmail;
+window.saveAlertEmails          = saveAlertEmails;
 window.importarExcelCertificados = importarExcelCertificados;
 window.baixarModeloCertificados  = baixarModeloCertificados;
 window.selectAllCerts            = selectAllCerts;

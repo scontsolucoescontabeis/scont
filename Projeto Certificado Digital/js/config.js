@@ -80,7 +80,8 @@ const APP_STATE = {
   sortDir: 'asc',
   isConnected: false,
   isDarkMode: localStorage.getItem('theme') === 'dark',
-  podeVerSenha: false
+  podeVerSenha: false,
+  alertEmails: []
 };
 
 // ============================================
