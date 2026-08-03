@@ -3708,7 +3708,7 @@ async function gerarPreviaBeneficios() {
         }));
 
         const empregadosFiltrados = (empregadosData || []).filter(e =>
-            (e.situacao || '').trim() !== 'Demitido' && (e.tipo_empregado || '').trim() === 'Empregado'
+            (e.situacao || '').trim() !== 'Demitido' && ['Empregado', 'Estágiario'].includes((e.tipo_empregado || '').trim())
         );
 
         if (empregadosFiltrados.length === 0) {
