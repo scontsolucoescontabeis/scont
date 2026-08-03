@@ -564,6 +564,34 @@
     </div>
   </div>
 
+  <!-- MODAL CONCLUIR RENOVAÇÃO -->
+  <div class="modal" id="renewModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>Concluir renovação</h3>
+        <button class="modal-close" id="closeRenewModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="renewForm">
+          <input id="renewCertId" type="hidden">
+          <div id="renewModalInfo" style="margin-bottom:16px;font-size:13px;color:var(--text-muted);"></div>
+          <div class="field">
+            <label>Nova data de emissão</label>
+            <input id="renewEmissao" type="date">
+          </div>
+          <div class="field">
+            <label>Nova data de vencimento *</label>
+            <input id="renewVencimento" type="date" required>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 24px;">
+            <button type="button" class="btn btn-secondary" id="cancelRenewForm" style="flex: 1;">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex: 1;">Confirmar renovação</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL DETALHES -->
   <div class="modal" id="detailsModal">
     <div class="modal-card">

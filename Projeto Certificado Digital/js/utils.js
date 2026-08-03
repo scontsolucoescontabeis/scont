@@ -59,6 +59,11 @@ function statusVisual(days) {
   return '🟢 Normal';
 }
 
+function canRenew(cert) {
+  const d = daysLeft(cert.data_vencimento);
+  return d !== null && d <= 60;
+}
+
 function badgeClass(status) {
   const map = {
     'Ativo': 'badge-success',

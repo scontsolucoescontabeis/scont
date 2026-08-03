@@ -164,6 +164,7 @@ function renderCertTable() {
       : d !== null && d < 0 ? 'style="background:rgba(239,68,68,0.04)"'
       : d !== null && d <= 7 ? 'style="background:rgba(245,158,11,0.03)"' : '';
     const inatBadge = inativo ? '<span class="badge" style="font-size:10px;background:var(--text-muted);color:#fff;margin-left:4px;">Inativo</span>' : '';
+    const renewBtn = canRenew(c) ? `<button class="btn btn-ghost" onclick="openRenewModal('${c.id}')" style="padding:5px 10px;font-size:12px;margin-right:3px;color:var(--success);">♻ Renovar</button>` : '';
     return `
       <tr ${rowStyle}>
         <td><strong>${c.empresa_id}</strong>${inatBadge}</td>
@@ -176,6 +177,7 @@ function renderCertTable() {
           <button class="btn btn-ghost" onclick="openDetails('${c.id}')"    style="padding:5px 10px;font-size:12px;margin-right:3px;">👁 Ver</button>
           <button class="btn btn-ghost" onclick="openCertModal('${c.id}')"  style="padding:5px 10px;font-size:12px;margin-right:3px;">✏ Editar</button>
           <button class="btn btn-ghost" onclick="openScheduleModal('${c.id}')" style="padding:5px 10px;font-size:12px;margin-right:3px;">📅 ${c.data_renovacao_agendada ? 'Reagendar' : 'Agendar'}</button>
+          ${renewBtn}
           <button class="btn btn-ghost" onclick="removeCert('${c.id}')"    style="padding:5px 10px;font-size:12px;color:var(--danger);">🗑</button>
         </td>
       </tr>`;
@@ -334,7 +336,10 @@ function renderAgendaPage() {
       <td>${fmt(c.data_vencimento)}</td>
       <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
       <td>${c.responsavel_nome || '—'}</td>
-      <td><button class="btn btn-ghost" onclick="openScheduleModal('${c.id}')" style="padding:5px 10px;font-size:12px;">📅 Reagendar</button></td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-ghost" onclick="openScheduleModal('${c.id}')" style="padding:5px 10px;font-size:12px;margin-right:3px;">📅 Reagendar</button>
+        ${canRenew(c) ? `<button class="btn btn-primary" onclick="openRenewModal('${c.id}')" style="padding:5px 10px;font-size:12px;">♻ Renovar</button>` : ''}
+      </td>
     </tr>`).join('')
     : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Nenhum agendamento registrado</td></tr>';
 
@@ -349,7 +354,10 @@ function renderAgendaPage() {
       <td>${fmt(c.data_vencimento)}</td>
       <td><span style="color:${color};font-weight:700;">${text}</span></td>
       <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
-      <td><button class="btn btn-primary" onclick="openScheduleModal('${c.id}')" style="padding:5px 10px;font-size:12px;">📅 Agendar</button></td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-secondary" onclick="openScheduleModal('${c.id}')" style="padding:5px 10px;font-size:12px;margin-right:3px;">📅 Agendar</button>
+        ${canRenew(c) ? `<button class="btn btn-primary" onclick="openRenewModal('${c.id}')" style="padding:5px 10px;font-size:12px;">♻ Renovar</button>` : ''}
+      </td>
     </tr>`;
   }).join('')
     : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Sem vencimentos próximos sem agendamento</td></tr>';
@@ -770,7 +778,93 @@ async function removeSchedule() {
   }
 }
 
-function openDetails(id) {
+// ============================================
+// MODAL — CONCLUIR RENOVAÇÃO
+// ============================================
+
+function openRenewModal(id) {
+  const cert = APP_STATE._allCertificates.find(c => c.id === id);
+  if (!cert) return;
+
+  q('#renewCertId').value = cert.id;
+  q('#renewEmissao').value = '';
+  q('#renewVencimento').value = '';
+  q('#renewModalInfo').innerHTML = `<strong>${cert.empresa_id}</strong> — ${cert.tipo_id || '—'} • Vencimento atual: ${fmt(cert.data_vencimento)}`;
+
+  q('#renewModal').classList.add('active');
+}
+
+function closeRenewModal() {
+  q('#renewModal').classList.remove('active');
+}
+
+async function saveRenewal() {
+  const id = q('#renewCertId').value;
+  const novaEmissao = q('#renewEmissao').value;
+  const novoVencimento = q('#renewVencimento').value;
+  if (!id || !novoVencimento) return;
+
+  const cert = APP_STATE._allCertificates.find(c => c.id === id);
+  if (!cert) return;
+
+  try {
+    const update = {
+      data_vencimento: novoVencimento,
+      situacao: 'Ativo',
+      data_renovacao_agendada: null,
+      atualizado_por: APP_STATE.currentUser?.usuario_id
+    };
+    if (novaEmissao) update.data_emissao = novaEmissao;
+
+    const { error } = await supabaseClient
+      .from(TABLE_NAMES.CERTIFICADOS)
+      .update(update)
+      .eq('id', id);
+    if (error) throw error;
+
+    const valorAnterior = `Emissão: ${fmt(cert.data_emissao) || '—'} • Vencimento: ${fmt(cert.data_vencimento) || '—'}`;
+    const valorNovo      = `Emissão: ${novaEmissao ? fmt(novaEmissao) : fmt(cert.data_emissao) || '—'} • Vencimento: ${fmt(novoVencimento)}`;
+
+    const { error: histError } = await supabaseClient
+      .from(TABLE_NAMES.HISTORICO)
+      .insert([{
+        certificado_id: id,
+        empresa_id: cert.empresa_id,
+        tipo_alteracao: 'Renovação',
+        campo_alterado: 'renovação',
+        valor_anterior: valorAnterior,
+        valor_novo: valorNovo,
+        responsavel: APP_STATE.currentUser?.nome_usuario || APP_STATE.currentUser?.usuario_email || null
+      }]);
+    if (histError) console.error('Erro ao registrar histórico de renovação:', histError);
+
+    showToast('Certificado renovado com sucesso!');
+    closeRenewModal();
+    await fetchCertificates();
+    if (q('#page-agenda')?.classList.contains('active')) renderAgendaPage();
+    if (q('#page-historico')?.classList.contains('active')) fetchHistory();
+  } catch (err) {
+    showToast('Erro ao renovar: ' + err.message, 'error');
+  }
+}
+
+async function fetchCertRenewalHistory(id) {
+  try {
+    const { data, error } = await supabaseClient
+      .from(TABLE_NAMES.HISTORICO)
+      .select('*')
+      .eq('certificado_id', id)
+      .eq('tipo_alteracao', 'Renovação')
+      .order('data_alteracao', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.error('Erro ao buscar histórico de renovações:', err);
+    return [];
+  }
+}
+
+async function openDetails(id) {
   const cert = APP_STATE._allCertificates.find(c => c.id === id);
   if (!cert) return;
 
@@ -779,6 +873,23 @@ function openDetails(id) {
   const dText  = d === null ? '—' : d < 0 ? `Vencido há ${Math.abs(d)} dias` : `${d} dias restantes`;
   const dBg    = d !== null && d <= 30 ? 'rgba(239,68,68,0.05)' : 'var(--bg-soft)';
   const dBorder = d !== null && d <= 30 ? 'rgba(239,68,68,0.2)' : 'var(--border)';
+
+  q('#detailsModal').classList.add('active');
+  q('#detailsContent').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">Carregando...</div>';
+
+  const renewals = await fetchCertRenewalHistory(id);
+  const renewalsHTML = renewals.length ? `
+    <div class="timeline">
+      ${renewals.map(r => `
+        <div class="timeline-item">
+          <div class="timeline-content">
+            <div class="timeline-title">♻ Renovação</div>
+            <div class="timeline-meta">${fmtDateTime(r.data_alteracao)}${r.responsavel ? ' • ' + r.responsavel : ''}</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px;"><em>${r.valor_anterior || '—'}</em> → <strong>${r.valor_novo || '—'}</strong></div>
+          </div>
+        </div>`).join('')}
+    </div>`
+    : '<div style="color:var(--text-muted);text-align:center;padding:12px;">Nenhuma renovação registrada ainda</div>';
 
   q('#detailsContent').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -803,11 +914,13 @@ function openDetails(id) {
       ${cert.informacoes_adicionais ? `<div style="grid-column:1/-1;">${dRow('📝 Informações', cert.informacoes_adicionais)}</div>` : ''}
       ${cert.observacao_risco ? `<div style="grid-column:1/-1;">${dRow('⚠️ Risco', cert.observacao_risco)}</div>` : ''}
     </div>
+    <h3 style="margin:24px 0 12px;font-size:15px;font-weight:700;">Histórico de renovações</h3>
+    ${renewalsHTML}
     <div style="display:flex;gap:8px;margin-top:20px;">
-      <button class="btn btn-primary" onclick="openCertModal('${cert.id}');closeDetailsModal();" style="flex:1;">✏ Editar</button>
+      ${canRenew(cert) ? `<button class="btn btn-primary" style="flex:1;color:#fff;background:var(--success);border-color:var(--success);" onclick="closeDetailsModal();openRenewModal('${cert.id}');">♻ Renovar</button>` : ''}
+      <button class="btn btn-secondary" onclick="openCertModal('${cert.id}');closeDetailsModal();" style="flex:1;">✏ Editar</button>
       <button class="btn btn-secondary" onclick="closeDetailsModal();" style="flex:1;">Fechar</button>
     </div>`;
-  q('#detailsModal').classList.add('active');
 }
 
 function dRow(label, value) {
@@ -1206,6 +1319,13 @@ function setupAppListeners() {
     saveSchedule();
   });
 
+  q('#closeRenewModal')?.addEventListener('click', closeRenewModal);
+  q('#cancelRenewForm')?.addEventListener('click', closeRenewModal);
+  q('#renewForm')?.addEventListener('submit', e => {
+    e.preventDefault();
+    saveRenewal();
+  });
+
   q('#userMenuBtn')?.addEventListener('click', () => q('#userDropdown').classList.toggle('active'));
   document.addEventListener('click', e => {
     if (!e.target.closest('.user-menu')) q('#userDropdown')?.classList.remove('active');
@@ -1227,6 +1347,7 @@ document.addEventListener('DOMContentLoaded', () => {
 window.openDetails              = openDetails;
 window.openCertModal            = openCertModal;
 window.openScheduleModal        = openScheduleModal;
+window.openRenewModal           = openRenewModal;
 window.removeCert               = removeCert;
 window.exportCSV                = exportCSV;
 window.filterRelatorio          = filterRelatorio;
