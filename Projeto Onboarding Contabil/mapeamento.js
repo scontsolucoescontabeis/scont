@@ -12,9 +12,18 @@
 
   const BANCOS_SUGERIDOS = ['Itaú', 'Bradesco', 'Banco do Brasil', 'Caixa', 'Santander', 'Sicoob', 'Sicredi', 'Inter', 'Nubank'];
   const SISTEMAS_SUGERIDOS = ['Domínio', 'Alterdata', 'Bling', 'Omie', 'Contmatic', 'SAP', 'Totvs'];
-  const ENTREGAVEIS_SUGERIDOS = ['Balancete', 'DRE', 'Folha de Pagamento', 'Guias de Impostos', 'Relatório Gerencial'];
   const OBRIGACOES_SUGERIDAS = ['SPED Fiscal', 'SPED Contribuições', 'ECD', 'ECF', 'DCTF', 'DCTFWeb', 'EFD-Reinf', 'DAS', 'DEFIS', 'DIRF'];
-  const FORMA_ENVIO_SUGERIDA = ['E-mail', 'WhatsApp', 'Google Drive', 'Sistema próprio'];
+
+  const ENTREGAVEIS_OPCOES = ['Folha de pagamento', 'Guias de impostos', 'Relatórios gerenciais', 'Balancete de verificação com análise vertical', 'Livro Diário', 'Livro Razão', 'Balanço Patrimonial', 'DFC', 'Outros'];
+  const FORMA_ENVIO_OPCOES = ['Onvio', 'Outros'];
+  const SISTEMA_FINANCEIRO_OPCOES = ['Conta Azul', 'Outros'];
+
+  // campo de checkbox → coluna onde fica o texto livre quando "Outros" é marcado
+  const CAMPOS_OUTROS_DETALHE = {
+    forma_envio_documentos: 'forma_envio_documentos_outros_detalhe',
+    entregaveis_esperados: 'entregaveis_esperados_outros_detalhe',
+    sistema_financeiro_utilizado: 'sistema_financeiro_outros_detalhe',
+  };
 
   let empresas = [];          // [{ codigo_empresa, nome_empresa }]
   let mapeamentos = [];       // linhas de contabil_mapeamento
@@ -365,16 +374,17 @@
             </select>
           </div>
           <div class="full"><label><input type="checkbox" data-campo="acesso_bancario_leitura" ${m.acesso_bancario_leitura ? 'checked' : ''}> Possui acesso bancário de leitura</label></div>
-          <div class="full">${renderTagsInput('forma_envio_documentos', 'Forma de Envio dos Documentos', m.forma_envio_documentos, FORMA_ENVIO_SUGERIDA)}</div>
+          <div class="full">${renderCheckboxGroup('forma_envio_documentos', 'Forma de Envio dos Documentos', m.forma_envio_documentos, FORMA_ENVIO_OPCOES, m.forma_envio_documentos_outros_detalhe)}</div>
           <div class="full" id="secaoBancos"></div>
           <div class="full">${renderTagsInput('sistemas_utilizados', 'Sistemas Utilizados', m.sistemas_utilizados, SISTEMAS_SUGERIDOS)}</div>
+          <div class="full">${renderCheckboxGroup('sistema_financeiro_utilizado', 'Sistema Financeiro Utilizado', m.sistema_financeiro_utilizado, SISTEMA_FINANCEIRO_OPCOES, m.sistema_financeiro_outros_detalhe)}</div>
         </div>
       </div>
 
       <div class="mapa-secao">
         <div class="mapa-secao-header">Entregáveis & Particularidades</div>
         <div class="mapa-secao-body">
-          <div class="full">${renderTagsInput('entregaveis_esperados', 'Entregáveis Esperados', m.entregaveis_esperados, ENTREGAVEIS_SUGERIDOS)}</div>
+          <div class="full">${renderCheckboxGroup('entregaveis_esperados', 'Entregáveis Esperados', m.entregaveis_esperados, ENTREGAVEIS_OPCOES, m.entregaveis_esperados_outros_detalhe)}</div>
           <div class="full">${renderTagsInput('obrigacoes_acessorias', 'Obrigações Acessórias', m.obrigacoes_acessorias, OBRIGACOES_SUGERIDAS)}</div>
           <div class="full"><label>Particularidades Contábeis</label><textarea data-campo="particularidades_contabeis" rows="3">${escapeHtml(m.particularidades_contabeis || '')}</textarea></div>
           <div class="full"><label>Particularidades Fiscais</label><textarea data-campo="particularidades_fiscais" rows="3">${escapeHtml(m.particularidades_fiscais || '')}</textarea></div>
@@ -426,6 +436,29 @@
       });
     });
 
+    main.querySelectorAll('[data-checkbox-grupo]').forEach((chk) => {
+      if (RO) { chk.disabled = true; return; }
+      chk.addEventListener('change', async () => {
+        const campo = chk.getAttribute('data-checkbox-grupo');
+        const valor = chk.getAttribute('data-checkbox-valor');
+        const atual = mapeamentoAtual[campo] || [];
+        const novaLista = chk.checked ? [...atual, valor] : atual.filter((v) => v !== valor);
+        await salvarTags(campo, novaLista);
+        const campoDetalhe = CAMPOS_OUTROS_DETALHE[campo];
+        if (valor === 'Outros' && campoDetalhe) {
+          if (chk.checked) { renderPerfil(); abrirModalOutros(campoDetalhe, mapeamentoAtual[campoDetalhe] || ''); return; }
+          await salvarCampoValor(campoDetalhe, null);
+        }
+        renderPerfil();
+      });
+    });
+    main.querySelectorAll('[data-editar-outros]').forEach((btn) => {
+      if (RO) { btn.style.display = 'none'; return; }
+      btn.addEventListener('click', () => {
+        abrirModalOutros(btn.getAttribute('data-editar-outros'), btn.getAttribute('data-outros-atual'));
+      });
+    });
+
     document.getElementById('btnRelatorioPDF').addEventListener('click', gerarRelatorioPDF);
 
     renderizarSecaoComIsolamento('Acessos Bancários', renderBancos);
@@ -457,6 +490,25 @@
       <div class="mapa-tags" data-tags-container="${campo}">${tagsHtml}</div>
       <input type="text" list="${datalistId}" placeholder="Adicionar e pressionar Enter" data-tag-input="${campo}">
       <datalist id="${datalistId}">${sugestoes.map((s) => `<option value="${escapeHtml(s)}">`).join('')}</datalist>
+    `;
+  }
+
+  function renderCheckboxGroup(campo, label, valoresSelecionados, opcoes, detalheOutrosAtual) {
+    valoresSelecionados = valoresSelecionados || [];
+    const itensHtml = opcoes.map((op) => `
+      <label class="mapa-checkbox-item">
+        <input type="checkbox" data-checkbox-grupo="${campo}" data-checkbox-valor="${escapeHtml(op)}" ${valoresSelecionados.includes(op) ? 'checked' : ''}>
+        ${escapeHtml(op)}
+      </label>
+    `).join('');
+    const campoDetalhe = CAMPOS_OUTROS_DETALHE[campo];
+    const detalheHtml = valoresSelecionados.includes('Outros')
+      ? `<div class="mapa-checkbox-detalhe">Outros: ${detalheOutrosAtual ? escapeHtml(detalheOutrosAtual) : '<em>não especificado</em>'} <button type="button" data-editar-outros="${campoDetalhe}" data-outros-atual="${escapeHtml(detalheOutrosAtual || '')}">editar</button></div>`
+      : '';
+    return `
+      <label>${label}</label>
+      <div class="mapa-checkbox-grupo" data-checkbox-container="${campo}">${itensHtml}</div>
+      ${detalheHtml}
     `;
   }
 
@@ -561,10 +613,61 @@
     }
   }
 
-  async function salvarTags(campo, novaLista) {
-    mapeamentoAtual[campo] = novaLista;
-    const { error } = await supabaseClient.from('contabil_mapeamento').update({ [campo]: novaLista }).eq('id', mapeamentoAtual.id);
+  async function salvarCampoValor(campo, valor) {
+    mapeamentoAtual[campo] = valor;
+    const { error } = await supabaseClient.from('contabil_mapeamento').update({ [campo]: valor }).eq('id', mapeamentoAtual.id);
     if (error) { console.error(error); mostrarToast('Erro ao salvar. Veja o console (F12) para detalhes.', 'erro'); }
+  }
+
+  async function salvarTags(campo, novaLista) {
+    await salvarCampoValor(campo, novaLista);
+  }
+
+  // ─── MODAL: "OUTROS" (texto livre) ─────────────────────────
+
+  let _outrosModalCampoDetalhe = null;
+
+  function abrirModalOutros(campoDetalhe, valorAtual) {
+    _outrosModalCampoDetalhe = campoDetalhe;
+    let modal = document.getElementById('modalOutros');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalOutros';
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Especifique "Outros"</h3>
+            <button class="modal-close" id="fecharModalOutros">✕</button>
+          </div>
+          <div class="modal-body">
+            <textarea id="outrosTexto" rows="4" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font:inherit"></textarea>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" id="cancelarOutros">Cancelar</button>
+            <button class="btn btn-primary" id="salvarOutros">Salvar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      document.getElementById('fecharModalOutros').addEventListener('click', fecharModalOutros);
+      document.getElementById('cancelarOutros').addEventListener('click', fecharModalOutros);
+      document.getElementById('salvarOutros').addEventListener('click', salvarModalOutros);
+    }
+    document.getElementById('outrosTexto').value = valorAtual || '';
+    modal.classList.add('active');
+    document.getElementById('outrosTexto').focus();
+  }
+
+  function fecharModalOutros() {
+    document.getElementById('modalOutros')?.classList.remove('active');
+  }
+
+  async function salvarModalOutros() {
+    const texto = document.getElementById('outrosTexto').value.trim();
+    await salvarCampoValor(_outrosModalCampoDetalhe, texto || null);
+    fecharModalOutros();
+    renderPerfil();
   }
 
   // ─── NÍVEL DE ATENÇÃO ───────────────────────────────────────
@@ -786,6 +889,10 @@
 
     const texto = (v) => (v == null || v === '' ? '—' : String(v));
     const tags = (arr) => (arr && arr.length ? arr.join(', ') : '—');
+    const tagsComOutros = (arr, detalhe) => {
+      if (!arr || !arr.length) return '—';
+      return arr.map((v) => (v === 'Outros' && detalhe ? `Outros (${detalhe})` : v)).join(', ');
+    };
 
     doc.setFillColor(139, 58, 58);
     doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, 20, 2, 2, 'F');
@@ -816,16 +923,17 @@
     const linhasOperacao = [
       ['Financeiro Interno ou BPO', m.financeiro_interno_bpo ? FINANCEIRO_LABELS[m.financeiro_interno_bpo] : '—'],
       ['Acesso Bancário de Leitura', m.acesso_bancario_leitura ? 'Sim' : 'Não'],
-      ['Forma de Envio dos Documentos', tags(m.forma_envio_documentos)],
+      ['Forma de Envio dos Documentos', tagsComOutros(m.forma_envio_documentos, m.forma_envio_documentos_outros_detalhe)],
     ];
     // Dados bancários não entram no PDF para quem não pode editar o
     // Mapeamento (Prestador de Serviço) — mesma restrição da tela.
     if (_podeEditar) linhasOperacao.push(['Bancos Utilizados', tags((bancosPorMapeamento[m.id] || []).map((b) => b.banco))]);
     linhasOperacao.push(['Sistemas Utilizados', tags(m.sistemas_utilizados)]);
+    linhasOperacao.push(['Sistema Financeiro Utilizado', tagsComOutros(m.sistema_financeiro_utilizado, m.sistema_financeiro_outros_detalhe)]);
     y = secaoTabelaPdf(doc, 'Operação / Financeiro', linhasOperacao, y, pageW, MARGEM);
 
     y = secaoTabelaPdf(doc, 'Entregáveis & Particularidades', [
-      ['Entregáveis Esperados', tags(m.entregaveis_esperados)],
+      ['Entregáveis Esperados', tagsComOutros(m.entregaveis_esperados, m.entregaveis_esperados_outros_detalhe)],
       ['Obrigações Acessórias', tags(m.obrigacoes_acessorias)],
       ['Particularidades Contábeis', texto(m.particularidades_contabeis)],
       ['Particularidades Fiscais', texto(m.particularidades_fiscais)],
@@ -865,7 +973,18 @@
     doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(139, 58, 58);
     doc.text('Empresas Relacionadas', MARGEM, y);
     doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(44, 62, 80);
-    doc.text(relacionadas.length ? relacionadas.join(', ') : 'Nenhuma empresa relacionada.', MARGEM, y + 6, { maxWidth: pageW - MARGEM * 2 });
+    const textoRelacionadas = relacionadas.length ? relacionadas.join(', ') : 'Nenhuma empresa relacionada.';
+    const linhasRelacionadas = doc.splitTextToSize(textoRelacionadas, pageW - MARGEM * 2);
+    doc.text(linhasRelacionadas, MARGEM, y + 6);
+    y += 6 + linhasRelacionadas.length * 4.2 + 8;
+
+    if (y > pageH - 25) { doc.addPage(); y = MARGEM; }
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(139, 58, 58);
+    doc.text('Observações Gerais', MARGEM, y);
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(44, 62, 80);
+    const textoObs = m.observacoes_gerais && m.observacoes_gerais.trim() ? m.observacoes_gerais : 'Nenhuma observação registrada.';
+    const linhasObs = doc.splitTextToSize(textoObs, pageW - MARGEM * 2);
+    doc.text(linhasObs, MARGEM, y + 6);
 
     const nomeArquivoSeguro = nomeEmpresa
       .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');

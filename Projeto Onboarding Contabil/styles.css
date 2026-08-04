@@ -717,6 +717,8 @@ input,select,textarea{font:inherit}
 .mapa-checkbox-grupo{ display:flex; flex-wrap:wrap; gap:10px; }
 .mapa-checkbox-item{ display:flex; align-items:center; gap:5px; font-size:12.5px; color:var(--text); font-weight:normal; margin:0; }
 .mapa-checkbox-item input{ width:auto; }
+.mapa-checkbox-detalhe{ margin-top:6px; font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.mapa-checkbox-detalhe button{ border:none; background:none; color:var(--brand); cursor:pointer; font-size:12px; text-decoration:underline; padding:0; }
 .mapa-tag button{ border:none; background:none; cursor:pointer; color:var(--muted); font-size:13px; line-height:1; }
 
 .mapa-pendencia-item{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--line-soft); font-size:13px; }
