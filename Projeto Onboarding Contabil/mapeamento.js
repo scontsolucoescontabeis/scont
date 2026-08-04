@@ -11,18 +11,17 @@
   const PERIODICIDADE_LABELS = { mensal: 'Mensal', trimestral: 'Trimestral', anual: 'Anual' };
 
   const BANCOS_SUGERIDOS = ['Itaú', 'Bradesco', 'Banco do Brasil', 'Caixa', 'Santander', 'Sicoob', 'Sicredi', 'Inter', 'Nubank'];
-  const SISTEMAS_SUGERIDOS = ['Domínio', 'Alterdata', 'Bling', 'Omie', 'Contmatic', 'SAP', 'Totvs'];
   const OBRIGACOES_SUGERIDAS = ['SPED Fiscal', 'SPED Contribuições', 'ECD', 'ECF', 'DCTF', 'DCTFWeb', 'EFD-Reinf', 'DAS', 'DEFIS', 'DIRF'];
 
   const ENTREGAVEIS_OPCOES = ['Folha de pagamento', 'Guias de impostos', 'Relatórios gerenciais', 'Balancete de verificação com análise vertical', 'Livro Diário', 'Livro Razão', 'Balanço Patrimonial', 'DFC', 'Outros'];
   const FORMA_ENVIO_OPCOES = ['Onvio', 'Outros'];
-  const SISTEMA_FINANCEIRO_OPCOES = ['Conta Azul', 'Outros'];
+  const SISTEMAS_OPCOES = ['Domínio', 'Alterdata', 'Bling', 'Omie', 'Contmatic', 'SAP', 'Totvs', 'Conta Azul', 'Outros'];
 
   // campo de checkbox → coluna onde fica o texto livre quando "Outros" é marcado
   const CAMPOS_OUTROS_DETALHE = {
     forma_envio_documentos: 'forma_envio_documentos_outros_detalhe',
     entregaveis_esperados: 'entregaveis_esperados_outros_detalhe',
-    sistema_financeiro_utilizado: 'sistema_financeiro_outros_detalhe',
+    sistemas_utilizados: 'sistemas_utilizados_outros_detalhe',
   };
 
   let empresas = [];          // [{ codigo_empresa, nome_empresa }]
@@ -376,8 +375,7 @@
           <div class="full"><label><input type="checkbox" data-campo="acesso_bancario_leitura" ${m.acesso_bancario_leitura ? 'checked' : ''}> Possui acesso bancário de leitura</label></div>
           <div class="full">${renderCheckboxGroup('forma_envio_documentos', 'Forma de Envio dos Documentos', m.forma_envio_documentos, FORMA_ENVIO_OPCOES, m.forma_envio_documentos_outros_detalhe)}</div>
           <div class="full" id="secaoBancos"></div>
-          <div class="full">${renderTagsInput('sistemas_utilizados', 'Sistemas Utilizados', m.sistemas_utilizados, SISTEMAS_SUGERIDOS)}</div>
-          <div class="full">${renderCheckboxGroup('sistema_financeiro_utilizado', 'Sistema Financeiro Utilizado', m.sistema_financeiro_utilizado, SISTEMA_FINANCEIRO_OPCOES, m.sistema_financeiro_outros_detalhe)}</div>
+          <div class="full">${renderCheckboxGroup('sistemas_utilizados', 'Sistemas Utilizados', m.sistemas_utilizados, SISTEMAS_OPCOES, m.sistemas_utilizados_outros_detalhe)}</div>
         </div>
       </div>
 
@@ -928,8 +926,7 @@
     // Dados bancários não entram no PDF para quem não pode editar o
     // Mapeamento (Prestador de Serviço) — mesma restrição da tela.
     if (_podeEditar) linhasOperacao.push(['Bancos Utilizados', tags((bancosPorMapeamento[m.id] || []).map((b) => b.banco))]);
-    linhasOperacao.push(['Sistemas Utilizados', tags(m.sistemas_utilizados)]);
-    linhasOperacao.push(['Sistema Financeiro Utilizado', tagsComOutros(m.sistema_financeiro_utilizado, m.sistema_financeiro_outros_detalhe)]);
+    linhasOperacao.push(['Sistemas Utilizados', tagsComOutros(m.sistemas_utilizados, m.sistemas_utilizados_outros_detalhe)]);
     y = secaoTabelaPdf(doc, 'Operação / Financeiro', linhasOperacao, y, pageW, MARGEM);
 
     y = secaoTabelaPdf(doc, 'Entregáveis & Particularidades', [
