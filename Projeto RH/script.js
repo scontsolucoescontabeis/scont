@@ -2012,6 +2012,10 @@ function _competenciaMesSeguinte(comp) {
     return `${String(mesSeg).padStart(2, '0')}/${anoSeg}`;
 }
 
+function _pdfIndividualAtivo(cfg) {
+    return !!cfg && cfg['pdf_individual_por_empregado']?.cod === '1';
+}
+
 function atualizarExemploBeneficiosPeriodo() {
     const el = document.getElementById('cfgBeneficiosPeriodoExemplo');
     if (!el) return;
@@ -2133,6 +2137,8 @@ function _preencherCamposConfigRubricas(cfg) {
     if (cBenPeriodoInicio) cBenPeriodoInicio.value = cfg['beneficios_periodo_dia_inicio']?.cod || '';
     if (cBenPeriodoFim)    cBenPeriodoFim.value = cfg['beneficios_periodo_dia_fim']?.cod || '';
     atualizarExemploBeneficiosPeriodo();
+    const cPdfIndividual = document.getElementById('cfgPdfIndividualPorEmpregado');
+    if (cPdfIndividual) cPdfIndividual.checked = cfg['pdf_individual_por_empregado']?.cod === '1';
 }
 
 function _limparCamposConfigRubricas() {
@@ -2186,6 +2192,8 @@ function _limparCamposConfigRubricas() {
     if (cBenPeriodoInicio2) cBenPeriodoInicio2.value = '';
     if (cBenPeriodoFim2)    cBenPeriodoFim2.value = '';
     atualizarExemploBeneficiosPeriodo();
+    const cPdfIndividual2 = document.getElementById('cfgPdfIndividualPorEmpregado');
+    if (cPdfIndividual2) cPdfIndividual2.checked = false;
 }
 
 // --- GRUPOS DE EMPRESAS ---
@@ -2853,6 +2861,7 @@ async function salvarConfigRubricas() {
         { codigo_empresa: codigoEmpresa, evento: 'beneficios_periodo_ativo',      codigo_rubrica: document.getElementById('cfgBeneficiosPeriodoAtivo')?.checked ? '1' : '0', tipo_valor: 'config' },
         { codigo_empresa: codigoEmpresa, evento: 'beneficios_periodo_dia_inicio', codigo_rubrica: (document.getElementById('cfgBeneficiosPeriodoDiaInicio')?.value || '').trim(), tipo_valor: 'config' },
         { codigo_empresa: codigoEmpresa, evento: 'beneficios_periodo_dia_fim',    codigo_rubrica: (document.getElementById('cfgBeneficiosPeriodoDiaFim')?.value || '').trim(), tipo_valor: 'config' },
+        { codigo_empresa: codigoEmpresa, evento: 'pdf_individual_por_empregado',   codigo_rubrica: document.getElementById('cfgPdfIndividualPorEmpregado')?.checked ? '1' : '0', tipo_valor: 'config' },
     ];
 
     try {
@@ -4108,9 +4117,10 @@ function _prepararContainerRecibosOffscreen(sheetsHtml) {
     return container;
 }
 
-// Gera 1 PDF (1 página por empregado elegível, 2 vias cada) e dispara o download
-// automático — sem diálogo de impressão.
-async function _gerarPdfRecibos(nomeArquivo, sheetsHtml) {
+// Gera 1 PDF (1 página por empregado elegível, 2 vias cada). Por padrão dispara o
+// download automático (nomeArquivo); com retornarBlob=true devolve o blob em vez de
+// salvar, para ser empacotado em .zip (PDF individual por empregado).
+async function _gerarPdfRecibos(nomeArquivo, sheetsHtml, retornarBlob = false) {
     const container = _prepararContainerRecibosOffscreen(sheetsHtml);
     try {
         const paginas = Array.from(container.querySelectorAll('.gm-recibo-va'));
@@ -4134,10 +4144,22 @@ async function _gerarPdfRecibos(nomeArquivo, sheetsHtml) {
             pdf.addImage(imgData, 'JPEG', x, y, larguraImg, alturaImg);
         }
 
+        if (retornarBlob) return pdf.output('blob');
         pdf.save(nomeArquivo);
     } finally {
         container.remove();
     }
+}
+
+// Dispara o download de um blob já pronto (usado para os .zip de PDFs individuais
+// por empregado, tanto em Benefícios quanto em Folha de Ponto).
+function _baixarBlob(blob, nomeArquivo) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomeArquivo;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 async function gerarRecibosBeneficios() {
@@ -4189,14 +4211,26 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
 
     if (grupos.length === 0) { mostrarMensagem('Aviso', 'Nenhum recibo gerado — todos os valores de VT/VA estão zerados ou em branco.'); return; }
 
-    const totalPdfs = grupos.length + porEmpresa.size;
-    mostrarMensagem('Aguarde', `Gerando ${totalPdfs} PDF(s) de recibos e relatórios líquidos...`);
+    mostrarMensagem('Aguarde', 'Gerando os recibos e relatórios líquidos...');
     try {
         for (const grupo of grupos) {
-            const sheetsHtml = grupo.elegiveis.map(l => _reciboSheetHTML(grupo.tipo, l, periodoTexto)).join('');
             const nomeEmpresaArquivo = grupo.nomeEmpresa.replace(/[^\p{L}\p{N}]+/gu, '_');
-            const nomeArquivo = `${grupo.codigoEmpresa}_Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesFmt}${ano}.pdf`;
-            await _gerarPdfRecibos(nomeArquivo, sheetsHtml);
+            const cfgEmpresa = await _buscarConfigRubricas(grupo.codigoEmpresa);
+            if (_pdfIndividualAtivo(cfgEmpresa)) {
+                const zip = new JSZip();
+                for (const l of grupo.elegiveis) {
+                    const sheetHtml = _reciboSheetHTML(grupo.tipo, l, periodoTexto);
+                    const blob = await _gerarPdfRecibos(null, sheetHtml, true);
+                    const nomeEmpregadoArquivo = l.nome_empregado.replace(/[^\p{L}\p{N}]+/gu, '_');
+                    zip.file(`${grupo.codigoEmpresa}_Recibo_${grupo.label.replace(/\s+/g, '_')}_${l.codigo_empregado}_${nomeEmpregadoArquivo}_${mesFmt}${ano}.pdf`, blob);
+                }
+                const blobZip = await zip.generateAsync({ type: 'blob' });
+                _baixarBlob(blobZip, `Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesFmt}${ano}.zip`);
+            } else {
+                const sheetsHtml = grupo.elegiveis.map(l => _reciboSheetHTML(grupo.tipo, l, periodoTexto)).join('');
+                const nomeArquivo = `${grupo.codigoEmpresa}_Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesFmt}${ano}.pdf`;
+                await _gerarPdfRecibos(nomeArquivo, sheetsHtml);
+            }
         }
         porEmpresa.forEach((grupo, codigoEmpresa) => {
             _relatorioLiquidoBeneficiosPDF({ codigoEmpresa, nomeEmpresa: grupo.nomeEmpresa, linhas: grupo.linhas }, comp, periodoTexto, mesFmt, ano);
@@ -5062,17 +5096,9 @@ function _renderizarListaFolhaPonto(avisos) {
     document.getElementById('folhaPontoResultadoContainer').style.display = 'block';
 }
 
-// Constrói o PDF de uma empresa (uma página por empregado) e devolve a instância jsPDF
-// pronta para .save() ou .output('blob').
-function _construirPdfEmpresaFolhaPonto(empresaDados) {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    const MARGEM = 8;
-    const pageW = doc.internal.pageSize.getWidth();
-
-    empresaDados.empregados.forEach((emp, idx) => {
-        if (idx > 0) doc.addPage();
-
+// Desenha a página de folha de ponto de 1 empregado na posição atual do doc (sem
+// addPage) — usada tanto no PDF único por empresa quanto no PDF individual por empregado.
+function _desenharPaginaFolhaPontoEmpregado(doc, empresaDados, emp, MARGEM, pageW) {
         doc.setFontSize(11); doc.setFont('helvetica', 'bold');
         doc.text('FOLHA INDIVIDUAL DE PONTO', MARGEM, MARGEM + 4);
         doc.setFontSize(9); doc.setFont('helvetica', 'normal');
@@ -5133,8 +5159,32 @@ function _construirPdfEmpresaFolhaPonto(empresaDados) {
         doc.text('Visto chefia', MARGEM + 12, finalY + 22);
         doc.text('_______________________________', pageW / 2 + 10, finalY + 18);
         doc.text('Visto funcionário', pageW / 2 + 22, finalY + 22);
+}
+
+// Constrói o PDF de uma empresa (uma página por empregado) e devolve a instância jsPDF
+// pronta para .save() ou .output('blob').
+function _construirPdfEmpresaFolhaPonto(empresaDados) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const MARGEM = 8;
+    const pageW = doc.internal.pageSize.getWidth();
+
+    empresaDados.empregados.forEach((emp, idx) => {
+        if (idx > 0) doc.addPage();
+        _desenharPaginaFolhaPontoEmpregado(doc, empresaDados, emp, MARGEM, pageW);
     });
 
+    return doc;
+}
+
+// Constrói o PDF de folha de ponto de um único empregado (PDF individual por
+// empregado, quando a empresa tem o toggle "pdf_individual_por_empregado" ativo).
+function _construirPdfEmpregadoFolhaPonto(empresaDados, emp) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const MARGEM = 8;
+    const pageW = doc.internal.pageSize.getWidth();
+    _desenharPaginaFolhaPontoEmpregado(doc, empresaDados, emp, MARGEM, pageW);
     return doc;
 }
 
@@ -5143,7 +5193,13 @@ async function baixarPdfsFolhaPonto() {
     if (!dados || dados.empresas.length === 0) return;
     const [mm, aaaa] = dados.competencia.split('/');
 
-    if (dados.empresas.length === 1) {
+    const cfgsPorEmpresa = {};
+    for (const empresaDados of dados.empresas) {
+        cfgsPorEmpresa[empresaDados.codigo_empresa] = await _buscarConfigRubricas(empresaDados.codigo_empresa);
+    }
+    const algumaIndividual = dados.empresas.some(e => _pdfIndividualAtivo(cfgsPorEmpresa[e.codigo_empresa]));
+
+    if (dados.empresas.length === 1 && !algumaIndividual) {
         const empresaDados = dados.empresas[0];
         const doc = _construirPdfEmpresaFolhaPonto(empresaDados);
         doc.save(`FolhaDePonto_${empresaDados.codigo_empresa}_${mm}-${aaaa}.pdf`);
@@ -5154,17 +5210,21 @@ async function baixarPdfsFolhaPonto() {
     try {
         const zip = new JSZip();
         for (const empresaDados of dados.empresas) {
-            const doc = _construirPdfEmpresaFolhaPonto(empresaDados);
-            const blob = doc.output('blob');
-            zip.file(`FolhaDePonto_${empresaDados.codigo_empresa}_${mm}-${aaaa}.pdf`, blob);
+            if (_pdfIndividualAtivo(cfgsPorEmpresa[empresaDados.codigo_empresa])) {
+                empresaDados.empregados.forEach(emp => {
+                    const doc = _construirPdfEmpregadoFolhaPonto(empresaDados, emp);
+                    const blob = doc.output('blob');
+                    const nomeEmpregadoArquivo = emp.nome_empregado.replace(/[^\p{L}\p{N}]+/gu, '_');
+                    zip.file(`FolhaDePonto_${empresaDados.codigo_empresa}_${emp.codigo_empregado}_${nomeEmpregadoArquivo}_${mm}-${aaaa}.pdf`, blob);
+                });
+            } else {
+                const doc = _construirPdfEmpresaFolhaPonto(empresaDados);
+                const blob = doc.output('blob');
+                zip.file(`FolhaDePonto_${empresaDados.codigo_empresa}_${mm}-${aaaa}.pdf`, blob);
+            }
         }
         const blobZip = await zip.generateAsync({ type: 'blob' });
-        const url = URL.createObjectURL(blobZip);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `FolhasDePonto_${mm}-${aaaa}.zip`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        _baixarBlob(blobZip, `FolhasDePonto_${mm}-${aaaa}.zip`);
         fecharModalMensagem();
     } catch (erro) {
         console.error('Erro ao gerar zip de folhas de ponto:', erro);
