@@ -11,6 +11,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const state = {
     empresas: [],
     empregadosDisponiveis: [],
+    jornadasDisponiveis: [], // rh_jornadas cadastradas para a empresa selecionada
     empresaSelecionada: null,
     competencia: '',
     periodoApuracaoInicio: null, // dia do mês anterior à competência (período customizado da empresa)
@@ -182,6 +183,7 @@ async function selecionarEmpresa(codigo, nome) {
     if (label) label.textContent = '';
     const cfg = await _buscarConfigRubricas(codigo);
     _aplicarConfigEmpresaNaTelaEdicao(cfg);
+    state.jornadasDisponiveis = await _buscarJornadas(codigo);
     state.feriasCalculadas = await carregarFeriasCalculadas(codigo);
     const obsBanner     = document.getElementById('empresaObservacoesBanner');
     const obsTexto      = document.getElementById('empresaObservacoesTexto');
@@ -225,7 +227,7 @@ async function carregarEmpregados(codigoEmpresa) {
     try {
         const { data, error } = await supabaseClient
             .from('rh_empregados')
-            .select('codigo_empregado, nome_empregado, tipo_empregado, situacao')
+            .select('codigo_empregado, nome_empregado, tipo_empregado, situacao, jornada_id')
             .eq('codigo_empresa', codigoEmpresa)
             .order('nome_empregado', { ascending: true });
         if (error) throw error;
@@ -234,6 +236,32 @@ async function carregarEmpregados(codigoEmpresa) {
         console.error('Erro ao carregar empregados:', erro);
         mostrarMensagem('Erro', 'Falha ao carregar a lista de empregados.');
     }
+}
+
+// Resolve a jornada efetiva de um empregado: a jornada nomeada associada a
+// ele (rh_jornadas, via rh_empregados.jornada_id), ou a Jornada Padrão da
+// empresa (state.jornada*) quando não há associação.
+function _resolverJornadaEmpregado(empregadoId) {
+    const padrao = {
+        jornada: state.jornada,
+        jornadaSextaAtiva: state.jornadaSextaAtiva,
+        jornadaSexta: state.jornadaSexta,
+        jornadaSabadoAtiva: state.jornadaSabadoAtiva,
+        jornadaSabado: state.jornadaSabado,
+        sabadoSempreExtra: state.sabadoSempreExtra,
+    };
+    const emp = state.empregadosDisponiveis.find(e => e.codigo_empregado === empregadoId);
+    if (!emp || !emp.jornada_id) return padrao;
+    const jornada = state.jornadasDisponiveis.find(j => j.id === emp.jornada_id);
+    if (!jornada) return padrao;
+    return {
+        jornada: jornada.jornada_diaria,
+        jornadaSextaAtiva: !!jornada.jornada_sexta_ativa,
+        jornadaSexta: jornada.jornada_sexta,
+        jornadaSabadoAtiva: !!jornada.jornada_sabado_ativa,
+        jornadaSabado: jornada.jornada_sabado,
+        sabadoSempreExtra: !!jornada.sabado_sempre_extra,
+    };
 }
 
 // ✅ Mapa codigo_empregado -> períodos de férias, para exibição na Folha de Ponto
@@ -1213,17 +1241,18 @@ async function processarFolhaComSalvamento(nomeResponsavel) {
                 flagsFolgaType: typeof flagsFolgaObj
             });
             
+            const jr = _resolverJornadaEmpregado(folha.empregadoId);
             return {
                 usuario_id: usuarioUUID,
                 empresa_codigo: state.empresaSelecionada.codigo_empresa,
                 nome_trabalhador: folha.nome,
                 competencia: state.competencia,
-                jornada: state.jornada,
-                jornada_sexta: state.jornadaSextaAtiva ? state.jornadaSexta : null,
-                jornada_sexta_ativa: state.jornadaSextaAtiva,
-                jornada_sabado: state.jornadaSabadoAtiva ? state.jornadaSabado : null,
-                jornada_sabado_ativa: state.jornadaSabadoAtiva,
-                sabado_sempre_extra: state.sabadoSempreExtra,
+                jornada: jr.jornada,
+                jornada_sexta: jr.jornadaSextaAtiva ? jr.jornadaSexta : null,
+                jornada_sexta_ativa: jr.jornadaSextaAtiva,
+                jornada_sabado: jr.jornadaSabadoAtiva ? jr.jornadaSabado : null,
+                jornada_sabado_ativa: jr.jornadaSabadoAtiva,
+                sabado_sempre_extra: jr.sabadoSempreExtra,
                 rule_extra_100_opcional: state.ruleExtra100Optional,
                 dados_json: JSON.stringify(folha.dados),
                 feriados_json: JSON.stringify(state.feriados),
@@ -1346,18 +1375,19 @@ function simpleHash(str) {
 
 // --- MOTOR DE CÁLCULO ---
 function calcularFolha(folha) {
-    const jornadaMinutos = converterHoraParaMinutos(state.jornada);
-    const jornadaSextaMinutos = (state.jornadaSextaAtiva && state.jornadaSexta)
-        ? converterHoraParaMinutos(state.jornadaSexta)
+    const jr = _resolverJornadaEmpregado(folha.empregadoId);
+    const jornadaMinutos = converterHoraParaMinutos(jr.jornada);
+    const jornadaSextaMinutos = (jr.jornadaSextaAtiva && jr.jornadaSexta)
+        ? converterHoraParaMinutos(jr.jornadaSexta)
         : jornadaMinutos;
-    const jornadaSabadoMinutos = (state.jornadaSabadoAtiva && state.jornadaSabado)
-        ? converterHoraParaMinutos(state.jornadaSabado)
+    const jornadaSabadoMinutos = (jr.jornadaSabadoAtiva && jr.jornadaSabado)
+        ? converterHoraParaMinutos(jr.jornadaSabado)
         : jornadaMinutos;
     let totalTrabalhado = 0, totalExtra50 = 0, totalExtra100 = 0, totalNoturno = 0, totalNoturnoConvertido = 0, totalFaltante = 0, totalFaltas = 0;
 
     const diasCalculados = folha.dados.map(dia => {
         const jornadaEfetiva = dia.diaSemana === 'Sab'
-            ? (state.sabadoSempreExtra ? 0 : jornadaSabadoMinutos)
+            ? (jr.sabadoSempreExtra ? 0 : jornadaSabadoMinutos)
             : dia.diaSemana === 'Sex'
                 ? jornadaSextaMinutos
                 : jornadaMinutos;
@@ -2194,6 +2224,257 @@ function _limparCamposConfigRubricas() {
     atualizarExemploBeneficiosPeriodo();
     const cPdfIndividual2 = document.getElementById('cfgPdfIndividualPorEmpregado');
     if (cPdfIndividual2) cPdfIndividual2.checked = false;
+
+    _jornadasConfigAtual = [];
+    _empregadosConfigAtual = [];
+    cancelarFormJornada();
+    const jList = document.getElementById('cfgJornadasLista');
+    if (jList) jList.innerHTML = 'Selecione uma empresa para ver as jornadas cadastradas.';
+    const assocList = document.getElementById('cfgAssociacaoEmpregados');
+    if (assocList) assocList.innerHTML = 'Selecione uma empresa para associar empregados a uma jornada.';
+    const btnAssoc = document.getElementById('cfgBtnSalvarAssociacoes');
+    if (btnAssoc) btnAssoc.style.display = 'none';
+}
+
+// --- JORNADAS DE TRABALHO EXTRAS (além da Jornada Padrão) ---
+
+let _cacheJornadas = {};
+let _jornadasConfigAtual = [];
+let _empregadosConfigAtual = [];
+
+async function _buscarJornadas(codigoEmpresa) {
+    if (!codigoEmpresa) return [];
+    if (_cacheJornadas[codigoEmpresa] !== undefined) return _cacheJornadas[codigoEmpresa];
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_jornadas')
+            .select('id, codigo_empresa, nome, jornada_diaria, jornada_sexta_ativa, jornada_sexta, jornada_sabado_ativa, jornada_sabado, sabado_sempre_extra')
+            .eq('codigo_empresa', codigoEmpresa)
+            .order('nome', { ascending: true });
+        if (error) throw error;
+        _cacheJornadas[codigoEmpresa] = data || [];
+        return _cacheJornadas[codigoEmpresa];
+    } catch (erro) {
+        console.error('Erro ao carregar jornadas:', erro);
+        _cacheJornadas[codigoEmpresa] = [];
+        return [];
+    }
+}
+
+function _invalidarCacheJornadas(codigoEmpresa) {
+    delete _cacheJornadas[codigoEmpresa];
+}
+
+async function _carregarSecaoJornadasConfig(codigoEmpresa) {
+    _invalidarCacheJornadas(codigoEmpresa);
+    cancelarFormJornada();
+    _jornadasConfigAtual = await _buscarJornadas(codigoEmpresa);
+    _renderizarListaJornadasConfig();
+    await _carregarEmpregadosConfigAssociacao(codigoEmpresa);
+    _renderizarAssociacaoEmpregadosConfig();
+}
+
+function _renderizarListaJornadasConfig() {
+    const container = document.getElementById('cfgJornadasLista');
+    if (!container) return;
+    if (_jornadasConfigAtual.length === 0) {
+        container.innerHTML = 'Nenhuma jornada extra cadastrada. Empregados usam a Jornada Padrão acima.';
+        return;
+    }
+    container.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${_jornadasConfigAtual.map(j => {
+                const excecoes = [];
+                if (j.jornada_sexta_ativa) excecoes.push(`sexta ${j.jornada_sexta || ''}`);
+                if (j.sabado_sempre_extra) excecoes.push('sábado sempre extra');
+                else if (j.jornada_sabado_ativa) excecoes.push(`sábado ${j.jornada_sabado || ''}`);
+                return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f0f0f0;">
+                    <div>
+                        <span style="font-weight: 600;">${j.nome}</span>
+                        <span style="color: var(--text-secondary); margin-left: 8px;">${j.jornada_diaria}${excecoes.length ? ' · ' + excecoes.join(', ') : ''}</span>
+                    </div>
+                    <div style="display: flex; gap: 4px;">
+                        <button type="button" class="btn-icon" title="Editar" onclick="editarJornadaConfig('${j.id}')">✏️</button>
+                        <button type="button" class="btn-icon" title="Excluir" style="color: var(--danger-color);" onclick="excluirJornadaConfig('${j.id}')">🗑️</button>
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>
+    `;
+}
+
+function abrirFormNovaJornada() {
+    document.getElementById('cfgJornadaFormId').value = '';
+    document.getElementById('cfgJornadaFormNome').value = '';
+    document.getElementById('cfgJornadaFormDiaria').value = '08:00';
+    document.getElementById('cfgJornadaFormSextaAtiva').checked = false;
+    document.getElementById('cfgJornadaFormSextaContainer').style.display = 'none';
+    document.getElementById('cfgJornadaFormSexta').value = '04:00';
+    document.getElementById('cfgJornadaFormSabadoAtiva').checked = false;
+    document.getElementById('cfgJornadaFormSabadoContainer').style.display = 'none';
+    document.getElementById('cfgJornadaFormSabado').value = '04:00';
+    document.getElementById('cfgJornadaFormSabadoSempreExtra').checked = false;
+    document.getElementById('cfgJornadaFormContainer').style.display = 'block';
+}
+
+function cancelarFormJornada() {
+    const container = document.getElementById('cfgJornadaFormContainer');
+    if (container) container.style.display = 'none';
+}
+
+function editarJornadaConfig(id) {
+    const j = _jornadasConfigAtual.find(x => x.id === id);
+    if (!j) return;
+    abrirFormNovaJornada();
+    document.getElementById('cfgJornadaFormId').value = j.id;
+    document.getElementById('cfgJornadaFormNome').value = j.nome;
+    document.getElementById('cfgJornadaFormDiaria').value = j.jornada_diaria || '08:00';
+    document.getElementById('cfgJornadaFormSextaAtiva').checked = !!j.jornada_sexta_ativa;
+    document.getElementById('cfgJornadaFormSextaContainer').style.display = j.jornada_sexta_ativa ? 'flex' : 'none';
+    document.getElementById('cfgJornadaFormSexta').value = j.jornada_sexta || '04:00';
+    document.getElementById('cfgJornadaFormSabadoAtiva').checked = !!j.jornada_sabado_ativa;
+    document.getElementById('cfgJornadaFormSabadoContainer').style.display = j.jornada_sabado_ativa ? 'flex' : 'none';
+    document.getElementById('cfgJornadaFormSabado').value = j.jornada_sabado || '04:00';
+    document.getElementById('cfgJornadaFormSabadoSempreExtra').checked = !!j.sabado_sempre_extra;
+}
+
+async function salvarJornadaConfig() {
+    const codigoEmpresa = (document.getElementById('cfgCodigoEmpresa')?.value || '').trim();
+    if (!codigoEmpresa) { mostrarMensagem('Aviso', 'Selecione uma empresa antes de salvar.'); return; }
+
+    const id = document.getElementById('cfgJornadaFormId').value || null;
+    const nome = document.getElementById('cfgJornadaFormNome').value.trim();
+    const diaria = document.getElementById('cfgJornadaFormDiaria').value.trim();
+    const sextaAtiva = document.getElementById('cfgJornadaFormSextaAtiva').checked;
+    const sexta = document.getElementById('cfgJornadaFormSexta').value.trim();
+    const sabadoSempreExtra = document.getElementById('cfgJornadaFormSabadoSempreExtra').checked;
+    const sabadoAtiva = !sabadoSempreExtra && document.getElementById('cfgJornadaFormSabadoAtiva').checked;
+    const sabado = document.getElementById('cfgJornadaFormSabado').value.trim();
+
+    if (!nome) { mostrarMensagem('Erro', 'Informe um nome para a jornada.'); return; }
+    if (!validarHora(diaria)) { mostrarMensagem('Erro', 'Horas diárias inválidas.'); return; }
+    if (sextaAtiva && !validarHora(sexta)) { mostrarMensagem('Erro', 'Jornada da Sexta inválida.'); return; }
+    if (sabadoAtiva && !validarHora(sabado)) { mostrarMensagem('Erro', 'Jornada do Sábado inválida.'); return; }
+
+    const row = {
+        codigo_empresa: codigoEmpresa,
+        nome,
+        jornada_diaria: diaria,
+        jornada_sexta_ativa: sextaAtiva,
+        jornada_sexta: sextaAtiva ? sexta : null,
+        jornada_sabado_ativa: sabadoAtiva,
+        jornada_sabado: sabadoAtiva ? sabado : null,
+        sabado_sempre_extra: sabadoSempreExtra,
+    };
+
+    try {
+        const query = id
+            ? supabaseClient.from('rh_jornadas').update(row).eq('id', id)
+            : supabaseClient.from('rh_jornadas').insert(row);
+        const { error } = await query;
+        if (error) throw error;
+        cancelarFormJornada();
+        await _carregarSecaoJornadasConfig(codigoEmpresa);
+        mostrarMensagem('Sucesso', '✅ Jornada salva com sucesso!');
+    } catch (e) {
+        mostrarMensagem('Erro', 'Erro ao salvar jornada: ' + e.message);
+    }
+}
+
+function excluirJornadaConfig(id) {
+    const codigoEmpresa = (document.getElementById('cfgCodigoEmpresa')?.value || '').trim();
+    const j = _jornadasConfigAtual.find(x => x.id === id);
+    if (!j) return;
+    mostrarConfirmacao('Excluir Jornada', `Excluir a jornada "${j.nome}"? Empregados associados a ela voltam a usar a Jornada Padrão.`, async () => {
+        try {
+            const { error } = await supabaseClient.from('rh_jornadas').delete().eq('id', id);
+            if (error) throw error;
+            await _carregarSecaoJornadasConfig(codigoEmpresa);
+            mostrarMensagem('Sucesso', '✅ Jornada excluída com sucesso!');
+        } catch (e) {
+            mostrarMensagem('Erro', 'Erro ao excluir jornada: ' + e.message);
+        }
+    });
+}
+
+async function _carregarEmpregadosConfigAssociacao(codigoEmpresa) {
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_empregados')
+            .select('codigo_empregado, nome_empregado, tipo_empregado, situacao, jornada_id')
+            .eq('codigo_empresa', codigoEmpresa)
+            .order('nome_empregado', { ascending: true });
+        if (error) throw error;
+        _empregadosConfigAtual = _excluirContribuinte(data);
+    } catch (erro) {
+        console.error('Erro ao carregar empregados para associação de jornada:', erro);
+        _empregadosConfigAtual = [];
+    }
+}
+
+function _renderizarAssociacaoEmpregadosConfig() {
+    const container = document.getElementById('cfgAssociacaoEmpregados');
+    const btnSalvar = document.getElementById('cfgBtnSalvarAssociacoes');
+    if (!container) return;
+
+    if (_jornadasConfigAtual.length === 0) {
+        container.innerHTML = 'Cadastre uma jornada acima para poder associar empregados a ela.';
+        if (btnSalvar) btnSalvar.style.display = 'none';
+        return;
+    }
+    if (_empregadosConfigAtual.length === 0) {
+        container.innerHTML = 'Esta empresa não possui empregados cadastrados.';
+        if (btnSalvar) btnSalvar.style.display = 'none';
+        return;
+    }
+
+    const opcoesJornadas = _jornadasConfigAtual.map(j => `<option value="${j.id}">${j.nome}</option>`).join('');
+    container.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto;">
+            ${_empregadosConfigAtual.map(emp => `
+                <div style="display: grid; grid-template-columns: 2fr 1.3fr; gap: 10px; align-items: center; padding: 5px 0; border-bottom: 1px solid #f5f5f5;">
+                    <span style="font-size: 13px;">${emp.codigo_empregado} - ${emp.nome_empregado}</span>
+                    <select class="jornada-assoc-select" data-codigo-empregado="${emp.codigo_empregado}"
+                        style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                        <option value="">Padrão da empresa</option>
+                        ${opcoesJornadas}
+                    </select>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    _empregadosConfigAtual.forEach(emp => {
+        const sel = container.querySelector(`.jornada-assoc-select[data-codigo-empregado="${emp.codigo_empregado}"]`);
+        if (sel) sel.value = emp.jornada_id || '';
+    });
+    if (btnSalvar) btnSalvar.style.display = 'inline-flex';
+}
+
+async function salvarAssociacoesJornadaEmpregados() {
+    const codigoEmpresa = (document.getElementById('cfgCodigoEmpresa')?.value || '').trim();
+    if (!codigoEmpresa) { mostrarMensagem('Aviso', 'Selecione uma empresa antes de salvar.'); return; }
+
+    const selects = Array.from(document.querySelectorAll('.jornada-assoc-select'));
+    if (selects.length === 0) { mostrarMensagem('Aviso', 'Não há empregados para associar.'); return; }
+
+    const rows = selects.map(sel => ({
+        codigo_empresa: codigoEmpresa,
+        codigo_empregado: sel.dataset.codigoEmpregado,
+        jornada_id: sel.value || null,
+    }));
+
+    try {
+        const { error } = await supabaseClient
+            .from('rh_empregados')
+            .upsert(rows, { onConflict: 'codigo_empresa,codigo_empregado' });
+        if (error) throw error;
+        await _carregarEmpregadosConfigAssociacao(codigoEmpresa);
+        _renderizarAssociacaoEmpregadosConfig();
+        mostrarMensagem('Sucesso', '✅ Associações salvas com sucesso!');
+    } catch (e) {
+        mostrarMensagem('Erro', 'Erro ao salvar associações: ' + e.message);
+    }
 }
 
 // --- GRUPOS DE EMPRESAS ---
@@ -2679,7 +2960,7 @@ async function processarLoteGrupo(fileList) {
     _carregarProximaEmpresaFila();
 }
 
-function _carregarProximaEmpresaFila() {
+async function _carregarProximaEmpresaFila() {
     const fila = _filaLoteGrupo;
     if (!fila) return;
     const item = fila.itens[fila.indice];
@@ -2692,6 +2973,8 @@ function _carregarProximaEmpresaFila() {
     state.feriasCalculadas = item.feriasCalculadas || {};
 
     _aplicarConfigEmpresaNaTelaEdicao(item.cfg);
+    await carregarEmpregados(item.codigo_empresa);
+    state.jornadasDisponiveis = await _buscarJornadas(item.codigo_empresa);
 
     mostrarTela('mainScreen');
     renderizarAbas();
@@ -2830,6 +3113,7 @@ async function selecionarEmpresaConfig(codigo, nome) {
     document.getElementById('cfgBuscaEmpresaResultados').style.display = 'none';
     const cfg = await _buscarConfigRubricas(codigo);
     _preencherCamposConfigRubricas(cfg);
+    await _carregarSecaoJornadasConfig(codigo);
 }
 
 async function salvarConfigRubricas() {

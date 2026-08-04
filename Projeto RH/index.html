@@ -1134,10 +1134,10 @@
                     Campos vazios = sem pré-preenchimento ao gerar TXT. Desconto de VT/VA é lançado automaticamente quando o empregado tiver falta ou atestado no período.
                 </p>
 
-                <!-- Jornada de Trabalho -->
+                <!-- Jornada Padrão -->
                 <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
                     <div style="background: var(--background-color); padding: 8px 14px;">
-                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Jornada de Trabalho</span>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Jornada Padrão</span>
                     </div>
                     <div style="padding: 14px 14px;">
                         <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
@@ -1170,6 +1170,77 @@
                                 onchange="if (this.checked) { document.getElementById('cfgJornadaSabadoAtiva').checked = false; document.getElementById('cfgJornadaSabadoContainer').style.display = 'none'; }">
                             <label for="cfgSabadoSempreExtra" style="font-size: 13px; cursor: pointer; margin: 0;">Sábado sempre extra</label>
                         </div>
+                        <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; margin-bottom: 0;">
+                            Usada para todo empregado sem uma jornada própria associada abaixo.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Outras Jornadas -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Outras Jornadas</span>
+                        <button type="button" class="btn btn-secondary btn-small" style="font-size: 11px;" onclick="abrirFormNovaJornada()">+ Nova Jornada</button>
+                    </div>
+                    <div style="padding: 10px 14px;">
+                        <div id="cfgJornadasLista" style="font-size: 13px; color: var(--text-secondary);">Selecione uma empresa para ver as jornadas cadastradas.</div>
+
+                        <div id="cfgJornadaFormContainer" style="display: none; margin-top: 12px; padding: 12px; border: 1px dashed var(--border-color); border-radius: 8px;">
+                            <input type="hidden" id="cfgJornadaFormId">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Nome da jornada</label>
+                                <input type="text" id="cfgJornadaFormNome" placeholder="Ex: Turno Reduzido" maxlength="60"
+                                    style="flex: 1; padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas diárias</label>
+                                <input type="text" id="cfgJornadaFormDiaria" value="08:00" maxlength="5" placeholder="HH:MM"
+                                    oninput="this.value = formatarHora(this.value);"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <input type="checkbox" id="cfgJornadaFormSextaAtiva" style="width: 16px; height: 16px; cursor: pointer;"
+                                    onchange="document.getElementById('cfgJornadaFormSextaContainer').style.display = this.checked ? 'flex' : 'none';">
+                                <label for="cfgJornadaFormSextaAtiva" style="font-size: 13px; cursor: pointer; margin: 0;">Jornada diferenciada para a Sexta</label>
+                            </div>
+                            <div id="cfgJornadaFormSextaContainer" style="display: none; align-items: center; gap: 12px; padding-left: 24px; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas na Sexta</label>
+                                <input type="text" id="cfgJornadaFormSexta" value="04:00" maxlength="5" placeholder="HH:MM"
+                                    oninput="this.value = formatarHora(this.value);"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <input type="checkbox" id="cfgJornadaFormSabadoAtiva" style="width: 16px; height: 16px; cursor: pointer;"
+                                    onchange="document.getElementById('cfgJornadaFormSabadoContainer').style.display = this.checked ? 'flex' : 'none'; if (this.checked) { document.getElementById('cfgJornadaFormSabadoSempreExtra').checked = false; }">
+                                <label for="cfgJornadaFormSabadoAtiva" style="font-size: 13px; cursor: pointer; margin: 0;">Jornada diferenciada para o Sábado</label>
+                            </div>
+                            <div id="cfgJornadaFormSabadoContainer" style="display: none; align-items: center; gap: 12px; padding-left: 24px; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas no Sábado</label>
+                                <input type="text" id="cfgJornadaFormSabado" value="04:00" maxlength="5" placeholder="HH:MM"
+                                    oninput="this.value = formatarHora(this.value);"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                <input type="checkbox" id="cfgJornadaFormSabadoSempreExtra" style="width: 16px; height: 16px; cursor: pointer;"
+                                    onchange="if (this.checked) { document.getElementById('cfgJornadaFormSabadoAtiva').checked = false; document.getElementById('cfgJornadaFormSabadoContainer').style.display = 'none'; }">
+                                <label for="cfgJornadaFormSabadoSempreExtra" style="font-size: 13px; cursor: pointer; margin: 0;">Sábado sempre extra</label>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button type="button" class="btn btn-primary btn-small" onclick="salvarJornadaConfig()">Salvar Jornada</button>
+                                <button type="button" class="btn btn-secondary btn-small" onclick="cancelarFormJornada()">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Associar Empregados -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Associar Empregados</span>
+                    </div>
+                    <div style="padding: 10px 14px;">
+                        <div id="cfgAssociacaoEmpregados" style="font-size: 13px; color: var(--text-secondary);">Selecione uma empresa para associar empregados a uma jornada.</div>
+                        <button type="button" class="btn btn-primary btn-small" id="cfgBtnSalvarAssociacoes" style="display: none; margin-top: 10px;" onclick="salvarAssociacoesJornadaEmpregados()">💾 Salvar Associações</button>
                     </div>
                 </div>
 
