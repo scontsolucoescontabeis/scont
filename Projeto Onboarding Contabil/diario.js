@@ -240,10 +240,11 @@
   async function enviarAlertaValidacao(codigoEmpresa, ano, mes, auth) {
     const { data: cfg, error: errCfg } = await supabaseClient
       .from('contabil_config_geral')
-      .select('email_alerta_validacao')
+      .select('email_alerta_validacao, notificar_validacao_fechamento')
       .eq('id', 1)
       .maybeSingle();
     if (errCfg) { console.error(errCfg); return; }
+    if (cfg?.notificar_validacao_fechamento === false) return; // desligado em Configurações
 
     const destinatarios = (cfg?.email_alerta_validacao || '').split(',').map((s) => s.trim()).filter(Boolean);
     if (!destinatarios.length) {
@@ -288,12 +289,21 @@
   async function enviarNotificacaoPrestador(codigoEmpresa, ano, mes, tipoEvento, mensagem, eventoEnviadoAnterior) {
     if (!eventoEnviadoAnterior?.usuario_id) return; // evento sem autor identificável (ex.: importação legada)
 
+    const aprovado = tipoEvento === 'aprovado';
+    const { data: cfg, error: errCfg } = await supabaseClient
+      .from('contabil_config_geral')
+      .select('notificar_fechamento_aprovado, notificar_fechamento_rejeitado')
+      .eq('id', 1)
+      .maybeSingle();
+    if (errCfg) { console.error(errCfg); return; }
+    const notificarAtivo = aprovado ? cfg?.notificar_fechamento_aprovado : cfg?.notificar_fechamento_rejeitado;
+    if (notificarAtivo === false) return; // desligado em Configurações
+
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (!session) return;
 
     const nomeEmp = empresaNome(codigoEmpresa);
     const mesAno = `${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
-    const aprovado = tipoEvento === 'aprovado';
     const assunto = aprovado
       ? `✅ Fechamento aprovado — ${nomeEmp} — ${mesAno}`
       : `❌ Fechamento rejeitado — ${nomeEmp} — ${mesAno}`;
@@ -606,10 +616,11 @@
   async function enviarAlertaPendencia(codigoEmpresa, ano, mes, motivo, auth) {
     const { data: cfg, error: errCfg } = await supabaseClient
       .from('contabil_config_geral')
-      .select('email_alerta_validacao')
+      .select('email_alerta_validacao, notificar_pendencia_execucao')
       .eq('id', 1)
       .maybeSingle();
     if (errCfg) { console.error(errCfg); return; }
+    if (cfg?.notificar_pendencia_execucao === false) return; // desligado em Configurações
 
     const destinatarios = (cfg?.email_alerta_validacao || '').split(',').map((s) => s.trim()).filter(Boolean);
     if (!destinatarios.length) return; // alerta de validação já avisa quando não há e-mail configurado
@@ -645,6 +656,51 @@
   async function resolverPendencia(codigoEmpresa, ano, mes) {
     if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
     await transicionarStatusMes(codigoEmpresa, ano, mes, 'pendencia', 'em_andamento', null);
+    const auth = window.__contabilAuth || {};
+    enviarAlertaPendenciaResolvida(codigoEmpresa, ano, mes, auth).catch((e) => console.error('Erro ao enviar alerta de pendência sanada:', e));
+  }
+
+  // Mesmo padrão de enviarAlertaPendencia, para o evento inverso: notifica
+  // os e-mails cadastrados em Configurações → Alertas por E-mail quando a
+  // pendência de execução é sanada (mês volta de "pendencia" para
+  // "em_andamento").
+  async function enviarAlertaPendenciaResolvida(codigoEmpresa, ano, mes, auth) {
+    const { data: cfg, error: errCfg } = await supabaseClient
+      .from('contabil_config_geral')
+      .select('email_alerta_validacao, notificar_pendencia_resolvida')
+      .eq('id', 1)
+      .maybeSingle();
+    if (errCfg) { console.error(errCfg); return; }
+    if (cfg?.notificar_pendencia_resolvida === false) return; // desligado em Configurações
+
+    const destinatarios = (cfg?.email_alerta_validacao || '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (!destinatarios.length) return; // alerta de validação já avisa quando não há e-mail configurado
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    const nomeEmp = empresaNome(codigoEmpresa);
+    const mesAno = `${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+    const assunto = `🟢 Pendência sanada — ${nomeEmp} — ${mesAno}`;
+    const params = {
+      tipo: 'pendencia_resolvida',
+      empresa: nomeEmp,
+      mes_ano: mesAno,
+      resolvido_por: auth.userData?.nome || auth.email || 'Usuário',
+      portal_url: window.location.origin + window.location.pathname,
+    };
+
+    const resultados = await Promise.all(destinatarios.map((destinatario) =>
+      fetch(`${SUPABASE_URL}/functions/v1/enviar-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({ destinatario, assunto, params }),
+      }).then((r) => r.json()).catch((e) => ({ ok: false, error: e.message }))
+    ));
+
+    if (resultados.some((r) => !r.ok)) {
+      mostrarToast('Pendência sanada, mas houve falha ao notificar por e-mail a equipe Scont.', 'erro');
+    }
   }
 
   async function marcarConcluido(codigoEmpresa, ano, mes) {

@@ -205,6 +205,29 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
         ` + _rodape(nomeRemetente) + _fechamento();
     }
 
+    // ── Alerta: pendência de execução sanada na grade (Diário Contábil) ──
+    if (tipo === 'pendencia_resolvida') {
+        const empresaNome  = (params.empresa as string)      || '';
+        const mesAno       = (params.mes_ano as string)      || '';
+        const resolvidoPor = (params.resolvido_por as string) || 'um responsável';
+        const portalUrl    = (params.portal_url as string)   || '';
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#22A366;margin:0 0 8px;font-size:20px;">🟢 Pendência sanada</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            <strong>${resolvidoPor}</strong> sanou a pendência de execução em <strong>${mesAno}</strong>
+            da empresa <strong>${empresaNome}</strong>. O mês voltou a ficar em andamento.
+          </p>
+
+          ${portalUrl ? `
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
+            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+              📔 Acessar o Diário Contábil
+            </a>
+          </td></tr></table>` : ''}
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
     // ── Alerta: certificado digital entrou em limiar de vencimento ──
     if (tipo === 'alerta_certificado_vencimento') {
         const empresaNome   = (params.empresa as string)        || '';

@@ -8,6 +8,17 @@
   let usuariosAprovados = []; // [{ id, nome, email, empresa }]
   let responsaveisPorEmpresa = {}; // { codigo_empresa: Set<usuario_id> }
   let emailAlertaValidacao = '';
+  let notificacoesEventos = {}; // { <coluna>: boolean } — ver EVENTOS_EMAIL
+
+  // Eventos do Diário Contábil que hoje disparam e-mail, com o toggle
+  // correspondente em contabil_config_geral (todas as colunas default TRUE).
+  const EVENTOS_EMAIL = [
+    { coluna: 'notificar_validacao_fechamento', label: 'Fechamento enviado para validação' },
+    { coluna: 'notificar_fechamento_aprovado', label: 'Fechamento aprovado' },
+    { coluna: 'notificar_fechamento_rejeitado', label: 'Fechamento rejeitado' },
+    { coluna: 'notificar_pendencia_execucao', label: 'Pendência de execução criada' },
+    { coluna: 'notificar_pendencia_resolvida', label: 'Pendência de execução sanada' },
+  ];
 
   document.addEventListener('DOMContentLoaded', iniciar);
 
@@ -42,7 +53,7 @@
       supabaseClient.from('contabil_empresas_config').select('codigo_empresa, possui_contabil'),
       supabaseClient.rpc('contabil_listar_usuarios_aprovados'),
       supabaseClient.from('contabil_empresas_responsaveis').select('codigo_empresa, usuario_id'),
-      supabaseClient.from('contabil_config_geral').select('email_alerta_validacao').eq('id', 1).maybeSingle(),
+      supabaseClient.from('contabil_config_geral').select(`email_alerta_validacao, ${EVENTOS_EMAIL.map((ev) => ev.coluna).join(', ')}`).eq('id', 1).maybeSingle(),
     ]);
     if (errEmpresas) console.error(errEmpresas);
     if (errConfig) console.error(errConfig);
@@ -65,6 +76,8 @@
     });
 
     emailAlertaValidacao = dataConfigGeral?.email_alerta_validacao || '';
+    notificacoesEventos = {};
+    EVENTOS_EMAIL.forEach((ev) => { notificacoesEventos[ev.coluna] = dataConfigGeral?.[ev.coluna] !== false; });
   }
 
   async function salvarEmailAlertaValidacao(valor) {
@@ -72,6 +85,14 @@
       .from('contabil_config_geral')
       .upsert({ id: 1, email_alerta_validacao: valor, updated_at: new Date().toISOString() }, { onConflict: 'id' });
     if (!error) emailAlertaValidacao = valor;
+    return { error };
+  }
+
+  async function salvarToggleEvento(coluna, valor) {
+    const { error } = await supabaseClient
+      .from('contabil_config_geral')
+      .upsert({ id: 1, [coluna]: valor, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    if (!error) notificacoesEventos[coluna] = valor;
     return { error };
   }
 
@@ -189,6 +210,15 @@
             <input type="text" id="inputEmailAlertaValidacao" placeholder="ex: herbertscont@gmail.com" style="flex:1;min-width:260px;" value="${escapeAttr(emailAlertaValidacao)}">
             <button type="button" class="btn btn-primary" id="btnSalvarEmailAlerta">Salvar</button>
           </div>
+          <p class="full mapa-empty" style="margin:16px 0 4px;">Escolha quais desses eventos disparam e-mail. Desmarcar um evento não afeta os demais; a alteração é salva ao clicar.</p>
+          <div class="full" id="listaEventosEmail">
+            ${EVENTOS_EMAIL.map((ev) => `
+              <label class="responsavel-check-item">
+                <input type="checkbox" class="chk-evento-email" data-coluna="${escapeAttr(ev.coluna)}" ${notificacoesEventos[ev.coluna] !== false ? 'checked' : ''}>
+                <span>${escapeHtml(ev.label)}</span>
+              </label>
+            `).join('')}
+          </div>
         </div>
       </div>
       <div class="mapa-secao">
@@ -220,6 +250,23 @@
       btn.disabled = false;
       if (error) { console.error(error); mostrarToast('Erro ao salvar o e-mail de alerta.', 'erro'); return; }
       mostrarToast('E-mail de alerta salvo.', 'sucesso');
+    });
+
+    document.getElementById('listaEventosEmail').querySelectorAll('.chk-evento-email').forEach((chk) => {
+      chk.addEventListener('change', async () => {
+        const coluna = chk.getAttribute('data-coluna');
+        const valor = chk.checked;
+        chk.disabled = true;
+        const { error } = await salvarToggleEvento(coluna, valor);
+        chk.disabled = false;
+        if (error) {
+          console.error(error);
+          chk.checked = !valor;
+          mostrarToast('Erro ao salvar. Alteração desfeita.', 'erro');
+          return;
+        }
+        mostrarToast('Configuração de e-mail salva.', 'sucesso');
+      });
     });
 
     document.getElementById('buscaEmpresaConfig').addEventListener('input', renderTabela);
