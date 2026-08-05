@@ -596,6 +596,50 @@
   async function marcarPendencia(codigoEmpresa, ano, mes, motivo) {
     if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
     await transicionarStatusMes(codigoEmpresa, ano, mes, 'em_andamento', 'pendencia', motivo);
+    const auth = window.__contabilAuth || {};
+    enviarAlertaPendencia(codigoEmpresa, ano, mes, motivo, auth).catch((e) => console.error('Erro ao enviar alerta de pendência:', e));
+  }
+
+  // Mesmo padrão de enviarAlertaValidacao: notifica os e-mails cadastrados
+  // em Configurações → Alertas por E-mail (mesma lista, reaproveitada)
+  // quando o Prestador de Serviço marca uma pendência de execução na grade.
+  async function enviarAlertaPendencia(codigoEmpresa, ano, mes, motivo, auth) {
+    const { data: cfg, error: errCfg } = await supabaseClient
+      .from('contabil_config_geral')
+      .select('email_alerta_validacao')
+      .eq('id', 1)
+      .maybeSingle();
+    if (errCfg) { console.error(errCfg); return; }
+
+    const destinatarios = (cfg?.email_alerta_validacao || '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (!destinatarios.length) return; // alerta de validação já avisa quando não há e-mail configurado
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    const nomeEmp = empresaNome(codigoEmpresa);
+    const mesAno = `${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+    const assunto = `🔴 Pendência de execução — ${nomeEmp} — ${mesAno}`;
+    const params = {
+      tipo: 'pendencia_execucao',
+      empresa: nomeEmp,
+      mes_ano: mesAno,
+      marcado_por: auth.userData?.nome || auth.email || 'Usuário',
+      motivo: motivo || '',
+      portal_url: window.location.origin + window.location.pathname,
+    };
+
+    const resultados = await Promise.all(destinatarios.map((destinatario) =>
+      fetch(`${SUPABASE_URL}/functions/v1/enviar-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({ destinatario, assunto, params }),
+      }).then((r) => r.json()).catch((e) => ({ ok: false, error: e.message }))
+    ));
+
+    if (resultados.some((r) => !r.ok)) {
+      mostrarToast('Pendência registrada, mas houve falha ao notificar por e-mail a equipe Scont.', 'erro');
+    }
   }
 
   async function resolverPendencia(codigoEmpresa, ano, mes) {
