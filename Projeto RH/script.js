@@ -1399,7 +1399,7 @@ function calcularFolha(folha) {
             dia.entrada1, dia.saida1, dia.entrada2, dia.saida2,
             dia.entrada3, dia.saida3, state.terceiroTurno
         );
-        const minTrabalhados = calcularHorasTrabalhadas(e1n, s1n)
+        const minTrabalhadosReais = calcularHorasTrabalhadas(e1n, s1n)
             + calcularHorasTrabalhadas(e2n, s2n)
             + (state.terceiroTurno ? calcularHorasTrabalhadas(e3n, s3n) : 0);
         const minNoturnos = calcularHorasNoturnas(
@@ -1409,7 +1409,9 @@ function calcularFolha(folha) {
             state.terceiroTurno ? s3n : null
         );
         const minNoturnosConvertidos = Math.round(minNoturnos / 0.875);
-        
+        // ✅ Horas trabalhadas = horas fictas (noturno convertido) + horas trabalhadas fora do período noturno.
+        const minTrabalhados = minTrabalhadosReais - minNoturnos + minNoturnosConvertidos;
+
         let extra50 = 0, extra100 = 0, faltante = 0;
         let flagDSR = isDSRCustomizado;
         let flagFolga = false, flagFalta = false, flagAtestado = false, flagAtestadoComparecimento = false, flagLiberacaoMeioExpediente = false, flagSemRegistro = false, flagCompensacao = false;
@@ -3613,7 +3615,7 @@ async function _construirConteudoTXTExportacao() {
                 dia.entrada1, dia.saida1, dia.entrada2, dia.saida2,
                 dia.entrada3, dia.saida3, state.terceiroTurno
             );
-            const minTrab = calcularHorasTrabalhadas(e1n, s1n)
+            const minTrabReal = calcularHorasTrabalhadas(e1n, s1n)
                 + calcularHorasTrabalhadas(e2n, s2n)
                 + (state.terceiroTurno ? calcularHorasTrabalhadas(e3n, s3n) : 0);
             const minNot  = calcularHorasNoturnas(
@@ -3623,6 +3625,8 @@ async function _construirConteudoTXTExportacao() {
                 state.terceiroTurno ? s3n : null
             );
             const minNotConv = Math.round(minNot / 0.875);
+            // ✅ Horas trabalhadas = horas fictas (noturno convertido) + horas trabalhadas fora do período noturno.
+            const minTrab = minTrabReal - minNot + minNotConv;
             let ex50 = 0, ex100 = 0, dev = 0;
             const flag = flagsFolga[dia.data];
             const isAtestadoMedicoExp = flag === 'atestado';
