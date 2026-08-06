@@ -108,3 +108,25 @@ origem. `confirmarReplicarFluxoCF()` monta uma mensagem de confirmação
 `delete().in('codigo_empresa', codigos)` + `insert` em lote na tabela
 `fechamento_config_empresa_fase` para todas as empresas marcadas. Sem SQL
 novo.
+
+## Revisão: fluxo da empresa também em cards sequenciais
+
+Pedido do usuário, mesmo dia, após confirmar que o drag-and-drop funciona:
+mostrar o fluxo que está sendo montado (`#listaFasesConfig`) também como
+cards, em sequência, e não mais como lista vertical.
+
+`renderListaFasesConfig()` passou a gerar `.fase-cards-fluxo` (flex-wrap) com
+um `.fase-card-fluxo` por fase — numeração circular (`.fase-fluxo-numero`),
+nome, e ações (✎ editar, ◀/▶ mover — antes eram ↑/↓, trocados para combinar
+com o layout horizontal —, 🗑 remover). Um separador "→" (`.fase-fluxo-seta`)
+é inserido entre os cards para reforçar a leitura de sequência. O container
+`#listaFasesConfig` continua sendo o mesmo drop zone de antes (a troca é só
+no HTML interno gerado, os listeners de drag estão no container, não no
+conteúdo). Lógica de edição/mover/remover inalterada, só a marcação HTML.
+
+**Nota de depuração:** o usuário reportou que o drag-and-drop "não foi
+criado"; investigação com Chrome headless via CDP (`Input.setInterceptDrags`
++ `Input.dispatchDragEvent`) mostrou que o mecanismo real funciona — a
+falha inicial foi um artefato do harness de teste (coordenadas de drop fora
+do viewport do Chrome headless), não um bug no código. O usuário confirmou
+que funciona no navegador real antes dessa investigação terminar.

@@ -625,13 +625,13 @@ async function onEmpresaConfigChange() {
 function renderListaFasesConfig() {
     const div = document.getElementById('listaFasesConfig');
     if (!empresaConfigSelecionada) { div.innerHTML = '<em>Selecione uma empresa para configurar.</em>'; return; }
-    if (!configFasesAtual.length) { div.innerHTML = '<em>Nenhuma fase adicionada ainda.</em>'; return; }
+    if (!configFasesAtual.length) { div.innerHTML = '<em>Nenhuma fase adicionada ainda. Arraste um card do catálogo acima, ou use o seletor abaixo.</em>'; return; }
 
-    div.innerHTML = `<div class="fase-lista">${configFasesAtual.map((f, i) => {
+    const cards = configFasesAtual.map((f, i) => {
         if (editandoIndexConfig === i) {
             return `
-                <div class="fase-item">
-                    <input type="text" id="inputEditFaseConfig" value="${f.nome_fase}" style="flex:1;">
+                <div class="fase-card-fluxo editando">
+                    <input type="text" id="inputEditFaseConfig" value="${escapeHtml(f.nome_fase)}">
                     <span class="fase-config-acoes">
                         <button class="btn btn-primary btn-small" onclick="salvarEdicaoFaseConfig(${i})">Salvar</button>
                         <button class="btn btn-secondary btn-small" onclick="cancelarEdicaoFaseConfig()">Cancelar</button>
@@ -639,16 +639,19 @@ function renderListaFasesConfig() {
                 </div>`;
         }
         return `
-            <div class="fase-item">
-                <span class="fase-nome">${i + 1}. ${f.nome_fase}</span>
+            <div class="fase-card-fluxo">
+                <span class="fase-fluxo-numero">${i + 1}</span>
+                <span class="fase-nome">${escapeHtml(f.nome_fase)}</span>
                 <span class="fase-config-acoes">
-                    <button class="btn btn-secondary btn-small" onclick="editarFaseConfig(${i})">Editar</button>
-                    <button class="btn btn-secondary btn-small" onclick="moverFaseConfig(${i}, -1)" ${i === 0 ? 'disabled' : ''}>↑</button>
-                    <button class="btn btn-secondary btn-small" onclick="moverFaseConfig(${i}, 1)" ${i === configFasesAtual.length - 1 ? 'disabled' : ''}>↓</button>
-                    <button class="btn btn-secondary btn-small" onclick="removerFaseConfig(${i})">Remover</button>
+                    <button class="btn-icone-fluxo" onclick="editarFaseConfig(${i})" title="Editar">✎</button>
+                    <button class="btn-icone-fluxo" onclick="moverFaseConfig(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="Mover para trás">◀</button>
+                    <button class="btn-icone-fluxo" onclick="moverFaseConfig(${i}, 1)" ${i === configFasesAtual.length - 1 ? 'disabled' : ''} title="Mover para frente">▶</button>
+                    <button class="btn-icone-fluxo" onclick="removerFaseConfig(${i})" title="Remover">🗑</button>
                 </span>
             </div>`;
-    }).join('')}</div>`;
+    });
+
+    div.innerHTML = `<div class="fase-cards-fluxo">${cards.join('<span class="fase-fluxo-seta">→</span>')}</div>`;
 }
 
 function editarFaseConfig(i) {
