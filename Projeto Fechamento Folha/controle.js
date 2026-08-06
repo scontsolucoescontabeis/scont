@@ -27,8 +27,8 @@ let competenciaGeralCache = ''; // vazio = usa o mês corrente calculado
 // E-mail(is) que recebem alerta quando o fechamento de uma empresa é concluído
 let emailAlertaFechamentoCache = ''; // string bruta, separada por vírgula
 
-const STATUS_CICLO_LABEL = { nao_iniciada: 'Não iniciada', em_execucao: 'Em execução', fechada: 'Fechada' };
-const STATUS_CICLO_BADGE = { nao_iniciada: 'badge-nao-iniciada', em_execucao: 'badge-em-execucao', fechada: 'badge-fechada' };
+const STATUS_CICLO_LABEL = { nao_iniciada: 'Não iniciada', em_execucao: 'Em execução', pronta_fechar: 'Pronta para fechar', fechada: 'Fechada' };
+const STATUS_CICLO_BADGE = { nao_iniciada: 'badge-nao-iniciada', em_execucao: 'badge-em-execucao', pronta_fechar: 'badge-pronta-fechar', fechada: 'badge-fechada' };
 
 // ──────────────────────────────────────────────
 // MENSAGENS
@@ -249,7 +249,8 @@ async function carregarDashboard() {
 
 function statusCiclo(entry) {
     if (!entry.ciclo) return 'nao_iniciada';
-    if (entry.fases.length && entry.fases.every(f => f.status === 'concluida')) return 'fechada';
+    if (entry.ciclo.concluido_em) return 'fechada';
+    if (entry.fases.length && entry.fases.every(f => f.status === 'concluida')) return 'pronta_fechar';
     return 'em_execucao';
 }
 
@@ -290,6 +291,12 @@ function renderFasesLista(cod, entry) {
     `;
 }
 
+function renderAcaoCell(entry, status, cod, comp) {
+    if (!entry.ciclo) return `<button class="btn btn-primary btn-small" onclick="iniciarCiclo('${cod}')">▶ Iniciar fechamento de ${comp}</button>`;
+    if (status === 'pronta_fechar') return `<button class="btn btn-primary btn-small" onclick="fecharFolha('${cod}')">✅ Fechar Folha</button>`;
+    return '';
+}
+
 function renderDashboard(codigos, comp) {
     const corpo = document.getElementById('corpoDashboard');
     corpo.innerHTML = '';
@@ -308,7 +315,7 @@ function renderDashboard(codigos, comp) {
             <td><span class="badge ${STATUS_CICLO_BADGE[status]}">${STATUS_CICLO_LABEL[status]}</span></td>
             <td>${renderResponsavelCell(entry)}</td>
             <td>${entry.ciclo ? `${concluidas}/${total}` : '—'}</td>
-            <td>${entry.ciclo ? '' : `<button class="btn btn-primary btn-small" onclick="iniciarCiclo('${cod}')">▶ Iniciar fechamento de ${comp}</button>`}</td>
+            <td>${renderAcaoCell(entry, status, cod, comp)}</td>
         `;
         corpo.appendChild(trPrincipal);
 
@@ -376,16 +383,36 @@ async function atualizarStatusFase(fase_id, codigo_empresa, concluida) {
         const fase = entry.fases.find(f => f.id === fase_id);
         if (fase) fase.status = novoStatus;
         const todasConcluidas = entry.fases.length > 0 && entry.fases.every(f => f.status === 'concluida');
-        const jaConcluido = !!entry.ciclo.concluido_em;
-        if (todasConcluidas && !jaConcluido) {
-            await supabaseClient.from('fechamento_ciclo').update({ concluido_em: new Date().toISOString() }).eq('id', entry.ciclo.id);
-            await notificarFechamentoConcluido(codigo_empresa, entry.ciclo.competencia);
-        } else if (!todasConcluidas && jaConcluido) {
+        const jaFechado = !!entry.ciclo.concluido_em;
+        // Marcar todas as fases não fecha mais sozinho — precisa apertar "Fechar Folha".
+        // Mas se uma fase voltar a ficar pendente depois de já fechada, reabre automaticamente.
+        if (!todasConcluidas && jaFechado) {
             await supabaseClient.from('fechamento_ciclo').update({ concluido_em: null }).eq('id', entry.ciclo.id);
         }
     }
 
     expandido[codigo_empresa] = true;
+    await carregarDashboard();
+}
+
+// Fecha a folha da empresa manualmente — só pode ser chamado quando todas as
+// fases já estão concluídas (status "Pronta para fechar"). É o único gatilho
+// que grava fechamento_ciclo.concluido_em e dispara o e-mail de notificação;
+// marcar a última fase como concluída não fecha mais sozinho.
+async function fecharFolha(codigo_empresa) {
+    const entry = ciclosCache[codigo_empresa];
+    if (!entry || !entry.ciclo) return;
+    const todasConcluidas = entry.fases.length > 0 && entry.fases.every(f => f.status === 'concluida');
+    if (!todasConcluidas) { mostrarMensagem('Atenção', 'Todas as fases precisam estar concluídas antes de fechar a folha.'); return; }
+    if (!window.confirm(`Fechar a folha de ${nomeEmpresa(codigo_empresa)} (${entry.ciclo.competencia})? Os responsáveis cadastrados serão notificados por e-mail.`)) return;
+
+    const agora = new Date().toISOString();
+    const { error } = await supabaseClient.from('fechamento_ciclo').update({ concluido_em: agora }).eq('id', entry.ciclo.id);
+    if (error) { mostrarMensagem('Erro', 'Falha ao fechar a folha: ' + error.message); return; }
+
+    entry.ciclo.concluido_em = agora;
+    await notificarFechamentoConcluido(codigo_empresa, entry.ciclo.competencia);
+    mostrarToastCF('Folha fechada com sucesso.', 'sucesso');
     await carregarDashboard();
 }
 
