@@ -587,7 +587,6 @@ async function salvarEdicaoFaseCatalogo(id) {
     editandoCatalogoId = null;
     await carregarCatalogo();
     renderListaCatalogoConfig();
-    popularSelectCatalogoAdd();
 }
 
 function popularSelectEmpresaConfig() {
@@ -605,7 +604,6 @@ async function onEmpresaConfigChange() {
 
     if (!empresaConfigSelecionada) {
         renderListaFasesConfig();
-        popularSelectCatalogoAdd();
         return;
     }
 
@@ -619,13 +617,12 @@ async function onEmpresaConfigChange() {
 
     configFasesAtual = (data || []).map(f => ({ nome_fase: f.nome_fase }));
     renderListaFasesConfig();
-    popularSelectCatalogoAdd();
 }
 
 function renderListaFasesConfig() {
     const div = document.getElementById('listaFasesConfig');
     if (!empresaConfigSelecionada) { div.innerHTML = '<em>Selecione uma empresa para configurar.</em>'; return; }
-    if (!configFasesAtual.length) { div.innerHTML = '<em>Nenhuma fase adicionada ainda. Arraste um card do catálogo acima, ou use o seletor abaixo.</em>'; return; }
+    if (!configFasesAtual.length) { div.innerHTML = '<em>Nenhuma fase adicionada ainda. Arraste um card do catálogo acima.</em>'; return; }
 
     const cards = configFasesAtual.map((f, i) => {
         if (editandoIndexConfig === i) {
@@ -671,15 +668,6 @@ function salvarEdicaoFaseConfig(i) {
     configFasesAtual[i].nome_fase = novoNome;
     editandoIndexConfig = null;
     renderListaFasesConfig();
-    popularSelectCatalogoAdd();
-}
-
-function popularSelectCatalogoAdd() {
-    const select = document.getElementById('selectCatalogoAdd');
-    const usados = new Set(configFasesAtual.map(f => f.nome_fase));
-    const disponiveis = catalogoCache.filter(c => !usados.has(c.nome));
-    select.innerHTML = '<option value="">Selecione uma fase do catálogo...</option>' +
-        disponiveis.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('');
 }
 
 function adicionarFaseCatalogoPorNome(nome) {
@@ -688,12 +676,6 @@ function adicionarFaseCatalogoPorNome(nome) {
     if (configFasesAtual.some(f => f.nome_fase === nome)) { mostrarToastCF('Essa fase já foi adicionada ao fluxo.', 'erro'); return; }
     configFasesAtual.push({ nome_fase: nome });
     renderListaFasesConfig();
-    popularSelectCatalogoAdd();
-}
-
-function adicionarFaseCatalogo() {
-    const select = document.getElementById('selectCatalogoAdd');
-    adicionarFaseCatalogoPorNome(select.value);
 }
 
 function adicionarFaseCustom() {
@@ -704,7 +686,6 @@ function adicionarFaseCustom() {
     configFasesAtual.push({ nome_fase: nome });
     input.value = '';
     renderListaFasesConfig();
-    popularSelectCatalogoAdd();
 }
 
 function moverFaseConfig(i, dir) {
@@ -717,7 +698,6 @@ function moverFaseConfig(i, dir) {
 function removerFaseConfig(i) {
     configFasesAtual.splice(i, 1);
     renderListaFasesConfig();
-    popularSelectCatalogoAdd();
 }
 
 async function salvarConfig() {

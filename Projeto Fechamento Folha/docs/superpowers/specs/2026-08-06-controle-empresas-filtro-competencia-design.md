@@ -130,3 +130,32 @@ criado"; investigação com Chrome headless via CDP (`Input.setInterceptDrags`
 falha inicial foi um artefato do harness de teste (coordenadas de drop fora
 do viewport do Chrome headless), não um bug no código. O usuário confirmou
 que funciona no navegador real antes dessa investigação terminar.
+
+## Revisão: remoção do dropdown de catálogo + reordenação da nova fase
+
+Pedido do usuário, mesmo dia: já que o drag-and-drop cobre o caso de uso do
+antigo dropdown "Adicionar fase do catálogo" (`#selectCatalogoAdd` + botão),
+ele deve ser removido; e o bloco "Nova fase personalizada" deve subir para
+antes da seção "Configuração do fluxo por empresa" (ficando logo após o
+catálogo).
+
+**HTML:** removido o `config-add-row` do dropdown de catálogo; o
+`config-add-row` de "Nova fase personalizada" foi movido para logo depois de
+`#listaCatalogoConfig`, antes do `section-header` "Configuração do fluxo por
+empresa". Nenhuma mudança de comportamento em `adicionarFaseCustom()` — ainda
+adiciona diretamente ao fluxo em edição da empresa selecionada (exige
+empresa selecionada, mesma validação de antes).
+
+**JS:** removida a função `popularSelectCatalogoAdd()` (populava o
+`<select>` agora inexistente) e todas as chamadas a ela (em
+`onEmpresaConfigChange`, `salvarEdicaoFaseCatalogo`, `salvarEdicaoFaseConfig`,
+`adicionarFaseCatalogoPorNome`, `removerFaseConfig`) — eram referências a um
+elemento que deixou de existir no DOM, teriam quebrado com
+`TypeError: Cannot set properties of null` na primeira interação após a
+remoção do HTML. Removida também `adicionarFaseCatalogo()` (handler do botão
+"+ Adicionar" do dropdown removido), mantendo `adicionarFaseCatalogoPorNome(nome)`
+que o drag-and-drop ainda usa. Texto do estado vazio do fluxo atualizado (não
+menciona mais "o seletor abaixo").
+
+Reverificado com o mesmo harness Chrome headless via CDP: catálogo renderiza,
+drag-and-drop continua funcionando, nenhuma exceção no console.
