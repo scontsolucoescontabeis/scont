@@ -24,6 +24,10 @@ let responsaveisFolhaPorEmpresa = {}; // { codigo_empresa: Set<usuario_id> }
 // Competência geral (indicação livre de qual competência a equipe está trabalhando)
 let competenciaGeralCache = ''; // vazio = usa o mês corrente calculado
 
+// Filtro local da tela Controle Empresas — não persiste, não afeta a competência
+// em execução global. Vazio = segue a competência em execução automaticamente.
+let competenciaFiltroDashboardCF = '';
+
 // E-mail(is) que recebem alerta quando o fechamento de uma empresa é concluído
 let emailAlertaFechamentoCache = ''; // string bruta, separada por vírgula
 
@@ -159,6 +163,12 @@ function competenciaAtual() {
     return competenciaGeralCache || competenciaCalendario();
 }
 
+// Competência efetivamente exibida no Dashboard — usa o filtro local se
+// definido, senão cai para a competência em execução (comportamento padrão).
+function competenciaExibida() {
+    return competenciaFiltroDashboardCF || competenciaAtual();
+}
+
 async function salvarCompetenciaGeralCF() {
     if (!isAdminAtual) return;
     const input = document.getElementById('inputCompetenciaGeralCF');
@@ -207,9 +217,43 @@ function renderCompetenciaGeralCF() {
     }
 }
 
+function renderCompetenciaFiltroCF() {
+    const bar = document.getElementById('competenciaFiltroCF');
+    if (!bar) return;
+    const exibida = competenciaExibida();
+    const diferente = competenciaFiltroDashboardCF && competenciaFiltroDashboardCF !== competenciaAtual();
+
+    bar.innerHTML = `
+        <label for="inputCompetenciaFiltroCF">Ver competência</label>
+        <input type="text" id="inputCompetenciaFiltroCF" placeholder="${escapeHtml(competenciaAtual())}" maxlength="7" value="${escapeHtml(competenciaFiltroDashboardCF)}">
+        <button class="btn btn-secondary btn-small" onclick="aplicarFiltroCompetenciaCF()">Ver</button>
+        ${diferente ? `<small>Exibindo ${escapeHtml(exibida)} — diferente da competência em execução. <a href="#" onclick="limparFiltroCompetenciaCF(); return false;">Voltar para atual</a></small>` : `<small>Em branco = usa a competência em execução (${escapeHtml(competenciaAtual())}).</small>`}
+    `;
+
+    const input = document.getElementById('inputCompetenciaFiltroCF');
+    if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') aplicarFiltroCompetenciaCF(); });
+}
+
+function aplicarFiltroCompetenciaCF() {
+    const input = document.getElementById('inputCompetenciaFiltroCF');
+    const valor = input.value.trim();
+    if (valor && !/^\d{2}\/\d{4}$/.test(valor)) {
+        mostrarMensagem('Atenção', 'Informe a competência no formato MM/AAAA, ou deixe em branco para usar a competência em execução.');
+        return;
+    }
+    competenciaFiltroDashboardCF = valor;
+    carregarDashboard();
+}
+
+function limparFiltroCompetenciaCF() {
+    competenciaFiltroDashboardCF = '';
+    carregarDashboard();
+}
+
 async function carregarDashboard() {
     renderCompetenciaGeralCF();
-    const comp = competenciaAtual();
+    renderCompetenciaFiltroCF();
+    const comp = competenciaExibida();
     const corpo = document.getElementById('corpoDashboard');
     const codigos = await buscarEmpresasConfiguradas();
 
@@ -336,7 +380,7 @@ function toggleExpandir(cod) {
 }
 
 async function iniciarCiclo(codigo_empresa) {
-    const comp = competenciaAtual();
+    const comp = competenciaExibida();
 
     const { data: config, error: errConfig } = await supabaseClient
         .from('fechamento_config_empresa_fase')

@@ -47,6 +47,7 @@
         .competencia-geral-bar label { font-weight: 600; font-size: 13px; }
         .competencia-geral-bar input[type="text"] { padding: 7px 10px; border: 1px solid var(--border-color); border-radius: 6px; width: 110px; }
         .competencia-geral-bar small { flex-basis: 100%; color: var(--text-secondary); font-size: 11px; }
+        .competencia-geral-bar + .competencia-geral-bar { margin-top: 6px; margin-bottom: 16px; }
 
         .empresas-filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 16px 0 10px; }
         .empresas-filtros input[type="text"] { flex: 1; min-width: 220px; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 6px; }
@@ -143,10 +144,11 @@
     <div id="telaDashboardCF" class="active">
         <div class="container">
             <div class="competencia-geral-bar" id="competenciaGeralCF"></div>
+            <div class="competencia-geral-bar" id="competenciaFiltroCF"></div>
 
             <div class="section-header">
                 <h2>Empresas</h2>
-                <p>Status do fechamento da competência aberta de cada empresa configurada</p>
+                <p>Status do fechamento da competência selecionada de cada empresa configurada</p>
             </div>
             <div class="table-wrapper">
                 <table>
