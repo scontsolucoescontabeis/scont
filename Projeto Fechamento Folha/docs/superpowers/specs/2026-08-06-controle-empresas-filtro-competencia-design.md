@@ -1,4 +1,10 @@
-# Controle de Fechamento — Filtro de competência em "Controle Empresas"
+# Controle de Fechamento — Seleção de competência em "Controle Empresas"
+
+> **Revisão (2026-08-06, mesmo dia):** o filtro por texto (`MM/AAAA`) e a barra
+> "Competência em execução" descritos abaixo foram substituídos por cards de
+> mês clicáveis + navegação de ano, conforme pedido do usuário logo em seguida.
+> Ver seção "Revisão: cards de mês/ano" ao final. O texto original abaixo é
+> mantido como histórico da primeira iteração.
 
 ## Contexto
 
@@ -24,3 +30,26 @@ Permitir que qualquer usuário visualize o andamento por empresa em qualquer com
 - Persistir o filtro entre sessões/usuários.
 - Visão de matriz empresa x múltiplas competências.
 - Alterar o comportamento da barra "Competência em execução" existente.
+
+## Revisão: cards de mês/ano
+
+Pedido do usuário: substituir totalmente o filtro por texto e a barra "Competência
+em execução" por cards de seleção de mês, com navegação de ano por setas. Decisões
+(via clarificação com o usuário):
+
+- **Cards simples**, sem indicador de status agregado (mais rápido, sem custo
+  extra de carregar dados de todos os meses do ano de uma vez).
+- **Navegação por ano com setas** (`‹ 2026 ›`) ao lado dos 12 cards Jan–Dez.
+- A antiga config "Competência em execução" (`fechamento_config_geral.competencia_atual`)
+  **sai da UI**, mas a coluna permanece no banco sem uso (sem migração necessária) —
+  confirmado que nenhuma outra tela do módulo lê essa coluna.
+
+**Implementação:** `anoSelecionadoCF` / `mesSelecionadoCF` (estado em memória,
+default = mês/ano corrente, não persiste). `competenciaSelecionadaCF()` é a
+única fonte de verdade lida por `carregarDashboard()` e `iniciarCiclo()`
+(substituindo `competenciaAtual()`/`competenciaExibida()` da primeira
+iteração, ambas removidas). Clicar num card (`selecionarMesCF`) ou nas setas
+de ano (`mudarAnoCF`) atualiza o estado e recarrega a tabela de empresas —
+"a competência na tabela vai mudando de forma dinâmica". O botão "Iniciar
+fechamento" por empresa já existente cobre "dar a possibilidade de
+preenchimento daquele mês" quando não há ciclo ainda.

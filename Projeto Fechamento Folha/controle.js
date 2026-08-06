@@ -21,12 +21,13 @@ let empresasFolhaCache = []; // empresasCache filtrado por status_situacao ativo
 let folhaConfigPorEmpresa = {}; // { codigo_empresa: boolean } — ausente = false (padrão opt-in)
 let responsaveisFolhaPorEmpresa = {}; // { codigo_empresa: Set<usuario_id> }
 
-// Competência geral (indicação livre de qual competência a equipe está trabalhando)
-let competenciaGeralCache = ''; // vazio = usa o mês corrente calculado
+// Competência selecionada nos cards de mês/ano da tela Controle Empresas —
+// não persiste (reseta pro mês corrente ao recarregar a página).
+const hojeCF = new Date();
+let anoSelecionadoCF = hojeCF.getFullYear();
+let mesSelecionadoCF = hojeCF.getMonth() + 1;
 
-// Filtro local da tela Controle Empresas — não persiste, não afeta a competência
-// em execução global. Vazio = segue a competência em execução automaticamente.
-let competenciaFiltroDashboardCF = '';
+const NOMES_MESES_CF = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 // E-mail(is) que recebem alerta quando o fechamento de uma empresa é concluído
 let emailAlertaFechamentoCache = ''; // string bruta, separada por vírgula
@@ -114,7 +115,7 @@ async function carregarBase() {
         supabaseClient.from('usuarios').select('id, nome, email').order('nome'),
         supabaseClient.from('fechamento_empresas_config').select('codigo_empresa, possui_folha'),
         supabaseClient.from('fechamento_empresas_responsaveis').select('codigo_empresa, usuario_id'),
-        supabaseClient.from('fechamento_config_geral').select('competencia_atual, email_alerta_fechamento').eq('id', 1).maybeSingle()
+        supabaseClient.from('fechamento_config_geral').select('email_alerta_fechamento').eq('id', 1).maybeSingle()
     ]);
     if (errEmp) { mostrarMensagem('Erro', 'Falha ao carregar empresas: ' + errEmp.message); return; }
     if (errUsu) { mostrarMensagem('Erro', 'Falha ao carregar usuários: ' + errUsu.message); return; }
@@ -123,7 +124,6 @@ async function carregarBase() {
     if (errFolhaResp) console.warn('fechamento_empresas_responsaveis indisponível:', errFolhaResp.message);
     if (errConfigGeral) console.warn('fechamento_config_geral indisponível:', errConfigGeral.message);
 
-    competenciaGeralCache = configGeral?.competencia_atual || '';
     emailAlertaFechamentoCache = configGeral?.email_alerta_fechamento || '';
 
     empresasCache = empresas || [];
@@ -151,41 +151,43 @@ function nomeEmpresa(codigo) {
     return emp ? emp.nome_empresa : codigo;
 }
 
-function competenciaCalendario() {
-    const d = new Date();
-    return String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+// Competência selecionada nos cards de mês/ano — única fonte de verdade
+// usada pelo Dashboard para localizar/criar ciclos (substitui a antiga
+// "Competência em execução" configurável em fechamento_config_geral).
+function competenciaSelecionadaCF() {
+    return String(mesSelecionadoCF).padStart(2, '0') + '/' + anoSelecionadoCF;
 }
 
-// Competência que o Dashboard usa para localizar os ciclos — a indicada
-// manualmente em "Competência em execução" (fechamento_config_geral),
-// com fallback para o mês corrente do calendário se nada foi indicado.
-function competenciaAtual() {
-    return competenciaGeralCache || competenciaCalendario();
+function selecionarMesCF(mes) {
+    mesSelecionadoCF = mes;
+    carregarDashboard();
 }
 
-// Competência efetivamente exibida no Dashboard — usa o filtro local se
-// definido, senão cai para a competência em execução (comportamento padrão).
-function competenciaExibida() {
-    return competenciaFiltroDashboardCF || competenciaAtual();
+function mudarAnoCF(delta) {
+    anoSelecionadoCF += delta;
+    carregarDashboard();
 }
 
-async function salvarCompetenciaGeralCF() {
-    if (!isAdminAtual) return;
-    const input = document.getElementById('inputCompetenciaGeralCF');
-    const valor = input.value.trim();
-    if (valor && !/^\d{2}\/\d{4}$/.test(valor)) {
-        mostrarMensagem('Atenção', 'Informe a competência no formato MM/AAAA, ou deixe em branco para usar o mês corrente.');
-        return;
-    }
+function renderCompetenciaCardsCF() {
+    const wrap = document.getElementById('competenciaCardsCF');
+    if (!wrap) return;
 
-    const { error } = await supabaseClient
-        .from('fechamento_config_geral')
-        .upsert({ id: 1, competencia_atual: valor || null, updated_at: new Date().toISOString() }, { onConflict: 'id' });
-    if (error) { mostrarMensagem('Erro', 'Falha ao salvar a competência: ' + error.message); return; }
+    const cards = NOMES_MESES_CF.map((nome, i) => {
+        const mes = i + 1;
+        const classes = ['mes-card'];
+        if (mes === mesSelecionadoCF) classes.push('mes-selecionado');
+        if (mes === (hojeCF.getMonth() + 1) && anoSelecionadoCF === hojeCF.getFullYear()) classes.push('mes-atual-calendario');
+        return `<div class="${classes.join(' ')}" onclick="selecionarMesCF(${mes})">${nome}</div>`;
+    }).join('');
 
-    competenciaGeralCache = valor;
-    mostrarToastCF('Competência atualizada.', 'sucesso');
-    await carregarDashboard();
+    wrap.innerHTML = `
+        <div class="competencia-cards-ano">
+            <button type="button" onclick="mudarAnoCF(-1)" aria-label="Ano anterior">‹</button>
+            <span>${anoSelecionadoCF}</span>
+            <button type="button" onclick="mudarAnoCF(1)" aria-label="Próximo ano">›</button>
+        </div>
+        <div class="competencia-cards-meses">${cards}</div>
+    `;
 }
 
 // ──────────────────────────────────────────────
@@ -200,60 +202,9 @@ async function buscarEmpresasConfiguradas() {
     return [...new Set((data || []).map(r => r.codigo_empresa))];
 }
 
-function renderCompetenciaGeralCF() {
-    const bar = document.getElementById('competenciaGeralCF');
-    if (!bar) return;
-    const placeholderCalendario = competenciaCalendario();
-
-    if (isAdminAtual) {
-        bar.innerHTML = `
-            <label for="inputCompetenciaGeralCF">Competência em execução</label>
-            <input type="text" id="inputCompetenciaGeralCF" placeholder="${placeholderCalendario}" maxlength="7" value="${escapeHtml(competenciaGeralCache)}">
-            <button class="btn btn-secondary btn-small" onclick="salvarCompetenciaGeralCF()">Salvar</button>
-            <small>Indica de forma geral qual competência a equipe da folha está trabalhando. Em branco = usa o mês corrente (${placeholderCalendario}).</small>
-        `;
-    } else {
-        bar.innerHTML = `<label>Competência em execução</label> <strong>${competenciaAtual()}</strong>`;
-    }
-}
-
-function renderCompetenciaFiltroCF() {
-    const bar = document.getElementById('competenciaFiltroCF');
-    if (!bar) return;
-    const exibida = competenciaExibida();
-    const diferente = competenciaFiltroDashboardCF && competenciaFiltroDashboardCF !== competenciaAtual();
-
-    bar.innerHTML = `
-        <label for="inputCompetenciaFiltroCF">Ver competência</label>
-        <input type="text" id="inputCompetenciaFiltroCF" placeholder="${escapeHtml(competenciaAtual())}" maxlength="7" value="${escapeHtml(competenciaFiltroDashboardCF)}">
-        <button class="btn btn-secondary btn-small" onclick="aplicarFiltroCompetenciaCF()">Ver</button>
-        ${diferente ? `<small>Exibindo ${escapeHtml(exibida)} — diferente da competência em execução. <a href="#" onclick="limparFiltroCompetenciaCF(); return false;">Voltar para atual</a></small>` : `<small>Em branco = usa a competência em execução (${escapeHtml(competenciaAtual())}).</small>`}
-    `;
-
-    const input = document.getElementById('inputCompetenciaFiltroCF');
-    if (input) input.addEventListener('keydown', (e) => { if (e.key === 'Enter') aplicarFiltroCompetenciaCF(); });
-}
-
-function aplicarFiltroCompetenciaCF() {
-    const input = document.getElementById('inputCompetenciaFiltroCF');
-    const valor = input.value.trim();
-    if (valor && !/^\d{2}\/\d{4}$/.test(valor)) {
-        mostrarMensagem('Atenção', 'Informe a competência no formato MM/AAAA, ou deixe em branco para usar a competência em execução.');
-        return;
-    }
-    competenciaFiltroDashboardCF = valor;
-    carregarDashboard();
-}
-
-function limparFiltroCompetenciaCF() {
-    competenciaFiltroDashboardCF = '';
-    carregarDashboard();
-}
-
 async function carregarDashboard() {
-    renderCompetenciaGeralCF();
-    renderCompetenciaFiltroCF();
-    const comp = competenciaExibida();
+    renderCompetenciaCardsCF();
+    const comp = competenciaSelecionadaCF();
     const corpo = document.getElementById('corpoDashboard');
     const codigos = await buscarEmpresasConfiguradas();
 
@@ -380,7 +331,7 @@ function toggleExpandir(cod) {
 }
 
 async function iniciarCiclo(codigo_empresa) {
-    const comp = competenciaExibida();
+    const comp = competenciaSelecionadaCF();
 
     const { data: config, error: errConfig } = await supabaseClient
         .from('fechamento_config_empresa_fase')
