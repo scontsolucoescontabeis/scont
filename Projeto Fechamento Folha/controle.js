@@ -21,6 +21,9 @@ let empresasFolhaCache = []; // empresasCache filtrado por status_situacao ativo
 let folhaConfigPorEmpresa = {}; // { codigo_empresa: boolean } — ausente = false (padrão opt-in)
 let responsaveisFolhaPorEmpresa = {}; // { codigo_empresa: Set<usuario_id> }
 
+// Competência geral (indicação livre de qual competência a equipe está trabalhando)
+let competenciaGeralCache = ''; // vazio = usa o mês corrente calculado
+
 const STATUS_CICLO_LABEL = { nao_iniciada: 'Não iniciada', em_execucao: 'Em execução', fechada: 'Fechada' };
 const STATUS_CICLO_BADGE = { nao_iniciada: 'badge-nao-iniciada', em_execucao: 'badge-em-execucao', fechada: 'badge-fechada' };
 
@@ -97,19 +100,23 @@ async function carregarBase() {
         { data: empresas, error: errEmp },
         { data: usuarios, error: errUsu },
         { data: folhaConfig, error: errFolhaConfig },
-        { data: folhaResp, error: errFolhaResp }
+        { data: folhaResp, error: errFolhaResp },
+        { data: configGeral, error: errConfigGeral }
     ] = await Promise.all([
         supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, status_situacao').order('nome_empresa'),
         supabaseClient.from('usuarios').select('id, nome, email').order('nome'),
         supabaseClient.from('fechamento_empresas_config').select('codigo_empresa, possui_folha'),
-        supabaseClient.from('fechamento_empresas_responsaveis').select('codigo_empresa, usuario_id')
+        supabaseClient.from('fechamento_empresas_responsaveis').select('codigo_empresa, usuario_id'),
+        supabaseClient.from('fechamento_config_geral').select('competencia_atual').eq('id', 1).maybeSingle()
     ]);
     if (errEmp) { mostrarMensagem('Erro', 'Falha ao carregar empresas: ' + errEmp.message); return; }
     if (errUsu) { mostrarMensagem('Erro', 'Falha ao carregar usuários: ' + errUsu.message); return; }
-    // Tabelas novas (Empresas com Folha de Pagamento) — se a migração ainda não rodou,
-    // não bloqueia o restante da tela; só avisa no console.
+    // Tabelas novas — se a migração ainda não rodou, não bloqueia o restante da tela; só avisa no console.
     if (errFolhaConfig) console.warn('fechamento_empresas_config indisponível:', errFolhaConfig.message);
     if (errFolhaResp) console.warn('fechamento_empresas_responsaveis indisponível:', errFolhaResp.message);
+    if (errConfigGeral) console.warn('fechamento_config_geral indisponível:', errConfigGeral.message);
+
+    competenciaGeralCache = configGeral?.competencia_atual || '';
 
     empresasCache = empresas || [];
     usuariosCache = usuarios || [];
@@ -136,9 +143,35 @@ function nomeEmpresa(codigo) {
     return emp ? emp.nome_empresa : codigo;
 }
 
-function competenciaAtual() {
+function competenciaCalendario() {
     const d = new Date();
     return String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+}
+
+// Competência que o Dashboard usa para localizar os ciclos — a indicada
+// manualmente em "Competência em execução" (fechamento_config_geral),
+// com fallback para o mês corrente do calendário se nada foi indicado.
+function competenciaAtual() {
+    return competenciaGeralCache || competenciaCalendario();
+}
+
+async function salvarCompetenciaGeralCF() {
+    if (!isAdminAtual) return;
+    const input = document.getElementById('inputCompetenciaGeralCF');
+    const valor = input.value.trim();
+    if (valor && !/^\d{2}\/\d{4}$/.test(valor)) {
+        mostrarMensagem('Atenção', 'Informe a competência no formato MM/AAAA, ou deixe em branco para usar o mês corrente.');
+        return;
+    }
+
+    const { error } = await supabaseClient
+        .from('fechamento_config_geral')
+        .upsert({ id: 1, competencia_atual: valor || null, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    if (error) { mostrarMensagem('Erro', 'Falha ao salvar a competência: ' + error.message); return; }
+
+    competenciaGeralCache = valor;
+    mostrarToastCF('Competência atualizada.', 'sucesso');
+    await carregarDashboard();
 }
 
 // ──────────────────────────────────────────────
@@ -153,7 +186,25 @@ async function buscarEmpresasConfiguradas() {
     return [...new Set((data || []).map(r => r.codigo_empresa))];
 }
 
+function renderCompetenciaGeralCF() {
+    const bar = document.getElementById('competenciaGeralCF');
+    if (!bar) return;
+    const placeholderCalendario = competenciaCalendario();
+
+    if (isAdminAtual) {
+        bar.innerHTML = `
+            <label for="inputCompetenciaGeralCF">Competência em execução</label>
+            <input type="text" id="inputCompetenciaGeralCF" placeholder="${placeholderCalendario}" maxlength="7" value="${escapeHtml(competenciaGeralCache)}">
+            <button class="btn btn-secondary btn-small" onclick="salvarCompetenciaGeralCF()">Salvar</button>
+            <small>Indica de forma geral qual competência a equipe da folha está trabalhando. Em branco = usa o mês corrente (${placeholderCalendario}).</small>
+        `;
+    } else {
+        bar.innerHTML = `<label>Competência em execução</label> <strong>${competenciaAtual()}</strong>`;
+    }
+}
+
 async function carregarDashboard() {
+    renderCompetenciaGeralCF();
     const comp = competenciaAtual();
     const corpo = document.getElementById('corpoDashboard');
     const codigos = await buscarEmpresasConfiguradas();

@@ -39,6 +39,14 @@
         .config-add-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 16px 0; }
         .config-add-row .form-group { margin-bottom: 0; flex: 1; min-width: 220px; }
 
+        .competencia-geral-bar {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            padding: 12px 16px; background: var(--background-color); border-radius: 8px; margin-bottom: 4px;
+        }
+        .competencia-geral-bar label { font-weight: 600; font-size: 13px; }
+        .competencia-geral-bar input[type="text"] { padding: 7px 10px; border: 1px solid var(--border-color); border-radius: 6px; width: 110px; }
+        .competencia-geral-bar small { flex-basis: 100%; color: var(--text-secondary); font-size: 11px; }
+
         .empresas-filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 16px 0 10px; }
         .empresas-filtros input[type="text"] { flex: 1; min-width: 220px; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 6px; }
         .empresas-contador { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
@@ -90,7 +98,7 @@
         <div class="sidebar-section">Controle de Fechamento</div>
 
         <button class="sidebar-item active" id="navDashboardCF" onclick="navegarPara('dashboard')">
-            <span class="sidebar-item-icon">📊</span> Dashboard
+            <span class="sidebar-item-icon">📊</span> Controle Empresas
         </button>
 
         <div class="sidebar-section" id="sectionConfigCF" style="display:none; padding-top:10px;">Configurações</div>
@@ -133,6 +141,8 @@
     <!-- TELA DASHBOARD -->
     <div id="telaDashboardCF" class="active">
         <div class="container">
+            <div class="competencia-geral-bar" id="competenciaGeralCF"></div>
+
             <div class="section-header">
                 <h2>Empresas</h2>
                 <p>Status do fechamento da competência aberta de cada empresa configurada</p>
