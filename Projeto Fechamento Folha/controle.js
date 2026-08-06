@@ -508,11 +508,11 @@ function renderListaCatalogoConfig() {
     const div = document.getElementById('listaCatalogoConfig');
     if (!catalogoCache.length) { div.innerHTML = '<em>Nenhuma fase cadastrada no catálogo.</em>'; return; }
 
-    div.innerHTML = `<div class="fase-lista">${catalogoCache.map(c => {
+    div.innerHTML = `<div class="fase-cards-catalogo">${catalogoCache.map(c => {
         if (editandoCatalogoId === c.id) {
             return `
-                <div class="fase-item">
-                    <input type="text" id="inputEditCatalogo" value="${c.nome}" style="flex:1;">
+                <div class="fase-card-catalogo editando">
+                    <input type="text" id="inputEditCatalogo" value="${escapeHtml(c.nome)}">
                     <span class="fase-config-acoes">
                         <button class="btn btn-primary btn-small" onclick="salvarEdicaoFaseCatalogo('${c.id}')">Salvar</button>
                         <button class="btn btn-secondary btn-small" onclick="cancelarEdicaoFaseCatalogo()">Cancelar</button>
@@ -520,14 +520,48 @@ function renderListaCatalogoConfig() {
                 </div>`;
         }
         return `
-            <div class="fase-item">
-                <span class="fase-nome">${c.nome}</span>
-                <span class="fase-config-acoes">
-                    <button class="btn btn-secondary btn-small" onclick="editarFaseCatalogo('${c.id}')">Editar</button>
-                </span>
+            <div class="fase-card-catalogo" draggable="true"
+                ondragstart="dragStartFaseCatalogo(event, '${c.id}')"
+                title="Arraste para o quadro de fluxo abaixo">
+                <span class="fase-nome">${escapeHtml(c.nome)}</span>
+                <button type="button" class="btn-editar-fase-catalogo" onclick="editarFaseCatalogo('${c.id}')" title="Editar">✎</button>
             </div>`;
     }).join('')}</div>`;
 }
+
+// ─── DRAG AND DROP: catálogo → fluxo da empresa ─────────────
+function dragStartFaseCatalogo(event, catalogoId) {
+    const fase = catalogoCache.find(c => c.id === catalogoId);
+    if (!fase) return;
+    event.dataTransfer.setData('text/plain', fase.nome);
+    event.dataTransfer.effectAllowed = 'copy';
+}
+
+function permitirDropFaseConfig(event) {
+    if (!event.dataTransfer.types.includes('text/plain')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    document.getElementById('listaFasesConfig').classList.add('drop-ativo');
+}
+
+function saindoDropFaseConfig() {
+    document.getElementById('listaFasesConfig').classList.remove('drop-ativo');
+}
+
+function dropFaseConfig(event) {
+    event.preventDefault();
+    document.getElementById('listaFasesConfig').classList.remove('drop-ativo');
+    const nome = event.dataTransfer.getData('text/plain');
+    adicionarFaseCatalogoPorNome(nome);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const dropZone = document.getElementById('listaFasesConfig');
+    if (!dropZone) return;
+    dropZone.addEventListener('dragover', permitirDropFaseConfig);
+    dropZone.addEventListener('dragleave', saindoDropFaseConfig);
+    dropZone.addEventListener('drop', dropFaseConfig);
+});
 
 function editarFaseCatalogo(id) {
     editandoCatalogoId = id;
@@ -645,13 +679,18 @@ function popularSelectCatalogoAdd() {
         disponiveis.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('');
 }
 
-function adicionarFaseCatalogo() {
+function adicionarFaseCatalogoPorNome(nome) {
+    if (!nome) return;
     if (!empresaConfigSelecionada) { mostrarMensagem('Atenção', 'Selecione uma empresa antes de adicionar fases.'); return; }
-    const select = document.getElementById('selectCatalogoAdd');
-    if (!select.value) return;
-    configFasesAtual.push({ nome_fase: select.value });
+    if (configFasesAtual.some(f => f.nome_fase === nome)) { mostrarToastCF('Essa fase já foi adicionada ao fluxo.', 'erro'); return; }
+    configFasesAtual.push({ nome_fase: nome });
     renderListaFasesConfig();
     popularSelectCatalogoAdd();
+}
+
+function adicionarFaseCatalogo() {
+    const select = document.getElementById('selectCatalogoAdd');
+    adicionarFaseCatalogoPorNome(select.value);
 }
 
 function adicionarFaseCustom() {

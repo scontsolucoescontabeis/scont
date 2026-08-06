@@ -53,3 +53,33 @@ de ano (`mudarAnoCF`) atualiza o estado e recarrega a tabela de empresas —
 "a competência na tabela vai mudando de forma dinâmica". O botão "Iniciar
 fechamento" por empresa já existente cobre "dar a possibilidade de
 preenchimento daquele mês" quando não há ciclo ainda.
+
+## Revisão: catálogo em cards + drag-and-drop no "Fluxo por Empresa"
+
+Pedido do usuário, mesmo dia: na tela "Fluxo por Empresa", (1) o catálogo de
+fases padrão deve virar cards (em vez da lista vertical com botão "Editar"),
+e (2) a configuração do fluxo por empresa deve aceitar arrastar um card do
+catálogo para montar o fluxo daquela empresa.
+
+**Catálogo em cards:** `renderListaCatalogoConfig()` passou a gerar um grid
+(`.fase-cards-catalogo`, `auto-fill minmax(160px,1fr)`) de `.fase-card-catalogo`,
+cada um com o nome da fase + botão "✎" que mantém a edição inline já existente
+(`editandoCatalogoId`) — o card em edição vira coluna (input + Salvar/Cancelar).
+Cards não em edição ganham `draggable="true"`.
+
+**Drag-and-drop para o fluxo:** `#listaFasesConfig` (o quadro do fluxo da
+empresa selecionada) é o drop zone — recebe listeners `dragover`/`dragleave`/`drop`
+uma única vez no `DOMContentLoaded` (o container em si não é recriado por
+`innerHTML`, só seu conteúdo). `dragStartFaseCatalogo(event, catalogoId)` grava
+o **nome** da fase (resolvido por id em `catalogoCache`, nunca embutido cru num
+atributo inline) em `event.dataTransfer`. `dropFaseConfig` lê esse nome e chama
+`adicionarFaseCatalogoPorNome(nome)` — nova função compartilhada que também
+passou a ser usada pelo fluxo antigo (seletor + botão "+ Adicionar"), com duas
+validações que antes só existiam implicitamente via filtro do `<select>`:
+exige empresa selecionada e rejeita fase duplicada (toast de erro). O seletor
+dropdown **não foi removido** — continua como alternativa ao drag-and-drop
+(acessibilidade/touch). Reordenar dentro do fluxo continua pelos botões ↑/↓
+existentes (não foi pedido drag-reorder).
+
+Sem SQL novo, sem mudança de schema — é só reorganização de UI sobre o mesmo
+`fechamento_config_empresa_fase`.
