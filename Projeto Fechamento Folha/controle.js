@@ -24,6 +24,9 @@ let responsaveisFolhaPorEmpresa = {}; // { codigo_empresa: Set<usuario_id> }
 // Competência geral (indicação livre de qual competência a equipe está trabalhando)
 let competenciaGeralCache = ''; // vazio = usa o mês corrente calculado
 
+// E-mail(is) que recebem alerta quando o fechamento de uma empresa é concluído
+let emailAlertaFechamentoCache = ''; // string bruta, separada por vírgula
+
 const STATUS_CICLO_LABEL = { nao_iniciada: 'Não iniciada', em_execucao: 'Em execução', fechada: 'Fechada' };
 const STATUS_CICLO_BADGE = { nao_iniciada: 'badge-nao-iniciada', em_execucao: 'badge-em-execucao', fechada: 'badge-fechada' };
 
@@ -107,7 +110,7 @@ async function carregarBase() {
         supabaseClient.from('usuarios').select('id, nome, email').order('nome'),
         supabaseClient.from('fechamento_empresas_config').select('codigo_empresa, possui_folha'),
         supabaseClient.from('fechamento_empresas_responsaveis').select('codigo_empresa, usuario_id'),
-        supabaseClient.from('fechamento_config_geral').select('competencia_atual').eq('id', 1).maybeSingle()
+        supabaseClient.from('fechamento_config_geral').select('competencia_atual, email_alerta_fechamento').eq('id', 1).maybeSingle()
     ]);
     if (errEmp) { mostrarMensagem('Erro', 'Falha ao carregar empresas: ' + errEmp.message); return; }
     if (errUsu) { mostrarMensagem('Erro', 'Falha ao carregar usuários: ' + errUsu.message); return; }
@@ -117,6 +120,7 @@ async function carregarBase() {
     if (errConfigGeral) console.warn('fechamento_config_geral indisponível:', errConfigGeral.message);
 
     competenciaGeralCache = configGeral?.competencia_atual || '';
+    emailAlertaFechamentoCache = configGeral?.email_alerta_fechamento || '';
 
     empresasCache = empresas || [];
     usuariosCache = usuarios || [];
@@ -396,14 +400,16 @@ async function salvarObservacoesCiclo(cicloId, codigoEmpresa, valor) {
     mostrarToastCF('Observações salvas.', 'sucesso');
 }
 
-// Notifica os responsáveis cadastrados em "Empresas com Folha de Pagamento"
-// quando todas as fases do fluxo de uma empresa são concluídas — mesmo
-// mecanismo (Edge Function enviar-email) usado pelo Diário Contábil.
+// Notifica os responsáveis cadastrados em "Empresas com Folha de Pagamento" e
+// os e-mails gerais definidos em "Alertas por e-mail" (Configuração > Fluxo por
+// Empresa) quando todas as fases do fluxo de uma empresa são concluídas —
+// mesmo mecanismo (Edge Function enviar-email) usado pelo Diário Contábil.
 async function notificarFechamentoConcluido(codigoEmpresa, competencia) {
     const ids = responsaveisFolhaPorEmpresa[codigoEmpresa];
-    if (!ids || !ids.size) return; // nenhum responsável cadastrado para esta empresa
+    const doResponsaveis = (ids && ids.size) ? usuariosCache.filter(u => ids.has(u.id)).map(u => u.email).filter(Boolean) : [];
+    const doAlertaGeral = emailAlertaFechamentoCache.split(',').map(s => s.trim()).filter(Boolean);
 
-    const destinatarios = usuariosCache.filter(u => ids.has(u.id)).map(u => u.email).filter(Boolean);
+    const destinatarios = [...new Set([...doResponsaveis, ...doAlertaGeral])];
     if (!destinatarios.length) return;
 
     const { data: { session } } = await supabaseClient.auth.getSession();
@@ -440,10 +446,30 @@ async function iniciarConfig() {
         navegarPara('dashboard');
         return;
     }
+    renderEmailAlertaFechamentoCF();
     await carregarCatalogo();
     renderListaCatalogoConfig();
     popularSelectEmpresaConfig();
     renderListaFasesConfig();
+}
+
+function renderEmailAlertaFechamentoCF() {
+    const input = document.getElementById('inputEmailAlertaFechamentoCF');
+    if (input) input.value = emailAlertaFechamentoCache;
+}
+
+async function salvarEmailAlertaFechamentoCF() {
+    if (!isAdminAtual) return;
+    const input = document.getElementById('inputEmailAlertaFechamentoCF');
+    const valor = input.value.trim();
+
+    const { error } = await supabaseClient
+        .from('fechamento_config_geral')
+        .upsert({ id: 1, email_alerta_fechamento: valor || null, updated_at: new Date().toISOString() }, { onConflict: 'id' });
+    if (error) { mostrarMensagem('Erro', 'Falha ao salvar o(s) e-mail(is) de alerta: ' + error.message); return; }
+
+    emailAlertaFechamentoCache = valor;
+    mostrarToastCF('E-mail(is) de alerta salvo(s).', 'sucesso');
 }
 
 async function carregarCatalogo() {

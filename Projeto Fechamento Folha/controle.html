@@ -171,6 +171,18 @@
     <div id="telaConfigFluxoCF">
         <div class="container">
             <div class="section-header">
+                <h2>Alertas por e-mail</h2>
+                <p>E-mail(is) que recebem um alerta sempre que o fechamento de uma empresa é concluído (todas as fases marcadas), além dos responsáveis cadastrados em "Empresas com Folha de Pagamento". Separe vários e-mails por vírgula.</p>
+            </div>
+            <div class="config-add-row">
+                <div class="form-group">
+                    <label for="inputEmailAlertaFechamentoCF">E-mail(is) de alerta</label>
+                    <input type="text" id="inputEmailAlertaFechamentoCF" placeholder="ex: herbertscont@gmail.com, outro@scontdf.com.br">
+                </div>
+                <button class="btn btn-primary" onclick="salvarEmailAlertaFechamentoCF()">💾 Salvar</button>
+            </div>
+
+            <div class="section-header">
                 <h2>Catálogo de fases padrão</h2>
                 <p>Nomes sugeridos ao adicionar fases nas empresas — editar aqui não altera empresas já configuradas</p>
             </div>
