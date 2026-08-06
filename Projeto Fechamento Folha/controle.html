@@ -8,9 +8,10 @@
     <script src="../supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../portal-auth-guard.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        #telaDashboardCF, #telaConfigCF { display: none; }
-        #telaDashboardCF.active, #telaConfigCF.active { display: block; }
+        #telaDashboardCF, #telaConfigFluxoCF, #telaConfigEmpresasCF { display: none; }
+        #telaDashboardCF.active, #telaConfigFluxoCF.active, #telaConfigEmpresasCF.active { display: block; }
 
         .badge-nao-iniciada { background: #eceff1; color: #455a64; }
         .badge-em-execucao  { background: #fff3e0; color: #e65100; }
@@ -28,6 +29,38 @@
         .fase-config-acoes { display: flex; gap: 6px; }
         .config-add-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 16px 0; }
         .config-add-row .form-group { margin-bottom: 0; flex: 1; min-width: 220px; }
+
+        .empresas-filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 16px 0 10px; }
+        .empresas-filtros input[type="text"] { flex: 1; min-width: 220px; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 6px; }
+        .empresas-contador { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+
+        .folha-toggle { border: none; border-radius: 999px; padding: 4px 14px; font-size: 12px; font-weight: 700; cursor: pointer; min-width: 52px; }
+        .folha-toggle.folha-sim { background: #e8f5e9; color: var(--success-color); }
+        .folha-toggle.folha-nao { background: #fdecea; color: var(--danger-color); }
+        .folha-toggle:disabled { opacity: .6; cursor: default; }
+
+        .responsavel-cel { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .responsavel-nomes { font-size: 12px; }
+        .btn-editar-responsavel { border: none; background: none; cursor: pointer; font-size: 14px; color: var(--text-secondary); }
+        .btn-editar-responsavel:hover { color: var(--primary-color); }
+
+        .responsavel-check-item { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border-color); font-size: 13px; cursor: pointer; }
+        .responsavel-check-item:last-child { border-bottom: none; }
+        .responsavel-check-item small { color: var(--text-secondary); }
+
+        .modal-content.large { max-width: 640px; }
+        #modalResponsavelUsuarioCFBody { max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 10px; }
+
+        .toast-cf {
+            position: fixed; bottom: 24px; right: 24px;
+            background: var(--text-primary); color: #fff;
+            padding: 12px 18px; border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            font-size: 13px; z-index: 2000; display: none;
+        }
+        .toast-cf.show { display: block; }
+        .toast-cf.erro { background: var(--danger-color); }
+        .toast-cf.sucesso { background: var(--success-color); }
     </style>
 </head>
 <body>
@@ -50,8 +83,13 @@
         <button class="sidebar-item active" id="navDashboardCF" onclick="navegarPara('dashboard')">
             <span class="sidebar-item-icon">📊</span> Dashboard
         </button>
-        <button class="sidebar-item" id="navConfigCF" onclick="navegarPara('config')" style="display:none;">
-            <span class="sidebar-item-icon">⚙️</span> Configuração
+
+        <div class="sidebar-section" id="sectionConfigCF" style="display:none; padding-top:10px;">Configurações</div>
+        <button class="sidebar-item sidebar-subitem" id="navConfigFluxoCF" onclick="navegarPara('config-fluxo')" style="display:none;">
+            <span class="sidebar-item-icon">🔀</span> Fluxo por Empresa
+        </button>
+        <button class="sidebar-item sidebar-subitem" id="navConfigEmpresasCF" onclick="navegarPara('config-empresas')" style="display:none;">
+            <span class="sidebar-item-icon">🏢</span> Empresas com Folha de Pagamento
         </button>
 
         <div class="sidebar-divider"></div>
@@ -110,8 +148,8 @@
         </div>
     </div>
 
-    <!-- TELA CONFIGURAÇÃO -->
-    <div id="telaConfigCF">
+    <!-- TELA FLUXO POR EMPRESA -->
+    <div id="telaConfigFluxoCF">
         <div class="container">
             <div class="section-header">
                 <h2>Catálogo de fases padrão</h2>
@@ -161,7 +199,84 @@
         </div>
     </div>
 
+    <!-- TELA EMPRESAS COM FOLHA DE PAGAMENTO -->
+    <div id="telaConfigEmpresasCF">
+        <div class="container">
+            <div class="section-header">
+                <h2>Empresas com Folha de Pagamento</h2>
+                <p>Marque as empresas ativas que têm folha de pagamento fechada pela Scont — somente as marcadas com "Sim" aparecem em "Fluxo por Empresa". As alterações são salvas automaticamente.</p>
+            </div>
+
+            <div class="empresas-filtros">
+                <input type="text" id="buscaEmpresaFolhaCF" placeholder="Buscar empresa...">
+                <button class="btn btn-secondary btn-small" onclick="alternarVisiveisFolha(true)">Marcar visíveis</button>
+                <button class="btn btn-secondary btn-small" onclick="alternarVisiveisFolha(false)">Desmarcar visíveis</button>
+                <button class="btn btn-secondary btn-small" onclick="document.getElementById('fileImportarFolhaCF').click()">📊 Importar planilha</button>
+                <button class="btn btn-secondary btn-small" onclick="abrirModalResponsavelPorUsuarioCF()">👤 Atribuir por usuário</button>
+                <input type="file" id="fileImportarFolhaCF" accept=".xlsx,.xls,.csv" style="display:none">
+            </div>
+            <p class="empresas-contador" id="contadorEmpresasFolhaCF"></p>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Código Empresa</th>
+                            <th>Nome Empresa</th>
+                            <th>Folha de Pagamento</th>
+                            <th>Responsável(is)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="corpoTabelaEmpresasFolhaCF">
+                        <tr><td colspan="4">Carregando...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
 </div><!-- /main-content -->
+
+<!-- MODAL RESPONSÁVEIS (por empresa) -->
+<div class="modal" id="modalResponsaveisCF">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalResponsaveisCFTitulo">Responsável(is)</h3>
+            <button class="modal-close" onclick="fecharModalResponsaveisCF()">×</button>
+        </div>
+        <div class="modal-body" id="modalResponsaveisCFBody"></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary btn-small" onclick="fecharModalResponsaveisCF()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL ATRIBUIR RESPONSÁVEL POR USUÁRIO (várias empresas) -->
+<div class="modal" id="modalResponsavelUsuarioCF">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h3>Atribuir responsável a várias empresas</h3>
+            <button class="modal-close" onclick="fecharModalResponsavelUsuarioCF()">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">Escolha um usuário e marque todas as empresas pelas quais ele é responsável pelo fechamento. As alterações são salvas automaticamente.</p>
+            <div class="form-group">
+                <select id="selectUsuarioResponsavelCF" onchange="renderCorpoModalResponsavelUsuarioCF()"></select>
+            </div>
+            <div class="empresas-filtros" style="margin-bottom:8px;">
+                <input type="text" id="buscaEmpresaModalUsuarioCF" placeholder="Buscar empresa..." oninput="renderCorpoModalResponsavelUsuarioCF()">
+                <button class="btn btn-secondary btn-small" onclick="alternarTodasModalUsuarioCF(true)">Marcar visíveis</button>
+                <button class="btn btn-secondary btn-small" onclick="alternarTodasModalUsuarioCF(false)">Desmarcar visíveis</button>
+            </div>
+            <div id="modalResponsavelUsuarioCFBody"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary btn-small" onclick="fecharModalResponsavelUsuarioCF()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-cf" id="toastCF"></div>
 
 <!-- MODAL MENSAGEM -->
 <div class="modal" id="messageModal">

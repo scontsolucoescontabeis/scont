@@ -16,6 +16,11 @@ let empresaConfigSelecionada = '';
 let editandoIndexConfig = null;
 let editandoCatalogoId = null;
 
+// Empresas com Folha de Pagamento
+let empresasFolhaCache = []; // empresasCache filtrado por status_situacao ativo
+let folhaConfigPorEmpresa = {}; // { codigo_empresa: boolean } — ausente = false (padrão opt-in)
+let responsaveisFolhaPorEmpresa = {}; // { codigo_empresa: Set<usuario_id> }
+
 const STATUS_CICLO_LABEL = { nao_iniciada: 'Não iniciada', em_execucao: 'Em execução', fechada: 'Fechada' };
 const STATUS_CICLO_BADGE = { nao_iniciada: 'badge-nao-iniciada', em_execucao: 'badge-em-execucao', fechada: 'badge-fechada' };
 
@@ -53,13 +58,17 @@ function fecharSidebar() {
 }
 
 function navegarPara(modo) {
+    if (modo === 'config') modo = 'config-fluxo'; // compatibilidade com links antigos (?tela=config)
     fecharSidebar();
     document.getElementById('navDashboardCF').classList.toggle('active', modo === 'dashboard');
-    document.getElementById('navConfigCF').classList.toggle('active', modo === 'config');
+    document.getElementById('navConfigFluxoCF').classList.toggle('active', modo === 'config-fluxo');
+    document.getElementById('navConfigEmpresasCF').classList.toggle('active', modo === 'config-empresas');
     document.getElementById('telaDashboardCF').classList.toggle('active', modo === 'dashboard');
-    document.getElementById('telaConfigCF').classList.toggle('active', modo === 'config');
+    document.getElementById('telaConfigFluxoCF').classList.toggle('active', modo === 'config-fluxo');
+    document.getElementById('telaConfigEmpresasCF').classList.toggle('active', modo === 'config-empresas');
     if (modo === 'dashboard') carregarDashboard();
-    if (modo === 'config') iniciarConfig();
+    if (modo === 'config-fluxo') iniciarConfig();
+    if (modo === 'config-empresas') iniciarConfigEmpresas();
 }
 
 // ──────────────────────────────────────────────
@@ -70,24 +79,56 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!auth) return;
 
     isAdminAtual = auth.isAdmin === true;
-    document.getElementById('navConfigCF').style.display = isAdminAtual ? '' : 'none';
+    document.getElementById('sectionConfigCF').style.display = isAdminAtual ? '' : 'none';
+    document.getElementById('navConfigFluxoCF').style.display = isAdminAtual ? '' : 'none';
+    document.getElementById('navConfigEmpresasCF').style.display = isAdminAtual ? '' : 'none';
 
     await carregarBase();
 
     const params = new URLSearchParams(window.location.search);
-    const telaInicial = (params.get('tela') === 'config' && isAdminAtual) ? 'config' : 'dashboard';
+    const telaParam = params.get('tela');
+    const telasAdmin = ['config', 'config-fluxo', 'config-empresas'];
+    const telaInicial = (telasAdmin.includes(telaParam) && isAdminAtual) ? telaParam : 'dashboard';
     navegarPara(telaInicial);
 });
 
 async function carregarBase() {
-    const [{ data: empresas, error: errEmp }, { data: usuarios, error: errUsu }] = await Promise.all([
-        supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa').order('nome_empresa'),
-        supabaseClient.from('usuarios').select('id, nome').order('nome')
+    const [
+        { data: empresas, error: errEmp },
+        { data: usuarios, error: errUsu },
+        { data: folhaConfig, error: errFolhaConfig },
+        { data: folhaResp, error: errFolhaResp }
+    ] = await Promise.all([
+        supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, status_situacao').order('nome_empresa'),
+        supabaseClient.from('usuarios').select('id, nome').order('nome'),
+        supabaseClient.from('fechamento_empresas_config').select('codigo_empresa, possui_folha'),
+        supabaseClient.from('fechamento_empresas_responsaveis').select('codigo_empresa, usuario_id')
     ]);
     if (errEmp) { mostrarMensagem('Erro', 'Falha ao carregar empresas: ' + errEmp.message); return; }
     if (errUsu) { mostrarMensagem('Erro', 'Falha ao carregar usuários: ' + errUsu.message); return; }
+    // Tabelas novas (Empresas com Folha de Pagamento) — se a migração ainda não rodou,
+    // não bloqueia o restante da tela; só avisa no console.
+    if (errFolhaConfig) console.warn('fechamento_empresas_config indisponível:', errFolhaConfig.message);
+    if (errFolhaResp) console.warn('fechamento_empresas_responsaveis indisponível:', errFolhaResp.message);
+
     empresasCache = empresas || [];
     usuariosCache = usuarios || [];
+
+    const ativa = (s) => !s || String(s).trim().toLowerCase().startsWith('ativ');
+    empresasFolhaCache = empresasCache.filter(e => ativa(e.status_situacao));
+
+    folhaConfigPorEmpresa = {};
+    (folhaConfig || []).forEach(c => { folhaConfigPorEmpresa[c.codigo_empresa] = c.possui_folha; });
+
+    responsaveisFolhaPorEmpresa = {};
+    (folhaResp || []).forEach(r => {
+        if (!responsaveisFolhaPorEmpresa[r.codigo_empresa]) responsaveisFolhaPorEmpresa[r.codigo_empresa] = new Set();
+        responsaveisFolhaPorEmpresa[r.codigo_empresa].add(r.usuario_id);
+    });
+}
+
+function possuiFolha(codigoEmpresa) {
+    return folhaConfigPorEmpresa[codigoEmpresa] === true;
 }
 
 function nomeEmpresa(codigo) {
@@ -358,8 +399,10 @@ async function salvarEdicaoFaseCatalogo(id) {
 
 function popularSelectEmpresaConfig() {
     const select = document.getElementById('selectEmpresaConfig');
-    select.innerHTML = '<option value="">Selecione a empresa...</option>' +
-        empresasCache.map(e => `<option value="${e.codigo_empresa}">${e.nome_empresa}</option>`).join('');
+    const disponiveis = empresasCache.filter(e => possuiFolha(e.codigo_empresa));
+    select.innerHTML = disponiveis.length
+        ? '<option value="">Selecione a empresa...</option>' + disponiveis.map(e => `<option value="${e.codigo_empresa}">${e.nome_empresa}</option>`).join('')
+        : '<option value="">Nenhuma empresa marcada com folha de pagamento — configure em "Empresas com Folha de Pagamento"</option>';
 }
 
 async function onEmpresaConfigChange() {
@@ -493,4 +536,413 @@ async function salvarConfig() {
     if (errIns) { mostrarMensagem('Erro', 'Falha ao salvar nova configuração: ' + errIns.message); return; }
 
     mostrarMensagem('Sucesso', 'Configuração salva para ' + nomeEmpresa(empresaConfigSelecionada) + '.');
+}
+
+// ──────────────────────────────────────────────
+// EMPRESAS COM FOLHA DE PAGAMENTO
+// ──────────────────────────────────────────────
+function mostrarToastCF(msg, tipo) {
+    const toast = document.getElementById('toastCF');
+    toast.textContent = msg;
+    toast.className = 'toast-cf show' + (tipo === 'erro' ? ' erro' : tipo === 'sucesso' ? ' sucesso' : '');
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+function iniciarConfigEmpresas() {
+    if (!isAdminAtual) {
+        mostrarMensagem('Acesso restrito', 'Somente administradores podem configurar as empresas com folha de pagamento.');
+        navegarPara('dashboard');
+        return;
+    }
+    document.getElementById('buscaEmpresaFolhaCF').value = '';
+    renderTabelaEmpresasFolha();
+}
+
+function empresasFolhaVisiveis() {
+    const termo = (document.getElementById('buscaEmpresaFolhaCF').value || '').trim().toLowerCase();
+    if (!termo) return empresasFolhaCache;
+    return empresasFolhaCache.filter(e =>
+        e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo));
+}
+
+function toggleFolhaHtml(codigoEmpresa) {
+    const sim = possuiFolha(codigoEmpresa);
+    return `<button type="button" class="folha-toggle ${sim ? 'folha-sim' : 'folha-nao'}" data-empresa-codigo="${codigoEmpresa}" data-value="${sim}">${sim ? 'Sim' : 'Não'}</button>`;
+}
+
+function responsavelFolhaHtml(codigoEmpresa) {
+    const ids = responsaveisFolhaPorEmpresa[codigoEmpresa];
+    const nomes = ids && ids.size ? usuariosCache.filter(u => ids.has(u.id)).map(u => u.nome).join(', ') : '';
+    return `
+        <div class="responsavel-cel">
+            <span class="responsavel-nomes">${nomes || '—'}</span>
+            <button type="button" class="btn-editar-responsavel" onclick="abrirModalResponsaveisCF('${codigoEmpresa}')" title="Editar responsável(is)">✎</button>
+        </div>
+    `;
+}
+
+function renderTabelaEmpresasFolha() {
+    const corpo = document.getElementById('corpoTabelaEmpresasFolhaCF');
+    const visiveis = empresasFolhaVisiveis();
+
+    corpo.innerHTML = visiveis.length
+        ? visiveis.map(e => `
+            <tr>
+                <td>${e.codigo_empresa}</td>
+                <td>${e.nome_empresa}</td>
+                <td>${toggleFolhaHtml(e.codigo_empresa)}</td>
+                <td>${responsavelFolhaHtml(e.codigo_empresa)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="4">Nenhuma empresa encontrada.</td></tr>';
+
+    corpo.querySelectorAll('.folha-toggle').forEach(btn => {
+        btn.addEventListener('click', () => alternarFolhaUma(btn));
+    });
+
+    atualizarContadorFolha();
+}
+
+function atualizarContadorFolha() {
+    const todos = document.querySelectorAll('#corpoTabelaEmpresasFolhaCF .folha-toggle');
+    const marcados = document.querySelectorAll('#corpoTabelaEmpresasFolhaCF .folha-toggle[data-value="true"]');
+    document.getElementById('contadorEmpresasFolhaCF').textContent =
+        `${marcados.length} de ${todos.length} com folha de pagamento (${empresasFolhaCache.length} empresas ativas no total)`;
+}
+
+function definirValorFolha(btn, valor) {
+    btn.setAttribute('data-value', String(valor));
+    btn.textContent = valor ? 'Sim' : 'Não';
+    btn.classList.toggle('folha-sim', valor);
+    btn.classList.toggle('folha-nao', !valor);
+}
+
+async function salvarFolhaLote(registros) {
+    if (!registros.length) return { error: null };
+    const payload = registros.map(r => ({ ...r, updated_at: new Date().toISOString() }));
+    const { error } = await supabaseClient.from('fechamento_empresas_config').upsert(payload, { onConflict: 'codigo_empresa' });
+    if (!error) registros.forEach(r => { folhaConfigPorEmpresa[r.codigo_empresa] = r.possui_folha; });
+    return { error };
+}
+
+async function alternarFolhaUma(btn) {
+    const codigo = btn.getAttribute('data-empresa-codigo');
+    const anterior = btn.getAttribute('data-value') === 'true';
+    const novo = !anterior;
+
+    definirValorFolha(btn, novo);
+    btn.disabled = true;
+    atualizarContadorFolha();
+
+    const { error } = await salvarFolhaLote([{ codigo_empresa: codigo, possui_folha: novo }]);
+
+    btn.disabled = false;
+    if (error) {
+        console.error(error);
+        definirValorFolha(btn, anterior);
+        atualizarContadorFolha();
+        mostrarToastCF('Erro ao salvar. Alteração desfeita.', 'erro');
+        return;
+    }
+    mostrarToastCF('Configuração salva.', 'sucesso');
+}
+
+async function alternarVisiveisFolha(marcar) {
+    const botoes = Array.from(document.querySelectorAll('#corpoTabelaEmpresasFolhaCF .folha-toggle'));
+    const paraSalvar = botoes.filter(b => (b.getAttribute('data-value') === 'true') !== marcar);
+    if (!paraSalvar.length) return;
+
+    paraSalvar.forEach(b => { b.disabled = true; });
+    const registros = paraSalvar.map(b => ({ codigo_empresa: b.getAttribute('data-empresa-codigo'), possui_folha: marcar }));
+    const { error } = await salvarFolhaLote(registros);
+    paraSalvar.forEach(b => { b.disabled = false; });
+
+    if (error) {
+        console.error(error);
+        mostrarToastCF('Erro ao salvar as alterações.', 'erro');
+        return;
+    }
+
+    paraSalvar.forEach(b => definirValorFolha(b, marcar));
+    atualizarContadorFolha();
+    mostrarToastCF('Configuração salva.', 'sucesso');
+}
+
+async function salvarResponsavelFolha(codigoEmpresa, usuarioId, marcado) {
+    if (marcado) {
+        const { error } = await supabaseClient
+            .from('fechamento_empresas_responsaveis')
+            .insert([{ codigo_empresa: codigoEmpresa, usuario_id: usuarioId }]);
+        if (error) return { error };
+        if (!responsaveisFolhaPorEmpresa[codigoEmpresa]) responsaveisFolhaPorEmpresa[codigoEmpresa] = new Set();
+        responsaveisFolhaPorEmpresa[codigoEmpresa].add(usuarioId);
+    } else {
+        const { error } = await supabaseClient
+            .from('fechamento_empresas_responsaveis')
+            .delete()
+            .eq('codigo_empresa', codigoEmpresa)
+            .eq('usuario_id', usuarioId);
+        if (error) return { error };
+        responsaveisFolhaPorEmpresa[codigoEmpresa]?.delete(usuarioId);
+    }
+    return { error: null };
+}
+
+// ─── MODAL: RESPONSÁVEIS (por empresa) ──────────────────────
+function abrirModalResponsaveisCF(codigoEmpresa) {
+    document.getElementById('modalResponsaveisCFTitulo').textContent = `Responsável(is) — ${nomeEmpresa(codigoEmpresa)}`;
+    renderCorpoModalResponsaveisCF(codigoEmpresa);
+    document.getElementById('modalResponsaveisCF').classList.add('active');
+}
+
+function fecharModalResponsaveisCF() {
+    document.getElementById('modalResponsaveisCF').classList.remove('active');
+}
+
+function renderCorpoModalResponsaveisCF(codigoEmpresa) {
+    const body = document.getElementById('modalResponsaveisCFBody');
+    if (!usuariosCache.length) {
+        body.innerHTML = '<p><em>Nenhum usuário cadastrado no portal.</em></p>';
+        return;
+    }
+    const atuais = responsaveisFolhaPorEmpresa[codigoEmpresa] || new Set();
+    body.innerHTML = usuariosCache.map(u => `
+        <label class="responsavel-check-item">
+            <input type="checkbox" class="chk-responsavel-cf" value="${u.id}" ${atuais.has(u.id) ? 'checked' : ''}>
+            <span>${u.nome}</span>
+        </label>
+    `).join('');
+
+    body.querySelectorAll('.chk-responsavel-cf').forEach(chk => {
+        chk.addEventListener('change', async () => {
+            const usuarioId = chk.value;
+            const marcado = chk.checked;
+            chk.disabled = true;
+            const { error } = await salvarResponsavelFolha(codigoEmpresa, usuarioId, marcado);
+            chk.disabled = false;
+            if (error) {
+                console.error(error);
+                chk.checked = !marcado;
+                mostrarToastCF('Erro ao salvar. Alteração desfeita.', 'erro');
+                return;
+            }
+            renderTabelaEmpresasFolha();
+        });
+    });
+}
+
+// ─── MODAL: ATRIBUIR RESPONSÁVEL POR USUÁRIO (várias empresas) ──
+function abrirModalResponsavelPorUsuarioCF() {
+    if (!usuariosCache.length) { mostrarToastCF('Nenhum usuário cadastrado no portal.', 'erro'); return; }
+
+    const select = document.getElementById('selectUsuarioResponsavelCF');
+    const usuarioAtual = select.value;
+    select.innerHTML = usuariosCache.map(u => `<option value="${u.id}">${u.nome}</option>`).join('');
+    if (usuarioAtual && usuariosCache.some(u => u.id === usuarioAtual)) select.value = usuarioAtual;
+
+    document.getElementById('buscaEmpresaModalUsuarioCF').value = '';
+    renderCorpoModalResponsavelUsuarioCF();
+    document.getElementById('modalResponsavelUsuarioCF').classList.add('active');
+}
+
+function fecharModalResponsavelUsuarioCF() {
+    document.getElementById('modalResponsavelUsuarioCF').classList.remove('active');
+}
+
+function empresasFolhaVisiveisModalUsuario() {
+    const termo = (document.getElementById('buscaEmpresaModalUsuarioCF').value || '').trim().toLowerCase();
+    if (!termo) return empresasFolhaCache;
+    return empresasFolhaCache.filter(e =>
+        e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo));
+}
+
+function renderCorpoModalResponsavelUsuarioCF() {
+    const usuarioId = document.getElementById('selectUsuarioResponsavelCF').value;
+    const body = document.getElementById('modalResponsavelUsuarioCFBody');
+    const visiveis = empresasFolhaVisiveisModalUsuario();
+
+    if (!visiveis.length) {
+        body.innerHTML = '<p><em>Nenhuma empresa encontrada.</em></p>';
+        return;
+    }
+
+    body.innerHTML = visiveis.map(e => {
+        const marcado = (responsaveisFolhaPorEmpresa[e.codigo_empresa] || new Set()).has(usuarioId);
+        return `
+            <label class="responsavel-check-item">
+                <input type="checkbox" class="chk-responsavel-usuario-cf" value="${e.codigo_empresa}" ${marcado ? 'checked' : ''}>
+                <span>${e.nome_empresa} <small>(${e.codigo_empresa})</small></span>
+            </label>
+        `;
+    }).join('');
+
+    body.querySelectorAll('.chk-responsavel-usuario-cf').forEach(chk => {
+        chk.addEventListener('change', async () => {
+            const codigo = chk.value;
+            const marcado = chk.checked;
+            chk.disabled = true;
+            const { error } = await salvarResponsavelFolha(codigo, usuarioId, marcado);
+            chk.disabled = false;
+            if (error) {
+                console.error(error);
+                chk.checked = !marcado;
+                mostrarToastCF('Erro ao salvar. Alteração desfeita.', 'erro');
+                return;
+            }
+            renderTabelaEmpresasFolha();
+        });
+    });
+}
+
+async function alternarTodasModalUsuarioCF(marcar) {
+    const usuarioId = document.getElementById('selectUsuarioResponsavelCF').value;
+    const checkboxes = Array.from(document.querySelectorAll('#modalResponsavelUsuarioCFBody .chk-responsavel-usuario-cf'));
+    const paraSalvar = checkboxes.filter(chk => chk.checked !== marcar);
+    if (!paraSalvar.length) return;
+
+    paraSalvar.forEach(chk => { chk.disabled = true; });
+    const codigos = paraSalvar.map(chk => chk.value);
+
+    let error;
+    if (marcar) {
+        ({ error } = await supabaseClient
+            .from('fechamento_empresas_responsaveis')
+            .insert(codigos.map(codigo_empresa => ({ codigo_empresa, usuario_id: usuarioId }))));
+    } else {
+        ({ error } = await supabaseClient
+            .from('fechamento_empresas_responsaveis')
+            .delete()
+            .eq('usuario_id', usuarioId)
+            .in('codigo_empresa', codigos));
+    }
+
+    paraSalvar.forEach(chk => { chk.disabled = false; });
+
+    if (error) {
+        console.error(error);
+        mostrarToastCF('Erro ao salvar as alterações.', 'erro');
+        return;
+    }
+
+    codigos.forEach(codigo => {
+        if (!responsaveisFolhaPorEmpresa[codigo]) responsaveisFolhaPorEmpresa[codigo] = new Set();
+        if (marcar) responsaveisFolhaPorEmpresa[codigo].add(usuarioId);
+        else responsaveisFolhaPorEmpresa[codigo].delete(usuarioId);
+    });
+    paraSalvar.forEach(chk => { chk.checked = marcar; });
+    renderTabelaEmpresasFolha();
+}
+
+// ─── IMPORTAÇÃO EM MASSA (planilha) ─────────────────────────
+function normalizarChaveCF(str) {
+    return String(str ?? '')
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+}
+
+const ALIASES_CODIGO_CF = ['codigoempresa', 'codigo', 'codempresa', 'codemp'];
+const ALIASES_FOLHA_CF = ['folhadepagamento', 'folha', 'possuifolha', 'temfolha', 'temfolhadepagamento'];
+
+function interpretarSimNaoCF(valor) {
+    if (valor === null || valor === undefined) return null;
+    const v = normalizarChaveCF(valor);
+    if (!v) return null;
+    if (['sim', 's', 'true', '1', 'yes', 'y'].includes(v)) return true;
+    if (['nao', 'n', 'false', '0', 'no'].includes(v)) return false;
+    return null;
+}
+
+function lerPlanilhaFolhaCF(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const wb = XLSX.read(e.target.result, { type: 'array' });
+                const sheet = wb.Sheets[wb.SheetNames[0]];
+                if (!sheet) throw new Error('Não foi possível ler o conteúdo deste arquivo.');
+                resolve(XLSX.utils.sheet_to_json(sheet, { defval: null }));
+            } catch (err) { reject(err); }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('fileImportarFolhaCF');
+    if (fileInput) fileInput.addEventListener('change', handleImportarPlanilhaFolhaCF);
+    const busca = document.getElementById('buscaEmpresaFolhaCF');
+    if (busca) busca.addEventListener('input', renderTabelaEmpresasFolha);
+});
+
+async function handleImportarPlanilhaFolhaCF(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    let linhas;
+    try {
+        linhas = await lerPlanilhaFolhaCF(file);
+    } catch (err) {
+        console.error(err);
+        mostrarToastCF('Erro ao ler a planilha.', 'erro');
+        return;
+    }
+
+    if (!linhas.length) { mostrarToastCF('Planilha vazia.', 'erro'); return; }
+
+    const cabecalhos = Object.keys(linhas[0]);
+    const chaveCodigo = cabecalhos.find(h => ALIASES_CODIGO_CF.includes(normalizarChaveCF(h)));
+    const chaveFolha = cabecalhos.find(h => ALIASES_FOLHA_CF.includes(normalizarChaveCF(h)));
+
+    if (!chaveCodigo || !chaveFolha) {
+        mostrarToastCF('Planilha inválida: são necessárias as colunas "Código Empresa" e "Folha de Pagamento".', 'erro');
+        return;
+    }
+
+    const empresasPorCodigo = {};
+    empresasFolhaCache.forEach(e => { empresasPorCodigo[e.codigo_empresa] = e; });
+
+    const registrosPorCodigo = {};
+    let naoEncontradas = 0;
+    let ignoradas = 0;
+
+    linhas.forEach(linha => {
+        const codigo = String(linha[chaveCodigo] ?? '').trim();
+        if (!codigo) return;
+
+        const valor = interpretarSimNaoCF(linha[chaveFolha]);
+        if (valor === null) { ignoradas++; return; }
+
+        if (!empresasPorCodigo[codigo]) { naoEncontradas++; return; }
+
+        registrosPorCodigo[codigo] = valor; // linha repetida: prevalece a última ocorrência
+    });
+
+    const registros = Object.entries(registrosPorCodigo).map(([codigo_empresa, possui_folha]) => ({ codigo_empresa, possui_folha }));
+
+    if (!registros.length) {
+        const partes = ['Nenhuma alteração aplicável encontrada na planilha.'];
+        if (naoEncontradas) partes.push(`${naoEncontradas} código(s) não encontrado(s) entre as empresas ativas.`);
+        if (ignoradas) partes.push(`${ignoradas} linha(s) com valor inválido.`);
+        mostrarToastCF(partes.join(' '), 'erro');
+        return;
+    }
+
+    const { error } = await salvarFolhaLote(registros);
+
+    if (error) {
+        console.error(error);
+        mostrarToastCF('Erro ao salvar as alterações importadas.', 'erro');
+        return;
+    }
+
+    renderTabelaEmpresasFolha();
+
+    const partes = [`${registros.length} empresa(s) salva(s) no banco.`];
+    if (naoEncontradas) partes.push(`${naoEncontradas} código(s) não encontrado(s) entre as empresas ativas.`);
+    if (ignoradas) partes.push(`${ignoradas} linha(s) com valor inválido.`);
+    mostrarToastCF(partes.join(' '), 'sucesso');
 }
