@@ -27,6 +27,15 @@
         }
         .fase-nome { font-weight: 600; }
         .fase-config-acoes { display: flex; gap: 6px; }
+        .fase-checkbox { display: flex; align-items: center; gap: 10px; cursor: pointer; width: 100%; }
+        .fase-checkbox input[type="checkbox"] { width: 17px; height: 17px; cursor: pointer; flex-shrink: 0; }
+        .fase-observacoes { margin-top: 4px; padding: 12px; background: var(--background-color); border-radius: 6px; }
+        .fase-observacoes label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+        .fase-observacoes textarea {
+            width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px;
+            font-family: inherit; font-size: 13px; resize: vertical;
+        }
+        .fase-observacoes textarea:focus { outline: none; border-color: var(--primary-color); }
         .config-add-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 16px 0; }
         .config-add-row .form-group { margin-bottom: 0; flex: 1; min-width: 220px; }
 

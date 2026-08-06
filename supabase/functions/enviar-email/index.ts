@@ -175,6 +175,28 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
         ` + _rodape(nomeRemetente) + _fechamento();
     }
 
+    // ── Fluxo de fechamento de folha concluído (Controle de Fechamento) ──
+    if (tipo === 'fechamento_folha_concluido') {
+        const empresaNome  = (params.empresa as string)      || '';
+        const competencia  = (params.competencia as string)  || '';
+        const portalUrl    = (params.portal_url as string)   || '';
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#33aa23;margin:0 0 8px;font-size:20px;">✅ Fechamento de folha concluído</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            Todas as etapas do fluxo de fechamento da folha de <strong>${competencia}</strong>
+            da empresa <strong>${empresaNome}</strong> foram <strong style="color:#33aa23;">concluídas</strong>.
+          </p>
+
+          ${portalUrl ? `
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
+            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+              📊 Acessar o Controle de Fechamento
+            </a>
+          </td></tr></table>` : ''}
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
     // ── Alerta: pendência de execução marcada na grade (Diário Contábil) ──
     if (tipo === 'pendencia_execucao') {
         const empresaNome  = (params.empresa as string)      || '';

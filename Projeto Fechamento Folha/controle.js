@@ -100,7 +100,7 @@ async function carregarBase() {
         { data: folhaResp, error: errFolhaResp }
     ] = await Promise.all([
         supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, status_situacao').order('nome_empresa'),
-        supabaseClient.from('usuarios').select('id, nome').order('nome'),
+        supabaseClient.from('usuarios').select('id, nome, email').order('nome'),
         supabaseClient.from('fechamento_empresas_config').select('codigo_empresa, possui_folha'),
         supabaseClient.from('fechamento_empresas_responsaveis').select('codigo_empresa, usuario_id')
     ]);
@@ -165,7 +165,7 @@ async function carregarDashboard() {
 
     const { data: ciclos, error: errCiclos } = await supabaseClient
         .from('fechamento_ciclo')
-        .select('id, codigo_empresa, competencia, responsavel_id, concluido_em')
+        .select('id, codigo_empresa, competencia, responsavel_id, concluido_em, observacoes')
         .eq('competencia', comp)
         .in('codigo_empresa', codigos);
     if (errCiclos) { mostrarMensagem('Erro', 'Falha ao carregar ciclos: ' + errCiclos.message); return; }
@@ -208,19 +208,31 @@ function renderResponsavelCell(entry) {
     </select>`;
 }
 
-function renderFasesLista(cod, fases) {
-    if (!fases.length) return '<em>Nenhuma fase configurada.</em>';
-    const linhas = fases.map(f => `
-        <div class="fase-item">
-            <span class="fase-nome">${f.ordem}. ${f.nome_fase}</span>
-            <select onchange="atualizarStatusFase('${f.id}', '${cod}', this.value)">
-                <option value="pendente" ${f.status === 'pendente' ? 'selected' : ''}>Pendente</option>
-                <option value="andamento" ${f.status === 'andamento' ? 'selected' : ''}>Em andamento</option>
-                <option value="concluida" ${f.status === 'concluida' ? 'selected' : ''}>Concluída</option>
-            </select>
+function escapeHtml(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function renderFasesLista(cod, entry) {
+    const fases = entry.fases;
+    const fasesHtml = fases.length
+        ? fases.map(f => `
+            <div class="fase-item">
+                <label class="fase-checkbox">
+                    <input type="checkbox" ${f.status === 'concluida' ? 'checked' : ''} onchange="atualizarStatusFase('${f.id}', '${cod}', this.checked)">
+                    <span class="fase-nome">${f.ordem}. ${f.nome_fase}</span>
+                </label>
+            </div>
+        `).join('')
+        : '<em>Nenhuma fase configurada.</em>';
+
+    return `
+        <div class="fase-lista">${fasesHtml}</div>
+        <div class="fase-observacoes">
+            <label for="obs-${cod}">Observações gerais</label>
+            <textarea id="obs-${cod}" rows="3" placeholder="Observações sobre o fechamento desta competência..."
+                onblur="salvarObservacoesCiclo('${entry.ciclo.id}', '${cod}', this.value)">${escapeHtml(entry.ciclo.observacoes)}</textarea>
         </div>
-    `).join('');
-    return `<div class="fase-lista">${linhas}</div>`;
+    `;
 }
 
 function renderDashboard(codigos, comp) {
@@ -249,7 +261,7 @@ function renderDashboard(codigos, comp) {
             const trFases = document.createElement('tr');
             trFases.id = 'fases-' + cod;
             trFases.style.display = expandido[cod] ? '' : 'none';
-            trFases.innerHTML = `<td colspan="6">${renderFasesLista(cod, entry.fases)}</td>`;
+            trFases.innerHTML = `<td colspan="6">${renderFasesLista(cod, entry)}</td>`;
             corpo.appendChild(trFases);
         }
     });
@@ -296,7 +308,8 @@ async function atualizarResponsavel(ciclo_id, usuario_id) {
     await carregarDashboard();
 }
 
-async function atualizarStatusFase(fase_id, codigo_empresa, novoStatus) {
+async function atualizarStatusFase(fase_id, codigo_empresa, concluida) {
+    const novoStatus = concluida ? 'concluida' : 'pendente';
     const { error } = await supabaseClient
         .from('fechamento_ciclo_fase')
         .update({ status: novoStatus, atualizado_em: new Date().toISOString() })
@@ -311,6 +324,7 @@ async function atualizarStatusFase(fase_id, codigo_empresa, novoStatus) {
         const jaConcluido = !!entry.ciclo.concluido_em;
         if (todasConcluidas && !jaConcluido) {
             await supabaseClient.from('fechamento_ciclo').update({ concluido_em: new Date().toISOString() }).eq('id', entry.ciclo.id);
+            await notificarFechamentoConcluido(codigo_empresa, entry.ciclo.competencia);
         } else if (!todasConcluidas && jaConcluido) {
             await supabaseClient.from('fechamento_ciclo').update({ concluido_em: null }).eq('id', entry.ciclo.id);
         }
@@ -318,6 +332,52 @@ async function atualizarStatusFase(fase_id, codigo_empresa, novoStatus) {
 
     expandido[codigo_empresa] = true;
     await carregarDashboard();
+}
+
+async function salvarObservacoesCiclo(cicloId, codigoEmpresa, valor) {
+    const { error } = await supabaseClient
+        .from('fechamento_ciclo')
+        .update({ observacoes: valor })
+        .eq('id', cicloId);
+    if (error) { mostrarMensagem('Erro', 'Falha ao salvar observações: ' + error.message); return; }
+    const entry = ciclosCache[codigoEmpresa];
+    if (entry && entry.ciclo) entry.ciclo.observacoes = valor;
+    mostrarToastCF('Observações salvas.', 'sucesso');
+}
+
+// Notifica os responsáveis cadastrados em "Empresas com Folha de Pagamento"
+// quando todas as fases do fluxo de uma empresa são concluídas — mesmo
+// mecanismo (Edge Function enviar-email) usado pelo Diário Contábil.
+async function notificarFechamentoConcluido(codigoEmpresa, competencia) {
+    const ids = responsaveisFolhaPorEmpresa[codigoEmpresa];
+    if (!ids || !ids.size) return; // nenhum responsável cadastrado para esta empresa
+
+    const destinatarios = usuariosCache.filter(u => ids.has(u.id)).map(u => u.email).filter(Boolean);
+    if (!destinatarios.length) return;
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    const nomeEmp = nomeEmpresa(codigoEmpresa);
+    const assunto = `✅ Fechamento de folha concluído — ${nomeEmp} — ${competencia}`;
+    const params = {
+        tipo: 'fechamento_folha_concluido',
+        empresa: nomeEmp,
+        competencia,
+        portal_url: window.location.origin + window.location.pathname,
+    };
+
+    const resultados = await Promise.all(destinatarios.map(destinatario =>
+        fetch(`${SUPABASE_URL}/functions/v1/enviar-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_KEY },
+            body: JSON.stringify({ destinatario, assunto, params }),
+        }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }))
+    ));
+
+    if (resultados.some(r => !r.ok)) {
+        mostrarToastCF('Fechamento concluído, mas houve falha ao notificar algum responsável por e-mail.', 'erro');
+    }
 }
 
 // ──────────────────────────────────────────────
