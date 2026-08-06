@@ -260,6 +260,7 @@
 
             <div class="btn-group">
                 <button class="btn btn-primary" onclick="salvarConfig()">💾 Salvar configuração</button>
+                <button class="btn btn-secondary" onclick="abrirModalReplicarFluxoCF()">🔁 Replicar fluxo para outras empresas</button>
             </div>
         </div>
     </div>
@@ -338,6 +339,29 @@
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary btn-small" onclick="fecharModalResponsavelUsuarioCF()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL REPLICAR FLUXO PARA OUTRAS EMPRESAS -->
+<div class="modal" id="modalReplicarFluxoCF">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h3 id="modalReplicarFluxoCFTitulo">Replicar fluxo</h3>
+            <button class="modal-close" onclick="fecharModalReplicarFluxoCF()">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">Marque as empresas que devem receber este mesmo fluxo. Empresas já marcadas com "já configurada" terão o fluxo atual delas substituído.</p>
+            <div class="empresas-filtros" style="margin-bottom:8px;">
+                <input type="text" id="buscaEmpresaReplicarFluxoCF" placeholder="Buscar empresa..." oninput="renderCorpoModalReplicarFluxoCF()">
+                <button class="btn btn-secondary btn-small" onclick="alternarTodasModalReplicarFluxoCF(true)">Marcar visíveis</button>
+                <button class="btn btn-secondary btn-small" onclick="alternarTodasModalReplicarFluxoCF(false)">Desmarcar visíveis</button>
+            </div>
+            <div id="modalReplicarFluxoCFBody"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary btn-small" onclick="fecharModalReplicarFluxoCF()">Cancelar</button>
+            <button class="btn btn-primary btn-small" onclick="confirmarReplicarFluxoCF()">Replicar</button>
         </div>
     </div>
 </div>

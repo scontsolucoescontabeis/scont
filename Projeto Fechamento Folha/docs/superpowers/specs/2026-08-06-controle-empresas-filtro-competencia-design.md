@@ -83,3 +83,28 @@ existentes (não foi pedido drag-reorder).
 
 Sem SQL novo, sem mudança de schema — é só reorganização de UI sobre o mesmo
 `fechamento_config_empresa_fase`.
+
+## Revisão: replicar fluxo para outras empresas
+
+Pedido do usuário, mesmo dia: várias empresas compartilham o mesmo fluxo de
+fechamento — precisa ser possível replicar o fluxo já configurado de uma
+empresa para outras, em vez de montar cada uma manualmente.
+
+Decisões (via clarificação): sobrescreve com confirmação as empresas de
+destino que já tiverem fluxo próprio (aviso lista quais); sempre usa o
+**fluxo salvo no banco** da empresa de origem (não o estado em edição na
+tela) — se não houver nada salvo, pede pra salvar primeiro.
+
+**Implementação:** novo botão "🔁 Replicar fluxo para outras empresas" ao
+lado de "💾 Salvar configuração". `abrirModalReplicarFluxoCF()` busca (1) o
+fluxo salvo da empresa selecionada (`fechamento_config_empresa_fase` por
+`codigo_empresa`) e (2) todos os `codigo_empresa` que já têm algum fluxo
+ativo (pra marcar "já configurada" na lista) — aborta com mensagem se a
+origem não tiver nada salvo. Modal (`modalReplicarFluxoCF`, mesmo padrão dos
+outros modais de seleção múltipla de empresa: busca + marcar/desmarcar
+visíveis) lista as empresas com `possui_folha = true`, exceto a própria
+origem. `confirmarReplicarFluxoCF()` monta uma mensagem de confirmação
+(`window.confirm`) citando quantas serão sobrescritas, depois faz
+`delete().in('codigo_empresa', codigos)` + `insert` em lote na tabela
+`fechamento_config_empresa_fase` para todas as empresas marcadas. Sem SQL
+novo.

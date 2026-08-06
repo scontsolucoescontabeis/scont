@@ -736,6 +736,102 @@ async function salvarConfig() {
     mostrarMensagem('Sucesso', 'Configuração salva para ' + nomeEmpresa(empresaConfigSelecionada) + '.');
 }
 
+// ─── REPLICAR FLUXO PARA OUTRAS EMPRESAS ─────────────────────
+let empresaOrigemReplicarCF = '';
+let fasesParaReplicarCF = [];
+let empresasComFluxoReplicarCF = new Set();
+
+async function abrirModalReplicarFluxoCF() {
+    if (!empresaConfigSelecionada) { mostrarMensagem('Atenção', 'Selecione uma empresa antes de replicar o fluxo.'); return; }
+    empresaOrigemReplicarCF = empresaConfigSelecionada;
+
+    const [
+        { data: dataOrigem, error: errOrigem },
+        { data: dataTodas, error: errTodas }
+    ] = await Promise.all([
+        supabaseClient.from('fechamento_config_empresa_fase')
+            .select('nome_fase, ordem')
+            .eq('codigo_empresa', empresaOrigemReplicarCF)
+            .eq('ativo', true)
+            .order('ordem'),
+        supabaseClient.from('fechamento_config_empresa_fase')
+            .select('codigo_empresa')
+            .eq('ativo', true)
+    ]);
+    if (errOrigem) { mostrarMensagem('Erro', 'Falha ao carregar o fluxo desta empresa: ' + errOrigem.message); return; }
+    if (errTodas) { mostrarMensagem('Erro', 'Falha ao carregar fluxos salvos: ' + errTodas.message); return; }
+    if (!dataOrigem || !dataOrigem.length) { mostrarMensagem('Atenção', 'Esta empresa ainda não tem um fluxo salvo para replicar. Salve a configuração primeiro.'); return; }
+
+    fasesParaReplicarCF = dataOrigem;
+    empresasComFluxoReplicarCF = new Set((dataTodas || []).map(f => f.codigo_empresa));
+
+    document.getElementById('modalReplicarFluxoCFTitulo').textContent = `Replicar fluxo de ${nomeEmpresa(empresaOrigemReplicarCF)}`;
+    document.getElementById('buscaEmpresaReplicarFluxoCF').value = '';
+    renderCorpoModalReplicarFluxoCF();
+    document.getElementById('modalReplicarFluxoCF').classList.add('active');
+}
+
+function fecharModalReplicarFluxoCF() {
+    document.getElementById('modalReplicarFluxoCF').classList.remove('active');
+}
+
+function empresasReplicarFluxoVisiveis() {
+    const termo = (document.getElementById('buscaEmpresaReplicarFluxoCF').value || '').trim().toLowerCase();
+    const candidatas = empresasCache.filter(e => possuiFolha(e.codigo_empresa) && e.codigo_empresa !== empresaOrigemReplicarCF);
+    if (!termo) return candidatas;
+    return candidatas.filter(e =>
+        e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo));
+}
+
+function renderCorpoModalReplicarFluxoCF() {
+    const body = document.getElementById('modalReplicarFluxoCFBody');
+    const visiveis = empresasReplicarFluxoVisiveis();
+
+    if (!visiveis.length) {
+        body.innerHTML = '<p><em>Nenhuma empresa encontrada.</em></p>';
+        return;
+    }
+
+    body.innerHTML = visiveis.map(e => `
+        <label class="responsavel-check-item">
+            <input type="checkbox" class="chk-replicar-fluxo-cf" value="${e.codigo_empresa}">
+            <span>${escapeHtml(e.nome_empresa)} <small>(${e.codigo_empresa})</small>${empresasComFluxoReplicarCF.has(e.codigo_empresa) ? ' <small>— já configurada</small>' : ''}</span>
+        </label>
+    `).join('');
+}
+
+function alternarTodasModalReplicarFluxoCF(marcar) {
+    document.querySelectorAll('#modalReplicarFluxoCFBody .chk-replicar-fluxo-cf').forEach(chk => { chk.checked = marcar; });
+}
+
+async function confirmarReplicarFluxoCF() {
+    const codigos = Array.from(document.querySelectorAll('#modalReplicarFluxoCFBody .chk-replicar-fluxo-cf:checked')).map(chk => chk.value);
+    if (!codigos.length) { mostrarToastCF('Selecione ao menos uma empresa de destino.', 'erro'); return; }
+
+    const jaConfiguradas = codigos.filter(c => empresasComFluxoReplicarCF.has(c));
+    let confirmacao = `Replicar o fluxo de ${nomeEmpresa(empresaOrigemReplicarCF)} para ${codigos.length} empresa(s)?`;
+    if (jaConfiguradas.length) {
+        confirmacao += `\n\nAtenção: ${jaConfiguradas.length} delas já têm um fluxo próprio e serão sobrescritas:\n` +
+            jaConfiguradas.map(c => '- ' + nomeEmpresa(c)).join('\n');
+    }
+    if (!window.confirm(confirmacao)) return;
+
+    const { error: errDel } = await supabaseClient
+        .from('fechamento_config_empresa_fase')
+        .delete()
+        .in('codigo_empresa', codigos);
+    if (errDel) { mostrarMensagem('Erro', 'Falha ao limpar fluxo anterior das empresas de destino: ' + errDel.message); return; }
+
+    const novasLinhas = codigos.flatMap(cod =>
+        fasesParaReplicarCF.map((f, i) => ({ codigo_empresa: cod, nome_fase: f.nome_fase, ordem: i + 1, ativo: true }))
+    );
+    const { error: errIns } = await supabaseClient.from('fechamento_config_empresa_fase').insert(novasLinhas);
+    if (errIns) { mostrarMensagem('Erro', 'Falha ao replicar o fluxo: ' + errIns.message); return; }
+
+    fecharModalReplicarFluxoCF();
+    mostrarToastCF(`Fluxo replicado para ${codigos.length} empresa(s).`, 'sucesso');
+}
+
 // ──────────────────────────────────────────────
 // EMPRESAS COM FOLHA DE PAGAMENTO
 // ──────────────────────────────────────────────
