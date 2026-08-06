@@ -894,6 +894,16 @@ async function alternarTodasModalUsuarioCF(marcar) {
     renderTabelaEmpresasFolha();
 }
 
+function baixarModeloEmpresasFolhaCF() {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+        ['Código Empresa', 'Folha de Pagamento'],
+    ]);
+    ws['!cols'] = [18, 20].map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, 'Empresas');
+    XLSX.writeFile(wb, 'modelo_empresas_folha_pagamento.xlsx');
+}
+
 // ─── IMPORTAÇÃO EM MASSA (planilha) ─────────────────────────
 function normalizarChaveCF(str) {
     return String(str ?? '')
