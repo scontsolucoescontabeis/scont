@@ -31,25 +31,14 @@ function _cabecalho(nomeRemetente: string): string {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-<style>
-  /* Neutraliza o modo escuro automático do Gmail (mobile/app) no cabeçalho. Sem isso,
-     o Gmail não reconhece "background: linear-gradient(...)" como uma cor de fundo e
-     não a escurece, mas ainda assim força o texto branco do título para uma cor
-     escura — resultado: fundo bordô + texto quase da mesma cor, ilegível. [data-ogsc]
-     é o atributo que o Gmail injeta nos elementos que ele recolore; sobrescrever com
-     !important aqui garante que o cabeçalho sempre fique bordô com texto branco,
-     independente do tema do e-mail no celular. */
-  [data-ogsc] .scont-header, [data-ogsc] .scont-header * { background-color:#4e1820 !important; color:#ffffff !important; }
-  [data-ogsc] .scont-header .scont-subtitulo { color:#e8d5d5 !important; }
-</style>
 </head>
 <body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#f0f2f5" style="background-color:#f0f2f5;padding:32px 16px;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-        <tr><td class="scont-header" bgcolor="#4e1820" style="background-color:#4e1820;background-image:linear-gradient(135deg,#4e1820,#3a1018);padding:32px;text-align:center;border-radius:12px 12px 0 0;">
-          <h1 style="background-color:#4e1820;color:#ffffff;margin:0;font-size:22px;font-weight:700;">${nomeRemetente}</h1>
-          <p class="scont-subtitulo" style="background-color:#4e1820;color:#e8d5d5;margin:6px 0 0;font-size:13px;">Contabilidade com excelência</p>
+        <tr><td bgcolor="#f5eae9" style="background-color:#f5eae9;padding:32px;text-align:center;border-radius:12px 12px 0 0;border:1px solid #e0c8c6;border-bottom:none;">
+          <h1 style="color:#4e1820;margin:0;font-size:22px;font-weight:700;">${nomeRemetente}</h1>
+          <p style="color:#8b4a4a;margin:6px 0 0;font-size:13px;">Contabilidade com excelência</p>
         </td></tr>
         <tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:36px 32px;border:1px solid #e0e6ed;border-top:none;">`;
 }
@@ -93,7 +82,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
 
           ${portalUrl ? `
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
-            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+            <a href="${portalUrl}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
               🏠 Acessar o Portal
             </a>
           </td></tr></table>` : ''}
@@ -133,7 +122,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
 
           ${portalUrl ? `
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
-            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+            <a href="${portalUrl}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
               📔 Acessar o Diário Contábil
             </a>
           </td></tr></table>` : ''}
@@ -155,7 +144,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
 
           ${portalUrl ? `
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
-            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+            <a href="${portalUrl}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
               📔 Acessar o Diário Contábil
             </a>
           </td></tr></table>` : ''}
@@ -184,7 +173,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
 
           ${portalUrl ? `
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
-            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+            <a href="${portalUrl}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
               📔 Acessar o Diário Contábil
             </a>
           </td></tr></table>` : ''}
@@ -206,7 +195,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
 
           ${portalUrl ? `
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
-            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+            <a href="${portalUrl}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
               📊 Acessar o Controle de Fechamento
             </a>
           </td></tr></table>` : ''}
@@ -236,7 +225,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
 
           ${portalUrl ? `
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
-            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+            <a href="${portalUrl}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
               📔 Acessar o Diário Contábil
             </a>
           </td></tr></table>` : ''}
@@ -259,7 +248,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
 
           ${portalUrl ? `
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
-            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+            <a href="${portalUrl}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
               📔 Acessar o Diário Contábil
             </a>
           </td></tr></table>` : ''}
@@ -295,7 +284,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
 
           ${portalUrl ? `
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
-            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+            <a href="${portalUrl}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
               🔐 Acessar Certificados Digitais
             </a>
           </td></tr></table>` : ''}
@@ -319,7 +308,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
 
           ${portalUrl ? `
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
-            <a href="${portalUrl}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+            <a href="${portalUrl}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
               🔐 Acessar Certificados Digitais
             </a>
           </td></tr></table>` : ''}
@@ -352,7 +341,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
           <p style="color:#434343;margin:0 0 20px;line-height:1.7;">${mensagem}</p>
           ${linkApresentacao ? `
           <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 0;">
-            <a href="${linkApresentacao}" style="background:linear-gradient(135deg,#4e1820,#3a1018);color:white;padding:15px 36px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+            <a href="${linkApresentacao}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
               📄 Acessar Apresentação
             </a>
           </td></tr></table>
