@@ -172,6 +172,11 @@ function renderizarTabelaEmpresas() {
             <td title="${e.cep||''}">${fmt(e.cep)}</td>
             <td title="${e.cidade||''}">${fmt(e.cidade)}</td>
             <td title="${e.uf||''}">${fmt(e.uf)}</td>
+            <td>
+                <input type="text" value="${(e.email_responsavel || '').replace(/"/g, '&quot;')}"
+                    placeholder="e-mail(is) separados por vírgula" style="width:180px; font-size:12px; padding:3px 6px;"
+                    onblur="salvarEmailResponsavelEmpresa('${e.codigo_empresa}', this.value)">
+            </td>
         </tr>`;
     });
 
@@ -219,6 +224,19 @@ async function deletarEmpresa(codigo) {
         mostrarStatus('statusEmpresas', '✅ Empresa deletada com sucesso!', 'success');
         carregarEmpresas();
     } catch (erro) { mostrarStatus('statusEmpresas', 'Erro ao deletar empresa: ' + erro.message, 'error'); }
+}
+
+async function salvarEmailResponsavelEmpresa(codigo, valor) {
+    const emailResponsavel = valor.trim() || null;
+    try {
+        const { error } = await supabaseClient.from('rh_empresas').update({ email_responsavel: emailResponsavel }).eq('codigo_empresa', codigo);
+        if (error) throw error;
+        const emp = _todasEmpresas.find(e => e.codigo_empresa === codigo);
+        if (emp) emp.email_responsavel = emailResponsavel;
+        mostrarStatus('statusEmpresas', '✅ E-mail responsável salvo.', 'success');
+    } catch (erro) {
+        mostrarStatus('statusEmpresas', 'Erro ao salvar e-mail responsável: ' + erro.message, 'error');
+    }
 }
 
 // --- EMPREGADOS ---
