@@ -4494,7 +4494,8 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
     const [mes, ano] = comp.split('/').map(Number);
     const ultimoDiaRef = new Date(ano, mes, 0).getDate();
     const mesFmt = String(mes).padStart(2, '0');
-    const periodoTexto = `01/${mesFmt}/${ano} a ${String(ultimoDiaRef).padStart(2, '0')}/${mesFmt}/${ano}`;
+    const periodoTextoPadrao = `01/${mesFmt}/${ano} a ${String(ultimoDiaRef).padStart(2, '0')}/${mesFmt}/${ano}`;
+    const compMesSeguinte = _competenciaMesSeguinte(comp);
 
     const porEmpresa = new Map();
     linhas.forEach(l => {
@@ -4523,9 +4524,22 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
 
     mostrarMensagem('Aguarde', 'Gerando os recibos e relatórios líquidos...');
     try {
+        const periodoTextoPorEmpresa = {};
         for (const grupo of grupos) {
             const nomeEmpresaArquivo = grupo.nomeEmpresa.replace(/[^\p{L}\p{N}]+/gu, '_');
             const cfgEmpresa = await _buscarConfigRubricas(grupo.codigoEmpresa);
+            if (!(grupo.codigoEmpresa in periodoTextoPorEmpresa)) {
+                const { diaInicio, diaFim } = _resolverPeriodoBeneficios(cfgEmpresa);
+                if (diaInicio !== null && diaFim !== null) {
+                    const dias = gerarDiasDoMes(compMesSeguinte, diaInicio, diaFim);
+                    periodoTextoPorEmpresa[grupo.codigoEmpresa] = dias.length > 0
+                        ? `${dias[0].data} a ${dias.at(-1).data}`
+                        : periodoTextoPadrao;
+                } else {
+                    periodoTextoPorEmpresa[grupo.codigoEmpresa] = periodoTextoPadrao;
+                }
+            }
+            const periodoTexto = periodoTextoPorEmpresa[grupo.codigoEmpresa];
             if (_pdfIndividualAtivo(cfgEmpresa)) {
                 const zip = new JSZip();
                 for (const l of grupo.elegiveis) {
@@ -4547,6 +4561,7 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
             }
         }
         porEmpresa.forEach((grupo, codigoEmpresa) => {
+            const periodoTexto = periodoTextoPorEmpresa[codigoEmpresa] || periodoTextoPadrao;
             _relatorioLiquidoBeneficiosPDF({ codigoEmpresa, nomeEmpresa: grupo.nomeEmpresa, linhas: grupo.linhas }, comp, periodoTexto, mesFmt, ano);
         });
         fecharModalMensagem();
