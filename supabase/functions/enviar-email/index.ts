@@ -48,8 +48,8 @@ function _cabecalho(nomeRemetente: string): string {
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
         <tr><td class="scont-header" bgcolor="#4e1820" style="background-color:#4e1820;background-image:linear-gradient(135deg,#4e1820,#3a1018);padding:32px;text-align:center;border-radius:12px 12px 0 0;">
-          <h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:700;">${nomeRemetente}</h1>
-          <p class="scont-subtitulo" style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px;">Contabilidade com excelência</p>
+          <h1 style="background-color:#4e1820;color:#ffffff;margin:0;font-size:22px;font-weight:700;">${nomeRemetente}</h1>
+          <p class="scont-subtitulo" style="background-color:#4e1820;color:#e8d5d5;margin:6px 0 0;font-size:13px;">Contabilidade com excelência</p>
         </td></tr>
         <tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:36px 32px;border:1px solid #e0e6ed;border-top:none;">`;
 }
