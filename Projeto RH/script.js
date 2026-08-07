@@ -2173,6 +2173,13 @@ function _preencherCamposConfigRubricas(cfg) {
     if (cPdfIndividual) cPdfIndividual.checked = cfg['pdf_individual_por_empregado']?.cod === '1';
 }
 
+// E-mail do Responsável não vem de cfg (rh_config_rubricas_txt) — é coluna própria em
+// rh_empresas, preenchida a partir de state.empresas por quem chama esta função.
+function _preencherEmailResponsavelConfig(emailResponsavel) {
+    const cEmailResp = document.getElementById('cfgEmailResponsavel');
+    if (cEmailResp) cEmailResp.value = emailResponsavel || '';
+}
+
 function _limparCamposConfigRubricas() {
     _CFG_EVENTOS.forEach(def => {
         const rubEl  = document.getElementById(`cfgRub_${def.ev}`);
@@ -2226,6 +2233,7 @@ function _limparCamposConfigRubricas() {
     atualizarExemploBeneficiosPeriodo();
     const cPdfIndividual2 = document.getElementById('cfgPdfIndividualPorEmpregado');
     if (cPdfIndividual2) cPdfIndividual2.checked = false;
+    _preencherEmailResponsavelConfig('');
 
     _jornadasConfigAtual = [];
     _empregadosConfigAtual = [];
@@ -3131,6 +3139,8 @@ async function selecionarEmpresaConfig(codigo, nome) {
     document.getElementById('cfgBuscaEmpresaResultados').style.display = 'none';
     const cfg = await _buscarConfigRubricas(codigo);
     _preencherCamposConfigRubricas(cfg);
+    const empresaSelecionada = state.empresas.find(e => e.codigo_empresa === codigo);
+    _preencherEmailResponsavelConfig(empresaSelecionada?.email_responsavel);
     await _carregarSecaoJornadasConfig(codigo);
 }
 
@@ -3165,12 +3175,24 @@ async function salvarConfigRubricas() {
         { codigo_empresa: codigoEmpresa, evento: 'beneficios_periodo_dia_fim',    codigo_rubrica: (document.getElementById('cfgBeneficiosPeriodoDiaFim')?.value || '').trim(), tipo_valor: 'config' },
         { codigo_empresa: codigoEmpresa, evento: 'pdf_individual_por_empregado',   codigo_rubrica: document.getElementById('cfgPdfIndividualPorEmpregado')?.checked ? '1' : '0', tipo_valor: 'config' },
     ];
+    const emailResponsavel = (document.getElementById('cfgEmailResponsavel')?.value || '').trim() || null;
 
     try {
         const { error } = await supabaseClient
             .from('rh_config_rubricas_txt')
             .upsert([...rows, ...jornadaRows], { onConflict: 'codigo_empresa,evento' });
         if (error) throw error;
+
+        // E-mail do Responsável não é config de rubrica — é a mesma coluna rh_empresas.email_responsavel
+        // usada pelo cadastro em admin.html e pelo botão "Enviar por E-mail" (Benefícios/Folha de Ponto).
+        const { error: errEmail } = await supabaseClient
+            .from('rh_empresas')
+            .update({ email_responsavel: emailResponsavel })
+            .eq('codigo_empresa', codigoEmpresa);
+        if (errEmail) throw errEmail;
+        const empresaAtualizada = state.empresas.find(e => e.codigo_empresa === codigoEmpresa);
+        if (empresaAtualizada) empresaAtualizada.email_responsavel = emailResponsavel;
+
         delete _cacheConfigRubricas[codigoEmpresa];
         fecharModalConfigRubricas();
         mostrarMensagem('Sucesso', '✅ Configuração de rubricas salva com sucesso!');
