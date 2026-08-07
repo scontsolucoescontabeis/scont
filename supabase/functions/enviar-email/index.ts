@@ -18,7 +18,7 @@ function _rodape(nomeRemetente: string): string {
             🏢 Administrativo: <a href="mailto:contato@scontdf.com.br" style="color:#b47938;">contato@scontdf.com.br</a>
           </td></tr></table>
         </td></tr>
-        <tr><td style="background:#f8f9fa;padding:18px;text-align:center;border:1px solid #e0e6ed;border-top:none;border-radius:0 0 12px 12px;">
+        <tr><td bgcolor="#f8f9fa" style="background-color:#f8f9fa;padding:18px;text-align:center;border:1px solid #e0e6ed;border-top:none;border-radius:0 0 12px 12px;">
           <p style="margin:0;font-size:11px;color:#aaa;">© 2026 ${nomeRemetente} · Todos os direitos reservados</p>
         </td></tr>`;
 }
@@ -26,16 +26,32 @@ function _rodape(nomeRemetente: string): string {
 function _cabecalho(nomeRemetente: string): string {
     return `<!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:32px 16px;">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<style>
+  /* Neutraliza o modo escuro automático do Gmail (mobile/app) no cabeçalho. Sem isso,
+     o Gmail não reconhece "background: linear-gradient(...)" como uma cor de fundo e
+     não a escurece, mas ainda assim força o texto branco do título para uma cor
+     escura — resultado: fundo bordô + texto quase da mesma cor, ilegível. [data-ogsc]
+     é o atributo que o Gmail injeta nos elementos que ele recolore; sobrescrever com
+     !important aqui garante que o cabeçalho sempre fique bordô com texto branco,
+     independente do tema do e-mail no celular. */
+  [data-ogsc] .scont-header, [data-ogsc] .scont-header * { background-color:#4e1820 !important; color:#ffffff !important; }
+  [data-ogsc] .scont-header .scont-subtitulo { color:#e8d5d5 !important; }
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#f0f2f5" style="background-color:#f0f2f5;padding:32px 16px;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-        <tr><td style="background:linear-gradient(135deg,#4e1820,#3a1018);padding:32px;text-align:center;border-radius:12px 12px 0 0;">
-          <h1 style="color:white;margin:0;font-size:22px;font-weight:700;">${nomeRemetente}</h1>
-          <p style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px;">Contabilidade com excelência</p>
+        <tr><td class="scont-header" bgcolor="#4e1820" style="background-color:#4e1820;background-image:linear-gradient(135deg,#4e1820,#3a1018);padding:32px;text-align:center;border-radius:12px 12px 0 0;">
+          <h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:700;">${nomeRemetente}</h1>
+          <p class="scont-subtitulo" style="color:rgba(255,255,255,0.8);margin:6px 0 0;font-size:13px;">Contabilidade com excelência</p>
         </td></tr>
-        <tr><td style="background:#ffffff;padding:36px 32px;border:1px solid #e0e6ed;border-top:none;">`;
+        <tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:36px 32px;border:1px solid #e0e6ed;border-top:none;">`;
 }
 
 function _fechamento(): string {
