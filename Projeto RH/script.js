@@ -89,7 +89,7 @@ async function carregarEmpresas() {
     try {
         const { data, error } = await supabaseClient
             .from('rh_empresas')
-            .select('codigo_empresa, nome_empresa, status_situacao')
+            .select('codigo_empresa, nome_empresa, status_situacao, email_responsavel')
             .order('nome_empresa', { ascending: true });
         if (error) throw error;
         // Só empresas ativas (mesmo critério da Administração: sem status = ativa por padrão)
@@ -3769,7 +3769,7 @@ let _itensGruposBeneficiosCache = {};  // grupo_id -> Set(codigo_empresa)
 async function _carregarGruposParaBeneficios() {
     try {
         const [{ data: grupos, error: errG }, { data: itens, error: errI }] = await Promise.all([
-            supabaseClient.from('rh_grupos_empresas').select('id, nome_grupo').order('nome_grupo', { ascending: true }),
+            supabaseClient.from('rh_grupos_empresas').select('id, nome_grupo, email_responsavel').order('nome_grupo', { ascending: true }),
             supabaseClient.from('rh_grupos_empresas_itens').select('grupo_id, codigo_empresa'),
         ]);
         if (errG) throw errG;
@@ -3782,6 +3782,7 @@ async function _carregarGruposParaBeneficios() {
         _gruposBeneficiosCache = (grupos || []).map(g => ({
             id: g.id,
             nome_grupo: g.nome_grupo,
+            email_responsavel: g.email_responsavel,
             qtdEmpresas: _itensGruposBeneficiosCache[g.id]?.size || 0,
         }));
 
@@ -5050,7 +5051,7 @@ let _itensGruposFolhaPontoCache = {};
 async function _carregarGruposParaFolhaPonto() {
     try {
         const [{ data: grupos, error: errG }, { data: itens, error: errI }] = await Promise.all([
-            supabaseClient.from('rh_grupos_empresas').select('id, nome_grupo').order('nome_grupo', { ascending: true }),
+            supabaseClient.from('rh_grupos_empresas').select('id, nome_grupo, email_responsavel').order('nome_grupo', { ascending: true }),
             supabaseClient.from('rh_grupos_empresas_itens').select('grupo_id, codigo_empresa'),
         ]);
         if (errG) throw errG;
@@ -5063,6 +5064,7 @@ async function _carregarGruposParaFolhaPonto() {
         _gruposFolhaPontoCache = (grupos || []).map(g => ({
             id: g.id,
             nome_grupo: g.nome_grupo,
+            email_responsavel: g.email_responsavel,
             qtdEmpresas: _itensGruposFolhaPontoCache[g.id]?.size || 0,
         }));
 
