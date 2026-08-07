@@ -4587,7 +4587,6 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
             _relatorioLiquidoBeneficiosPDF({ codigoEmpresa, nomeEmpresa: grupo.nomeEmpresa, linhas: grupo.linhas }, comp, periodoTexto, mesFmt, ano);
         });
         fecharModalMensagem();
-        _atualizarBotaoEnvioEmailBeneficios();
     } catch (erro) {
         console.error('Erro ao gerar recibos em PDF:', erro);
         fecharModalMensagem();
@@ -4665,10 +4664,6 @@ function _relatorioLiquidoBeneficiosPDF(grupo, comp, periodoTexto, mesFmt, ano) 
     doc.save(nomeArquivoFinal);
 }
 
-function _atualizarBotaoEnvioEmailBeneficios() {
-    const btn = document.getElementById('beneficiosBtnEnviarEmail');
-    if (btn) btn.disabled = !Object.values(state._beneficiosArquivosGerados || {}).some(e => e.arquivos.length > 0);
-}
 
 // ===== AJUDA DE CUSTO — EMPRESA 350 (ITC BRASIL TECNOLOGIAS LTDA), RUBRICA 201 =====
 // Regra fixa (só para essa empresa): ajudaCusto = max(0, 1000 - (VTmensal + VAmensal)).
@@ -5572,7 +5567,6 @@ async function baixarPdfsFolhaPonto() {
         const nomeArquivo = `FolhaDePonto_${empresaDados.codigo_empresa}_${mm}-${aaaa}.pdf`;
         state._folhaPontoArquivosGerados[empresaDados.codigo_empresa].arquivos.push({ nome: nomeArquivo, blob: doc.output('blob') });
         doc.save(nomeArquivo);
-        _atualizarBotaoEnvioEmailFolhaPonto();
         return;
     }
 
@@ -5600,17 +5594,11 @@ async function baixarPdfsFolhaPonto() {
         const blobZip = await zip.generateAsync({ type: 'blob' });
         _baixarBlob(blobZip, `FolhasDePonto_${mm}-${aaaa}.zip`);
         fecharModalMensagem();
-        _atualizarBotaoEnvioEmailFolhaPonto();
     } catch (erro) {
         console.error('Erro ao gerar zip de folhas de ponto:', erro);
         fecharModalMensagem();
         mostrarMensagem('Erro', 'Falha ao gerar o arquivo zip: ' + erro.message);
     }
-}
-
-function _atualizarBotaoEnvioEmailFolhaPonto() {
-    const btn = document.getElementById('folhaPontoBtnEnviarEmail');
-    if (btn) btn.disabled = !Object.values(state._folhaPontoArquivosGerados || {}).some(e => e.arquivos.length > 0);
 }
 
 // Os campos JSONB de rh_escala_trabalho são gravados via JSON.stringify (mesmo
@@ -6782,7 +6770,11 @@ function abrirModalEnvioEmailFolhaPonto() {
 }
 
 function _abrirModalEnvioEmail(tipoDocumento, competencia, itensPorEmpresa, gruposMarcadosIds, gruposInfo, itensGruposCache) {
-    if (itensPorEmpresa.length === 0) { mostrarMensagem('Aviso', 'Gere os PDFs antes de enviar por e-mail.'); return; }
+    if (itensPorEmpresa.length === 0) {
+        const acao = tipoDocumento === 'Benefícios' ? 'gerar o recibo' : 'baixar o PDF';
+        mostrarMensagem('Aviso', `O envio por e-mail só é possível após ${acao}.`);
+        return;
+    }
 
     const emailPorEmpresa = {};
     state.empresas.forEach(e => { emailPorEmpresa[e.codigo_empresa] = e.email_responsavel; });
