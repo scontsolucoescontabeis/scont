@@ -310,6 +310,21 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
         ` + _rodape(nomeRemetente) + _fechamento();
     }
 
+    // ── Documentos de Benefícios / Folha de Ponto (Controle de Frequência) ──
+    if (tipo === 'documentos_frequencia') {
+        const tipoDocumento = (params.tipoDocumento as string) || 'Documentos';
+        const competencia   = (params.competencia as string)   || '';
+        const destino       = (params.destino as string)       || '';
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#4e1820;margin:0 0 8px;font-size:20px;">📎 ${tipoDocumento} — ${competencia}</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            Segue${destino ? `m em anexo os documentos de <strong>${tipoDocumento}</strong> de <strong>${destino}</strong>` : ' em anexo os documentos'}
+            referentes à competência <strong>${competencia}</strong>.
+          </p>
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
     // ── Template padrão (apresentação) ────────────────────────
     const empresa          = (params.empresa as string)           || '';
     const mensagem         = (params.mensagem as string)          || 'Preparamos uma apresentação personalizada para sua empresa. Acesse o link abaixo!';
@@ -333,6 +348,7 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
 // ── Envia via Brevo (API HTTP) ─────────────────────────────────
 async function enviarBrevo(cfg: Record<string, string>, payload: {
     nomeRemetente: string; emailRemetente: string; to: string; subject: string; html: string;
+    anexos?: Array<{ nome: string; conteudoBase64: string }>;
 }) {
     if (!cfg.brevo_api_key) throw new Error('Brevo API Key não configurada. Acesse Admin → Configurações.');
 
@@ -344,6 +360,7 @@ async function enviarBrevo(cfg: Record<string, string>, payload: {
             to:          [{ email: payload.to }],
             subject:     payload.subject,
             htmlContent: payload.html,
+            ...(payload.anexos?.length ? { attachment: payload.anexos.map(a => ({ content: a.conteudoBase64, name: a.nome })) } : {}),
         }),
     });
     const json = await resp.json();
@@ -354,6 +371,7 @@ async function enviarBrevo(cfg: Record<string, string>, payload: {
 // ── Envia via SMTP (Outlook, Gmail, etc.) via nodemailer ─────
 async function enviarSmtp(cfg: Record<string, string>, payload: {
     from: string; to: string; subject: string; html: string;
+    anexos?: Array<{ nome: string; conteudoBase64: string }>;
 }) {
     if (!cfg.smtp_host || !cfg.smtp_usuario || !cfg.smtp_senha) {
         throw new Error('Configurações SMTP incompletas. Acesse Admin → Configurações → SMTP.');
@@ -375,6 +393,7 @@ async function enviarSmtp(cfg: Record<string, string>, payload: {
         to:      payload.to,
         subject: payload.subject,
         html:    payload.html,
+        ...(payload.anexos?.length ? { attachments: payload.anexos.map(a => ({ filename: a.nome, content: a.conteudoBase64, encoding: 'base64' })) } : {}),
     });
 
     return { provider: 'smtp', id: info.messageId };
@@ -395,8 +414,9 @@ Deno.serve(async (req) => {
             nomeDestinatario?: string;
             assunto?: string;
             params?: Record<string, unknown>;
+            anexos?: Array<{ nome: string; conteudoBase64: string }>;
         };
-        const { usuarioId, assunto } = body;
+        const { usuarioId, assunto, anexos } = body;
         let { destinatario, nomeDestinatario } = body;
         const params: Record<string, unknown> = body.params ?? {};
 
@@ -449,8 +469,8 @@ Deno.serve(async (req) => {
         };
 
         const result = provedor === 'smtp'
-            ? await enviarSmtp(cfg, mailPayload)
-            : await enviarBrevo(cfg, { nomeRemetente: nomeRem, emailRemetente: emailRem, to: destinatario, subject: mailPayload.subject, html: mailPayload.html });
+            ? await enviarSmtp(cfg, { ...mailPayload, anexos })
+            : await enviarBrevo(cfg, { nomeRemetente: nomeRem, emailRemetente: emailRem, to: destinatario, subject: mailPayload.subject, html: mailPayload.html, anexos });
 
         return new Response(JSON.stringify({ ok: true, ...result }), {
             headers: { ...CORS, 'Content-Type': 'application/json' },
