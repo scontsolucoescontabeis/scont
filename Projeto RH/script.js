@@ -5505,10 +5505,18 @@ async function baixarPdfsFolhaPonto() {
     }
     const algumaIndividual = dados.empresas.some(e => _pdfIndividualAtivo(cfgsPorEmpresa[e.codigo_empresa]));
 
+    state._folhaPontoArquivosGerados = {};
+    dados.empresas.forEach(empresaDados => {
+        state._folhaPontoArquivosGerados[empresaDados.codigo_empresa] = { nomeEmpresa: empresaDados.nome_empresa, arquivos: [] };
+    });
+
     if (dados.empresas.length === 1 && !algumaIndividual) {
         const empresaDados = dados.empresas[0];
         const doc = _construirPdfEmpresaFolhaPonto(empresaDados);
-        doc.save(`FolhaDePonto_${empresaDados.codigo_empresa}_${mm}-${aaaa}.pdf`);
+        const nomeArquivo = `FolhaDePonto_${empresaDados.codigo_empresa}_${mm}-${aaaa}.pdf`;
+        state._folhaPontoArquivosGerados[empresaDados.codigo_empresa].arquivos.push({ nome: nomeArquivo, blob: doc.output('blob') });
+        doc.save(nomeArquivo);
+        _atualizarBotaoEnvioEmailFolhaPonto();
         return;
     }
 
@@ -5521,22 +5529,32 @@ async function baixarPdfsFolhaPonto() {
                     const doc = _construirPdfEmpregadoFolhaPonto(empresaDados, emp);
                     const blob = doc.output('blob');
                     const nomeEmpregadoArquivo = emp.nome_empregado.replace(/[^\p{L}\p{N}]+/gu, '_');
-                    zip.file(`FolhaDePonto_${empresaDados.codigo_empresa}_${emp.codigo_empregado}_${nomeEmpregadoArquivo}_${mm}-${aaaa}.pdf`, blob);
+                    const nomeArquivo = `FolhaDePonto_${empresaDados.codigo_empresa}_${emp.codigo_empregado}_${nomeEmpregadoArquivo}_${mm}-${aaaa}.pdf`;
+                    zip.file(nomeArquivo, blob);
+                    state._folhaPontoArquivosGerados[empresaDados.codigo_empresa].arquivos.push({ nome: nomeArquivo, blob });
                 });
             } else {
                 const doc = _construirPdfEmpresaFolhaPonto(empresaDados);
                 const blob = doc.output('blob');
-                zip.file(`FolhaDePonto_${empresaDados.codigo_empresa}_${mm}-${aaaa}.pdf`, blob);
+                const nomeArquivo = `FolhaDePonto_${empresaDados.codigo_empresa}_${mm}-${aaaa}.pdf`;
+                zip.file(nomeArquivo, blob);
+                state._folhaPontoArquivosGerados[empresaDados.codigo_empresa].arquivos.push({ nome: nomeArquivo, blob });
             }
         }
         const blobZip = await zip.generateAsync({ type: 'blob' });
         _baixarBlob(blobZip, `FolhasDePonto_${mm}-${aaaa}.zip`);
         fecharModalMensagem();
+        _atualizarBotaoEnvioEmailFolhaPonto();
     } catch (erro) {
         console.error('Erro ao gerar zip de folhas de ponto:', erro);
         fecharModalMensagem();
         mostrarMensagem('Erro', 'Falha ao gerar o arquivo zip: ' + erro.message);
     }
+}
+
+function _atualizarBotaoEnvioEmailFolhaPonto() {
+    const btn = document.getElementById('folhaPontoBtnEnviarEmail');
+    if (btn) btn.disabled = !Object.values(state._folhaPontoArquivosGerados || {}).some(e => e.arquivos.length > 0);
 }
 
 // Os campos JSONB de rh_escala_trabalho são gravados via JSON.stringify (mesmo
