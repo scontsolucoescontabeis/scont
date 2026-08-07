@@ -2520,7 +2520,7 @@ function renderizarListaGrupos() {
 }
 
 function novoGrupo() {
-    _grupoAtual = { id: null, nome_grupo: '', observacoes: '', empresas: [] };
+    _grupoAtual = { id: null, nome_grupo: '', observacoes: '', email_responsavel: '', empresas: [] };
     renderizarListaGrupos();
     _renderGrupoDetalhe();
 }
@@ -2531,7 +2531,7 @@ async function selecionarGrupo(id) {
     try {
         const { data: grupoCompleto, error: errG } = await supabaseClient
             .from('rh_grupos_empresas')
-            .select('id, nome_grupo, observacoes')
+            .select('id, nome_grupo, observacoes, email_responsavel')
             .eq('id', id)
             .single();
         if (errG) throw errG;
@@ -2544,7 +2544,13 @@ async function selecionarGrupo(id) {
             const emp = state.empresas.find(e => e.codigo_empresa === it.codigo_empresa);
             return { codigo_empresa: it.codigo_empresa, nome_empresa: emp?.nome_empresa || it.codigo_empresa };
         });
-        _grupoAtual = { id: grupoCompleto.id, nome_grupo: grupoCompleto.nome_grupo, observacoes: grupoCompleto.observacoes || '', empresas };
+        _grupoAtual = {
+            id: grupoCompleto.id,
+            nome_grupo: grupoCompleto.nome_grupo,
+            observacoes: grupoCompleto.observacoes || '',
+            email_responsavel: grupoCompleto.email_responsavel || '',
+            empresas,
+        };
         renderizarListaGrupos();
         _renderGrupoDetalhe();
     } catch (erro) {
@@ -2612,13 +2618,14 @@ async function salvarGrupo() {
     const nome = (document.getElementById('grpNome')?.value || '').trim();
     if (!nome) { mostrarMensagem('Aviso', 'Informe o nome do grupo.'); return; }
     const observacoes = (document.getElementById('grpObservacoes')?.value || '').trim();
+    const emailResponsavel = (document.getElementById('grpEmailResponsavel')?.value || '').trim() || null;
     try {
         let grupoId = _grupoAtual.id;
         if (grupoId) {
-            const { error } = await supabaseClient.from('rh_grupos_empresas').update({ nome_grupo: nome, observacoes }).eq('id', grupoId);
+            const { error } = await supabaseClient.from('rh_grupos_empresas').update({ nome_grupo: nome, observacoes, email_responsavel: emailResponsavel }).eq('id', grupoId);
             if (error) throw error;
         } else {
-            const { data, error } = await supabaseClient.from('rh_grupos_empresas').insert({ nome_grupo: nome, observacoes }).select('id').single();
+            const { data, error } = await supabaseClient.from('rh_grupos_empresas').insert({ nome_grupo: nome, observacoes, email_responsavel: emailResponsavel }).select('id').single();
             if (error) throw error;
             grupoId = data.id;
         }
@@ -2665,6 +2672,15 @@ function _renderGrupoDetalhe() {
         <div class="form-group" style="margin-bottom:14px;">
             <label>Nome do Grupo</label>
             <input type="text" id="grpNome" value="${_grupoAtual.nome_grupo.replace(/"/g, '&quot;')}" placeholder="Ex: Grupo Shopping X" style="width:100%; box-sizing:border-box;">
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+            <label>E-mail(is) do Responsável pelo Grupo</label>
+            <input type="text" id="grpEmailResponsavel" value="${(_grupoAtual.email_responsavel || '').replace(/"/g, '&quot;')}"
+                placeholder="ex: financeiro@empresa.com, rh@empresa.com" style="width:100%; box-sizing:border-box;">
+            <small style="color: var(--text-secondary); font-size:11px;">
+                Quando preenchido, os PDFs de Benefícios/Folha de Ponto gerados com este grupo marcado no seletor
+                são enviados juntos para este(s) e-mail(is), em vez do e-mail individual de cada empresa.
+            </small>
         </div>
         <div class="form-group" style="margin-bottom:8px;">
             <label>Empresas do Grupo</label>
