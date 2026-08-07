@@ -660,6 +660,18 @@ input,select,textarea{font:inherit}
 }
 .btn-icone-fechamento:hover{ border-color:var(--brand); }
 
+.btn-icone-doc{
+  position:absolute; top:-6px; left:-6px;
+  width:20px; height:20px; line-height:18px;
+  border-radius:50%; font-size:11px; padding:0;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+button.btn-icone-doc{ cursor:pointer; }
+span.btn-icone-doc{ cursor:default; }
+.btn-icone-doc.doc-disponivel{ background:var(--brand); border:1px solid var(--brand); filter:none; }
+.btn-icone-doc.doc-nao-marcado{ background:#fff; border:1px dashed var(--line); opacity:.55; }
+.btn-icone-doc.doc-nao-marcado:hover{ opacity:1; border-color:var(--brand); }
+
 .fechamento-evento{ padding:10px 0; border-top:1px solid var(--line-soft); font-size:13px; }
 .fechamento-evento:first-child{ border-top:none; }
 .fechamento-evento-msg{ margin-top:4px; color:var(--muted); font-size:12px; white-space:pre-wrap; }

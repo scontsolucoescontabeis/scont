@@ -15,6 +15,7 @@
   let bancosPorMapeamento = {};
   let statusMensalPorEmpresa = {}; // { codigo_empresa: { 'ano-mes': status } }
   let motivoPendenciaPorEmpresa = {}; // { codigo_empresa: { 'ano-mes': motivo|null } }
+  let documentacaoPorEmpresa = {}; // { codigo_empresa: { 'ano-mes': disponivel(bool) } }
   let empresaAtualCodigo = null;
   let anoGradeAtual = new Date().getFullYear();
 
@@ -150,10 +151,12 @@
       });
     }
 
-    const { data: statusMensal, error: errStatus } = await supabaseClient
-      .from('contabil_diario_status_mensal')
-      .select('*');
+    const [{ data: statusMensal, error: errStatus }, { data: documentacao, error: errDocumentacao }] = await Promise.all([
+      supabaseClient.from('contabil_diario_status_mensal').select('*'),
+      supabaseClient.from('contabil_diario_documentacao').select('*'),
+    ]);
     if (errStatus) console.error(errStatus);
+    if (errDocumentacao) console.error(errDocumentacao);
     statusMensalPorEmpresa = {};
     motivoPendenciaPorEmpresa = {};
     (statusMensal || []).forEach((s) => {
@@ -161,6 +164,11 @@
       bucket[`${s.ano}-${s.mes}`] = s.status;
       const motivoBucket = (motivoPendenciaPorEmpresa[s.codigo_empresa] = motivoPendenciaPorEmpresa[s.codigo_empresa] || {});
       motivoBucket[`${s.ano}-${s.mes}`] = s.motivo_pendencia || null;
+    });
+    documentacaoPorEmpresa = {};
+    (documentacao || []).forEach((d) => {
+      const bucket = (documentacaoPorEmpresa[d.codigo_empresa] = documentacaoPorEmpresa[d.codigo_empresa] || {});
+      bucket[`${d.ano}-${d.mes}`] = !!d.disponivel;
     });
 
     window.__diarioContext = {
@@ -384,6 +392,11 @@
     return (bucket && bucket[`${ano}-${mes}`]) || null;
   }
 
+  function documentacaoDisponivelDoMes(codigoEmpresa, ano, mes) {
+    const bucket = documentacaoPorEmpresa[codigoEmpresa];
+    return !!(bucket && bucket[`${ano}-${mes}`]);
+  }
+
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str == null ? '' : String(str);
@@ -603,6 +616,34 @@
     await transicionarStatusMes(codigoEmpresa, ano, mes, 'nao_iniciado', 'em_andamento', null);
   }
 
+  // Selo "Documentação Disponível": só equipe Scont/Admin marca/desmarca,
+  // só vale enquanto o mês estiver "Não Iniciado" (ver spec
+  // docs/superpowers/specs/2026-08-07-diario-documentacao-disponivel-design.md).
+  // Independente da máquina de estados de contabil_diario_status_mensal.
+  async function alternarDocumentacaoDisponivel(codigoEmpresa, ano, mes) {
+    if (!(_isAdmin || _isScontTeam)) return;
+    const atual = documentacaoDisponivelDoMes(codigoEmpresa, ano, mes);
+    const novo = !atual;
+    const auth = window.__contabilAuth || {};
+    const { error } = await supabaseClient
+      .from('contabil_diario_documentacao')
+      .upsert({
+        codigo_empresa: codigoEmpresa, ano, mes, disponivel: novo,
+        marcado_por_nome: auth.userData?.nome || null,
+        marcado_por_email: auth.email || null,
+        marcado_em: new Date().toISOString(),
+      }, { onConflict: 'codigo_empresa,ano,mes' });
+    if (error) { console.error(error); mostrarToast('Erro ao atualizar a documentação disponível.', 'erro'); return; }
+
+    const bucket = (documentacaoPorEmpresa[codigoEmpresa] = documentacaoPorEmpresa[codigoEmpresa] || {});
+    bucket[`${ano}-${mes}`] = novo;
+
+    const campo = `Documentação Disponível — ${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+    await registrarAuditoria(codigoEmpresa, campo, atual ? 'Sim' : 'Não', novo ? 'Sim' : 'Não', null);
+
+    renderGradeMensal();
+  }
+
   async function marcarPendencia(codigoEmpresa, ano, mes, motivo) {
     if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
     await transicionarStatusMes(codigoEmpresa, ano, mes, 'em_andamento', 'pendencia', motivo);
@@ -784,6 +825,22 @@
     return `<button type="button" class="btn-icone-fechamento" data-mes-fechamento="${mes}" title="${info.titulo}">${info.icone}</button>`;
   }
 
+  // Selo "Documentação Disponível": equipe Scont/Admin vê (e clica) sempre
+  // que o mês está "Não Iniciado" (marcado ou não); demais usuários só veem
+  // quando já está marcado — nada aparece no estado "não marcado" pra não
+  // poluir a tela de quem não pode agir sobre isso.
+  function iconeDocumentacaoHtml(mes, docDisponivel) {
+    const podeMarcar = _isAdmin || _isScontTeam;
+    if (!podeMarcar && !docDisponivel) return '';
+    const classe = docDisponivel ? 'doc-disponivel' : 'doc-nao-marcado';
+    const titulo = docDisponivel
+      ? 'Documentação disponível' + (podeMarcar ? ' — clique para desmarcar' : '')
+      : 'Marcar documentação disponível';
+    const tag = podeMarcar ? 'button' : 'span';
+    const atributoTipo = podeMarcar ? ' type="button"' : '';
+    return `<${tag}${atributoTipo} class="btn-icone-doc ${classe}" data-mes-doc="${mes}" title="${titulo}">📄</${tag}>`;
+  }
+
   function renderGradeMensal() {
     const el = document.getElementById('secaoGradeMensal');
     const meses = window.ContabilDiarioUtil.MESES_LABELS;
@@ -794,11 +851,13 @@
       const statusFech = statusFechamentoDoMes(empresaAtualCodigo, anoGradeAtual, mes);
       const travada = statusFech === 'aprovado';
       const motivo = motivoPendenciaDoMes(empresaAtualCodigo, anoGradeAtual, mes);
-      const titulo = `${label}/${anoGradeAtual} — ${STATUS_GRADE_LABELS[status]}${travada ? ' (fechamento aprovado — travado)' : ''}${motivo ? ` — ${motivo}` : ''}`;
+      const docDisponivel = status === 'nao_iniciado' && documentacaoDisponivelDoMes(empresaAtualCodigo, anoGradeAtual, mes);
+      const titulo = `${label}/${anoGradeAtual} — ${STATUS_GRADE_LABELS[status]}${travada ? ' (fechamento aprovado — travado)' : ''}${motivo ? ` — ${motivo}` : ''}${docDisponivel ? ' — Documentação disponível' : ''}`;
       return `
         <div class="mapa-grade-cel status-${status}${travada ? ' grade-travada' : ''}" data-mes="${mes}" title="${escapeHtml(titulo)}">
           <span class="mapa-grade-mes">${label}</span>
           ${status === 'concluido' ? iconeFechamentoHtml(mes, statusFech) : ''}
+          ${status === 'nao_iniciado' ? iconeDocumentacaoHtml(mes, docDisponivel) : ''}
         </div>
       `;
     }).join('');
@@ -834,6 +893,12 @@
       btn.addEventListener('click', (ev) => {
         ev.stopPropagation();
         abrirModalFechamento(empresaAtualCodigo, anoGradeAtual, Number(btn.getAttribute('data-mes-fechamento')));
+      });
+    });
+    el.querySelectorAll('button.btn-icone-doc').forEach((btn) => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        alternarDocumentacaoDisponivel(empresaAtualCodigo, anoGradeAtual, Number(btn.getAttribute('data-mes-doc')));
       });
     });
   }
