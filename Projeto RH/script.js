@@ -6719,3 +6719,105 @@ async function _efetivarDownloadTXTResultados() {
         mostrarMensagem('Aviso', erro.message);
     }
 }
+
+// ===== ENVIO DE DOCUMENTOS POR E-MAIL (Benefícios / Folha de Ponto) =====
+
+let _envioEmailContexto = null; // { tipoDocumento, competencia, destinatarios }
+
+function _montarItensPorEmpresa(arquivosGerados) {
+    return Object.entries(arquivosGerados || {})
+        .filter(([, v]) => v.arquivos.length > 0)
+        .map(([codigoEmpresa, v]) => ({ codigoEmpresa, nomeEmpresa: v.nomeEmpresa, arquivos: v.arquivos }));
+}
+
+function abrirModalEnvioEmailBeneficios() {
+    const comp = document.getElementById('beneficiosCompetencia').value;
+    const itensPorEmpresa = _montarItensPorEmpresa(state._beneficiosArquivosGerados);
+    const gruposMarcadosIds = Array.from(document.querySelectorAll('.beneficios-grupo-check:checked')).map(cb => cb.value);
+    _abrirModalEnvioEmail('Benefícios', comp, itensPorEmpresa, gruposMarcadosIds, _gruposBeneficiosCache, _itensGruposBeneficiosCache);
+}
+
+function abrirModalEnvioEmailFolhaPonto() {
+    const comp = state._folhaPontoDados?.competencia || '';
+    const itensPorEmpresa = _montarItensPorEmpresa(state._folhaPontoArquivosGerados);
+    const gruposMarcadosIds = Array.from(document.querySelectorAll('.folhaPonto-grupo-check:checked')).map(cb => cb.value);
+    _abrirModalEnvioEmail('Folhas de Ponto', comp, itensPorEmpresa, gruposMarcadosIds, _gruposFolhaPontoCache, _itensGruposFolhaPontoCache);
+}
+
+function _abrirModalEnvioEmail(tipoDocumento, competencia, itensPorEmpresa, gruposMarcadosIds, gruposInfo, itensGruposCache) {
+    if (itensPorEmpresa.length === 0) { mostrarMensagem('Aviso', 'Gere os PDFs antes de enviar por e-mail.'); return; }
+
+    const emailPorEmpresa = {};
+    state.empresas.forEach(e => { emailPorEmpresa[e.codigo_empresa] = e.email_responsavel; });
+
+    const { destinatarios, semEmail } = _resolverDestinatariosEnvio({
+        itensPorEmpresa, gruposMarcadosIds, gruposInfo, itensGruposCache, emailPorEmpresa,
+    });
+
+    _envioEmailContexto = { tipoDocumento, competencia, destinatarios };
+
+    const conteudo = document.getElementById('envioEmailConteudo');
+    const btnConfirmar = document.getElementById('envioEmailBtnConfirmar');
+
+    let html = '';
+    if (destinatarios.length === 0) {
+        html += '<p style="color:#E74C3C;">Nenhuma empresa deste lote tem e-mail de responsável cadastrado.</p>';
+        btnConfirmar.disabled = true;
+    } else {
+        btnConfirmar.disabled = false;
+        html += destinatarios.map(d => `
+            <div style="padding:8px 0; border-bottom:1px solid #f0f0f0;">
+                <strong>${d.email}</strong> ${d.origem === 'grupo' ? `<span style="color:var(--text-secondary);">(Grupo ${d.nomeOrigem})</span>` : ''}<br>
+                <span style="font-size:12px; color:var(--text-secondary);">${d.empresas.join(', ')} — ${d.arquivos.length} arquivo(s)</span>
+            </div>
+        `).join('');
+    }
+    if (semEmail.length > 0) {
+        html += `<p style="margin-top:12px; color:#E8890C; font-size:13px;">⚠️ Sem e-mail cadastrado: ${semEmail.join(', ')}</p>`;
+    }
+    conteudo.innerHTML = html;
+
+    document.getElementById('envioEmailModal').classList.add('active');
+}
+
+function _fecharModalEnvioEmail() {
+    document.getElementById('envioEmailModal').classList.remove('active');
+    _envioEmailContexto = null;
+}
+
+async function _confirmarEnvioEmail() {
+    if (!_envioEmailContexto || _envioEmailContexto.destinatarios.length === 0) return;
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { mostrarMensagem('Erro', 'Sessão expirada. Faça login novamente.'); return; }
+
+    const btnConfirmar = document.getElementById('envioEmailBtnConfirmar');
+    btnConfirmar.disabled = true;
+
+    const { tipoDocumento, competencia, destinatarios } = _envioEmailContexto;
+
+    const resultados = await Promise.all(destinatarios.map(async d => {
+        const anexos = await Promise.all(d.arquivos.map(async a => ({ nome: a.nome, conteudoBase64: await _blobParaBase64(a.blob) })));
+        const assunto = `${tipoDocumento} — ${d.nomeOrigem} — ${competencia}`;
+        return fetch(`${SUPABASE_URL}/functions/v1/enviar-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_KEY },
+            body: JSON.stringify({
+                destinatario: d.email,
+                assunto,
+                params: { tipo: 'documentos_frequencia', tipoDocumento, competencia, destino: d.nomeOrigem },
+                anexos,
+            }),
+        }).then(r => r.json()).catch(e => ({ ok: false, error: e.message }));
+    }));
+
+    _fecharModalEnvioEmail();
+
+    const todosOk = resultados.every(r => r.ok);
+    mostrarMensagem(
+        todosOk ? 'Sucesso' : 'Atenção',
+        todosOk
+            ? `✅ E-mail enviado para ${resultados.length} destinatário(s).`
+            : 'Alguns e-mails falharam ao enviar. Verifique o console para detalhes.'
+    );
+    if (!todosOk) console.error('Falhas no envio de e-mail:', resultados.filter(r => !r.ok));
+}

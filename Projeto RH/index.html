@@ -318,6 +318,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
                     <span id="beneficiosPreviaInfo" style="font-size:13px; color: var(--text-secondary);"></span>
                     <div style="display:flex; gap:10px;">
+                        <button type="button" class="btn btn-secondary" id="beneficiosBtnEnviarEmail" disabled onclick="abrirModalEnvioEmailBeneficios()">✉️ Enviar por E-mail</button>
                         <button type="button" class="btn btn-secondary" onclick="gerarRecibosBeneficios()">🧾 Gerar Recibo</button>
                         <button type="button" class="btn btn-secondary" onclick="abrirModalLancamentoVaVt()">📄 Gerar Lançamentos na Folha</button>
                         <button type="button" class="btn btn-primary" onclick="exportarBeneficiosExcel()">📥 Gerar Excel</button>
@@ -438,7 +439,10 @@
             <div id="folhaPontoResultadoContainer" style="display:none;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
                     <span id="folhaPontoResultadoInfo" style="font-size:13px; color: var(--text-secondary);"></span>
-                    <button type="button" class="btn btn-primary" id="folhaPontoBtnBaixar" onclick="baixarPdfsFolhaPonto()">📥 Baixar PDF(s)</button>
+                    <div style="display:flex; gap:10px;">
+                        <button type="button" class="btn btn-secondary" id="folhaPontoBtnEnviarEmail" disabled onclick="abrirModalEnvioEmailFolhaPonto()">✉️ Enviar por E-mail</button>
+                        <button type="button" class="btn btn-primary" id="folhaPontoBtnBaixar" onclick="baixarPdfsFolhaPonto()">📥 Baixar PDF(s)</button>
+                    </div>
                 </div>
                 <div id="folhaPontoListaEmpregados"></div>
             </div>
@@ -1423,6 +1427,22 @@
         </div>
     </div>
 
+    <div id="envioEmailModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 style="margin:0;">✉️ Enviar por E-mail</h3>
+                <button type="button" class="modal-close" onclick="_fecharModalEnvioEmail()">×</button>
+            </div>
+            <div class="modal-body" style="padding:20px;">
+                <div id="envioEmailConteudo"></div>
+            </div>
+            <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; padding:15px 20px; border-top:1px solid #eee;">
+                <button type="button" class="btn btn-secondary" onclick="_fecharModalEnvioEmail()">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="envioEmailBtnConfirmar" onclick="_confirmarEnvioEmail()">Enviar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Dropdown de busca de empresa — fora de qualquer container para evitar clipping -->
     <div id="buscaEmpresaResultados" style="
         display: none;
@@ -1474,6 +1494,7 @@
 
     <script src="escala-calculo.js"></script>
     <script src="folha-ponto-calculo.js"></script>
+    <script src="envio-email-frequencia.js"></script>
     <script src="script.js"></script>
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
     <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
