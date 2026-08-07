@@ -4516,6 +4516,11 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
 
     if (grupos.length === 0) { mostrarMensagem('Aviso', 'Nenhum recibo gerado — todos os valores de VT/VA estão zerados ou em branco.'); return; }
 
+    state._beneficiosArquivosGerados = {};
+    porEmpresa.forEach((grupo, codigoEmpresa) => {
+        state._beneficiosArquivosGerados[codigoEmpresa] = { nomeEmpresa: grupo.nomeEmpresa, arquivos: [] };
+    });
+
     mostrarMensagem('Aguarde', 'Gerando os recibos e relatórios líquidos...');
     try {
         for (const grupo of grupos) {
@@ -4530,17 +4535,22 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
                     zip.file(`${grupo.codigoEmpresa}_Recibo_${grupo.label.replace(/\s+/g, '_')}_${l.codigo_empregado}_${nomeEmpregadoArquivo}_${mesFmt}${ano}.pdf`, blob);
                 }
                 const blobZip = await zip.generateAsync({ type: 'blob' });
-                _baixarBlob(blobZip, `Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesFmt}${ano}.zip`);
+                const nomeZip = `Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesFmt}${ano}.zip`;
+                _baixarBlob(blobZip, nomeZip);
+                state._beneficiosArquivosGerados[grupo.codigoEmpresa].arquivos.push({ nome: nomeZip, blob: blobZip });
             } else {
                 const sheetsHtml = grupo.elegiveis.map(l => _reciboSheetHTML(grupo.tipo, l, periodoTexto)).join('');
                 const nomeArquivo = `${grupo.codigoEmpresa}_Recibos_${grupo.label.replace(/\s+/g, '_')}_${nomeEmpresaArquivo}_${mesFmt}${ano}.pdf`;
-                await _gerarPdfRecibos(nomeArquivo, sheetsHtml);
+                const blob = await _gerarPdfRecibos(nomeArquivo, sheetsHtml, true);
+                _baixarBlob(blob, nomeArquivo);
+                state._beneficiosArquivosGerados[grupo.codigoEmpresa].arquivos.push({ nome: nomeArquivo, blob });
             }
         }
         porEmpresa.forEach((grupo, codigoEmpresa) => {
             _relatorioLiquidoBeneficiosPDF({ codigoEmpresa, nomeEmpresa: grupo.nomeEmpresa, linhas: grupo.linhas }, comp, periodoTexto, mesFmt, ano);
         });
         fecharModalMensagem();
+        _atualizarBotaoEnvioEmailBeneficios();
     } catch (erro) {
         console.error('Erro ao gerar recibos em PDF:', erro);
         fecharModalMensagem();
@@ -4611,7 +4621,16 @@ function _relatorioLiquidoBeneficiosPDF(grupo, comp, periodoTexto, mesFmt, ano) 
     });
 
     const nomeEmpresaArquivo = grupo.nomeEmpresa.replace(/[^\p{L}\p{N}]+/gu, '_');
-    doc.save(`${grupo.codigoEmpresa}_Relatorio_Liquido_Beneficios_${nomeEmpresaArquivo}_${mesFmt}${ano}.pdf`);
+    const nomeArquivoFinal = `${grupo.codigoEmpresa}_Relatorio_Liquido_Beneficios_${nomeEmpresaArquivo}_${mesFmt}${ano}.pdf`;
+    if (state._beneficiosArquivosGerados?.[grupo.codigoEmpresa]) {
+        state._beneficiosArquivosGerados[grupo.codigoEmpresa].arquivos.push({ nome: nomeArquivoFinal, blob: doc.output('blob') });
+    }
+    doc.save(nomeArquivoFinal);
+}
+
+function _atualizarBotaoEnvioEmailBeneficios() {
+    const btn = document.getElementById('beneficiosBtnEnviarEmail');
+    if (btn) btn.disabled = !Object.values(state._beneficiosArquivosGerados || {}).some(e => e.arquivos.length > 0);
 }
 
 // ===== AJUDA DE CUSTO — EMPRESA 350 (ITC BRASIL TECNOLOGIAS LTDA), RUBRICA 201 =====
