@@ -457,9 +457,13 @@
     }).join('')}</span>`;
   }
 
+  // Diferente de miniGradeHtml (janela deslizante dos últimos 6 meses,
+  // olhando pro passado): documentação costuma ser marcada pro mês atual
+  // ou futuro, então aqui mostra o ano-calendário inteiro (Jan-Dez do ano
+  // corrente) em vez de uma janela relativa a hoje.
   function miniGradeDocumentacaoHtml(codigoEmpresa) {
-    const hoje = new Date();
-    const meses = window.ContabilDiarioUtil.ultimosNMeses(hoje.getFullYear(), hoje.getMonth() + 1, 6);
+    const anoAtual = new Date().getFullYear();
+    const meses = Array.from({ length: 12 }, (_, idx) => ({ ano: anoAtual, mes: idx + 1 }));
     return `<span class="mapa-mini-grade">${meses.map(({ ano, mes }) => {
       const disponivel = documentacaoDisponivelDoMes(codigoEmpresa, ano, mes);
       const classe = disponivel ? 'doc-sim' : 'doc-nao';
@@ -481,8 +485,8 @@
           <td>${m && m.responsavel_execucao ? escapeHtml(m.responsavel_execucao) : '—'}</td>
           <td><span class="badge-nivel nivel-${nivel}">${NIVEL_LABELS[nivel]}</span></td>
           <td>${abertas}</td>
-          <td>${miniGradeHtml(e.codigo_empresa)}</td>
           <td>${miniGradeDocumentacaoHtml(e.codigo_empresa)}</td>
+          <td>${miniGradeHtml(e.codigo_empresa)}</td>
         </tr>
       `;
     }).join('');
@@ -492,7 +496,7 @@
         <div><h2>Visão Geral</h2></div>
       </div>
       <table class="mapa-table">
-        <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Nível</th><th>Pendências</th><th>Últimos 6 meses</th><th>Documentação — Últimos 6 meses</th></tr></thead>
+        <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Nível</th><th>Pendências</th><th>Documentação — Ano Atual</th><th>Últimos 6 meses</th></tr></thead>
         <tbody>${linhas || '<tr><td colspan="7">Nenhuma empresa encontrada.</td></tr>'}</tbody>
       </table>
     `;
