@@ -39,6 +39,13 @@
     renderFiltros(main, ctx);
   }
 
+  // "Realizar Nova Consulta": volta a tela para o estado inicial (mesmos
+  // filtros em branco/default de renderFiltros) — chamado a partir do
+  // botão ao lado de "Gerar PDF".
+  function novaConsulta(main, ctx) {
+    renderFiltros(main, ctx);
+  }
+
   function bancosDistintos(ctx) {
     const nomes = new Set();
     Object.values(ctx.bancosPorMapeamento).forEach((lista) => {
@@ -120,7 +127,7 @@
     document.getElementById('btnBuscarRelatorio').addEventListener('click', () => {
       const filtros = lerFiltros();
       const encontradas = aplicarFiltros(ctx, filtros);
-      renderResultados(document.getElementById('secaoResultadosRelatorio'), ctx, encontradas, filtros);
+      renderResultados(main, document.getElementById('secaoResultadosRelatorio'), ctx, encontradas, filtros);
     });
   }
 
@@ -201,7 +208,7 @@
     });
   }
 
-  function renderResultados(el, ctx, encontradas, filtros) {
+  function renderResultados(main, el, ctx, encontradas, filtros) {
     if (!encontradas.length) {
       el.innerHTML = '<div class="mapa-secao"><div class="mapa-secao-body"><p class="mapa-empty full">Nenhuma empresa encontrada com esses filtros.</p></div></div>';
       return;
@@ -234,7 +241,10 @@
       </div>
       <div class="mapa-secao">
         <div class="mapa-secao-body">
-          <div class="full"><button type="button" class="btn btn-primary" id="btnGerarRelatorioPdf">📄 Gerar PDF</button></div>
+          <div class="full" style="display:flex; gap:10px;">
+            <button type="button" class="btn btn-primary" id="btnGerarRelatorioPdf">📄 Gerar PDF</button>
+            <button type="button" class="btn btn-secondary" id="btnNovaConsultaRelatorio">🔄 Realizar Nova Consulta</button>
+          </div>
         </div>
       </div>
     `;
@@ -245,6 +255,7 @@
       if (!codigosSelecionados.length) return;
       await gerarPdfRelatorio(ctx, codigosSelecionados, colunasSelecionadas, filtros);
     });
+    el.querySelector('#btnNovaConsultaRelatorio').addEventListener('click', () => novaConsulta(main, ctx));
   }
 
   function truncar(texto, max) {
