@@ -82,11 +82,15 @@
           </div>
           <div>
             <label>Mês/Ano da Grade</label>
-            <div style="display:flex; gap:6px;">
+            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
               <select id="filtroGradeMes">
+                <option value="">Todos os meses</option>
                 ${window.ContabilDiarioUtil.MESES_LABELS.map((l, idx) => `<option value="${idx + 1}" ${idx + 1 === mesAtual ? 'selected' : ''}>${l}</option>`).join('')}
               </select>
               <input type="number" id="filtroGradeAno" value="${anoAtual}" style="width:90px;">
+              <label style="display:flex; align-items:center; gap:4px; font-weight:normal;">
+                <input type="checkbox" id="chkGradeTodosAnos"> Todos os anos
+              </label>
             </div>
           </div>
           <div class="full">
@@ -109,6 +113,10 @@
       <div id="secaoResultadosRelatorio"></div>
     `;
 
+    const chkTodosAnos = document.getElementById('chkGradeTodosAnos');
+    const inputGradeAno = document.getElementById('filtroGradeAno');
+    chkTodosAnos.addEventListener('change', () => { inputGradeAno.disabled = chkTodosAnos.checked; });
+
     document.getElementById('btnBuscarRelatorio').addEventListener('click', () => {
       const filtros = lerFiltros();
       const encontradas = aplicarFiltros(ctx, filtros);
@@ -120,19 +128,39 @@
     return Array.from(document.querySelectorAll(`input[name="${nomeGrupo}"]:checked`)).map((el) => el.value);
   }
 
+  // gradeMes/gradeAno = null significa "todos" (checkbox/opção "Todos"
+  // marcada) — ver docs/superpowers/specs/2026-08-08-diario-relatorios-filtro-todos-mes-ano-design.md.
   function lerFiltros() {
+    const valorMes = document.getElementById('filtroGradeMes').value;
+    const todosAnos = document.getElementById('chkGradeTodosAnos').checked;
     return {
       niveis: valoresMarcados('filtroNivel'),
       situacoesAno: valoresMarcados('filtroSituacaoAno'),
       statusGrade: document.getElementById('filtroStatusGrade').value || null,
-      gradeMes: Number(document.getElementById('filtroGradeMes').value),
-      gradeAno: Number(document.getElementById('filtroGradeAno').value),
+      gradeMes: valorMes === '' ? null : Number(valorMes),
+      gradeAno: todosAnos ? null : Number(document.getElementById('filtroGradeAno').value),
       bancos: valoresMarcados('filtroBanco'),
       regimes: valoresMarcados('filtroRegime'),
       financeiros: valoresMarcados('filtroFinanceiro'),
       periodoDe: document.getElementById('filtroPeriodoDe').value || null,
       periodoAte: document.getElementById('filtroPeriodoAte').value || null,
     };
+  }
+
+  // Ocorrências (chave 'ano-mes') do status filtrado nas entradas
+  // explícitas de contabil_diario_status_mensal da empresa, respeitando
+  // mês/ano quando não estão em modo "todos" (null). Reaproveitado pelo
+  // filtro e pela coluna "Status da Grade Mensal" do PDF — ver
+  // docs/superpowers/specs/2026-08-08-diario-relatorios-filtro-todos-mes-ano-design.md.
+  function ocorrenciasStatusGrade(ctx, codigoEmpresa, filtros) {
+    const bucket = ctx.statusMensalPorEmpresa[codigoEmpresa] || {};
+    return Object.entries(bucket).filter(([chave, status]) => {
+      if (status !== filtros.statusGrade) return false;
+      const [anoChave, mesChave] = chave.split('-').map(Number);
+      if (filtros.gradeAno !== null && anoChave !== filtros.gradeAno) return false;
+      if (filtros.gradeMes !== null && mesChave !== filtros.gradeMes) return false;
+      return true;
+    });
   }
 
   function aplicarFiltros(ctx, filtros) {
@@ -147,9 +175,13 @@
       }
 
       if (filtros.statusGrade) {
-        const bucket = ctx.statusMensalPorEmpresa[e.codigo_empresa];
-        const statusMes = (bucket && bucket[`${filtros.gradeAno}-${filtros.gradeMes}`]) || 'nao_iniciado';
-        if (statusMes !== filtros.statusGrade) return false;
+        if (filtros.gradeMes === null || filtros.gradeAno === null) {
+          if (!ocorrenciasStatusGrade(ctx, e.codigo_empresa, filtros).length) return false;
+        } else {
+          const bucket = ctx.statusMensalPorEmpresa[e.codigo_empresa];
+          const statusMes = (bucket && bucket[`${filtros.gradeAno}-${filtros.gradeMes}`]) || 'nao_iniciado';
+          if (statusMes !== filtros.statusGrade) return false;
+        }
       }
 
       if (filtros.bancos.length) {
@@ -274,6 +306,16 @@
           case 'particularidadesFiscais': return m && m.particularidades_fiscais ? m.particularidades_fiscais : '—';
           case 'particularidadesSocietarias': return m && m.particularidades_societarias ? m.particularidades_societarias : '—';
           case 'statusGrade': {
+            if (filtros.gradeMes === null || filtros.gradeAno === null) {
+              if (!filtros.statusGrade) return '—';
+              const ocorrencias = ocorrenciasStatusGrade(ctx, codigo, filtros)
+                .map(([chave]) => {
+                  const [anoChave, mesChave] = chave.split('-').map(Number);
+                  return `${window.ContabilDiarioUtil.MESES_LABELS[mesChave - 1]}/${anoChave}`;
+                })
+                .sort();
+              return ocorrencias.length ? ocorrencias.join(', ') : '—';
+            }
             const bucket = ctx.statusMensalPorEmpresa[codigo];
             const status = (bucket && bucket[`${filtros.gradeAno}-${filtros.gradeMes}`]) || 'nao_iniciado';
             return STATUS_GRADE_LABELS[status];
