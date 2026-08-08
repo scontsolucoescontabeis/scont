@@ -631,6 +631,8 @@ input,select,textarea{font:inherit}
 .mini-quad.status-pendencia{ background:var(--danger); }
 .mini-quad.status-em_andamento{ background:#F1C40F; }
 .mini-quad.status-nao_iniciado{ background:var(--line-soft); }
+.mini-quad.doc-sim{ background:var(--brand); }
+.mini-quad.doc-nao{ background:var(--line-soft); }
 
 .mapa-grade-nav{ display:flex; align-items:center; gap:12px; margin-bottom:8px; }
 .mapa-grade-nav button{ background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:4px 10px; cursor:pointer; font-size:14px; }

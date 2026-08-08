@@ -457,6 +457,17 @@
     }).join('')}</span>`;
   }
 
+  function miniGradeDocumentacaoHtml(codigoEmpresa) {
+    const hoje = new Date();
+    const meses = window.ContabilDiarioUtil.ultimosNMeses(hoje.getFullYear(), hoje.getMonth() + 1, 6);
+    return `<span class="mapa-mini-grade">${meses.map(({ ano, mes }) => {
+      const disponivel = documentacaoDisponivelDoMes(codigoEmpresa, ano, mes);
+      const classe = disponivel ? 'doc-sim' : 'doc-nao';
+      const titulo = `${String(mes).padStart(2, '0')}/${ano} — Documentação ${disponivel ? '' : 'não '}disponível`;
+      return `<span class="mini-quad ${classe}" title="${titulo}"></span>`;
+    }).join('')}</span>`;
+  }
+
   function renderDashboardDiario() {
     const main = document.getElementById('main');
     const linhas = empresas.map((e) => {
@@ -471,6 +482,7 @@
           <td><span class="badge-nivel nivel-${nivel}">${NIVEL_LABELS[nivel]}</span></td>
           <td>${abertas}</td>
           <td>${miniGradeHtml(e.codigo_empresa)}</td>
+          <td>${miniGradeDocumentacaoHtml(e.codigo_empresa)}</td>
         </tr>
       `;
     }).join('');
@@ -480,8 +492,8 @@
         <div><h2>Visão Geral</h2></div>
       </div>
       <table class="mapa-table">
-        <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Nível</th><th>Pendências</th><th>Últimos 6 meses</th></tr></thead>
-        <tbody>${linhas || '<tr><td colspan="6">Nenhuma empresa encontrada.</td></tr>'}</tbody>
+        <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Nível</th><th>Pendências</th><th>Últimos 6 meses</th><th>Documentação — Últimos 6 meses</th></tr></thead>
+        <tbody>${linhas || '<tr><td colspan="7">Nenhuma empresa encontrada.</td></tr>'}</tbody>
       </table>
     `;
 
