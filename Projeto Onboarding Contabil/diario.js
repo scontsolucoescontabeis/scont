@@ -884,6 +884,72 @@
     }, 0);
   }
 
+  // ─── POPOVER: admin do portal muda o status livremente ──────
+  // Só _isAdmin (super-admin do Portal Scont) — não _isScontTeam. Pula
+  // pra qualquer status, sem seguir o pipeline normal
+  // (nao_iniciado→em_andamento→pendencia/concluido). Bloqueado só pelo
+  // lock de "aprovado" (validação de encerramento), igual a todo mundo —
+  // ver docs/superpowers/specs/2026-08-08-diario-admin-status-livre-design.md.
+  const OPCOES_STATUS_ADMIN = [
+    { valor: 'nao_iniciado', label: '⚪ Não Iniciado' },
+    { valor: 'em_andamento', label: '🟡 Em Andamento' },
+    { valor: 'pendencia', label: '🔴 Pendência' },
+    { valor: 'concluido', label: '🟢 Concluído' },
+  ];
+
+  async function alterarStatusMesAdmin(codigoEmpresa, ano, mes, statusAtual, statusNovo, motivo) {
+    if (!_isAdmin) return;
+    if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
+    if (statusAtual === statusNovo) return;
+    await transicionarStatusMes(codigoEmpresa, ano, mes, statusAtual, statusNovo, motivo);
+  }
+
+  function abrirFormPendenciaAdminNoPopover(pop, codigoEmpresa, ano, mes, statusAtual) {
+    pop.innerHTML = `
+      <label>Motivo da pendência (obrigatório)</label>
+      <textarea id="popMotivoPendenciaAdmin" rows="2" placeholder="Ex: falta disponibilização de documentação..."></textarea>
+      <button type="button" class="btn btn-primary" id="popBtnConfirmarPendenciaAdmin">Confirmar</button>
+    `;
+    pop.addEventListener('click', (ev) => ev.stopPropagation());
+    pop.querySelector('#popBtnConfirmarPendenciaAdmin').addEventListener('click', () => {
+      const motivo = pop.querySelector('#popMotivoPendenciaAdmin').value.trim();
+      if (!motivo) { mostrarToast('Informe o motivo da pendência.', 'erro'); return; }
+      fecharPopoverGrade();
+      alterarStatusMesAdmin(codigoEmpresa, ano, mes, statusAtual, 'pendencia', motivo);
+    });
+  }
+
+  function abrirPopoverStatusAdmin(cel, codigoEmpresa, ano, mes) {
+    fecharPopoverGrade();
+    const statusAtual = statusDoMes(codigoEmpresa, ano, mes);
+    const pop = document.createElement('div');
+    pop.id = 'popoverGrade';
+    pop.className = 'popover-grade';
+    pop.innerHTML = OPCOES_STATUS_ADMIN.map((o) => `
+      <button type="button" class="btn btn-secondary" data-status-admin="${o.valor}" ${o.valor === statusAtual ? 'disabled' : ''}>${o.label}${o.valor === statusAtual ? ' (atual)' : ''}</button>
+    `).join('');
+    pop.addEventListener('click', (ev) => ev.stopPropagation());
+    document.body.appendChild(pop);
+
+    const rect = cel.getBoundingClientRect();
+    pop.style.top = `${rect.bottom + 6}px`;
+    pop.style.left = `${Math.min(Math.max(rect.left + rect.width / 2 - 100, 8), window.innerWidth - 208)}px`;
+
+    pop.querySelectorAll('[data-status-admin]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const statusNovo = btn.getAttribute('data-status-admin');
+        if (statusNovo === 'pendencia') { abrirFormPendenciaAdminNoPopover(pop, codigoEmpresa, ano, mes, statusAtual); return; }
+        fecharPopoverGrade();
+        alterarStatusMesAdmin(codigoEmpresa, ano, mes, statusAtual, statusNovo, null);
+      });
+    });
+
+    setTimeout(() => {
+      document.addEventListener('click', fecharPopoverGradeAoClicarFora);
+      window.addEventListener('scroll', fecharPopoverGrade, true);
+    }, 0);
+  }
+
   const ICONE_FECHAMENTO = {
     aberto: { icone: '📤', titulo: 'Encerrar mês contábil' },
     aguardando_validacao: { icone: '⏳', titulo: 'Aguardando validação' },
@@ -952,6 +1018,7 @@
       cel.addEventListener('click', () => {
         const mes = Number(cel.getAttribute('data-mes'));
         if (statusFechamentoDoMes(empresaAtualCodigo, anoGradeAtual, mes) === 'aprovado') return;
+        if (_isAdmin) { abrirPopoverStatusAdmin(cel, empresaAtualCodigo, anoGradeAtual, mes); return; }
         const status = statusDoMes(empresaAtualCodigo, anoGradeAtual, mes);
         if (status === 'nao_iniciado') { iniciarMes(empresaAtualCodigo, anoGradeAtual, mes); return; }
         if (status === 'em_andamento') { abrirPopoverGrade(cel, empresaAtualCodigo, anoGradeAtual, mes); return; }
