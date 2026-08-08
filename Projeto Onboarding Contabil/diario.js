@@ -174,6 +174,8 @@
     window.__diarioContext = {
       supabaseClient,
       empresas,
+      restringirPorResponsavel: _restringirSeletor,
+      meusResponsaveisCodigos: Array.from(_meusResponsaveisSet),
       mapeamentos,
       bancosPorMapeamento,
       statusMensalPorEmpresa,

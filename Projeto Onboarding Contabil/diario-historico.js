@@ -29,6 +29,14 @@
     const el = document.getElementById('secaoResultadosHistorico');
     el.innerHTML = '<p class="mapa-empty">Carregando...</p>';
 
+    // Prestador de Serviço restrito só pode ver histórico das empresas
+    // atribuídas a ele (mesma restrição já aplicada ao seletor geral e à
+    // grade em diario.js). Sem nenhuma empresa atribuída, nem consulta.
+    if (ctx.restringirPorResponsavel && !ctx.meusResponsaveisCodigos.length) {
+      el.innerHTML = '<div class="mapa-secao"><div class="mapa-secao-body"><p class="mapa-empty full">Nenhuma empresa atribuída a você.</p></div></div>';
+      return;
+    }
+
     const empresaTermo = (document.getElementById('filtroHistoricoEmpresa').value || '').trim().toLowerCase();
     const de = document.getElementById('filtroHistoricoDe').value || null;
     const ate = document.getElementById('filtroHistoricoAte').value || null;
@@ -43,6 +51,11 @@
       .select('codigo_empresa, campo, valor_anterior, valor_novo, observacao, usuario_nome, usuario_email, created_at')
       .order('created_at', { ascending: false })
       .limit(LIMITE);
+
+    if (ctx.restringirPorResponsavel) {
+      queryLancamentos = queryLancamentos.in('codigo_empresa', ctx.meusResponsaveisCodigos);
+      queryAuditoria = queryAuditoria.in('codigo_empresa', ctx.meusResponsaveisCodigos);
+    }
 
     if (de) { queryLancamentos = queryLancamentos.gte('created_at', de); queryAuditoria = queryAuditoria.gte('created_at', de); }
     if (ate) { queryLancamentos = queryLancamentos.lte('created_at', ate + 'T23:59:59'); queryAuditoria = queryAuditoria.lte('created_at', ate + 'T23:59:59'); }
