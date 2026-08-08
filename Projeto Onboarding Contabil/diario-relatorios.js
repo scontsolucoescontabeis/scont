@@ -80,22 +80,28 @@
             <label>Situação do Ano Corrente (${anoAtualStr()})</label>
             <div class="mapa-checkbox-grupo">${checkboxGrupo('filtroSituacaoAno', Object.entries(ctx.SITUACAO_LABELS).map(([value, label]) => ({ value, label })))}</div>
           </div>
-          <div>
-            <label>Status da Grade Mensal</label>
-            <select id="filtroStatusGrade">
-              <option value="">(não filtrar)</option>
-              ${Object.entries(STATUS_GRADE_LABELS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
-            </select>
-          </div>
-          <div>
-            <label>Mês/Ano da Grade</label>
-            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-              <select id="filtroGradeMes">
-                <option value="">Todos os meses</option>
-                ${window.ContabilDiarioUtil.MESES_LABELS.map((l, idx) => `<option value="${idx + 1}" ${idx + 1 === mesAtual ? 'selected' : ''}>${l}</option>`).join('')}
-              </select>
-              <input type="number" id="filtroGradeAno" value="${anoAtual}" style="width:90px;">
-              <label style="display:flex; align-items:center; gap:4px; font-weight:normal;">
+          <div class="full">
+            <div style="display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap;">
+              <div style="flex:1; min-width:220px;">
+                <label>Status da Grade Mensal</label>
+                <select id="filtroStatusGrade">
+                  <option value="">(não filtrar)</option>
+                  ${Object.entries(STATUS_GRADE_LABELS).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}
+                  <option value="documentacao_disponivel">📄 Documentação Disponível</option>
+                </select>
+              </div>
+              <div>
+                <label>Mês</label>
+                <select id="filtroGradeMes">
+                  <option value="">Todos os meses</option>
+                  ${window.ContabilDiarioUtil.MESES_LABELS.map((l, idx) => `<option value="${idx + 1}" ${idx + 1 === mesAtual ? 'selected' : ''}>${l}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label>Ano</label>
+                <input type="number" id="filtroGradeAno" value="${anoAtual}" style="width:90px;">
+              </div>
+              <label style="display:flex; align-items:center; gap:4px; font-weight:normal; padding-bottom:8px;">
                 <input type="checkbox" id="chkGradeTodosAnos"> Todos os anos
               </label>
             </div>
@@ -170,6 +176,21 @@
     });
   }
 
+  // Mesmo formato de ocorrenciasStatusGrade, mas pra contabil_diario_
+  // documentacao (flag disponivel, não um dos 4 status da grade) — opção
+  // "📄 Documentação Disponível" embutida no mesmo dropdown de Status da
+  // Grade Mensal, a pedido do usuário.
+  function ocorrenciasDocumentacaoDisponivel(ctx, codigoEmpresa, filtros) {
+    const bucket = (ctx.documentacaoPorEmpresa || {})[codigoEmpresa] || {};
+    return Object.entries(bucket).filter(([chave, disponivel]) => {
+      if (!disponivel) return false;
+      const [anoChave, mesChave] = chave.split('-').map(Number);
+      if (filtros.gradeAno !== null && anoChave !== filtros.gradeAno) return false;
+      if (filtros.gradeMes !== null && mesChave !== filtros.gradeMes) return false;
+      return true;
+    });
+  }
+
   function aplicarFiltros(ctx, filtros) {
     return ctx.empresas.filter((e) => {
       const m = ctx.mapeamentoDe(e.codigo_empresa);
@@ -181,7 +202,9 @@
         if (!statusAno || !filtros.situacoesAno.includes(statusAno)) return false;
       }
 
-      if (filtros.statusGrade) {
+      if (filtros.statusGrade === 'documentacao_disponivel') {
+        if (!ocorrenciasDocumentacaoDisponivel(ctx, e.codigo_empresa, filtros).length) return false;
+      } else if (filtros.statusGrade) {
         if (filtros.gradeMes === null || filtros.gradeAno === null) {
           if (!ocorrenciasStatusGrade(ctx, e.codigo_empresa, filtros).length) return false;
         } else {
@@ -317,6 +340,15 @@
           case 'particularidadesFiscais': return m && m.particularidades_fiscais ? m.particularidades_fiscais : '—';
           case 'particularidadesSocietarias': return m && m.particularidades_societarias ? m.particularidades_societarias : '—';
           case 'statusGrade': {
+            if (filtros.statusGrade === 'documentacao_disponivel') {
+              const ocorrencias = ocorrenciasDocumentacaoDisponivel(ctx, codigo, filtros)
+                .map(([chave]) => {
+                  const [anoChave, mesChave] = chave.split('-').map(Number);
+                  return `${window.ContabilDiarioUtil.MESES_LABELS[mesChave - 1]}/${anoChave}`;
+                })
+                .sort();
+              return ocorrencias.length ? ocorrencias.join(', ') : '—';
+            }
             if (filtros.gradeMes === null || filtros.gradeAno === null) {
               if (!filtros.statusGrade) return '—';
               const ocorrencias = ocorrenciasStatusGrade(ctx, codigo, filtros)

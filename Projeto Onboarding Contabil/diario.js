@@ -179,6 +179,7 @@
       mapeamentos,
       bancosPorMapeamento,
       statusMensalPorEmpresa,
+      documentacaoPorEmpresa,
       NIVEL_LABELS, REGIME_LABELS, SITUACAO_LABELS, FINANCEIRO_LABELS, PERIODICIDADE_LABELS,
       mapeamentoDe,
       escapeHtml,
