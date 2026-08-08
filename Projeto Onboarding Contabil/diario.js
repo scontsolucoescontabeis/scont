@@ -641,7 +641,63 @@
     const campo = `Documentação Disponível — ${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
     await registrarAuditoria(codigoEmpresa, campo, atual ? 'Sim' : 'Não', novo ? 'Sim' : 'Não', null);
 
+    if (novo) {
+      enviarAlertaDocumentacaoDisponivel(codigoEmpresa, ano, mes, auth).catch((e) => console.error('Erro ao enviar alerta de documentação disponível:', e));
+    }
+
     renderGradeMensal();
+  }
+
+  // Ao marcar (nunca ao desmarcar) a documentação como disponível, avisa
+  // por e-mail todos os responsáveis atribuídos à empresa em
+  // contabil_empresas_responsaveis (mesma tabela que resolve
+  // _meusResponsaveisSet/podeEncerrar) — ver
+  // docs/superpowers/specs/2026-08-08-diario-documentacao-disponivel-email-design.md.
+  async function enviarAlertaDocumentacaoDisponivel(codigoEmpresa, ano, mes, auth) {
+    const { data: cfg, error: errCfg } = await supabaseClient
+      .from('contabil_config_geral')
+      .select('notificar_documentacao_disponivel')
+      .eq('id', 1)
+      .maybeSingle();
+    if (errCfg) { console.error(errCfg); return; }
+    if (cfg?.notificar_documentacao_disponivel === false) return; // desligado em Configurações
+
+    const { data: responsaveis, error: errResp } = await supabaseClient
+      .from('contabil_empresas_responsaveis')
+      .select('usuario_id')
+      .eq('codigo_empresa', codigoEmpresa);
+    if (errResp) { console.error(errResp); return; }
+    const usuarioIds = (responsaveis || []).map((r) => r.usuario_id).filter(Boolean);
+    if (!usuarioIds.length) {
+      mostrarToast('Documentação marcada como disponível, mas nenhum responsável está atribuído a esta empresa (Configurações → Responsáveis).', 'erro');
+      return;
+    }
+
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return;
+
+    const nomeEmp = empresaNome(codigoEmpresa);
+    const mesAno = `${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+    const assunto = `📄 Documentação disponível — ${nomeEmp} — ${mesAno}`;
+    const params = {
+      tipo: 'documentacao_disponivel',
+      empresa: nomeEmp,
+      mes_ano: mesAno,
+      marcado_por: auth.userData?.nome || auth.email || 'Equipe Scont',
+      portal_url: window.location.origin + window.location.pathname,
+    };
+
+    const resultados = await Promise.all(usuarioIds.map((usuarioId) =>
+      fetch(`${SUPABASE_URL}/functions/v1/enviar-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': SUPABASE_KEY },
+        body: JSON.stringify({ usuarioId, assunto, params }),
+      }).then((r) => r.json()).catch((e) => ({ ok: false, error: e.message }))
+    ));
+
+    if (resultados.some((r) => !r.ok)) {
+      mostrarToast('Documentação marcada, mas houve falha ao notificar por e-mail um ou mais responsáveis.', 'erro');
+    }
   }
 
   async function marcarPendencia(codigoEmpresa, ano, mes, motivo) {

@@ -12,8 +12,9 @@
 -- ============================================================
 
 ALTER TABLE public.contabil_config_geral
-    ADD COLUMN IF NOT EXISTS notificar_validacao_fechamento  BOOLEAN NOT NULL DEFAULT TRUE,
-    ADD COLUMN IF NOT EXISTS notificar_fechamento_aprovado   BOOLEAN NOT NULL DEFAULT TRUE,
-    ADD COLUMN IF NOT EXISTS notificar_fechamento_rejeitado  BOOLEAN NOT NULL DEFAULT TRUE,
-    ADD COLUMN IF NOT EXISTS notificar_pendencia_execucao    BOOLEAN NOT NULL DEFAULT TRUE,
-    ADD COLUMN IF NOT EXISTS notificar_pendencia_resolvida   BOOLEAN NOT NULL DEFAULT TRUE;
+    ADD COLUMN IF NOT EXISTS notificar_validacao_fechamento      BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS notificar_fechamento_aprovado       BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS notificar_fechamento_rejeitado      BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS notificar_pendencia_execucao        BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS notificar_pendencia_resolvida       BOOLEAN NOT NULL DEFAULT TRUE,
+    ADD COLUMN IF NOT EXISTS notificar_documentacao_disponivel   BOOLEAN NOT NULL DEFAULT TRUE;

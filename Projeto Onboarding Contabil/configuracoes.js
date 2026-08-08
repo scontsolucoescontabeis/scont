@@ -18,6 +18,7 @@
     { coluna: 'notificar_fechamento_rejeitado', label: 'Fechamento rejeitado' },
     { coluna: 'notificar_pendencia_execucao', label: 'Pendência de execução criada' },
     { coluna: 'notificar_pendencia_resolvida', label: 'Pendência de execução sanada' },
+    { coluna: 'notificar_documentacao_disponivel', label: 'Documentação disponível marcada' },
   ];
 
   document.addEventListener('DOMContentLoaded', iniciar);

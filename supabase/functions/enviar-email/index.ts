@@ -255,6 +255,30 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
         ` + _rodape(nomeRemetente) + _fechamento();
     }
 
+    // ── Documentação marcada como disponível (Diário Contábil) ──
+    if (tipo === 'documentacao_disponivel') {
+        const empresaNome = (params.empresa as string)     || '';
+        const mesAno      = (params.mes_ano as string)     || '';
+        const marcadoPor  = (params.marcado_por as string) || 'a equipe Scont';
+        const portalUrl   = (params.portal_url as string)  || '';
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#4e1820;margin:0 0 8px;font-size:20px;">📄 Documentação disponível</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            <strong>${marcadoPor}</strong> marcou a documentação de <strong>${mesAno}</strong>
+            da empresa <strong>${empresaNome}</strong> como <strong style="color:#33aa23;">disponível</strong>.
+            Você já pode iniciar o lançamento contábil do mês.
+          </p>
+
+          ${portalUrl ? `
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
+            <a href="${portalUrl}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+              📔 Acessar o Diário Contábil
+            </a>
+          </td></tr></table>` : ''}
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
     // ── Alerta: certificado digital entrou em limiar de vencimento ──
     if (tipo === 'alerta_certificado_vencimento') {
         const empresaNome   = (params.empresa as string)        || '';
