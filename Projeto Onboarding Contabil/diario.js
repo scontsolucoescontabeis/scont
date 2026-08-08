@@ -608,16 +608,32 @@
   // auditoria com created_at, o que permite calcular depois os tempos
   // do fechamento (ver calcularTemposFechamento em contabil-diario-util.js).
 
+  // "nao_iniciado" nunca é gravado explicitamente em
+  // contabil_diario_status_mensal — é o default implícito da ausência de
+  // linha (statusDoMes cai pra 'nao_iniciado' quando não acha nada no
+  // bucket) e a CHECK constraint da coluna só aceita
+  // em_andamento/pendencia/concluido. Até aqui nenhum chamador tentava
+  // gravar 'nao_iniciado' (só saía dele, via iniciarMes); o admin
+  // pode agora voltar um mês pra 'nao_iniciado' livremente
+  // (alterarStatusMesAdmin), então isso precisa apagar a linha em vez de
+  // tentar um upsert que violaria a constraint.
   async function transicionarStatusMes(codigoEmpresa, ano, mes, statusAtual, statusNovo, motivo) {
-    const { error } = await supabaseClient
-      .from('contabil_diario_status_mensal')
-      .upsert({ codigo_empresa: codigoEmpresa, ano, mes, status: statusNovo, motivo_pendencia: motivo || null, updated_at: new Date().toISOString() }, { onConflict: 'codigo_empresa,ano,mes' });
+    const { error } = statusNovo === 'nao_iniciado'
+      ? await supabaseClient.from('contabil_diario_status_mensal').delete()
+          .eq('codigo_empresa', codigoEmpresa).eq('ano', ano).eq('mes', mes)
+      : await supabaseClient.from('contabil_diario_status_mensal')
+          .upsert({ codigo_empresa: codigoEmpresa, ano, mes, status: statusNovo, motivo_pendencia: motivo || null, updated_at: new Date().toISOString() }, { onConflict: 'codigo_empresa,ano,mes' });
     if (error) { console.error(error); mostrarToast('Erro ao atualizar o status do mês.', 'erro'); return; }
 
     const bucket = (statusMensalPorEmpresa[codigoEmpresa] = statusMensalPorEmpresa[codigoEmpresa] || {});
-    bucket[`${ano}-${mes}`] = statusNovo;
     const motivoBucket = (motivoPendenciaPorEmpresa[codigoEmpresa] = motivoPendenciaPorEmpresa[codigoEmpresa] || {});
-    motivoBucket[`${ano}-${mes}`] = motivo || null;
+    if (statusNovo === 'nao_iniciado') {
+      delete bucket[`${ano}-${mes}`];
+      delete motivoBucket[`${ano}-${mes}`];
+    } else {
+      bucket[`${ano}-${mes}`] = statusNovo;
+      motivoBucket[`${ano}-${mes}`] = motivo || null;
+    }
 
     const campo = `Status Mensal — ${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
     await registrarAuditoria(codigoEmpresa, campo, STATUS_GRADE_LABELS[statusAtual], STATUS_GRADE_LABELS[statusNovo], motivo);

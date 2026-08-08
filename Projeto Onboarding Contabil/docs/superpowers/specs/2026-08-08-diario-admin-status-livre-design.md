@@ -50,6 +50,28 @@ travado por `aprovado`.
    notificar a equipe Scont. Continua auditável via Histórico de qualquer
    forma.
 
+## Correção pós-implementação: voltar pra "Não Iniciado"
+
+Primeiro teste em produção falhou: `new row for relation
+"contabil_diario_status_mensal" violates check constraint
+"contabil_diario_status_mensal_status_check"`. Causa raiz confirmada
+consultando a constraint direto no banco
+(`CHECK (status = ANY (ARRAY['em_andamento','pendencia','concluido']))`):
+`'nao_iniciado'` **nunca** é um valor gravado explicitamente nessa tabela —
+é só o default implícito quando não existe linha (`statusDoMes` cai pra
+`'nao_iniciado'` na ausência de entrada no bucket). Até esta feature, nenhum
+caminho do código tentava gravar `'nao_iniciado'` (só saía dele, via
+`iniciarMes`); o admin agora pode voltar um mês pra "Não Iniciado", que é
+exatamente o caso novo que faltava tratar.
+
+Corrigido em `transicionarStatusMes`: quando `statusNovo === 'nao_iniciado'`,
+faz `DELETE` da linha (`codigo_empresa`+`ano`+`mes`) em vez de `upsert`, e
+remove a chave correspondente de `statusMensalPorEmpresa`/
+`motivoPendenciaPorEmpresa` em memória (em vez de gravar a string) — mesmo
+efeito de "sem linha = não iniciado" que já regia o resto do módulo, agora
+também alcançável a partir de qualquer outro status via o override do
+admin.
+
 ## Fora de escopo
 
 - Fluxo de fechamento/validação (`contabil_diario_fechamentos`,
