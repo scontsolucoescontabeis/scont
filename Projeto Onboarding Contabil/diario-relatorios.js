@@ -243,11 +243,21 @@
       </label>
     `).join('');
 
-    const colunasHtml = COLUNAS.map((c) => `
+    // Filtrando por "Documentação Disponível", a coluna que lista os meses
+    // batidos (reaproveita o key 'statusGrade', já sabe listar ocorrências
+    // nesse modo) vem marcada por padrão e com rótulo mais claro — sem
+    // isso, o usuário teria que lembrar de marcar manualmente pra ver a
+    // quais meses o filtro se referia.
+    const emModoDocumentacao = filtros.statusGrade === 'documentacao_disponivel';
+    const colunasHtml = COLUNAS.map((c) => {
+      const forcarCheck = emModoDocumentacao && c.key === 'statusGrade';
+      const label = forcarCheck ? 'Meses com Documentação Disponível' : c.label;
+      return `
       <label class="mapa-checkbox-item">
-        <input type="checkbox" data-coluna-key="${c.key}" ${c.padrao || c.fixa ? 'checked' : ''} ${c.fixa ? 'disabled' : ''}> ${c.label}
+        <input type="checkbox" data-coluna-key="${c.key}" ${c.padrao || c.fixa || forcarCheck ? 'checked' : ''} ${c.fixa ? 'disabled' : ''}> ${label}
       </label>
-    `).join('');
+    `;
+    }).join('');
 
     el.innerHTML = `
       <div class="mapa-secao">
@@ -305,6 +315,30 @@
       if (!bucket.ultimo) bucket.ultimo = l;
     });
     return porEmpresa;
+  }
+
+  // Descreve, em texto corrido, só os filtros que estão de fato ativos
+  // (arrays vazios/campos em branco são omitidos) — impresso no cabeçalho
+  // do PDF pra deixar claro quais parâmetros geraram aquele relatório.
+  function resumoFiltrosTexto(ctx, filtros) {
+    const partes = [];
+    if (filtros.niveis.length) partes.push(`Nível de Atenção: ${filtros.niveis.map((v) => ctx.NIVEL_LABELS[v] || v).join(', ')}`);
+    if (filtros.situacoesAno.length) partes.push(`Situação do Ano Corrente (${anoAtualStr()}): ${filtros.situacoesAno.map((v) => ctx.SITUACAO_LABELS[v] || v).join(', ')}`);
+    if (filtros.statusGrade) {
+      const labelStatus = filtros.statusGrade === 'documentacao_disponivel' ? 'Documentação Disponível' : (STATUS_GRADE_LABELS[filtros.statusGrade] || filtros.statusGrade);
+      const mesTxt = filtros.gradeMes === null ? 'todos os meses' : window.ContabilDiarioUtil.MESES_LABELS[filtros.gradeMes - 1];
+      const anoTxt = filtros.gradeAno === null ? 'todos os anos' : String(filtros.gradeAno);
+      partes.push(`Status da Grade Mensal: ${labelStatus} (${mesTxt}/${anoTxt})`);
+    }
+    if (filtros.bancos.length) partes.push(`Banco: ${filtros.bancos.join(', ')}`);
+    if (filtros.regimes.length) partes.push(`Regime Tributário: ${filtros.regimes.map((v) => ctx.REGIME_LABELS[v] || v).join(', ')}`);
+    if (filtros.financeiros.length) partes.push(`Financeiro Interno/BPO: ${filtros.financeiros.map((v) => ctx.FINANCEIRO_LABELS[v] || v).join(', ')}`);
+    if (filtros.periodoDe || filtros.periodoAte) {
+      const de = filtros.periodoDe ? parseDataLocalRelatorio(filtros.periodoDe).toLocaleDateString('pt-BR') : '—';
+      const ate = filtros.periodoAte ? parseDataLocalRelatorio(filtros.periodoAte).toLocaleDateString('pt-BR') : '—';
+      partes.push(`Lançamentos: ${de} a ${ate}`);
+    }
+    return partes.length ? partes.join('  •  ') : 'Sem filtros aplicados';
   }
 
   async function gerarPdfRelatorio(ctx, codigos, colunas, filtros) {
@@ -389,10 +423,19 @@
     doc.setFontSize(8); doc.setFont('helvetica', 'normal');
     doc.text('Gerado em ' + new Date().toLocaleDateString('pt-BR'), pageW - MARGEM - 4, MARGEM + 10, { align: 'right' });
 
+    doc.setTextColor(90, 90, 90);
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+    const linhasFiltro = doc.splitTextToSize(`Filtros: ${resumoFiltrosTexto(ctx, filtros)}`, pageW - MARGEM * 2 - 4);
+    let yFiltros = MARGEM + 16 + 5;
+    linhasFiltro.forEach((linha) => {
+      doc.text(linha, MARGEM + 2, yFiltros);
+      yFiltros += 3.6;
+    });
+
     doc.autoTable({
-      head: [colunas.map((c) => c.label)],
+      head: [colunas.map((c) => (c.key === 'statusGrade' && filtros.statusGrade === 'documentacao_disponivel') ? 'Meses com Documentação Disponível' : c.label)],
       body: linhas,
-      startY: MARGEM + 22,
+      startY: yFiltros + 2,
       margin: { left: MARGEM, right: MARGEM },
       styles: { fontSize: 7.5, cellPadding: 1.6, textColor: [44, 62, 80] },
       headStyles: { fillColor: [139, 58, 58], textColor: 255 },
