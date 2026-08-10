@@ -1,0 +1,180 @@
+<p class="manual-intro">A Mala Direta cria campanhas de comunicação em massa (email e WhatsApp) para clientes e colaboradores, acompanha quem já recebeu cada mensagem e quem confirmou leitura ou interesse. Existem duas versões: a versão <strong>web</strong>, dentro do Portal Scont, onde todo o trabalho de montar campanhas, contatos, grupos e o conversor de avisos de vencimento acontece — o envio pode ser manual pelo Outlook (um clique por destinatário) ou automático via Brevo; e a versão <strong>desktop</strong> (aplicativo instalado no Windows), que não cria nada por conta própria — ela só abre as campanhas já montadas na web e as envia automaticamente pelo Outlook instalado no computador, sem precisar clicar "Enviar" em cada email.</p>
+
+<section class="manual-item" id="campanhas">
+  <h2>Campanhas</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>No menu <strong>Campanhas</strong>, clique em <strong>+ Nova Campanha</strong> e informe nome, descrição e o <strong>Tipo de Confirmação</strong> desejado: Confirmar Leitura, Confirmar Interesse ou Sem Confirmação.</li>
+    <li>Opcionalmente, envie uma planilha Excel com um destinatário por linha — cada coluna vira uma variável <code>{{nome da coluna}}</code> disponível no assunto e no template (além das variáveis padrão <code>{{nome}}</code>, <code>{{empresa}}</code>, <code>{{cargo}}</code>, <code>{{email}}</code>, <code>{{telefone}}</code>).</li>
+    <li>Escreva o <strong>Template da Mensagem</strong> em texto plano ou HTML (alterne pelo botão no topo do campo) — para HTML há uma pré-visualização ao vivo. Clique nos chips de variável para inseri-las no ponto do cursor.</li>
+    <li>Salve a campanha e abra o seu detalhe. Clique em <strong>+ Destinatários</strong> para adicionar pessoas por grupo, pela lista de contatos, por outra planilha Excel ou avulsas (ver seção Contatos e Grupos).</li>
+    <li>Use o <strong>Preview das Mensagens</strong> para navegar destinatário a destinatário e conferir como cada variável foi preenchida antes de enviar.</li>
+    <li>Envie pelo botão <strong>Outlook</strong> ou <strong>Enviar via Brevo</strong> (ver seção Envio pela Web), acompanhe os totais (Total, Enviados, Confirmados, Sem resposta) e, se precisar, marque manualmente com <strong>Todos enviados</strong> ou exclua a campanha inteira.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Dois formatos de template — texto plano ou HTML completo — com pré-visualização HTML embutida.</li>
+    <li>Substituição automática de variáveis por destinatário; no preview, uma variável sem valor para aquele destinatário aparece destacada para chamar atenção antes do envio.</li>
+    <li>Cada destinatário recebe um link de confirmação único (token individual), usado tanto para o botão de confirmação no email quanto para reenvio manual do link.</li>
+    <li>Busca/filtro de destinatários dentro da campanha e edição de campanha existente pelo mesmo modal de criação.</li>
+    <li>Assunto do email preenchido automaticamente com o nome da campanha, mas pode ser customizado e também aceita variáveis.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Posso mudar o tipo de confirmação depois de já ter enviado a campanha?</dt>
+    <dd>Sim, mas isso não reenvia nada — a mudança só passa a valer para os próximos envios feitos a partir dali (o botão de confirmação embutido no HTML é montado no momento do disparo).</dd>
+    <dt>De onde vêm as variáveis que aparecem como chips ao lado do template?</dt>
+    <dd>São as colunas da planilha Excel enviada na criação da campanha. Sem planilha, só ficam disponíveis as variáveis padrão do cadastro de contato (nome, empresa, cargo, email, telefone).</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="contatos-grupos">
+  <h2>Contatos e Grupos</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Em <strong>Contatos</strong>, cadastre o catálogo reutilizável de destinatários (nome, email, WhatsApp, empresa, cargo) — independente de qualquer campanha específica.</li>
+    <li>Em <strong>Grupos</strong>, crie agrupamentos como "Clientes VIP" ou "Fornecedores" e adicione contatos existentes ou importe uma planilha diretamente para dentro do grupo.</li>
+    <li>Ao montar os destinatários de uma campanha (botão <strong>+ Destinatários</strong>), use "Selecionar por Grupo" para marcar de uma vez todos os contatos de um grupo, ou busque e marque contatos individualmente na lista.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Um contato pode ter múltiplos emails (separados por vírgula) — todos recebem a mesma mensagem no envio.</li>
+    <li>Importação e exportação de contatos via Excel, com as colunas <code>nome</code> (obrigatória), <code>email</code>, <code>telefone</code>, <code>empresa</code> e <code>cargo</code>.</li>
+    <li>Seleção em massa com exclusão de vários contatos, ou de vários membros de um grupo, de uma vez.</li>
+    <li>Destinatário "avulso": é possível adicionar alguém direto numa campanha sem cadastrá-lo antes no catálogo de Contatos.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="envio-web">
+  <h2>Envio pela Web — Outlook manual e Brevo automático</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li><strong>Envio individual:</strong> na lista de destinatários da campanha, clique em "Abrir no email" — o navegador abre o cliente de email padrão do computador (normalmente o Outlook) já com destinatário, assunto e corpo preenchidos. É preciso clicar em <strong>Enviar</strong> dentro do próprio Outlook para concluir.</li>
+    <li>Para campanhas em HTML, escolha o modo <strong>HTML formatado</strong> antes de abrir — o conteúdo é copiado para a área de transferência (com o botão de confirmação já embutido) e é preciso colar com Ctrl+V no corpo do email aberto, já que esse tipo de link não carrega HTML sozinho.</li>
+    <li><strong>Envio em lote pelo Outlook:</strong> no detalhe da campanha, clique em <strong>Outlook</strong> → <strong>Iniciar Envio em Lote</strong>. O sistema divide os destinatários em lotes (tamanho definido em Configurações) e vai abrindo um rascunho de email por vez, respeitando o intervalo configurado — ainda é preciso clicar Enviar em cada rascunho que abrir no Outlook.</li>
+    <li><strong>Envio automático pelo Brevo:</strong> com a chave de API do Brevo cadastrada em Configurações, clique em <strong>Enviar via Brevo</strong> na campanha — os emails pendentes são disparados um a um direto pela API, sem abrir o Outlook e sem precisar clicar em nada. Acompanhe a barra de progresso; quem falhar aparece com o motivo do erro e pode ser reenviado.</li>
+    <li><strong>WhatsApp:</strong> abre o WhatsApp Web/aplicativo com a mensagem já pronta para o número do destinatário; o envio final também é manual (clicar Enviar dentro do WhatsApp).</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Em <strong>Configurações</strong>, é possível ajustar o máximo de emails por lote, o intervalo entre lotes (minutos) e o intervalo entre emails dentro do lote (segundos) — evita bloqueios do Outlook por excesso de envios em sequência.</li>
+    <li>Um card de progresso do envio em lote fica visível no Dashboard mesmo trocando de tela dentro do sistema, desde que a aba do navegador continue aberta.</li>
+    <li>Cada disparo (individual, em lote ou via Brevo) marca automaticamente o destinatário como "enviado".</li>
+    <li>Teste de conexão com o Brevo direto da tela de Configurações, sem precisar disparar uma campanha de verdade.</li>
+    <li>Plano gratuito do Brevo permite até 300 emails por dia.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>O número de lotes do envio pelo Outlook é calculado a partir do total de destinatários com email e do máximo configurado por lote; o tempo estimado do envio completo soma os intervalos entre lotes (o último lote não soma intervalo, pois não há um próximo):</p>
+  <div class="manual-formula">numLotes = arredondar_para_cima(totalDestinatarios / maximoPorLote)
+tempoEstimado = (numLotes − 1) × intervaloEntreLotes</div>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Por que preciso clicar em Enviar depois que o Outlook abre?</dt>
+    <dd>A versão web roda dentro do navegador, que não tem permissão para controlar o Outlook instalado no computador — ela só consegue montar o rascunho e abri-lo. Quem precisa do envio realmente automático, sem clicar em nada, deve usar o aplicativo Desktop (ver seção "App Desktop") ou o envio via Brevo.</dd>
+    <dt>O que preciso configurar para usar o envio automático via Brevo?</dt>
+    <dd>Uma chave de API gerada em brevo.com (SMTP &amp; API → API Keys) e um email remetente verificado na conta Brevo, cadastrados na tela de Configurações do módulo.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="confirmacao">
+  <h2>Confirmação de Leitura e Interesse</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Ao criar a campanha, escolha o Tipo de Confirmação: <strong>Confirmar Leitura</strong> (um botão único), <strong>Confirmar Interesse</strong> (dois botões — "Tenho Interesse" e "Não Tenho Interesse") ou <strong>Sem Confirmação</strong> (nenhum botão/link é adicionado).</li>
+    <li>O link de confirmação, único para cada destinatário, é inserido automaticamente ao final da mensagem quando o email é enviado em HTML; também pode ser copiado manualmente na tela de detalhe do envio, para colar em mensagens de WhatsApp ou texto simples.</li>
+    <li>O destinatário clica no botão do email (ou abre o link recebido) e cai numa página de confirmação simples, sem necessidade de login, que registra a resposta na hora.</li>
+    <li>Acompanhe o resultado na coluna "Confirmação" de cada campanha e nos indicadores "Confirmações" e "Taxa de Resposta" do Dashboard.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Página de confirmação pública, separada do restante do sistema — não exige que o destinatário tenha conta no Portal Scont.</li>
+    <li>Link vinculado a um token individual por destinatário, não reaproveitável entre pessoas diferentes.</li>
+    <li>Indicador consolidado de "Taxa de Resposta" no Dashboard, somando todas as campanhas ativas.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="conversor-pdf">
+  <h2>Conversor PDF → Excel e Envios Recorrentes</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Em <strong>Conversor PDF</strong>, arraste ou selecione o PDF do relatório de Avisos de Vencimento exportado do sistema de folha/RH.</li>
+    <li>A ferramenta lê o PDF e extrai automaticamente, linha a linha, a empresa, o CNPJ, o colaborador, o tipo de evento e a data de vencimento. Use a aba <strong>Tabela</strong> para revisar, filtrar por empresa/colaborador/tipo, ou baixar os dados em Excel.</li>
+    <li>Vá para a aba <strong>Agrupar e Agendar</strong>: marque os tipos de evento desejados (ex.: aniversário, certificado digital, contrato de experiência) e, se quiser, restrinja a empresas específicas.</li>
+    <li>Escolha a frequência do envio — único numa data, semanal num dia da semana, ou mensal num dia fixo (1º, 15, um dia personalizado ou o último dia do mês) — e decida se agrupa todos os colaboradores de uma mesma empresa numa única mensagem ou envia uma mensagem por colaborador.</li>
+    <li>Clique em <strong>Criar Campanha Agora</strong> para gerar a campanha imediatamente com os destinatários calculados para o período, ou em <strong>Salvar como Regra Recorrente</strong> para deixar programada e reaproveitar nos próximos meses.</li>
+    <li>Acompanhe as regras salvas na tela <strong>Envios Recorrentes</strong>: cada uma pode ser ativada, desativada, excluída ou executada manualmente ali mesmo.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Reconhece automaticamente os tipos de evento: Aniversário de colaboradores, Certificado digital, Contrato de experiência (1º vencimento e prorrogação), Vencimento de 2º período de férias, Aviso prévio de rescisão, Envio de rescisão ao eSocial, Monitoramento de Saúde (admissional e mudança de função) e Retorno de afastamento (licença maternidade, doença, acidente de trabalho).</li>
+    <li>Sugere automaticamente um template de mensagem adequado ao(s) tipo(s) escolhido(s), totalmente editável antes de criar a campanha ou a regra.</li>
+    <li>Permite gerar, além do envio para os clientes, um envio consolidado só para controle interno da SCONT.</li>
+    <li>Ao abrir o sistema num dia em que alguma regra recorrente está programada, aparece um aviso no topo da tela de Envios Recorrentes lembrando de executá-la.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>O período considerado para cada frequência determina quais linhas do PDF entram no envio (comparando a data de vencimento de cada linha com o período):</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Frequência</th><th>Período considerado</th></tr></thead>
+    <tbody>
+      <tr><td>Único</td><td>Só a data escolhida manualmente, sem filtro de período.</td></tr>
+      <tr><td>Semanal</td><td>Da próxima ocorrência do dia da semana escolhido, considera-se a semana inteira (domingo a sábado) em que esse dia cai.</td></tr>
+      <tr><td>Mensal</td><td>O mês calendário inteiro em que cai o dia escolhido (1º, 15, personalizado ou último dia do mês).</td></tr>
+    </tbody>
+  </table>
+  <p>Eventos que só têm dia e mês no PDF (sem ano, como aniversários) são comparados contra o ano atual e o seguinte, para não perder um evento que cai virando o ano.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Uma regra recorrente dispara sozinha, mesmo sem eu abrir o sistema?</dt>
+    <dd>Não. A regra só faz aparecer um aviso quando alguém abre a tela de Envios Recorrentes no dia programado — a execução em si continua manual e depende de reimportar o PDF do dia, já que os dados vêm sempre de um arquivo enviado na hora, não ficam guardados de uma execução para outra.</dd>
+    <dt>O sistema não reconheceu um tipo de evento do meu PDF. Por quê?</dt>
+    <dd>Só são reconhecidos os textos de evento no formato exato usado pelo relatório padrão de Avisos de Vencimento. Um relatório de outra origem ou com nomenclatura diferente pode não ser lido corretamente.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="desktop-outlook">
+  <h2>App Desktop — Envio Automático via Outlook</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra o aplicativo <strong>SCONT Mala Direta</strong> instalado no Windows e faça login com o mesmo usuário e senha usados no Portal Scont.</li>
+    <li>A tela inicial lista as campanhas já criadas na versão web — o aplicativo Desktop não cria campanhas, contatos, grupos nem lê PDFs; ele serve só para enviar o que já foi montado na web.</li>
+    <li>Abra a campanha desejada para ver a lista de destinatários, com email e status (Enviado, Pendente ou Sem email).</li>
+    <li>Se quiser, ajuste o <strong>Intervalo entre emails</strong> (em milissegundos) no topo da lista de destinatários.</li>
+    <li>Clique em <strong>Enviar [N] pendentes automaticamente</strong>. O aplicativo dispara, um por um, todos os destinatários pendentes com email diretamente pelo Outlook instalado no computador — sem abrir janelas de rascunho e sem precisar clicar Enviar em nenhum deles. Acompanhe a barra de progresso; quem falhar aparece com o motivo do erro e pode ser reenviado clicando em "Reenviar" no fim do lote.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Exige o Microsoft Outlook (aplicativo de mesa, não o navegador) instalado e com uma conta de email já configurada na mesma máquina — o envio funciona controlando o Outlook diretamente, então precisa dele pronto para uso.</li>
+    <li>Preserva o mesmo template (texto ou HTML) e o mesmo botão de confirmação de leitura/interesse configurados na campanha criada pela web.</li>
+    <li>Cada envio bem-sucedido marca o destinatário como "enviado" na mesma base de dados usada pela versão web — o status fica sincronizado entre as duas versões.</li>
+    <li>Não é preciso manter nenhuma aba de navegador aberta durante o envio; roda inteiramente dentro do aplicativo instalado.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Quando vale a pena usar a versão Desktop em vez da web?</dt>
+    <dd>Quando o objetivo é enviar uma campanha inteira sem clicar "Enviar" em cada email — diferente do fluxo Outlook da versão web, que abre um rascunho por destinatário e exige confirmação manual em cada um. É a alternativa ao Brevo para quem prefere enviar pelo próprio Outlook da empresa em vez de um serviço externo de disparo de email.</dd>
+    <dt>O Desktop substitui a versão web?</dt>
+    <dd>Não. Toda a criação e edição de campanhas, contatos, grupos, o conversor de PDF e as regras recorrentes continuam sendo feitos exclusivamente na versão web. O aplicativo Desktop só entra na etapa final, para disparar automaticamente as campanhas já prontas.</dd>
+    <dt>Ao clicar em enviar, pode aparecer um aviso do próprio Outlook perguntando se permito o envio. É normal?</dt>
+    <dd>Sim — é um recurso de segurança do próprio Outlook para automações de terceiros (nesse caso, o aplicativo controlando o Outlook para disparar os emails). Basta permitir o acesso para o lote seguir enviando.</dd>
+    <dt>Por que um destinatário específico falhou no envio automático?</dt>
+    <dd>Os motivos mais comuns são o Outlook não estar aberto/configurado corretamente na máquina no momento do envio, ou o endereço de email do destinatário estar inválido. O motivo exato do erro aparece ao lado do destinatário na lista, e ele pode ser reenviado individualmente depois de corrigido.</dd>
+  </dl>
+</section>

@@ -1,0 +1,89 @@
+<p class="manual-intro">A Triagem de Atendimentos mostra, organizadas por departamento e prioridade, as demandas dos clientes capturadas nas conversas do Gestta Messenger (as abas "Pendentes" e "Em Atendimento" do atendimento via chat do escritório). A extração e a classificação das conversas acontecem fora do Portal; aqui você faz o upload da planilha já classificada e acompanha o resultado em um dashboard e em uma lista de demandas com o histórico de cada conversa.</p>
+
+<section class="manual-item" id="upload">
+  <h2>Upload da planilha</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na tela de Triagem, clique em <strong>📤 Upload planilha</strong> (botão no cabeçalho do Dashboard, ou acesse diretamente a tela de Upload).</li>
+    <li>Arraste o arquivo <code>triagem_atendimento.xlsx</code> para a área indicada, ou clique nela para selecionar o arquivo manualmente.</li>
+    <li>Acompanhe a barra de progresso e as etapas listadas (leitura da planilha, limpeza dos dados anteriores, envio de demandas, resumo e conversas).</li>
+    <li>Ao final, confira o resumo com a quantidade de demandas, conversas e alertas enviados, e a referência (data/hora) informada na planilha.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Aceita arrastar-e-soltar ou seleção manual do arquivo (<code>.xlsx</code>/<code>.xls</code>).</li>
+    <li>Lê três abas da planilha: <strong>Triagem</strong> (lista numerada de demandas), <strong>Resumo</strong> (totais por departamento e prioridade, alertas e texto de encaminhamento) e a aba cujo nome contenha "Completa" (histórico das conversas por contato).</li>
+    <li>Cada upload <strong>substitui por completo</strong> os dados anteriores — não existe histórico de uploads dentro da ferramenta, só o conteúdo do último arquivo enviado.</li>
+    <li>Em caso de erro em qualquer etapa do envio, a etapa que falhou fica marcada e a mensagem de erro é exibida na tela.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>De onde vem a planilha <code>triagem_atendimento.xlsx</code>?</dt>
+    <dd>Ela é gerada fora do Portal, a partir da captura das conversas do Gestta Messenger e da classificação dessas conversas por departamento, categoria e prioridade. O upload aqui só recebe o arquivo já pronto — não faz a extração nem a classificação das conversas.</dd>
+    <dt>Fazer um novo upload apaga os dados do upload anterior?</dt>
+    <dd>Sim. Cada envio limpa as demandas, o resumo e as conversas anteriores antes de gravar os novos dados.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="dashboard">
+  <h2>Dashboard</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra a Triagem pelo portal — a tela inicial é o <strong>Dashboard</strong>.</li>
+    <li>Veja os cards de resumo no topo: total de demandas e quantidade por prioridade (Alta/Média/Baixa), além de um card por departamento encontrado na planilha.</li>
+    <li>Consulte os gráficos de barra "Por Departamento" e "Por Prioridade" para a distribuição proporcional das demandas.</li>
+    <li>Se a planilha trouxer alertas, eles aparecem no quadro <strong>⚠️ Alertas</strong>.</li>
+    <li>Se houver um texto de encaminhamento geral na planilha, ele aparece no quadro <strong>📌 Encaminhamento</strong>.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Cards e gráficos são montados a partir dos departamentos e prioridades presentes na planilha enviada (não é uma lista fixa de departamentos).</li>
+    <li>Indicador de status no rodapé do menu lateral mostra se os dados foram carregados, a referência (data/hora) da planilha, ou se houve erro ao consultar os dados.</li>
+    <li>A tela atualiza os dados automaticamente a cada 30 segundos, sem precisar recarregar a página.</li>
+    <li>Se nenhuma planilha foi enviada ainda, a tela mostra uma mensagem de boas-vindas com atalho direto para o Upload.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="demandas">
+  <h2>Demandas Triadas</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>No menu lateral, clique em <strong>Triagem</strong> para ver a lista de demandas.</li>
+    <li>Use a busca por cliente e os seletores de departamento e prioridade para filtrar a lista — os três filtros podem ser combinados.</li>
+    <li>Clique em <strong>✕ Limpar</strong> para remover todos os filtros de uma vez.</li>
+    <li>Clique em qualquer linha da tabela para abrir o histórico da conversa daquele cliente, quando ela foi localizada na planilha.</li>
+    <li>Dentro do card de conversa, role para acompanhar as mensagens trocadas entre cliente e atendente, agrupadas por dia. Feche com o <strong>✕</strong> ou a tecla <strong>Esc</strong>.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Colunas da lista: número, cliente/empresa, departamento, categoria, subtipo, funcionário(s) envolvidos, prazo, prioridade e pendências.</li>
+    <li>Badge colorido de prioridade (🔴 Alta / 🟠 Média / 🔵 Baixa) e de departamento (DP, Tributário, Fiscal, Contábil).</li>
+    <li>Ícone <strong>💬 N msg</strong> na coluna Conversa quando a conversa daquele cliente foi localizada na aba de histórico da planilha; um traço (—) quando não foi.</li>
+    <li>Contador de resultados exibido junto aos filtros sempre que algum filtro está ativo, mostrando quantas demandas estão visíveis do total.</li>
+    <li>No card de conversa, mensagens do cliente aparecem à esquerda e do atendente à direita, cada uma com data e hora; avisos do sistema (ex.: "sem mensagens no período") aparecem centralizados.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Cada demanda é ligada à conversa correspondente comparando o nome do cliente da lista de demandas com o nome do contato na aba de histórico da planilha — os dois nomes são normalizados (sem acentos/pontuação, em minúsculas) antes da comparação. A busca segue esta ordem, parando na primeira que encontrar:</p>
+  <ol>
+    <li>Nome normalizado do cliente é igual ao nome normalizado do contato.</li>
+    <li>Um dos nomes é prefixo, sufixo, ou está contido no outro.</li>
+    <li>As duas primeiras palavras do nome do cliente aparecem no nome do contato.</li>
+  </ol>
+  <p>Quando nenhuma dessas comparações encontra o contato, a coluna Conversa mostra "—" e, ao abrir o card, aparece o aviso de que nenhuma mensagem foi encontrada para aquele cliente.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>A coluna Conversa aparece vazia (—) para um cliente que sei que foi atendido — o que houve?</dt>
+    <dd>O nome do cliente na lista de demandas provavelmente está escrito de forma muito diferente do nome do contato na aba de histórico da planilha (abreviação, sobrenome trocado, etc.). Ajuste o nome na planilha de origem e faça um novo upload.</dd>
+    <dt>Consigo alterar o departamento, a prioridade ou o status de uma demanda pela tela?</dt>
+    <dd>Não. A tela é somente de consulta — qualquer correção precisa ser feita na planilha de origem, seguida de um novo upload.</dd>
+  </dl>
+</section>

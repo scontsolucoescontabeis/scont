@@ -1,0 +1,183 @@
+<p class="manual-intro">A <strong>Central do Departamento Contábil</strong> reúne quatro áreas acessadas a partir de um hub único: <strong>Onboarding</strong> (levantamento de documentos de empresas ingressantes), <strong>Mapeamento Estratégico</strong> (perfil operacional/fiscal de cada empresa da carteira), <strong>Diário Contábil</strong> (andamento mensal, lançamentos e encerramento/validação) e <strong>Configurações</strong> (quais empresas têm contábil, responsáveis e alertas por e-mail). O acesso de edição em várias telas depende do perfil: a equipe SCONT e administradores editam livremente; um usuário vinculado a "Prestador de Serviço" normalmente só visualiza (e só as empresas onde está atribuído como responsável).</p>
+
+<section class="manual-item" id="onboarding">
+  <h2>Onboarding de Empresas</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Clique em <strong>+ Novo Onboarding</strong>. Se a empresa já existe no cadastro do escritório, selecione-a na lista; se for uma empresa totalmente nova, marque <strong>"Empresa nova"</strong> e preencha nome (e, se quiser, um código — senão um código é gerado automaticamente).</li>
+    <li>Preencha CNPJ, data de corte do balanço inicial, regime tributário, responsável SCONT e data de início do levantamento.</li>
+    <li>Responda as <strong>perguntas-gatilho</strong> (possui contabilidade anterior, é uma empresa recém-aberta, possui empregados, possui estoques, possui empréstimos/financiamentos). As respostas definem quais seções e itens do checklist serão gerados — "empresa recém-aberta" só fica disponível quando a resposta de "possui contabilidade anterior" for Não.</li>
+    <li>Clique em <strong>Gerar checklist</strong>. O onboarding aparece na lista lateral, com busca por nome ou código e uma barra de progresso.</li>
+    <li>Dentro do onboarding, use a aba <strong>Checklist (Seções A-G)</strong> para os itens que o cliente precisa enviar: cada item tem um campo de upload e um status. Envie o arquivo (o status muda para "Enviado" automaticamente) e depois ajuste o status conforme a análise (Aprovado, Rejeitado, Não aplicável).</li>
+    <li>Use a aba <strong>Validação Interna (Seção H)</strong> para os itens de conferência que são só da equipe SCONT (sem upload, só troca de status) — por exemplo, checagens internas antes de considerar o onboarding concluído.</li>
+    <li>Clique no ícone de observação de um item para registrar uma anotação (ex.: pendência específica daquele documento).</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Checklist dinâmico: as seções e itens que aparecem dependem das respostas às perguntas-gatilho, não é uma lista fixa igual para toda empresa.</li>
+    <li>Upload direto por item, com link para reabrir o arquivo já enviado a qualquer momento.</li>
+    <li>Progresso calculado automaticamente e mostrado na lista lateral de cada onboarding em andamento.</li>
+    <li>Separação clara entre o que é responsabilidade do cliente enviar (Seções A-G) e o que é conferência interna da equipe (Seção H).</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>O percentual de progresso mostrado na barra de cada onboarding é <code>(itens com status Aprovado + itens com status Não aplicável) ÷ total de itens do onboarding</code>, arredondado — itens "Pendente", "Enviado" ou "Rejeitado" ainda não contam como concluídos.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Por que a pergunta "empresa recém-aberta" fica desabilitada?</dt>
+    <dd>Ela só se aplica quando a empresa não tem contabilidade anterior — marque "Possui contabilidade anterior?" como Não primeiro.</dd>
+    <dt>Um item da Seção H também tem campo de upload?</dt>
+    <dd>Não. Itens da Seção H (Validação Interna) são só de status — servem para a equipe SCONT marcar conferências já feitas, sem exigir um arquivo anexado.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="mapeamento">
+  <h2>Mapeamento Estratégico</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na tela inicial (Visão Geral do Mapeamento), use os cards de Nível de Atenção para filtrar rapidamente (clique de novo no card para remover o filtro), ou os filtros de Regime/Financeiro e o campo de busca por código ou nome da empresa.</li>
+    <li>Clique numa empresa da tabela (ou selecione pelo campo "Selecionar empresa..." da barra lateral) para abrir o perfil completo dela.</li>
+    <li>Preencha os dados por seção: Execução (periodicidade, regime, responsável, último mês fechado, contato), Situação de Fechamento (status do ano corrente e do anterior), Operação/Financeiro (financeiro interno ou BPO, acesso bancário, forma de envio de documentos, bancos utilizados, sistemas utilizados), Entregáveis & Particularidades, Nível de Atenção e Empresas Relacionadas. Campos de texto salvam ao sair do campo; seletores e checkboxes salvam na hora.</li>
+    <li>Em "Sistemas Utilizados", "Forma de Envio dos Documentos" e "Entregáveis Esperados", marcar a opção "Outros" abre uma janela para descrever o que não está na lista.</li>
+    <li>Para cadastrar um acesso bancário, digite o nome do banco no campo "Bancos Utilizados" e pressione Enter — depois preencha agência, conta, operador/login, senha e observações direto na tabela que aparece. O ícone de olho mostra/esconde a senha.</li>
+    <li>Clique em <strong>📄 Gerar Relatório PDF</strong> a qualquer momento para exportar o perfil completo da empresa.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Sugestão automática de Nível de Atenção (veja Memórias de cálculo) — pode ser sobrescrita manualmente a qualquer momento; ao sobrescrever, o sistema para de recalcular sozinho até alguém destravar (mudando algum campo que dispara o recálculo automático de novo).</li>
+    <li><strong>Contato da empresa e dados bancários (agência/conta/login/senha) só ficam visíveis para a equipe SCONT e administradores</strong> — um usuário de "Prestador de Serviço" não vê esses campos em nenhuma tela nem no PDF, e a leitura desses dados é bloqueada também no banco (não é só uma tela escondida).</li>
+    <li>Edição do Mapeamento é exclusiva da equipe SCONT/administradores; um Prestador de Serviço vê o perfil em modo somente leitura, com aviso no topo da tela.</li>
+    <li>"Responsável pela Execução" e "Regime Tributário" são sincronizados automaticamente a partir da tela de Configurações — uma edição manual direto nesses dois campos aqui pode ser sobrescrita na próxima sincronização.</li>
+    <li>Relatório PDF traz todas as seções preenchidas, incluindo a lista de empresas relacionadas (bancos e contato só entram no PDF para quem pode editar o Mapeamento).</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>A <strong>Sugestão do Sistema</strong> para o Nível de Atenção segue esta ordem:</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Condição</th><th>Nível sugerido</th></tr></thead>
+    <tbody>
+      <tr><td>Situação do ano corrente ou do ano anterior marcada como "Crítico"</td><td>Crítico (direto, ignora o resto)</td></tr>
+      <tr><td>Atraso de fechamento ≥ 3 meses além da tolerância do ciclo</td><td>Crítico</td></tr>
+      <tr><td>Atraso de 2 meses além da tolerância</td><td>Alto</td></tr>
+      <tr><td>Atraso de 1 mês além da tolerância</td><td>Médio</td></tr>
+      <tr><td>Sem atraso relevante</td><td>Baixo</td></tr>
+    </tbody>
+  </table>
+  <p>A "tolerância" depende da periodicidade cadastrada: mensal tolera 1 mês sem fechar, trimestral tolera 3 meses, anual tolera 12 meses — só o que passar dessa tolerância conta como atraso para a tabela acima.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Alterei o Nível de Atenção manualmente e agora ele nunca mais muda sozinho. Por quê?</dt>
+    <dd>Uma escolha manual "trava" a sugestão automática para aquela empresa. Para destravar, é preciso que um campo que dispara o recálculo (situação do ano, último mês fechado ou periodicidade) seja alterado de novo.</dd>
+    <dt>Sou Prestador de Serviço e não vejo o campo de Contato nem os bancos da empresa. É um erro?</dt>
+    <dd>Não — é proposital. Esses dados são restritos à equipe SCONT/administradores.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="diario">
+  <h2>Diário Contábil — Lançamentos e Grade Mensal</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na <strong>Visão Geral</strong>, use os filtros (empresa por código/nome, regime, responsável, status do mês, documentação disponível, mês/ano) para localizar as empresas que precisam de atenção. A coluna "Pendências" mostra quantos meses da grade daquela empresa já foram marcados como pendência (somando todos os anos).</li>
+    <li>Clique numa empresa (ou use o campo de busca da barra lateral, também por código ou nome) para abrir a página dela: um resumo do Mapeamento Estratégico (com atalho para editar), a grade mensal do ano e a lista de lançamentos.</li>
+    <li>Na grade mensal, clique num mês "Não Iniciado" para começar (vira "Em Andamento"). Clique de novo para escolher entre <strong>Marcar Pendência</strong> (exige descrever o motivo) ou <strong>Marcar Concluído</strong>. Um mês em pendência volta para "Em Andamento" com um clique simples assim que for resolvido.</li>
+    <li>Use as setas ‹ › acima da grade para navegar entre anos.</li>
+    <li>Para registrar um lançamento, clique em <strong>+ Adicionar Lançamento</strong>: escreva o texto, e opcionalmente escolha um Assunto (lista fixa) e um Mês de Referência — útil quando o lançamento fala de uma competência diferente do mês em que está sendo digitado. Lançamentos não podem ser editados ou excluídos depois de salvos; autor e data ficam registrados automaticamente.</li>
+    <li>Use os filtros de Mês de Referência/Ano e Assunto acima da lista de lançamentos para encontrar um lançamento específico sem precisar rolar a lista inteira.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>O selo <strong>📄</strong> no canto de um mês "Não Iniciado" indica que a documentação do cliente já chegou e dá para começar a lançar — só a equipe SCONT/administradores marcam esse selo; outros usuários só o veem quando já está marcado.</li>
+    <li>Um mês "Concluído" pode ser reaberto manualmente (com confirmação), a menos que o fechamento dele já tenha sido aprovado — nesse caso a célula fica travada.</li>
+    <li>Um Prestador de Serviço só vê, nos seletores de empresa do Diário, as empresas onde está cadastrado como responsável (em Configurações); a equipe SCONT/administradores veem todas.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Dá para editar ou apagar um lançamento depois de salvo?</dt>
+    <dd>Não — lançamentos do Diário são só de inclusão, para manter um histórico confiável de quem registrou o quê e quando.</dd>
+    <dt>Marquei um mês como pendência sem querer. Como desfaço?</dt>
+    <dd>Clique na célula — um clique simples num mês em pendência resolve ele de volta para "Em Andamento".</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="diario-fechamento">
+  <h2>Diário Contábil — Encerramento e Validação Mensal</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Quando um mês estiver "Concluído" na grade, um ícone de encerramento aparece na célula. Clique nele para abrir o <strong>Fechamento do Mês</strong>.</li>
+    <li>Anexe o <strong>balancete do mês em PDF</strong> (obrigatório) e, se quiser, escreva uma observação para quem vai validar. Clique em encerrar.</li>
+    <li>Se quem está encerrando for Prestador de Serviço (não faz parte da equipe SCONT), o mês vai para <strong>"Aguardando validação"</strong> — a equipe SCONT recebe um aviso e revisa o balancete anexado antes de Aprovar ou Rejeitar (rejeitar exige motivo, e o mês volta a ficar "Aberto" para reenvio).</li>
+    <li>Se quem está encerrando já faz parte da equipe SCONT/é administrador, o sistema pula a etapa de validação: depois de anexar o balancete, aparece um resumo para revisão dentro do mesmo formulário — ao confirmar, o mês já fica encerrado e aprovado diretamente.</li>
+    <li>Um mês "Aprovado" fica travado: a grade não cicla mais e o balancete/linha do tempo continuam disponíveis para consulta a qualquer momento no mesmo formulário de Fechamento do Mês.</li>
+    <li>Para acompanhar o que está pendente de validação (ou de reenvio, no caso de rejeição), use o item <strong>Validações</strong> do menu lateral — ele lista tudo que precisa da sua ação, com link direto para o balancete anexado.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Todo evento do fechamento (enviado, aprovado, rejeitado) fica registrado numa linha do tempo, com quem fez, quando e o balancete daquele momento.</li>
+    <li>O formulário mostra o tempo total gasto no fechamento daquele mês, quanto tempo ficou em pendência e o tempo efetivo de trabalho (total menos o tempo em pendência).</li>
+    <li>Leitura do balancete anexado é restrita: só a equipe SCONT/administradores ou o responsável cadastrado pela empresa conseguem abrir o arquivo.</li>
+    <li>Alertas por e-mail automáticos nos principais eventos (envio para validação, aprovação, rejeição) — podem ser desligados individualmente na tela de Configurações.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Por que não recebi validação depois de encerrar o mês?</dt>
+    <dd>Se você faz parte da equipe SCONT, o encerramento já sai aprovado direto — não existe uma etapa de "validar a si mesmo". Isso só se aplica a quem encerra sendo Prestador de Serviço.</dd>
+    <dt>O balancete é obrigatório mesmo para reenviar depois de uma rejeição?</dt>
+    <dd>O reenvio (pela tela de Validações) reaproveita o balancete já enviado anteriormente — não pede um novo arquivo.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="diario-relatorios">
+  <h2>Diário Contábil — Relatórios, Histórico e Validações</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Em <strong>Relatórios</strong>, marque os filtros que quiser combinar (Nível de Atenção, situação do ano corrente, status da grade num mês/ano específico, banco, regime, financeiro, período de lançamentos) e clique em Buscar.</li>
+    <li>Confira a lista de empresas encontradas (todas vêm pré-marcadas — desmarque as que não quiser incluir) e escolha quais colunas entram no relatório.</li>
+    <li>Clique em <strong>Gerar PDF</strong>.</li>
+    <li>Em <strong>Histórico</strong>, veja a linha do tempo combinada de lançamentos do Diário e de mudanças de status (grade mensal, documentação disponível) de todas as empresas, mais recentes primeiro.</li>
+    <li>Em <strong>Validações</strong>, confira a lista "Pendentes para você": para a equipe SCONT, são os fechamentos aguardando aprovação; para um Prestador de Serviço, são os fechamentos rejeitados aguardando reenvio.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>As colunas do Relatório misturam campos do Mapeamento Estratégico e do Diário — a coluna "Contato" só aparece como opção para quem pode editar o Mapeamento (mesma restrição do perfil da empresa).</li>
+    <li>Os filtros de período/mês de referência de lançamentos só afetam as colunas "Qtd. Lançamentos" e "Último Lançamento" — não tiram nenhuma empresa da lista de resultados.</li>
+    <li>Na tela de Validações, cada fechamento pendente mostra o tempo total já decorrido, para ajudar a priorizar o que validar primeiro.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="configuracoes">
+  <h2>Configurações</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na tabela de empresas, clique no botão Sim/Não da coluna "Contabilidade" para marcar se aquela empresa deve aparecer nos seletores do Onboarding e do Diário — a mudança salva na hora, sem precisar de botão Salvar.</li>
+    <li>Use <strong>📊 Importar planilha</strong> para atualizar várias empresas de uma vez (a planilha precisa ter uma coluna de código da empresa e uma de contabilidade Sim/Não); linhas que não aparecerem na planilha ou com código não encontrado mantêm a configuração atual.</li>
+    <li>Atribua um ou mais responsáveis por empresa — isso define tanto quem consegue encerrar o mês daquela empresa no Diário quanto quais empresas um Prestador de Serviço enxerga nos seletores.</li>
+    <li>Em "Alertas por E-mail", ligue ou desligue cada tipo de notificação (envio para validação, aprovação, rejeição, pendência criada, pendência sanada) — o ajuste vale para todo mundo, não é por empresa.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Uma empresa sem configuração explícita entra automaticamente nos seletores (o padrão é "possui contábil = sim") — só precisa mexer aqui para tirar uma empresa da lista.</li>
+    <li>Esta tela fica escondida para usuários de "Prestador de Serviço" — só a equipe SCONT/administradores a acessam.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Desmarcar "possui contábil" apaga os dados da empresa?</dt>
+    <dd>Não. A empresa só some dos seletores de escolha (Onboarding/Diário) — o Mapeamento, os lançamentos e o histórico já registrados continuam intactos e podem ser reativados a qualquer momento.</dd>
+  </dl>
+</section>

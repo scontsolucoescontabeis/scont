@@ -1,0 +1,170 @@
+<p class="manual-intro">O Gerenciador de Certificados Digitais controla a carteira de certificados A1, A3, e-CNPJ e e-CPF do escritório: vencimentos, agendamento de renovação, conclusão da renovação com histórico, alertas visuais e por e-mail (inclusive um aviso diário automático, sem precisar abrir a ferramenta), consulta protegida de senhas e relatórios exportáveis.</p>
+
+<section class="manual-item" id="visao-geral">
+  <h2>Dashboard — visão geral</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Ao abrir a ferramenta, o Dashboard mostra os cartões de resumo da carteira, a tabela de <strong>Alertas críticos</strong> (vencimentos mais próximos) e a <strong>Agenda rápida</strong> com os próximos agendamentos e o histórico mais recente.</li>
+    <li>Clique no sino 🔔 no topo para ir direto à tela de Relatórios (é um atalho, não abre uma lista separada de notificações).</li>
+    <li>Use o botão 🌙/☀️ ao lado do sino para alternar entre tema claro e escuro.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Cartões: Total de Certificados, Ativos, Vencidos, Vencimento Próximo (30 dias), Pagamentos Pendentes e — só aparece quando houver algum — Inadimplentes.</li>
+    <li>O número no ícone 🔔 conta certificados ativos (não inativos) com 15 dias ou menos até o vencimento.</li>
+    <li>A lista de dados é atualizada automaticamente a cada 60 segundos, além de sempre que uma ação é concluída (salvar, renovar, agendar etc.).</li>
+    <li>O indicador "🟢 Conectado / ⚫ Desconectado" no topo mostra se a última busca de dados no servidor teve sucesso.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>Todos os cartões, alertas e a agenda rápida do Dashboard ignoram certificados marcados como <strong>inativos</strong> (ver seção Certificados). Os cartões "Vencidos" e "Vencimento Próximo" são calculados pela <strong>data de vencimento</strong> real (hoje em diante), e não pelo texto escolhido no campo Situação — um certificado pode continuar marcado como "Ativo" no cadastro e mesmo assim contar como vencido nos cartões, se ninguém atualizou a Situação depois que a data passou.</p>
+</section>
+
+<section class="manual-item" id="certificados">
+  <h2>Certificados</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na aba <strong>Certificados</strong>, clique em <strong>+ Novo certificado</strong> para cadastrar um manualmente, preenchendo ao menos Empresa, Tipo e Data de vencimento.</li>
+    <li>Para cadastrar vários de uma vez, clique em <strong>📥 Importar Excel</strong> e envie a planilha no formato esperado (baixe o botão <strong>📄 Modelo</strong> se precisar do arquivo de referência com as colunas certas).</li>
+    <li>Confira a prévia com até 10 linhas exibida antes de importar e clique em <strong>✓ Confirmar importação</strong>.</li>
+    <li>Use os filtros de Empresa, Cliente, Tipo, Situação e Situação financeira para localizar registros, e <strong>Limpar</strong> para voltar à lista completa.</li>
+    <li>Na linha de cada certificado: <strong>👁 Ver</strong> abre os detalhes completos, <strong>✏ Editar</strong> abre o formulário preenchido, <strong>📅 Agendar/Reagendar</strong> marca uma data de contato futura, <strong>♻ Renovar</strong> (só aparece quando aplicável) conclui a renovação, e 🗑 exclui o certificado.</li>
+    <li>Para tirar um certificado dos relatórios e cartões operacionais sem apagá-lo (empresa que encerrou o contrato, por exemplo), edite o certificado e marque a caixa <strong>"Cliente/certificado inativo"</strong>.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Campos do cadastro: Empresa, CPF/CNPJ, Tipo (A1/A3/e-CNPJ/e-CPF), Autoridade certificadora, Emissão, Vencimento, Senha, Situação (Ativo/Agendado/Renovado/Aguardando Contato/Vencido), Responsável interno, e-mail, telefone, Cliente, Situação financeira, Forma de pagamento, Informações adicionais e Observação de risco.</li>
+    <li>O campo <strong>Cliente</strong> pode ser usado para filtrar a lista de Certificados, mas só aparece como coluna visível na tela de Relatórios e nos Detalhes — não na tabela principal de Certificados.</li>
+    <li>Certificados inativos continuam aparecendo na lista de Certificados (esmaecidos, com selo "Inativo"), mas somem do Dashboard, dos Relatórios, da Agenda e dos alertas por e-mail.</li>
+    <li>Importação por Excel: identifica empresas já cadastradas (comparação por nome, sem diferenciar maiúsculas/minúsculas) e pula duplicadas automaticamente, sem sobrescrever o registro existente; linhas sem o campo "empresa" preenchido são rejeitadas.</li>
+    <li>Exclusão é lógica (soft delete) — o certificado some das telas mas o registro é preservado no banco.</li>
+    <li>Exclusão em lote pelos checkboxes da lista.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>A coluna "Situação" da tabela mostra exatamente o texto salvo no cadastro (Ativo, Vencido, Agendado, Renovado ou Aguardando Contato) — ela não é recalculada automaticamente pela data. Já a cor de destaque da linha (fundo levemente avermelhado/amarelado) segue os dias restantes até o vencimento, independente do texto da Situação. Por isso um certificado pode aparecer com o badge verde "Ativo" mesmo depois de vencido, se a Situação não foi atualizada manualmente ou por uma ação de agendar/renovar/remover agendamento.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Importei uma planilha e algumas empresas não entraram — por quê?</dt>
+    <dd>A importação ignora silenciosamente (conta como "duplicado ignorado") qualquer linha cuja empresa já exista em um certificado não excluído. Ela não atualiza o registro existente — edite manualmente se precisar corrigir dados de uma empresa já cadastrada.</dd>
+    <dt>Marquei o certificado como inativo e ele sumiu dos meus relatórios, isso é esperado?</dt>
+    <dd>Sim. Inativo é justamente para excluir o certificado das telas operacionais (Dashboard, Relatórios, Agenda, alertas por e-mail) sem apagar o histórico. Ele continua visível, só que esmaecido, na lista de Certificados.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="agenda-renovacao">
+  <h2>Agenda e Renovação</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na aba <strong>Agenda</strong>, veja as "Renovações agendadas" (com data e hora marcadas) e os "Vencimentos próximos sem agendamento" (certificados ativos que vencem em até 60 dias e ainda não têm data de contato marcada).</li>
+    <li>Para marcar um contato futuro com o cliente, clique em <strong>📅 Agendar</strong> (ou <strong>Reagendar</strong>) em qualquer linha e informe data e hora — isso muda a Situação do certificado para "Agendado".</li>
+    <li>Se precisar desmarcar, abra o mesmo modal e use <strong>Remover agendamento</strong>.</li>
+    <li>Quando o certificado novo já foi emitido, clique em <strong>♻ Renovar</strong> (disponível na Agenda, na lista de Certificados e nos Detalhes) e informe a nova data de vencimento (e, se mudou, a nova data de emissão).</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>O botão "♻ Renovar" só aparece para certificados com 60 dias ou menos até o vencimento (incluindo já vencidos) — não é preciso ter agendado antes para renovar.</li>
+    <li>Concluir a renovação: atualiza a data de vencimento (e emissão, se informada), muda a Situação para "Ativo", limpa qualquer agendamento pendente e reinicia o contador de alertas do certificado (para que ele volte a disparar avisos normalmente no próximo ciclo de vencimento).</li>
+    <li>Se o certificado tinha um alerta de vencimento ativo no momento da renovação, um e-mail de "renovado / alerta resolvido" é enviado automaticamente para a lista de e-mails de alerta cadastrada em Configurações.</li>
+    <li>Cada renovação concluída gera um registro na aba Histórico, com o antes/depois de emissão e vencimento.</li>
+    <li>Remover um agendamento recalcula a Situação: volta para "Vencido" se a data já passou, ou "Ativo" caso contrário.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Preciso agendar antes de renovar?</dt>
+    <dd>Não. Agendar é só para marcar uma data de contato/lembrete. Renovar (lançar a nova validade) pode ser feito a qualquer momento dentro dos 60 dias antes do vencimento, com ou sem agendamento prévio.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="relatorios">
+  <h2>Relatórios</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra a aba <strong>Relatórios</strong> para ver a carteira completa (só certificados ativos) com colunas adicionais, incluindo Cliente, CPF/CNPJ, Situação financeira e Forma de pagamento.</li>
+    <li>Filtre por Empresa, Cliente, Tipo, Situação, Situação financeira, Forma de pagamento e por período de vencimento ("Venc. a partir de" / "Venc. até").</li>
+    <li>Clique em <strong>⬇ Exportar CSV</strong> para baixar a lista filtrada (usa os mesmos filtros de Empresa, Tipo, Situação e período; os filtros de Cliente, Situação financeira e Forma de pagamento não entram na exportação).</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Faixa de resumo no topo com contagem total e por faixa de urgência: vencidos, críticos (≤7 dias), urgentes (≤15 dias) e atenção (≤30 dias).</li>
+    <li>Coluna "Dias Restantes" com destaque de cor conforme a proximidade do vencimento.</li>
+    <li>CSV inclui e-mail e telefone do responsável, que não aparecem na tabela em tela.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="historico">
+  <h2>Histórico</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra a aba <strong>Histórico</strong> para ver a linha do tempo de renovações concluídas, mais recentes primeiro.</li>
+    <li>Use o campo de busca para filtrar por empresa, responsável ou tipo de alteração.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Cada entrada mostra o responsável, a data/hora e o valor anterior e novo (emissão e vencimento).</li>
+    <li>Os últimos 5 registros também aparecem resumidos no Dashboard, em "Histórico recente".</li>
+    <li>Dentro dos Detalhes de um certificado específico, a seção "Histórico de renovações" mostra só os registros daquele certificado.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Editei um certificado (troquei responsável, situação financeira etc.) e não apareceu no Histórico — é um bug?</dt>
+    <dd>Não. O Histórico registra apenas conclusões de renovação. Edições de cadastro (criar, editar campos, marcar como inativo, excluir) não geram entrada de histórico.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="seguranca">
+  <h2>Segurança</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra a aba <strong>Segurança</strong> para consultar as senhas cadastradas dos certificados.</li>
+    <li>Clique em <strong>👁 Ver</strong> na linha desejada para revelar a senha daquele certificado; clique em <strong>🙈 Ocultar</strong> para escondê-la de novo.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Acesso restrito: só usuários administradores ou com a permissão específica "Ver Senhas" concedida para esta ferramenta enxergam a lista — os demais veem apenas um aviso de acesso restrito.</li>
+    <li>Cada senha só é decifrada no servidor no momento em que se clica em "Ver" — não ficam todas visíveis ao abrir a tela.</li>
+    <li>Só entram na lista certificados que têm senha cadastrada.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="alertas-configuracoes">
+  <h2>Configurações e alertas automáticos</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na aba <strong>Configurações</strong>, escolha o tema (claro/escuro) e quantos certificados exibir por página na lista.</li>
+    <li>Em "Limiares de Alerta", defina a partir de quantos dias antes do vencimento um certificado é considerado 🔴 Crítico, 🟠 Urgente e 🟡 Atenção, e clique em <strong>💾 Salvar configurações</strong>.</li>
+    <li>Em "E-mails de Alerta", cadastre os endereços que devem receber os avisos automáticos e clique em <strong>💾 Salvar e-mails</strong>.</li>
+    <li>Use <strong>🔄 Sincronizar dados</strong> se quiser forçar uma atualização imediata da lista, sem esperar o ciclo automático de 60 segundos.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Um job automático roda uma vez por dia (por volta das 8h, horário de Brasília) no servidor, mesmo com a ferramenta fechada, comparando cada certificado ativo com os limiares configurados e enviando e-mail para os endereços cadastrados quando o certificado entra em um novo nível de alerta (vencido / crítico / urgente / atenção).</li>
+    <li>O mesmo nível de alerta não é reenviado todos os dias — o e-mail só sai de novo quando o certificado muda de faixa (por exemplo, de "atenção" para "crítico") ou é renovado.</li>
+    <li>Certificados inativos não entram no job diário de alertas.</li>
+    <li>Ao concluir uma renovação, se havia um alerta pendente para aquele certificado, sai imediatamente um e-mail de "renovado" para a mesma lista.</li>
+    <li>Os limiares e a lista de e-mails ficam salvos no servidor (não só no navegador), pois o job diário de alerta roda fora do navegador de qualquer usuário e precisa ler os mesmos valores configurados na tela.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Mudei os limiares de alerta, quando isso passa a valer no aviso diário por e-mail?</dt>
+    <dd>No próximo ciclo do job diário — a mudança é salva na hora, mas o cálculo de quem está em cada faixa só roda de novo na execução automática seguinte (uma vez por dia).</dd>
+  </dl>
+</section>

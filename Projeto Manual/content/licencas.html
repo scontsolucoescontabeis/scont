@@ -1,0 +1,142 @@
+<p class="manual-intro">O Controle de Licenças centraliza o cadastro e o acompanhamento de licenças, alvarás e certificações das empresas do escritório: quando cada documento vence, o processo de renovação em andamento e relatórios de conformidade. A empresa de cada documento vem do mesmo cadastro usado no módulo RH (não existe mais uma lista de "Clientes" própria desta ferramenta), e o tipo de licença é escolhido de um catálogo configurável em vez de digitado livremente.</p>
+
+<section class="manual-item" id="dashboard">
+  <h2>Dashboard</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra o Controle de Licenças — a tela inicial já é o Dashboard.</li>
+    <li>Veja os quatro indicadores no topo: licenças ativas, documentos próximos do vencimento, documentos vencidos e empresas ativas.</li>
+    <li>Na tabela <strong>Documentos Críticos</strong>, veja e (pelos ícones de ação) visualize ou edite qualquer documento que vence nos próximos 30 dias.</li>
+    <li>No painel <strong>Alertas visuais</strong>, veja os 10 documentos mais urgentes (vencidos primeiro, depois por proximidade do vencimento), com destaque de cor por gravidade.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Indicadores calculados em tempo real a partir das licenças e alvarás cadastrados (não é um número fixo — recalcula a cada carregamento da tela).</li>
+    <li>Alertas visuais coloridos por urgência: vermelho para vencido/vence hoje/vence em até 7 dias, amarelo para até 14 dias, azul para o restante da janela configurada.</li>
+    <li>A janela de dias usada nos alertas visuais segue o valor definido em <strong>Configurações → Dias para Alerta de Vencimento Próximo</strong> (30 dias por padrão).</li>
+    <li>Botão <strong>Sincronizar</strong>, no topo, recarrega os dados do Dashboard sob demanda.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="licencas">
+  <h2>Licenças (Documentos)</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Clique em <strong>Novo documento</strong> (ou em <strong>Novo registro</strong>, no topo, disponível em qualquer tela).</li>
+    <li>Se o documento for de uma empresa específica, clique em <strong>🔍 Buscar empresa</strong> e localize-a por nome, código ou CNPJ — o campo é opcional, então também é possível salvar sem vincular empresa.</li>
+    <li>Preencha o <strong>Estabelecimento</strong> e escolha o <strong>Tipo de Operação</strong>: <em>Emissão</em> (documento ainda está sendo obtido pela primeira vez) ou <em>Renovação</em> (já existe número, data de emissão e validade).</li>
+    <li>Escolha o <strong>Tipo de Licença</strong> na lista (o catálogo é mantido em Configurações).</li>
+    <li>Em Renovação, preencha número, data de emissão e data de validade; em Emissão esses campos ficam ocultos e não são pedidos ainda.</li>
+    <li>Complete órgão emissor, responsável e observações e salve.</li>
+    <li>Para editar, visualizar ou excluir um documento já salvo, use os ícones de ação na linha correspondente da tabela.</li>
+    <li>Para cadastrar vários documentos de uma vez, use <strong>📥 Importar Excel</strong> — baixe primeiro o <strong>📄 Modelo</strong> para preencher no formato esperado.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Busca por empresa, número ou responsável, e filtros rápidos por status (Ativas / Pendentes / Vencidas).</li>
+    <li>Empresa do documento vem do cadastro <strong>rh_empresas</strong> (mesma base do módulo RH), buscável por nome, código ou CNPJ; só entram empresas ativas na busca.</li>
+    <li>Tipo de Licença é um catálogo compartilhado entre todos os usuários (tabela de configuração, não texto livre) — gerenciado em Configurações.</li>
+    <li>Importação de planilha Excel com prévia dos registros antes de confirmar; a empresa é casada por nome com o cadastro do RH (se o nome da planilha não bater com nenhuma empresa, o documento é salvo sem empresa vinculada).</li>
+    <li>Documentos com tipo de licença antigo (removido do catálogo) continuam exibindo o valor original ao editar, marcado como "(inativo)", em vez de trocar o dado silenciosamente.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>O status de cada documento é calculado, não digitado:</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Status exibido</th><th>Quando aparece</th></tr></thead>
+    <tbody>
+      <tr><td><code>Em emissão</code></td><td>Tipo de Operação = Emissão. Fica assim até o documento ser editado com número e datas preenchidos.</td></tr>
+      <tr><td><code>Vencida</code></td><td>Tipo de Operação = Renovação e a data de validade já passou.</td></tr>
+      <tr><td><code>Próximo vencimento</code></td><td>Renovação com validade dentro dos próximos 30 dias.</td></tr>
+      <tr><td><code>Ativa</code></td><td>Renovação com validade além dos próximos 30 dias.</td></tr>
+    </tbody>
+  </table>
+  <p>Ao criar um documento em modo <strong>Emissão</strong>, o campo Número é gravado como <code>PENDENTE</code> e as datas ficam em branco. O filtro "Pendentes" reúne tanto os documentos "Em emissão" quanto os de Renovação próximos do vencimento — os dois aparecem sob o mesmo status <code>pending</code>.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Cadastrei um documento como "Emissão". Como registro o número e as datas quando ele sair?</dt>
+    <dd>Edite o documento — o formulário de edição sempre pede número, data de emissão e data de validade, então preenchê-los e salvar completa o registro.</dd>
+    <dt>Preciso obrigatoriamente vincular uma empresa ao documento?</dt>
+    <dd>Não. O campo Empresa é opcional — o documento pode ser salvo só com o nome do estabelecimento.</dd>
+    <dt>Não encontro mais a tela de "Clientes" que existia antes. Onde cadastro uma empresa nova?</dt>
+    <dd>O cadastro de empresas passou a ser o mesmo do módulo RH. Cadastre a empresa por lá; a partir daí ela já aparece no buscador de empresa desta ferramenta.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="processos">
+  <h2>Processos</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Clique em <strong>Novo processo</strong>.</li>
+    <li>Selecione o <strong>Documento Associado</strong> na lista (mostra empresa, estabelecimento, tipo e situação atual de cada documento cadastrado).</li>
+    <li>Preencha número do processo, status, data de abertura, previsão de conclusão, responsável, descrição e observações.</li>
+    <li>Acompanhe a lista de processos e filtre rapidamente por status (Abertos / Em Análise / Aprovados / Concluídos).</li>
+    <li>Para mudar o andamento de um processo, abra-o para edição e altere o campo Status — a mudança fica registrada automaticamente no histórico.</li>
+    <li>Use <strong>👁 Ver</strong> em um processo para abrir seus detalhes junto com o histórico completo de andamento.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Cada processo é vinculado a um documento (licença) específico, usado para dar contexto (empresa, estabelecimento, tipo).</li>
+    <li>Histórico de andamento imutável: toda vez que o status de um processo muda, é gravada uma linha com status anterior, status novo, data, responsável e observação — nada é sobrescrito ou apagado.</li>
+    <li>Ao criar um processo, já é gravada a primeira linha do histórico ("Processo criado").</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Preciso ter um documento cadastrado antes de abrir um processo?</dt>
+    <dd>Sim. A tela avisa e bloqueia a criação do processo se ainda não existir nenhuma licença cadastrada no sistema.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="relatorios">
+  <h2>Relatórios Gerenciais</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra a aba <strong>Relatórios</strong> para ver, em uma única tela, saúde documental, vencimentos próximos, distribuição por tipo, clientes com documentos vencidos, tendência dos últimos 90 dias, conformidade por órgão emissor e distribuição de processos por status.</li>
+    <li>No relatório de <strong>Vencimentos Próximos</strong>, ajuste o número de dias e clique em <strong>Aplicar filtro</strong> para recalcular a janela.</li>
+    <li>Use <strong>Atualizar relatórios</strong> para recarregar todos os dados de uma vez.</li>
+    <li>Use <strong>📥 Exportar PDF</strong> ou <strong>📥 Exportar CSV</strong> para baixar exatamente o que está sendo exibido na tela nesse momento.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Gráficos de pizza/rosca e barras para saúde documental e distribuição por tipo.</li>
+    <li>Relatório de vencimentos com janela de dias configurável por consulta (independente da janela de 30 dias do Dashboard).</li>
+    <li>Exportação PDF/CSV reúne todas as seções do relatório em um único arquivo, na mesma ordem exibida na tela.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="configuracoes">
+  <h2>Configurações</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Em <strong>Alertas de Vencimento</strong>, ative ou desative os alertas visuais, defina quantos dias de antecedência usar e, opcionalmente, informe um e-mail de referência.</li>
+    <li>Clique em <strong>Salvar configurações</strong>.</li>
+    <li>Em <strong>Tipos de Licença</strong>, digite o nome de um novo tipo e clique em <strong>+ Adicionar tipo</strong> para incluí-lo no catálogo.</li>
+    <li>Para remover um tipo, clique no <strong>×</strong> ao lado do nome dele na lista.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Os dias de antecedência configurados aqui controlam a janela usada nos alertas visuais do Dashboard.</li>
+    <li>O catálogo de <strong>Tipos de Licença</strong> é compartilhado entre todos os usuários — alimenta o campo "Tipo de Licença" no cadastro e na edição de documentos.</li>
+    <li>Remover um tipo não apaga documentos já cadastrados com ele: o valor antigo continua aparecendo (marcado como inativo) nos documentos existentes, só deixa de estar disponível para novos cadastros.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>As configurações de alerta valem para todos os usuários?</dt>
+    <dd>Não. Ativar/desativar alertas, os dias de antecedência e o e-mail informado são salvos localmente no navegador de cada usuário — cada pessoa configura a sua própria preferência. Já o catálogo de Tipos de Licença é compartilhado por todos.</dd>
+    <dt>Informar um e-mail em "Email para Notificações" faz o sistema enviar avisos automaticamente?</dt>
+    <dd>Esse campo hoje só fica salvo como referência local; os alertas de vencimento aparecem visualmente no Dashboard, não há envio automático de e-mail a partir dele.</dd>
+  </dl>
+</section>

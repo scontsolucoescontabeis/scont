@@ -1,0 +1,112 @@
+<p class="manual-intro">O Gerador de Modelos cria documentos (termos, contratos, autorizações) a partir de modelos com variáveis — como <code>{{empregado.nome_empregado}}</code> — preenchidas automaticamente com dados de Empresas, Empregados, Sócios e Rubricas cadastrados no módulo RH, ou de uma planilha Excel enviada na hora. Um documento pode ser gerado avulso ou como parte de um "Evento" (ex: Admissão), que reúne vários modelos e gera todos de uma vez para os mesmos empregados.</p>
+
+<section class="manual-item" id="modelos">
+  <h2>Modelos</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na tela <strong>Modelos</strong>, clique em <strong>+ Novo Modelo</strong> (ou "Editar" em um já existente).</li>
+    <li>Informe o nome, uma descrição opcional, o <strong>Tipo</strong> (Por Registro ou Consolidado) e o <strong>Cabeçalho Padrão</strong> que o documento deve usar ao ser gerado.</li>
+    <li>Marque as <strong>Fontes de Dados</strong> que o modelo vai usar: Empresas, Empregados, Sócios, Rubricas e/ou Planilha Excel. Cada fonte marcada libera um grupo de variáveis no painel acima do editor.</li>
+    <li>Escreva o texto do documento no editor. Clique em qualquer variável do painel (ex: <code>{{empregado.nome_empregado}}</code>) para inseri-la na posição do cursor — não é preciso digitar as chaves manualmente.</li>
+    <li>Formate o texto pela barra de ferramentas do editor (negrito, itálico, sublinhado, alinhamento, tamanho e tipo de fonte, inserir tabela). O botão <strong>Ver HTML</strong> alterna para o código-fonte do modelo, para ajustes finos.</li>
+    <li>Se precisar de dados que não existem no sistema (ex: uma lista personalizada), suba uma planilha em "Planilha Excel — variáveis extras" dentro do próprio modal: cada coluna vira uma variável <code>{{excel.NOME_DA_COLUNA}}</code>.</li>
+    <li>Clique em <strong>Salvar Modelo</strong>.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li><strong>Tipo "Por Registro"</strong>: gera um documento para cada empregado selecionado na geração (ou um por empresa, se o modelo não usar a fonte Empregados) — é o tipo usado para a maioria dos termos individuais.</li>
+    <li><strong>Tipo "Consolidado"</strong>: gera um único documento por empresa selecionada, não um por empregado. Se as fontes Empregados/Sócios/Rubricas estiverem marcadas, o documento usa o primeiro registro encontrado daquela empresa para preencher as variáveis — útil para documentos que falam da empresa como um todo, não de uma pessoa específica.</li>
+    <li>Variável <code>ext</code> ao lado de cada campo numérico: insere o valor por extenso (ex: salário "1500,00" vira "mil e quinhentos reais") em vez do número puro.</li>
+    <li>Variáveis de sistema sempre disponíveis: <code>{{sistema.data_atual}}</code> e <code>{{sistema.data_atual_extenso}}</code> (data do dia, por extenso).</li>
+    <li>Variáveis de planilha (<code>{{excel.*}}</code>) ficam disponíveis tanto quando "Planilha Excel" é marcada como fonte, quanto quando uma planilha extra é anexada só para aquele modelo — os dois casos aparecem no mesmo painel de variáveis.</li>
+    <li>Um modelo sem nenhuma fonte de banco de dados marcada, mas usando variáveis <code>{{excel.*}}</code>, funciona em modo "Excel puro": a geração pede só a planilha, sem passar pelos passos de Empresas/Empregados/Sócios/Rubricas.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Qual a diferença entre marcar "Planilha Excel" como fonte e anexar uma planilha só no modal do modelo?</dt>
+    <dd>São a mesma coisa em termos de variáveis disponíveis (<code>{{excel.coluna}}</code>). A diferença é o momento do upload: marcando a fonte, a planilha é enviada durante o assistente de Geração (um passo a mais no wizard, podendo trocar de planilha a cada geração); anexando no modal, a planilha fica fixa junto ao modelo.</dd>
+    <dt>Posso editar o HTML do modelo diretamente?</dt>
+    <dd>Sim, o botão "Ver HTML" no topo do editor alterna para o código-fonte. As duas visões (visual e HTML) editam o mesmo conteúdo.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="eventos">
+  <h2>Eventos</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Na tela <strong>Eventos</strong>, clique em <strong>+ Novo Evento</strong>.</li>
+    <li>Informe o nome (ex: "Admissão") e uma descrição opcional.</li>
+    <li>Na lista de "Modelos disponíveis", clique em <strong>+ Adicionar</strong> em cada modelo que deve compor o evento.</li>
+    <li>Na lista "Modelos do evento", use as setas ↑/↓ para definir a ordem em que os documentos serão gerados, ou ✕ para remover um modelo do evento.</li>
+    <li>Clique em <strong>Salvar Evento</strong>.</li>
+    <li>Para gerar, use o botão <strong>⚡ Gerar</strong> no card do evento — o mesmo assistente de Geração é usado, mas produz todos os modelos do evento de uma vez para os mesmos empregados/empresas escolhidos.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Um evento não duplica os modelos: ele só referencia os modelos já cadastrados em Modelos, na ordem escolhida. Editar um modelo depois reflete em todos os eventos que o usam.</li>
+    <li>Excluir um evento não apaga os modelos individuais que o compunham.</li>
+    <li>Um evento só pode ser gerado se tiver pelo menos um modelo configurado (o botão "Gerar" fica desabilitado até lá).</li>
+    <li>Na geração, cada documento do evento sai com seu próprio cabeçalho (nome/logo da empresa + título daquele modelo específico), e cada modelo entra em página separada — tanto entre os modelos de um mesmo empregado, quanto entre um empregado e o próximo.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="gerar">
+  <h2>Gerar Documento</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra <strong>Gerar</strong> no menu (ou clique em "⚡ Gerar" a partir de um card de Modelo ou de Evento) e siga os passos indicados na barra no topo da tela.</li>
+    <li><strong>Modelo:</strong> escolha o modelo (esse passo é pulado quando a geração parte de um Evento).</li>
+    <li><strong>Empresas:</strong> marque uma ou mais empresas. Aqui também é possível anexar/trocar/remover a <strong>logo</strong> de cada empresa — uma vez enviada, ela passa a aparecer automaticamente no cabeçalho de qualquer documento gerado para essa empresa dali em diante.</li>
+    <li><strong>Empregados / Sócios / Rubricas</strong> (só aparecem se o modelo usar essas fontes): todos os registros das empresas escolhidas já vêm pré-selecionados; use os botões "Todos"/"Nenhum" ou desmarque individualmente quem não deve entrar na geração.</li>
+    <li><strong>Planilha</strong> (só aparece se o modelo usar variáveis de Excel): envie o arquivo. A primeira linha deve ter os cabeçalhos — cada um vira uma variável <code>{{excel.COLUNA}}</code>.</li>
+    <li><strong>Exportar:</strong> revise a pré-visualização (setas "‹ Anterior" / "Próximo ›" percorrem cada documento que será gerado), escolha o tipo de cabeçalho e clique em <strong>📄 Salvar PDF</strong> ou <strong>📊 Exportar Excel</strong>.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Os passos do assistente mudam de acordo com as fontes marcadas no modelo (ou na união das fontes dos modelos de um evento) — um modelo que só usa Empresas e Empregados não mostra os passos de Sócios/Rubricas/Planilha.</li>
+    <li><strong>Descartar registro:</strong> na pré-visualização, é possível remover da geração o documento que está sendo exibido no momento (ex: um empregado que não deve receber aquele termo) sem refazer os passos anteriores — ele some tanto do PDF quanto do Excel exportados.</li>
+    <li><strong>Três opções de cabeçalho</strong>, escolhidas na hora de exportar: <em>Completo</em> (logo da empresa cliente, ou a marca "SCONT" se ela não tiver logo cadastrada, + nome da empresa + título do modelo), <em>Neutro</em> (nome da empresa + título do modelo, com "SCONT Soluções Contábeis" discretamente no canto) e <em>Sem Cabeçalho</em> (só o conteúdo do modelo).</li>
+    <li><strong>"Ajustar para caber em 1 página"</strong>: encolhe proporcionalmente o conteúdo de cada documento que ultrapassaria uma folha A4, sem nunca ampliar o que já cabe.</li>
+    <li><strong>Múltiplas empresas na mesma geração</strong>: ao exportar em PDF, o sistema abre uma janela de impressão separada por empresa (evitando misturar documentos de clientes diferentes em um único arquivo). Ao exportar em Excel, todos os registros saem juntos em uma única planilha, com uma coluna extra <code>documento_gerado</code> contendo o texto final de cada documento.</li>
+    <li><strong>Salvar PDF</strong> abre a caixa de impressão do navegador — o documento é salvo escolhendo "Salvar como PDF" no destino da impressão, não é um download automático. Recomenda-se desmarcar "Cabeçalhos e rodapés" na caixa de impressão para não sair a data/URL do navegador na folha.</li>
+    <li>Toda geração (PDF ou Excel) fica registrada no Histórico, mesmo sem alterar nenhum cadastro.</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p><strong>Geração em modo "Excel puro"</strong> (modelo sem nenhuma fonte de Empresas/Empregados/Sócios/Rubricas, só variáveis <code>{{excel.*}}</code>): o sistema tenta identificar automaticamente, pelo nome do cabeçalho da planilha, qual coluna indica a empresa de cada linha (reconhece cabeçalhos como "Empresa", "Cliente", "Razão Social", "Nome Fantasia" etc.). Se encontrar, gera um PDF separado por empresa (o mesmo comportamento de "múltiplas empresas" descrito acima); se nenhuma coluna for identificada e o usuário não escolher uma manualmente, é exibido um campo para digitar o nome da empresa que vai constar no cabeçalho de todos os documentos daquela geração.</p>
+  <p><strong>Valor por extenso</strong> (variáveis com o sufixo <code>ext</code>): o número da variável (aceita tanto formato brasileiro "1.500,00" quanto "1500.00") é convertido para texto por extenso no padrão de valor monetário, ex.: <code>1500,50</code> → "mil e quinhentos reais e cinquenta centavos".</p>
+  <p><strong>Ordem dos passos do assistente:</strong> Empresas sempre aparece primeiro (exceto no modo Excel puro); Empregados/Sócios/Rubricas aparecem só se marcados como fonte do modelo; Planilha aparece se a fonte Excel estiver marcada <em>ou</em> se o texto do modelo contiver alguma variável <code>{{excel.*}}</code>, mesmo que a fonte não tenha sido marcada explicitamente.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>A empresa de um empregado não aparece nas variáveis do documento gerado (campos <code>{{empresa.*}}</code> em branco)?</dt>
+    <dd>O código da empresa do empregado (em Empregados) precisa bater exatamente com o código cadastrado em Empresas. Confira se não há espaços a mais em um dos dois cadastros.</dd>
+    <dt>Consigo trocar a logo de uma empresa depois de já ter gerado documentos com ela?</dt>
+    <dd>Sim. A logo fica salva no cadastro da empresa (não no documento já gerado) — trocá-la ou removê-la na tela de Empresas do assistente afeta só as próximas gerações.</dd>
+    <dt>Por que meu PDF não abriu?</dt>
+    <dd>O navegador pode ter bloqueado o pop-up da janela de impressão, principalmente quando várias empresas geram várias janelas de uma vez. Permita pop-ups para esta página e clique em "Salvar PDF" novamente.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="dashboard-historico">
+  <h2>Dashboard e Histórico</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>O <strong>Dashboard</strong> abre ao entrar na ferramenta e mostra um resumo: total de modelos cadastrados, gerações feitas hoje, total de gerações e total de registros (documentos) já gerados, além dos modelos mais recentes e das últimas gerações.</li>
+    <li>O <strong>Histórico</strong> lista todas as gerações já feitas (até as 100 mais recentes), com modelo usado, empresas envolvidas, quantidade de registros, tipo de cabeçalho, quem gerou e quando.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Quando a geração é de um Evento, o Histórico grava uma linha por modelo do evento (não uma linha só para o evento), permitindo ver individualmente quantos de cada documento foram emitidos.</li>
+    <li>O Histórico é só um registro do que já foi gerado — não guarda o PDF/Excel em si, apenas os metadados da geração (modelo, empresas, quantidade, cabeçalho, autor e data).</li>
+  </ul>
+</section>

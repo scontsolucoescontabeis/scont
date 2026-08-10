@@ -1,0 +1,135 @@
+<p class="manual-intro">O Gerenciador de Formulários reúne três formulários públicos de captação — <strong>Registro de Empresa</strong>, <strong>Alteração de Empresa</strong> e <strong>Registro de Empregado</strong> — com um painel interno para a equipe acompanhar, validar, editar e excluir tudo o que é recebido. Os formulários são páginas independentes (compartilháveis por link) que qualquer cliente preenche sem precisar de login; o painel de gestão, o histórico de edições e o navegador de arquivos do servidor exigem acesso ao portal.</p>
+
+<section class="manual-item" id="painel-gestao">
+  <h2>Painel de Gestão de Formulários</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Acesse <strong>Gerenciamento de Formulários</strong> pelo portal — a tela inicial lista todos os envios recebidos, mais recentes primeiro.</li>
+    <li>Use o menu lateral para filtrar por tipo (Todos, Registro de Empresa, Alteração de Empresa, Registro de Empregado); use a busca por nome/CPF/e-mail e o filtro de Status (o padrão ao abrir a tela é mostrar só "Recebido").</li>
+    <li>Clique em um card para abrir os <strong>Detalhes</strong> — inclui os sócios (registro/alteração) ou os dependentes (empregado) já buscados do banco.</li>
+    <li>Use os botões rápidos do card: <strong>📁 Docs</strong> (documentos anexados no Storage), <strong>👁️ Ver</strong> (detalhes), <strong>✏️ Editar</strong>, <strong>📊</strong> (exportar aquele registro para Excel) e <strong>🗑️</strong> (excluir).</li>
+    <li>Em <strong>Editar</strong>, ajuste o Status (Recebido/Validado/Rejeitado), o Responsável e os campos do formulário; ao clicar em <strong>Salvar Alterações</strong> o sistema grava no banco, gera um PDF atualizado com os novos dados e registra o evento no histórico.</li>
+    <li>Use <strong>Consulta CNAE</strong> na barra lateral para pesquisar por código ou descrição — copia o CNAE selecionado para a área de transferência (útil para colar no campo de atividade).</li>
+    <li>Para gerar o link de um dos três formulários (para enviar ao cliente), use <strong>Links dos Formulários</strong> no topo da tela e clique no ícone de copiar — cada cópia gera um link com um token novo.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Atualização em tempo real: um novo envio ou uma edição feita por outra pessoa aparece na lista sem precisar recarregar a página.</li>
+    <li>Visibilidade por sub-permissão: usuários sem acesso de administrador só veem as abas "Registro/Alteração" e/ou "Registro de Empregado" conforme liberado para eles em Configurações — quem não tem nenhuma das duas nem enxerga a respectiva opção no menu.</li>
+    <li>Exclusão lógica: o botão excluir nunca apaga a linha do banco — marca o status como "excluido" (o card some da listagem) e grava o evento no histórico.</li>
+    <li>Exportação para Excel por registro individual, com as colunas já traduzidas para rótulos legíveis.</li>
+    <li>Visualizador de documentos por formulário: lista, pré-visualiza e baixa os arquivos que o cliente anexou (identificação dos sócios, documentos do empregado), sem precisar abrir o navegador de arquivos do servidor.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Excluí um formulário por engano — dá para recuperar?</dt>
+    <dd>Sim. A exclusão só muda o status para "excluido"; o registro continua no banco. É preciso pedir para alguém com acesso ao banco reverter o status manualmente, já que a tela não oferece um botão de "desfazer".</dd>
+    <dt>Por que não vejo os cards de Registro/Alteração de Empresa (ou de Empregado)?</dt>
+    <dd>Seu usuário não tem a sub-permissão correspondente liberada. Peça para um administrador ajustar em Configurações do portal.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="registro-empresa">
+  <h2>Formulário de Registro de Empresa</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra o link do formulário (gerado no Painel de Gestão ou pelo card correspondente na Central de Documentos) — não é preciso login.</li>
+    <li>Preencha os blocos: Informações da Empresa (nome, propostas de nome alternativo, porte, capital social), Sede do Estabelecimento, Atividades (principal e secundárias).</li>
+    <li>Em Dados dos Sócios, clique em <strong>+ Adicionar Sócio</strong> para cada sócio; cada card exige nome, CPF, se é administrador, participação societária e o upload do documento de identificação (RG, CPF ou CNH).</li>
+    <li>Leia e aceite o Termo de Consentimento LGPD e clique em <strong>Salvar e Enviar</strong>.</li>
+    <li>Ao concluir, a tela mostra o ID da submissão e oferece um botão para compartilhar a confirmação por WhatsApp.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>A soma das participações societárias precisa fechar exatamente 100% antes do envio ser aceito.</li>
+    <li>O campo de Regime de Partilha de Bens só aparece quando o sócio é marcado como casado ou em união estável.</li>
+    <li>Upload de documento por sócio limitado a PDF/JPG/PNG, até 5 MB por arquivo.</li>
+    <li>Ao enviar, o sistema gera automaticamente um PDF-resumo do formulário (sem precisar de servidor), salva o registro e os sócios no banco, envia os documentos para o Storage e dispara um e-mail de aviso para a equipe administrativa.</li>
+    <li>Este formulário não salva rascunho automático — diferente dos formulários de Alteração e de Empregado, se a página for fechada antes do envio o preenchimento é perdido.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="alteracao-empresa">
+  <h2>Formulário de Alteração de Empresa</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra o link do formulário e informe o nome legal da empresa.</li>
+    <li>Para cada bloco (nome, nome fantasia, capital social, dados do estabelecimento, atividades, quadro societário), responda "Sim" apenas se aquilo for mudar — os campos daquele bloco só ficam visíveis e obrigatórios quando a resposta é "Sim".</li>
+    <li>Se houver mudança no quadro societário, adicione um card por sócio afetado e escolha a Ação (Inclusão, Edição ou Exclusão) além dos dados do sócio.</li>
+    <li>Aceite o Termo de Consentimento LGPD e envie.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Rascunho automático: dois segundos após qualquer alteração no formulário, o preenchimento é salvo sozinho vinculado a um token único gerado na URL (parâmetro <code>?token=</code>).</li>
+    <li>Se a pessoa fechar a aba e reabrir o mesmo link (com o mesmo token), as respostas voltam automaticamente e um aviso confirma que o rascunho foi restaurado.</li>
+    <li>O rascunho é apagado assim que o envio é concluído com sucesso.</li>
+    <li>Gera PDF-resumo, salva sócios com a ação indicada e notifica a equipe administrativa por e-mail, no mesmo padrão do Registro de Empresa.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Perdi o link que eu estava usando para preencher — meu rascunho sumiu?</dt>
+    <dd>O rascunho fica vinculado ao token daquele link específico. Abrir o formulário do zero (sem o parâmetro <code>token</code> da sessão anterior) gera um token novo e começa um preenchimento em branco.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="registro-empregado">
+  <h2>Formulário de Registro de Empregado</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra o link do formulário e preencha os dados pessoais do empregado.</li>
+    <li>Em Informações Familiares, responda se há filhos; se "Sim", a tabela de dependentes aparece — clique em <strong>+ Adicionar Dependente</strong> para cada um (nome, CPF, nascimento, parentesco).</li>
+    <li>Em Benefícios e Descontos, informe se é optante do Vale Transporte (e, se for, se autoriza o desconto de 6%) e os valores diários de VT/VA.</li>
+    <li>Em Dados Contratuais, informe empresa, cargo, admissão, salário, dias e horário de trabalho.</li>
+    <li>Em Documentação Exigida, envie os arquivos por categoria (Identificação, Familiares, Médicos) — cada campo aceita mais de um arquivo, inclusive em cliques separados.</li>
+    <li>Aceite o Termo de Consentimento LGPD e envie.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Cada campo de upload acumula os arquivos escolhidos a cada seleção — não é preciso selecionar tudo de uma vez; dá para remover um arquivo específico antes de enviar.</li>
+    <li>Rascunho automático com restauração por token na URL, no mesmo padrão do formulário de Alteração de Empresa.</li>
+    <li>O e-mail de aviso de novo envio vai para a equipe de Pessoal/RH — endereço diferente do usado pelos formulários de Registro e Alteração de Empresa (equipe administrativa).</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="historico-edicoes">
+  <h2>Histórico de Edições</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Acesse <strong>Histórico de Edições</strong> pelo menu lateral do Gerenciador.</li>
+    <li>Use a busca para filtrar por responsável ou nome do campo alterado, e o filtro de data para um dia específico.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Registra automaticamente todo salvamento feito pela tela de Edição (valor anterior → novo valor de status, quem editou, quando) e toda exclusão de formulário.</li>
+    <li>É um log de auditoria imutável — não existe edição nem exclusão de uma linha do histórico pela interface.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="central-documentos">
+  <h2>Central de Documentos e Arquivos do Servidor</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>A <strong>Central de Documentos</strong> é a porta de entrada: reúne, em cards, os três formulários de preenchimento e os atalhos para o Gerenciador e para os Arquivos do Servidor.</li>
+    <li>Em <strong>Arquivos do Servidor</strong>, navegue pelas pastas do repositório de documentos usando o caminho (breadcrumb) no topo da tela.</li>
+    <li>Use os botões de cada arquivo para baixar ou excluir, ou o botão de upload para enviar um arquivo novo na pasta atual.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Navegação em pastas com pré-visualização de arquivos (PDF/imagem) direto no navegador, sem precisar baixar primeiro.</li>
+    <li>Acesso de leitura e gestão de arquivos independente de qual formulário gerou o documento — útil para organizar ou limpar manualmente a estrutura de pastas do Storage.</li>
+  </ul>
+</section>

@@ -1,0 +1,252 @@
+<p class="manual-intro">O CRM WhatsApp centraliza o atendimento dos quatro departamentos do escritório (Pessoal, Contábil, Administrativo e Tributário) num só lugar: as conversas chegam pelo WhatsApp — direto ou depois de passar por um chatbot de triagem —, os agentes respondem, transferem entre departamentos e registram tarefas e anotações internas sem sair da tela. Além do atendimento do dia a dia, o CRM tem telas de administração (chatbot, conexão do WhatsApp, SLA, usuários) e um painel de métricas, e é acompanhado por uma ferramenta separada — o Simulador WhatsApp — usada para testar conversas sem depender de um WhatsApp real.</p>
+
+<section class="manual-item" id="atendimento">
+  <h2>Atendimento — Conversas e Chat</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra o <strong>CRM WhatsApp</strong> pelo menu lateral. A tela principal tem três colunas: lista de conversas à esquerda, chat no centro e painel de contexto à direita.</li>
+    <li>Use a busca (nome, telefone ou protocolo) e o filtro de departamento para localizar uma conversa. As abas <strong>Todas / Abertas / Atendendo / Aguardando / Encerradas</strong> mostram o total de cada status.</li>
+    <li>Clique numa conversa para abrir o chat. Se ela ainda não tiver um agente responsável, clique em <strong>Assumir</strong> para vinculá-la a você — o status passa para "Em Atendimento".</li>
+    <li>Digite a resposta na barra inferior e pressione Enter para enviar pelo WhatsApp (Shift+Enter quebra linha sem enviar).</li>
+    <li>Para registrar algo que só a equipe deve ver — nunca é enviado ao cliente — troque o modo do campo de digitação para <strong>Nota interna</strong> antes de enviar.</li>
+    <li>Clique em <strong>Prontas</strong> para buscar e inserir o texto de uma mensagem pronta cadastrada (ver seção Mensagens Prontas), sem precisar digitar tudo de novo.</li>
+    <li>Para passar a conversa para outro departamento (e, se quiser, um agente específico), clique em <strong>Transferir</strong>, escolha o destino e, opcionalmente, o motivo.</li>
+    <li>Para abrir uma tarefa vinculada a essa conversa, clique em <strong>Tarefa</strong>.</li>
+    <li>Ao concluir o atendimento, clique em <strong>Encerrar</strong> e confirme. Uma conversa encerrada não aceita mais mensagens.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Layout de três colunas com a lista de conversas redimensionável (arraste a borda direita da lista; a largura escolhida fica salva no navegador).</li>
+    <li>Indicador de mensagens não lidas por conversa e badges de <strong>departamento</strong> e <strong>status</strong> em cada card da lista.</li>
+    <li>Quando a conversa chegou por triagem automática, a lista mostra um badge "🤖 bot" com a categoria que o cliente escolheu no menu.</li>
+    <li>O painel direito traz: dados do contato (telefone, empresa(s) vinculada(s), protocolo, data de abertura), a classificação do cliente (🥉 Bronze / 🥈 Prata / 🥇 Ouro) quando cadastrada, a linha do tempo de transferências da conversa atual e o histórico das últimas conversas do mesmo contato.</li>
+    <li><strong>Contexto do bot:</strong> quando o atendimento veio de uma triagem automática, o painel direito mostra também a empresa e o CNPJ identificados pelo bot, a trilha departamento › categoria › subcategoria escolhida no menu, a primeira mensagem livre digitada pelo cliente após o menu, e o transcript completo da conversa com o bot antes do repasse para um humano.</li>
+    <li>Mídia recebida do cliente (imagem, áudio, documento, vídeo) aparece direto na bolha da mensagem; os arquivos ficam num armazenamento privado e o link de visualização é temporário (expira em 1 hora).</li>
+    <li><strong>Alertas de SLA:</strong> conversas abertas ainda sem resposta de um agente aparecem destacadas num painel próprio, acima do painel de contato, agrupadas por departamento e com cronômetro regressivo. Ver "Memórias de cálculo".</li>
+  </ul>
+
+  <h3>Memórias de cálculo</h3>
+  <p>O SLA (prazo de atendimento) mede o tempo até a <strong>primeira resposta de um agente</strong> numa conversa recém-aberta. Só conta enquanto a conversa está com status <code>Aberta</code> e sem nenhuma mensagem de agente — assim que o agente clica em <strong>Assumir</strong> ou envia a primeira mensagem (o que acontecer primeiro), o relógio para e o alerta some da lista.</p>
+  <div class="manual-formula">tempo_maximo_efetivo = tempo_maximo_do_departamento × multiplicador_da_classificação_do_cliente
+
+restante = tempo_maximo_efetivo − (agora − data_de_abertura_da_conversa)
+
+restante ≤ 0                    → VENCIDO
+restante ≤ limite "crítico"     → CRÍTICO (pisca)
+restante ≤ limite "aviso"       → AVISO
+caso contrário                  → sem alerta</div>
+  <p>Tempo máximo e os limites de aviso/crítico são configurados por departamento, e o multiplicador por classificação do cliente (Ouro/Prata/Bronze/Sem classificação), ambos em <strong>Administração › SLA</strong>.</p>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Por que o botão "Assumir" não aparece numa conversa?</dt>
+    <dd>Ele só aparece em conversas com status Aberta ou Aguardando. Conversas já Em Atendimento (com agente vinculado) ou Encerradas não mostram esse botão.</dd>
+    <dt>A nota interna aparece para o cliente no WhatsApp?</dt>
+    <dd>Não. Nota interna nunca é enviada — fica só na visualização do CRM, com fundo amarelo e um ícone de cadeado, só para a equipe.</dd>
+    <dt>Dá para reabrir uma conversa encerrada?</dt>
+    <dd>Não pela tela de atendimento. Um novo contato do mesmo cliente abre uma conversa nova, que fica visível no histórico do painel direito da conversa anterior.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="tarefas">
+  <h2>Tarefas</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra <strong>Tarefas</strong> no menu lateral. A tela mostra um quadro com as colunas Abertas, Em Execução, Concluídas e Canceladas.</li>
+    <li>Para criar uma tarefa avulsa (sem vínculo com uma conversa), clique em <strong>Nova Tarefa</strong> e preencha título, demandante, descrição, departamento, prioridade, responsável (opcional) e prazo (opcional).</li>
+    <li>Para criar a partir de um atendimento em andamento, use o botão <strong>Tarefa</strong> na tela de chat — o vínculo com a conversa e o protocolo ficam registrados automaticamente.</li>
+    <li>Clique num cartão para expandir e ver a descrição completa e as datas de abertura/conclusão.</li>
+    <li>Use os botões <strong>▶ Iniciar</strong> e <strong>✓ Concluir</strong> no cartão expandido para avançar o status, ou <strong>Cancelar</strong> para descartar a tarefa.</li>
+    <li>Filtre por departamento no topo da tela, se necessário.</li>
+    <li>Clique em <strong>Exportar Excel</strong> para baixar a lista de tarefas (respeitando o filtro de departamento aplicado) em planilha.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Prioridade (Baixa/Normal/Alta/Urgente) sinalizada por uma faixa colorida na lateral do cartão.</li>
+    <li>Aviso visual de prazo: o cartão fica com tag laranja no dia do vencimento e vermelha quando atrasado.</li>
+    <li>Contador de tarefas abertas (não concluídas nem canceladas) no cabeçalho da página.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="contatos">
+  <h2>Contatos</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra <strong>Contatos</strong> no menu lateral — é a mesma base de clientes usada nas conversas do CRM.</li>
+    <li>Use a busca para localizar por nome, telefone ou empresa vinculada.</li>
+    <li>Clique em <strong>Novo Contato</strong> para cadastrar manualmente: nome, telefone (WhatsApp), e-mail e CPF/CNPJ (opcionais), e uma ou mais empresas vinculadas — cada uma com cargo e classificação (🥉 Bronze / 🥈 Prata / 🥇 Ouro).</li>
+    <li>Para importar vários contatos de uma vez, abra o menu ao lado de "Novo Contato" → <strong>Importar via planilha</strong>. Baixe o modelo se precisar, envie o arquivo preenchido e revise a prévia antes de confirmar.</li>
+    <li>Clique num contato para expandir e ver dados cadastrais completos, empresas vinculadas e o histórico de conversas anteriores dele.</li>
+    <li>Clique em <strong>Editar</strong> para corrigir dados ou empresas vinculadas.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Um contato pode estar vinculado a mais de uma empresa (ex.: a mesma pessoa falando em nome de dois clientes diferentes), cada vínculo com cargo e classificação próprios.</li>
+    <li>A importação por planilha identifica automaticamente, pelo telefone, se cada linha é um contato novo, uma nova empresa para um contato já cadastrado, ou um conflito (a mesma empresa já vinculada a esse contato) — nesse último caso é preciso escolher, linha a linha, "Atualizar" ou "Ignorar" antes de confirmar.</li>
+    <li>Campo de observações de texto livre por contato.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="mensagens-prontas">
+  <h2>Mensagens Prontas</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra <strong>Msgs. Prontas</strong> no menu lateral.</li>
+    <li>Clique em <strong>Nova mensagem</strong> e preencha título, categoria (livre, opcional), departamento (ou deixe em branco para "Geral", valendo para todos) e o texto completo da mensagem.</li>
+    <li>Administradores podem marcar <strong>Compartilhar com toda a equipe</strong>; sem marcar, a mensagem fica visível só para quem a criou.</li>
+    <li>Use as abas por departamento para filtrar a lista.</li>
+    <li>Durante o atendimento, clique em <strong>Prontas</strong> na barra de digitação do chat para buscar e inserir uma mensagem pronta sem sair da conversa.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Separação visual entre mensagens "Compartilhadas" (toda a equipe) e "Minhas mensagens" (só quem criou vê e edita).</li>
+    <li>Busca por título, conteúdo ou categoria no seletor de mensagens dentro do chat.</li>
+    <li>Mensagens próprias podem ser editadas e excluídas por quem criou; mensagens compartilhadas, só por administradores.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="chatbot">
+  <h2>Administração — Chatbot de Roteamento</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Disponível só para administradores. Abra <strong>Chatbot</strong> no menu lateral.</li>
+    <li>Na aba <strong>Geral</strong>, ative ou desative o bot, defina o timeout de inatividade, o número máximo de tentativas inválidas antes de encerrar a sessão, e as mensagens de boas-vindas — com versões específicas por classificação do cliente (Bronze/Prata/Ouro), fora do horário de atendimento e de fila de espera.</li>
+    <li>Na aba <strong>Menus</strong>, monte a árvore departamento → categoria → subcategoria que o bot oferece ao cliente no WhatsApp. É possível reordenar, ativar/desativar e editar cada item diretamente na lista.</li>
+    <li>Na aba <strong>Horários</strong>, defina o horário global de atendimento (dias da semana + faixa de horário) e, se algum departamento precisar de um horário diferente, ative o override específico dele.</li>
+    <li>Na aba <strong>Avaliações</strong>, acompanhe a nota média (CSAT) dada pelos clientes ao final do atendimento, filtrando por departamento e período.</li>
+    <li>Na aba <strong>Calendário</strong>, cadastre feriados (o bot responde com aviso de dia não útil e encerra a sessão) e datas-pico fiscais (atendimento segue normal, mas a mensagem de fila avisa sobre alta demanda).</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>O bot faz a triagem inicial do cliente no WhatsApp antes de existir uma conversa com um agente: pergunta o assunto pelo menu configurado aqui e só depois direciona para a fila humana do departamento certo.</li>
+    <li>Toda a navegação do cliente no bot fica disponível para o agente no painel de "Contexto do bot", dentro da tela de atendimento.</li>
+    <li>Mensagens específicas por feriado/data-pico substituem a mensagem padrão só quando cadastradas — senão o sistema usa o texto genérico configurado na aba Geral.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="conexao-whatsapp">
+  <h2>Administração — Conexão do WhatsApp</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Disponível só para administradores. Abra <strong>Conexão WhatsApp</strong> no menu lateral.</li>
+    <li>Escolha o canal ativo: <strong>QR Code</strong> (conexão temporária, útil enquanto a API oficial não está disponível) ou <strong>API Oficial</strong> (Meta Cloud API).</li>
+    <li>Ao trocar de canal, confirme a troca — ela vale imediatamente para as próximas mensagens enviadas e recebidas.</li>
+    <li>No canal QR Code, clique em <strong>Gerar QR Code</strong> (ou "Atualizar QR Code" se já houver um), abra o WhatsApp no celular em Aparelhos Conectados → Conectar um aparelho, e escaneie o código na tela.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Indicador de status da conexão QR Code: Desconectado / Conectando / Conectado.</li>
+    <li>No canal API Oficial não existe QR Code — a tela só confirma que a Meta Cloud API está em uso.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Preciso escanear o QR Code de novo com frequência?</dt>
+    <dd>Só quando o status voltar para "Desconectado" (por exemplo, sessão expirada ou celular muito tempo sem internet). Nesse caso, gere um novo QR Code e escaneie novamente.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="sla-config">
+  <h2>Administração — SLA de Atendimento</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Disponível só para administradores. Abra <strong>SLA</strong> no menu lateral.</li>
+    <li>Para cada departamento, defina o tempo máximo de atendimento inicial (em minutos) e os limiares de aviso e crítico. O limiar crítico precisa ser menor que o de aviso, que precisa ser menor que o tempo máximo.</li>
+    <li>Desative o interruptor "Ativo" de um departamento para suspender o controle de SLA nele — nenhum alerta é gerado enquanto estiver desativado.</li>
+    <li>Ajuste os multiplicadores por classificação do cliente (Ouro/Prata/Bronze/Sem classificação): o multiplicador é aplicado sobre o tempo máximo do departamento para dar mais ou menos tolerância a cada perfil de cliente.</li>
+    <li>Salve as duas seções separadamente — tempos por departamento e multiplicadores têm botões de salvar próprios.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Pré-visualização do tempo efetivo (tempo máximo × multiplicador) para cada classificação, calculada com base no maior tempo máximo entre os departamentos ativos.</li>
+    <li>Validação ao salvar: impede configurar um limiar crítico maior ou igual ao de aviso, ou um aviso maior ou igual ao tempo máximo.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Quanto menor o multiplicador de uma classificação, o atendimento fica mais rígido ou mais tolerante?</dt>
+    <dd>Mais rígido. O multiplicador reduz o tempo máximo do departamento — um multiplicador de 0,5, por exemplo, corta o prazo pela metade para clientes daquela classificação.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="usuarios-crm">
+  <h2>Administração — Usuários e Permissões</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Disponível só para administradores. Abra <strong>Usuários</strong> no menu lateral — a lista traz todos os usuários do portal, separados em "Com acesso ao CRM" e "Sem acesso ao CRM".</li>
+    <li>Para dar acesso a alguém que ainda não tem, clique em <strong>Conceder acesso</strong> na lista "Sem acesso", escolha ao menos um departamento e o perfil (Agente ou Admin CRM).</li>
+    <li>Para alterar departamentos ou perfil de quem já tem acesso, clique em <strong>Editar</strong>.</li>
+    <li>Para remover o acesso de alguém ao CRM, clique em <strong>Revogar</strong>.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Administradores do portal (identificados pelo ícone de escudo) têm acesso Admin ao CRM em todos os departamentos automaticamente, sem precisar de configuração adicional.</li>
+    <li>Um usuário pode ter acesso a mais de um departamento ao mesmo tempo.</li>
+    <li>Perfil <strong>Agente</strong> só atende conversas dos departamentos atribuídos a ele; perfil <strong>Admin CRM</strong> também gerencia usuários, métricas, SLA, chatbot e conexão do WhatsApp.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="metricas">
+  <h2>Painel de Métricas</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Disponível só para administradores. Abra <strong>Métricas</strong> no menu lateral.</li>
+    <li>A faixa "Ao vivo" no topo mostra, em tempo real, quantas conversas estão aguardando atendimento, em atendimento e aguardando resposta do cliente, além de quantos agentes estão ativos no momento.</li>
+    <li>Escolha o período de análise (Hoje / 7 dias / Mês / Personalizado) e navegue pelas abas Geral, Equipe, Tempo e Qualidade.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li><strong>Geral:</strong> total de conversas, encerradas, abertas/pendentes e taxa de resolução, cada uma comparada em variação percentual com o período anterior equivalente, além do volume diário de conversas e da distribuição por departamento.</li>
+    <li><strong>Equipe:</strong> ranking de conversas encerradas por agente, quantos agentes tiveram atendimento no período, maior carga individual e carga atual (conversas abertas) por departamento.</li>
+    <li><strong>Tempo:</strong> TMA (tempo médio até a primeira resposta do agente), maior tempo registrado no período, percentual de conversas resolvidas em até 10 minutos, TMA por departamento e distribuição de faixas de tempo de atendimento.</li>
+    <li><strong>Qualidade:</strong> taxa de resolução e de transferência, média de mensagens por conversa e os motivos de transferência mais frequentes.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="simulador-whatsapp">
+  <h2>Simulador WhatsApp</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra a ferramenta <strong>Simulador WhatsApp</strong> — fica junto do CRM na mesma pasta, mas é listada separadamente no portal e também exige login.</li>
+    <li>Antes de usar, abra <strong>⚙ Configuração do simulador</strong> e informe o "Bypass Token" combinado com quem preparou o ambiente — sem ele, o envio de mensagens simuladas é recusado.</li>
+    <li>Clique em <strong>+ Novo telefone</strong> para criar um cliente simulado: informe um nome (opcional) e um telefone com DDI, ou clique em "↻ Gerar aleatório" para preencher um número fictício automaticamente.</li>
+    <li>Selecione o telefone simulado na lista à esquerda e digite mensagens como se fosse o cliente pelo WhatsApp — elas chegam de verdade no CRM (aparecem para os agentes) como se fossem de um cliente real.</li>
+    <li>Se o chatbot de roteamento estiver ativo, a conversa simulada passa pelo mesmo menu que um cliente real veria; responda como se estivesse no WhatsApp.</li>
+    <li>Acompanhe as respostas do bot e dos agentes chegando em tempo real na própria tela do simulador.</li>
+    <li>Use o ícone de lixeira para remover um telefone simulado da lista — a conversa correspondente não é apagada do CRM.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Cada telefone simulado guarda seu próprio histórico e protocolo, permitindo simular vários "clientes" em paralelo, em abas separadas na lista.</li>
+    <li>Contador de mensagens não lidas por telefone simulado e indicador de status da conversa (Aberta/Em atendimento/Aguardando/Encerrada) atualizados em tempo real.</li>
+    <li>Ferramenta de desenvolvimento e teste: serve para validar o menu do bot, os fluxos de atendimento e os alertas de SLA sem depender de um número de WhatsApp real.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>As mensagens enviadas pelo simulador chegam a algum WhatsApp real?</dt>
+    <dd>Não. O simulador cria contatos e conversas de teste que os agentes veem normalmente na tela de atendimento do CRM, mas nada é enviado ou recebido de um WhatsApp de verdade.</dd>
+    <dt>O que é o "Bypass Token" pedido na configuração?</dt>
+    <dd>É uma senha combinada de uso interno que autoriza o simulador a criar mensagens de teste. Peça o valor a quem administra o ambiente caso a tela mostre erro ao enviar.</dd>
+  </dl>
+</section>

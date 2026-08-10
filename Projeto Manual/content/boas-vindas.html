@@ -1,0 +1,93 @@
+<p class="manual-intro">O Boas-Vindas gera uma página de apresentação personalizada para cada cliente novo — um guia com os departamentos da Scont (Fiscal, Pessoal, Contábil, Administrativo), orientações e contatos, com um link único que também exibe os dados cadastrais daquele cliente. A administração (criação, envio e acompanhamento dos links) fica em <strong>admin/admin.html</strong>; a página que o cliente recebe é o <strong>index.html</strong> da ferramenta.</p>
+
+<section class="manual-item" id="criar">
+  <h2>Criar Apresentação</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Digite o CNPJ do cliente e clique em <strong>Buscar</strong> (ou tecle Enter) para preencher automaticamente Razão Social, Ramo de Atividade, Porte, Telefone, Regime (quando optante pelo Simples) e os CNAEs principal/secundários a partir da Receita Federal. Campos já preenchidos manualmente não são sobrescritos por valores vazios.</li>
+    <li>Confira/ajuste Regime tributário e Porte.</li>
+    <li>Confirme o <strong>CNAE Principal</strong> (obrigatório) — se a busca automática não tiver preenchido, clique em <strong>Consultar</strong> para abrir a lista de CNAEs e escolher manualmente. Adicione CNAEs secundários pelo mesmo mecanismo, um de cada vez.</li>
+    <li>Preencha os dados de contato do cliente: Nome e E-mail são obrigatórios; Cargo e Telefone são opcionais (mas o Telefone é necessário se quiser enviar por WhatsApp).</li>
+    <li>Escreva, se quiser, uma mensagem de boas-vindas personalizada (até 400 caracteres) — ela substitui o texto padrão no topo da página do cliente.</li>
+    <li>Marque como a apresentação deve ser enviada: <strong>E-mail</strong> (marcado por padrão, dispara sozinho ao gerar) e/ou <strong>WhatsApp</strong> (abre uma conversa no WhatsApp Web/App com a mensagem já pronta — o envio final ainda depende de você clicar em enviar por lá).</li>
+    <li>Clique em <strong>Gerar Apresentação</strong>. O sistema mostra o link exclusivo do cliente, com botões para copiar, visualizar, reenviar e-mail ou começar uma nova apresentação.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Busca automática de dados cadastrais por CNPJ (BrasilAPI) — inclui CNAE principal e todos os secundários informados pela Receita.</li>
+    <li>Consulta manual de CNAE por código ou nome da atividade, com busca de texto na lista completa (mesma base usada em outras ferramentas do portal).</li>
+    <li>E-mail de boas-vindas enviado automaticamente na criação, através de uma função do sistema (não abre um cliente de e-mail local).</li>
+    <li>WhatsApp: abre uma conversa já com a mensagem redigida (saudação + nome da empresa + link); não é enviado sozinho, é preciso confirmar o envio na própria conversa.</li>
+    <li>Botão <strong>Reenviar Email</strong> na tela de resultado, para reenviar a mesma apresentação sem precisar recriá-la (funciona enquanto a tela não for recarregada/fechada).</li>
+    <li>Link exclusivo por cliente, no formato <code>index.html?id=...</code>, gerado automaticamente ao salvar.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>A busca por CNPJ não encontrou a empresa, o que fazer?</dt>
+    <dd>Preencha os campos manualmente — Razão Social, Regime, Porte e CNAE Principal continuam obrigatórios mesmo sem a busca automática.</dd>
+    <dt>Marquei WhatsApp mas nada abriu. Por quê?</dt>
+    <dd>O telefone do contato precisa estar preenchido. Sem telefone, a apresentação é criada normalmente, só o envio por WhatsApp é pulado (aparece um aviso na tela de resultado).</dd>
+    <dt>Posso editar uma apresentação depois de criada?</dt>
+    <dd>Não há tela de edição. Se os dados estiverem errados, crie uma nova apresentação e desative a antiga no Histórico para não haver dois links ativos para o mesmo cliente.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="historico">
+  <h2>Histórico</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>Abra a aba <strong>Histórico</strong> no menu lateral para ver todas as apresentações já criadas, mais recentes primeiro.</li>
+    <li>Use a busca para filtrar por empresa, contato, e-mail ou CNPJ, e o seletor de status para ver só <strong>Ativas</strong> (padrão), só <strong>Desativadas</strong> ou <strong>Todas</strong>.</li>
+    <li>Em cada linha ativa: <strong>visualizar</strong> o link, <strong>copiar</strong> o link, <strong>enviar por WhatsApp</strong> (se houver telefone cadastrado), <strong>desativar</strong> ou <strong>excluir</strong>.</li>
+    <li>Em linhas desativadas, as ações disponíveis são <strong>reativar</strong> e <strong>excluir</strong>.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Três indicadores no topo: total de apresentações ativas, soma de acessos das apresentações ativas e quantas foram criadas no mês corrente — todos recalculados a partir da lista carregada.</li>
+    <li><strong>Desativar</strong> é reversível: o link do cliente para de abrir a apresentação personalizada (cai no modo genérico, sem os dados cadastrais) até alguém reativar. É a forma recomendada de "encerrar" um link sem perder o histórico de acessos.</li>
+    <li><strong>Excluir</strong> é permanente — remove o registro do banco, não há como recuperar.</li>
+    <li>O contador de acessos é incrementado automaticamente quando o cliente abre o link (não exige nenhuma ação do administrador).</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>Criei uma apresentação e o cliente acabou de acessar — o contador não mudou na tela.</dt>
+    <dd>O Histórico não atualiza em tempo real. Troque de aba (ex.: vá em Criar Apresentação e volte) ou recarregue a página para ver o número de acessos mais recente.</dd>
+    <dt>Desativar apaga os dados da empresa?</dt>
+    <dd>Não. Desativar só bloqueia o link — os dados continuam no Histórico (na lista "Desativadas") e podem ser reativados a qualquer momento.</dd>
+    <dt>Quantas apresentações a lista mostra?</dt>
+    <dd>As 50 mais recentes. Use a busca para localizar uma apresentação específica se ela não aparecer na lista.</dd>
+  </dl>
+</section>
+
+<section class="manual-item" id="apresentacao-cliente">
+  <h2>O que o cliente vê</h2>
+
+  <h3>Como usar</h3>
+  <ol>
+    <li>O cliente recebe o link (por e-mail ou WhatsApp) e abre a página de apresentação da Scont, com um menu fixo para navegar entre os departamentos: Fiscal, Pessoal, Contábil, Administrativo, Ferramentas/Serviços, Segurança e Contatos.</li>
+    <li>Se o link tiver o identificador da apresentação dele (o link gerado no admin), a página soma uma seção inicial de <strong>Dados Cadastrais</strong> com o que foi cadastrado (razão social, CNPJ, inscrição estadual, regime, porte, ramo, CNAE principal e secundários, e o contato responsável) — e a saudação no topo passa a citar o nome da empresa.</li>
+    <li>O cliente navega livremente pelo guia, pode voltar ao topo, imprimir a página (o menu e outros elementos de navegação somem na impressão) e usar o link quantas vezes quiser.</li>
+  </ol>
+
+  <h3>Funcionalidades</h3>
+  <ul>
+    <li>Sem identificador válido na URL (link genérico, digitado direto ou apresentação desativada/excluída), a página exibe o guia padrão da Scont, sem a seção de dados cadastrais e sem personalização — não trava nem mostra erro para o cliente.</li>
+    <li>Com identificador válido: saudação personalizada ("Bem-vinda à Scont, [Empresa]"), mensagem de boas-vindas customizada (ou a padrão, se não foi escrita nenhuma), selo "Apresentação personalizada" no canto da tela e chips com CNPJ/Regime/Porte logo abaixo do título.</li>
+    <li>Cada abertura do link registra um acesso automaticamente, usado para compor os números do Histórico no admin.</li>
+    <li>Barra de progresso de leitura, botão de voltar ao topo e destaque automático do departamento atual no menu conforme o cliente rola a página.</li>
+  </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>O cliente perde acesso se eu desativar a apresentação depois de enviada?</dt>
+    <dd>Sim — o link continua abrindo, mas volta a mostrar o guia genérico, sem os dados cadastrais nem a saudação personalizada. Reativando no Histórico, volta ao normal.</dd>
+    <dt>O cliente vê quantas vezes já acessou o link?</dt>
+    <dd>Não. O contador de acessos só aparece para a equipe, na tela de Histórico do admin.</dd>
+  </dl>
+</section>
