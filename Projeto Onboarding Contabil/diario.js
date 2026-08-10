@@ -19,6 +19,15 @@
   let empresaAtualCodigo = null;
   let anoGradeAtual = new Date().getFullYear();
 
+  // Filtros da Visão Geral (persistem entre re-renders da própria tela,
+  // resetados só pelo botão "Limpar filtros" ou ao trocar de aba).
+  let dashboardFiltroRegime = '';
+  let dashboardFiltroResponsavel = '';
+  let dashboardFiltroStatus = '';
+  let dashboardFiltroDocumentacao = '';
+  let dashboardFiltroMes; // undefined = ainda não inicializado (default: mês atual); null = "Todos os meses" (seleção explícita)
+  let dashboardFiltroAno = null;
+
   // ─── ESCOPO / FLUXO DE FECHAMENTO ───────────────────────────
   // Ver docs/superpowers/specs/2026-08-01-diario-fechamento-validacao-design.md
   let _isAdmin = false;
@@ -181,6 +190,7 @@
       statusMensalPorEmpresa,
       documentacaoPorEmpresa,
       NIVEL_LABELS, REGIME_LABELS, SITUACAO_LABELS, FINANCEIRO_LABELS, PERIODICIDADE_LABELS,
+      ASSUNTOS_LANCAMENTO,
       mapeamentoDe,
       escapeHtml,
       fechamentos,
@@ -469,9 +479,56 @@
     }).join('')}</span>`;
   }
 
-  function renderDashboardDiario() {
-    const main = document.getElementById('main');
-    const linhas = empresas.map((e) => {
+  function responsaveisDistintosDashboard() {
+    const nomes = new Set();
+    mapeamentos.forEach((m) => { if (m.responsavel_execucao) nomes.add(m.responsavel_execucao); });
+    return Array.from(nomes).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }
+
+  // dashboardFiltroMes === null significa "Todos os meses" (dentro do ano
+  // escolhido) — verifica se QUALQUER mês do ano bate com o critério, em
+  // vez de exigir um mês específico.
+  function statusBateEmAlgumMes(codigoEmpresa, ano, statusAlvo) {
+    for (let mes = 1; mes <= 12; mes++) {
+      if (statusDoMes(codigoEmpresa, ano, mes) === statusAlvo) return true;
+    }
+    return false;
+  }
+
+  function documentacaoDisponivelEmAlgumMes(codigoEmpresa, ano) {
+    for (let mes = 1; mes <= 12; mes++) {
+      if (documentacaoDisponivelDoMes(codigoEmpresa, ano, mes)) return true;
+    }
+    return false;
+  }
+
+  // Status/Documentação são filtrados no mês/ano escolhidos (default: mês
+  // atual, com opção "Todos os meses") — a mini-grade continua mostrando
+  // o ano inteiro, o filtro só decide quais empresas aparecem na lista.
+  function empresasFiltradasDashboard() {
+    return empresas.filter((e) => {
+      const m = mapeamentoDe(e.codigo_empresa);
+      if (dashboardFiltroRegime && (!m || m.regime_tributario !== dashboardFiltroRegime)) return false;
+      if (dashboardFiltroResponsavel && (!m || m.responsavel_execucao !== dashboardFiltroResponsavel)) return false;
+      if (dashboardFiltroStatus) {
+        const bate = dashboardFiltroMes === null
+          ? statusBateEmAlgumMes(e.codigo_empresa, dashboardFiltroAno, dashboardFiltroStatus)
+          : statusDoMes(e.codigo_empresa, dashboardFiltroAno, dashboardFiltroMes) === dashboardFiltroStatus;
+        if (!bate) return false;
+      }
+      if (dashboardFiltroDocumentacao) {
+        const disponivel = dashboardFiltroMes === null
+          ? documentacaoDisponivelEmAlgumMes(e.codigo_empresa, dashboardFiltroAno)
+          : documentacaoDisponivelDoMes(e.codigo_empresa, dashboardFiltroAno, dashboardFiltroMes);
+        if (dashboardFiltroDocumentacao === 'sim' && !disponivel) return false;
+        if (dashboardFiltroDocumentacao === 'nao' && disponivel) return false;
+      }
+      return true;
+    });
+  }
+
+  function linhasDashboardHtml() {
+    const linhas = empresasFiltradasDashboard().map((e) => {
       const m = mapeamentoDe(e.codigo_empresa);
       const nivel = nivelDe(e.codigo_empresa);
       const abertas = m ? pendenciasAbertasDe(m.id).length : 0;
@@ -487,19 +544,103 @@
         </tr>
       `;
     }).join('');
+    return linhas || '<tr><td colspan="7">Nenhuma empresa encontrada com esses filtros.</td></tr>';
+  }
+
+  function renderDashboardDiario() {
+    const main = document.getElementById('main');
+    const hoje = new Date();
+    if (dashboardFiltroMes === undefined) dashboardFiltroMes = hoje.getMonth() + 1;
+    if (dashboardFiltroAno == null) dashboardFiltroAno = hoje.getFullYear();
+
+    const responsaveis = responsaveisDistintosDashboard();
 
     main.innerHTML = `
       <div class="onboarding-header">
         <div><h2>Visão Geral</h2></div>
       </div>
+      <div class="mapa-secao">
+        <div class="mapa-secao-header">Filtros</div>
+        <div class="mapa-secao-body">
+          <div>
+            <label>Regime Tributário</label>
+            <select id="filtroDashRegime">
+              <option value="">Todos</option>
+              ${Object.entries(REGIME_LABELS).map(([v, l]) => `<option value="${v}" ${dashboardFiltroRegime === v ? 'selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Responsável</label>
+            <select id="filtroDashResponsavel">
+              <option value="">Todos</option>
+              ${responsaveis.map((r) => `<option value="${escapeHtml(r)}" ${dashboardFiltroResponsavel === r ? 'selected' : ''}>${escapeHtml(r)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="full" style="display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap;">
+            <div style="flex:1; min-width:200px;">
+              <label>Status do Mês</label>
+              <select id="filtroDashStatus">
+                <option value="">Todos</option>
+                ${Object.entries(STATUS_GRADE_LABELS).map(([v, l]) => `<option value="${v}" ${dashboardFiltroStatus === v ? 'selected' : ''}>${l}</option>`).join('')}
+              </select>
+            </div>
+            <div style="flex:1; min-width:200px;">
+              <label>Documentação Disponível</label>
+              <select id="filtroDashDocumentacao">
+                <option value="">Todos</option>
+                <option value="sim" ${dashboardFiltroDocumentacao === 'sim' ? 'selected' : ''}>Sim</option>
+                <option value="nao" ${dashboardFiltroDocumentacao === 'nao' ? 'selected' : ''}>Não</option>
+              </select>
+            </div>
+            <div>
+              <label>Mês</label>
+              <select id="filtroDashMes">
+                <option value="" ${dashboardFiltroMes === null ? 'selected' : ''}>Todos os meses</option>
+                ${window.ContabilDiarioUtil.MESES_LABELS.map((l, idx) => `<option value="${idx + 1}" ${idx + 1 === dashboardFiltroMes ? 'selected' : ''}>${l}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label>Ano</label>
+              <input type="number" id="filtroDashAno" value="${dashboardFiltroAno}" style="width:90px;">
+            </div>
+            <div>
+              <button type="button" class="btn btn-secondary" id="btnLimparFiltrosDash">Limpar filtros</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <table class="mapa-table">
         <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Nível</th><th>Pendências</th><th>Documentação — Ano Atual</th><th>Contabilidade — Ano Atual</th></tr></thead>
-        <tbody>${linhas || '<tr><td colspan="7">Nenhuma empresa encontrada.</td></tr>'}</tbody>
+        <tbody id="tbodyDashboard">${linhasDashboardHtml()}</tbody>
       </table>
     `;
 
-    main.querySelectorAll('tbody tr[data-codigo]').forEach((tr) => {
-      tr.addEventListener('click', () => selecionarEmpresaDiario(tr.getAttribute('data-codigo')));
+    function ligarCliquesLinhas() {
+      main.querySelectorAll('tbody tr[data-codigo]').forEach((tr) => {
+        tr.addEventListener('click', () => selecionarEmpresaDiario(tr.getAttribute('data-codigo')));
+      });
+    }
+    ligarCliquesLinhas();
+
+    function atualizarTabelaDashboard() {
+      document.getElementById('tbodyDashboard').innerHTML = linhasDashboardHtml();
+      ligarCliquesLinhas();
+    }
+
+    document.getElementById('filtroDashRegime').addEventListener('change', (ev) => { dashboardFiltroRegime = ev.target.value; atualizarTabelaDashboard(); });
+    document.getElementById('filtroDashResponsavel').addEventListener('change', (ev) => { dashboardFiltroResponsavel = ev.target.value; atualizarTabelaDashboard(); });
+    document.getElementById('filtroDashStatus').addEventListener('change', (ev) => { dashboardFiltroStatus = ev.target.value; atualizarTabelaDashboard(); });
+    document.getElementById('filtroDashDocumentacao').addEventListener('change', (ev) => { dashboardFiltroDocumentacao = ev.target.value; atualizarTabelaDashboard(); });
+    document.getElementById('filtroDashMes').addEventListener('change', (ev) => { dashboardFiltroMes = ev.target.value === '' ? null : Number(ev.target.value); atualizarTabelaDashboard(); });
+    document.getElementById('filtroDashAno').addEventListener('change', (ev) => { dashboardFiltroAno = Number(ev.target.value) || dashboardFiltroAno; atualizarTabelaDashboard(); });
+    document.getElementById('btnLimparFiltrosDash').addEventListener('click', () => {
+      dashboardFiltroRegime = '';
+      dashboardFiltroResponsavel = '';
+      dashboardFiltroStatus = '';
+      dashboardFiltroDocumentacao = '';
+      dashboardFiltroMes = hoje.getMonth() + 1;
+      dashboardFiltroAno = hoje.getFullYear();
+      renderDashboardDiario();
     });
   }
 
@@ -1208,6 +1349,22 @@
 
   // ─── LANÇAMENTOS DO DIÁRIO ──────────────────────────────────
 
+  // Assuntos macro pré-definidos pra padronizar o lançamento — lista
+  // livre (não é enum no banco, coluna assunto é TEXT), campo opcional.
+  const ASSUNTOS_LANCAMENTO = [
+    'Escrituração Contábil',
+    'Escrituração Fiscal',
+    'Apuração de Impostos',
+    'Obrigações Acessórias (SPED, DCTF, ECD, ECF...)',
+    'Conciliação Bancária',
+    'Fechamento Contábil / Balancete',
+    'Documentação Pendente',
+    'Folha de Pagamento',
+    'Financeiro (Contas a Pagar/Receber)',
+    'Atendimento ao Cliente',
+    'Outros',
+  ];
+
   function formatarDataHora(iso) {
     return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
@@ -1219,6 +1376,26 @@
         <div class="mapa-secao-header">Lançamentos do Diário</div>
         <div class="mapa-secao-body">
           <div><label>Data</label><input type="date" id="novoLancamentoData" value="${new Date().toISOString().slice(0, 10)}"></div>
+          <div>
+            <label>Assunto (opcional)</label>
+            <select id="novoLancamentoAssunto">
+              <option value="">Não informado</option>
+              ${ASSUNTOS_LANCAMENTO.map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}
+            </select>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <div style="flex:1;">
+              <label>Mês de referência (opcional)</label>
+              <select id="novoLancamentoMesRef">
+                <option value="">—</option>
+                ${window.ContabilDiarioUtil.MESES_LABELS.map((l, idx) => `<option value="${idx + 1}">${l}</option>`).join('')}
+              </select>
+            </div>
+            <div style="width:100px;">
+              <label>Ano ref.</label>
+              <input type="number" id="novoLancamentoAnoRef" placeholder="Ano">
+            </div>
+          </div>
           <div class="full"><label>Registro</label><textarea id="novoLancamentoTexto" rows="2" placeholder="Ex: Enviado SPED Fiscal de junho, pendente confirmação do cliente."></textarea></div>
           <div><button type="button" class="btn-novo" id="btnAddLancamento">+ Adicionar Lançamento</button></div>
           <div class="full mapa-filtros mapa-filtros-lancamentos" style="margin-top:10px;border-top:1px solid var(--line-soft);padding-top:14px;">
@@ -1246,16 +1423,25 @@
       const data = document.getElementById('novoLancamentoData').value;
       const texto = document.getElementById('novoLancamentoTexto').value.trim();
       if (!data || !texto) return;
+      const mesRef = document.getElementById('novoLancamentoMesRef').value;
+      const anoRef = document.getElementById('novoLancamentoAnoRef').value;
+      const assunto = document.getElementById('novoLancamentoAssunto').value;
       const auth = window.__contabilAuth || {};
       const { error } = await supabaseClient.from('contabil_diario_lancamentos').insert({
         codigo_empresa: empresaAtualCodigo,
         data,
         texto,
+        mes_referencia: mesRef ? Number(mesRef) : null,
+        ano_referencia: anoRef ? Number(anoRef) : null,
+        assunto: assunto || null,
         criado_por_nome: auth.userData?.nome || null,
         criado_por_email: auth.email || null,
       });
-      if (error) { console.error(error); return; }
+      if (error) { console.error(error); mostrarToast('Erro ao adicionar lançamento.', 'erro'); return; }
       document.getElementById('novoLancamentoTexto').value = '';
+      document.getElementById('novoLancamentoMesRef').value = '';
+      document.getElementById('novoLancamentoAnoRef').value = '';
+      document.getElementById('novoLancamentoAssunto').value = '';
       carregarListaLancamentos();
     });
 
@@ -1329,12 +1515,18 @@
       return;
     }
 
-    container.innerHTML = data.map((l) => `
+    container.innerHTML = data.map((l) => {
+      const tags = [];
+      if (l.assunto) tags.push(`<span class="badge-nivel nivel-baixo">${escapeHtml(l.assunto)}</span>`);
+      if (l.mes_referencia) tags.push(`<span class="badge-nivel nivel-baixo">Ref.: ${window.ContabilDiarioUtil.MESES_LABELS[l.mes_referencia - 1]}${l.ano_referencia ? '/' + l.ano_referencia : ''}</span>`);
+      return `
       <div class="mapa-lancamento-item">
         <div class="mapa-lancamento-data">${parseDataLocal(l.data).toLocaleDateString('pt-BR')}</div>
+        ${tags.length ? `<div class="mapa-lancamento-tags" style="display:flex; gap:6px; margin:4px 0;">${tags.join('')}</div>` : ''}
         <div class="mapa-lancamento-texto">${escapeHtml(l.texto)}</div>
         <div class="mapa-lancamento-autor">— ${escapeHtml(l.criado_por_nome || l.criado_por_email || 'desconhecido')} (${formatarDataHora(l.created_at)})</div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
 })();
