@@ -75,6 +75,19 @@ function badgeClass(status) {
   return map[status] || 'badge-info';
 }
 
+// A coluna `situacao` só é reescrita manualmente (cadastro/renovação) — sem
+// isso, um certificado "Ativo" nunca vira "Vencido" sozinho quando a data
+// passa. Aqui corrigimos só essa dupla (Ativo -> Vencido pela data real);
+// os demais estados (Agendado, Renovado, Aguardando Contato) são de
+// workflow e não são sobrescritos.
+function situacaoEfetiva(cert) {
+  if (cert.situacao === 'Ativo') {
+    const d = daysLeft(cert.data_vencimento);
+    if (d !== null && d < 0) return 'Vencido';
+  }
+  return cert.situacao;
+}
+
 function getInitials(name) {
   return name
     .split(' ')

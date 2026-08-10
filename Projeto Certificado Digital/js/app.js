@@ -64,7 +64,7 @@ function renderDashboard() {
   const certs = APP_STATE._allCertificates;
   const ativos = certs.filter(c => c.ativo !== false);
   const total      = certs.length;
-  const active     = ativos.filter(c => c.situacao === 'Ativo').length;
+  const active     = ativos.filter(c => situacaoEfetiva(c) === 'Ativo').length;
   const expired    = ativos.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d < 0; }).length;
   const upcoming   = ativos.filter(c => { const d = daysLeft(c.data_vencimento); return d !== null && d >= 0 && d <= 30; }).length;
   const pendentes  = ativos.filter(c => c.situacao_financeira === 'Pendente').length;
@@ -117,11 +117,12 @@ function renderDashboard() {
     const d = daysLeft(c.data_vencimento);
     const color = d < 0 ? 'var(--danger)' : d <= 7 ? 'var(--danger)' : d <= 15 ? 'var(--warning)' : 'var(--text-secondary)';
     const text  = d < 0 ? `Vencido há ${Math.abs(d)}d` : `${d} dias`;
+    const sit   = situacaoEfetiva(c);
     return `
       <tr>
         <td><strong>${c.empresa_id}</strong></td>
         <td>${fmt(c.data_vencimento)}</td>
-        <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
+        <td><span class="badge ${badgeClass(sit)}">${sit}</span></td>
         <td><span style="color:${color};font-weight:700;">${text}</span></td>
       </tr>`;
   }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Nenhum alerta crítico</td></tr>';
@@ -135,7 +136,7 @@ function renderDashboard() {
     <tr>
       <td><strong>${c.empresa_id}</strong></td>
       <td>${fmtDateTime(c.data_renovacao_agendada)}</td>
-      <td><span class="badge badge-info">${c.situacao}</span></td>
+      <td><span class="badge badge-info">${situacaoEfetiva(c)}</span></td>
     </tr>`).join('') : '<tr><td colspan="3" style="text-align:center;color:var(--text-muted);">Nenhum agendamento</td></tr>';
 
   q('#timeline').innerHTML = APP_STATE.historyLog.slice(0, 5).map(log => `
@@ -165,13 +166,14 @@ function renderCertTable() {
       : d !== null && d <= 7 ? 'style="background:rgba(245,158,11,0.03)"' : '';
     const inatBadge = inativo ? '<span class="badge" style="font-size:10px;background:var(--text-muted);color:#fff;margin-left:4px;">Inativo</span>' : '';
     const renewBtn = canRenew(c) ? `<button class="btn btn-ghost" onclick="openRenewModal('${c.id}')" style="padding:5px 10px;font-size:12px;margin-right:3px;color:var(--success);">♻ Renovar</button>` : '';
+    const sit = situacaoEfetiva(c);
     return `
       <tr ${rowStyle}>
         <td><strong>${c.empresa_id}</strong>${inatBadge}</td>
         <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id || '—'}</span></td>
         <td>${fmt(c.data_vencimento)}</td>
         <td>${fmt(c.data_emissao)}</td>
-        <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao || '—'}</span></td>
+        <td><span class="badge ${badgeClass(sit)}">${sit || '—'}</span></td>
         <td>${c.responsavel_nome || '—'}</td>
         <td style="white-space:nowrap;">
           <button class="btn btn-ghost" onclick="openDetails('${c.id}')"    style="padding:5px 10px;font-size:12px;margin-right:3px;">👁 Ver</button>
@@ -218,6 +220,7 @@ function renderRelatorio(certs = APP_STATE._allCertificates.filter(c => c.ativo 
     const dStr = d === null ? '—'
       : d < 0 ? `<span style="color:var(--danger);font-weight:700;">Vencido há ${Math.abs(d)}d</span>`
       : `<span style="color:${d<=7?'var(--danger)':d<=15?'var(--warning)':'var(--text-secondary)'};font-weight:${d<=30?700:400};">${d}d</span>`;
+    const sit = situacaoEfetiva(c);
     return `
       <tr>
         <td><strong>${c.empresa_id}</strong></td>
@@ -226,7 +229,7 @@ function renderRelatorio(certs = APP_STATE._allCertificates.filter(c => c.ativo 
         <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id || '—'}</span></td>
         <td>${fmt(c.data_emissao)}</td>
         <td>${fmt(c.data_vencimento)}</td>
-        <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao || '—'}</span></td>
+        <td><span class="badge ${badgeClass(sit)}">${sit || '—'}</span></td>
         <td>${c.situacao_financeira || '—'}</td>
         <td>${c.forma_pagamento || '—'}</td>
         <td>${dStr}</td>
@@ -250,7 +253,7 @@ function filterRelatorio() {
     if (empresa  && !(c.empresa_id || '').toLowerCase().includes(empresa)) return false;
     if (cliente  && !(c.cliente    || '').toLowerCase().includes(cliente)) return false;
     if (tipo     && (c.tipo_id     || '').toLowerCase() !== tipo)          return false;
-    if (situacao && (c.situacao    || '').toLowerCase() !== situacao)      return false;
+    if (situacao && (situacaoEfetiva(c) || '').toLowerCase() !== situacao) return false;
     if (sitFin   && (c.situacao_financeira || '').toLowerCase() !== sitFin)   return false;
     if (formaPag && (c.forma_pagamento     || '').toLowerCase() !== formaPag) return false;
     if (dataDe   && c.data_vencimento && c.data_vencimento < dataDe) return false;
@@ -277,7 +280,7 @@ function exportCSV() {
   const certs = APP_STATE._allCertificates.filter(c => {
     if (empresa  && !c.empresa_id.toLowerCase().includes(empresa)) return false;
     if (tipo     && c.tipo_id !== tipo)     return false;
-    if (situacao && c.situacao !== situacao) return false;
+    if (situacao && situacaoEfetiva(c) !== situacao) return false;
     if (dataDe   && c.data_vencimento < dataDe) return false;
     if (dataAte  && c.data_vencimento > dataAte) return false;
     return true;
@@ -288,7 +291,7 @@ function exportCSV() {
     const d = daysLeft(c.data_vencimento);
     return [
       c.empresa_id, c.cliente || '', c.cpf_cnpj || '', c.tipo_id,
-      fmt(c.data_emissao), fmt(c.data_vencimento), c.situacao,
+      fmt(c.data_emissao), fmt(c.data_vencimento), situacaoEfetiva(c),
       c.situacao_financeira || '', c.forma_pagamento || '',
       d === null ? '' : d,
       c.responsavel_nome || '', c.responsavel_email || '', c.responsavel_telefone || ''
@@ -334,7 +337,7 @@ function renderAgendaPage() {
       <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id}</span></td>
       <td>${fmtDateTime(c.data_renovacao_agendada)}</td>
       <td>${fmt(c.data_vencimento)}</td>
-      <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
+      <td><span class="badge ${badgeClass(situacaoEfetiva(c))}">${situacaoEfetiva(c)}</span></td>
       <td>${c.responsavel_nome || '—'}</td>
       <td style="white-space:nowrap;">
         <button class="btn btn-ghost" onclick="openScheduleModal('${c.id}')" style="padding:5px 10px;font-size:12px;margin-right:3px;">📅 Reagendar</button>
@@ -353,7 +356,7 @@ function renderAgendaPage() {
       <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id}</span></td>
       <td>${fmt(c.data_vencimento)}</td>
       <td><span style="color:${color};font-weight:700;">${text}</span></td>
-      <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
+      <td><span class="badge ${badgeClass(situacaoEfetiva(c))}">${situacaoEfetiva(c)}</span></td>
       <td style="white-space:nowrap;">
         <button class="btn btn-secondary" onclick="openScheduleModal('${c.id}')" style="padding:5px 10px;font-size:12px;margin-right:3px;">📅 Agendar</button>
         ${canRenew(c) ? `<button class="btn btn-primary" onclick="openRenewModal('${c.id}')" style="padding:5px 10px;font-size:12px;">♻ Renovar</button>` : ''}
@@ -490,7 +493,7 @@ function renderSegurancaPage() {
               <td><strong>${c.empresa_id}</strong></td>
               <td><span class="badge badge-info" style="font-size:11px;">${c.tipo_id}</span></td>
               <td>${fmt(c.data_vencimento)}</td>
-              <td><span class="badge ${badgeClass(c.situacao)}">${c.situacao}</span></td>
+              <td><span class="badge ${badgeClass(situacaoEfetiva(c))}">${situacaoEfetiva(c)}</span></td>
               <td>
                 <div style="display:flex;align-items:center;gap:8px;">
                   <span id="senha-${i}" style="font-family:monospace;font-size:13px;letter-spacing:2px;">••••••••</span>
@@ -998,7 +1001,7 @@ async function openDetails(id) {
         <div style="font-size:11px;color:var(--text-muted);font-weight:600;margin-bottom:4px;">⏳ SITUAÇÃO TEMPORAL</div>
         <div style="font-size:20px;font-weight:800;color:${dColor};">${dText}</div>
       </div>
-      ${dRow('📊 Situação',        `<span class="badge ${badgeClass(cert.situacao)}">${cert.situacao}</span>`)}
+      ${dRow('📊 Situação',        `<span class="badge ${badgeClass(situacaoEfetiva(cert))}">${situacaoEfetiva(cert)}</span>`)}
       ${dRow('💰 Sit. Financeira', cert.situacao_financeira || '—')}
       ${dRow('💳 Forma Pagamento', cert.forma_pagamento     || '—')}
       ${dRow('👤 Cliente',         cert.cliente             || '—')}
@@ -1378,7 +1381,7 @@ function setupAppListeners() {
       (!empresa  || c.empresa_id.toLowerCase().includes(empresa)) &&
       (!cliente  || (c.cliente || '').toLowerCase().includes(cliente)) &&
       (!tipo     || c.tipo_id === tipo) &&
-      (!situacao || c.situacao === situacao) &&
+      (!situacao || situacaoEfetiva(c) === situacao) &&
       (!sitFin   || c.situacao_financeira === sitFin)
     );
     APP_STATE.currentPage = 1;
