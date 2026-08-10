@@ -31,7 +31,7 @@
   let relacionadasPorEmpresa = {};  // cache simples { codigo_empresa: [codigo_empresa_relacionada, ...] }
   let mapeamentoAtualId = null;     // codigo_empresa selecionado (null = dashboard)
   let mapeamentoAtual = null;       // linha de contabil_mapeamento selecionada
-  let filtro = { nivel: null, regime: '', financeiro: '' };
+  let filtro = { nivel: null, regime: '', financeiro: '', busca: '' };
 
   // ─── ESCOPO: "Prestador de Serviço" só vê empresas onde é responsável ──
   // Mesma convenção client-side já usada no Diário Contábil (diario.js).
@@ -201,12 +201,37 @@
   // ─── DASHBOARD ──────────────────────────────────────────────
 
   function empresasFiltradas() {
+    const termoBusca = filtro.busca.trim().toLowerCase();
     return empresas.filter((e) => {
       const m = mapeamentoDe(e.codigo_empresa);
+      if (termoBusca && !e.codigo_empresa.toLowerCase().includes(termoBusca) && !e.nome_empresa.toLowerCase().includes(termoBusca)) return false;
       if (filtro.nivel && nivelDe(e.codigo_empresa) !== filtro.nivel) return false;
       if (filtro.regime && (!m || m.regime_tributario !== filtro.regime)) return false;
       if (filtro.financeiro && (!m || m.financeiro_interno_bpo !== filtro.financeiro)) return false;
       return true;
+    });
+  }
+
+  function linhasDashboardHtml() {
+    const linhas = empresasFiltradas().map((e) => {
+      const m = mapeamentoDe(e.codigo_empresa);
+      const nivel = nivelDe(e.codigo_empresa);
+      return `
+        <tr data-codigo="${escapeHtml(e.codigo_empresa)}">
+          <td>${escapeHtml(e.codigo_empresa)} - ${escapeHtml(e.nome_empresa)}</td>
+          <td>${m && m.regime_tributario ? (REGIME_LABELS[m.regime_tributario] || m.regime_tributario) : '—'}</td>
+          <td>${m && m.responsavel_execucao ? escapeHtml(m.responsavel_execucao) : '—'}</td>
+          <td>${m && m.ultimo_mes_fechado ? formatarMesAno(m.ultimo_mes_fechado) : '—'}</td>
+          <td><span class="badge-nivel nivel-${nivel}">${NIVEL_LABELS[nivel]}</span></td>
+        </tr>
+      `;
+    }).join('');
+    return linhas || '<tr><td colspan="5">Nenhuma empresa encontrada.</td></tr>';
+  }
+
+  function ligarCliquesLinhasDashboard() {
+    document.querySelectorAll('tbody tr[data-codigo]').forEach((tr) => {
+      tr.addEventListener('click', () => selecionarEmpresa(tr.getAttribute('data-codigo')));
     });
   }
 
@@ -222,23 +247,10 @@
       </div>
     `).join('');
 
-    const linhas = empresasFiltradas().map((e) => {
-      const m = mapeamentoDe(e.codigo_empresa);
-      const nivel = nivelDe(e.codigo_empresa);
-      return `
-        <tr data-codigo="${escapeHtml(e.codigo_empresa)}">
-          <td>${escapeHtml(e.nome_empresa)}</td>
-          <td>${m && m.regime_tributario ? (REGIME_LABELS[m.regime_tributario] || m.regime_tributario) : '—'}</td>
-          <td>${m && m.responsavel_execucao ? escapeHtml(m.responsavel_execucao) : '—'}</td>
-          <td>${m && m.ultimo_mes_fechado ? formatarMesAno(m.ultimo_mes_fechado) : '—'}</td>
-          <td><span class="badge-nivel nivel-${nivel}">${NIVEL_LABELS[nivel]}</span></td>
-        </tr>
-      `;
-    }).join('');
-
     main.innerHTML = `
       <div class="mapa-dashboard-cards">${cardsHtml}</div>
       <div class="mapa-filtros">
+        <input type="text" id="filtroBusca" value="${escapeHtml(filtro.busca)}" placeholder="Buscar por código ou nome...">
         <select id="filtroRegime">
           <option value="">Todos os regimes</option>
           ${Object.entries(REGIME_LABELS).map(([v, l]) => `<option value="${v}" ${filtro.regime === v ? 'selected' : ''}>${l}</option>`).join('')}
@@ -250,7 +262,7 @@
       </div>
       <table class="mapa-table">
         <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Último mês fechado</th><th>Nível</th></tr></thead>
-        <tbody>${linhas || '<tr><td colspan="5">Nenhuma empresa encontrada.</td></tr>'}</tbody>
+        <tbody id="tbodyDashboardMapeamento">${linhasDashboardHtml()}</tbody>
       </table>
     `;
 
@@ -261,11 +273,14 @@
         renderDashboard();
       });
     });
+    document.getElementById('filtroBusca').addEventListener('input', (ev) => {
+      filtro.busca = ev.target.value;
+      document.getElementById('tbodyDashboardMapeamento').innerHTML = linhasDashboardHtml();
+      ligarCliquesLinhasDashboard();
+    });
     document.getElementById('filtroRegime').addEventListener('change', (ev) => { filtro.regime = ev.target.value; renderDashboard(); });
     document.getElementById('filtroFinanceiro').addEventListener('change', (ev) => { filtro.financeiro = ev.target.value; renderDashboard(); });
-    main.querySelectorAll('tbody tr[data-codigo]').forEach((tr) => {
-      tr.addEventListener('click', () => selecionarEmpresa(tr.getAttribute('data-codigo')));
-    });
+    ligarCliquesLinhasDashboard();
   }
 
   // ─── SIDEBAR: SELETOR DE EMPRESA ─────────────────────────────

@@ -477,11 +477,13 @@
     input.addEventListener('input', () => {
       const termo = input.value.trim().toLowerCase();
       if (!termo) { lista.innerHTML = ''; lista.classList.remove('aberta'); return; }
-      const resultados = empresas.filter((e) => e.nome_empresa.toLowerCase().includes(termo)).slice(0, 20);
+      const resultados = empresas
+        .filter((e) => e.codigo_empresa.toLowerCase().includes(termo) || e.nome_empresa.toLowerCase().includes(termo))
+        .slice(0, 20);
       if (!resultados.length) {
         lista.innerHTML = '<div class="combobox-item combobox-vazio">Nenhuma empresa encontrada.</div>';
       } else {
-        lista.innerHTML = resultados.map((e) => `<div class="combobox-item" data-codigo="${escapeHtml(e.codigo_empresa)}">${escapeHtml(e.nome_empresa)}</div>`).join('');
+        lista.innerHTML = resultados.map((e) => `<div class="combobox-item" data-codigo="${escapeHtml(e.codigo_empresa)}">${escapeHtml(e.codigo_empresa)} - ${escapeHtml(e.nome_empresa)}</div>`).join('');
       }
       lista.classList.add('aberta');
     });
