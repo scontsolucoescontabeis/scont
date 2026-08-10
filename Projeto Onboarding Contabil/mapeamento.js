@@ -27,6 +27,7 @@
   let empresas = [];          // [{ codigo_empresa, nome_empresa }]
   let mapeamentos = [];       // linhas de contabil_mapeamento
   let bancosPorMapeamento = {};     // { mapeamento_id: [bancos] }
+  let contatoPorMapeamento = {};    // { mapeamento_id: {nome, telefone, email} }
   let relacionadasPorEmpresa = {};  // cache simples { codigo_empresa: [codigo_empresa_relacionada, ...] }
   let mapeamentoAtualId = null;     // codigo_empresa selecionado (null = dashboard)
   let mapeamentoAtual = null;       // linha de contabil_mapeamento selecionada
@@ -123,6 +124,19 @@
       (bancos || []).forEach((b) => {
         (bancosPorMapeamento[b.mapeamento_id] = bancosPorMapeamento[b.mapeamento_id] || []).push(b);
       });
+    }
+
+    // Mesma restrição do contato da empresa — Prestador de Serviço não pode
+    // ver (nem a RLS de contabil_mapeamento_contatos deixaria a leitura
+    // passar, mas evitamos buscar à toa).
+    contatoPorMapeamento = {};
+    if (ids.length && _podeEditar) {
+      const { data: contatos, error: errContatos } = await supabaseClient
+        .from('contabil_mapeamento_contatos')
+        .select('*')
+        .in('mapeamento_id', ids);
+      if (errContatos) console.error(errContatos);
+      (contatos || []).forEach((c) => { contatoPorMapeamento[c.mapeamento_id] = c; });
     }
   }
 
@@ -293,6 +307,7 @@
     const main = document.getElementById('main');
     const m = mapeamentoAtual;
     const RO = !_podeEditar;
+    const contato = contatoPorMapeamento[m.id] || {};
     const voltarDiarioHtml = m.codigo_empresa === _origemDiarioEmpresa
       ? `<a class="btn btn-secondary" href="diario.html?empresa=${encodeURIComponent(m.codigo_empresa)}">← Voltar ao Diário</a>`
       : '';
@@ -326,9 +341,13 @@
           </div>
           <div><label>Responsável pela Execução</label><input type="text" data-campo="responsavel_execucao" value="${escapeHtml(m.responsavel_execucao || '')}"></div>
           <div><label>Último Mês Fechado</label><input type="month" data-campo="ultimo_mes_fechado" value="${m.ultimo_mes_fechado ? String(m.ultimo_mes_fechado).slice(0, 7) : ''}"></div>
-          <div><label>Contato — Nome</label><input type="text" data-campo="contato_nome" value="${escapeHtml(m.contato_nome || '')}"></div>
-          <div><label>Contato — Telefone</label><input type="text" data-campo="contato_telefone" value="${escapeHtml(m.contato_telefone || '')}"></div>
-          <div><label>Contato — E-mail</label><input type="email" data-campo="contato_email" value="${escapeHtml(m.contato_email || '')}"></div>
+          ${RO ? `
+            <div class="full"><label>Contato</label><p class="mapa-empty">🔒 Contato da empresa visível apenas para a equipe Scont.</p></div>
+          ` : `
+            <div><label>Contato — Nome</label><input type="text" data-contato-campo="nome" value="${escapeHtml(contato.nome || '')}"></div>
+            <div><label>Contato — Telefone</label><input type="text" data-contato-campo="telefone" value="${escapeHtml(contato.telefone || '')}"></div>
+            <div><label>Contato — E-mail</label><input type="email" data-contato-campo="email" value="${escapeHtml(contato.email || '')}"></div>
+          `}
         </div>
       </div>
 
@@ -382,6 +401,10 @@
       el.disabled = RO;
       const evento = el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'blur';
       el.addEventListener(evento, () => salvarCampo(el));
+    });
+
+    main.querySelectorAll('[data-contato-campo]').forEach((el) => {
+      el.addEventListener('blur', () => salvarCampoContato(el));
     });
 
     main.querySelectorAll('[data-tag-input]').forEach((input) => {
@@ -584,6 +607,20 @@
     if (campo.startsWith('situacao_') || campo === 'ultimo_mes_fechado' || campo === 'periodicidade') {
       atualizarSugestaoNivel();
     }
+  }
+
+  async function salvarCampoContato(el) {
+    const campo = el.getAttribute('data-contato-campo');
+    const valor = el.value.trim() || null;
+    const m = mapeamentoAtual;
+    const atual = { ...(contatoPorMapeamento[m.id] || {}), [campo]: valor };
+    const { data, error } = await supabaseClient
+      .from('contabil_mapeamento_contatos')
+      .upsert({ mapeamento_id: m.id, nome: atual.nome || null, telefone: atual.telefone || null, email: atual.email || null }, { onConflict: 'mapeamento_id' })
+      .select()
+      .single();
+    if (error) { console.error(error); mostrarToast('Erro ao salvar o contato. Veja o console (F12) para detalhes.', 'erro'); return; }
+    contatoPorMapeamento[m.id] = data;
   }
 
   async function salvarCampoValor(campo, valor) {
@@ -798,12 +835,18 @@
 
     let y = MARGEM + 28;
 
-    y = secaoTabelaPdf(doc, 'Execução', [
+    const linhasExecucao = [
       ['Periodicidade', m.periodicidade ? PERIODICIDADE_LABELS[m.periodicidade] : '—'],
       ['Regime Tributário', m.regime_tributario ? REGIME_LABELS[m.regime_tributario] : '—'],
       ['Responsável pela Execução', texto(m.responsavel_execucao)],
-      ['Contato', [m.contato_nome, m.contato_telefone, m.contato_email].filter(Boolean).join(' • ') || '—'],
-    ], y, pageW, MARGEM);
+    ];
+    // Contato não entra no PDF para quem não pode editar o Mapeamento
+    // (Prestador de Serviço) — mesma restrição da tela e da RLS da tabela.
+    if (_podeEditar) {
+      const contato = contatoPorMapeamento[m.id] || {};
+      linhasExecucao.push(['Contato', [contato.nome, contato.telefone, contato.email].filter(Boolean).join(' • ') || '—']);
+    }
+    y = secaoTabelaPdf(doc, 'Execução', linhasExecucao, y, pageW, MARGEM);
 
     y = secaoTabelaPdf(doc, 'Situação de Fechamento', [
       ['Último Mês Fechado', m.ultimo_mes_fechado ? formatarMesAno(m.ultimo_mes_fechado) : '—'],

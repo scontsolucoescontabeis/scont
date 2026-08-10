@@ -13,6 +13,7 @@
   let empresas = [];
   let mapeamentos = [];
   let bancosPorMapeamento = {};
+  let contatoPorMapeamento = {}; // { mapeamento_id: {nome, telefone, email} }
   let statusMensalPorEmpresa = {}; // { codigo_empresa: { 'ano-mes': status } }
   let motivoPendenciaPorEmpresa = {}; // { codigo_empresa: { 'ano-mes': motivo|null } }
   let documentacaoPorEmpresa = {}; // { codigo_empresa: { 'ano-mes': disponivel(bool) } }
@@ -21,6 +22,7 @@
 
   // Filtros da Visão Geral (persistem entre re-renders da própria tela,
   // resetados só pelo botão "Limpar filtros" ou ao trocar de aba).
+  let dashboardFiltroBusca = ''; // código ou nome da empresa
   let dashboardFiltroRegime = '';
   let dashboardFiltroResponsavel = '';
   let dashboardFiltroStatus = '';
@@ -160,6 +162,17 @@
       });
     }
 
+    // Contato da empresa: mesma restrição de Bancos — Prestador de Serviço
+    // não pode ver (a RLS de contabil_mapeamento_contatos também bloqueia,
+    // mas evitamos buscar à toa quando já sabemos que não vai poder mostrar).
+    contatoPorMapeamento = {};
+    if (ids.length && _podeEditarMapeamento) {
+      const { data: contatos, error: errContatos } = await supabaseClient
+        .from('contabil_mapeamento_contatos').select('*').in('mapeamento_id', ids);
+      if (errContatos) console.error(errContatos);
+      (contatos || []).forEach((c) => { contatoPorMapeamento[c.mapeamento_id] = c; });
+    }
+
     const [{ data: statusMensal, error: errStatus }, { data: documentacao, error: errDocumentacao }] = await Promise.all([
       supabaseClient.from('contabil_diario_status_mensal').select('*'),
       supabaseClient.from('contabil_diario_documentacao').select('*'),
@@ -187,6 +200,7 @@
       meusResponsaveisCodigos: Array.from(_meusResponsaveisSet),
       mapeamentos,
       bancosPorMapeamento,
+      contatoPorMapeamento,
       statusMensalPorEmpresa,
       documentacaoPorEmpresa,
       NIVEL_LABELS, REGIME_LABELS, SITUACAO_LABELS, FINANCEIRO_LABELS, PERIODICIDADE_LABELS,
@@ -541,8 +555,10 @@
   // atual, com opção "Todos os meses") — a mini-grade continua mostrando
   // o ano inteiro, o filtro só decide quais empresas aparecem na lista.
   function empresasFiltradasDashboard() {
+    const termoBusca = dashboardFiltroBusca.trim().toLowerCase();
     return empresas.filter((e) => {
       const m = mapeamentoDe(e.codigo_empresa);
+      if (termoBusca && !e.codigo_empresa.toLowerCase().includes(termoBusca) && !e.nome_empresa.toLowerCase().includes(termoBusca)) return false;
       if (dashboardFiltroRegime && (!m || m.regime_tributario !== dashboardFiltroRegime)) return false;
       if (dashboardFiltroResponsavel && (!m || m.responsavel_execucao !== dashboardFiltroResponsavel)) return false;
       if (dashboardFiltroStatus) {
@@ -569,7 +585,7 @@
       const mesesPendencia = mesesComPendenciaDe(e.codigo_empresa);
       return `
         <tr data-codigo="${escapeHtml(e.codigo_empresa)}">
-          <td>${escapeHtml(e.nome_empresa)}</td>
+          <td>${escapeHtml(e.codigo_empresa)} - ${escapeHtml(e.nome_empresa)}</td>
           <td>${m && m.regime_tributario ? (REGIME_LABELS[m.regime_tributario] || m.regime_tributario) : '—'}</td>
           <td>${m && m.responsavel_execucao ? escapeHtml(m.responsavel_execucao) : '—'}</td>
           <td><span class="badge-nivel nivel-${nivel}">${NIVEL_LABELS[nivel]}</span></td>
@@ -597,6 +613,10 @@
       <div class="mapa-secao">
         <div class="mapa-secao-header">Filtros</div>
         <div class="mapa-secao-body">
+          <div>
+            <label>Empresa (código ou nome)</label>
+            <input type="text" id="filtroDashBusca" value="${escapeHtml(dashboardFiltroBusca)}" placeholder="Buscar por código ou nome...">
+          </div>
           <div>
             <label>Regime Tributário</label>
             <select id="filtroDashRegime">
@@ -662,6 +682,7 @@
       ligarCliquesLinhas();
     }
 
+    document.getElementById('filtroDashBusca').addEventListener('input', (ev) => { dashboardFiltroBusca = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashRegime').addEventListener('change', (ev) => { dashboardFiltroRegime = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashResponsavel').addEventListener('change', (ev) => { dashboardFiltroResponsavel = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashStatus').addEventListener('change', (ev) => { dashboardFiltroStatus = ev.target.value; atualizarTabelaDashboard(); });
@@ -669,6 +690,7 @@
     document.getElementById('filtroDashMes').addEventListener('change', (ev) => { dashboardFiltroMes = ev.target.value === '' ? null : Number(ev.target.value); atualizarTabelaDashboard(); });
     document.getElementById('filtroDashAno').addEventListener('change', (ev) => { dashboardFiltroAno = Number(ev.target.value) || dashboardFiltroAno; atualizarTabelaDashboard(); });
     document.getElementById('btnLimparFiltrosDash').addEventListener('click', () => {
+      dashboardFiltroBusca = '';
       dashboardFiltroRegime = '';
       dashboardFiltroResponsavel = '';
       dashboardFiltroStatus = '';
@@ -728,6 +750,10 @@
     const nivel = m.nivel_atencao || 'baixo';
     const anoAtual = String(new Date().getFullYear());
     const statusAno = m[`situacao_${anoAtual}_status`];
+    const contato = contatoPorMapeamento[m.id] || {};
+    const contatoHtml = _podeEditarMapeamento
+      ? `<div><label>Contato</label><span>${[contato.nome, contato.telefone, contato.email].filter(Boolean).map(escapeHtml).join(' • ') || '—'}</span></div>`
+      : '';
 
     el.innerHTML = `
       <div class="mapa-secao">
@@ -736,7 +762,7 @@
           <div><label>Regime Tributário</label><span>${m.regime_tributario ? REGIME_LABELS[m.regime_tributario] : '—'}</span></div>
           <div><label>Periodicidade</label><span>${m.periodicidade ? PERIODICIDADE_LABELS[m.periodicidade] : '—'}</span></div>
           <div><label>Responsável pela Execução</label><span>${m.responsavel_execucao ? escapeHtml(m.responsavel_execucao) : '—'}</span></div>
-          <div><label>Contato</label><span>${[m.contato_nome, m.contato_telefone, m.contato_email].filter(Boolean).map(escapeHtml).join(' • ') || '—'}</span></div>
+          ${contatoHtml}
           <div><label>Financeiro Interno/BPO</label><span>${m.financeiro_interno_bpo ? FINANCEIRO_LABELS[m.financeiro_interno_bpo] : '—'}</span></div>
           <div><label>Bancos Utilizados</label><span>${bancos.length ? bancos.map(escapeHtml).join(', ') : '—'}</span></div>
           <div><label>Sistemas Utilizados</label><span>${(m.sistemas_utilizados || []).length ? m.sistemas_utilizados.map(escapeHtml).join(', ') : '—'}</span></div>

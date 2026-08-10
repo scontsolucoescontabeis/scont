@@ -264,7 +264,11 @@
     // isso, o usuário teria que lembrar de marcar manualmente pra ver a
     // quais meses o filtro se referia.
     const emModoDocumentacao = filtros.statusGrade === 'documentacao_disponivel';
-    const colunasHtml = COLUNAS.map((c) => {
+    // Contato da empresa é restrito à equipe Scont/admin — nem aparece como
+    // opção de coluna para quem não pode editar o Mapeamento Estratégico
+    // (mesma restrição de contabil_mapeamento_contatos e da tela).
+    const colunasDisponiveis = ctx.podeValidar() ? COLUNAS : COLUNAS.filter((c) => c.key !== 'contato');
+    const colunasHtml = colunasDisponiveis.map((c) => {
       const forcarCheck = emModoDocumentacao && c.key === 'statusGrade';
       const label = forcarCheck ? 'Meses com Documentação Disponível' : c.label;
       return `
@@ -299,7 +303,7 @@
 
     el.querySelector('#btnGerarRelatorioPdf').addEventListener('click', async () => {
       const codigosSelecionados = Array.from(el.querySelectorAll('[data-empresa-codigo]:checked')).map((i) => i.getAttribute('data-empresa-codigo'));
-      const colunasSelecionadas = COLUNAS.filter((c) => el.querySelector(`[data-coluna-key="${c.key}"]`).checked);
+      const colunasSelecionadas = colunasDisponiveis.filter((c) => el.querySelector(`[data-coluna-key="${c.key}"]`).checked);
       if (!codigosSelecionados.length) return;
       await gerarPdfRelatorio(ctx, codigosSelecionados, colunasSelecionadas, filtros);
     });
@@ -383,7 +387,10 @@
           case 'regime': return m && m.regime_tributario ? (ctx.REGIME_LABELS[m.regime_tributario] || m.regime_tributario) : '—';
           case 'periodicidade': return m && m.periodicidade ? (ctx.PERIODICIDADE_LABELS[m.periodicidade] || m.periodicidade) : '—';
           case 'responsavel': return m && m.responsavel_execucao ? m.responsavel_execucao : '—';
-          case 'contato': return m ? [m.contato_nome, m.contato_telefone, m.contato_email].filter(Boolean).join(' • ') || '—' : '—';
+          case 'contato': {
+            const contato = m ? (ctx.contatoPorMapeamento[m.id] || {}) : {};
+            return [contato.nome, contato.telefone, contato.email].filter(Boolean).join(' • ') || '—';
+          }
           case 'financeiro': return m && m.financeiro_interno_bpo ? (ctx.FINANCEIRO_LABELS[m.financeiro_interno_bpo] || m.financeiro_interno_bpo) : '—';
           case 'bancos': return bancos.length ? bancos.join(', ') : '—';
           case 'sistemas': return m && (m.sistemas_utilizados || []).length ? m.sistemas_utilizados.join(', ') : '—';
