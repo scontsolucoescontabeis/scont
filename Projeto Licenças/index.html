@@ -1317,7 +1317,7 @@
 
         <button class="btn btn-primary" id="saveConfigBtn">Salvar configurações</button>
         <div class="note">
-          ℹ️ As configurações são salvas localmente no seu navegador. Os alertas visuais no dashboard respeitarão o número de dias configurado.
+          ℹ️ As configurações são compartilhadas entre todos os usuários. Além dos alertas visuais no dashboard, um alerta diário automático por e-mail é enviado (uma vez por documento) quando ele entra na janela de dias configurada ou vence, para o(s) e-mail(s) informado(s) acima.
         </div>
       </section>
 
@@ -2371,7 +2371,12 @@ function exportReports(format) {
     // CONFIGURAÇÕES
     // ============================================
 
-    function saveConfig() {
+    // Configurações de alerta ficam em configuracoes_licencas (chave/valor,
+    // compartilhada entre todos os usuários) — não mais em localStorage do
+    // navegador, porque a Edge Function agendada (alerta-licencas-vencimento,
+    // roda 1x/dia fora do navegador) precisa ler o mesmo "ativar/dias/e-mail"
+    // configurado aqui. Mesmo padrão de Certificado Digital.
+    async function saveConfig() {
       const alertDays = document.getElementById('alertDays').value;
       const alertEmail = document.getElementById('alertEmail').value;
       const alertEnabled = document.getElementById('alertEnabled').checked;
@@ -2381,11 +2386,19 @@ function exportReports(format) {
         return;
       }
 
-      localStorage.setItem('alertConfig', JSON.stringify({
-        days: parseInt(alertDays),
-        email: alertEmail,
-        enabled: alertEnabled
-      }));
+      const linhas = [
+        { chave: 'alertas_ativado', valor: String(alertEnabled) },
+        { chave: 'dias_alerta',     valor: String(parseInt(alertDays)) },
+        { chave: 'emails_alerta',   valor: alertEmail || '' },
+      ];
+      const { error } = await supabaseClient
+        .from('configuracoes_licencas')
+        .upsert(linhas, { onConflict: 'chave' });
+      if (error) {
+        console.error('Erro ao salvar configurações:', error);
+        showAlert('❌ Erro ao salvar configurações. Veja o console (F12) para detalhes.', 'error');
+        return;
+      }
 
       window.appConfig = {
         alertDays: parseInt(alertDays),
@@ -2397,16 +2410,21 @@ function exportReports(format) {
       showAlert(`✓ Configurações salvas! Alertas configurados para ${alertDays} dias`, 'success');
     }
 
-    function loadConfig() {
+    async function loadConfig() {
       console.log('⚙️ Carregando configurações...');
-      const config = JSON.parse(localStorage.getItem('alertConfig') || '{}');
       const alertDaysDefault = 30;
       const alertEmailDefault = '';
       const alertEnabledDefault = true;
 
-      const alertDays = config.days || alertDaysDefault;
-      const alertEmail = config.email || alertEmailDefault;
-      const alertEnabled = config.enabled !== undefined ? config.enabled : alertEnabledDefault;
+      const { data, error } = await supabaseClient.from('configuracoes_licencas').select('chave, valor');
+      if (error) console.error('Erro ao carregar configurações:', error);
+
+      const cfg = {};
+      (data || []).forEach(r => { cfg[r.chave] = r.valor; });
+
+      const alertDays = cfg.dias_alerta !== undefined ? parseInt(cfg.dias_alerta) : alertDaysDefault;
+      const alertEmail = cfg.emails_alerta !== undefined ? cfg.emails_alerta : alertEmailDefault;
+      const alertEnabled = cfg.alertas_ativado !== undefined ? cfg.alertas_ativado === 'true' : alertEnabledDefault;
 
       const alertDaysInput = document.getElementById('alertDays');
       const alertEmailInput = document.getElementById('alertEmail');
@@ -3874,15 +3892,16 @@ function exportReports(format) {
         document.getElementById('authOverlay')?.remove();
         console.log('✓ Autenticação validada:', auth.email);
 
-        // Carregar configurações PRIMEIRO
-        window.appConfig = loadConfig();
+        // Inicializar Supabase de Licenças PRIMEIRO — loadConfig() já lê
+        // configuracoes_licencas via supabaseClient
+        await initSupabase();
+
+        // Carregar configurações
+        window.appConfig = await loadConfig();
         console.log('✓ Configurações carregadas globalmente');
 
         // Setup de listeners
         setupEventListeners();
-
-        // Inicializar Supabase de Licenças
-        initSupabase();
       } catch (error) {
         console.error('❌ Erro durante inicialização:', error);
         showAlert('Erro ao inicializar aplicação', 'error');
