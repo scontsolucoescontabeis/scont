@@ -120,6 +120,18 @@
           </div>
           <div><label>Lançamentos — de</label><input type="date" id="filtroPeriodoDe"></div>
           <div><label>Lançamentos — até</label><input type="date" id="filtroPeriodoAte"></div>
+          <div>
+            <label>Lançamentos — Mês de referência</label>
+            <select id="filtroLancRefMes">
+              <option value="">Todos</option>
+              ${window.ContabilDiarioUtil.MESES_LABELS.map((l, idx) => `<option value="${idx + 1}">${l}</option>`).join('')}
+            </select>
+          </div>
+          <div><label>Lançamentos — Ano de referência</label><input type="number" id="filtroLancRefAno" placeholder="Ano" style="width:90px;"></div>
+          <div class="full">
+            <label>Lançamentos — Assunto</label>
+            <div class="mapa-checkbox-grupo">${checkboxGrupo('filtroLancAssunto', (ctx.ASSUNTOS_LANCAMENTO || []).map((a) => ({ value: a, label: a })))}</div>
+          </div>
           <div class="full"><button type="button" class="btn-novo" id="btnBuscarRelatorio">Buscar</button></div>
         </div>
       </div>
@@ -157,6 +169,9 @@
       financeiros: valoresMarcados('filtroFinanceiro'),
       periodoDe: document.getElementById('filtroPeriodoDe').value || null,
       periodoAte: document.getElementById('filtroPeriodoAte').value || null,
+      lancRefMes: document.getElementById('filtroLancRefMes').value ? Number(document.getElementById('filtroLancRefMes').value) : null,
+      lancRefAno: document.getElementById('filtroLancRefAno').value ? Number(document.getElementById('filtroLancRefAno').value) : null,
+      lancAssuntos: valoresMarcados('filtroLancAssunto'),
     };
   }
 
@@ -296,15 +311,18 @@
     return texto.length > max ? texto.slice(0, max) + '…' : texto;
   }
 
-  async function buscarInfoLancamentos(ctx, codigos, periodoDe, periodoAte) {
+  async function buscarInfoLancamentos(ctx, codigos, filtros) {
     let query = ctx.supabaseClient
       .from('contabil_diario_lancamentos')
-      .select('codigo_empresa, data, texto, criado_por_nome, criado_por_email, created_at')
+      .select('codigo_empresa, data, texto, criado_por_nome, criado_por_email, created_at, mes_referencia, ano_referencia, assunto')
       .in('codigo_empresa', codigos)
       .order('data', { ascending: false })
       .order('created_at', { ascending: false });
-    if (periodoDe) query = query.gte('data', periodoDe);
-    if (periodoAte) query = query.lte('data', periodoAte);
+    if (filtros.periodoDe) query = query.gte('data', filtros.periodoDe);
+    if (filtros.periodoAte) query = query.lte('data', filtros.periodoAte);
+    if (filtros.lancRefMes) query = query.eq('mes_referencia', filtros.lancRefMes);
+    if (filtros.lancRefAno) query = query.eq('ano_referencia', filtros.lancRefAno);
+    if (filtros.lancAssuntos.length) query = query.in('assunto', filtros.lancAssuntos);
     const { data, error } = await query;
     if (error) { console.error(error); return {}; }
 
@@ -338,13 +356,19 @@
       const ate = filtros.periodoAte ? parseDataLocalRelatorio(filtros.periodoAte).toLocaleDateString('pt-BR') : '—';
       partes.push(`Lançamentos: ${de} a ${ate}`);
     }
+    if (filtros.lancRefMes || filtros.lancRefAno) {
+      const mesTxt = filtros.lancRefMes ? window.ContabilDiarioUtil.MESES_LABELS[filtros.lancRefMes - 1] : 'todos os meses';
+      const anoTxt = filtros.lancRefAno ? String(filtros.lancRefAno) : 'todos os anos';
+      partes.push(`Lançamentos — Mês de referência: ${mesTxt}/${anoTxt}`);
+    }
+    if (filtros.lancAssuntos.length) partes.push(`Lançamentos — Assunto: ${filtros.lancAssuntos.join(', ')}`);
     return partes.length ? partes.join('  •  ') : 'Sem filtros aplicados';
   }
 
   async function gerarPdfRelatorio(ctx, codigos, colunas, filtros) {
     const precisaLancamentos = colunas.some((c) => c.key === 'qtdLancamentos' || c.key === 'ultimoLancamento');
     const infoLancamentos = precisaLancamentos
-      ? await buscarInfoLancamentos(ctx, codigos, filtros.periodoDe, filtros.periodoAte)
+      ? await buscarInfoLancamentos(ctx, codigos, filtros)
       : {};
 
     const linhas = codigos.map((codigo) => {
