@@ -26,7 +26,6 @@
 
   let empresas = [];          // [{ codigo_empresa, nome_empresa }]
   let mapeamentos = [];       // linhas de contabil_mapeamento
-  let pendenciasPorMapeamento = {}; // { mapeamento_id: [pendencias] }
   let bancosPorMapeamento = {};     // { mapeamento_id: [bancos] }
   let relacionadasPorEmpresa = {};  // cache simples { codigo_empresa: [codigo_empresa_relacionada, ...] }
   let mapeamentoAtualId = null;     // codigo_empresa selecionado (null = dashboard)
@@ -111,17 +110,6 @@
     mapeamentos = dataMapeamentos || [];
 
     const ids = mapeamentos.map((m) => m.id);
-    pendenciasPorMapeamento = {};
-    if (ids.length) {
-      const { data: pendencias, error: errPend } = await supabaseClient
-        .from('contabil_mapeamento_pendencias')
-        .select('*')
-        .in('mapeamento_id', ids);
-      if (errPend) console.error(errPend);
-      (pendencias || []).forEach((p) => {
-        (pendenciasPorMapeamento[p.mapeamento_id] = pendenciasPorMapeamento[p.mapeamento_id] || []).push(p);
-      });
-    }
 
     // Prestador de Serviço não pode ver dados bancários (nem em memória no
     // navegador) — só busca essa tabela para quem pode editar o Mapeamento.
@@ -147,10 +135,6 @@
     return m ? (m.nivel_atencao || 'baixo') : 'baixo';
   }
 
-  function pendenciasAbertasDe(mapeamentoId) {
-    return (pendenciasPorMapeamento[mapeamentoId] || []).filter((p) => p.status === 'aberta');
-  }
-
   function empresaNome(codigoEmpresa) {
     const e = empresas.find((x) => x.codigo_empresa === codigoEmpresa);
     return e ? e.nome_empresa : codigoEmpresa;
@@ -165,11 +149,6 @@
   function formatarMesAno(dataStr) {
     const d = window.parseDataLocal(dataStr);
     return d.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' });
-  }
-
-  function formatarData(dataStr) {
-    const d = window.parseDataLocal(dataStr);
-    return d.toLocaleDateString('pt-BR');
   }
 
   function mostrarToast(msg, tipo) {
@@ -232,7 +211,6 @@
     const linhas = empresasFiltradas().map((e) => {
       const m = mapeamentoDe(e.codigo_empresa);
       const nivel = nivelDe(e.codigo_empresa);
-      const abertas = m ? pendenciasAbertasDe(m.id).length : 0;
       return `
         <tr data-codigo="${escapeHtml(e.codigo_empresa)}">
           <td>${escapeHtml(e.nome_empresa)}</td>
@@ -240,7 +218,6 @@
           <td>${m && m.responsavel_execucao ? escapeHtml(m.responsavel_execucao) : '—'}</td>
           <td>${m && m.ultimo_mes_fechado ? formatarMesAno(m.ultimo_mes_fechado) : '—'}</td>
           <td><span class="badge-nivel nivel-${nivel}">${NIVEL_LABELS[nivel]}</span></td>
-          <td>${abertas}</td>
         </tr>
       `;
     }).join('');
@@ -258,8 +235,8 @@
         </select>
       </div>
       <table class="mapa-table">
-        <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Último mês fechado</th><th>Nível</th><th>Pendências</th></tr></thead>
-        <tbody>${linhas || '<tr><td colspan="6">Nenhuma empresa encontrada.</td></tr>'}</tbody>
+        <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Último mês fechado</th><th>Nível</th></tr></thead>
+        <tbody>${linhas || '<tr><td colspan="5">Nenhuma empresa encontrada.</td></tr>'}</tbody>
       </table>
     `;
 
@@ -391,7 +368,6 @@
       </div>
 
       <div id="secaoNivelAtencao"></div>
-      <div id="secaoPendencias"></div>
       <div id="secaoRelacionadas"></div>
 
       <div class="mapa-secao">
@@ -461,7 +437,6 @@
 
     renderizarSecaoComIsolamento('Acessos Bancários', renderBancos);
     renderizarSecaoComIsolamento('Nível de Atenção', renderNivelAtencao);
-    renderizarSecaoComIsolamento('Pendências', renderPendencias);
     renderizarSecaoComIsolamento('Empresas Relacionadas', renderRelacionadas);
   }
 
@@ -674,8 +649,9 @@
     const el = document.getElementById('secaoNivelAtencao');
     const m = mapeamentoAtual;
     const RO = !_podeEditar;
-    const pendencias = pendenciasPorMapeamento[m.id] || [];
-    const sugestao = window.calcularNivelSugerido(m, pendencias, new Date());
+    // Pendências do Mapeamento foram descontinuadas (seção removida) — a
+    // sugestão de nível agora considera só o atraso de fechamento.
+    const sugestao = window.calcularNivelSugerido(m, [], new Date());
 
     el.innerHTML = `
       <div class="mapa-secao">
@@ -705,95 +681,12 @@
 
   function atualizarSugestaoNivel() {
     if (!mapeamentoAtual || mapeamentoAtual.nivel_atencao_travado) { renderNivelAtencao(); return; }
-    const pendencias = pendenciasPorMapeamento[mapeamentoAtual.id] || [];
-    const sugestao = window.calcularNivelSugerido(mapeamentoAtual, pendencias, new Date());
+    const sugestao = window.calcularNivelSugerido(mapeamentoAtual, [], new Date());
     if (sugestao !== mapeamentoAtual.nivel_atencao) {
       mapeamentoAtual.nivel_atencao = sugestao;
       supabaseClient.from('contabil_mapeamento').update({ nivel_atencao: sugestao }).eq('id', mapeamentoAtual.id).then(({ error }) => { if (error) console.error(error); });
     }
     renderNivelAtencao();
-  }
-
-  // ─── PENDÊNCIAS ─────────────────────────────────────────────
-
-  function renderPendencias() {
-    const el = document.getElementById('secaoPendencias');
-    const m = mapeamentoAtual;
-    const RO = !_podeEditar;
-    const pendencias = (pendenciasPorMapeamento[m.id] || []).slice().sort((a, b) => (a.status === b.status ? 0 : a.status === 'aberta' ? -1 : 1));
-    const hoje = new Date();
-
-    const itensHtml = pendencias.map((p) => {
-      const vencida = p.status === 'aberta' && p.prazo && window.parseDataLocal(p.prazo) < hoje;
-      return `
-        <div class="mapa-pendencia-item ${vencida ? 'vencida' : ''} ${p.status === 'resolvida' ? 'resolvida' : ''}">
-          <span class="desc">${escapeHtml(p.descricao)}${p.responsavel ? ` — <em>${escapeHtml(p.responsavel)}</em>` : ''}${p.prazo ? ` (prazo: ${formatarData(p.prazo)})` : ''}</span>
-          ${RO ? '' : `
-            <span class="acoes">
-              ${p.status === 'aberta' ? `<button type="button" data-resolver="${p.id}">Resolver</button>` : ''}
-              <button type="button" class="btn-excluir-pendencia" data-excluir="${p.id}">Excluir</button>
-            </span>
-          `}
-        </div>
-      `;
-    }).join('') || '<p class="mapa-empty">Nenhuma pendência registrada.</p>';
-
-    el.innerHTML = `
-      <div class="mapa-secao">
-        <div class="mapa-secao-header">Pendências</div>
-        <div class="mapa-secao-body">
-          <div class="full">${itensHtml}</div>
-          ${RO ? '' : `
-            <div><label>Descrição</label><input type="text" id="novaPendenciaDesc" placeholder="Ex: Enviar guia DAS de junho"></div>
-            <div><label>Responsável</label><input type="text" id="novaPendenciaResp" placeholder="Nome do responsável"></div>
-            <div><label>Prazo</label><input type="date" id="novaPendenciaPrazo"></div>
-            <div style="align-self:end;"><button type="button" id="btnAddPendencia" class="btn-novo">+ Adicionar Pendência</button></div>
-          `}
-        </div>
-      </div>
-    `;
-
-    if (RO) return;
-
-    el.querySelectorAll('[data-resolver]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const id = btn.getAttribute('data-resolver');
-        const { error } = await supabaseClient.from('contabil_mapeamento_pendencias').update({ status: 'resolvida', resolvido_em: new Date().toISOString() }).eq('id', id);
-        if (error) { console.error(error); mostrarToast('Erro ao resolver a pendência. Veja o console (F12) para detalhes.', 'erro'); return; }
-        const item = (pendenciasPorMapeamento[m.id] || []).find((p) => p.id === id);
-        if (item) { item.status = 'resolvida'; item.resolvido_em = new Date().toISOString(); }
-        atualizarSugestaoNivel();
-        renderPendencias();
-      });
-    });
-
-    el.querySelectorAll('[data-excluir]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const id = btn.getAttribute('data-excluir');
-        if (!window.confirm('Excluir esta pendência? Essa ação não pode ser desfeita.')) return;
-        const { error } = await supabaseClient.from('contabil_mapeamento_pendencias').delete().eq('id', id);
-        if (error) { console.error(error); mostrarToast('Erro ao excluir a pendência. Veja o console (F12) para detalhes.', 'erro'); return; }
-        pendenciasPorMapeamento[m.id] = (pendenciasPorMapeamento[m.id] || []).filter((p) => p.id !== id);
-        atualizarSugestaoNivel();
-        renderPendencias();
-      });
-    });
-
-    el.querySelector('#btnAddPendencia').addEventListener('click', async () => {
-      const descricao = document.getElementById('novaPendenciaDesc').value.trim();
-      if (!descricao) return;
-      const responsavel = document.getElementById('novaPendenciaResp').value.trim() || null;
-      const prazo = document.getElementById('novaPendenciaPrazo').value || null;
-      const { data, error } = await supabaseClient
-        .from('contabil_mapeamento_pendencias')
-        .insert({ mapeamento_id: m.id, descricao, responsavel, prazo, status: 'aberta' })
-        .select()
-        .single();
-      if (error) { console.error(error); mostrarToast('Erro ao adicionar a pendência. Veja o console (F12) para detalhes.', 'erro'); return; }
-      (pendenciasPorMapeamento[m.id] = pendenciasPorMapeamento[m.id] || []).push(data);
-      atualizarSugestaoNivel();
-      renderPendencias();
-    });
   }
 
   // ─── EMPRESAS RELACIONADAS ──────────────────────────────────
@@ -936,28 +829,6 @@
       ['Particularidades Fiscais', texto(m.particularidades_fiscais)],
       ['Particularidades Societárias', texto(m.particularidades_societarias)],
     ], y, pageW, MARGEM);
-
-    const pendencias = pendenciasPorMapeamento[m.id] || [];
-    if (y > pageH - 45) { doc.addPage(); y = MARGEM; }
-    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(139, 58, 58);
-    doc.text('Pendências', MARGEM, y);
-    y += 3;
-    if (pendencias.length) {
-      doc.autoTable({
-        head: [['Descrição', 'Responsável', 'Prazo', 'Status']],
-        body: pendencias.map((p) => [p.descricao, p.responsavel || '—', p.prazo ? formatarData(p.prazo) : '—', p.status === 'aberta' ? 'Aberta' : 'Resolvida']),
-        startY: y,
-        margin: { left: MARGEM, right: MARGEM },
-        styles: { fontSize: 8, cellPadding: 1.6 },
-        headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 8 },
-        alternateRowStyles: { fillColor: [249, 250, 251] },
-      });
-      y = doc.lastAutoTable.finalY + 8;
-    } else {
-      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(90, 108, 125);
-      doc.text('Nenhuma pendência registrada.', MARGEM, y + 3);
-      y += 12;
-    }
 
     const { data: relData, error: relErr } = await supabaseClient
       .from('contabil_mapeamento_relacionadas')

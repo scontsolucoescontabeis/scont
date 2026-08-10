@@ -11,7 +11,6 @@
 
   let empresas = [];
   let mapeamentos = [];
-  let pendenciasPorMapeamento = {};
   let bancosPorMapeamento = {};
   let statusMensalPorEmpresa = {}; // { codigo_empresa: { 'ano-mes': status } }
   let motivoPendenciaPorEmpresa = {}; // { codigo_empresa: { 'ano-mes': motivo|null } }
@@ -143,18 +142,11 @@
     });
 
     const ids = mapeamentos.map((m) => m.id);
-    pendenciasPorMapeamento = {};
     bancosPorMapeamento = {};
     if (ids.length) {
-      const [{ data: pendencias, error: errPend }, { data: bancos, error: errBancos }] = await Promise.all([
-        supabaseClient.from('contabil_mapeamento_pendencias').select('*').in('mapeamento_id', ids),
-        supabaseClient.from('contabil_mapeamento_bancos').select('*').in('mapeamento_id', ids),
-      ]);
-      if (errPend) console.error(errPend);
+      const { data: bancos, error: errBancos } = await supabaseClient
+        .from('contabil_mapeamento_bancos').select('*').in('mapeamento_id', ids);
       if (errBancos) console.error(errBancos);
-      (pendencias || []).forEach((p) => {
-        (pendenciasPorMapeamento[p.mapeamento_id] = pendenciasPorMapeamento[p.mapeamento_id] || []).push(p);
-      });
       (bancos || []).forEach((b) => {
         (bancosPorMapeamento[b.mapeamento_id] = bancosPorMapeamento[b.mapeamento_id] || []).push(b);
       });
@@ -391,8 +383,14 @@
     return m ? (m.nivel_atencao || 'baixo') : 'baixo';
   }
 
-  function pendenciasAbertasDe(mapeamentoId) {
-    return (pendenciasPorMapeamento[mapeamentoId] || []).filter((p) => p.status === 'aberta');
+  // Conta quantos meses da grade (todos os anos) estão marcados como
+  // "pendencia" para a empresa — substitui a antiga contagem de pendências
+  // abertas do Mapeamento Estratégico (tabela contabil_mapeamento_pendencias,
+  // descontinuada na tela do Mapeamento).
+  function mesesComPendenciaDe(codigoEmpresa) {
+    const bucket = statusMensalPorEmpresa[codigoEmpresa];
+    if (!bucket) return 0;
+    return Object.values(bucket).filter((status) => status === 'pendencia').length;
   }
 
   function statusDoMes(codigoEmpresa, ano, mes) {
@@ -531,14 +529,14 @@
     const linhas = empresasFiltradasDashboard().map((e) => {
       const m = mapeamentoDe(e.codigo_empresa);
       const nivel = nivelDe(e.codigo_empresa);
-      const abertas = m ? pendenciasAbertasDe(m.id).length : 0;
+      const mesesPendencia = mesesComPendenciaDe(e.codigo_empresa);
       return `
         <tr data-codigo="${escapeHtml(e.codigo_empresa)}">
           <td>${escapeHtml(e.nome_empresa)}</td>
           <td>${m && m.regime_tributario ? (REGIME_LABELS[m.regime_tributario] || m.regime_tributario) : '—'}</td>
           <td>${m && m.responsavel_execucao ? escapeHtml(m.responsavel_execucao) : '—'}</td>
           <td><span class="badge-nivel nivel-${nivel}">${NIVEL_LABELS[nivel]}</span></td>
-          <td>${abertas}</td>
+          <td>${mesesPendencia}</td>
           <td>${miniGradeDocumentacaoHtml(e.codigo_empresa)}</td>
           <td>${miniGradeHtml(e.codigo_empresa)}</td>
         </tr>
