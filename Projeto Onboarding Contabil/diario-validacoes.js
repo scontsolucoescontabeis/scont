@@ -101,6 +101,7 @@
           <td>${mesAno(t.ano, t.mes)}</td>
           <td>${ctx.escapeHtml(evento.usuario_nome || evento.usuario_email || '—')}</td>
           <td>${formatarDataHora(evento.created_at)}</td>
+          <td>${evento.balancete_url ? `<a href="#" class="arquivo-link" data-ver-balancete="${ctx.escapeHtml(evento.balancete_url)}">📄 ${ctx.escapeHtml(evento.balancete_nome || 'ver')}</a>` : '—'}</td>
           <td>${tempoTotal}</td>
           <td>
             <button type="button" class="btn btn-primary btn-aprovar-validacao" data-codigo="${ctx.escapeHtml(t.codigo_empresa)}" data-ano="${t.ano}" data-mes="${t.mes}">Aprovar</button>
@@ -109,7 +110,7 @@
         </tr>
         ${rejeicaoAberta ? `
         <tr class="linha-rejeicao" data-chave-rejeicao="${chave}">
-          <td colspan="6">
+          <td colspan="7">
             <label>Motivo da rejeição (obrigatório)</label>
             <textarea class="txt-motivo-rejeicao" rows="2" placeholder="Explique o que precisa ser corrigido..."></textarea>
             <button type="button" class="btn btn-secondary btn-confirmar-rejeicao" data-codigo="${ctx.escapeHtml(t.codigo_empresa)}" data-ano="${t.ano}" data-mes="${t.mes}">Confirmar rejeição</button>
@@ -123,12 +124,19 @@
         <div class="mapa-secao-header">Pendentes para você (${pendentes.length})</div>
         <div class="mapa-secao-body">
           <table class="mapa-table full">
-            <thead><tr><th>Empresa</th><th>Mês/Ano</th><th>Enviado por</th><th>Enviado em</th><th>Tempo total</th><th>Ação</th></tr></thead>
+            <thead><tr><th>Empresa</th><th>Mês/Ano</th><th>Enviado por</th><th>Enviado em</th><th>Balancete</th><th>Tempo total</th><th>Ação</th></tr></thead>
             <tbody>${linhasHtml}</tbody>
           </table>
         </div>
       </div>
     `;
+
+    el.querySelectorAll('[data-ver-balancete]').forEach((link) => {
+      link.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ctx.abrirBalancete(link.getAttribute('data-ver-balancete'));
+      });
+    });
 
     el.querySelectorAll('.btn-aprovar-validacao').forEach((btn) => {
       btn.addEventListener('click', () => acaoAprovar(ctx, btn.getAttribute('data-codigo'), Number(btn.getAttribute('data-ano')), Number(btn.getAttribute('data-mes'))));

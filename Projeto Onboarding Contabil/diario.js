@@ -2,6 +2,7 @@
   'use strict';
 
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const BUCKET = 'documentos';
 
   const NIVEL_LABELS = { baixo: 'Baixo', medio: 'Médio', alto: 'Alto', critico: 'Crítico' };
   const REGIME_LABELS = { simples_nacional: 'Simples Nacional', lucro_presumido: 'Lucro Presumido', lucro_real: 'Lucro Real', mei: 'MEI' };
@@ -36,6 +37,13 @@
   let _meusResponsaveisSet = new Set(); // empresas onde o usuário logado é responsável atribuído
   let fechamentos = []; // linhas cruas de contabil_diario_fechamentos
   let fechamentosPorChave = {}; // 'codigo|ano|mes' -> eventos (mais recente primeiro)
+
+  // Modal de encerramento: quando quem encerra também pode validar (equipe
+  // Scont/admin), o clique não envia direto — abre uma etapa de revisão
+  // dentro do mesmo modal antes de confirmar o encerramento já aprovado.
+  let _etapaEncerramento = 'form'; // 'form' | 'revisao'
+  let _arquivoBalanceteSelecionado = null; // File escolhido, guardado entre os passos
+  let _observacaoEncerramentoPendente = '';
 
   document.addEventListener('DOMContentLoaded', iniciar);
 
@@ -195,6 +203,7 @@
       atualizarBadgeValidacoes,
       mostrarToast,
       buscarEventosStatusGrade,
+      abrirBalancete,
     };
   }
 
@@ -215,7 +224,33 @@
     return 'aberto'; // rejeitado volta para aberto
   }
 
-  async function criarEventoFechamento(codigoEmpresa, ano, mes, tipoEvento, mensagem) {
+  // Balancete do mês (PDF) fica no bucket compartilhado "documentos" (mesmo
+  // do Onboarding), num caminho próprio cuja leitura é restrita por RLS
+  // (equipe Scont ou responsável pela empresa — ver
+  // _sql/schema_contabil_diario_fechamentos_balancete.sql).
+  function caminhoBalancete(codigoEmpresa, ano, mes, nomeArquivo) {
+    const nomeSeguro = nomeArquivo.replace(/\s+/g, '_');
+    return `diario-contabil-balancetes/${codigoEmpresa}/${ano}-${String(mes).padStart(2, '0')}/${Date.now()}_${nomeSeguro}`;
+  }
+
+  async function uploadBalancete(codigoEmpresa, ano, mes, file) {
+    const caminho = caminhoBalancete(codigoEmpresa, ano, mes, file.name);
+    const { error } = await supabaseClient.storage.from(BUCKET).upload(caminho, file, {
+      contentType: file.type || 'application/pdf',
+      cacheControl: '3600',
+    });
+    if (error) return { error };
+    return { data: { url: caminho, nome: file.name } };
+  }
+
+  async function abrirBalancete(caminho) {
+    if (!caminho) return;
+    const { data, error } = await supabaseClient.storage.from(BUCKET).createSignedUrl(caminho, 60);
+    if (error) { console.error(error); mostrarToast('Erro ao abrir o balancete. Veja o console (F12) para detalhes.', 'erro'); return; }
+    window.open(data.signedUrl, '_blank');
+  }
+
+  async function criarEventoFechamento(codigoEmpresa, ano, mes, tipoEvento, mensagem, balancete) {
     const auth = window.__contabilAuth || {};
     // Capturado ANTES do insert: quem enviou para validação é o autor do
     // evento 'enviado' mais recente (o que está prestes a ser substituído
@@ -233,6 +268,8 @@
       usuario_id: auth.userId || null,
       usuario_nome: auth.userData?.nome || null,
       usuario_email: auth.email || null,
+      balancete_url: balancete ? balancete.url : null,
+      balancete_nome: balancete ? balancete.nome : null,
     };
     const { data, error } = await supabaseClient.from('contabil_diario_fechamentos').insert(registro).select().single();
     if (error) return { error };
@@ -1215,6 +1252,7 @@
       <div class="fechamento-evento">
         <div><strong>${TIPO_EVENTO_LABEL[ev.tipo_evento] || ev.tipo_evento}</strong> — ${escapeHtml(ev.usuario_nome || ev.usuario_email || 'desconhecido')} <span class="mapa-empty">(${formatarDataHoraFechamento(ev.created_at)})</span></div>
         ${ev.mensagem ? `<div class="fechamento-evento-msg">${escapeHtml(ev.mensagem)}</div>` : ''}
+        ${ev.balancete_url ? `<div><a href="#" class="arquivo-link" data-ver-balancete="${escapeHtml(ev.balancete_url)}">📄 ${escapeHtml(ev.balancete_nome || 'Balancete do mês')}</a></div>` : ''}
       </div>
     `).join('');
   }
@@ -1246,6 +1284,9 @@
 
     document.getElementById('modalFechamentoTitulo').textContent =
       `Fechamento — ${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano} — ${empresaNome(codigoEmpresa)}`;
+    _etapaEncerramento = 'form';
+    _arquivoBalanceteSelecionado = null;
+    _observacaoEncerramentoPendente = '';
     renderModalFechamentoBody(codigoEmpresa, ano, mes);
     modal.classList.add('active');
   }
@@ -1263,23 +1304,53 @@
     `;
   }
 
+  function acaoEncerramentoFormHtml(autoAprovar) {
+    return `
+      <div class="mapa-secao-body" style="padding:0 0 16px;">
+        <div class="full"><label>Balancete do Mês (PDF) — obrigatório</label><input type="file" id="fechBalanceteArquivo" accept="application/pdf,.pdf"></div>
+        <div class="full"><label>Observação (opcional)</label><textarea id="fechObservacaoEnvio" rows="2" placeholder="Alguma observação para a equipe Scont...">${escapeHtml(_observacaoEncerramentoPendente)}</textarea></div>
+        <div class="full"><button type="button" class="btn btn-primary" id="btnEncerrarMes">${autoAprovar ? 'Revisar e Encerrar' : 'Encerrar mês contábil'}</button></div>
+      </div>
+    `;
+  }
+
+  function acaoEncerramentoRevisaoHtml(codigoEmpresa, ano, mes) {
+    return `
+      <div class="mapa-secao-body" style="padding:0 0 16px;">
+        <div class="full"><p class="mapa-empty" style="margin:0;">
+          Revise antes de confirmar — ${escapeHtml(empresaNome(codigoEmpresa))},
+          ${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}.
+        </p></div>
+        <div class="full"><label>Balancete anexado</label><span>📄 ${escapeHtml(_arquivoBalanceteSelecionado ? _arquivoBalanceteSelecionado.name : '—')}</span></div>
+        ${_observacaoEncerramentoPendente ? `<div class="full"><label>Observação</label><span>${escapeHtml(_observacaoEncerramentoPendente)}</span></div>` : ''}
+        <div class="full"><p class="mapa-empty" style="margin:0;">
+          Você faz parte da equipe Scont — este encerramento será aprovado diretamente,
+          sem passar por validação. Tem certeza que deseja confirmar?
+        </p></div>
+        <div class="full" style="display:flex; gap:10px;">
+          <button type="button" class="btn btn-secondary" id="btnVoltarEncerramento">Voltar</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmarEncerramento">Confirmar Encerramento</button>
+        </div>
+      </div>
+    `;
+  }
+
   async function renderModalFechamentoBody(codigoEmpresa, ano, mes) {
     const body = document.getElementById('modalFechamentoBody');
     const statusFech = statusFechamentoDoMes(codigoEmpresa, ano, mes);
     const ultimo = eventosFechamentoDoMes(codigoEmpresa, ano, mes)[0];
+    const autoAprovar = podeValidar();
 
     let acaoHtml = '';
     if (statusFech === 'aberto' && podeEncerrar(codigoEmpresa)) {
-      acaoHtml = `
-        <div class="mapa-secao-body" style="padding:0 0 16px;">
-          <div class="full"><label>Observação (opcional)</label><textarea id="fechObservacaoEnvio" rows="2" placeholder="Alguma observação para a equipe Scont..."></textarea></div>
-          <div class="full"><button type="button" class="btn btn-primary" id="btnEncerrarMes">Encerrar mês contábil</button></div>
-        </div>
-      `;
+      acaoHtml = _etapaEncerramento === 'revisao' && autoAprovar
+        ? acaoEncerramentoRevisaoHtml(codigoEmpresa, ano, mes)
+        : acaoEncerramentoFormHtml(autoAprovar);
     } else if (statusFech === 'aguardando_validacao') {
       if (podeValidar()) {
         acaoHtml = `
           <div class="mapa-secao-body" style="padding:0 0 16px;">
+            ${ultimo && ultimo.balancete_url ? `<div class="full"><label>Balancete do Mês</label><a href="#" class="arquivo-link" data-ver-balancete="${escapeHtml(ultimo.balancete_url)}">📄 ${escapeHtml(ultimo.balancete_nome || 'ver balancete')}</a></div>` : ''}
             <div class="full"><button type="button" class="btn btn-primary" id="btnAprovarFechamento">Aprovar</button></div>
             <div class="full"><label>Motivo da rejeição (obrigatório para rejeitar)</label><textarea id="fechMotivoRejeicao" rows="2" placeholder="Explique o que precisa ser corrigido..."></textarea></div>
             <div class="full"><button type="button" class="btn btn-secondary" id="btnRejeitarFechamento">Rejeitar</button></div>
@@ -1302,15 +1373,62 @@
       <div id="fechTimeline">${timelineFechamentoHtml(codigoEmpresa, ano, mes)}</div>
     `;
 
+    body.querySelectorAll('[data-ver-balancete]').forEach((link) => {
+      link.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        abrirBalancete(link.getAttribute('data-ver-balancete'));
+      });
+    });
+
     const btnEncerrar = document.getElementById('btnEncerrarMes');
     if (btnEncerrar) {
       btnEncerrar.addEventListener('click', async () => {
-        btnEncerrar.disabled = true;
+        const arquivo = document.getElementById('fechBalanceteArquivo').files[0];
+        if (!arquivo) { mostrarToast('Anexe o balancete do mês em PDF antes de encerrar.', 'erro'); return; }
         const mensagem = document.getElementById('fechObservacaoEnvio').value.trim();
-        const { error } = await criarEventoFechamento(codigoEmpresa, ano, mes, 'enviado', mensagem);
+
+        if (autoAprovar) {
+          _arquivoBalanceteSelecionado = arquivo;
+          _observacaoEncerramentoPendente = mensagem;
+          _etapaEncerramento = 'revisao';
+          renderModalFechamentoBody(codigoEmpresa, ano, mes);
+          return;
+        }
+
+        btnEncerrar.disabled = true;
+        const { data: balancete, error: errUpload } = await uploadBalancete(codigoEmpresa, ano, mes, arquivo);
+        if (errUpload) { console.error(errUpload); btnEncerrar.disabled = false; mostrarToast('Erro ao enviar o balancete.', 'erro'); return; }
+        const { error } = await criarEventoFechamento(codigoEmpresa, ano, mes, 'enviado', mensagem, balancete);
         btnEncerrar.disabled = false;
         if (error) { console.error(error); mostrarToast('Erro ao encerrar o mês.', 'erro'); return; }
         mostrarToast('Mês encerrado e enviado para validação da equipe Scont.', 'sucesso');
+        renderModalFechamentoBody(codigoEmpresa, ano, mes);
+        renderGradeMensal();
+      });
+    }
+
+    const btnVoltarEncerramento = document.getElementById('btnVoltarEncerramento');
+    if (btnVoltarEncerramento) {
+      btnVoltarEncerramento.addEventListener('click', () => {
+        _etapaEncerramento = 'form';
+        _arquivoBalanceteSelecionado = null;
+        renderModalFechamentoBody(codigoEmpresa, ano, mes);
+      });
+    }
+
+    const btnConfirmarEncerramento = document.getElementById('btnConfirmarEncerramento');
+    if (btnConfirmarEncerramento) {
+      btnConfirmarEncerramento.addEventListener('click', async () => {
+        btnConfirmarEncerramento.disabled = true;
+        const { data: balancete, error: errUpload } = await uploadBalancete(codigoEmpresa, ano, mes, _arquivoBalanceteSelecionado);
+        if (errUpload) { console.error(errUpload); btnConfirmarEncerramento.disabled = false; mostrarToast('Erro ao enviar o balancete.', 'erro'); return; }
+        const { error } = await criarEventoFechamento(codigoEmpresa, ano, mes, 'aprovado', _observacaoEncerramentoPendente, balancete);
+        btnConfirmarEncerramento.disabled = false;
+        if (error) { console.error(error); mostrarToast('Erro ao encerrar o mês.', 'erro'); return; }
+        mostrarToast('Mês encerrado e aprovado diretamente pela equipe Scont.', 'sucesso');
+        _etapaEncerramento = 'form';
+        _arquivoBalanceteSelecionado = null;
+        _observacaoEncerramentoPendente = '';
         renderModalFechamentoBody(codigoEmpresa, ano, mes);
         renderGradeMensal();
       });
