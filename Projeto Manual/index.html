@@ -10,6 +10,9 @@
     <script src="../supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="../portal-auth-guard.js"></script>
+    <!-- jsPDF + AutoTable (Gerar PDF do manual) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <script src="tools-map.js"></script>
     <script src="content-data.js"></script>
 </head>
@@ -32,7 +35,10 @@
 
         <main class="manual-conteudo">
             <div class="manual-header-conteudo">
-                <h1 id="manualHeaderTitulo">Selecione uma ferramenta</h1>
+                <div class="manual-header-linha">
+                    <h1 id="manualHeaderTitulo">Selecione uma ferramenta</h1>
+                    <button type="button" id="manualBtnPdf" class="manual-btn-pdf" style="display:none;">📄 Gerar PDF</button>
+                </div>
                 <p>Forma de uso, funcionalidades e memórias de cálculo de cada ferramenta do portal.</p>
             </div>
             <div id="manualCorpo" class="manual-corpo">

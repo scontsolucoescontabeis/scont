@@ -128,6 +128,27 @@ body {
     font-size: 24px;
 }
 .manual-header-conteudo p { margin: 0; color: var(--text-light); font-size: 14px; }
+.manual-header-linha {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+.manual-header-linha h1 { flex: 1; }
+.manual-btn-pdf {
+    flex-shrink: 0;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.manual-btn-pdf:hover { opacity: .9; }
+.manual-btn-pdf:disabled { opacity: .6; cursor: wait; }
 
 .manual-corpo {
     background: var(--card);
