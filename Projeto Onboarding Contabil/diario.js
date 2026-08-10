@@ -1414,6 +1414,23 @@
             <button type="button" class="btn btn-secondary" id="btnFiltrarLancamentos">Filtrar</button>
             <button type="button" class="btn btn-secondary" id="btnLimparFiltroLancamentos">Limpar</button>
           </div>
+          <div class="full mapa-filtros" style="margin-top:8px;">
+            <div>
+              <label>Mês de referência</label>
+              <select id="filtroLancamentoRefMes">
+                <option value="">Todos</option>
+                ${window.ContabilDiarioUtil.MESES_LABELS.map((l, idx) => `<option value="${idx + 1}">${l}</option>`).join('')}
+              </select>
+            </div>
+            <div><label>Ano de referência</label><input type="number" id="filtroLancamentoRefAno" placeholder="Ano" style="width:80px;"></div>
+            <div style="flex:1; min-width:220px;">
+              <label>Assunto</label>
+              <select id="filtroLancamentoAssunto">
+                <option value="">Todos</option>
+                ${ASSUNTOS_LANCAMENTO.map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
           <div class="full" id="listaLancamentos"><p class="mapa-empty">Carregando...</p></div>
         </div>
       </div>
@@ -1456,8 +1473,14 @@
       document.getElementById('filtroLancamentoAte').value = '';
       document.getElementById('filtroLancamentoMes').value = '';
       document.getElementById('filtroLancamentoAno').value = '';
+      document.getElementById('filtroLancamentoRefMes').value = '';
+      document.getElementById('filtroLancamentoRefAno').value = '';
+      document.getElementById('filtroLancamentoAssunto').value = '';
       carregarListaLancamentos();
     });
+    el.querySelector('#filtroLancamentoRefMes').addEventListener('change', () => carregarListaLancamentos());
+    el.querySelector('#filtroLancamentoRefAno').addEventListener('change', () => carregarListaLancamentos());
+    el.querySelector('#filtroLancamentoAssunto').addEventListener('change', () => carregarListaLancamentos());
     el.querySelector('#btnFiltroMesAtual').addEventListener('click', () => {
       const hoje = new Date();
       document.getElementById('filtroLancamentoMes').value = String(hoje.getMonth() + 1);
@@ -1497,6 +1520,9 @@
     const container = document.getElementById('listaLancamentos');
     const de = document.getElementById('filtroLancamentoDe')?.value || null;
     const ate = document.getElementById('filtroLancamentoAte')?.value || null;
+    const refMes = document.getElementById('filtroLancamentoRefMes')?.value || null;
+    const refAno = document.getElementById('filtroLancamentoRefAno')?.value || null;
+    const assunto = document.getElementById('filtroLancamentoAssunto')?.value || null;
 
     let query = supabaseClient
       .from('contabil_diario_lancamentos')
@@ -1504,6 +1530,9 @@
       .eq('codigo_empresa', empresaAtualCodigo);
     if (de) query = query.gte('data', de);
     if (ate) query = query.lte('data', ate);
+    if (refMes) query = query.eq('mes_referencia', Number(refMes));
+    if (refAno) query = query.eq('ano_referencia', Number(refAno));
+    if (assunto) query = query.eq('assunto', assunto);
 
     const { data, error } = await query
       .order('data', { ascending: false })
