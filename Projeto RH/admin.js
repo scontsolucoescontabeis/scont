@@ -868,24 +868,25 @@ function _vgRenderizarTabela(porEmpresa) {
         let linhaDetalhe = '';
         if (expandido) {
             const linhasSituacao = situacoes.map(([situacao, s]) => `
-                <tr style="background:#FAFAFA;">
-                    <td></td>
-                    <td style="padding-left:24px;color:#555;">${situacao}</td>
-                    <td>${s.total}</td>
-                    <td>${s.porTipo['Empregado'] || 0}</td>
-                    <td>${s.porTipo['Estágiario'] || 0}</td>
-                    <td>${s.porTipo['Contribuinte'] || 0}</td>
-                </tr>`).join('');
-            linhaDetalhe = `<tr id="vgDetalhe-${cod}"><td colspan="6" style="padding:0;border:none;">
-                <table class="admin-table" style="width:100%;">
-                    <thead><tr><th style="width:26px;"></th><th>Situação</th><th>Total</th><th>Empregados</th><th>Estagiários</th><th>Contribuintes</th></tr></thead>
-                    <tbody>${linhasSituacao || '<tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:10px;">Sem vínculos no período.</td></tr>'}</tbody>
-                </table>
+                <div class="vg-detalhe-grid vg-detalhe-row">
+                    <span>${situacao}</span>
+                    <span>${s.total}</span>
+                    <span>${s.porTipo['Empregado'] || 0}</span>
+                    <span>${s.porTipo['Estágiario'] || 0}</span>
+                    <span>${s.porTipo['Contribuinte'] || 0}</span>
+                </div>`).join('');
+            linhaDetalhe = `<tr id="vgDetalhe-${cod}"><td colspan="6" style="padding:0;border:none;background:#FCFAF9;">
+                <div style="padding:6px 16px 14px 46px;">
+                    <div class="vg-detalhe-grid vg-detalhe-head">
+                        <span>Situação</span><span>Total</span><span>Empregados</span><span>Estagiários</span><span>Contribuintes</span>
+                    </div>
+                    ${linhasSituacao || '<div class="vg-empty">Sem vínculos no período.</div>'}
+                </div>
             </td></tr>`;
         }
 
-        return `<tr>
-            <td style="cursor:pointer;text-align:center;" onclick="_vgToggleLinha('${cod}')">${expandido ? '▼' : '▶'}</td>
+        return `<tr class="vg-empresa-row${expandido ? ' expandida' : ''}" onclick="_vgToggleLinha('${cod}')">
+            <td style="text-align:center;"><span class="vg-arrow${expandido ? ' expandido' : ''}">▶</span></td>
             <td><strong>${cod}</strong> — ${r.nome}</td>
             <td>${r.total}</td>
             <td>${r.porTipo['Empregado'] || 0}</td>

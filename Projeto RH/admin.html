@@ -60,6 +60,17 @@
             .form-row { grid-template-columns: 1fr; }
             .import-grid { grid-template-columns: 1fr; }
         }
+        .vg-empresa-row { cursor: pointer; }
+        .admin-table tbody tr.vg-empresa-row:hover { background: #FBF0F0; }
+        .admin-table tbody tr.vg-empresa-row.expandida { background: #F8ECEC; }
+        .vg-arrow { display: inline-block; color: #8B3A3A; font-size: 11px; transition: transform 0.18s ease; }
+        .vg-arrow.expandido { transform: rotate(90deg); }
+        .vg-detalhe-grid { display: grid; grid-template-columns: 2.2fr 0.8fr 1fr 1fr 1fr; gap: 6px; align-items: center; }
+        .vg-detalhe-head { padding: 6px 10px 8px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #8B3A3A; border-bottom: 1.5px solid #E8D6D6; }
+        .vg-detalhe-row { padding: 7px 10px; font-size: 12.5px; color: #444; border-bottom: 1px solid #EFE7E7; border-radius: 4px; }
+        .vg-detalhe-row:last-child { border-bottom: none; }
+        .vg-detalhe-row:hover { background: #F3E7E7; }
+        .vg-empty { text-align: center; color: #95A5A6; padding: 10px; font-size: 12px; }
     </style>
 </head>
 <body>
