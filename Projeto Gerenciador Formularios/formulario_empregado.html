@@ -1322,18 +1322,15 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
 
             console.log('✅ Arquivo enviado com sucesso:', uploadData);
 
-            const { data: publicUrl } = supabase.storage
-                .from(BUCKET_NAME)
-                .getPublicUrl(caminhoCompleto);
-
-            console.log('🔗 URL pública:', publicUrl.publicUrl);
-
+            // BUCKET_NAME ("documentos") é privado — não existe URL pública de
+            // verdade pra guardar aqui; qualquer tela que for exibir o arquivo
+            // depois deve gerar um link via createSignedUrl(caminho), igual ao
+            // resto do portal.
             console.log('✅✅✅ UPLOAD CONCLUÍDO COM SUCESSO ✅✅✅');
 
             return {
                 sucesso: true,
                 caminho: caminhoCompleto,
-                url: publicUrl.publicUrl,
                 nomeArquivo: nomeArquivoCompleto,
                 tamanho: arquivo.size,
                 tipo: arquivo.type
@@ -1586,16 +1583,20 @@ const { data: empregadoData, error: empregadoError } = await supabase
                         );
 
                         if (uploadResult) {
+                            // Tabela "documentos" não existe no banco — o
+                            // registro de metadados vai pra "arquivos" (mesma
+                            // tabela usada por formulario_alteracao.html),
+                            // colunas reais dela, não as que existiam aqui antes.
                             const { error: docError } = await supabase
-                                .from('documentos')
+                                .from('arquivos')
                                 .insert([{
                                     empregado_id: empregadoId,
                                     tipo_documento: fieldName,
-                                    categoria: categoria,
-                                    caminho_arquivo: uploadResult.caminho,
                                     nome_arquivo: uploadResult.nomeArquivo,
-                                    tamanho_arquivo: uploadResult.tamanho,
-                                    tipo_arquivo: uploadResult.tipo
+                                    caminho_storage: uploadResult.caminho,
+                                    bucket: BUCKET_NAME,
+                                    tamanho_bytes: uploadResult.tamanho,
+                                    mime_type: uploadResult.tipo,
                                 }]);
 
                             if (docError) {

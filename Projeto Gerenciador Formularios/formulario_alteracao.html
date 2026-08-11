@@ -1178,22 +1178,11 @@ async function handleFormSubmit(e) {
         console.log('📄 Gerando PDF...');
         const pdfBlob = await gerarPDFFormulario();
 
-        // 3. Uploads
-        console.log('📤 Upload PDF...');
-        const nomeFormulario = gerarNomeFormulario(formData.nomeEmpresa);
-        await uploadArquivo(pdfBlob, 'formulario', nomeFormulario);
-        console.log('📤 Upload docs sócios...');
-        const sociosCount = getSociosCount();
-        for (let i = 1; i <= sociosCount; i++) {
-            const nomeField = form.elements['socio' + i + 'Nome'];
-            if (nomeField && nomeField.value && uploadedDocuments['socio' + i]) {
-                const arquivo = uploadedDocuments['socio' + i];
-                const nomeDoc = gerarNomeDocumentoSocio(formData.nomeEmpresa, i);
-                await uploadArquivo(arquivo, 'documento', nomeDoc);
-            }
-        }
-
-        // 3. Salvar formulario (manter campos 'alteracao')
+        // 3. Salvar formulario (manter campos 'alteracao') — precisa vir ANTES
+        // dos uploads porque a tabela arquivos exige formulario_id OU
+        // empregado_id preenchido (constraint arquivo_deve_ter_referencia);
+        // aqui não existe empregado, só dá pra satisfazer com o id do
+        // formulário recém-criado.
         console.log('💾 Salvando formulario...');
         if (!supabaseClient) {
             console.warn('⚠️ Supabase simulado.');
@@ -1236,7 +1225,22 @@ async function handleFormSubmit(e) {
         submissionId = formulario[0].id;
         console.log('✅ Formulario ID:', submissionId);
 
-        // 4. NOVO: Salvar sócios (try isolado)
+        // 4. Uploads (agora com o formulario_id do registro recém-criado)
+        console.log('📤 Upload PDF...');
+        const nomeFormulario = gerarNomeFormulario(formData.nomeEmpresa);
+        await uploadArquivo(pdfBlob, 'formulario', nomeFormulario, submissionId);
+        console.log('📤 Upload docs sócios...');
+        const sociosCount = getSociosCount();
+        for (let i = 1; i <= sociosCount; i++) {
+            const nomeField = form.elements['socio' + i + 'Nome'];
+            if (nomeField && nomeField.value && uploadedDocuments['socio' + i]) {
+                const arquivo = uploadedDocuments['socio' + i];
+                const nomeDoc = gerarNomeDocumentoSocio(formData.nomeEmpresa, i);
+                await uploadArquivo(arquivo, 'documento', nomeDoc, submissionId);
+            }
+        }
+
+        // 5. NOVO: Salvar sócios (try isolado)
         try {
             console.log('💾 Salvando sócios...');
             const sociosData = [];
@@ -1516,7 +1520,7 @@ async function handleFormSubmit(e) {
         }
 
         // ===== UPLOAD DE ARQUIVOS (VERSÃO PADRONIZADA) =====
-        async function uploadArquivo(arquivo, tipo, nomeArquivoBase) {
+        async function uploadArquivo(arquivo, tipo, nomeArquivoBase, formularioId) {
             try {
                 const supabase = getSupabaseClient();
                 
@@ -1568,23 +1572,21 @@ async function handleFormSubmit(e) {
 
                 console.log('✅ Arquivo enviado com sucesso:', uploadData);
 
-                // PASSO 5: Obter URL pública
-                const { data: publicUrl } = supabase.storage
-                    .from('documentos')
-                    .getPublicUrl(caminhoCompleto);
-
-                console.log('🔗 URL pública:', publicUrl.publicUrl);
-
-                // PASSO 6: Registrar no banco de dados (OPCIONAL - se tabela existir)
+                // PASSO 5: Registrar no banco de dados (tabela arquivos — bucket
+                // "documentos" é privado, então não guardamos URL pública, só o
+                // caminho; a leitura de qualquer tela futura deve usar
+                // createSignedUrl(caminho_storage), igual ao resto do portal)
                 try {
-                    const { data: registroData, error: registroError } = await supabase
+                    const { error: registroError } = await supabase
                         .from('arquivos')
                         .insert([{
-                            arquivo_nome: nomeArquivoCompleto,
-                            arquivo_tipo: tipo,
-                            arquivo_tamanho: arquivo.size,
-                            arquivo_url: publicUrl.publicUrl,
-                            arquivo_caminho: caminhoCompleto,
+                            formulario_id: formularioId,
+                            tipo_documento: tipo,
+                            nome_arquivo: nomeArquivoCompleto,
+                            caminho_storage: caminhoCompleto,
+                            bucket: 'documentos',
+                            tamanho_bytes: arquivo.size,
+                            mime_type: arquivo.type,
                         }]);
 
                     if (registroError) {
