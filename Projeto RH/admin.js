@@ -733,6 +733,23 @@ function abrirVisaoGerencial() {
     if (inpAno && !inpAno.value) {
         inpAno.value = String(hoje.getFullYear());
     }
+    // Padrão da série histórica: últimos 6 meses até o mês atual
+    const seisAntes = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1);
+    const selMesDe = document.getElementById('vgMesDe');
+    const inpAnoDe = document.getElementById('vgAnoDe');
+    const selMesAte = document.getElementById('vgMesAte');
+    const inpAnoAte = document.getElementById('vgAnoAte');
+    if (selMesDe && !selMesDe.dataset.inicializado) {
+        selMesDe.value = String(seisAntes.getMonth() + 1);
+        selMesDe.dataset.inicializado = '1';
+    }
+    if (inpAnoDe && !inpAnoDe.value) inpAnoDe.value = String(seisAntes.getFullYear());
+    if (selMesAte && !selMesAte.dataset.inicializado) {
+        selMesAte.value = String(hoje.getMonth() + 1);
+        selMesAte.dataset.inicializado = '1';
+    }
+    if (inpAnoAte && !inpAnoAte.value) inpAnoAte.value = String(hoje.getFullYear());
+
     _vgInicializarFiltroEmpresas();
     document.getElementById('modalVisaoGerencial').classList.add('active');
     atualizarVisaoGerencial();
@@ -740,6 +757,18 @@ function abrirVisaoGerencial() {
 
 function fecharVisaoGerencial() {
     document.getElementById('modalVisaoGerencial').classList.remove('active');
+}
+
+function _vgMudarModo() {
+    const modo = document.querySelector('input[name="vgModo"]:checked')?.value || 'unico';
+    const camposUnico = document.getElementById('vgCamposUnico');
+    const camposSerie = document.getElementById('vgCamposSerie');
+    if (camposUnico) camposUnico.style.display = modo === 'unico' ? 'flex' : 'none';
+    if (camposSerie) camposSerie.style.display = modo === 'serie' ? 'flex' : 'none';
+    const colPrincipal = document.getElementById('vgColPrincipal');
+    if (colPrincipal) colPrincipal.textContent = modo === 'unico' ? 'Empresa' : 'Mês/Ano';
+    _vgLinhasExpandidas.clear();
+    atualizarVisaoGerencial();
 }
 
 function _vgInicializarFiltroEmpresas() {
@@ -800,22 +829,12 @@ function _vgContaNoMes(empregado, inicioMes, fimMes) {
     return true;
 }
 
-function atualizarVisaoGerencial() {
-    const mes = parseInt(document.getElementById('vgMes')?.value, 10);
-    const ano = parseInt(document.getElementById('vgAno')?.value, 10);
-    const tbody = document.getElementById('vgTableBody');
-    const resumo = document.getElementById('vgResumo');
-    if (!tbody || !mes || !ano) return;
+const _VG_NOMES_MES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
+/** Calcula, para um mês/ano e um conjunto de empresas, a contagem de vínculos ativos por empresa/tipo/situação. */
+function _vgCalcularContagem(mes, ano, empresasConsideradas) {
     const inicioMes = new Date(ano, mes - 1, 1);
     const fimMes = new Date(ano, mes, 0, 23, 59, 59);
-
-    const empresasConsideradas = [..._vgEmpresasSelecionadas];
-    if (empresasConsideradas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:20px;">Nenhuma empresa selecionada.</td></tr>';
-        if (resumo) resumo.textContent = '';
-        return;
-    }
 
     // { codigo_empresa: { nome, total, porTipo:{}, porSituacao:{ situacao: { total, porTipo:{} } } } }
     const porEmpresa = {};
@@ -840,10 +859,67 @@ function atualizarVisaoGerencial() {
         registro.porSituacao[situacao].porTipo[tipo] = (registro.porSituacao[situacao].porTipo[tipo] || 0) + 1;
     });
 
+    return porEmpresa;
+}
+
+function atualizarVisaoGerencial() {
+    const modo = document.querySelector('input[name="vgModo"]:checked')?.value || 'unico';
+    if (modo === 'serie') _vgAtualizarSerie();
+    else _vgAtualizarUnico();
+}
+
+function _vgAtualizarUnico() {
+    const mes = parseInt(document.getElementById('vgMes')?.value, 10);
+    const ano = parseInt(document.getElementById('vgAno')?.value, 10);
+    const tbody = document.getElementById('vgTableBody');
+    const resumo = document.getElementById('vgResumo');
+    if (!tbody || !mes || !ano) return;
+
+    const empresasConsideradas = [..._vgEmpresasSelecionadas];
+    if (empresasConsideradas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:20px;">Nenhuma empresa selecionada.</td></tr>';
+        if (resumo) resumo.textContent = '';
+        return;
+    }
+
+    const porEmpresa = _vgCalcularContagem(mes, ano, empresasConsideradas);
     _vgRenderizarTabela(porEmpresa);
 
     const totalGeral = Object.values(porEmpresa).reduce((s, r) => s + r.total, 0);
     if (resumo) resumo.textContent = `${totalGeral} vínculo(s) ativo(s) em ${String(mes).padStart(2, '0')}/${ano} nas ${empresasConsideradas.length} empresa(s) selecionada(s).`;
+}
+
+function _vgAtualizarSerie() {
+    const mesDe = parseInt(document.getElementById('vgMesDe')?.value, 10);
+    const anoDe = parseInt(document.getElementById('vgAnoDe')?.value, 10);
+    const mesAte = parseInt(document.getElementById('vgMesAte')?.value, 10);
+    const anoAte = parseInt(document.getElementById('vgAnoAte')?.value, 10);
+    const tbody = document.getElementById('vgTableBody');
+    const resumo = document.getElementById('vgResumo');
+    if (!tbody || !mesDe || !anoDe || !mesAte || !anoAte) return;
+
+    const empresasConsideradas = [..._vgEmpresasSelecionadas];
+    if (empresasConsideradas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:20px;">Nenhuma empresa selecionada.</td></tr>';
+        if (resumo) resumo.textContent = '';
+        return;
+    }
+
+    let chaveInicio = anoDe * 12 + (mesDe - 1);
+    let chaveFim = anoAte * 12 + (mesAte - 1);
+    if (chaveInicio > chaveFim) { const tmp = chaveInicio; chaveInicio = chaveFim; chaveFim = tmp; }
+
+    const periodos = [];
+    for (let c = chaveInicio; c <= chaveFim; c++) {
+        periodos.push({ ano: Math.floor(c / 12), mes: (c % 12) + 1, chave: String(c) });
+    }
+
+    const dados = periodos.map(p => ({ ...p, porEmpresa: _vgCalcularContagem(p.mes, p.ano, empresasConsideradas) }));
+
+    _vgRenderizarTabelaSerie(dados);
+
+    const primeiro = periodos[0], ultimo = periodos[periodos.length - 1];
+    if (resumo) resumo.textContent = `Série de ${periodos.length} mês(es), de ${_VG_NOMES_MES[primeiro.mes - 1]}/${primeiro.ano} até ${_VG_NOMES_MES[ultimo.mes - 1]}/${ultimo.ano}, em ${empresasConsideradas.length} empresa(s) selecionada(s).`;
 }
 
 function _vgRenderizarTabela(porEmpresa) {
@@ -907,10 +983,60 @@ function _vgRenderizarTabela(porEmpresa) {
     tbody.innerHTML = html;
 }
 
-function _vgToggleLinha(cod) {
-    if (_vgLinhasExpandidas.has(cod)) _vgLinhasExpandidas.delete(cod);
-    else _vgLinhasExpandidas.add(cod);
+function _vgToggleLinha(chave) {
+    if (_vgLinhasExpandidas.has(chave)) _vgLinhasExpandidas.delete(chave);
+    else _vgLinhasExpandidas.add(chave);
     atualizarVisaoGerencial();
+}
+
+/** Renderiza a série histórica: uma linha por mês/ano, expansível para o detalhamento por empresa daquele mês. */
+function _vgRenderizarTabelaSerie(dados) {
+    const tbody = document.getElementById('vgTableBody');
+
+    if (dados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:20px;">Nenhum período no intervalo selecionado.</td></tr>';
+        return;
+    }
+
+    const html = dados.map(p => {
+        const registrosEmpresa = Object.entries(p.porEmpresa).sort((a, b) => a[1].nome.localeCompare(b[1].nome));
+        const total = registrosEmpresa.reduce((s, [, r]) => s + r.total, 0);
+        const porTipo = {};
+        _VG_TIPOS.forEach(t => { porTipo[t] = registrosEmpresa.reduce((s, [, r]) => s + (r.porTipo[t] || 0), 0); });
+
+        const expandido = _vgLinhasExpandidas.has(p.chave);
+
+        let linhaDetalhe = '';
+        if (expandido) {
+            const linhasEmpresa = registrosEmpresa.map(([cod, r]) => `
+                <div class="vg-detalhe-grid vg-detalhe-row">
+                    <span><strong>${cod}</strong> — ${r.nome}</span>
+                    <span>${r.total}</span>
+                    <span>${r.porTipo['Empregado'] || 0}</span>
+                    <span>${r.porTipo['Estágiario'] || 0}</span>
+                    <span>${r.porTipo['Contribuinte'] || 0}</span>
+                </div>`).join('');
+            linhaDetalhe = `<tr id="vgDetalheSerie-${p.chave}"><td colspan="6" style="padding:0;border:none;background:#FCFAF9;">
+                <div style="padding:6px 16px 14px 46px;">
+                    <div class="vg-detalhe-grid vg-detalhe-head">
+                        <span>Empresa</span><span>Total</span><span>Empregados</span><span>Estagiários</span><span>Contribuintes</span>
+                    </div>
+                    ${linhasEmpresa || '<div class="vg-empty">Sem vínculos no período.</div>'}
+                </div>
+            </td></tr>`;
+        }
+
+        return `<tr class="vg-empresa-row${expandido ? ' expandida' : ''}" onclick="_vgToggleLinha('${p.chave}')">
+            <td style="text-align:center;"><span class="vg-arrow${expandido ? ' expandido' : ''}">▶</span></td>
+            <td><strong>${_VG_NOMES_MES[p.mes - 1]}/${p.ano}</strong></td>
+            <td>${total}</td>
+            <td>${porTipo['Empregado'] || 0}</td>
+            <td>${porTipo['Estágiario'] || 0}</td>
+            <td>${porTipo['Contribuinte'] || 0}</td>
+        </tr>${linhaDetalhe}`;
+    }).join('');
+
+    tbody.innerHTML = html;
 }
 
 // --- FÉRIAS (INFORMAÇÕES) ---

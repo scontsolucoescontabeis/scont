@@ -796,28 +796,81 @@
             <button type="button" class="modal-close" onclick="fecharVisaoGerencial()">×</button>
         </div>
         <div class="modal-body">
-            <p style="color:#7F8C8D;font-size:12px;margin-bottom:14px;">Quantidade de empregados, estagiários e contribuintes vinculados em cada empresa no mês/ano selecionado, com base na data de admissão e de demissão. Um empregado admitido durante o mês já conta nesse mês; um empregado demitido durante o mês não conta mais a partir desse mês.</p>
-            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:14px 16px;">
-                <div class="form-group" style="margin-bottom:0;min-width:150px;">
-                    <label>Mês</label>
-                    <select id="vgMes">
-                        <option value="1">Janeiro</option>
-                        <option value="2">Fevereiro</option>
-                        <option value="3">Março</option>
-                        <option value="4">Abril</option>
-                        <option value="5">Maio</option>
-                        <option value="6">Junho</option>
-                        <option value="7">Julho</option>
-                        <option value="8">Agosto</option>
-                        <option value="9">Setembro</option>
-                        <option value="10">Outubro</option>
-                        <option value="11">Novembro</option>
-                        <option value="12">Dezembro</option>
-                    </select>
+            <p style="color:#7F8C8D;font-size:12px;margin-bottom:14px;">Quantidade de empregados, estagiários e contribuintes vinculados em cada empresa, com base na data de admissão e de demissão. Um empregado admitido durante o mês já conta nesse mês; um empregado demitido durante o mês não conta mais a partir desse mês.</p>
+            <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px;background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:14px 16px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Modo</label>
+                    <div style="display:flex;gap:12px;font-size:12px;padding-top:8px;">
+                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:600;color:#2C3E50;"><input type="radio" name="vgModo" value="unico" checked onchange="_vgMudarModo()"> Mês único</label>
+                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:600;color:#2C3E50;"><input type="radio" name="vgModo" value="serie" onchange="_vgMudarModo()"> Série histórica</label>
+                    </div>
                 </div>
-                <div class="form-group" style="margin-bottom:0;min-width:90px;">
-                    <label>Ano</label>
-                    <input type="number" id="vgAno" min="2000" max="2100" style="width:100px;">
+            </div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:14px 16px;">
+                <div id="vgCamposUnico" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+                    <div class="form-group" style="margin-bottom:0;min-width:150px;">
+                        <label>Mês</label>
+                        <select id="vgMes">
+                            <option value="1">Janeiro</option>
+                            <option value="2">Fevereiro</option>
+                            <option value="3">Março</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Maio</option>
+                            <option value="6">Junho</option>
+                            <option value="7">Julho</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Setembro</option>
+                            <option value="10">Outubro</option>
+                            <option value="11">Novembro</option>
+                            <option value="12">Dezembro</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;min-width:90px;">
+                        <label>Ano</label>
+                        <input type="number" id="vgAno" min="2000" max="2100" style="width:100px;">
+                    </div>
+                </div>
+                <div id="vgCamposSerie" style="display:none;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+                    <div class="form-group" style="margin-bottom:0;min-width:150px;">
+                        <label>De (mês/ano)</label>
+                        <div style="display:flex;gap:6px;">
+                            <select id="vgMesDe">
+                                <option value="1">Janeiro</option>
+                                <option value="2">Fevereiro</option>
+                                <option value="3">Março</option>
+                                <option value="4">Abril</option>
+                                <option value="5">Maio</option>
+                                <option value="6">Junho</option>
+                                <option value="7">Julho</option>
+                                <option value="8">Agosto</option>
+                                <option value="9">Setembro</option>
+                                <option value="10">Outubro</option>
+                                <option value="11">Novembro</option>
+                                <option value="12">Dezembro</option>
+                            </select>
+                            <input type="number" id="vgAnoDe" min="2000" max="2100" style="width:80px;">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;min-width:150px;">
+                        <label>Até (mês/ano)</label>
+                        <div style="display:flex;gap:6px;">
+                            <select id="vgMesAte">
+                                <option value="1">Janeiro</option>
+                                <option value="2">Fevereiro</option>
+                                <option value="3">Março</option>
+                                <option value="4">Abril</option>
+                                <option value="5">Maio</option>
+                                <option value="6">Junho</option>
+                                <option value="7">Julho</option>
+                                <option value="8">Agosto</option>
+                                <option value="9">Setembro</option>
+                                <option value="10">Outubro</option>
+                                <option value="11">Novembro</option>
+                                <option value="12">Dezembro</option>
+                            </select>
+                            <input type="number" id="vgAnoAte" min="2000" max="2100" style="width:80px;">
+                        </div>
+                    </div>
                 </div>
                 <div style="flex:1;min-width:240px;">
                     <label style="display:block;font-weight:600;color:#2C3E50;font-size:13px;margin-bottom:5px;">Empresas</label>
@@ -838,13 +891,13 @@
                 <table class="admin-table">
                     <thead><tr>
                         <th style="width:26px;"></th>
-                        <th>Empresa</th>
+                        <th id="vgColPrincipal">Empresa</th>
                         <th>Total</th>
                         <th>Empregados</th>
                         <th>Estagiários</th>
                         <th>Contribuintes</th>
                     </tr></thead>
-                    <tbody id="vgTableBody"><tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:20px;">Selecione o mês/ano e clique em Atualizar.</td></tr></tbody>
+                    <tbody id="vgTableBody"><tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:20px;">Selecione o período e clique em Atualizar.</td></tr></tbody>
                 </table>
             </div>
         </div>
