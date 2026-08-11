@@ -1,0 +1,302 @@
+<p class="manual-intro">Certificado Digital vive em <code>Projeto Certificado Digital/</code> e é uma SPA de página única: todas as telas (Dashboard, Certificados, Relatórios, Agenda, Histórico, Segurança, Configurações) são <code>&lt;section class="page"&gt;</code> dentro do mesmo <code>index.html</code>, alternadas via <code>setPage()</code> — não existe um arquivo HTML por tela como em outras ferramentas do portal. Stack: HTML + JS puro, sem framework/bundler, IIFE global (<code>APP_STATE</code> como estado único). Cliente Supabase único criado em <code>js/config.js</code> (<code>supabaseClient</code>), autenticação via <code>portal-auth-guard.js</code> compartilhado do portal, orquestrada por <code>js/auth.js</code> (<code>checkAuth()</code>). Toda a lógica de tela, CRUD e renderização está em <code>js/app.js</code> (~1465 linhas); <code>js/utils.js</code> tem formatação/validação/toasts; <code>js/config.js</code> declara constantes, nomes de tabela e o estado global. Não há geração de PDF nesta ferramenta (diferente de outras do portal) — Relatórios exporta CSV client-side e a importação em massa usa SheetJS (xlsx) via CDN. <strong>Ignore <code>certificado_digital.html</code> solto na raiz da pasta</strong> — é um prototípo antigo isolado, só com <code>localStorage</code>, sem nenhuma integração com Supabase; a ferramenta real é <code>index.html</code> + <code>js/*.js</code>. Não há build step — arquivos servidos como estão.</p>
+
+<section class="manual-item" id="dashboard">
+  <h2>Dashboard</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Sem arquivo próprio — é <code>#page-dashboard</code> dentro de <code>index.html</code>, populada por <code>renderDashboard()</code> em <code>js/app.js</code> (linhas ~63-149).</li>
+    <li>Não lê o banco diretamente: consome <code>APP_STATE._allCertificates</code> (todos os certificados não-excluídos, já carregados por <code>fetchCertificates()</code>) e <code>APP_STATE.historyLog</code> (últimos 100 registros de <code>historico_certificados</code>, já carregados por <code>fetchHistory()</code> quando a tela Histórico foi visitada pela última vez).</li>
+    <li>Cards, tabela de alertas críticos, agenda rápida e timeline recente são recalculados 100% no cliente a cada chamada de <code>renderDashboard()</code> — não há agregação no banco.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Não introduz tabela própria — lê os mesmos <code>certificados</code> e <code>historico_certificados</code> documentados na seção Certificados/Histórico abaixo.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[DOMContentLoaded] --> B[checkAuth via PortalAuthGuard]
+    B --> C[initializeApp]
+    C --> D[loadConfiguracoes le configuracoes_certificados]
+    D --> E[checkPermissaoVerSenha]
+    E --> F[setPage dashboard]
+    F --> G[fetchCertificates]
+    G --> H[renderCertTable e renderDashboard]
+    C --> I[setupRealtime]
+    I --> J[setInterval fetchCertificates a cada 60s]
+    J --> G
+  </pre>
+  <p>Não existe realtime de verdade — <code>setupRealtime()</code> é um nome que sobrou de um <code>setInterval</code> de polling puro (60s). Toda operação CRUD chama <code>fetchCertificates()</code> de novo no final, então o dashboard fica no máximo 60s desatualizado em relação a mudanças feitas por outra aba/usuário.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Todo cálculo de "dias restantes", situação exibida e contagem do sino de notificações (<code>#notifBtn</code>) usa <code>daysLeft()</code> e <code>situacaoEfetiva()</code> (ver seção Certificados) — nunca uma coluna persistida no banco.</li>
+    <li>O clique no sino de notificações (<code>#notifBtn</code>) apenas navega para a tela Relatórios — não abre um painel de notificações próprio.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="certificados">
+  <h2>Certificados</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>#page-certificados</code> em <code>index.html</code> — tabela paginada, filtros client-side, modal de cadastro/edição (<code>#certModal</code>), importação/exportação via SheetJS.</li>
+    <li>Toda a lógica CRUD está em <code>js/app.js</code>: <code>fetchCertificates()</code>, <code>saveCertificate()</code>, <code>removeCert()</code>, <code>deleteSelectedCerts()</code> (exclusão em lote), <code>importarExcelCertificados()</code>, <code>renderCertTable()</code>.</li>
+    <li>Paginação (<code>APP_STATE.currentPage</code>/<code>pageSize</code>) e filtros (<code>APP_STATE.certificates</code> vs. <code>_allCertificates</code>) são só em memória — cada filtro refaz o <code>.filter()</code> sobre a lista já carregada, nunca uma nova query.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela / Coluna</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>certificados</code></td><td>Tabela central. <strong>Sem <code>CREATE TABLE</code> versionado no repo</strong> — só existem migrações incrementais (<code>_sql/certificados_add_ativo.sql</code>, <code>schema_certificado_alertas_email.sql</code>, RLS de senha em <code>_sql/certificados_ver_senhas.sql</code>). A definição original e as policies de SELECT/UPDATE/DELETE da tabela base não estão em nenhum arquivo do repositório — só no painel do Supabase.</td></tr>
+      <tr><td><code>empresa_id</code>, <code>tipo_id</code>, <code>autoridade_id</code></td><td>Apesar do sufixo <code>_id</code>, são colunas <strong>texto livre</strong> (nome da empresa, "A1"/"A3"/"e-CNPJ"/"e-CPF", nome da autoridade certificadora) — não são FKs. As tabelas <code>empresas</code>, <code>tipos_certificados</code> e <code>autoridades_certificadoras</code> existem em <code>TABLE_NAMES</code> (<code>js/config.js</code>) mas nenhuma delas é lida ou escrita em nenhum lugar do código — normalização aspiracional que nunca foi implementada.</td></tr>
+      <tr><td><code>situacao</code></td><td>Texto livre com os 5 valores de <code>SITUACOES_CERTIFICADO</code> (Ativo/Agendado/Renovado/Aguardando Contato/Vencido). Só é reescrita manualmente pelo formulário, por <code>saveSchedule()</code>/<code>removeSchedule()</code> e por <code>saveRenewal()</code> — nunca por um job de data. Ver "Decisões de Design" abaixo.</td></tr>
+      <tr><td><code>senha_hash</code></td><td>Nome enganoso: guarda a senha em texto simples ou em base64 (<code>btoa</code>), <strong>nunca um hash</strong>. Ver seção Segurança.</td></tr>
+      <tr><td><code>ativo</code></td><td>BOOLEAN NOT NULL DEFAULT TRUE (<code>_sql/certificados_add_ativo.sql</code>). Marca cliente/certificado encerrado — excluído dos relatórios e do dashboard operacional, mas continua na tabela.</td></tr>
+      <tr><td><code>deleted_at</code> / <code>deleted_by</code></td><td>Soft delete — <code>removeCert()</code> e <code>deleteSelectedCerts()</code> fazem <code>UPDATE</code>, nunca <code>DELETE</code>. Toda leitura filtra <code>.is('deleted_at', null)</code>.</td></tr>
+      <tr><td><code>data_renovacao_agendada</code></td><td>Timestamp opcional — presença dela é o que define se um certificado aparece em "Renovações agendadas" na tela Agenda (ver seção Agenda/Renovação).</td></tr>
+      <tr><td><code>ultimo_alerta_nivel</code> / <code>ultimo_alerta_em</code></td><td>Adicionadas em <code>schema_certificado_alertas_email.sql</code> — dedupe do job diário de e-mail (ver seção Configurações/Alertas). Zeradas em <code>saveRenewal()</code> ao renovar.</td></tr>
+      <tr><td><code>cliente</code>, <code>situacao_financeira</code>, <code>forma_pagamento</code>, <code>responsavel_nome/email/telefone</code>, <code>informacoes_adicionais</code>, <code>observacao_risco</code>, <code>criado_por</code>, <code>atualizado_por</code></td><td>Campos de formulário sem lógica especial — texto livre ou enum só no front (<code>SITUACOES_CERTIFICADO</code>/formas de pagamento no HTML).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Usuario abre modal Novo ou Editar] --> B[Preenche formulario certForm]
+    B --> C[submit dispara saveCertificate]
+    C --> D{certId preenchido}
+    D -- sim --> E[UPDATE certificados por id]
+    D -- nao --> F[INSERT certificados com criado_por]
+    E --> G[fetchCertificates recarrega tudo]
+    F --> G
+    G --> H[renderCertTable e renderDashboard]
+  </pre>
+  <p>Importação em massa segue caminho paralelo: <code>importarExcelCertificados()</code> lê a planilha com SheetJS, mostra prévia (<code>showCertImportPreview</code>), deduplica contra <code>empresa_id</code> já existentes (comparação case-insensitive em memória) e faz um <code>INSERT</code> por linha — sem transação, então uma falha no meio da planilha não desfaz as linhas já importadas.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>Padrão situacaoEfetiva — leia antes de tocar em qualquer lógica de situação.</strong> Até 2026-08-10 a coluna <code>situacao</code> só era reescrita manualmente (cadastro/renovação/agendamento): um certificado "Ativo" nunca virava "Vencido" sozinho quando a data passava, porque nada recalculava a coluna com o tempo. A correção foi <code>situacaoEfetiva(cert)</code> em <code>js/utils.js</code> — recalcula Ativo → Vencido comparando <code>data_vencimento</code> com hoje <strong>só no momento de exibir/filtrar</strong> (dashboard, tabela, relatório, agenda, CSV, filtro por situação). Ela <strong>não reescreve a coluna no banco</strong> e <strong>não altera o formulário de edição</strong> — o campo "Situação" do modal (<code>openCertModal</code>) continua mostrando <code>cert.situacao</code> cru. Os demais estados (Agendado, Renovado, Aguardando Contato) são de workflow e não são tocados por essa função. <strong>Qualquer tela nova que liste/filtre certificados precisa chamar <code>situacaoEfetiva()</code> em vez de ler <code>cert.situacao</code> direto</strong> — é fácil reintroduzir o mesmo bug adicionando uma tela que esqueça disso (ex.: um card novo, um export novo).</li>
+    <li>Checkbox "inativo" no formulário é invertido em relação à coluna: o campo do banco é <code>ativo</code> (true = ativo), mas o checkbox <code>#ativo</code> marca <strong>inatividade</strong> ("Cliente/certificado inativo..."). <code>saveCertificate()</code> grava <code>ativo: !(checkbox marcado)</code>, e <code>openCertModal()</code> faz o inverso na carga (<code>checked = cert.ativo === false</code>). Um <code>id</code> de campo igual ao nome da coluna com semântica oposta é uma armadilha clássica de leitura rápida do código.</li>
+    <li><code>canRenew(cert)</code> (limiar de 60 dias) controla tanto o botão "♻ Renovar" na tabela/detalhes quanto a divisão da tela Agenda entre "agendados" e "vencimentos próximos sem agendamento" — mesmo limiar, duas telas.</li>
+    <li>Exclusão em lote (<code>deleteSelectedCerts</code>) faz um <code>UPDATE</code> por id em sequência (sem <code>Promise.all</code>, sem batch), reportando sucesso/falha por item — lento para seleções grandes, mas cada falha individual não impede as demais.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Tabela <code>certificados</code> não tem <code>CREATE TABLE</code> nem definição de RLS de SELECT/UPDATE/DELETE versionada em nenhum arquivo do repo — só as colunas adicionadas depois por migração incremental. Qualquer alteração estrutural feita direto no painel do Supabase fica invisível pro Git.</li>
+    <li><code>TABLE_NAMES.EMPRESAS</code>, <code>TIPOS</code>, <code>AUTORIDADES</code>, <code>ALERTAS</code>, <code>AGENDA</code>, <code>LOGS</code>, <code>INTEGRACAO</code>, <code>NOTIFICACOES</code>, <code>RELATORIOS</code> (em <code>js/config.js</code>) e <code>BUCKET_NAMES.CERTIFICADOS</code> nunca são referenciados em nenhum <code>.from()</code>/<code>.storage.</code> do código — nomes reservados de um modelo mais normalizado que nunca foi implementado. Não há upload de arquivo nesta ferramenta apesar do bucket declarado.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="agenda-renovacao">
+  <h2>Agenda / Renovação</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>#page-agenda</code> é um container vazio (<code>#agendaPageContent</code>) preenchido inteiramente por <code>renderAgendaPage()</code> em <code>js/app.js</code> — não tem markup próprio no <code>index.html</code> além do container.</li>
+    <li>Dois modais compartilhados com a tela Certificados: <code>#scheduleModal</code> (agendar/reagendar) e <code>#renewModal</code> (concluir renovação), abertos também a partir da tabela de Certificados e do modal de Detalhes.</li>
+    <li>Não existe tabela <code>agenda</code> de verdade — a "Agenda" é uma view calculada em memória sobre <code>certificados</code> (<code>data_renovacao_agendada</code> preenchida = agendado).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Sem tabela própria. Usa exclusivamente <code>certificados.data_renovacao_agendada</code>, <code>data_vencimento</code>, <code>data_emissao</code>, <code>situacao</code> e <code>ultimo_alerta_nivel</code> (ver seção Certificados). Toda renovação concluída grava uma linha em <code>historico_certificados</code> (ver seção Histórico).</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> SemAgendamento
+    SemAgendamento --> Agendado: saveSchedule grava data_renovacao_agendada e situacao Agendado
+    Agendado --> SemAgendamento: removeSchedule limpa data e recalcula situacao Ativo ou Vencido pela data
+    Agendado --> Renovado: saveRenewal, so habilitado se dias restantes menor ou igual 60
+    SemAgendamento --> Renovado: saveRenewal direto, sem passar por Agendado
+    Renovado --> [*]: situacao volta para Ativo com nova data_vencimento
+  </pre>
+  <p><code>saveRenewal()</code> zera <code>ultimo_alerta_nivel</code> e <code>data_renovacao_agendada</code>, seta <code>situacao='Ativo'</code>, grava a nova <code>data_vencimento</code> (e opcionalmente <code>data_emissao</code>), insere uma linha em <code>historico_certificados</code> e, se o certificado tinha um alerta ativo (<code>ultimo_alerta_nivel</code> não nulo antes da renovação), dispara e-mail <code>certificado_renovado_alerta_resolvido</code> via <code>sendAlertEmail()</code> — chamada direta do navegador à Edge Function <code>enviar-email</code>, fora do job diário (ver seção Configurações/Alertas).</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><code>removeSchedule()</code> recalcula a situação na hora (<code>Vencido</code> se <code>daysLeft &lt; 0</code>, senão <code>Ativo</code>) e grava direto no banco — é uma reescrita manual pontual, não o padrão <code>situacaoEfetiva()</code> (que é só de exibição). Ou seja: aqui a coluna <em>é</em> corrigida na base, porque a ação do usuário (remover agendamento) é o gatilho natural para persistir o novo estado.</li>
+    <li>O e-mail de "alerta resolvido" só é disparado no fluxo manual de renovação — não existe uma verificação periódica que resolva alertas de certificados renovados por outro caminho (ex.: edição direta do campo <code>data_vencimento</code> no modal de Certificados não passa por <code>saveRenewal()</code> e não reseta <code>ultimo_alerta_nivel</code> nem envia esse e-mail).</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="relatorios">
+  <h2>Relatórios</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>#page-relatorios</code> em <code>index.html</code> — filtros (empresa, cliente, tipo, situação, sit. financeira, forma de pagamento, intervalo de vencimento) mais exportação CSV.</li>
+    <li><code>renderRelatorio()</code>, <code>filterRelatorio()</code>, <code>clearRelatorio()</code> e <code>exportCSV()</code> em <code>js/app.js</code> — todas operam sobre <code>APP_STATE._allCertificates</code>, já carregado pela tela Dashboard/Certificados.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Sem tabela própria — mesma fonte (<code>certificados</code>) das demais telas, sem nenhuma query adicional ao Supabase. Filtro e exportação são 100% client-side.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[APP_STATE._allCertificates ja carregado] --> B[usuario ajusta filtros]
+    B --> C[filterRelatorio aplica filtro em memoria]
+    C --> D[renderRelatorio redesenha tabela e resumo]
+    D --> E{usuario clica Exportar CSV}
+    E -- sim --> F[exportCSV reaplica os mesmos filtros e gera Blob CSV]
+    E -- nao --> B
+  </pre>
+  <p><code>exportCSV()</code> reimplementa a lógica de filtro de <code>filterRelatorio()</code> de forma independente (lê os mesmos campos do DOM, mas em outra função) — os dois precisam ser mantidos em sincronia manualmente se um filtro novo for adicionado.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Resumo (<code>#relSummary</code>) conta vencidos/críticos/urgentes/atenção usando <code>daysLeft()</code> bruto, não <code>situacaoEfetiva()</code> — coerente, já que a contagem é por prazo, não pelo texto de situação.</li>
+    <li>CSV usa BOM (<code>'﻿'</code>) explícito para abrir corretamente com acentuação no Excel.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="historico">
+  <h2>Histórico</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>#page-historico</code> em <code>index.html</code> — busca por texto livre (<code>#histSearchInput</code>) sobre uma timeline.</li>
+    <li><code>fetchHistory()</code>, <code>filterHistory()</code>, <code>renderHistoryPage()</code> em <code>js/app.js</code>. O mesmo <code>historyLog</code> alimenta a timeline "Histórico recente" do Dashboard (últimos 5 itens).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel / RLS</th></tr></thead>
+    <tbody>
+      <tr><td><code>historico_certificados</code></td><td><code>id</code>, <code>certificado_id</code> (FK <code>certificados.id</code> ON DELETE CASCADE), <code>empresa_id</code>, <code>tipo_alteracao</code>, <code>campo_alterado</code>, <code>valor_anterior</code>, <code>valor_novo</code>, <code>responsavel</code>, <code>data_alteracao</code>. RLS: SELECT e INSERT abertos a <code>authenticated</code> (<code>USING (true)</code> / <code>WITH CHECK (true)</code>), sem UPDATE/DELETE definidos. Criada em <code>schema_certificado_renovacao_historico.sql</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[fetchHistory ao abrir a tela] --> B[SELECT historico_certificados ordenado por data_alteracao desc, limit 100]
+    B --> C[APP_STATE.historyLog]
+    C --> D[renderHistoryPage desenha timeline]
+    C --> E[renderDashboard usa os 5 mais recentes]
+    F[unica escrita: saveRenewal] -- INSERT tipo_alteracao Renovacao --> B
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>O texto da tela diz "Registro completo de todas as operações realizadas", mas na prática só existe um ponto de escrita em toda a ferramenta: <code>saveRenewal()</code>.</strong> Criar, editar ou excluir um certificado (<code>saveCertificate()</code>, <code>removeCert()</code>, <code>deleteSelectedCerts()</code>, importação em massa) não grava nada em <code>historico_certificados</code> — só renovações aparecem aqui e no card "Detalhes do certificado → Histórico de renovações" (<code>fetchCertRenewalHistory</code>, que filtra <code>tipo_alteracao = 'Renovação'</code>). O schema da tabela (<code>campo_alterado</code>/<code>valor_anterior</code>/<code>valor_novo</code> genéricos) sugere que foi desenhada para auditoria geral, mas só o caso de renovação foi implementado — quem for adicionar auditoria de outras ações precisa inserir explicitamente em <code>historico_certificados</code> nos outros fluxos, isso não acontece sozinho.</li>
+    <li>Busca (<code>filterHistory</code>) é client-side sobre os 100 registros já carregados — não pagina nem busca no servidor, então histórico mais antigo que os últimos 100 registros simplesmente não aparece na tela, mesmo que exista no banco.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="seguranca">
+  <h2>Segurança</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>#page-seguranca</code> em <code>index.html</code> — lista certificados com senha cadastrada e um botão "Ver" por linha que revela a senha sob demanda.</li>
+    <li><code>renderSegurancaPage()</code>, <code>revelarSenha()</code>, <code>checkPermissaoVerSenha()</code> em <code>js/app.js</code>. A permissão é resolvida uma vez em <code>initializeApp()</code> e guardada em <code>APP_STATE.podeVerSenha</code>.</li>
+    <li>Migrações relevantes ficam fora da pasta da ferramenta, em <code>_sql/</code> na raiz do portal: <code>_sql/certificados_ver_senhas.sql</code> (permissão + função de decifragem) e <code>_sql/lgpd_compliance_migration.sql</code> (seção 6, RLS de <code>configuracoes_certificados</code>).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Peça</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>certificados.senha_hash</code></td><td>Apesar do nome, não é hash — é a senha em texto simples ou em base64 (<code>btoa</code>/<code>atob</code>), dependendo de quando o registro foi criado. Ver função <code>hashPassword()</code> em <code>js/utils.js</code>: existe no código mas <strong>não é chamada em lugar nenhum</strong> — <code>saveCertificate()</code> grava <code>formData.get('senha')</code> direto, sem nenhuma codificação no cliente.</td></tr>
+      <tr><td><code>fn_decifrar_senha_certificado(p_id uuid)</code></td><td>RPC <code>SECURITY DEFINER</code>. Exige <code>auth.uid()</code> não nulo e (<code>is_admin()</code> OU sub-permissão <code>ver_senhas</code> em <code>usuario_ferramentas.permissoes</code> para a ferramenta cujo <code>url_base</code> contém "certificado"). Tenta <code>pgp_sym_decrypt</code> com a chave <code>cert_encryption_key</code> lida do Supabase Vault; se falhar ou a chave estiver vazia, cai no fallback base64; se isso também falhar, devolve o valor bruto.</td></tr>
+      <tr><td><code>vault.decrypted_secrets</code> (chave <code>cert_encryption_key</code>)</td><td>Chave de criptografia pgp_sym — hoje cadastrada vazia por padrão em <code>_sql/lgpd_compliance_migration.sql</code>. Enquanto estiver vazia, o RPC nunca tenta <code>pgp_sym_decrypt</code> e sempre usa o caminho base64/texto puro.</td></tr>
+      <tr><td><code>ferramentas.sub_permissoes</code> / <code>usuario_ferramentas.permissoes</code></td><td>A chave <code>ver_senhas</code> é registrada em <code>ferramentas.sub_permissoes</code> (jsonb) pela migração e concedida por usuário em <code>usuario_ferramentas.permissoes</code> (array) — mesmo mecanismo genérico de sub-permissão usado por outras ferramentas do portal, lido no admin-dashboard.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+sequenceDiagram
+    participant U as Usuario
+    participant UI as renderSegurancaPage
+    participant RPC as fn_decifrar_senha_certificado
+    participant DB as Supabase Postgres
+
+    U->>UI: abre pagina Seguranca
+    UI->>UI: checkPermissaoVerSenha ja resolvido no boot
+    alt sem permissao ver_senhas e nao admin
+        UI-->>U: mostra bloqueio Acesso restrito
+    else com permissao
+        UI-->>U: lista certificados com senha oculta
+        U->>UI: clique Ver na linha
+        UI->>RPC: supabaseClient.rpc com p_id do certificado
+        RPC->>DB: valida auth.uid e permissao ver_senhas ou is_admin
+        RPC->>DB: le senha_hash e cert_encryption_key do Vault
+        RPC-->>UI: senha decifrada texto puro
+        UI-->>U: exibe senha na tela
+    end
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>O gate de permissão só protege a tela Segurança — não protege o modal de edição.</strong> <code>openCertModal()</code> (tela Certificados, disponível a qualquer usuário com acesso à ferramenta) faz <code>q('#senha').value = cert.senha_hash</code> direto, sem checar <code>APP_STATE.podeVerSenha</code>. Ou seja: qualquer usuário que consiga abrir "✏ Editar" em um certificado com senha cadastrada vê a senha em texto simples no campo do formulário, independentemente de ter a sub-permissão <code>ver_senhas</code>. O RPC gated por permissão é real, mas o caminho de edição contorna ele por completo — isso não é um bug sutil de RLS, é um caminho de leitura que simplesmente não passa pelo controle de acesso. Qualquer revisão de segurança desta ferramenta precisa considerar os dois caminhos.</li>
+    <li>O rótulo da coluna/RPC ("hash", "decifrar") sugere criptografia forte, mas por padrão (chave do Vault vazia) o dado é reversível com <code>atob()</code> por qualquer um com acesso direto à tabela via service role — documentado explicitamente como risco alto no comentário de <code>_sql/lgpd_compliance_migration.sql</code>, seção de avisos.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Migrar <code>cert_encryption_key</code> do Vault de valor vazio para uma chave real (ativando <code>pgp_sym_encrypt</code> nas gravações futuras) é uma ação manual pendente — hoje o sistema funciona inteiramente no modo fallback base64/texto puro.</li>
+    <li>Fechar a brecha do modal de edição (não popular <code>#senha</code> com o valor cru para quem não tem <code>ver_senhas</code>, ou trocar por um placeholder + fluxo de "trocar senha" que não expõe a atual) não foi implementado.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="configuracoes-alertas">
+  <h2>Configurações / Alertas</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>#page-configuracoes</code> em <code>index.html</code> — tema, itens por página, limiares de alerta, lista de e-mails de destino. <code>renderConfigPage()</code>, <code>salvarConfig()</code>, <code>addAlertEmail()</code>/<code>removeAlertEmail()</code>/<code>saveAlertEmails()</code> em <code>js/app.js</code>.</li>
+    <li>Job diário fora do navegador: <code>supabase/functions/alerta-certificados-vencimento/index.ts</code> (raiz do portal, <code>Projeto Portal Scont/supabase/functions/</code>), agendado por <code>schema_certificado_alertas_cron.sql</code> (pg_cron + pg_net).</li>
+    <li>Envio de e-mail (tanto do job diário quanto do fluxo manual de renovação) delega para a Edge Function compartilhada <code>supabase/functions/enviar-email/index.ts</code> — mesma função usada por Diário Contábil, Licenças e outras ferramentas do portal, cada uma com seu <code>tipo</code> de template dentro de <code>montarHtml()</code> (aqui: <code>alerta_certificado_vencimento</code> e <code>certificado_renovado_alerta_resolvido</code>).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela / Job</th><th>Papel / RLS</th></tr></thead>
+    <tbody>
+      <tr><td><code>configuracoes_certificados</code></td><td>Chave/valor (<code>chave</code> PK, <code>valor</code>, <code>atualizado_em</code>). Chaves usadas: <code>pageSize</code>, <code>dias_critico</code>, <code>dias_urgente</code>, <code>dias_caution</code>, <code>emails_alerta</code> (CSV de e-mails). Lida tanto pelo front (<code>loadConfiguracoes</code>) quanto pela Edge Function do cron.</td></tr>
+      <tr><td>Job pg_cron <code>alerta-certificados-vencimento-diario</code></td><td>Definido em <code>schema_certificado_alertas_cron.sql</code>, roda 1x/dia às 11:00 UTC (~08:00 Brasília) via <code>cron.schedule</code> + <code>net.http_post</code> chamando a Edge Function com o header Authorization anon key. Idempotente (o script sempre dá <code>cron.unschedule</code> antes de recriar).</td></tr>
+    </tbody>
+  </table>
+  <p><strong>RLS com múltiplas policies permissivas — mesma classe de armadilha documentada no Manual do Programador da Central do Departamento Contábil (bucket <code>documentos</code>):</strong> <code>_sql/lgpd_compliance_migration.sql</code> (seção 6) restringiu INSERT/UPDATE de <code>configuracoes_certificados</code> a admin, criando as policies <code>"cert_cfg: admin grava"</code>/<code>"cert_cfg: admin atualiza"</code>. Mas <code>schema_certificado_alertas_email.sql</code> (dentro desta pasta) cria, com <strong>nomes diferentes</strong> (<code>configuracoes_certificados_upsert_authenticated</code> / <code>_update_authenticated</code>), policies de INSERT/UPDATE abertas a qualquer <code>authenticated</code> — e como o script só verifica se aquele <em>nome</em> de policy já existe antes de criar, as duas coexistem no banco depois de rodar os dois scripts. RLS soma policies permissivas por <code>OR</code>: o resultado prático é que <strong>qualquer usuário autenticado continua conseguindo gravar em <code>configuracoes_certificados</code></strong>, apesar da migração LGPD ter pretendido restringir isso a admin. Antes de "corrigir" isso, decidir qual das duas é a intenção atual (o app hoje depende de escrita aberta para <code>salvarConfig()</code>/<code>saveAlertEmails()</code> funcionarem para qualquer usuário — restringir a admin de verdade quebraria a tela de Configurações para não-admins).</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+sequenceDiagram
+    participant CRON as pg_cron 11:00 UTC diario
+    participant FN as Edge Function alerta-certificados-vencimento
+    participant CFG as tabela configuracoes_certificados
+    participant CERT as tabela certificados
+    participant MAIL as Edge Function enviar-email
+    participant DEST as e-mails destinatarios
+
+    CRON->>FN: net.http_post com service role implicito
+    FN->>CFG: SELECT chave, valor
+    CFG-->>FN: limiares dias_critico dias_urgente dias_caution e emails_alerta
+    FN->>CERT: SELECT id empresa_id tipo_id data_vencimento ativo ultimo_alerta_nivel onde deleted_at is null
+    CERT-->>FN: lista de certificados
+    loop cada certificado ativo
+        FN->>FN: calcula dias restantes e nivel critico urgente atencao vencido
+        alt nivel mudou desde ultimo_alerta_nivel
+            loop cada destinatario em emails_alerta
+                FN->>MAIL: POST destinatario assunto tipo alerta_certificado_vencimento
+                MAIL-->>DEST: e-mail formatado enviado via Brevo ou SMTP
+            end
+            FN->>CERT: UPDATE ultimo_alerta_nivel e ultimo_alerta_em
+        end
+    end
+  </pre>
+  <p>Esse é o fluxo tecnicamente mais importante da ferramenta: é o único ponto que roda fora do navegador (Edge Function com <code>SUPABASE_SERVICE_ROLE_KEY</code>, ignorando RLS) e o único gatilho de e-mail que não depende de nenhuma aba aberta. Existe um segundo caminho de envio, totalmente separado, disparado pelo navegador em <code>sendAlertEmail()</code> (<code>js/app.js</code>) quando um certificado com alerta ativo é renovado manualmente — chama <code>enviar-email</code> direto do cliente, autenticado com a sessão do usuário, sem passar pela lógica de dedupe por <code>ultimo_alerta_nivel</code> do job diário (ela zera esse campo separadamente em <code>saveRenewal()</code>).</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><code>daysLeft()</code> é reimplementada de forma independente em três lugares com a mesma lógica: <code>js/utils.js</code> (front, fuso local do navegador), a Edge Function do cron (Deno, fuso UTC explícito via <code>Date.UTC</code>) e implicitamente nos comentários do SQL. O comentário no topo da função na Edge Function deixa isso explícito ("mesma lógica... usada no frontend") — mudar o critério de "dias restantes" em um lugar sem replicar no outro gera divergência entre o que o app mostra e o que dispara o e-mail.</li>
+    <li>Limiares de alerta (<code>ALERT_CONFIG</code>) têm defaults hardcoded no front (7/15/30 dias) que só são sobrescritos depois que <code>loadConfiguracoes()</code> resolve — a Edge Function usa os mesmos defaults como fallback (<code>cfg.dias_critico || '7'</code>), então os dois ficam consistentes mesmo se a tabela estiver vazia.</li>
+    <li>O JWT anon key usado pelo <code>net.http_post</code> do cron está hardcoded em texto claro dentro de <code>schema_certificado_alertas_cron.sql</code> — é a anon key pública do projeto (não a service role), então o risco de exposição é baixo, mas ainda é um valor específico de ambiente cravado num arquivo versionado; reexecutar esse script em outro projeto Supabase exige editar a URL e o JWT manualmente.</li>
+  </ul>
+</section>

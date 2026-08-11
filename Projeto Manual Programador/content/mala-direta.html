@@ -1,0 +1,166 @@
+<p class="manual-intro">A Mala Direta tem duas implementações independentes que compartilham o mesmo banco Supabase (projeto principal do portal, tabelas <code>mala_direta_*</code>): a versão <strong>web</strong>, em <code>Projeto Mala Direta/</code> — HTML+JS puro, um único <code>index.html</code> de ~255KB (sem build step, sem módulos separados) que concentra CRUD de campanhas/contatos/grupos, o conversor de PDF (pdf.js client-side) e os dois canais de disparo automático (Brevo) e semi-automático (mailto/lote Outlook); e a versão <strong>desktop</strong>, em <code>Projeto Mala Direta Electron/</code> — um app Electron enxuto (~3 arquivos) que só lê campanhas já criadas na web e as dispara controlando o Outlook instalado via COM/PowerShell. As duas seções abaixo documentam cada uma; a diferença de mecanismo de envio automático entre elas é o ponto mais importante desta spec.</p>
+
+<section class="manual-item" id="web">
+  <h2>Versão Web</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>Projeto Mala Direta/index.html</code> — SPA client-side única: todo HTML de todas as telas (Dashboard, Campanhas, Contatos, Grupos, Conversor PDF, Envios Recorrentes, Configurações) já está no DOM, navegação troca <code>display</code> de seções (<code>showSection()</code>), sem router. JS inline no próprio arquivo, sem módulos ES/bundler.</li>
+    <li><code>Projeto Mala Direta/styles.css</code> — folha de estilos própria (não reaproveita o CSS geral do portal).</li>
+    <li><code>Projeto Mala Direta/confirmacao.html</code> — página pública standalone (sem auth) que recebe <code>?token=&amp;acao=</code> e faz <code>UPDATE mala_direta_envios</code> via cliente Supabase anônimo.</li>
+    <li><code>Projeto Mala Direta/schema-mala-direta.sql</code> — schema versionado de <code>mala_direta_contatos</code>, <code>_campanhas</code>, <code>_envios</code>, <code>_grupos</code>, <code>_grupo_contatos</code>, <code>_regras</code> + RLS. <strong>Não inclui</strong> <code>mala_direta_config</code> (tabela chave/valor usada para a config do Brevo — existe no banco mas não está neste arquivo de schema, ver Dívida Técnica).</li>
+    <li><code>Projeto Mala Direta/conversor-vencimentos/</code> — ferramenta standalone <strong>desacoplada</strong>: script Python (<code>pdf_to_excel_vencimentos.py</code>) + wrappers <code>.bat</code>/<code>.sh</code>, roda fora do navegador e gera um Excel. Não é o caminho usado pela tela "Conversor PDF" do <code>index.html</code>, que reimplementa a extração em JS com pdf.js direto no navegador (<code>pdfjs-dist@3.11.174</code> via CDN, ver Fluxo Principal). Os dois conversores coexistem no repo por motivos históricos.</li>
+    <li>Autenticação via <code>../portal-auth-guard.js</code> (<code>window.PortalAuthGuard.init(1, {returnAfterLogin:true})</code>), mesmo guard compartilhado do resto do portal; cliente Supabase criado com <code>SUPABASE_URL</code>/<code>SUPABASE_KEY</code> globais definidos por esse script.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel / Colunas-chave</th></tr></thead>
+    <tbody>
+      <tr><td><code>mala_direta_contatos</code></td><td>Catálogo reutilizável (nome, email, telefone, empresa, cargo, ativo). RLS: qualquer <code>authenticated</code> tem CRUD total.</td></tr>
+      <tr><td><code>mala_direta_campanhas</code></td><td><code>tipo_confirmacao</code> (CHECK <code>leitura|interesse|nenhuma</code>), <code>template</code> (texto ou HTML completo — decidido por heurística, ver Decisões), <code>assunto_email</code>, <code>status</code> (<code>rascunho|ativa|encerrada</code>, pouco usado na prática), <code>data_agendamento</code> (preenchida pelo Conversor PDF/Regras). RLS: SELECT livre para authenticated; UPDATE/DELETE só <code>is_admin() OR auth.uid() = criado_por</code>.</td></tr>
+      <tr><td><code>mala_direta_envios</code></td><td>1 linha por (campanha × destinatário) — é o snapshot do envio, não um FK "vivo" para contato: <code>nome/email/telefone/empresa/cargo</code> são copiados no momento da criação (<code>contato_id</code> é opcional, pode ser <code>NULL</code> para destinatário avulso). <code>mensagem_final</code> guarda o template já com variáveis substituídas. <code>token</code> UUID hex de 32 chars (<code>crypto.randomUUID().replace(/-/g,'')</code>), gerado no front, é a "senha" de acesso à página de confirmação — não há verificação adicional. <code>status_envio</code> (<code>pendente|enviado</code>) e <code>status_confirmacao</code> (<code>pendente|lido|confirmado|recusado</code>) são independentes. RLS tem policy dedicada pro <code>anon</code>: só pode fazer UPDATE se <code>status_envio='enviado' AND status_confirmacao='pendente'</code>, e só pode escrever um novo <code>status_confirmacao</code> válido — evita dupla resposta e resposta antes do envio real.</td></tr>
+      <tr><td><code>mala_direta_grupos</code> / <code>mala_direta_grupo_contatos</code></td><td>Agrupamento N:N simples de contatos, usado só para pré-selecionar destinatários ao montar uma campanha (não persiste vínculo grupo↔campanha).</td></tr>
+      <tr><td><code>mala_direta_regras</code></td><td>Regras recorrentes geradas pelo Conversor PDF: <code>tipos</code> (array de tipos de evento reconhecidos), <code>frequencia</code> (<code>semanal|mensal|unica</code>), <code>dia_envio</code>/<code>dia_envio_tipo</code> (<code>'ultimo'</code> para último dia do mês), <code>agrupar_empresa</code>, <code>template</code>, <code>ultima_execucao</code>, <code>metodo_envio</code> (mailto/brevo — não está no schema.sql original, coluna adicionada depois). Execução é sempre manual (usuário clica "Executar" na tela); não há cron/edge function — a regra só dispara um aviso visual quando alguém abre a tela no dia programado.</td></tr>
+      <tr><td><code>mala_direta_config</code></td><td>Tabela chave/valor (<code>chave</code>, <code>valor</code>, <code>atualizado_em</code>) usada só para <code>brevo_key</code>/<code>brevo_nome</code>/<code>brevo_email</code>. Não documentada em <code>schema-mala-direta.sql</code>. A chave de API do Brevo fica em texto puro no banco (mesma categoria de decisão que <code>contabil_mapeamento_bancos</code> em Departamento Contábil) e também trafega para o cliente sem mascaramento (fica no <code>value</code> do input ao abrir Configurações).</td></tr>
+    </tbody>
+  </table>
+  <p>Configurações de lote de Outlook (<code>loteMax</code>, <code>loteIntervalo</code>, <code>loteDelay</code>) e o modo de template (texto/HTML) ficam só em <code>localStorage</code> do navegador (<code>md_lote_max</code>, <code>md_lote_intervalo</code>, <code>md_lote_delay</code>, <code>md_modo_html</code>) — não sincronizam entre máquinas/usuários, diferente da config do Brevo que é compartilhada via <code>mala_direta_config</code>.</p>
+
+  <h3>Fluxo Principal</h3>
+  <p>Conversor PDF → campanha (extração 100% client-side, sem backend):</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Usuario seleciona PDF de Avisos de Vencimento] --> B[pdf.js le paginas no navegador]
+    B --> C[Regex por tipo de evento reconhece linhas]
+    C --> D[Tabela revisavel: empresa, CNPJ, colaborador, tipo, vencimento]
+    D --> E[Aba Agrupar e Agendar: filtra tipos e empresas]
+    E --> F{Frequencia}
+    F -- unica --> G[Data escolhida manualmente]
+    F -- semanal --> H[Semana do dia da semana escolhido]
+    F -- mensal --> I[Mes calendario do dia escolhido]
+    G --> J{Criar Campanha Agora ou Salvar Regra}
+    H --> J
+    I --> J
+    J -- Campanha Agora --> K[INSERT mala_direta_campanhas + mala_direta_envios]
+    J -- Regra Recorrente --> L[INSERT mala_direta_regras]
+    L --> M[Aviso na tela Envios Recorrentes no dia programado]
+    M --> N[Execucao manual reimporta PDF do dia]
+  </pre>
+  <p>Envio automático via Brevo (<code>executarEnvioBrevo()</code>, linha ~5077) — chamada HTTP direta do navegador para a API do Brevo, sem intermediário no Supabase:</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant U as Usuario (navegador)
+    participant JS as index.html (client-side)
+    participant SB as Supabase REST
+    participant BR as api.brevo.com
+
+    U->>JS: clica Enviar via Brevo
+    JS->>SB: SELECT mala_direta_envios pendentes da campanha
+    loop cada destinatario pendente
+        JS->>JS: applyTemplate + _buildConfirmButton (token do envio)
+        JS->>BR: POST v3/smtp/email (api-key no header, sender, to, htmlContent)
+        BR-->>JS: 201 ou erro
+        alt sucesso
+            JS->>SB: UPDATE mala_direta_envios SET status_envio=enviado
+        else falha
+            JS->>JS: acumula em lista de erros, segue para o proximo
+        end
+        JS->>JS: sleep 300ms
+    end
+    JS-->>U: barra de progresso + toast com total ok/erro
+  </pre>
+  <p>Envio manual via mailto e lote pelo Outlook: <code>window.open('mailto:...')</code> monta um rascunho no cliente de email padrão do SO com destinatário/assunto/corpo (texto) já preenchidos; o corpo HTML não é aceito por <code>mailto:</code>, por isso o modo "HTML formatado" copia o HTML para a área de transferência e pede Ctrl+V manual. O "Envio em Lote" (<code>iniciarEnvioEmLote()</code>) só automatiza a abertura sequencial de rascunhos, respeitando <code>loteMax</code>/<code>loteIntervalo</code>/<code>loteDelay</code> do <code>localStorage</code> — cada rascunho ainda exige clique em Enviar dentro do Outlook; o job roda num objeto de estado global (<code>emailBatchJob</code>) que sobrevive à troca de tela dentro da SPA (mesma aba do navegador), mas é perdido se a aba fechar.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><code>isHtmlTemplate()</code> decide texto-vs-HTML por heurística de prefixo (<code>trim().toLowerCase().startsWith('&lt;!doctype'|'&lt;html')</code>) — não há coluna própria de tipo; se o usuário colar um HTML sem essas tags no topo, o sistema trata como texto plano e escapa tudo.</li>
+    <li><code>mala_direta_envios</code> é desnormalizada de propósito (snapshot de nome/email/etc. no momento do envio) — editar um contato depois não altera envios já criados a partir dele, e destinatário avulso funciona sem precisar de linha em <code>mala_direta_contatos</code>.</li>
+    <li>O link de confirmação embutido no HTML (<code>_buildConfirmButton</code>) é montado com URL <strong>relativa</strong> à própria página (<code>window.location.href</code> menos o querystring), então aponta para onde quer que o <code>index.html</code> esteja hospedado no momento do envio — diferente da versão Electron, que usa uma URL fixa do GitHub Pages (ver seção Desktop/Electron, Decisões).</li>
+    <li>Variáveis de template (<code>{{campo}}</code>) casam por nome de coluna case-insensitive contra as chaves da linha do envio; no preview, uma variável sem valor fica destacada em amarelo (<code>applyTemplateHighlight</code>) em vez de silenciosamente virar string vazia, para o usuário perceber antes de disparar.</li>
+    <li>Envio via Brevo não passa por nenhuma Edge Function do Supabase — é <code>fetch</code> direto do navegador para <code>api.brevo.com</code> com a API key exposta no client-side (qualquer um com acesso ao DevTools da sessão logada vê a chave).</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li><code>mala_direta_config</code> (config do Brevo) não está em <code>schema-mala-direta.sql</code> — quem for recriar o banco do zero a partir desse arquivo vai faltar essa tabela; precisa ser extraída do banco vivo antes de qualquer migração.</li>
+    <li>Coluna <code>metodo_envio</code> de <code>mala_direta_regras</code> (referenciada no JS) também não aparece no schema.sql — mesmo tipo de gap.</li>
+    <li>Chave de API do Brevo e senha nenhuma de criptografia: fica em texto puro no banco e é enviada ao client inteira sempre que a tela de Configurações carrega.</li>
+    <li>Progresso de envio em lote (Outlook) só existe em memória JS de uma aba — fechar a aba no meio de um lote perde o acompanhamento (os emails já efetivamente enviados continuam marcados no banco, mas o restante do lote não é retomado automaticamente).</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="desktop-electron">
+  <h2>Versão Desktop (Electron)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>Projeto Mala Direta Electron/main.js</code> — processo principal: cria a <code>BrowserWindow</code> (<code>contextIsolation: true</code>, <code>nodeIntegration: false</code>) e expõe um único handler IPC, <code>enviar-email-outlook</code>, que é todo o mecanismo de automação do Outlook (ver Fluxo Principal).</li>
+    <li><code>Projeto Mala Direta Electron/preload.js</code> — ponte <code>contextBridge</code>: reimplementa um client REST mínimo pro Supabase à mão (<code>sbPost</code>/<code>sbQuery</code>/<code>sbPatch</code> com <code>fetch</code> cru, sem <code>@supabase/supabase-js</code>), com <code>SB_URL</code>/<code>SB_KEY</code> (anon) hardcoded no arquivo. Expõe <code>window.electronAPI</code> ao renderer: <code>login</code>, <code>logout</code>, <code>getCampanhas</code>, <code>getCampanha</code>, <code>getEnvios</code>, <code>marcarEnviado</code>, <code>enviarEmail</code>.</li>
+    <li><code>Projeto Mala Direta Electron/index.html</code> — renderer: tela de login própria (chama <code>electronAPI.login</code>, que faz <code>POST /auth/v1/token?grant_type=password</code> direto, sem passar pelo <code>portal-auth-guard.js</code> do portal web) + lista de campanhas + detalhe/envio. CSS inline no próprio HTML, sem reaproveitar <code>styles.css</code> da versão web.</li>
+    <li><code>package.json</code> — <code>electron-builder</code> gera instalador NSIS Windows (<code>appId br.com.scont.maladireta</code>); dependências de dev apenas (<code>electron</code>, <code>electron-builder</code>), sem dependências de produção (nem <code>@supabase/supabase-js</code>, o REST é feito à mão).</li>
+    <li>App é <strong>somente leitura/disparo</strong> em relação ao domínio de campanhas — não cria campanha, contato, grupo, regra nem lê PDF; consome exclusivamente <code>mala_direta_campanhas</code> e <code>mala_direta_envios</code> já populadas pela versão web.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Uso pelo Electron</th></tr></thead>
+    <tbody>
+      <tr><td><code>mala_direta_campanhas</code></td><td>Somente leitura: <code>getCampanhas()</code> (<code>select=*&amp;order=created_at.desc</code>) e <code>getCampanha(id)</code>.</td></tr>
+      <tr><td><code>mala_direta_envios</code></td><td>Leitura (<code>getEnvios(campId)</code>, ordenado por nome) e a única escrita do app: <code>marcarEnviado(envioId)</code> faz <code>PATCH status_envio='enviado', data_envio=now()</code> após cada COM <code>.Send()</code> bem-sucedido — mesma tabela e mesmas colunas que a versão web usa, então o status fica sincronizado nos dois lados.</td></tr>
+    </tbody>
+  </table>
+  <p>Não há tabela nem coluna própria do Electron — ele não introduz schema novo, só consome o da versão web pela API REST do PostgREST (sem SDK, sem RLS bypass: usa o mesmo <code>anon key</code> + JWT de sessão obtido no login).</p>
+
+  <h3>Fluxo Principal</h3>
+  <p>Envio automático por destinatário (<code>enviarTodos()</code> no renderer → IPC → <code>main.js</code> → PowerShell → COM Outlook). Este é o mecanismo real, confirmado em <code>main.js</code>: não é uma API de e-mail, é automação de desktop do Outlook instalado.</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant R as Renderer (index.html)
+    participant P as preload.js (electronAPI)
+    participant M as main.js (processo principal)
+    participant FS as Sistema de arquivos temp
+    participant PS as powershell.exe
+    participant OL as Outlook.Application (COM)
+    participant SB as Supabase REST
+
+    R->>R: monta htmlFinal = template com variaveis + botao de confirmacao
+    R->>P: electronAPI.enviarEmail(dest, assunto, htmlFinal)
+    P->>M: ipcRenderer.invoke('enviar-email-outlook', dados)
+    M->>FS: writeFileSync temp/md_body_TIMESTAMP.html (corpo HTML)
+    M->>M: monta script .ps1 (string template, aspas simples escapadas)
+    M->>FS: writeFileSync temp/md_send_TIMESTAMP.ps1
+    M->>PS: execFile powershell -ExecutionPolicy Bypass -File script.ps1 (timeout 30s)
+    PS->>OL: New-Object -ComObject Outlook.Application
+    PS->>OL: CreateItem(0) / seta To, Subject, HTMLBody (le o temp html)
+    PS->>OL: mail.Send()
+    OL-->>PS: sucesso ou excecao COM
+    PS->>FS: Remove-Item do html temporario (finally)
+    PS-->>M: stdout OK ou stderr com mensagem de erro
+    M-->>P: resolve {ok:true} ou {ok:false, erro}
+    P-->>R: resultado da invocacao IPC
+    alt ok
+        R->>SB: electronAPI.marcarEnviado(envioId) -- PATCH status_envio
+    else erro
+        R->>R: acumula em errosEnvio, segue pro proximo destinatario
+    end
+    R->>R: sleep(delay em ms, configuravel na tela) antes do proximo
+  </pre>
+  <p>O laço fica inteiro no renderer (<code>for</code> sequencial em <code>enviarTodos()</code>), um IPC roundtrip por destinatário — não há envio em paralelo. O <code>.ps1</code> é gerado do zero a cada email (arquivo novo com timestamp no nome) e apagado só ao final da execução do PowerShell (<code>fs.unlinkSync(tmpPs)</code> no callback do <code>execFile</code>), enquanto o <code>.html</code> temporário é removido de dentro do próprio script PowerShell (bloco <code>finally</code>).</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>Automação COM, não API</strong>: o "envio automático" da versão Electron depende de o Outlook desktop estar instalado, configurado com uma conta de email e (na primeira vez, ou conforme política) aceitar o prompt de segurança do próprio Outlook para automação de terceiros controlando o objeto <code>Outlook.Application</code>. Sem Outlook instalado na máquina, o app não envia nada — diferente da versão web (mailto/Brevo), que não depende de nenhum programa externo.</li>
+    <li>Escape de aspas simples na montagem do script PowerShell é manual (<code>s.replace(/'/g, "''")</code>) diretamente na interpolação de string — não há sanitização contra outros metacaracteres do PowerShell (backtick, <code>$</code>); assunto/nome com esses caracteres pode quebrar o script gerado (risco de injeção de comando fraco, mitigado só pelo fato de o conteúdo vir de campanhas já cadastradas por usuários internos autenticados, não de input público).</li>
+    <li>Corpo do email é sempre gravado em arquivo temporário e lido de volta via <code>[System.IO.File]::ReadAllText(...)</code> dentro do PowerShell — decisão deliberada "evita problemas de escape" (comentário no código) por não colocar o HTML inteiro dentro da string do <code>.ps1</code>.</li>
+    <li><code>CONFIRM_BASE</code> do botão de confirmação é uma URL <strong>fixa</strong> apontando para <code>https://scontsolucoescontabeis.github.io/scont/Projeto%20Mala%20Direta/confirmacao.html</code> — diferente da versão web, que monta a URL de confirmação relativa a onde o <code>index.html</code> está hospedado no momento (ver seção Web, Decisões). Se o mirror do GitHub Pages sair de sincronia com o deploy real do portal, os links enviados pela versão Electron podem apontar para uma cópia desatualizada da página de confirmação.</li>
+    <li>Login do Electron não usa <code>portal-auth-guard.js</code> nem qualquer guard compartilhado — é uma chamada direta ao endpoint de senha do GoTrue (<code>/auth/v1/token?grant_type=password</code>), com o token de acesso guardado só em memória (variável <code>accessToken</code> em <code>preload.js</code>, perdido ao fechar o app).</li>
+    <li>Intervalo entre emails é configurável na UI (input em ms, persistido em <code>localStorage</code> do Electron, chave <code>md_el_delay</code>) — mesmo padrão de "config só local" da versão web, sem sincronizar com os campos <code>loteMax</code>/<code>loteIntervalo</code> de lá (são <code>localStorage</code>s de processos diferentes, nunca se veem).</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Sem paralelismo nem retomada de progresso: se o app fechar no meio do envio de uma campanha grande, é preciso reabrir a campanha e clicar em enviar de novo — como os já enviados ficam marcados no banco (<code>status_envio='enviado'</code>), o app filtra de novo por pendentes e não duplica envio, mas não há fila persistente.</li>
+    <li>URL de confirmação hardcoded (GitHub Pages) é um ponto de acoplamento que só é atualizado editando e recompilando o app — qualquer mudança de domínio/hospedagem do portal exige nova build do instalador Electron para todos os usuários da versão desktop.</li>
+  </ul>
+</section>

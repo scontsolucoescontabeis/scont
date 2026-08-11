@@ -1,0 +1,241 @@
+<p class="manual-intro">A Administração RH vive em <code>Projeto RH/admin.html</code> (~840 linhas, 8 abas em uma única página) + <code>Projeto RH/admin.js</code> (~2785 linhas, todas as funções em escopo global — sem IIFE, sem módulos — ligadas via <code>onclick=""</code> inline no HTML). Sem build step, sem framework: cada aba é <code>innerHTML</code> de template string re-renderizado a cada filtro/paginação. Cliente Supabase próprio (<code>supabase.createClient(SUPABASE_URL, SUPABASE_KEY)</code> de <code>../supabase-config.js</code>), autenticação via <code>portal-auth-guard.js</code> compartilhado do portal. Bibliotecas via CDN: SheetJS (<code>xlsx.full.min.js</code> 0.18.5) para leitura/escrita de Excel e PDF.js 3.11.174 para os dois importadores de PDF (férias e jornada). Os parsers de PDF (<code>ferias-parser.js</code>, <code>jornada-parser.js</code>) são módulos puros — sem DOM, sem Supabase, sem PDF.js — que rodam tanto como <code>&lt;script&gt;</code> global no navegador quanto via <code>require()</code> em Node, cobertos por <code>test-ferias-parser.js</code>/<code>test-jornada-parser.js</code> (só usados por esta ferramenta, não compartilhados com o restante do módulo RH). A ferramenta é o cadastro mestre de <code>rh_empresas</code>/<code>rh_empregados</code>/<code>rh_socios</code>/<code>rh_rubricas</code> que alimenta as demais telas do módulo RH (Controle de Frequência, Gerar Folhas de Ponto, Gerar Benefícios etc.).</p>
+
+<section class="manual-item" id="escopo-acesso-responsavel">
+  <h2>Escopo de Acesso por Responsável</h2>
+
+  <h3>Fluxo Principal</h3>
+  <p>Ao carregar a página, <code>_resolverEscopoUsuario()</code> lê <code>sessionStorage.userAuth</code> (preenchido pelo <code>portal-auth-guard.js</code>) e decide se o usuário atual enxerga todas as empresas ou só um subconjunto. O resultado fica em <code>_empresasPermitidas</code> (variável global do módulo: <code>null</code> = sem restrição).</p>
+  <pre class="mermaid">
+flowchart TD
+    A[DOMContentLoaded] --> B[_resolverEscopoUsuario]
+    B --> C{auth.isAdmin?}
+    C -- sim --> D[_empresasPermitidas = null, ve tudo]
+    C -- nao --> E{empresa do usuario == prestador de servico?}
+    E -- nao --> D
+    E -- sim --> F[SELECT codigo_empresa FROM contabil_empresas_responsaveis WHERE usuario_id]
+    F -- sucesso --> G[_empresasPermitidas = Set dos codigos retornados]
+    F -- erro --> H[_empresasPermitidas = Set vazio, nao mostra nenhuma empresa]
+    D --> I[carregarEmpresas/Empregados/Ferias/Jornada/Socios/Rubricas]
+    G --> I
+    H --> I
+  </pre>
+  <p>Cada tela filtra sua lista carregada pelo escopo com <code>_filtrarPorEscopo(linhas)</code> (filtro em memória, pós-fetch) — exceto Rubricas, que é paginada no servidor e usa <code>_aplicarEscopoQuery(query)</code> (<code>.in('codigo_empresa', [...set])</code>) para filtrar antes da paginação. Se o escopo falhar ao carregar (erro de rede), o fallback é <strong>não mostrar nenhuma empresa</strong> — mais seguro que vazar tudo, mas também significa que uma falha silenciosa da API deixa a tela vazia sem erro visível além do console.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>O gating é 100% client-side: RLS de todas as tabelas <code>rh_*</code> usadas nesta ferramenta é <code>TO authenticated USING (TRUE)</code> (ver seção Modelo de Dados de cada aba) — um usuário autenticado com a anon key lê/escreve qualquer empresa via API direta, independente do papel. A tela apenas não <em>mostra</em> o que está fora do escopo.</li>
+    <li>A tabela que define o escopo (<code>contabil_empresas_responsaveis</code>) pertence ao módulo Departamento Contábil, não ao RH — <code>admin.js</code> lê essa tabela de fora do seu próprio domínio. Mudanças na tela Configurações do Departamento Contábil (ver Manual do Programador daquele módulo) afetam diretamente quem vê o quê aqui.</li>
+    <li>Distinção de papel usa <code>auth.userData.empresa</code> (case-insensitive) comparado a strings fixas ("prestador de serviço") — não há enum nem tabela de papéis; renomear essa empresa cadastrada no portal quebra o gating silenciosamente (todo mundo passa a cair no ramo "vê tudo").</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="empresas-tecnico">
+  <h2>Aba Empresas</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_empresas</code></td><td>1 linha por empresa, <code>codigo_empresa</code> UNIQUE. Colunas base em <code>Projeto RH/schema_rh.sql</code> (id, codigo_empresa, nome_empresa); colunas de cadastro completo (cnpj, regime_enquadramento, inscricao_estadual, inscricao_municipal, municipio, status_situacao, data_cadastro, endereco, cep, cidade) vêm de <code>_sql/rh_importacao_campos.sql</code> — arquivo na raiz do portal, fora da pasta <code>Projeto RH/</code>. Colunas <code>uf</code> e <code>email</code>/<code>email_responsavel</code> em migrações à parte (<code>schema_rh_empresas_uf.sql</code>, <code>schema_rh_empresas_email.sql</code>, <code>schema_rh_email_responsavel.sql</code>). RLS: <code>TO authenticated USING (TRUE)</code> em todas.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal — Importação (relatório do ERP)</h3>
+  <p>A importação lê o relatório "Relação de Empresas" exportado diretamente do ERP fonte — não um modelo próprio da ferramenta (o botão "Modelo" foi removido quando o layout mudou para o do ERP). O parsing é <strong>posicional</strong>: 7 linhas de título/paginação ignoradas (<code>range=7</code> no SheetJS), 32 colunas mapeadas por índice fixo (várias em branco — resíduo de células mescladas do relatório original), <code>nome_empresa</code> vindo da coluna Razão Social (índice 27) e não da coluna "Empresa" (índice 2, truncada em ~28% das linhas do arquivo de referência).</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Arquivo .xlsx/.xls/.csv] --> B[lerPlanilha com range=7, 32 colunas posicionais fixas]
+    B --> C[Filtra linhas sem codigo_empresa ou nome_empresa]
+    C --> D{Tabela rh_empresas ja tem linhas?}
+    D -- nao --> E[Importa direto, sem perguntar]
+    D -- sim --> F[Modal Substituir vs Acrescentar]
+    E --> G[Busca UF por CEP em lotes de 5, ViaCEP + fallback por faixa numerica]
+    F --> G
+    G --> H{Modo == acrescentar e UF nao resolvida?}
+    H -- sim --> I[Nao sobrescreve UF ja salva]
+    H -- nao --> J[upsert em rh_empresas onConflict codigo_empresa]
+    I --> J
+  </pre>
+  <p>Como <code>codigo_empresa</code> é UNIQUE, "Substituir" e "Acrescentar" resultam na mesma linha final para Empresas — a única diferença real entre os dois modos aqui é o tratamento de UF quando a busca pelo CEP falha (comentário explícito no código: um DELETE antes do insert quebraria FKs lógicas de outras tabelas, ex. <code>contabil_onboardings.codigo_empresa</code>).</p>
+  <p>A busca de UF é dupla: tenta a API pública ViaCEP primeiro; se a rede falhar, cai em <code>_FAIXAS_CEP_UF</code>, uma tabela de faixas numéricas de CEP por estado embutida no próprio <code>admin.js</code>. O botão "Preencher UF pendentes" roda o mesmo mecanismo avulso, para empresas com CEP mas sem UF.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>O campo "E-mail Responsável" é editado inline na própria tabela (<code>onblur</code> salva direto, sem botão Salvar) — mesmo padrão sem-botão-salvar visto em outras telas do portal.</li>
+    <li>O filtro de Status (Ativo/Inativo) compara por prefixo de string ("ativ"/"inativ", case-insensitive) para cobrir tanto "Ativo" quanto "Ativa" vindos do ERP, já que <code>status_situacao</code> é texto livre, não enum.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="empregados-tecnico">
+  <h2>Aba Empregados</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_empregados</code></td><td>PK lógica <code>(codigo_empresa, codigo_empregado)</code> UNIQUE. ~100 colunas: dados contratuais, cargo/função, documentos (CPF/PIS/RG/CTPS/CNH/RNE/passaporte), dados pessoais, endereço, situação trabalhista, dados bancários, deficiência, 7 blocos de dependente (nome/nascimento/CPF/parentesco). Colunas além das 3 base vêm de <code>_sql/rh_empregados_campos.sql</code> (fora de <code>Projeto RH/</code>). Coluna <code>jornada_id</code> existe (FK para <code>rh_jornadas</code>, ver quadro abaixo) mas não é lida nem exibida nesta tela.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal — Listagem e Filtros</h3>
+  <p>Busca paginada em blocos de 1000 linhas (<code>range()</code> em loop) para superar o limite padrão do Supabase — a tabela pode ter mais de 14 mil linhas somando todas as empresas. A grade de colunas é configurável: <code>_GRUPOS_CAMPOS</code> define 9 grupos temáticos de colunas; o usuário marca/desmarca quais aparecem na tabela, no Excel exportado (<code>exportarRelatorioEmpregados</code>) e no PDF (<code>gerarRelatorioPDFEmpregados</code>, que abre uma janela nova com HTML próprio e chama <code>window.print()</code> — não usa jsPDF/AutoTable como o resto do portal).</p>
+  <p>Os filtros (empresa via checklist, nome/código, situação via checklist, tipo de empregado) são todos aplicados em memória sobre a lista já carregada — não há re-fetch por filtro.</p>
+
+  <h3>Fluxo Principal — Importação (mapeamento por nome de coluna, não por posição)</h3>
+  <p>Diferente da importação de Empresas (posicional), a de Empregados lê por <strong>nome do cabeçalho</strong>, porque o relatório fonte ("Todas as empresas / Apenas Ativos") repete a linha de cabeçalho a cada troca de empresa dentro do mesmo arquivo, e a ordem de algumas colunas (ex. Agência/Conta) varia entre empresas.</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Le todas as linhas com header igual a 1, sem mapeamento fixo] --> B{Linha parece cabecalho?}
+    B -- sim --> C[_construirMapaColunasEmpregados mapeia indice do arquivo para chave interna, por rotulo]
+    C --> D[Atualiza mapaAtual e continua]
+    B -- nao --> E{Existe mapaAtual?}
+    E -- nao --> F[Ignora linha, anterior ao 1o cabecalho]
+    E -- sim --> G[Aplica mapaAtual a linha, gera registro cru]
+    D --> H[Proxima linha]
+    F --> H
+    G --> H
+    H --> I[Filtra registros sem codigo_empresa/codigo_empregado/nome_empregado]
+    I --> J[Converte datas Excel/BR para ISO, salario para numero]
+    J --> K[Modal Substituir vs Acrescentar]
+    K --> L[upsert em lotes de 200, onConflict codigo_empresa+codigo_empregado]
+  </pre>
+  <p>Rótulos duplicados no modelo canônico (ex. "Categoria" aparece tanto para categoria do empregado quanto para categoria da CNH) são resolvidos por ordem de aparição: a N-ésima ocorrência de um rótulo no arquivo mapeia para a N-ésima ocorrência do mesmo rótulo no array canônico — depende da ordem das colunas no arquivo fonte ser estável entre blocos de empresa.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>No modo "Substituir", o DELETE é por <code>codigo_empresa IN (...)</code> — apaga <strong>todos</strong> os empregados das empresas presentes no arquivo antes de reinserir, não linha a linha.</li>
+    <li>O deletar de empregado individual (botão 🗑 na tabela) é hard delete direto em <code>rh_empregados</code> — sem soft delete, sem confirmação além do <code>confirm()</code> nativo do navegador.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="ferias-tecnico">
+  <h2>Aba Informações de Férias</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_ferias_calculadas</code></td><td>Upsert por <code>(codigo_empresa, codigo_empregado, ferias_inicio)</code> — histórico acumulado (múltiplos períodos por empregado convivem), não snapshot. Alimenta também o badge "Férias" no Controle de Frequência (index.html), fora desta ferramenta.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Importa o PDF "Relação de Férias Calculadas" (todas as empresas) via PDF.js: extrai <code>textContent</code> por página, reconstrói linhas de texto agrupando itens por posição Y (<code>_reconstruirLinhasPagina</code> em <code>ferias-parser.js</code>, tolerância de 1.0 no eixo Y), depois interpreta essas linhas com regras específicas do layout do relatório fonte (<code>_parsearLinhasFerias</code>). Linhas não reconhecidas viram avisos exibidos ao usuário (não silenciosamente descartadas) via <code>_renderizarResumoImportacaoFerias</code>. Antes de salvar, o código consulta as chaves já existentes em <code>rh_ferias_calculadas</code> para contar "novos" vs. "atualizados" por empresa no resumo pós-importação — sem esse SELECT prévio a UI não saberia diferenciar.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Esta aba é somente leitura na UI — sem edição/exclusão manual de período, só reimportação do PDF (que faz upsert, nunca limpa o que já existia antes de uma nova importação).</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="jornada-tecnico">
+  <h2>Aba Jornada de Trabalho</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_jornada_trabalho</code></td><td>1 linha por <code>(codigo_empresa, codigo_empregado, dia_semana)</code> UNIQUE — horário real de entrada/intervalo/saída por dia da semana em que o empregado trabalha, importado do PDF "Horário de Trabalho". <strong>Snapshot, não histórico</strong>: cada importação por PDF faz DELETE de toda a tabela antes de reinserir (comentário explícito no schema e no código: "reflete o estado atual da jornada de todos os empregados").</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Não confundir com <code>rh_jornadas</code></strong> (tabela criada em <code>schema_rh_jornadas.sql</code>, 05/08/2026): essa é a feature de <em>múltiplas jornadas nomeadas por empresa</em> (jornada diária + exceções de sexta/sábado), configurada na tela <strong>Configurações</strong> do Controle de Frequência (<code>index.html</code> / <code>script.js</code> — fora desta ferramenta) e associada a empregados via <code>rh_empregados.jornada_id</code> (NULL = usa a "Jornada Padrão" da empresa, guardada em <code>rh_config_rubricas_txt</code>). <code>admin.js</code> não lê nem escreve <code>rh_jornadas</code> em nenhum ponto — são dois conceitos de "jornada" com o mesmo nome de domínio e tabelas distintas, propositalmente separados desde a migração original (comentário no SQL: "conceito separado, não afetado por esta migração"). Quadro comparativo:</p>
+  <table class="manual-tabela">
+    <thead><tr><th></th><th><code>rh_jornada_trabalho</code> (esta aba)</th><th><code>rh_jornadas</code> (Configurações do Controle de Frequência)</th></tr></thead>
+    <tbody>
+      <tr><td>Granularidade</td><td>Por empregado × dia da semana</td><td>Por empresa, nomeada (ex. "Turno Noturno"), associada N:1 a empregados</td></tr>
+      <tr><td>Origem do dado</td><td>Importação de PDF do sistema fonte</td><td>Cadastro manual na UI de Configurações</td></tr>
+      <tr><td>Consumidor</td><td>Administração (esta tela) e Gerar Folhas de Ponto</td><td>Cálculo de frequência/extras no Controle de Frequência e Gerar Benefícios</td></tr>
+      <tr><td>Comportamento em import/edição</td><td>Snapshot — substitui tudo a cada PDF importado</td><td>Cadastro persistente, editado incrementalmente</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal — Importação e Edição Manual</h3>
+  <p>O parser (<code>jornada-parser.js</code>) agrupa itens do PDF.js por linha (mesma técnica Y do parser de férias) e depois por <strong>coluna</strong>, usando faixas fixas de posição X (<code>_COLS_JORNADA</code>: codigo, nome, dia, entrada, intervalo, saida, observacao) — não por proximidade textual. Isso existe para resolver um caso real do PDF fonte: quando o nome do empregado é comprido, ele "gruda" sem espaço com a data de admissão da coluna vizinha (ex. <code>"SANTOS14/07/2018"</code>); agrupar por posição X evita que esse vazamento contamine as outras colunas — só a coluna nome precisa de limpeza (corta a partir da 1ª data encontrada).</p>
+  <pre class="mermaid">
+flowchart TD
+    A[PDF Horario de Trabalho] --> B[PDF.js extrai items com posicao X/Y por pagina]
+    B --> C[Agrupa por linha, Y com tolerancia 1.0]
+    C --> D[Classifica cada item por coluna, faixa fixa de X]
+    D --> E[_parsearLinhasJornada monta registros codigo/nome/dia/horarios]
+    E --> F[DELETE FROM rh_jornada_trabalho neq id impossivel, ou seja apaga tudo]
+    F --> G[INSERT em lotes]
+    G --> H[carregarJornadaInfo agrupa por empregado para exibicao]
+  </pre>
+  <p>A tela agrupa as 7 linhas (uma por dia) de um mesmo empregado em 1 linha de tabela (colunas Segunda…Domingo). A edição manual (modal "Editar Jornada") opera direto sobre <code>rh_jornada_trabalho</code>: desmarcar um dia faz DELETE da linha daquele dia; marcar/editar faz upsert por <code>(codigo_empresa, codigo_empregado, dia_semana)</code>. Validações no salvamento: entrada e saída obrigatórias se o dia está marcado como trabalhado; entrada deve ser antes da saída; intervalo exige início E fim preenchidos, ou nenhum dos dois.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Uma nova importação de PDF apaga edições manuais feitas na tela desde a última importação — o snapshot é literal (delete-then-insert), sem merge.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="socios-tecnico">
+  <h2>Aba Sócios</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_socios</code></td><td>UNIQUE <code>(codigo_empresa, nome_socio)</code>. Tabela e colunas base (nome, cpf, participação, cargo, data_entrada) criadas em <code>_sql/rh_importacao_campos.sql</code>; colunas adicionais (capital_social, email_empresa, data_atualizacao_quadro, data_saida, email_socio) em <code>_sql/rh_socios_novos_campos.sql</code> — ambos fora de <code>Projeto RH/</code>, junto com as colunas extras de <code>rh_empresas</code> (ver aba Empresas).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Cadastro CRUD completo (form com editar/cancelar) além de importação em lote. A situação da empresa (Ativa/Inativa) exibida na linha do sócio é resolvida por lookup em <code>_todasEmpresas</code> (já carregada pela aba Empresas) — não é uma coluna de <code>rh_socios</code>, então a aba Sócios depende de Empresas já ter sido carregada no mesmo carregamento de página (ambas disparadas em paralelo no <code>DOMContentLoaded</code>, sem <code>await</code> entre elas — corrida benigna: se Sócios renderiza antes de Empresas terminar, o nome/CNPJ/situação aparecem como "—" até o próximo re-render).</p>
+  <p>A importação deduplica por <code>(codigo_empresa, nome_socio)</code> dentro do próprio arquivo antes de enviar ao banco — a última ocorrência de uma chave repetida prevalece, e o número de duplicatas descartadas é reportado ao usuário.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>No modo "Substituir" o DELETE é por empresa inteira (mesma lógica de Empregados) — sócios que saíram e não estão mais no arquivo importado são apagados, não marcados como inativos.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="rubricas-tecnico">
+  <h2>Aba Rubricas</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_rubricas</code></td><td>UNIQUE <code>(codigo_empresa, codigo_rubrica)</code>. Colunas <code>empresa</code> (nome desnormalizado, gravado no momento do cadastro/import), <code>descricao_rubrica</code>, <code>tipo</code> (texto livre, sem enum) vêm de <code>schema_rh_rubricas_v2.sql</code> — a tabela original em <code>schema_rh.sql</code> só tinha <code>evento</code>/<code>codigo_rubrica</code> (mapeamento evento→rubrica para geração de TXT de folha, ver <code>rh_config_rubricas_txt</code>, tabela separada e não gerenciada por esta aba).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Única aba com paginação real no servidor (<code>select('*', {count:'exact'}).range()</code>) em vez de carregar tudo e paginar em memória — decisão dimensionada para o volume de rubricas (uma empresa pode ter centenas). Filtros de empresa/texto/tipo são aplicados como cláusulas Supabase (<code>.eq</code>/<code>.or ilike</code>) antes da paginação, e passam por <code>_aplicarEscopoQuery</code> para respeitar o escopo do Prestador de Serviço (única aba, junto de Empresas, que aplica o escopo na query em vez de só filtrar em memória).</p>
+  <p>Import/export/cadastro manual convivem: o card "Rubricas" existe tanto na aba dedicada quanto na aba Importar Dados (mesmo <code>handleImportarRubricas</code>, dois <code>&lt;input type="file"&gt;</code> diferentes apontando para a mesma função — por isso a função atualiza dois elementos de status distintos, <code>statusImportarRubricas</code> e <code>statusImportarRubricasTab</code>).</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>No cadastro manual (não na importação), o <code>codigo_rubrica</code> é upsert por <code>(codigo_empresa, codigo_rubrica)</code> — editar uma rubrica existente pelo formulário sobrescreve a linha em vez de duplicar; na importação em modo "Substituir" é DELETE+INSERT por empresa, igual às demais entidades.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="renomeacao-tecnico">
+  <h2>Aba Regras de Renomeação</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_regras_renomeacao</code></td><td>Padrões DE/PARA com tags de template (<code>{CODIGO_EMPRESA}</code>, <code>{NOME_EMPRESA}</code>, <code>{NOME_ARQUIVO}</code>, <code>{NOME_DOCUMENTO}</code>, <code>{MM}</code>, <code>{AAAA}</code>, <code>{IGNORAR}</code>). CRUD simples com editar/cancelar.</td></tr>
+      <tr><td><code>rh_mapeamento_nomes</code></td><td>Dicionário <code>nome_arquivo</code> (UNIQUE) → <code>nome_documento</code>, usado pela tag <code>{NOME_DOCUMENTO}</code> dos padrões acima.</td></tr>
+    </tbody>
+  </table>
+  <p>Esta aba só <strong>cadastra</strong> as regras — quem as <strong>aplica</strong> para renomear arquivos de fato é <code>Projeto RH/renomeador.html</code> + <code>renomeador.js</code>, uma ferramenta separada não coberta por este documento (fora do escopo de "admin.html + JS relacionado").</p>
+</section>
+
+<section class="manual-item" id="importar-dados-tecnico">
+  <h2>Aba Importar Dados</h2>
+  <p>Hub com um card por entidade (Empresas, Empregados, Férias, Jornada, Rubricas, Sócios) — cada card só chama o handler específico já descrito na aba correspondente; não há lógica própria além de UI (drag-and-drop, barra de progresso, timestamp da última importação salvo em <code>localStorage</code> por tipo, chave <code>rh_ultima_importacao_&lt;Tipo&gt;</code>, não no banco — o timestamp não é compartilhado entre usuários/dispositivos).</p>
+
+  <h3>Fluxo Principal — Modal Substituir/Acrescentar</h3>
+  <p>Compartilhado por Empresas, Empregados, Rubricas e Sócios (Férias e Jornada não usam este modal — Férias sempre faz upsert acumulativo, Jornada sempre substitui tudo, ambos sem perguntar). <code>confirmarModoImportacao(entidade, qtd)</code> primeiro checa se a tabela alvo está vazia (<code>count</code> via <code>head:true</code>); se sim, importa direto sem modal. Senão, abre o modal e retorna uma Promise resolvida pelo clique do usuário (<code>'substituir'</code> / <code>'acrescentar'</code> / <code>null</code> se cancelado).</p>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li><strong>Bug real e verificável:</strong> <code>configurarUpload()</code> (chamada no <code>DOMContentLoaded</code>, depois das 8 chamadas <code>carregar*()</code>) faz <code>document.getElementById('uploadArea').addEventListener(...)</code>, mas o elemento <code>id="uploadArea"</code> não existe em <code>admin.html</code> — foi removido em algum momento (a importação virou os cards individualizados; sobrou uma referência ao design antigo com upload único de Excel multi-aba, função <code>processarArquivo</code>, que também está morta no arquivo). Isso lança <code>TypeError: Cannot read properties of null</code> de forma síncrona dentro do handler do <code>DOMContentLoaded</code>, o que interrompe a execução <em>antes</em> da linha seguinte, <code>_carregarTimestampsImportacao()</code> — na prática, os "📅 Última importação" nunca aparecem ao carregar a página (só depois de uma importação nova na mesma sessão, que chama <code>_salvarTimestampImportacao</code> diretamente). O erro é engolido silenciosamente do ponto de vista do usuário (só aparece no console).</li>
+    <li><code>processarArquivo()</code> (fluxo antigo de importação combinada Empresas+Empregados por abas de uma única planilha) está morto — nenhum elemento do HTML atual o referencia — mas continua no arquivo (~90 linhas) junto com seu helper <code>configurarUpload</code>/<code>handleFileSelect</code>. Seguro de remover, mas não removido.</li>
+    <li>Schema drift entre o que está versionado em <code>Projeto RH/*.sql</code> e o schema real: as colunas de cadastro completo de <code>rh_empresas</code> (cnpj, regime, inscrições, endereço etc.) e a tabela inteira <code>rh_socios</code> só existem em <code>_sql/rh_importacao_campos.sql</code> e <code>_sql/rh_socios_novos_campos.sql</code>, na raiz do portal — fora da pasta do módulo RH e fora do padrão de nome <code>schema_rh_*.sql</code> usado pelas migrações mais recentes. Fácil de não achar ao procurar "o que define esta coluna" só dentro de <code>Projeto RH/</code>.</li>
+  </ul>
+</section>

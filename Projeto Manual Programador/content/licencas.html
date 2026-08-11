@@ -1,0 +1,252 @@
+<p class="manual-intro">O Controle de Licenças vive em <code>Projeto Licenças/</code> e é um único arquivo <code>index.html</code> (~3.900 linhas) com HTML + CSS + JS inline — sem build step, sem módulos, sem framework. Um <code>&lt;script&gt;</code> só no fim do arquivo concentra toda a lógica (dashboard, documentos, processos, relatórios, configurações). Stack: cliente Supabase (<code>@supabase/supabase-js@2</code> via CDN) usando as credenciais globais do portal (<code>../supabase-config.js</code>, projeto <code>dsdqwigopzrdmxtmhsez</code>), autenticação via <code>../portal-auth-guard.js</code> (<code>PortalAuthGuard.init(1)</code>), Chart.js 4.4.0 para o dashboard, SheetJS (<code>xlsx@0.18.5</code>) para importar planilha de licenças, jsPDF 2.5.1 + AutoTable 3.8.2 para exportar relatórios em PDF. Navegação é por seções (<code>showSection('dashboard'|'documentos'|'processos'|'relatorios'|'config')</code>) que só alternam <code>classList</code> — não é SPA com router, é tudo a mesma página. Há um segundo arquivo solto, <code>alerts-mobile.html</code>, uma versão mobile-only do painel de alertas, linkado a partir de <code>Projeto Central Alertas/</code> (ver Dívida Técnica — aponta para um projeto Supabase diferente do resto do portal). O modelo de dados original tinha uma tabela própria <code>empresas</code> (schema v3, com campos de LGPD); a v4 repontou tudo para <code>rh_empresas</code> e a tela "Clientes" foi removida — <code>public.empresas</code> continua no banco, órfã, sem tela nenhuma que a leia.</p>
+
+<section class="manual-item" id="licencas-dashboard">
+  <h2>Dashboard</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Tudo dentro de <code>Projeto Licenças/index.html</code>: HTML da seção <code>#dashboard</code> perto do topo do <code>&lt;body&gt;</code>, funções <code>loadDashboard()</code>, <code>loadDashboardTable()</code> e <code>loadAlerts()</code> no script inline.</li>
+    <li>KPIs (<code>kpiAtivos</code>, <code>kpiVencendo</code>, <code>kpiVencidos</code>, <code>kpiEmpresasAtivas</code>) e o painel "Alertas Visuais" (<code>alertsList</code>) são recalculados no cliente a cada carga da seção — nenhuma dessas contagens é persistida.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Fonte</th><th>Uso no Dashboard</th></tr></thead>
+    <tbody>
+      <tr><td><code>licencas</code> + <code>alvaras</code> (<code>select('*')</code>, sem filtro de <code>ativo</code>)</td><td>Base para KPIs de ativos/vencendo/vencidos e para a lista de alertas visuais.</td></tr>
+      <tr><td><code>rh_empresas.status_situacao</code></td><td>KPI "Empresas Ativas" — mesmo filtro texto-livre usado em outras ferramentas do portal: <code>!status_situacao || status_situacao.trim().toLowerCase().startsWith('ativ')</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[loadDashboard] --> B[Busca licencas e alvaras completos]
+    A --> C[Busca rh_empresas.status_situacao]
+    B --> D[Calcula KPIs ativos/vencendo/vencidos no cliente]
+    C --> E[Calcula KPI empresas ativas no cliente]
+    D --> F[loadDashboardTable - grade recente]
+    D --> G[loadAlerts - painel visual top 10 por vencimento]
+    G --> H{ha dias_alerta configurado?}
+    H -- sim, window.appConfig.alertDays --> G
+    H -- nao, default 30 --> G
+  </pre>
+  <p>Esse "Alertas Visuais" do dashboard é <strong>independente</strong> do alerta por e-mail (ver seção Configurações/Alertas). Ele não usa dedupe (<code>ultimo_alerta_nivel</code>) nem checa se o alerta já foi enviado — recalcula do zero a cada vez que a seção é aberta, mostrando os 10 documentos mais próximos do vencimento (vencidos incluídos). É puramente informativo dentro da tela.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>KPIs de vencimento usam janela fixa de 30 dias hardcoded (<code>in30Days</code>), independente do <code>dias_alerta</code> configurável em Configurações — só o painel "Alertas Visuais" (<code>loadAlerts</code>) e o alerta por e-mail respeitam esse valor configurável.</li>
+    <li><code>setupRealtimeListeners()</code> assina <code>postgres_changes</code> em <code>licencas</code>/<code>alvaras</code> — qualquer INSERT/UPDATE/DELETE de outro usuário recarrega o dashboard automaticamente, sem polling.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="licencas-documentos">
+  <h2>Licenças e Alvarás (Documentos)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Mesma tela <code>index.html</code>, seção <code>#documentos</code>. CRUD via modal genérico (<code>#recordModal</code>) reaproveitado tanto para licenças quanto alvarás — o parâmetro <code>data-table</code> (<code>'licencas'</code> ou <code>'alvaras'</code>) nos botões de ação decide qual tabela cada operação (<code>viewRecord</code>/<code>editRecord</code>/<code>updateRecord</code>/<code>deleteRecord</code>) atinge.</li>
+    <li>Seletor de empresa é um modal próprio (<code>#empresaPickerModal</code>, funções <code>openEmpresaPicker</code>/<code>renderEmpresaPickerList</code>) que busca em <code>rh_empresas</code> — não é mais um <code>&lt;select&gt;</code> de uma tabela <code>empresas</code> local.</li>
+    <li>Importação em massa de licenças via Excel: <code>baixarModeloLicencas()</code> gera o template, <code>importarExcelLicencas(file)</code> lê com SheetJS e <code>showImportPreview()</code> confere antes de gravar.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Colunas-chave</th><th>RLS</th></tr></thead>
+    <tbody>
+      <tr><td><code>licencas</code></td><td><code>empresa_id</code> (FK <code>rh_empresas.id</code> desde v4, <code>ON DELETE SET NULL</code>, nullable — empresa é opcional na tela), <code>estabelecimento</code>, <code>tipo</code> (texto livre vindo do catálogo <code>tipos_licenca</code>), <code>numero</code>, <code>data_emissao</code>, <code>data_validade</code>, <code>tipo_operacao</code> (<code>'emissao'</code>/<code>'renovacao'</code>, só grava o que o formulário mandar — sem CHECK no banco), <code>ativo</code>/<code>deletado_*</code> (soft delete), <code>ultimo_alerta_nivel</code>/<code>ultimo_alerta_em</code> (adicionadas em 2026-08-10, ver seção Configurações/Alertas).</td><td><code>TO authenticated USING (ativo = TRUE AND deletado_em IS NULL)</code> em SELECT/UPDATE/DELETE; INSERT/UPDATE <code>WITH CHECK (TRUE)</code> — sem restrição por usuário/empresa.</td></tr>
+      <tr><td><code>alvaras</code></td><td>Mesmas colunas de <code>licencas</code> exceto <code>tipo_operacao</code> (não existe nessa tabela — a tela de Alvará não tem o conceito Emissão/Renovação, só Licença tem).</td><td>Idêntica a <code>licencas</code>.</td></tr>
+      <tr><td><code>tipos_licenca</code></td><td><code>nome</code> (UNIQUE), <code>ativo</code>. Catálogo configurável (seed: Bombeiros, Vigilância Sanitária, Meio Ambiente, Alvará de Funcionamento, ANVISA) — alimenta o <code>&lt;select&gt;</code> "Tipo de Licença" na criação/edição.</td><td>SELECT/INSERT abertos; "excluir" é soft delete via UPDATE <code>ativo=false</code> (<code>removerTipoLicenca</code>), sem policy de DELETE físico.</td></tr>
+      <tr><td><code>public.empresas</code> (legado, schema v3)</td><td>Tabela original com campos de LGPD (<code>base_legal</code>, auditoria completa). Não é mais referenciada por nenhuma tela — órfã desde a v4.</td><td>RLS ainda ativa, mas sem tráfego.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal — Criação de Documento</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[openNewDocumento] --> B[Seleciona Tipo de Operacao]
+    B -- Emissao --> C[Oculta Numero/Data Emissao/Data Validade, remove required]
+    B -- Renovacao --> D[Mostra e exige Numero/Data Emissao/Data Validade]
+    C --> E[saveDocumento]
+    D --> E
+    E -- tipo_operacao = emissao --> F["numero = literal PENDENTE, data_emissao/validade = null"]
+    E -- tipo_operacao = renovacao --> G["grava numero e datas informadas"]
+    F --> H[INSERT em licencas]
+    G --> H
+    H --> I[fetchDocumentos + loadDashboard]
+  </pre>
+  <p><code>toggleCamposDocumento()</code> só esconde/mostra campos e alterna o atributo <code>required</code> no HTML — o servidor não valida nada disso; um INSERT feito fora da tela (script, painel Supabase) pode gravar qualquer combinação. O literal <code>'PENDENTE'</code> em <code>numero</code> para Emissão é uma convenção de string, não um enum nem um valor sentinela reconhecido em consultas — filtros/relatórios que agrupam por <code>numero</code> ou fazem parsing dele precisam saber tratar esse caso.</p>
+
+  <h3>Ciclo de Vida de um Documento</h3>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> EmEmissao: tipo_operacao emissao, sem data_validade
+    [*] --> Ativa: tipo_operacao renovacao, validade alem de 30 dias
+    EmEmissao --> Ativa: edicao manual grava numero e datas reais
+    Ativa --> ProximoVencimento: validade a menos de 30 dias
+    ProximoVencimento --> Vencida: validade ja passou
+    Vencida --> Ativa: edicao com nova data_validade futura
+    Ativa --> [*]: soft delete, ativo false
+    Vencida --> [*]: soft delete, ativo false
+  </pre>
+  <p>Esse status (<code>situacaoDocumento()</code>: "Em emissão" / "Sem validade" / "Vencida" / "Próximo vencimento" / "Ativa") é <strong>sempre calculado no cliente a partir de <code>tipo_operacao</code> e <code>data_validade</code></strong> — não existe coluna <code>status</code> em <code>licencas</code>/<code>alvaras</code>. Cada tela que precisa exibir o status (Documentos, Relatórios, dashboard) recalcula essa mesma lógica de forma independente; não há um único ponto de verdade compartilhado, então uma mudança na regra (ex.: mudar o limiar de 30 dias) tem que ser replicada em cada função que hoje reimplementa esse cálculo (<code>situacaoDocumento</code>, os vários <code>loadReport*</code>, o dashboard).</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Empresa é opcional (<code>empresa_id</code> nullable) — um documento pode existir sem vínculo a nenhuma <code>rh_empresas</code>, identificado só pelo texto livre em <code>estabelecimento</code>.</li>
+    <li><code>tipoLicencaOptionsHtml()</code> preserva o valor gravado no <code>&lt;select&gt;</code> mesmo se o tipo tiver sido desativado no catálogo depois (mostra como "<em>Nome</em> (inativo)") — evita trocar silenciosamente o dado de um documento existente ao só abrir o formulário de edição sem tocar nesse campo.</li>
+    <li>Alvará não tem <code>tipo_operacao</code>: o conceito Emissão/Renovação é exclusivo do fluxo de Licença.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="licencas-processos">
+  <h2>Processos</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Seção <code>#processos</code> do mesmo <code>index.html</code>. Um processo é sempre vinculado a um documento existente (licença ou alvará) — <code>openNewProcesso()</code> carrega as duas tabelas juntas (<code>tipo_tabela: 'licencas'|'alvaras'</code>) para popular o seletor.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>processos</code></td><td><code>documento_id</code> + <code>tipo_documento</code> (<code>'licencas'</code>|<code>'alvaras'</code>) — FK "polimórfica" sem constraint de banco (não há <code>FOREIGN KEY</code> de fato, é só uma referência lógica resolvida no cliente). <code>status</code> com CHECK no banco (<code>aberto</code>, <code>em_analise</code>, <code>aprovado</code>, <code>rejeitado</code>, <code>concluido</code>, <code>cancelado</code>) — esse é o único status "de verdade" (persistido) da ferramenta inteira, ao contrário do status de documento (sempre calculado).</td></tr>
+      <tr><td><code>andamento_processos</code></td><td>Log append-only (Art. 46 LGPD nos comentários do schema) — RLS só concede SELECT e INSERT; sem policy de UPDATE/DELETE, logo esses comandos são bloqueados a nível de banco, não só de UI.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+sequenceDiagram
+    participant U as Usuario
+    participant UI as index.html
+    participant DB as Supabase
+
+    U->>UI: saveProcesso ou updateProcesso
+    UI->>DB: INSERT/UPDATE em processos
+    DB-->>UI: status atual
+    alt status mudou (ou criacao)
+        UI->>DB: INSERT em andamento_processos (status_anterior, status_novo)
+    end
+    UI->>UI: fetchProcessos + loadAllAndamentos
+  </pre>
+  <p>Em <code>updateProcesso()</code> o <code>status_anterior</code> é lido do banco (<code>SELECT status ... single()</code>) logo antes do UPDATE, comparado ao novo valor do formulário — só grava andamento se o status realmente mudou. Em <code>saveProcesso()</code> (criação) sempre grava um andamento inicial com <code>status_anterior: null</code>.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Se o INSERT em <code>andamento_processos</code> falhar, o erro só vai pro console (<code>console.error</code>) — o processo em si já foi salvo/atualizado com sucesso e a tela mostra "sucesso" do mesmo jeito. Ou seja, é possível ter uma mudança de status em <code>processos</code> sem o log correspondente em <code>andamento_processos</code> (falha silenciosa, não é transação atômica).</li>
+    <li><code>documento_id</code> não tem FK de banco porque aponta ora para <code>licencas.id</code> ora para <code>alvaras.id</code> — a integridade referencial depende inteiramente do código do front-end.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="licencas-relatorios">
+  <h2>Relatórios</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Seção <code>#relatorios</code>. Sete sub-relatórios, cada um com sua própria função <code>loadReport*()</code>: Saúde Geral, Vencimentos (configurável por dias), Por Tipo, Clientes com Documentos Vencidos, Temporal, Conformidade, Processos. Todos rodam <code>select('*')</code> nas mesmas tabelas (<code>licencas</code>, <code>alvaras</code>, <code>processos</code>) e recalculam agregações no cliente — não há view/RPC no banco para nenhum desses relatórios.</li>
+    <li>Export: <code>getReportSectionsData()</code> coleta o HTML já renderizado de cada tabela de relatório; <code>exportReportsCsv()</code> serializa isso pra CSV; <code>exportReportsPdf()</code> usa jsPDF+AutoTable com um cabeçalho próprio (<code>drawBanner()</code>).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Sem tabelas próprias — 100% derivado de <code>licencas</code>, <code>alvaras</code>, <code>processos</code> e <code>rh_empresas</code> (para nome de empresa). O relatório de Vencimentos Configurável reusa a mesma variável <code>window.appConfig.alertDays</code> gravada em <code>configuracoes_licencas</code> pela tela de Configurações.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[loadReports] --> B[loadReportSaude]
+    A --> C[loadReportVencimentosConfiguravel]
+    A --> D[loadReportTipo]
+    A --> E[loadReportClientesVencidos]
+    A --> F[loadReportTemporal]
+    A --> G[loadReportConformidade]
+    A --> H[loadReportProcessos]
+    B --> I[Renderiza tabelas na secao]
+    C --> I
+    D --> I
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    I --> J{Usuario clica Exportar}
+    J -- CSV --> K[buildReportsCsv + download]
+    J -- PDF --> L[jsPDF AutoTable + drawBanner]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Todos os relatórios reimplementam localmente a mesma lógica de "dias até vencer / vencido" já usada no dashboard e em <code>situacaoDocumento()</code> — não existe uma função utilitária única compartilhada dentro do arquivo (diferente do padrão de outras ferramentas do portal, como <code>contabil-diario-util.js</code>, que isola essas contas em funções puras testáveis).</li>
+    <li>Export é client-side puro — nenhuma chamada a Edge Function; todo o PDF/CSV é montado no navegador a partir do que já está renderizado na tela.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="licencas-configuracoes-alertas">
+  <h2>Configurações / Alertas de Vencimento por E-mail</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Seção <code>#config</code> em <code>index.html</code> — cadastro do catálogo <code>tipos_licenca</code> (<code>carregarTiposLicenca</code>/<code>adicionarTipoLicenca</code>/<code>removerTipoLicenca</code>) e o formulário de alerta (<code>alertEnabled</code>/<code>alertDays</code>/<code>alertEmail</code>, funções <code>saveConfig()</code>/<code>loadConfig()</code>).</li>
+    <li><strong>Novo em 2026-08-10</strong> — Edge Function agendada <code>Projeto Portal Scont/supabase/functions/alerta-licencas-vencimento/index.ts</code>, registrada via pg_cron em <code>schema_licencas_alertas_cron.sql</code>. Reusa a Edge Function compartilhada <code>Projeto Portal Scont/supabase/functions/enviar-email/index.ts</code> (mesma função usada por Diário Contábil e Certificado Digital), com o template novo <code>tipo: 'alerta_licenca_vencimento'</code> (bloco em torno da linha 319 de <code>enviar-email/index.ts</code>).</li>
+    <li>Antes dessa mudança a configuração de alerta ficava só em <code>localStorage</code> do navegador e não existia envio de e-mail nenhum — só o campo na tela. Isso significava que o alerta "funcionava" só enquanto a aba ficava aberta, sem persistência real nem notificação de verdade.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela / Coluna</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>configuracoes_licencas</code> (chave/valor)</td><td>Substituiu o <code>localStorage</code>. Chaves usadas: <code>alertas_ativado</code> (<code>'true'</code>/<code>'false'</code> como texto), <code>dias_alerta</code> (inteiro como texto, default 30), <code>emails_alerta</code> (lista separada por vírgula, único campo — não há tabela de destinatários). Upsert por <code>chave</code> a partir da tela; lida tanto pela tela (<code>loadConfig</code>) quanto pela Edge Function agendada — é o ponto de verdade compartilhado entre navegador e job.</td></tr>
+      <tr><td><code>licencas.ultimo_alerta_nivel</code> / <code>ultimo_alerta_em</code></td><td>Dedupe do job diário: só reenvia e-mail quando o nível calculado (<code>'proximo'</code> ou <code>'vencido'</code>) muda em relação ao último alerta já disparado para aquele documento.</td></tr>
+      <tr><td><code>alvaras.ultimo_alerta_nivel</code> / <code>ultimo_alerta_em</code></td><td>Idêntico, para a tabela de alvarás.</td></tr>
+    </tbody>
+  </table>
+  <p>RLS de <code>configuracoes_licencas</code>: SELECT e ALL (via <code>FOR ALL ... WITH CHECK(true)</code>) para <code>authenticated</code> — qualquer usuário logado no portal pode alterar os destinatários do alerta e-mail, não só admin/Configurações.</p>
+
+  <h3>Fluxo Principal — Job Diário de Alerta por E-mail</h3>
+  <pre class="mermaid">
+sequenceDiagram
+    participant CRON as pg_cron
+    participant FN as Edge Function alerta-licencas-vencimento
+    participant DB as Postgres service_role
+    participant MAIL as Edge Function enviar-email
+
+    CRON->>FN: POST diario, 11:15 UTC (~08:15 Brasilia)
+    FN->>DB: SELECT configuracoes_licencas
+    alt alertas_ativado = false ou sem destinatarios
+        FN-->>CRON: 200, processed 0 (motivo no corpo)
+    else configurado
+        FN->>DB: SELECT rh_empresas (id, nome_empresa)
+        loop para licencas e alvaras
+            FN->>DB: SELECT documentos ativos (deletado_em IS NULL)
+            loop para cada documento
+                FN->>FN: calcula dias restantes e nivel (proximo/vencido)
+                alt nivel nulo ou igual ao ultimo_alerta_nivel
+                    FN->>FN: pula (sem duplicar alerta)
+                else nivel novo
+                    loop para cada destinatario configurado
+                        FN->>MAIL: POST tipo alerta_licenca_vencimento
+                    end
+                    FN->>DB: UPDATE ultimo_alerta_nivel/ultimo_alerta_em
+                end
+            end
+        end
+        FN-->>CRON: 200, processed/alerted/destinatarios
+    end
+  </pre>
+  <p>O nível de alerta é binário e mais simples que o de Certificado Digital: só <code>'proximo'</code> (dentro de <code>dias_alerta</code>) ou <code>'vencido'</code> (dias &lt; 0) — não há os 3 níveis intermediários (<code>atencao</code>/<code>urgente</code>/<code>critico</code>) que existem no alerta de certificado. Diferente de Certificado Digital, também não existe um evento "renovado, alerta encerrado" — quando um documento é renovado e sai da janela de alerta, <code>ultimo_alerta_nivel</code> simplesmente fica desatualizado (nível antigo) até o próximo ciclo em que ele voltar a entrar em alerta, quando o nível muda de novo e o e-mail dispara normalmente. Não é um bug ativo, só uma simplificação deliberada em relação ao padrão de Certificado Digital.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Cron agendado 15 minutos depois do job de Certificado Digital (11:15 UTC vs 11:00 UTC), deliberadamente, para não disparar os dois ao mesmo tempo.</li>
+    <li>A Edge Function roda com <code>SUPABASE_SERVICE_ROLE_KEY</code> — ignora RLS por completo; ela é quem faz o UPDATE de <code>ultimo_alerta_nivel</code> mesmo a policy de UPDATE de <code>licencas</code>/<code>alvaras</code> sendo aberta a qualquer <code>authenticated</code> de qualquer forma.</li>
+    <li><code>emails_alerta</code> é uma única string com múltiplos e-mails separados por vírgula — sem validação de formato de e-mail nem de tabela normalizada de destinatários.</li>
+    <li>O toggle "Tipo de Operação" das licenças (Emissão vs Renovação) não interfere no alerta: um documento em modo Emissão não tem <code>data_validade</code>, então <code>daysLeft()</code> retorna <code>null</code> e <code>nivelAlerta()</code> nunca dispara pra ele — fica de fora do job até virar Renovação com data real.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li><code>Projeto Licenças/alerts-mobile.html</code> (versão mobile do painel de alertas, linkada a partir de <code>Projeto Central Alertas/</code>) hardcoda <code>SUPABASE_URL = 'https://graxaoomeffhsazuzkvg.supabase.co'</code> — um projeto Supabase <strong>diferente</strong> do resto da ferramenta e do portal (<code>dsdqwigopzrdmxtmhsez</code>, em <code>supabase-config.js</code>). Esse era o projeto antigo e dedicado de Licenças; <code>Projeto Portal Scont/licencas-config.js</code> já foi marcado como deprecado com a nota "O Projeto Licenças agora usa o mesmo Supabase do portal", mas <code>alerts-mobile.html</code> nunca foi migrado e continua lendo/gravando no projeto antigo, que pode estar desatualizado ou nem mais recebendo os dados reais de <code>licencas</code>/<code>alvaras</code>. Precisa apontar esse arquivo para <code>window.SUPABASE_URL</code>/<code>window.SUPABASE_KEY</code> do <code>supabase-config.js</code> global.</li>
+    <li>Sem view/RPC no banco para nenhum relatório — todo agregado (Saúde, Por Tipo, Conformidade etc.) é recalculado no cliente a cada abertura da seção Relatórios, buscando as tabelas inteiras (<code>select('*')</code>, sem paginação) a cada função <code>loadReport*</code>.</li>
+    <li>Lógica de "dias até vencer" e do status calculado do documento está duplicada em pelo menos: <code>situacaoDocumento()</code>, <code>loadAlerts()</code>, <code>loadDashboard()</code> e cada um dos sete <code>loadReport*()</code> — sem uma função utilitária única dentro do arquivo.</li>
+  </ul>
+</section>

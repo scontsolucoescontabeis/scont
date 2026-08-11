@@ -1,0 +1,150 @@
+<p class="manual-intro">A Triagem de Atendimentos vive em <code>Projeto Triagem/</code>: dois arquivos HTML+JS puro, sem framework/bundler, cliente Supabase próprio por arquivo (<code>supabase.createClient(SUPABASE_URL, SUPABASE_KEY)</code>) e autenticação via <code>portal-auth-guard.js</code> compartilhado do Portal. <strong>A origem dos dados é inteiramente externa ao Portal</strong>: a captura das conversas do Gestta Messenger e a classificação por departamento/categoria/prioridade acontecem em scripts soltos fora deste repositório de fato (mesmo estando versionados dentro da pasta), rodando na máquina do usuário ou num agendamento do Windows Task Scheduler — o Portal só entra em cena depois que a planilha <code>triagem_atendimento.xlsx</code> já está pronta. Não existe backend próprio: todo o parsing do <code>.xlsx</code> é client-side, com SheetJS (<code>xlsx.full.min.js</code> 0.18.5, via cdnjs) rodando no navegador em <code>upload.html</code>, e a mesma lógica de parsing é reimplementada em Python (<code>openpyxl</code>) em <code>upload_triagem.py</code> para o caminho agendado. Cada upload substitui <strong>100%</strong> dos dados anteriores (delete-all seguido de insert) — não existe histórico de uploads dentro das tabelas.</p>
+
+<section class="manual-item" id="upload-tecnico">
+  <h2>Upload da Planilha</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>upload.html</code> — tela do Portal. HTML+JS puro, protegida por <code>portal-auth-guard.js</code>. Lê o <code>.xlsx</code> inteiramente no navegador com <code>XLSX.read(buf, { type: 'array' })</code> (SheetJS) e envia o resultado direto pro Supabase com o cliente JS autenticado da sessão do Portal.</li>
+    <li><code>script captura messenger.txt</code> — <strong>não é tela do Portal</strong>. Script de console: o usuário cola no F12 do navegador aberto na página do Gestta Messenger. Faz scroll/clique programático nas abas "Pendentes" e "Em Atendimento", extrai bolhas de mensagem por seletor CSS e acumula tudo em <code>gestta_historico.txt</code> local (últimos 3 dias, arquivo único reescrito a cada ciclo). Roda só enquanto a aba do navegador estiver aberta com o script colado.</li>
+    <li><code>gestta_chat_extractor.py</code> + <code>agendar_gestta.bat</code> — caminho alternativo de captura, via Selenium, agendado no Task Scheduler do Windows a cada 5 minutos (<code>schtasks /sc MINUTE /mo 5</code>). Gera <code>Desktop\atendimentos\atendimentos.txt</code>, incremental. Coexiste com o script de console acima; o repositório não deixa claro qual dos dois é o caminho realmente em uso hoje — os dois produzem formatos de texto parecidos mas não idênticos.</li>
+    <li><strong>Nenhum script deste repositório classifica</strong> as conversas capturadas por departamento/categoria/prioridade nem monta as 3 abas (Triagem / Resumo / Triagem Completa) da planilha final. Essa etapa — a que de fato produz <code>triagem_atendimento.xlsx</code> a partir do texto bruto — não tem código correspondente aqui; é um processo manual ou uma ferramenta externa não documentada neste projeto.</li>
+    <li><code>upload_triagem.py</code> + <code>agendar_upload_triagem.bat</code> — segundo caminho de upload, paralelo ao <code>upload.html</code>. Agendado a cada 30 minutos (<code>schtasks /sc MINUTE /mo 30</code>), lê a planilha em <code>Desktop\captura_messenger\Triagem de Atendimentos - Gestta\triagem_atendimento.xlsx</code> (mesmo caminho exibido na UI de <code>upload.html</code>) com <code>openpyxl</code> e grava direto na API REST do Supabase via <code>requests</code>, sem passar pelo Portal nem pelo auth guard.</li>
+    <li>Parsing duplicado: <code>parseTriagem</code>/<code>parseResumo</code>/<code>parseTriagemCompleta</code> existem em JS dentro de <code>upload.html</code> e são reescritas quase linha a linha em Python (<code>parse_triagem</code>/<code>parse_resumo</code>/<code>parse_triagem_completa</code>) em <code>upload_triagem.py</code> — duas implementações independentes da mesma regra de parsing, sem teste automatizado comparando as duas.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel / Colunas-chave</th></tr></thead>
+    <tbody>
+      <tr><td><code>triagem_demandas</code></td><td>1 linha por demanda da aba "Triagem" da planilha. <code>num</code>, <code>cliente</code>, <code>dept</code>, <code>cat</code>, <code>sub</code>, <code>func</code>, <code>prazo</code>, <code>prio</code>, <code>pend</code> são exibidos na tela; <code>dados</code> (coluna I da planilha) e <code>dom</code> (coluna K) são gravados mas nenhuma tela lê ou mostra esses dois campos.</td></tr>
+      <tr><td><code>triagem_resumo</code></td><td>Singleton — <code>id</code> fixo em 1, sempre upsert. <code>total</code>, <code>by_dept</code> (JSONB, mapa departamento→quantidade), <code>by_prio</code> (JSONB, mapa prioridade→quantidade), <code>data_hora</code> (texto livre da referência informada na planilha), <code>alerts</code> (JSONB, array de strings) e <code>enc_text</code> (texto de encaminhamento).</td></tr>
+      <tr><td><code>triagem_conversas</code></td><td>1 linha por contato encontrado na aba "Triagem Completa" (ou qualquer aba cujo nome contenha "Completa"). <code>contact_key</code> é o nome do contato normalizado (sem acento/pontuação, minúsculo) — é a chave usada pelo algoritmo de correspondência com <code>triagem_demandas.cliente</code>. <code>raw_name</code> guarda o nome original. <code>msgs</code> é um array JSONB de objetos <code>{ type, time, text }</code>, com <code>type</code> igual a <code>cliente</code>, <code>atendente</code> ou <code>system</code> (mensagem de sistema, ex. "sem mensagens no período").</td></tr>
+    </tbody>
+  </table>
+  <p>Schema em <code>_sql/create_triagem_tables.sql</code>, na raiz do Portal. RLS habilitada nas 3 tabelas: leitura e escrita liberadas para <code>auth.role() = 'authenticated'</code>, sem distinção por usuário/empresa.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Gestta Messenger] --> B[Script de captura externo - console ou Selenium]
+    B --> C[Texto bruto local com historico de conversas]
+    C --> D[Classificacao por departamento categoria e prioridade - processo externo sem codigo neste repo]
+    D --> E[triagem_atendimento.xlsx com abas Triagem Resumo e Triagem Completa]
+    E --> F{Caminho de upload}
+    F -- Manual pelo Portal --> G[upload.html le com XLSX.js no navegador]
+    F -- Agendado a cada 30min --> H[upload_triagem.py le com openpyxl via Task Scheduler]
+    G --> I[Apaga todas as linhas das 3 tabelas]
+    H --> I
+    I --> J[Insere triagem_demandas]
+    I --> K[Upsert triagem_resumo id fixo 1]
+    I --> L[Insere triagem_conversas em lotes]
+    J --> M[index.html carrega as 3 tabelas]
+    K --> M
+    L --> M
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Substituição total a cada envio: as 3 tabelas são limpas (<code>.delete().gte('id', 0)</code> / <code>.eq('id', 1)</code>) antes de qualquer insert, tanto em <code>upload.html</code> quanto em <code>upload_triagem.py</code>. Não há soft-delete nem tabela de histórico de uploads — o upload anterior simplesmente deixa de existir.</li>
+    <li>Tamanho de lote do insert de <code>triagem_conversas</code> difere entre as duas implementações: 50 registros por lote em <code>upload.html</code>, 200 em <code>upload_triagem.py</code> — sem justificativa documentada para a diferença.</li>
+    <li>O vínculo entre uma demanda e sua conversa não é gravado em nenhuma tabela — é recalculado a cada carregamento da tela (<code>findConv()</code> em <code>index.html</code>), comparando o nome do cliente normalizado contra <code>contact_key</code>.</li>
+    <li>A RLS de escrita das 3 tabelas exige <code>auth.role() = 'authenticated'</code>. <code>upload.html</code> herda isso da sessão do Portal (o cliente Supabase-js roda autenticado depois do <code>portal-auth-guard.js</code>). Já <code>upload_triagem.py</code> chama a API REST só com a chave anon (o próprio JWT dessa chave tem <code>"role": "anon"</code>, decodificável em texto simples no início do arquivo) e nunca abre uma sessão de fato — pelas regras de RLS definidas em <code>create_triagem_tables.sql</code>, essas chamadas deveriam ser rejeitadas. Vale confirmar no ambiente real se o agendamento de 30 minutos está de fato gravando dado ou falhando silenciosamente (o script só loga erro localmente via <code>logging</code>, sem alertar ninguém no Portal).</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Duas implementações paralelas do parser da planilha (JS em <code>upload.html</code>, Python em <code>upload_triagem.py</code>) e dois scripts paralelos de captura (console vs. Selenium) — nenhuma das duplicações tem teste automatizado garantindo que ficam sincronizadas, e não está documentado se ambos os pares seguem em uso ou se um deles está obsoleto.</li>
+    <li>Risco de RLS descrito acima em <code>upload_triagem.py</code> (chave anon sem sessão vs. policy exigindo <code>authenticated</code>) — não verificado em produção nesta sessão, só via leitura de código.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="dashboard-tecnico">
+  <h2>Dashboard</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>index.html</code> — arquivo único (~1060 linhas) com sidebar, header, as duas "páginas" (Dashboard e Triagem) e o modal de conversa, tudo no mesmo documento. Não é SPA com router: <code>switchPage()</code> apenas alterna <code>display: none</code>/<code>''</code> entre <code>#pageDashboard</code> e <code>#pageTriagem</code>.</li>
+    <li>Autenticação via <code>portal-auth-guard.js</code> (<code>PortalAuthGuard.init(1)</code>), cliente Supabase criado só depois do guard liberar.</li>
+    <li>Sem gráficos de biblioteca externa — as barras de "Por Departamento" e "Por Prioridade" são <code>&lt;div&gt;</code>s com <code>width</code> calculada em JS, sem Chart.js nem SVG.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Consulta</th><th>Uso</th></tr></thead>
+    <tbody>
+      <tr><td><code>triagem_demandas</code> — <code>select('*').order('num')</code></td><td>Alimenta a lista completa de demandas (também usada na tela Triagem) e a checagem <code>hasData</code>.</td></tr>
+      <tr><td><code>triagem_resumo</code> — <code>select('*').eq('id', 1).maybeSingle()</code></td><td>Cards de totais, gráficos de barra, quadro de alertas e quadro de encaminhamento.</td></tr>
+      <tr><td><code>triagem_conversas</code> — <code>select('contact_key, raw_name, aba, msgs')</code></td><td>Monta o mapa <code>conversations</code> em memória, indexado por <code>contact_key</code>, usado tanto pelo indicador "💬 N msg" da lista quanto pelo modal de conversa.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[index.html carrega] --> B[PortalAuthGuard valida sessao]
+    B --> C[loadFromSupabase dispara os 3 selects em paralelo]
+    C --> D[renderAll monta cards graficos alertas tabela e filtros]
+    D --> E[setInterval de 30 segundos]
+    E --> C
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><code>hasData</code> é <code>true</code> se <code>triagemRows.length &gt; 0</code> <strong>ou</strong> <code>Object.keys(resumoData.byDept).length &gt; 0</code> — cobre o caso raro de a aba Resumo trazer totais agregados mesmo com a aba Triagem vazia.</li>
+    <li>Departamentos e prioridades não são uma lista fixa no código: cards, cores de gráfico e opções do filtro de departamento são derivados dinamicamente de <code>resumoData.byDept</code>/<code>byPrio</code> e de <code>triagemRows</code>. Cores têm um mapa fixo (<code>deptColors</code>, <code>prioColors</code>) com fallback (<code>#8B3A3A</code>) para valores não mapeados.</li>
+    <li>Auto-refresh é polling burro via <code>setInterval(REFRESH_MS = 30_000)</code>, recarregando as 3 tabelas inteiras a cada ciclo — não há Supabase Realtime nem atualização incremental, e o timer não é limpo ao trocar de página dentro da mesma aba (só é recriado se <code>loadFromSupabase()</code> for chamado de novo).</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li><code>triagem_dashboard.html</code> (707 linhas, na raiz de <code>Projeto Triagem/</code>) é um protótipo anterior — inclui <code>supabase-config.js</code> e <code>xlsx.full.min.js</code> no <code>&lt;head&gt;</code>, mas em nenhum ponto do arquivo chama <code>createClient</code> ou faz qualquer parsing de planilha. Não é referenciado por nenhum link, redirecionamento ou script de outro arquivo do Portal (confirmado por busca em todo o repositório) — parece ter sido superado pela divisão atual em <code>index.html</code> + <code>upload.html</code> e nunca removido.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="demandas-tecnico">
+  <h2>Demandas Triadas</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Mesmo arquivo <code>index.html</code>, seção <code>#pageTriagem</code>: barra de filtros (cliente/departamento/prioridade), tabela e modal de conversa. Sem componente separado — tudo é <code>innerHTML</code> de template string mais <code>querySelectorAll</code> pra religar os <code>onclick</code> a cada <code>renderTable()</code>.</li>
+    <li>Filtros são 100% client-side sobre o array <code>triagemRows</code> já carregado em memória — <code>applyFilters()</code> não refaz consulta ao Supabase, só alterna a classe <code>hidden</code> nas linhas já renderizadas do DOM.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Campo</th><th>Origem / Uso</th></tr></thead>
+    <tbody>
+      <tr><td><code>triagemRows[i]</code></td><td>Mapeado 1:1 de cada linha de <code>triagem_demandas</code>; <code>dados</code> e <code>dom</code> são carregados no objeto em memória mas nunca lidos por <code>renderTable()</code> nem por <code>openModal()</code> — só existem em memória e no banco.</td></tr>
+      <tr><td><code>conversations[contact_key]</code></td><td>Mapa em memória montado a partir de <code>triagem_conversas</code>, usado por <code>findConv()</code> para achar a conversa de uma demanda.</td></tr>
+      <tr><td><code>conv.msgs[i]</code></td><td>Objeto <code>{ type, time, text }</code>. <code>time</code> no formato <code>"DD/MM/YYYY HH:mm"</code>, separado em dia (para o divisor <code>.conv-day</code>) e hora (exibida na bolha) por <code>m.time.split(' ')</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Nome do cliente na demanda] --> B[normName remove acento pontuacao e caixa]
+    B --> C{Existe contact_key identica}
+    C -- Sim --> G[Usa essa conversa]
+    C -- Nao --> D{Algum contact_key comeca termina ou contem o nome normalizado}
+    D -- Sim --> G
+    D -- Nao --> E{As duas primeiras palavras do nome aparecem em algum contact_key}
+    E -- Sim --> G
+    E -- Nao --> F[Sem conversa - coluna mostra travessao]
+  </pre>
+  <p><code>findConv()</code> (idêntica em espírito a <code>normName</code> do lado Python) para na primeira regra que encontrar uma correspondência — não soma pontuação nem escolhe a "melhor" entre múltiplas candidatas; a primeira chave do objeto <code>conversations</code> que bater no laço <code>for...of</code> vence.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Tela é somente leitura — não existe nenhuma chamada de <code>update</code>/<code>insert</code> nesta seção do arquivo; qualquer correção de dado exige novo upload da planilha.</li>
+    <li>Contagem de mensagens exibida (<code>💬 N msg</code>) filtra fora as mensagens <code>type === 'system'</code> — o aviso "(sem mensagens no período)" não conta como mensagem real.</li>
+    <li>Modal de conversa é montado inteiramente no cliente a partir do array já carregado — abrir o modal não dispara nova consulta ao Supabase.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Colunas <code>dados</code> e <code>dom</code> de <code>triagem_demandas</code> são gravadas em todo upload mas não têm nenhum consumidor na UI — candidatas a remoção do schema ou a alguma tela futura que ainda não existe; hoje são peso morto.</li>
+    <li>O algoritmo de correspondência de nomes (<code>findConv</code>/<code>_norm_name</code>) não é coberto por nenhum teste automatizado — qualquer ajuste na heurística de prefixo/sufixo/duas-primeiras-palavras precisa ser validado manualmente contra a planilha real.</li>
+  </ul>
+</section>

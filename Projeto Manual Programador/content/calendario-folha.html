@@ -1,0 +1,75 @@
+<p class="manual-intro">O Calendário da Folha vive em <code>Projeto Calendario Folha/</code>: HTML + JS puro (sem framework/bundler), um único módulo (<code>app.js</code>, ~1130 linhas, tudo em escopo global via <code>&lt;script&gt;</code> simples, sem IIFE) mais <code>index.html</code> e <code>styles.css</code>. Cliente Supabase criado em <code>initApp()</code> (<code>supabase.createClient(SUPABASE_URL, SUPABASE_KEY)</code>), autenticação via <code>portal-auth-guard.js</code> compartilhado do portal (<code>PortalAuthGuard.init(1, {returnAfterLogin:true})</code> — sem diferenciação de papel dentro da ferramenta: qualquer usuário autenticado com acesso à ferramenta lê e escreve tudo). Reaproveita duas tabelas de outros módulos: <code>rh_empresas</code> (lista de empresas) e <code>rh_feriados</code> (feriados globais, usados só para cálculo de dia útil). Sem build step; sem geração de PDF nesta ferramenta (exportação é só <code>.ics</code>, gerado em memória com <code>Blob</code>, sem lib externa).</p>
+
+<section class="manual-item" id="calendario-folha-tecnico">
+  <h2>Calendário da Folha</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>index.html</code> — shell da página: header, barra de estatísticas (chips clicáveis), toolbar de navegação/filtros, grade do mês (<code>#calGrid</code>) e visão agenda (<code>#viewAgenda</code>), mais 5 modais (evento, dia, cronograma, template, gerar competência).</li>
+    <li><code>app.js</code> — toda a lógica: carregamento de dados, cálculo de datas (dia útil/feriado), render das duas visões, CRUD de eventos/templates/observações/checklist, geração de competência, exportação ICS. Não há separação em múltiplos arquivos como em outras ferramentas maiores do portal (ex.: Departamento Contábil) — é um módulo único porque a ferramenta é pequena.</li>
+    <li><code>styles.css</code> — estilos próprios da grade de calendário, pills de evento, cards de agenda e modais; usa variáveis de tema definidas em <code>../shared.css</code> (compartilhado do portal).</li>
+    <li><code>schema_calendario_folha.sql</code> — schema completo (4 tabelas, índices, RLS, seed de cronograma padrão e registro em <code>ferramentas</code>). Idempotente (<code>CREATE TABLE IF NOT EXISTS</code>, <code>DROP POLICY IF EXISTS</code> antes de recriar, <code>INSERT ... WHERE NOT EXISTS</code> no seed) — já foi executado (as 4 tabelas <code>cal_folha_*</code> existem em produção).</li>
+    <li>Sem arquivo de testes automatizados nesta ferramenta.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>cal_folha_templates</code></td><td>Cronograma recorrente (o "modelo" das atividades mensais). <code>codigo_empresa</code> NULL = atividade geral (gera 1 evento único ao rodar a competência); preenchido = atividade exclusiva daquela empresa (gera 1 evento só dela). Campos de regra: <code>regra</code> (<code>dia_fixo</code>/<code>dia_util</code>/<code>ultimo_dia_util</code>), <code>dia</code> (dia do mês ou n-ésimo dia útil), <code>mes_offset</code> (0 = mesmo mês da competência, 1 = mês seguinte), <code>mes_especifico</code> (NULL = todo mês; 1-12 = só numa competência específica, ex. 13º salário), <code>ajuste</code> (<code>antecipa</code>/<code>posterga</code>/<code>mantem</code> quando a data cai em fim de semana/feriado). Seed inicial traz 8 templates gerais (variáveis, fechamento, pagamento, eSocial, FGTS, DCTFWeb, 13º 1ª e 2ª parcela).</td></tr>
+      <tr><td><code>cal_folha_eventos</code></td><td>Eventos concretos exibidos no calendário — criados manualmente (<code>origem='manual'</code>) ou gerados de um template (<code>origem='cronograma'</code>, com <code>template_id</code> e <code>competencia</code> 'AAAA-MM' preenchidos). <code>codigo_empresa</code> NULL = evento geral; preenchido = evento de uma empresa específica. <code>status</code> (<code>pendente</code>/<code>em_andamento</code>/<code>concluido</code>) é editável manualmente, mas passa a ser <em>derivado</em> do checklist assim que o evento ganha itens de checklist (ver abaixo). Dois índices únicos parciais evitam duplicar a geração de um template pra mesma competência — um para template geral (<code>template_id, competencia</code> WHERE <code>codigo_empresa IS NULL</code>) e outro para template de empresa (<code>template_id, codigo_empresa, competencia</code> WHERE <code>codigo_empresa IS NOT NULL</code>); são dois índices porque UNIQUE padrão trata NULL como distinto de NULL, então um único índice não bastaria.</td></tr>
+      <tr><td><code>cal_folha_observacoes</code></td><td>Mural de notas por empresa dentro de um evento (ex.: "Empresa X pediu prorrogação"). <code>codigo_empresa</code> aqui é <strong>NOT NULL</strong> — sempre amarrada a uma empresa específica, mesmo que o evento pai seja geral. Nunca edita/sobrescreve; só insere e permite excluir.</td></tr>
+      <tr><td><code>cal_folha_checklist_itens</code></td><td>Checklist dentro de um evento. <code>codigo_empresa</code> NULL = item genérico (não amarrado a empresa nenhuma); preenchido = item daquela empresa. É a peça central de como um evento geral "abre" por empresa: ao adicionar um item o usuário escolhe entre item genérico, item replicado para <strong>todas</strong> as empresas cadastradas (1 linha por empresa, mesmo texto) ou item de uma empresa específica.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Calendário é único — não existe seleção de empresa na tela (nem troca de contexto por empresa). A granularidade por empresa entra em três camadas independentes: (1) o próprio evento/template pode já nascer amarrado a uma empresa (<code>codigo_empresa</code> em <code>cal_folha_eventos</code>/<code>cal_folha_templates</code>); (2) dentro de um evento aberto, observações por empresa (mural de notas); (3) dentro do mesmo evento, itens de checklist genéricos ou por empresa. Um evento "geral" tipicamente carrega o checklist "todas as empresas" para acompanhar quem já cumpriu a etapa dentro de um único card.</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Gerar competencia] --> B[Filtra templates ativos aplicaveis ao mes]
+    B --> C{template.codigo_empresa}
+    C -- NULL --> D[1 evento geral da competencia]
+    C -- preenchido --> E[1 evento so daquela empresa]
+    D --> F[Calcula data via regra + ajuste dia util/feriado]
+    E --> F
+    F --> G{Ja existe evento deste template nesta competencia}
+    G -- sim --> H[Pula, nao duplica nem sobrescreve status]
+    G -- nao --> I[Insere em cal_folha_eventos origem=cronograma]
+    I --> J[Usuario abre o evento]
+    J --> K[Adiciona checklist todas as empresas]
+    K --> L[Cada empresa marca seu item]
+    L --> M{Progresso do checklist}
+    M -- 0 de N --> N[status = pendente]
+    M -- parcial --> O[status = em_andamento]
+    M -- N de N --> P[status = concluido]
+  </pre>
+  <p>Máquina de status do evento — quando há checklist, o campo <code>status</code> deixa de ser editável na UI (<code>evStatus</code> fica <code>disabled</code>) e passa a ser recalculado por <code>sincronizarStatusPorChecklist()</code> a cada inserção/alternância/exclusão de item: 0 concluídos = <code>pendente</code>, parcial = <code>em_andamento</code>, todos concluídos = <code>concluido</code>. Sem checklist, o status volta a ser editável manualmente no modal.</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Evento sem checklist] -->|status editavel manualmente| B[pendente/em_andamento/concluido]
+    A -->|usuario adiciona 1o item de checklist| C[Evento com checklist]
+    C -->|status passa a ser derivado, select fica desabilitado| D{done vs total}
+    D -- 0 --> E[pendente]
+    D -- parcial --> F[em_andamento]
+    D -- todos --> G[concluido]
+    C -->|usuario exclui o ultimo item| A
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Cálculo de dia útil (<code>ehDiaUtil</code>) usa <code>rh_feriados</code>, mas o casamento é por <em>texto</em>: a coluna <code>data</code> de <code>rh_feriados</code> pode estar em formato <code>DD/MM</code> (feriado que se repete todo ano) ou <code>DD/MM/AAAA</code> (feriado de ano específico) — <code>nomeFeriado()</code> testa os dois formatos contra a mesma linha.</li>
+    <li>Geração de competência é idempotente por design: reexecutar para a mesma competência não duplica nem sobrescreve o status de eventos já gerados/editados — a checagem é feita client-side (busca eventos existentes daquela competência antes de montar o INSERT) e reforçada pelos dois índices únicos parciais no banco.</li>
+    <li>Ao editar um evento gerado do cronograma, a <code>competencia</code> original é preservada mesmo que a data seja alterada manualmente (<code>salvarEvento()</code>: <code>if (eventoEditando.origem === 'cronograma') payload.competencia = eventoEditando.competencia</code>) — evita que mover a data de um evento "escape" da competência que o índice único usa para não duplicar.</li>
+    <li>"Atrasados" é uma busca separada (<code>carregarAtrasados()</code>), sem limite de data inferior nem filtro de mês corrente — pega qualquer pendência vencida independente de quando ela foi criada, para alimentar a faixa de alerta e o chip "Atrasados" mesmo fora do mês em exibição.</li>
+    <li>RLS é aberta (<code>TO authenticated USING (true)</code>) nas 4 tabelas, mesmo padrão dos demais módulos internos — controle de acesso à ferramenta é só via <code>usuario_ferramentas</code>/<code>portal-auth-guard.js</code>, não há diferenciação de papel (admin/equipe/prestador) dentro do próprio código da ferramenta como existe em outros módulos do portal.</li>
+    <li>Exportação <code>.ics</code> usa só os eventos carregados na janela do mês atual e visíveis pelos filtros ativos (<code>eventos.filter(eventoVisivel)</code>) — não é uma exportação completa do calendário, é sempre relativa ao que está na tela.</li>
+    <li>Checklist "todas as empresas" insere 1 linha por empresa cadastrada em <code>rh_empresas</code> no momento do clique — empresas cadastradas depois não entram retroativamente nesse item; teriam que ser adicionadas manualmente como item "empresa específica".</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Sem testes automatizados (diferente de outras ferramentas do portal que têm ao menos funções puras testadas em Node).</li>
+    <li>Sincronização de status por checklist é assíncrona e não-transacional: são duas chamadas Supabase separadas (grava o item, depois grava o status recalculado do evento) — uma falha de rede entre as duas pode deixar o card com status desatualizado até o próximo <code>recarregar()</code>.</li>
+  </ul>
+</section>

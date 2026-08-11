@@ -1,0 +1,63 @@
+<p class="manual-intro">O Departamento Pessoal vive em <code>Projeto Departamento Pessoal/</code>. É a ferramenta mais simples do portal em termos de arquitetura: 3 arquivos (<code>index.html</code>, <code>app.js</code>, <code>styles.css</code>) + 1 arquivo de dados (<code>data/rescisao.js</code>), sem framework/bundler, sem cliente Supabase próprio — o único uso de Supabase é indireto, via <code>portal-auth-guard.js</code> (carrega <code>supabase-config.js</code> e o SDK <code>@supabase/supabase-js@2</code> só para o guard validar a sessão). Não há nenhuma chamada a <code>supabase.from(...)</code> em nenhum arquivo da ferramenta. É um guia de consulta operacional (roteiro de processos de DP), com todo o conteúdo hardcoded em JS — sem CRUD, sem persistência de dados própria, sem tela de edição. Renderização é <code>innerHTML</code> de template string, igual ao padrão do resto do portal. Diagramas usam Mermaid 10 via CDN (<code>mermaid@10/dist/mermaid.min.js</code>), com <code>mermaid.run()</code> chamado manualmente por diagrama (não <code>startOnLoad</code>).</p>
+
+<section class="manual-item" id="dp-arquitetura">
+  <h2>Arquitetura Geral</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>index.html</code> — shell único da ferramenta: sidebar (<code>#navTree</code>) + área de conteúdo (<code>#main</code>). Sem rotas, sem outras páginas — tudo é renderizado dentro dessa única página via JS.</li>
+    <li><code>app.js</code> (IIFE, ~193 linhas) — único script de comportamento. Monta a árvore de navegação a partir de <code>window.DP_CATEGORIAS</code>, renderiza o conteúdo do fluxo selecionado e inicializa o Mermaid.</li>
+    <li><code>data/rescisao.js</code> — único arquivo de dados hoje. Define <code>window.DP_CATEGORIAS</code>, um array de categorias (hoje só 1: "Rescisão", id <code>rescisao</code>) cada uma com um array de <code>fluxos</code>. Comentário no topo do arquivo diz que o conteúdo foi extraído de documentos <code>Fluxo Rescisão/*.docx</code> mantidos na raiz do projeto como referência (não lidos em runtime).</li>
+    <li><code>styles.css</code> — visual puro (paleta <code>--brand:#8B3A3A</code> igual à Central do Departamento Contábil), sem lógica.</li>
+    <li>Dependências externas via CDN: <code>@supabase/supabase-js@2</code> (só para o auth guard) e <code>mermaid@10</code>. Nenhuma outra lib (sem jsPDF/AutoTable — a ferramenta não gera PDF).</li>
+  </ul>
+  <p>Para adicionar uma categoria nova de processo (ex.: Admissão, Férias), o padrão é criar um novo arquivo em <code>data/&lt;categoria&gt;.js</code> que dá <code>push</code> ou concatena em <code>window.DP_CATEGORIAS</code> (ou edita <code>rescisao.js</code> para incluir outro objeto no array), e referenciar o novo <code>&lt;script&gt;</code> em <code>index.html</code> antes de <code>app.js</code>. <code>app.js</code> já é genérico o bastante para múltiplas categorias — a UI de sidebar já trata <code>DP_CATEGORIAS</code> como lista.</p>
+
+  <h3>Modelo de Dados</h3>
+  <p>Não há tabelas Supabase. A ferramenta não persiste nem lê dado nenhum do banco — é puramente um guia de referência estático, com todo o conteúdo (fluxos, etapas, tarefas, documentos, observações, diagramas) hardcoded em <code>data/rescisao.js</code> e servido como está. O único contato com o Supabase é o SDK carregado para o <code>portal-auth-guard.js</code> validar a sessão do usuário (<code>PortalAuthGuard.init(1)</code>) antes de remover o overlay de "Verificando acesso..." — não há gating de conteúdo por papel/empresa dentro da ferramenta em si; uma vez autenticado, o usuário vê todos os fluxos.</p>
+  <p>Estrutura de dados de cada item de <code>fluxo</code> (objeto JS, não schema de banco):</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Campo</th><th>Tipo</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>string</td><td>Slug único do fluxo, usado como chave de seleção (<code>dataset.fluxoId</code>) e para religar clique → conteúdo.</td></tr>
+      <tr><td><code>nome</code></td><td>string</td><td>Título exibido no botão da sidebar e no cabeçalho do conteúdo.</td></tr>
+      <tr><td><code>resumo</code></td><td>objeto <code>{ prazo, observacaoAvisoPrevio, referenciasLegais }</code></td><td>3 cartões de resumo rápido no topo da tela do fluxo.</td></tr>
+      <tr><td><code>etapas</code></td><td>array de <code>{ titulo, tarefas: [{ titulo, detalhes: [string] }] }</code></td><td>Passo a passo detalhado, renderizado como acordeão (<code>.etapa</code>/<code>.etapa-header</code>), primeira etapa já aberta.</td></tr>
+      <tr><td><code>observacoes</code></td><td>array de string (opcional)</td><td>Card "Considerações legais e operacionais" — só renderiza se o array existir e tiver itens.</td></tr>
+      <tr><td><code>documentos</code></td><td>array de string (opcional)</td><td>Card "Checklist de documentos" — mesma regra de renderização condicional.</td></tr>
+      <tr><td><code>mermaid</code></td><td>string (template literal com sintaxe Mermaid)</td><td>Fluxograma do processo, injetado literalmente dentro de <code>&lt;pre class="mermaid"&gt;</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Navegação de categoria → fluxo → renderização de conteúdo + diagrama. Cada clique num item da sidebar re-renderiza inteiramente <code>#main</code> via <code>innerHTML</code> e reprocessa o Mermaid daquele fluxo especificamente (por <code>id</code> incremental <code>mermaid-N</code>, evitando colisão com o diagrama do fluxo anterior que ainda pode estar no DOM até o innerHTML ser substituído).</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Carrega index.html] --> B[PortalAuthGuard.init aguarda sessao valida]
+    B --> C[renderNavTree monta sidebar a partir de DP_CATEGORIAS]
+    C --> D[Usuario clica numa categoria]
+    D --> E[Categoria expande/recolhe classe aberta]
+    E --> F[Usuario clica num fluxo]
+    F --> G[selecionarFluxo busca objeto fluxo por id]
+    G --> H[Monta innerHTML de main com resumo, mermaid bruto e etapas]
+    H --> I[mermaid.run renderiza o SVG do fluxograma daquele fluxo]
+    H --> J[Listeners de acordeao religados nas etapas]
+    G --> K[marcarAtivoNaSidebar destaca botao ativo]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>Mermaid já usado dentro da própria ferramenta</strong> — cada fluxo carrega seu próprio texto <code>flowchart TD</code> em <code>data/rescisao.js</code> (campo <code>mermaid</code>), incluindo um caso com nó de decisão (<code>acordo-mutuo</code> não, mas <code>pedido-demissao-desconto-dispensa</code> usa <code>D{Situação do Aviso Prévio}</code> com 3 ramificações rotuladas <code>D -->|A: Desconto total| E</code>). Sintaxe: sem aspas nos rótulos, mas com <code>&lt;br/&gt;</code> dentro dos colchetes para quebra de linha (funciona porque <code>flowchart: { htmlLabels: true }</code> está setado na config do Mermaid em <code>app.js</code>) — diferente da recomendação de "evitar HTML dentro de colchetes" de outras ferramentas do portal; aqui é deliberado e configurado para isso.</li>
+    <li>Tema do Mermaid é customizado via <code>mermaid.initialize({ theme: 'base', themeVariables: {...} })</code> com as cores da marca (<code>#8B3A3A</code>), igual à paleta de <code>styles.css</code> — não usa o tema Mermaid padrão.</li>
+    <li><code>mermaid.run({ nodes: [el] })</code> é chamado passando só o elemento do diagrama recém-inserido (não <code>mermaid.run()</code> global) — evita re-renderizar diagramas de fluxos já visitados que possam ter ficado de alguma forma no DOM, e evita a corrida de "Mermaid tenta renderizar antes do <code>innerHTML</code> terminar".</li>
+    <li><code>mermaidSeq</code> incrementa a cada seleção de fluxo, mesmo re-selecionando o mesmo fluxo — garante <code>id</code> único mesmo em cliques repetidos, já que o elemento antigo é substituído mas o Mermaid internamente pode cachear por id.</li>
+    <li>Renderização condicional dos cards "Considerações legais" e "Checklist de documentos" — nem todo fluxo tem os dois (ex.: <code>sem-justa-causa-com-aviso</code> não tem <code>observacoes</code>); ausência do campo não gera card vazio, só omite.</li>
+    <li>Todo o roteiro reflete o sistema legado "Domínio" (folha/DP) mencionado nos textos das tarefas (caminhos de menu tipo "Processos &gt; Rescisões &gt; Individual") — é documentação de processo operacional externo ao portal, não de uma tela do próprio Departamento Pessoal.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Uma única categoria (Rescisão) com 6 fluxos hoje — sem UI de busca/filtro na sidebar; se o conteúdo crescer bastante (novas categorias como Admissão, Férias, Afastamento), a sidebar de árvore simples pode não escalar bem sem paginação ou busca.</li>
+    <li>Conteúdo é só HTML injetado a partir de strings JS — não há sanitização porque o conteúdo é 100% estático/hardcoded pelo próprio time (sem input de usuário), mas isso significa que qualquer novo fluxo adicionado precisa ter HTML válido manualmente verificado (um <code>&lt;</code> ou <code>&gt;</code> solto em algum <code>detalhes</code> quebra o template).</li>
+  </ul>
+</section>

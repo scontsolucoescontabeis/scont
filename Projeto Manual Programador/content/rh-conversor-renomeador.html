@@ -1,0 +1,139 @@
+<p class="manual-intro">Duas ferramentas relacionadas do módulo RH, cada uma documentada em sua própria <code>&lt;section&gt;</code>: o <strong>Conversor de Folha de Ponto</strong> (<code>Projeto RH/conversor.html</code> + <code>conversor.js</code>) transforma o PDF exportado pelo Sólides ou pelo SmartPonto no Excel que o Controle de Frequência importa; o <strong>Renomeador de Arquivos</strong> (<code>Projeto RH/renomeador.html</code> + <code>renomeador.js</code>) aplica regras de nomenclatura cadastradas em <code>rh_regras_renomeacao</code> e grava os arquivos renomeados em dois destinos. O Renomeador também existe como app desktop em <code>Projeto Renomeador Electron/</code> (Electron — <code>main.js</code>/<code>preload.js</code>/<code>renderer.js</code>, empacotado com electron-builder), com a mesma lógica de regras portada para lá; esse app não é detalhado aqui.</p>
+
+<section class="manual-item" id="conversor">
+  <h2>Conversor de Folha de Ponto</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>conversor.html</code> — wizard de 4 etapas (Upload → Configuração → Colaboradores → Dados e Geração), sidebar do módulo RH, sem framework, CSS embutido inline no próprio HTML além de <code>styles.css</code> compartilhado.</li>
+    <li><code>conversor.js</code> — estado único em <code>state</code> (empresa, competência, colaboradores extraídos do PDF, vínculos, colaboradores confirmados), controla a navegação entre etapas e chama os parsers.</li>
+    <li><code>folha-ponto-solides-parser.js</code> e <code>folha-ponto-smartponto-parser.js</code> — módulos puros (sem DOM, sem Supabase, sem PDF.js), carregados como <code>&lt;script&gt;</code> globais e também via <code>require()</code> nos testes Node. Cada PDF é roteado para um dos dois conforme o formato detectado.</li>
+    <li>Funções do parser SmartPonto usam sufixo <code>Smart</code> (<code>_parsearPaginaColaboradorSmart</code>, <code>_melhorMatchEmpregadoSmart</code> etc.) — comentário no próprio arquivo explica que é para não colidir em silêncio com as funções de mesmo nome do parser do Sólides, já que os dois scripts vivem no mesmo escopo global da página.</li>
+    <li>Bibliotecas via CDN: <code>pdf.js</code> 3.11.174 (leitura do PDF no browser, <code>getTextContent()</code> por página) e SheetJS <code>xlsx</code> 0.18.5 (geração do Excel final, <code>XLSX.writeFile</code> — download direto, sem passar pelo servidor).</li>
+    <li>Cliente Supabase próprio (<code>supabase.createClient(SUPABASE_URL, SUPABASE_KEY)</code>), autenticação via <code>portal-auth-guard.js</code> compartilhado do portal.</li>
+    <li>Testes: <code>test-folha-ponto-solides-parser.js</code> e <code>test-folha-ponto-smartponto-parser.js</code> — Node puro sem framework, rodar com <code>node test-folha-ponto-solides-parser.js</code> / <code>node test-folha-ponto-smartponto-parser.js</code>.</li>
+    <li><strong>Fora de escopo desta ferramenta:</strong> <code>folha-ponto-calculo.js</code> está na mesma pasta e tem nome parecido, mas é usado pela tela "Folha de Ponto" (<code>index.html</code> do módulo RH, geração do horário previsto a partir de <code>rh_jornada_trabalho</code>), não pelo Conversor — fácil de confundir escopo por causa do prefixo comum <code>folha-ponto-*</code>.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Uso pelo Conversor</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_empresas</code></td><td>Só leitura — <code>codigo_empresa, nome_empresa</code>, carregada inteira na Etapa 1/2 para a busca/autocomplete de empresa.</td></tr>
+      <tr><td><code>rh_empregados</code></td><td>Só leitura — <code>codigo_empregado, nome_empregado, situacao</code>, filtrada por <code>codigo_empresa</code> da empresa selecionada e por <code>situacao != 'Demitido'</code>; usada como universo de destino do vínculo fuzzy na Etapa 3.</td></tr>
+    </tbody>
+  </table>
+  <p>O Conversor não grava nada no Supabase. O resultado (Excel) é gerado e baixado inteiramente no cliente via <code>XLSX.writeFile</code>; a persistência acontece depois, manualmente, quando esse Excel é importado no Controle de Frequência.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Upload do PDF] --> B[pdf.js extrai texto por pagina via getTextContent]
+    B --> C{Texto completo contem DADOS DO COLABORADOR e PONTOS e TRABALHADAS?}
+    C -- Sim --> D[Formato Solides]
+    C -- Nao --> E{Texto completo contem CARTAO DE PONTO e JORNADAS REALIZADAS e HORARIOS PREVISTOS?}
+    E -- Sim --> F[Formato SmartPonto]
+    E -- Nao --> G[Erro - arquivo nao reconhecido]
+    D --> H[Uma pagina = um colaborador - roda o parser do formato detectado em cada pagina]
+    F --> H
+    H --> I[Extrai competencia da data final do periodo no cabecalho]
+    I --> J[Etapa 2 - confirma empresa e competencia MM AAAA]
+    J --> K[Etapa 3 - match fuzzy nome extraido contra rh_empregados da empresa]
+    K --> L{Todo colaborador tem vinculo ou foi marcado Nao importar?}
+    L -- Nao --> K
+    L -- Sim --> M[Etapa 4 - tabela editavel por colaborador, uma aba por pessoa]
+    M --> N[Gerar Excel - XLSX.writeFile]
+    N --> O[Uma aba por colaborador mais aba consolidada Ocorrencias]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>Parser Sólides — segmentação por dia:</strong> <code>_dividirBlocosDia</code> usa como âncora o padrão regex <code>DD/MM + dia da semana por extenso</code> (ex.: <code>05/06 quinta-feira</code>) para cortar o texto corrido da página em um bloco por dia; dentro do bloco, tudo depois de <code>Total:</code> é descartado antes de seguir para o parsing de horários.</li>
+    <li><strong>Parser Sólides — horários vs. status:</strong> <code>_parsearCorpoDia</code> divide o bloco do dia por <code>|</code>. Sem <code>|</code>, o bloco inteiro é um status sem batida (falta/abono/feriado). Com <code>|</code>, os segmentos antes do último viram pares Entrada/Saída na ordem em que aparecem, e o segmento depois do último <code>|</code> (totais do dia) é descartado. Se um segmento sai com 1 ou 3+ horários (contaminação por quebra de linha do PDF original), o parser <strong>interrompe a leitura daquele dia</strong> em vez de gravar um horário errado — o comentário no código chama isso de proteção deliberada, deixando a correção para a revisão manual da Etapa 4.</li>
+    <li><strong>Parser SmartPonto — layout tabular denso, sem separador <code>|</code>:</strong> o export do SmartPonto não tem colunas delimitadas por caractere; é texto denso com colunas de largura fixa (JORNADAS REALIZADAS | NORMAL | EXTRA | LIMITE 1/2/3 | BANCO HR. | HORÁRIOS PREVISTOS) onde um corte único por posição X não é confiável. A extração usa "âncora mais próxima": localiza o X do rótulo <code>NORMAL</code> (fronteira <code>boundaryX</code>) e os X dos rótulos <code>ENT.</code>/<code>SAÍ.</code> à esquerda dela (âncoras de jornada); cada token de uma linha de dia entra na zona "jornada real" só se estiver mais perto de alguma âncora de jornada do que da fronteira <code>NORMAL</code> — senão é descartado (pertence a Normal/Extra/Limites/Banco de Horas/Horários Previstos).</li>
+    <li><strong>Detecção de formato:</strong> teste simples de substring (<code>_pareceSolides</code> / <code>_pareceSmartPonto</code>) sobre o texto concatenado de todas as páginas, decidido uma única vez antes de rodar o parser — não há mistura de formatos dentro do mesmo PDF/leva.</li>
+    <li><strong>Preenchimento de dias faltantes:</strong> quando a competência é detectada, cada parser gera antes um esqueleto com todos os dias do mês (<code>_gerarDiasDoMes</code> / <code>_gerarDiasDoMesSmart</code>) e depois mescla os dias efetivamente extraídos do PDF por sobre esse esqueleto (<code>_mesclarDias</code> / <code>_mesclarDiasSmart</code>) — garante 1 linha por dia do mês no Excel final mesmo se o PDF pular ou omitir algum dia.</li>
+    <li><strong>Vínculo fuzzy (Etapa 3):</strong> <code>_melhorMatchEmpregado(Smart)</code> normaliza nome (remove acento, lowercase, colapsa espaços) e prioriza igualdade exata; na ausência dela, usa o primeiro <code>includes()</code> bidirecional encontrado — não há score/ranking, é "primeiro que bater" na ordem em que <code>rh_empregados</code> foi carregado (ordenado por nome).</li>
+    <li>Terceiro turno (colunas Entrada 3/Saída 3) só aparece na tabela de revisão e no Excel se algum dia de algum colaborador do arquivo realmente tiver <code>entrada3</code>/<code>saida3</code> preenchidos — calculado em <code>prepararEtapa4</code> via <code>state.maxPeriodos</code>.</li>
+    <li>Aba "Ocorrências" do Excel gerado é só informativa (consolidado de status por colaborador/data); o importador do Controle de Frequência não a reconhece como aba de colaborador — o aviso de "aba não encontrada" nesse ponto é esperado.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>O parser SmartPonto depende de encontrar os literais exatos <code>NORMAL</code>, <code>ENT.</code> e <code>SAÍ.</code> como âncoras de coluna (<code>_acharBoundaryXSmart</code>, <code>_acharJornadaAnchorsSmart</code>). Se o export do SmartPonto mudar esses rótulos, a ordem das colunas ou o idioma, o parser não lança exceção — simplesmente não encontra âncoras e extrai zero dias, silenciosamente.</li>
+    <li>Nome do arquivo <code>folha-ponto-calculo.js</code> convive na mesma pasta com os dois parsers (<code>folha-ponto-solides-parser.js</code>, <code>folha-ponto-smartponto-parser.js</code>) mas pertence a outra tela — risco real de um programador futuro assumir que os três formam um conjunto e mexer no lugar errado.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="renomeador">
+  <h2>Renomeador de Arquivos</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>renomeador.html</code> — página standalone com CSS embutido próprio (variáveis <code>--primary-color</code> etc. redefinidas localmente, não reaproveita <code>styles.css</code> do módulo RH nem a sidebar padrão).</li>
+    <li><code>renomeador.js</code> — estado em variáveis de módulo soltas (<code>regrasCadastradas</code>, <code>empresasCadastradas</code>, <code>mapeamentosCadastrados</code>, <code>arquivosCarregados</code>, <code>arquivosAnalisados</code>), sem objeto <code>state</code> único como no Conversor.</li>
+    <li>Cliente Supabase próprio (<code>supabase.createClient(SUPABASE_URL, SUPABASE_KEY)</code>), autenticação via <code>portal-auth-guard.js</code>.</li>
+    <li>Sem bibliotecas de PDF/Excel — grava direto em disco via <strong>File System Access API</strong> nativa do navegador (<code>window.showDirectoryPicker</code>, <code>getFileHandle</code>/<code>createWritable</code>), sem gerar arquivo intermediário.</li>
+    <li>CRUD de regras e de mapeamentos de nome fica em <code>Projeto RH/admin.js</code> (funções <code>carregarRegras</code>/<code>salvarRegra</code>/<code>deletarRegra</code> e <code>carregarMapeamentos</code>/<code>salvarMapeamento</code>/<code>deletarMapeamento</code>, dentro de <code>admin.html</code>) — <code>renomeador.js</code> só lê essas tabelas, nunca escreve nelas.</li>
+    <li><code>Projeto Renomeador Electron/</code> — app desktop separado (<code>main.js</code>, <code>preload.js</code>, <code>renderer.js</code>, empacotado em <code>dist/SCONT Renomeador Setup 1.0.0.exe</code>) com a mesma lógica de casamento de regras portada para lá; grava direto no sistema de arquivos do Windows sem depender da File System Access API do browser. Repositório de código próprio, não compartilha arquivo JS com o Renomeador web.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel / RLS</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_regras_renomeacao</code></td><td><code>id uuid, padrao_de text, padrao_para text, data_criacao</code>. <code>padrao_de</code> é o padrão de entrada (vira regex), <code>padrao_para</code> o padrão de saída (template). RLS aberta: <code>FOR SELECT</code> e <code>FOR ALL</code> para <code>authenticated</code> com <code>USING (TRUE)</code>/<code>WITH CHECK (TRUE)</code> — controle de acesso real é só client-side (quem tem o link de <code>admin.html</code>).</td></tr>
+      <tr><td><code>rh_mapeamento_nomes</code></td><td>Dicionário <code>nome_arquivo</code> (UNIQUE) → <code>nome_documento</code>, upsert por <code>onConflict: 'nome_arquivo'</code> na tela de admin. RLS igualmente aberta para <code>authenticated</code>.</td></tr>
+      <tr><td><code>rh_empresas</code></td><td>Só leitura — <code>codigo_empresa, nome_empresa</code>, carregada inteira num dicionário em memória (<code>empresasCadastradas</code>) para resolver <code>{NOME_EMPRESA}</code> a partir do código extraído do nome do arquivo.</td></tr>
+    </tbody>
+  </table>
+  <p>O Renomeador não grava nada em nenhuma tabela — só lê as três acima. A "gravação" da ferramenta é sempre em disco local, via File System Access API, nunca no Supabase.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Upload de multiplos arquivos] --> B[Para cada arquivo remove a extensao antes de testar]
+    B --> C[Testa nome sem extensao contra cada regra cadastrada, na ordem retornada pelo banco]
+    C --> D{Alguma regra casou - primeira que bater e usada}
+    D -- Nao --> E[Status - Padrao nao reconhecido]
+    D -- Sim --> F[Extrai grupos nomeados codigo nome do regex]
+    F --> G{Codigo existe em rh_empresas?}
+    G -- Nao --> H[Status - Empresa codigo nao encontrada]
+    G -- Sim --> I[Resolve NOME_DOCUMENTO via rh_mapeamento_nomes, fallback para o nome cru]
+    I --> J[Monta novo nome substituindo placeholders no padrao_para da regra]
+    J --> K[Monta caminho relativo Dinamico substituindo placeholders no template do Passo 1]
+    K --> L[Status - Pronto, linha na tabela de previa]
+    L --> M[Usuario clica Salvar nos Destinos]
+    M --> N[showDirectoryPicker para a pasta EXPRESS]
+    N --> O[showDirectoryPicker para a pasta Dinamico]
+    O --> P[Grava cada arquivo Pronto nas duas pastas via getFileHandle e createWritable]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>Motor de regex</strong> (<code>criarRegexDoPadrao</code>): escapa os caracteres especiais de regex do <code>padrao_de</code> e só depois substitui os placeholders por grupos nomeados:</li>
+  </ul>
+  <div class="manual-formula">{CODIGO_EMPRESA} → (?&lt;codigo&gt;\d+)
+{NOME_ARQUIVO}    → (?&lt;nome&gt;.+?)
+{MM}              → (?&lt;mes&gt;\d{2})
+{AAAA}            → (?&lt;ano&gt;\d{4})
+{IGNORAR}         → .*?  (trecho descartado, sem grupo nomeado)
+
+Regex final: ^&lt;padrao_de convertido&gt;$  com flag "i" (case-insensitive)
+testada contra o nome do arquivo SEM extensao.</div>
+  <ul>
+    <li><strong>Ordem de casamento:</strong> o array de regras vem de <code>select('*')</code> sem <code>order()</code> — a ordem depende do que o Postgres/PostgREST devolver (na prática, próxima da ordem física/de inserção, não garantida por contrato). A primeira regra que casar é aplicada e o loop para (<code>break</code>); não existe priorização por especificidade nem detecção de regras ambíguas/conflitantes.</li>
+    <li><strong>Extensão original</strong> é sempre preservada à parte — cortada do nome antes do match e reanexada ao final do novo nome montado, nunca passa pelo regex nem pelo template de saída.</li>
+    <li><strong>Segunda fase de placeholders</strong> (montagem do novo nome e do caminho Dinâmico) resolve <code>{CODIGO_EMPRESA}</code> e <code>{NOME_ARQUIVO}</code> a partir dos grupos capturados no match, <code>{NOME_EMPRESA}</code> via <code>rh_empresas</code>, <code>{NOME_DOCUMENTO}</code> via <code>rh_mapeamento_nomes</code> (fallback para o nome de arquivo cru se não houver mapeamento cadastrado), e <code>{MM}</code>/<code>{AAAA}</code> vêm da <strong>Competência digitada no Passo 1</strong> — não do <code>{MM}</code>/<code>{AAAA}</code> eventualmente capturado do próprio nome do arquivo original.</li>
+    <li><strong>Separador de caminho:</strong> o caminho Dinâmico é normalizado para <code>/</code> internamente (barras trocadas e barras nas pontas removidas) para servir de lista de segmentos de pasta na gravação via File System Access API, e só é convertido de volta para <code>\</code> na exibição da tabela de prévia — tratamento manual de string, sem lib de path.</li>
+    <li><strong>Gravação em disco</strong> depende de <code>window.showDirectoryPicker</code> — só Chrome/Edge 86+; se ausente, a ferramenta mostra aviso e não tenta nenhum fallback (nem download, nem ZIP) nesse fluxo web.</li>
+    <li><strong>Discrepância entre UI e código:</strong> o texto fixo "Como funciona" em <code>renomeador.html</code> ainda diz que o sistema "gerará um arquivo .ZIP contendo duas pastas"; isso está desatualizado — <code>salvarNosDestinos()</code> não gera ZIP algum, grava diretamente nas duas pastas escolhidas pelo usuário via File System Access API. Quem for dar manutenção não deve se basear nesse texto para entender o mecanismo real.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>RLS de <code>rh_regras_renomeacao</code> e <code>rh_mapeamento_nomes</code> é totalmente aberta para qualquer usuário <code>authenticated</code> (<code>USING (TRUE)</code> tanto para leitura quanto para escrita) — mesmo padrão observado em outros módulos do portal; o controle de quem pode editar regras é só "quem tem o link de <code>admin.html</code>", não enforcement de banco.</li>
+    <li>Sem detecção de regras conflitantes/ambíguas: duas regras cujo <code>padrao_de</code> uma seja mais genérica que a outra, cadastradas na ordem errada, fazem a mais específica nunca ser alcançada (a primeira que casar vence, ver "Ordem de casamento" acima) — sem aviso na tela de admin nem no Renomeador.</li>
+    <li>Texto "Como funciona" desatualizado (menção a ZIP) mencionado acima — deveria ser corrigido para refletir a gravação direta via File System Access API, evita confundir tanto usuário quanto programador futuro lendo o HTML.</li>
+  </ul>
+</section>

@@ -1,0 +1,189 @@
+<p class="manual-intro">O Boas Vindas vive em <code>Projeto Boas Vindas/</code>. Mesma stack do resto do portal — HTML/JS puro, sem framework/bundler, cliente Supabase próprio por arquivo (<code>createClient(SUPABASE_URL, SUPABASE_KEY)</code> com a chave <strong>anon</strong> de <code>supabase-config.js</code>). Duas superfícies distintas: <code>admin/admin.html</code> + <code>admin-script.js</code> + <code>cnae.js</code> (painel interno, cria e gerencia apresentações — protegido por <code>portal-auth-guard.js</code>, exige <code>auth.isAdmin</code>) e <code>index.html</code> (página pública que o cliente recebe por e-mail/WhatsApp — sem nenhum auth guard, acessível por qualquer um com o link). O catálogo de CNAEs é reaproveitado de outra ferramenta do portal (<code>Projeto Gerenciador Formularios/cnaes.js</code>, carregado via <code>&lt;script&gt;</code> relativo cruzando pastas de projeto), e o envio de e-mail reusa o utilitário global <code>notificacoes.js</code> (raiz do portal), que chama a Edge Function compartilhada <code>enviar-email</code> (Resend). <strong>Atenção ao schema:</strong> <code>database/database.sql</code>, dentro da própria pasta da ferramenta, está desatualizado — é um schema MySQL antigo (camelCase, <code>AUTO_INCREMENT</code>, tabela <code>configuracoes</code> que não existe mais). O schema realmente em produção é Postgres/Supabase e vive em <code>_sql/apresentacoes.sql</code> (schema base + RLS + RPC) e <code>_sql/lgpd_compliance_migration.sql</code> (colunas LGPD adicionadas depois). Toda a documentação abaixo segue esses dois arquivos, confirmados contra o código real de <code>admin-script.js</code> e <code>index.html</code>.</p>
+
+<section class="manual-item" id="criar-apresentacao">
+  <h2>Criar Apresentação</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>admin/admin.html</code> — tela única com duas seções client-side (<code>#criar</code> / <code>#historico</code>) alternadas por <code>data-section</code>, sem roteamento real. Auth: bloco inline no fim do arquivo chama <code>PortalAuthGuard.init(2)</code> e redireciona para <code>portal.html</code> se <code>!auth.isAdmin</code> — só administradores chegam ao painel, não existe papel intermediário (equipe SCONT/Prestador) aqui.</li>
+    <li><code>admin/admin-script.js</code> — toda a lógica: máscaras de CNPJ/telefone, busca BrasilAPI, submit do formulário, histórico, ações de desativar/reativar/excluir.</li>
+    <li><code>admin/cnae.js</code> — parser do catálogo estático carregado por <code>Projeto Gerenciador Formularios/cnaes.js</code> (define <code>window.CNAE_DATA</code>, um CSV inline separado por <code>;</code>). Filtra só linhas cujo código bate com <code>NNNN-N/NN</code> (subclasses) e popula <code>window.CNAES_LISTA</code> — dependência entre pastas de projeto, não é uma cópia local do catálogo.</li>
+    <li><code>notificacoes.js</code> (raiz do portal, compartilhado) — <code>Notificacoes.enviarEmail()</code> chama a Edge Function <code>enviar-email</code> autenticada com o token de sessão do admin logado (<code>auth.getSession()</code>); <code>Notificacoes.abrirWhatsAppCliente()</code> só monta a URL <code>wa.me</code> e faz <code>window.open</code> — não existe envio automático de WhatsApp.</li>
+    <li>Busca de CNPJ é direta no navegador contra <code>https://brasilapi.com.br/api/cnpj/v1/&lt;cnpj&gt;</code> (sem proxy/Edge Function) — falha de CORS ou de disponibilidade da BrasilAPI é reportada ao usuário via toast, o formulário continua preenchível manualmente.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Tabela única, <code>public.apresentacoes</code>, definida em <code>_sql/apresentacoes.sql</code> e estendida por <code>_sql/lgpd_compliance_migration.sql</code>:</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Coluna</th><th>Tipo</th><th>Observação</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>UUID PK</td><td><code>DEFAULT gen_random_uuid()</code> — não é gerado no cliente nem por função própria.</td></tr>
+      <tr><td><code>razao_social</code>, <code>cnpj</code>, <code>nome_contato</code>, <code>email_cliente</code></td><td>TEXT NOT NULL</td><td>Únicos campos realmente obrigatórios no banco; <code>cnae_principal</code> é obrigatório só na UI (validado em JS antes do insert), a coluna em si aceita NULL.</td></tr>
+      <tr><td><code>inscricao</code>, <code>regime</code>, <code>porte</code>, <code>ramo</code>, <code>cnae_principal</code>, <code>cnaes_secundarios</code>, <code>telefone</code>, <code>cargo</code>, <code>mensagem</code></td><td>TEXT</td><td>Opcionais. <code>cnaes_secundarios</code> é uma única string com quebras de linha (<code>join('\n')</code> no front), não um array/JSONB.</td></tr>
+      <tr><td><code>acessos</code></td><td>INTEGER DEFAULT 0</td><td>Só incrementado pela RPC <code>fn_registrar_acesso_apresentacao</code> (ver seção Página Pública) — nunca escrito direto pelo admin.</td></tr>
+      <tr><td><code>ativo</code></td><td>BOOLEAN DEFAULT TRUE</td><td>Soft toggle usado tanto para "desativar" no Histórico quanto pela RLS pública (abaixo).</td></tr>
+      <tr><td><code>criado_em</code></td><td>TIMESTAMPTZ DEFAULT NOW()</td><td>Nome diferente do <code>dataCriacao</code> do schema MySQL antigo — não confundir.</td></tr>
+      <tr><td><code>base_legal</code></td><td>TEXT, CHECK, DEFAULT <code>'execucao_contrato'</code></td><td>Adicionada pela migração LGPD. Nunca enviada no payload do <code>admin-script.js</code> — toda linha fica com o default.</td></tr>
+      <tr><td><code>criado_por</code>, <code>atualizado_em</code>, <code>atualizado_por</code></td><td>TEXT / TIMESTAMPTZ / TEXT</td><td>Adicionadas pela migração LGPD para rastreabilidade. <strong>Nenhuma tela escreve nelas</strong> — permanecem <code>NULL</code> mesmo depois de criar, desativar, reativar. Ver Dívida Técnica.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>RLS</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Política</th><th>Comando</th><th>Regra</th></tr></thead>
+    <tbody>
+      <tr><td>apresentacoes: leitura pública ativa</td><td>SELECT</td><td><code>USING (ativo = TRUE)</code> — qualquer chave anon, sem login, lê qualquer linha com <code>ativo = true</code>. Não restringe por <code>id</code> (ver Dívida Técnica).</td></tr>
+      <tr><td>apresentacoes: admin gerencia</td><td>ALL</td><td><code>USING/WITH CHECK (public.is_admin())</code> — insert/update/delete só por admin autenticado.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+sequenceDiagram
+    participant Admin
+    participant BrasilAPI
+    participant CNAEmodal as Modal CNAE
+    participant DB as Supabase apresentacoes
+    participant EdgeFn as Edge Function enviar-email
+    participant WA as wa.me
+
+    Admin->>BrasilAPI: GET cnpj v1 cnpjDigitos
+    BrasilAPI-->>Admin: razao_social, cnae_fiscal, porte, telefone
+    Admin->>CNAEmodal: confirma ou escolhe CNAE Principal
+    Admin->>DB: insert apresentacoes retorna id
+    DB-->>Admin: id gerado gen_random_uuid
+    alt checkbox Email marcado
+        Admin->>EdgeFn: POST com Bearer token de sessao
+        EdgeFn-->>Admin: ok true ou erro
+    end
+    alt checkbox WhatsApp marcado e telefone preenchido
+        Admin->>WA: window.open wa.me com mensagem pronta
+        Note over WA: envio final depende do clique do admin
+    end
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Payload do insert usa nomes snake_case explícitos (<code>fd.get('razaoSocial') → razao_social</code> etc.) — o formulário HTML usa <code>name</code> em camelCase, o <code>FormData</code> é remapeado manualmente em <code>criarApresentacao()</code>, não existe conversão automática.</li>
+    <li><code>cnae_principal</code>/<code>cnaes_secundarios</code> são persistidos como texto já formatado (<code>"0111-3/01 — Descrição"</code>), não como código+descrição separados — qualquer relatório futuro que precise só do código tem que fazer parse de string.</li>
+    <li><code>formatarCodigoCnae()</code> converte o CNAE numérico da BrasilAPI (ex.: <code>111301</code>) para o formato com hífen/barra usado no catálogo local (<code>0111-3/01</code>) — é o ponto de acoplamento entre os dois formatos de CNAE que circulam no portal.</li>
+    <li>Envio de e-mail é automático ao criar (se o checkbox, marcado por padrão, estiver ligado); falha de e-mail não desfaz o insert — a apresentação já existe no banco mesmo se a Edge Function falhar, e fica disponível o botão "Reenviar Email" na tela de resultado (via <code>_ultimaApresentacao</code> em memória, perdido se a página recarregar).</li>
+    <li>Não existe tela de edição — a única forma de corrigir dados é criar uma nova apresentação e desativar a antiga manualmente no Histórico.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>As colunas de auditoria LGPD (<code>criado_por</code>, <code>atualizado_em</code>, <code>atualizado_por</code>) existem no schema mas nenhuma tela do Boas Vindas as preenche — nem na criação, nem em desativar/reativar/excluir. A migração LGPD adicionou a estrutura mas o código nunca foi atualizado para usá-la; qualquer auditoria de "quem criou/alterou" essa apresentação não tem dado nenhum hoje.</li>
+    <li><code>database/database.sql</code>, dentro da própria pasta do projeto, é lixo histórico (schema MySQL de uma versão anterior) e pode enganar quem procurar o schema ali primeiro — considerar removê-lo ou marcá-lo como obsoleto.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="historico-admin">
+  <h2>Histórico (Admin)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Mesmo <code>admin-script.js</code> — funções <code>carregarHistorico()</code>, <code>atualizarEstatisticas()</code>, <code>filtrarHistorico()</code>, <code>renderizarHistorico()</code> e as ações <code>desativarApresentacao()</code>/<code>reativarApresentacao()</code>/<code>excluirApresentacao()</code>.</li>
+    <li>Estado 100% client-side em <code>_historicoCache</code> (array carregado uma vez por visita à aba) — busca e filtro de status rodam sobre esse array em memória, não geram nova query ao Supabase.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Reusa <code>public.apresentacoes</code> (ver seção Criar Apresentação). A query de carga é:</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Aspecto</th><th>Comportamento</th></tr></thead>
+    <tbody>
+      <tr><td>Colunas</td><td><code>id, razao_social, cnpj, nome_contato, email_cliente, telefone, criado_em, acessos, ativo</code> — não traz <code>mensagem</code>, CNAEs nem os campos LGPD.</td></tr>
+      <tr><td>Ordenação</td><td><code>order('criado_em', ascending: false)</code>.</td></tr>
+      <tr><td>Limite</td><td><code>limit(50)</code> — fixo no código, sem paginação nem cursor.</td></tr>
+      <tr><td>Escrita</td><td><code>update({ ativo: false/true })</code> para desativar/reativar; <code>delete()</code> para excluir. Ambas dependem da policy "admin gerencia" (<code>is_admin()</code>).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Abrir aba Historico] --> B[SELECT ate 50 linhas ordenadas por criado_em desc]
+    B --> C[_historicoCache em memoria]
+    C --> D[atualizarEstatisticas sobre o cache]
+    C --> E[filtrarHistorico busca texto mais status]
+    E --> F[renderizarHistorico monta linhas da tabela]
+    F --> G{Acao do admin}
+    G -- Desativar --> H[UPDATE ativo=false]
+    G -- Reativar --> I[UPDATE ativo=true]
+    G -- Excluir --> J[DELETE definitivo]
+    G -- WhatsApp --> K[wa.me com mensagem pronta]
+    H --> C
+    I --> C
+    J --> C
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Os três indicadores do topo (total ativas, soma de acessos, criadas no mês) são calculados só sobre as 50 linhas carregadas — se houver mais de 50 apresentações ativas, os números exibidos <strong>não</strong> refletem o total real da tabela, só o total das 50 mais recentes.</li>
+    <li>Desativar é reversível (<code>ativo</code> volta a <code>true</code>); excluir é <code>DELETE</code> físico, sem tabela de histórico/soft-delete por trás — não há como recuperar uma apresentação excluída.</li>
+    <li>A confirmação de desativar/excluir usa <code>confirm()</code> nativo do navegador, sem modal customizado.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Sem paginação: a lista trava em 50 registros por design. Crescendo o volume de clientes, tanto a listagem quanto as estatísticas do topo ficam incompletas e isso não é sinalizado na tela (não há "mostrando 50 de N").</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="pagina-publica-cliente">
+  <h2>Página Pública do Cliente</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>index.html</code> — página autocontida (CSS e JS inline no próprio arquivo, sem dependência de <code>admin-script.js</code>). Único ponto de entrada do cliente final.</li>
+    <li>Sem <code>portal-auth-guard.js</code> — a página é deliberadamente pública, não pede login. A "segurança" do link é só o UUID de <code>id</code> ser difícil de adivinhar, mais a RLS do banco.</li>
+    <li>Todo o conteúdo institucional (departamentos Fiscal/Pessoal/Contábil/Administrativo, obrigações, alertas de fraude, equipe, contatos) é HTML estático fixo na página — não vem do banco. Só o bloco "Dados Cadastrais" no topo é dinâmico.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Operação</th><th>Detalhe</th></tr></thead>
+    <tbody>
+      <tr><td>Leitura</td><td><code>db.from('apresentacoes').select('*').eq('id', id).eq('ativo', true).single()</code> — usa a chave anon; a policy "leitura pública ativa" já é quem realmente autoriza o acesso (o filtro <code>.eq('id', id)</code> no client é redundante em relação à RLS, que libera qualquer linha ativa, não só a solicitada).</td></tr>
+      <tr><td>Contagem de acesso</td><td><code>db.rpc('fn_registrar_acesso_apresentacao', { p_id: id })</code> — função <code>SECURITY DEFINER</code>, <code>GRANT EXECUTE ... TO anon, authenticated</code>. Faz um <code>UPDATE acessos = acessos + 1 WHERE id = p_id AND ativo = TRUE</code> direto em SQL, sem round-trip de leitura+escrita no cliente (evita race condition de contagem).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+sequenceDiagram
+    participant Admin
+    participant DB as Supabase apresentacoes
+    participant Cliente
+    participant Pagina as index.html
+    participant RPC as fn_registrar_acesso_apresentacao
+
+    Admin->>DB: insert apresentacoes ver secao Criar
+    Admin->>Cliente: envia link index.html?id=uuid por email ou WhatsApp
+    Cliente->>Pagina: abre o link
+    Pagina->>DB: select apresentacoes where id=uuid and ativo=true
+    alt registro encontrado e ativo
+        DB-->>Pagina: dados cadastrais
+        Pagina->>Pagina: personalizarHero e preencherDadosCadastrais
+        Pagina->>RPC: rpc fn_registrar_acesso_apresentacao p_id=uuid
+        RPC-->>DB: UPDATE acessos = acessos plus 1
+        Note over Pagina,RPC: chamada fire and forget, catch silencioso
+    else sem id, id invalido ou desativado
+        DB-->>Pagina: erro ou linha vazia
+        Pagina->>Pagina: mostra guia generico sem dados cadastrais
+    end
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Ausência de <code>id</code> na URL, <code>id</code> inexistente e apresentação desativada resultam no <strong>mesmo</strong> comportamento: guia genérico, sem erro visível ao cliente — não dá pra distinguir os três casos olhando só a página.</li>
+    <li>A chamada à RPC de contagem de acesso é assíncrona e com <code>.catch(() => {})</code> — se falhar (rede, RLS, função removida), a página não trava nem avisa; o acesso simplesmente não é contado, sem log nem retry.</li>
+    <li><code>nomeCurtoEmpresa()</code> remove sufixos societários (LTDA, ME, EPP, EIRELI, S/A, SLU) via regex só para a saudação ("Bem-vinda à Scont, Empresa") ficar mais natural — não altera o dado persistido, é só apresentação.</li>
+    <li>Reativar uma apresentação no Histórico é suficiente para o link voltar a personalizar — a página pública não faz nenhuma outra checagem além de <code>ativo = true</code> no momento do carregamento.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li><strong>Risco real de exposição de dados:</strong> a policy de RLS "apresentacoes: leitura pública ativa" autoriza <code>SELECT</code> em <em>qualquer</em> linha com <code>ativo = true</code>, sem restringir por <code>id</code>. O filtro por <code>id</code> em <code>index.html</code> é só uma escolha da query do cliente, não uma regra do banco — uma chamada REST direta contra a API do Supabase com a chave anon pública (a mesma exposta em <code>supabase-config.js</code>), por exemplo <code>GET /rest/v1/apresentacoes?ativo=eq.true&amp;select=*</code>, retorna razão social, CNPJ, telefone, e-mail e nome do contato de <strong>todos</strong> os clientes com apresentação ativa, não só de quem tem o link. Dado que a migração LGPD (<code>_sql/lgpd_compliance_migration.sql</code>) já classifica essa tabela como contendo dados pessoais (Art. 5º, I), essa policy provavelmente deveria restringir a leitura a um <code>id</code> específico (ex.: via função <code>SECURITY DEFINER</code> equivalente à de acesso, em vez de <code>SELECT</code> aberto) — não foi corrigido até o momento desta documentação.</li>
+  </ul>
+</section>

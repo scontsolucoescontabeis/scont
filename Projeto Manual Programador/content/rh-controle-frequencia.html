@@ -1,0 +1,253 @@
+<p class="manual-intro">O Controle de Frequência vive em <code>Projeto RH/</code> e é a tela <code>index.html</code> + <code>script.js</code> (script único, ~6800 linhas — sem módulos, sem build step, tudo em <code>&lt;script&gt;</code> global carregado direto pelo navegador). Stack: HTML + JS puro, um <code>state</code> global mutável (objeto único no topo de <code>script.js</code>) que guarda empresa/competência/folhas em edição, cliente Supabase próprio (<code>supabase.createClient(SUPABASE_URL, SUPABASE_KEY)</code> de <code>../supabase-config.js</code>), autenticação via <code>portal-auth-guard.js</code> compartilhado do portal. SheetJS (import/export de Excel), jsPDF 2.5.1 + AutoTable 3.8.2 + html2canvas (recibos e folhas em PDF), todos via CDN. A tela é um hub de 7 telas alternadas por <code>mostrarTela(telaId)</code> (esconde todas, mostra uma, chama o inicializador daquela tela se houver) dentro do mesmo <code>index.html</code> — não há roteamento por URL, é tudo <code>display:none/block</code> em <code>&lt;div&gt;</code>s irmãs. Ferramentas do mesmo módulo RH documentadas separadamente (não cobertas aqui): <code>lancamentos.html</code> (Lançamentos de Folha), <code>admin.html</code> (Administração RH — cadastro de empregados, importação de férias/jornada/ponto de sistemas externos), <code>conversor.html</code>/<code>renomeador.html</code> (utilitários de arquivo). Este documento cobre só o que <code>index.html</code> renderiza: Folha de Ponto (preenchimento e cálculo), Grupos de Empresas, Configurações (Rubricas TXT/Jornadas), Valores VT/VA, Exportação TXT, Gerar Benefícios, Gerar Escala e Gerar Folhas de Ponto.</p>
+
+<section class="manual-item" id="frequencia-preenchimento">
+  <h2>Folha de Ponto — Preenchimento e Cálculo</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>index.html</code> — marcação das 7 telas + todos os modais (assinatura, feriados, config de rubricas, valores VT/VA, exportação TXT, etc.), <code>display:none</code> por padrão exceto <code>selectionScreen</code>.</li>
+    <li><code>script.js</code> — toda a lógica: carregamento de dados, grade de preenchimento, motor de cálculo de horas, salvamento, as 4 telas "Gerar *", exportação TXT, e-mail. Um único arquivo, sem <code>export</code>/<code>import</code> — tudo pendurado em <code>window</code> implicitamente (funções top-level) ou lido via <code>onclick="..."</code> inline no HTML.</li>
+    <li><code>escala-calculo.js</code> — módulo puro (sem DOM/Supabase) que decide se um dia é trabalho ou folga dado uma escala; consumido por <code>script.js</code> e testado isoladamente em Node (<code>test-escala-calculo.js</code>).</li>
+    <li><code>folha-ponto-calculo.js</code> — módulo puro que combina a saída de <code>calcularResumoMes</code> com a jornada por dia da semana para montar o "Horário Previsto" da Folha de Ponto em branco; testado em <code>test-folha-ponto-calculo.js</code>.</li>
+    <li><code>envio-email-frequencia.js</code> — módulo puro de resolução de destinatários (empresa vs. grupo) para o botão "Enviar por E-mail" de Benefícios/Folha de Ponto; testado em <code>test-envio-email-frequencia.js</code>.</li>
+    <li><code>styles.css</code> — único CSS da ferramenta (sidebar, tabs, tabelas, modais).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_empresas</code></td><td>Cadastro de empresas (<code>codigo_empresa</code> único). Colunas usadas por esta tela: <code>nome_empresa</code>, <code>cnpj</code>, <code>email</code>, <code>email_responsavel</code>, <code>uf</code>. Cadastro em si é feito por Administração RH (fora do escopo deste documento).</td></tr>
+      <tr><td><code>rh_empregados</code></td><td>Empregados por empresa. Esta tela lê <code>situacao</code>, <code>tipo_empregado</code>, <code>desc_cargo</code>, <code>jornada_id</code> (FK opcional para <code>rh_jornadas</code>) — todas colunas adicionadas por migrações fora deste diretório (importação em Administração RH), não fazem parte do <code>CREATE TABLE</code> original em <code>schema_rh.sql</code>.</td></tr>
+      <tr><td><code>rh_saves</code></td><td>Folha de ponto salva por <code>(empresa_codigo, nome_trabalhador, competencia)</code> — upsert, é o "documento" central desta tela. <code>dados_json</code> guarda a grade dia-a-dia (entradas/saídas), <code>dsr_dias</code> os dias marcados como descanso remunerado, <code>flags_folga</code> um mapa <code>data → 'folga'|'falta'|'atestado'|'atestado_comparecimento'|'liberacao_meio_expediente'|'compensacao'</code>. <code>status</code> é sempre gravado como <code>'finalizado'</code> pelo fluxo de salvamento — não existe hoje um estado "rascunho" gravado no banco apesar do <code>DEFAULT 'rascunho'</code> da coluna.</td></tr>
+      <tr><td><code>rh_config_rubricas_txt</code></td><td>Tabela chave-valor por empresa: <code>(codigo_empresa, evento)</code> único, valor sempre em <code>codigo_rubrica</code> (TEXT), <code>tipo_valor</code> só como dica de exibição. Ver "Decisões de Design" — reaproveitada para muito mais que rubricas.</td></tr>
+      <tr><td><code>rh_rubricas</code></td><td>Catálogo de rubricas por empresa (<code>codigo_rubrica</code>, <code>descricao_rubrica</code>, <code>tipo</code>) — alimenta os <code>&lt;select&gt;</code> de rubrica em vários modais (Exportação TXT, Lançamento VT/VA). Cadastro de fato acontece na ferramenta de Lançamentos (fora do escopo).</td></tr>
+      <tr><td><code>rh_feriados</code></td><td>Calendário de feriados global (não por empresa). <code>data</code> em formato <code>DD/MM</code> (recorrente) ou <code>DD/MM/AAAA</code> (específico) — comparação em <code>calcularFolha</code> testa os dois formatos.</td></tr>
+      <tr><td><code>rh_ferias_calculadas</code></td><td>Períodos de férias por empregado (somente leitura aqui — importados via Administração RH). Usada para excluir dias de férias do faltante/hora devida e do "Dias a Trabalhar" de Benefícios.</td></tr>
+    </tbody>
+  </table>
+  <p>RLS de todas as tabelas <code>rh_*</code> é permissiva (<code>TO authenticated USING (TRUE)</code> tanto para leitura quanto escrita) — controle de acesso real é 100% o auth guard do portal, não o banco.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[selectionScreen - competencia e empresa] --> B{Ja existe rh_saves para essa empresa e competencia?}
+    B -- Sim --> C[Modal de retomada - lista versoes salvas por data_atualizacao]
+    B -- Nao --> D[mainScreen em branco - 1 aba por empregado]
+    C -- Escolhe uma --> D
+    D --> E[Grade de horarios por empregado - entrada1 saida1 entrada2 saida2 opcional 3o turno]
+    E --> F[Processar e Salvar Folha]
+    F --> G[Modal de assinatura - nome ou email do responsavel]
+    G --> H[calcularFolha por empregado]
+    H --> I[upsert em rh_saves onConflict empresa competencia trabalhador]
+    I --> J[resultsScreen - consolidado e tabelas diarias]
+  </pre>
+  <p>O carregamento inicial (<code>selecionarEmpresa</code> → <code>verificarPreenchimentosAnteriores</code>) busca todos os <code>rh_saves</code> da <code>(empresa, competencia)</code>, agrupa por <code>nome_trabalhador</code> e oferece retomar a versão mais recente de cada um — não há histórico de versões visível na UI além da mais recente por trabalhador (o upsert sobrescreve).</p>
+
+  <h3>Motor de Cálculo (<code>calcularFolha</code>)</h3>
+  <p>Por dia, na ordem: primeiro decide se o dia é "dia de descanso" (feriado global OU marcado manualmente como DSR); depois calcula minutos trabalhados a partir dos pares entrada/saída (1º, 2º e opcionalmente 3º turno); depois aplica as regras abaixo.</p>
+  <div class="manual-formula">se atestado medico integral: dia zerado (nao conta trabalhado nem faltante)
+se atestado_comparecimento OU liberacao_meio_expediente: isenta metade da jornada
+  (faltante so se trabalhado < jornada/2)
+senao se minutos trabalhados > 0:
+  se dia de descanso (feriado ou DSR manual): 100% de tudo vira hora extra 100%
+  senao se trabalhado > jornada efetiva do dia:
+    excedente = trabalhado - jornada
+    se regra "100% a partir da 3a hora" ativa:
+      ate 120min = extra 50%, acima disso = extra 100%
+    senao: tudo excedente = extra 50%
+  senao se trabalhado < jornada: falta parcial (faltante = jornada - trabalhado)
+senao (sem horario no dia, nao e descanso):
+  flag manual do dia decide: folga | falta | compensacao (faltante = jornada inteira) | sem-registro
+
+Compensacao de faltante (apos calcular todos os dias do mes):
+  faltante total abate primeiro de Extra 50% acumulado, depois de Extra 100%
+  o que sobrar de faltante e "Horas Devidas" (nao compensadas no mes)</div>
+  <p>Adicional noturno: minutos trabalhados dentro da janela noturna são convertidos pela fórmula da "hora noturna reduzida" (<code>minutosNoturnos / 0.875</code>), e o total de minutos trabalhados do dia soma essa conversão em vez dos minutos reais — ou seja, a "hora ficta" noturna já entra no total de horas trabalhadas exibido e usado no restante do cálculo (jornada, extras, faltante).</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><code>usuario_id</code> gravado em <code>rh_saves</code> é sempre o UUID fixo <code>00000000-0000-0000-0000-000000000000</code> — nunca o usuário autenticado de fato. A auditoria de "quem alterou" depende inteiramente do campo de texto livre digitado no modal de assinatura (<code>responsavel_alteracao</code>/<code>nome_usuario</code>), sem vínculo com <code>auth.users</code>.</li>
+    <li>O grid de preenchimento aceita importação de Excel (<code>importarExcel</code>) no mesmo formato do "Baixar Modelo Excel" — usado tanto na tela normal quanto no fluxo de lote por grupo (ver seção Grupos de Empresas).</li>
+    <li>Flag "Terceiro Turno" (empresa com Entrada 3/Saída 3) é persistida em <code>localStorage</code> (<code>rh_terceiro_turno</code>), não no banco — é uma preferência do navegador, não da empresa; ao trocar de máquina o usuário precisa reativar manualmente.</li>
+    <li><code>calcularFolha</code> é a única função de cálculo de horas de toda a ferramenta — os módulos puros (<code>escala-calculo.js</code>, <code>folha-ponto-calculo.js</code>) resolvem outro problema (dias trabalho/folga da escala), não duplicam essa lógica de horas.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="configuracoes-empresa">
+  <h2>Configurações por Empresa (Rubricas TXT, Jornadas Extras, Valores VT/VA, Feriados)</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_config_rubricas_txt</code></td><td>Ver seção anterior. <code>salvarConfigRubricas()</code> grava numa única chamada <code>upsert</code> tanto os 8 eventos fixos de rubrica (Horas Normais, HE 50%, HE 100%, Noturno, Atraso, Falta, Desconto VT, Desconto VA) quanto ~13 outras configurações da empresa que nada têm a ver com rubrica: jornada diária/sexta/sábado, "sábado sempre extra", observações internas, regra de HE 100% opcional, terceiro turno, exclusão de feriados em Benefícios, período de apuração customizado (Frequência e Benefícios, cada um com seu próprio par de flags) e PDF individual por empregado.</td></tr>
+      <tr><td><code>rh_jornadas</code></td><td>Jornadas extras nomeadas por empresa (além da "Jornada Padrão" que vive em <code>rh_config_rubricas_txt</code>). Empregado sem <code>jornada_id</code> associado usa a Jornada Padrão.</td></tr>
+      <tr><td><code>rh_valores_va_vt</code></td><td>Valor diário de VT/VA por empregado, upsert por <code>(codigo_empresa, codigo_empregado)</code>. Editado no modal "Valores VT/VA" da sidebar; consumido por Gerar Benefícios.</td></tr>
+      <tr><td><code>rh_feriados</code></td><td>CRUD simples no modal "Gerenciar Feriados" — lista global, sem filtro por empresa/UF.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><code>rh_config_rubricas_txt</code> é efetivamente uma tabela EAV (entity-attribute-value): a coluna <code>codigo_rubrica</code> guarda tanto código de rubrica real ("000001") quanto booleanos como texto ("0"/"1") quanto números como texto (dia de início de período) quanto texto livre (observações). Não há validação de tipo no banco — cada leitor em <code>script.js</code> faz seu próprio <code>parseInt</code>/comparação com <code>'1'</code>. Adicionar uma configuração nova é só adicionar mais uma linha ao array de <code>evento</code>s em <code>salvarConfigRubricas()</code> e ler o valor onde precisar — não precisa de migração de schema, mas também não há nenhuma garantia de que o <code>evento</code> digitado em um lugar bate com o lido em outro (erro de digitação em uma string vira config silenciosamente ignorada).</li>
+    <li><code>_buscarConfigRubricas(codigoEmpresa)</code> e <code>_buscarCatalogoRubricas(codigoEmpresa)</code> cacheiam em memória (<code>_cacheConfigRubricas</code>, <code>_cacheCatalogoRubricas</code>) pela duração da sessão da aba; <code>salvarConfigRubricas()</code> invalida a entrada da empresa salva (<code>delete _cacheConfigRubricas[codigoEmpresa]</code>) mas outras abas/telas abertas na mesma sessão continuam com o cache antigo até recarregar a página.</li>
+    <li>E-mail do responsável (<code>rh_empresas.email_responsavel</code>) é editado no mesmo modal de Configurações de Rubricas mas gravado numa tabela diferente (<code>rh_empresas</code>, não <code>rh_config_rubricas_txt</code>) — é a mesma coluna usada pelo cadastro em Administração RH.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="exportacao-txt">
+  <h2>Exportação TXT para Lançamento na Folha</h2>
+
+  <h3>Fluxo</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Modal Exportar TXT] --> B[Informa competencia e clica Buscar]
+    B --> C[Lista empresas com rh_saves naquela competencia]
+    C --> D[Marca empresas + Tipo de Processo 11/41/42/51/52/70]
+    D --> E[Pre-visualizar]
+    E --> F[_construirConteudoTXTExportacao monta 1 linha por evento por empregado]
+    F --> G{DSR automatico ativo?}
+    G -- Sim --> H[detecta faltas da semana seg-sab, calcula domingo seguinte, gera linha de rubrica DSR]
+    G -- Nao --> I[usa so as rubricas configuradas em rh_config_rubricas_txt]
+    H --> J[Baixar TXT]
+    I --> J
+  </pre>
+  <p>Cada linha do TXT é montada combinando o código da rubrica (de <code>rh_config_rubricas_txt</code>, evento fixo) com o valor calculado (minutos convertidos conforme <code>tipo_valor</code>: horas HHMM, monetário R$, ou dias) — rubricas com valor zero são omitidas da exportação. O DSR automático detecta a rubrica "DIAS FALTAS DSR" pelo nome no catálogo (<code>rh_rubricas.descricao_rubrica</code>), não por um código fixo configurado.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Existe uma segunda via de exportação em lote, por grupo de empresas (<code>abrirExportacaoTxtGrupo</code>/<code>_abrirExportacaoTxtLote</code>), que reusa o mesmo modal e a mesma <code>_construirConteudoTXTExportacao()</code>, só pré-selecionando as empresas do grupo em vez de exigir busca manual.</li>
+    <li>Configuração de rubricas do modal de exportação (campos <code>expRub*</code>/<code>expTipo*</code>) é salva automaticamente ao digitar, na mesma <code>rh_config_rubricas_txt</code> — não há distinção entre "rubricas do modal de Configurações" e "rubricas do modal de Exportação TXT", são os mesmos 8 eventos fixos editados em dois lugares diferentes da UI.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="grupos-empresas">
+  <h2>Grupos de Empresas e Processamento em Lote</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_grupos_empresas</code></td><td>1 linha por grupo nomeado (<code>nome_grupo</code> único), com <code>observacoes</code> (texto livre longo — "não deixe nenhum detalhe de fora", conforme o placeholder da própria tela) e <code>email_responsavel</code> (adicionado por <code>schema_rh_email_responsavel.sql</code>, não está no <code>CREATE TABLE</code> original).</td></tr>
+      <tr><td><code>rh_grupos_empresas_itens</code></td><td>N:N grupo ↔ <code>codigo_empresa</code>, <code>ON DELETE CASCADE</code> quando o grupo é excluído.</td></tr>
+    </tbody>
+  </table>
+  <p>Grupos são reaproveitados como filtro rápido de seleção de empresas nas 3 telas "Gerar *" e na Exportação TXT (cada uma tem sua própria lista de checkboxes de empresas, e marcar um grupo pré-marca as empresas dele) — não é uma entidade exclusiva do processamento em lote.</p>
+
+  <h3>Fluxo — Processamento em Lote (fila sequencial)</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Processar em Lote - seleciona varios xlsx] --> B[Valida nome do arquivo contra Modelo_FolhaPonto_codigo_MM-AAAA.xlsx]
+    B -- nome invalido ou competencia nao bate ou empresa fora do grupo --> C[Entra em resultadosIniciais como erro, nao processa]
+    B -- valido --> D[_parseExcelParaFolhas por empresa, monta fila _filaLoteGrupo]
+    D --> E[_carregarProximaEmpresaFila - abre a 1a empresa no mainScreen para revisao]
+    E --> F[Usuario confere e ajusta a grade e clica Processar e Salvar Folha]
+    F --> G{Ainda ha empresas na fila?}
+    G -- Sim --> H[Proxima Empresa do Grupo]
+    H --> E
+    G -- Nao --> I[_finalizarFilaLoteGrupo - mostra resumo com status por empresa]
+  </pre>
+  <p>O lote nunca salva direto no banco sem passar pela tela de edição — cada empresa da fila é carregada no <code>mainScreen</code> normal (mesmo fluxo de "Folha de Ponto — Preenchimento") para o usuário revisar antes de confirmar, uma empresa por vez. Não há paralelismo nem salvamento em lote silencioso.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Validação do lote é inteiramente pelo <strong>nome do arquivo</strong> (regex <code>/^Modelo_FolhaPonto_(.+)_(\d{2})-(\d{4})\.xlsx$/i</code>), não pelo conteúdo. Uma tentativa anterior de validar por conteúdo foi revertida propositalmente — mudar esse critério exige pedido explícito (ver memória do projeto).</li>
+    <li>Arquivo duplicado para a mesma empresa dentro do mesmo lote é silenciosamente ignorado (mantém o primeiro), reportado como erro no resumo mas não interrompe o processamento das demais empresas.</li>
+    <li>"Baixar Modelos (.zip)" gera um Excel em branco por empresa do grupo já no formato esperado pelo parser do lote — reduz a chance de nome de arquivo errado, mas não elimina (o usuário pode renomear o arquivo depois de baixar).</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="gerar-escala">
+  <h2>Gerar Escala</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_escala_trabalho</code></td><td>1 linha por empregado (upsert por <code>codigo_empresa, codigo_empregado</code>). <code>tipo_escala</code>: <code>fixa</code> (dias da semana fixos em <code>dias_semana</code>), <code>variavel_datas</code> (trabalha todo dia exceto as datas em <code>datas_folga</code>) ou <code>variavel_padrao</code> (ciclo de blocos trabalho/folga que se repete a partir de <code>padrao_ancora</code>, definido em <code>padrao_blocos</code>). Empregado sem linha assume padrão 5x2 (segunda a sexta trabalho).</td></tr>
+      <tr><td><code>rh_escala_excecoes</code></td><td>Folga pontual por dia, marcada clicando num dia do mini-calendário da tela — não altera a escala configurada, só sobrepõe o resultado do cálculo para aquele dia específico.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo — Prioridade de Classificação do Dia</h3>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> AvaliarDia
+    AvaliarDia --> Ferias: data cai em periodo de rh_ferias_calculadas
+    AvaliarDia --> Excecao: nao esta em ferias E data esta em rh_escala_excecoes
+    AvaliarDia --> Escala: nao esta em ferias nem excecao
+    Ferias --> Folga
+    Excecao --> Folga
+    Escala --> TipoFixa: tipo_escala = fixa
+    Escala --> TipoVariavelDatas: tipo_escala = variavel_datas
+    Escala --> TipoVariavelPadrao: tipo_escala = variavel_padrao
+    Escala --> Padrao5x2: sem linha cadastrada
+    TipoFixa --> Trabalho
+    TipoFixa --> Folga
+    TipoVariavelDatas --> Trabalho
+    TipoVariavelDatas --> Folga
+    TipoVariavelPadrao --> Trabalho
+    TipoVariavelPadrao --> Folga
+    Padrao5x2 --> Trabalho
+    Padrao5x2 --> Folga
+  </pre>
+  <p>A função central é <code>calcularResumoMes</code> (<code>escala-calculo.js</code>), pura e testada em Node — prioridade fixa é férias &gt; exceção &gt; escala (um dia em férias nunca é classificado como "exceção" mesmo que também esteja marcado como tal). O mesmo critério (mesma função) é reusado por Gerar Benefícios e Gerar Folhas de Ponto — não há duplicação da lógica de classificação de dia entre as 3 telas.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Escala é conceito totalmente independente de jornada (<code>rh_jornada_trabalho</code>/<code>rh_jornadas</code>): a escala decide só "trabalha ou folga" nesse dia, nunca horário de entrada/saída.</li>
+    <li>Suporte a "período de apuração customizado" (<code>diaInicio</code>/<code>diaFim</code> fora do mês calendário) é compartilhado por mecânica com Frequência e Benefícios, mas cada um tem sua própria config independente em <code>rh_config_rubricas_txt</code> (<code>periodo_apuracao_*</code> vs. <code>beneficios_periodo_*</code>) — mudar um não afeta o outro.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="gerar-beneficios">
+  <h2>Gerar Benefícios (VT/VA)</h2>
+
+  <h3>Fluxo — Cálculo da Prévia</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Escolhe competencia mais empresas ou grupos] --> B[gerarPreviaBeneficios busca em paralelo empresas empregados valores ferias saves escalas excecoes]
+    B --> C[Para cada empregado ativo, calcularResumoMes com escala ferias e excecoes]
+    C --> D[Dias a Trabalhar = dias tipo trabalho, menos feriados nacionais se empresa configurada para excluir]
+    B --> E[Busca ultimo rh_saves da competencia por empresa e nome]
+    E --> F[Dias a Descontar = conta flags_folga igual a falta ou atestado]
+    D --> G[Dias a Pagar = Dias a Trabalhar menos Dias a Descontar, editavel na tela]
+    F --> G
+    G --> H[VT e VA Mensal = Dias a Pagar vezes valor diario de rh_valores_va_vt]
+    H --> I{Acao}
+    I --> J[Gerar Excel]
+    I --> K[Gerar Recibo PDF por empregado]
+    I --> L[Gerar Lancamentos na Folha - TXT de rubrica VT e VA]
+    I --> M[Enviar por E-mail]
+  </pre>
+  <p>"Dias a Trabalhar" nunca lê <code>rh_saves</code> — vem inteiramente da escala (<code>rh_escala_trabalho</code>/<code>rh_escala_excecoes</code>) e das férias. "Dias a Descontar" faz o caminho inverso: só lê os <code>flags_folga</code> da folha já processada/salva daquela competência (se não houver <code>rh_saves</code> para o empregado, desconto é zero). Os dois números nunca são recalculados a partir da mesma fonte — um erro de escala não aparece em "Dias a Descontar" e vice-versa.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Todo o cálculo de dias/valores é feito no cliente a cada geração de prévia — nada do resultado de Benefícios é persistido como tal (só o efeito colateral do botão "Gerar Lançamentos na Folha", que grava rubricas VT/VA no TXT de exportação de folha).</li>
+    <li>Empregados filtrados por <code>situacao != 'Demitido'</code> e <code>tipo_empregado in ('Empregado', 'Estagiário')</code> — hardcoded no filtro, não configurável por empresa.</li>
+    <li>Ajuda de Custo ITC (rubrica 201, hardcoded para a empresa 350 — ITC Brasil) usa uma lógica própria de geração com controle de idempotência via <code>rh_ajuda_custo_lancamentos</code> (1 linha por empresa+competência, impede gerar duas vezes) — regra específica de um cliente embutida no código genérico da tela, não configurável pela UI.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Regra da Ajuda de Custo ITC 350 está hardcoded no código-fonte (empresa e rubrica fixas) em vez de configurável — qualquer mudança de regra ou de empresa exige editar <code>script.js</code>.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="gerar-folhas-ponto">
+  <h2>Gerar Folhas de Ponto (PDF em branco) e Envio por E-mail</h2>
+
+  <h3>Fluxo</h3>
+  <p>Mesma mecânica de seleção de competência/grupos/empresas das outras 3 telas "Gerar *". Para cada empregado, gera uma página de folha em branco pronta para assinatura: usa <code>calcularResumoMes</code> (escala) para decidir dias de trabalho/folga/férias, e <code>montarLinhasFolhaPonto</code> (<code>folha-ponto-calculo.js</code>) para combinar isso com <code>rh_jornada_trabalho</code> (horário por dia da semana) e montar o texto do "Horário Previsto" de cada linha. Dias de folga aparecem sombreados; dias de férias já vêm marcados como "FÉRIAS" na própria folha impressa.</p>
+
+  <h3>Envio por E-mail (compartilhado com Gerar Benefícios)</h3>
+  <p><code>_abrirModalEnvioEmail()</code> é uma função genérica parametrizada por tipo de documento, usada tanto por Benefícios quanto por Folha de Ponto. A resolução de destinatário (<code>_resolverDestinatariosEnvio</code>, em <code>envio-email-frequencia.js</code>) prioriza o e-mail do <strong>grupo</strong> sobre o e-mail individual da empresa quando a empresa pertence a um grupo marcado no seletor da tela — múltiplas empresas de um mesmo grupo têm os PDFs agrupados num único e-mail para o(s) endereço(s) do grupo.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Geração de PDF é sempre client-side (jsPDF), incluindo para envio por e-mail — o PDF é montado no navegador, convertido para base64 (<code>_blobParaBase64</code>) e só então enviado a uma Edge Function/serviço de e-mail (fora do escopo deste arquivo).</li>
+    <li>Config <code>pdf_individual_por_empregado</code> (em <code>rh_config_rubricas_txt</code>) decide se cada empregado vira um PDF separado ou se todos os empregados da empresa saem no mesmo arquivo.</li>
+  </ul>
+</section>

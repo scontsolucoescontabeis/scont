@@ -1,0 +1,218 @@
+<p class="manual-intro">O Gerador de Modelos vive em <code>Projeto Gerador Modelos/</code>: um único par <code>index.html</code> (~600 linhas, todas as telas como <code>&lt;section&gt;</code> alternadas por <code>showSection()</code>) + <code>app.js</code> (~2150 linhas, sem módulos/IIFE — tudo em escopo global). HTML + JS puro, sem framework/bundler, cliente Supabase próprio (<code>supabase-config.js</code> + <code>portal-auth-guard.js</code> compartilhados do portal). Bibliotecas via CDN: <code>xlsx.js</code> 0.18.5 (leitura/escrita de planilhas), <code>html2canvas</code> 1.4.1 e <code>jspdf</code> 2.5.1 — as duas últimas carregadas no <code>index.html</code> mas <strong>não usadas em nenhum ponto do <code>app.js</code></strong> (confirmado por grep; nenhuma chamada a <code>html2canvas(</code> ou <code>new jsPDF(</code> no arquivo). A exportação "PDF" de verdade é feita abrindo uma janela nova com <code>window.open</code> e disparando <code>window.print()</code> — o usuário salva como PDF pela própria caixa de impressão do navegador. O módulo gira em torno de um "wizard" de 7 passos possíveis cuja sequência real é recalculada dinamicamente a partir das <em>fontes de dados</em> marcadas no modelo (ou na união dos modelos de um Evento).</p>
+
+<section class="manual-item" id="modelos">
+  <h2>Modelos</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>index.html</code> — seção <code>#modelos</code> (grid de cards) + modal de edição (<code>#modal-modelo</code>) com editor rich-text via <code>contenteditable</code> (sem biblioteca de editor — barra de formatação própria usando <code>document.execCommand</code>) e alternância "Ver HTML" (<code>toggleModoHtml()</code>) para editar o <code>template</code> como texto puro.</li>
+    <li><code>app.js</code> — CRUD em <code>carregarModelos()</code>/<code>renderModelos()</code>/<code>salvarModelo()</code>/<code>deletarModelo()</code>; painel de variáveis em <code>renderVarsPanel()</code>/<code>insertVar()</code>; catálogo de variáveis disponíveis por fonte é a constante <code>VARS_DEF</code> (objeto estático no topo do arquivo, ~200 linhas — <code>empresas</code>/<code>empregados</code>/<code>socios</code>/<code>rubricas</code>/<code>excel</code>/<code>sistema</code>, cada uma com <code>prefix</code> e lista <code>[campo, label]</code>).</li>
+    <li>Upload de planilha extra dentro do modal do modelo usa as mesmas funções de parsing Excel do wizard (<code>handleExcelUpload</code>/<code>_normalizeExcelData</code>), mas grava o resultado no <code>template</code>/estado do modelo, não no <code>wizardRegistros</code>.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Colunas-chave</th><th>Observações</th></tr></thead>
+    <tbody>
+      <tr><td><code>gm_modelos</code></td><td><code>id</code>, <code>nome</code>, <code>descricao</code>, <code>tipo</code> (CHECK <code>por_registro</code>/<code>consolidado</code>), <code>template</code> (HTML com <code>{{variavel}}</code>), <code>cabecalho_padrao</code> (CHECK <code>completo</code>/<code>neutro</code>/<code>nenhum</code>), <code>fontes</code> (TEXT[], subconjunto de <code>empresas</code>/<code>empregados</code>/<code>socios</code>/<code>rubricas</code>/<code>excel</code>), <code>criado_por</code></td><td>RLS: SELECT aberto a qualquer autenticado; INSERT/UPDATE/DELETE restritos a <code>is_admin()</code> OU <code>auth.uid() = criado_por</code>.</td></tr>
+    </tbody>
+  </table>
+  <p>Fontes externas lidas (não pertencem ao Gerador de Modelos): <code>rh_empresas</code>, <code>rh_empregados</code>, <code>rh_socios</code>, <code>rh_rubricas</code> — todas do módulo RH, consultadas direto por <code>codigo_empresa</code>, sem tabela de junção própria.</p>
+
+  <h3>Fluxo Principal</h3>
+  <p><code>substituirVars(template, varMap, highlight)</code> faz a interpolação com <code>template.replace(/\{\{([^}]+)\}\}/g, ...)</code>. Prefixo <code>extenso:</code> antes da chave (ex.: <code>{{extenso:empregado.salario}}</code>) desvia para <code>valorPorExtenso()</code> em vez do valor bruto — é essa a implementação por trás do botão "ext" ao lado dos campos numéricos no painel de variáveis (o botão só insere o texto <code>{{extenso:...}}</code>, não existe estado de "modo extenso" separado). Quando <code>highlight=true</code> (usado só na pré-visualização), uma variável sem valor no <code>varMap</code> é envolvida em <code>&lt;span class="var-missing"&gt;</code> em vez de sumir; na exportação real (<code>highlight=false</code>) uma variável sem valor mantém o texto literal <code>{{...}}</code> no documento final.</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Usuario marca fontes de dados] --> B[VARS_DEF libera grupos de variaveis no painel]
+    B --> C[Clique na variavel chama insertVar]
+    C --> D[Insere texto na posicao do cursor do contenteditable]
+    D --> E{Campo numerico}
+    E -- sim, botao ext --> F[Insere prefixo extenso antes do campo]
+    E -- nao --> G[Insere campo puro]
+    F --> H[salvarModelo grava template em gm_modelos]
+    G --> H
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>Tipo "Consolidado" não é por empregado</strong>: apesar do rótulo na UI ("um documento por empresa, reunindo todos os registros"), o código de <code>construirRegistros()</code> (linha ~1288) gera exatamente <strong>um registro por empresa selecionada</strong> (<code>wizardEmpresasSelecionadas.map(...)</code>), independente de quantos empregados/sócios/rubricas existam — cada registro usa <code>.find()</code> (primeiro match) sobre os empregados/sócios/rubricas daquela empresa, não uma lista. Ou seja: "Consolidado" != "todos os empregados em um único doc"; é "1 doc por empresa, com dados de 1 registro representativo de cada fonte marcada". Isso é adequado para documentos que falam da empresa como entidade (ex.: um termo de responsabilidade da própria empresa), mas <strong>não serve</strong> para gerar, por exemplo, uma lista consolidada de todos os empregados em uma única tabela — não há suporte a isso no gerador hoje.</li>
+    <li>O editor de texto é <code>contenteditable</code> com <code>document.execCommand</code> (API deprecada, mas ainda funcional em todos os browsers evergreen) — não há sanitização de HTML na gravação do <code>template</code>; o que está no DOM do editor vai direto para a coluna, incluindo qualquer HTML colado pelo usuário.</li>
+    <li>Variáveis de planilha (<code>{{excel.*}}</code>) não têm uma lista fixa em <code>VARS_DEF.excel.campos</code> — esse array é preenchido em runtime a partir dos cabeçalhos da última planilha carregada (seja no modal do modelo, seja no wizard), então o painel de variáveis muda de conteúdo dependendo do que foi carregado por último na sessão.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="eventos">
+  <h2>Eventos</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>index.html</code> — seção <code>#eventos</code> + modal (<code>#modal-evento</code>) com duas listas lado a lado (modelos disponíveis / modelos do evento) e reordenação por botões ↑/↓ (sem drag-and-drop).</li>
+    <li><code>app.js</code> — CRUD em <code>carregarEventos()</code>/<code>renderEventos()</code>/<code>salvarEvento()</code>/<code>deletarEvento()</code>; seleção/ordem no modal em <code>eventoModalSelecao</code> (array de ids, a posição no array É a ordem) via <code>adicionarModeloEvento()</code>/<code>removerModeloEvento()</code>/<code>moverModeloEvento()</code>.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Colunas-chave</th><th>Observações</th></tr></thead>
+    <tbody>
+      <tr><td><code>gm_eventos</code></td><td><code>id</code>, <code>nome</code>, <code>descricao</code>, <code>criado_por</code></td><td>RLS igual a <code>gm_modelos</code> (SELECT aberto, escrita restrita a admin/criador).</td></tr>
+      <tr><td><code>gm_eventos_modelos</code></td><td><code>evento_id</code> FK, <code>modelo_id</code> FK, <code>ordem</code> INT, UNIQUE <code>(evento_id, modelo_id)</code></td><td>Só referencia — não duplica o <code>template</code> do modelo. RLS <code>FOR ALL ... USING (true)</code> (mais aberta que a das duas tabelas pai).</td></tr>
+      <tr><td><code>gm_geracoes.evento_id</code></td><td>FK nullable para <code>gm_eventos</code></td><td>Adicionada depois de <code>gm_geracoes</code> já existir (ver <code>schema-gerador-modelos-eventos.sql</code>); permite filtrar histórico por evento sem alterar a granularidade de linha (ver Dashboard/Histórico).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p><code>carregarEventos()</code> busca <code>gm_eventos</code> e <code>gm_eventos_modelos.select('evento_id, ordem, gm_modelos(*)')</code> em paralelo via <code>Promise.all</code> — deliberadamente não depende do array global <code>modelos</code> (carregado por <code>carregarModelos()</code> ao mesmo tempo, sem ordem garantida entre as duas Promises na inicialização da página), montando <code>modelosOrdenados</code> a partir do próprio <code>gm_modelos(*)</code> embutido na consulta.</p>
+  <p><code>usarEvento(id)</code> → <code>_iniciarWizardComEvento(evento)</code> trata o evento como um "modelo sintético": monta um objeto <code>wizardModeloSelecionado</code> fake com <code>tipo: 'por_registro'</code> fixo e <code>fontes</code> = união das fontes de todos os modelos do evento, mais <code>'empregados'</code> forçado incondicionalmente (comentário no código: "eventos sempre geram por empregado"). O <code>template</code> desse objeto sintético é só a concatenação bruta dos templates dos modelos (usada apenas para <code>calcularSequencia()</code> detectar uso de <code>{{excel.*}}</code> — nunca é renderizado como texto final).</p>
+  <pre class="mermaid">
+flowchart TD
+    A[usarEvento id] --> B[_iniciarWizardComEvento]
+    B --> C[Uniao das fontes de todos os modelos do evento + empregados forcado]
+    C --> D[Monta modelo sintetico tipo por_registro]
+    D --> E[calcularSequencia usando o sintetico]
+    E --> F[Wizard segue fluxo normal de Empresas/Empregados/Socios/Rubricas/Planilha]
+    F --> G[renderPreview e exportarPDF iteram evento.modelosOrdenados]
+    G --> H[Um cabecalho + quebra de pagina por modelo, por registro]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Como o modelo sintético força <code>tipo: 'por_registro'</code>, um Evento sempre gera <strong>um conjunto de documentos por empregado selecionado</strong> — mesmo que todos os modelos que o compõem sejam individualmente do tipo <code>consolidado</code>. O campo <code>tipo</code> de cada modelo individual só é relevante quando ele é gerado avulso (fora de um evento); dentro de um evento, é ignorado.</li>
+    <li>Excluir um evento (<code>ON DELETE CASCADE</code> em <code>gm_eventos_modelos</code>) não afeta <code>gm_modelos</code> — os modelos continuam existindo e utilizáveis avulsos.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="gerar">
+  <h2>Gerar / Wizard</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>index.html</code> — seção <code>#gerar</code>: barra de passos (<code>#wizard-steps-bar</code>) + um <code>&lt;div class="wizard-panel"&gt;</code> por painel possível (<code>WIZARD_PANELS_ORDER</code>), todos no DOM o tempo todo, alternados por classe <code>.active</code> em <code>mostrarPainel()</code> — não é renderização condicional real, é show/hide via CSS.</li>
+    <li><code>app.js</code> — núcleo do wizard: estado em variáveis globais soltas (<code>wizardStep</code>, <code>wizardModeloSelecionado</code>, <code>wizardEmpresasSelecionadas</code>, <code>wizardRegistros</code>, <code>wizardEventoAtivo</code> etc., ~15 variáveis no topo do arquivo) — não há um objeto de estado único nem um reducer, cada função lê/escreve as globais diretamente.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Este painel não persiste dado próprio durante a navegação — só lê <code>gm_modelos</code>/<code>gm_eventos</code> e as tabelas RH (<code>rh_empresas</code>, <code>rh_empregados</code>, <code>rh_socios</code>, <code>rh_rubricas</code>). A única escrita fora do fechamento da geração é a logo da empresa (ver abaixo). Ao concluir (Exportar), grava em <code>gm_geracoes</code> — ver seção Dashboard/Histórico.</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela/Coluna</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_empresas.logo_base64</code></td><td>TEXT nullable, adicionada por <code>schema-gerador-modelos-logo-empresa.sql</code>. Guarda a logo como data URI (<code>data:image/png;base64,...</code>) direto na linha da empresa — sem bucket de Storage. Compartilhada com outros módulos que leem <code>rh_empresas</code> (coluna puramente aditiva).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal — Sequência dinâmica do wizard</h3>
+  <p><code>calcularSequencia()</code> (linha ~808) é a função central: recebe <code>wizardModeloSelecionado.fontes</code> e <code>.template</code> e devolve o array de passos ativos, a partir da ordem fixa <code>WIZARD_PANELS_ORDER = ['modelo','empresas','empregados','socios','rubricas','planilha','exportar']</code>.</p>
+  <ul>
+    <li><code>usaExcel</code> = fonte <code>excel</code> marcada <strong>OU</strong> o texto do <code>template</code> contém a substring <code>{{excel.</code> — ou seja, um modelo pode acabar exigindo o passo Planilha mesmo sem a fonte marcada explicitamente, só por ter uma variável <code>{{excel.x}}</code> colada no texto.</li>
+    <li><code>temFonteDB</code> = alguma fonte entre <code>empresas</code>/<code>empregados</code>/<code>socios</code>/<code>rubricas</code> está marcada.</li>
+    <li><code>soExcel</code> = <code>usaExcel &amp;&amp; !temFonteDB</code> → modo "Excel puro": pula Empresas/Empregados/Sócios/Rubricas inteiramente.</li>
+    <li>Passo <code>empresas</code> é sempre o segundo passo quando não é modo Excel puro (não depende de a fonte <code>empresas</code> estar marcada — está implícito, porque toda geração parte de uma empresa).</li>
+  </ul>
+  <pre class="mermaid">
+flowchart TD
+    A[calcularSequencia] --> B{fontes inclui excel OU template contem chave excel.}
+    B -- nao --> C[usaExcel = false]
+    B -- sim --> D[usaExcel = true]
+    C --> E{alguma fonte DB marcada}
+    D --> E
+    E -- nao E usaExcel=true --> F[soExcel = true, modo Excel puro]
+    E -- sim --> G[soExcel = false]
+    F --> H[sequencia = modelo, planilha, exportar]
+    G --> I[sequencia = modelo, empresas]
+    I --> J{fontes inclui empregados}
+    J -- sim --> K[push empregados]
+    J -- nao --> L[skip]
+    K --> M{fontes inclui socios}
+    L --> M
+    M -- sim --> N[push socios]
+    M -- nao --> O[skip]
+    N --> P{fontes inclui rubricas}
+    O --> P
+    P -- sim --> Q[push rubricas]
+    P -- nao --> R[skip]
+    Q --> S{usaExcel}
+    R --> S
+    S -- sim --> T[push planilha]
+    S -- nao --> U[skip]
+    T --> V[push exportar]
+    U --> V
+    H --> W[sequencia final]
+    V --> W
+  </pre>
+  <p><code>wizardAvançar()</code> reexecuta validações por painel corrente antes de avançar (ex.: exige ao menos 1 empresa marcada antes de liberar o passo seguinte) e, ao chegar em <code>empresas</code>, dispara <code>carregarDadosDasEmpresas()</code> (busca paralela de <code>rh_empregados</code>/<code>rh_socios</code>/<code>rh_rubricas</code> filtrados pelas empresas escolhidas, com todos os registros pré-selecionados por padrão). Ao chegar em <code>exportar</code>, chama <code>construirRegistros()</code> — se o wizard estiver em modo Excel puro e nenhuma coluna de empresa tiver sido detectada/escolhida, intercepta o avanço com <code>abrirModalNomeEmpresaExcel()</code> antes de montar os registros.</p>
+
+  <h3>Fluxo Principal — Construção dos registros (<code>construirRegistros</code>)</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[construirRegistros] --> B{soExcel}
+    B -- sim --> C[1 registro por linha da planilha, colunas viram excel.coluna]
+    B -- nao --> D{modelo.tipo}
+    D -- por_registro --> E{fonte empregados marcada E ha empregados selecionados}
+    E -- sim --> F[1 registro por empregado selecionado]
+    E -- nao --> G[1 registro por empresa selecionada]
+    D -- consolidado --> H[1 registro por empresa selecionada, sempre]
+    F --> I[buildVarMap cruza empresa/empregado/socio/rubrica/linha excel por indice]
+    G --> I
+    H --> I
+    C --> J[wizardRegistros pronto]
+    I --> J
+  </pre>
+  <p>O cruzamento empresa↔empregado usa <code>codigo_empresa</code> normalizado com <code>.trim()</code> dos dois lados antes de comparar (protege contra espaço acidental num dos dois cadastros); quando não encontra a empresa, loga <code>console.warn</code> e segue com objeto vazio <code>{}</code> em vez de lançar erro — o documento sai com os campos <code>{{empresa.*}}</code> em branco, silenciosamente, sem alertar o usuário na UI.</p>
+
+  <h3>Fluxo Principal — Exportação PDF (impressão do navegador)</h3>
+  <p><code>exportarPDF()</code> agrupa <code>wizardRegistros</code> por empresa (<code>_agruparRegistrosPorEmpresa</code>, chave <code>empresa.codigo_empresa</code> com fallback pro nome) e, para cada grupo, monta o HTML das páginas (<code>_montarPaginasPDF</code>) e chama <code>_abrirJanelaImpressao()</code> — que faz <code>window.open('', '_blank')</code>, escreve o HTML completo via <code>document.write</code> e agenda <code>window.print()</code> num <code>setTimeout</code> escalonado (300ms + 700ms por grupo adicional, para não empilhar vários diálogos de impressão simultâneos quando há N empresas). <strong>Não há geração real de arquivo PDF no cliente</strong> — o "Salvar PDF" citado na UI depende inteiramente de o usuário escolher "Salvar como PDF" na caixa de impressão do navegador; se o navegador bloquear o pop-up (comum quando há múltiplas empresas abrindo várias janelas de uma vez), o código detecta (<code>window.open</code> retorna <code>null</code>) e avisa via toast, mas não tem fallback automático.</p>
+  <p>As duas bibliotecas de geração de PDF client-side (<code>jsPDF</code>, <code>html2canvas</code>) carregadas no <code>index.html</code> não são referenciadas em nenhuma função do <code>app.js</code> — parecem ter sido incluídas para uma abordagem alternativa (renderizar como imagem/canvas e gerar PDF binário de verdade) que nunca chegou a ser implementada, ou foi removida sem tirar o <code>&lt;script&gt;</code>. Ao dar manutenção nessa área, não assumir que essas libs fazem algo — confirmar com grep antes de mexer.</p>
+
+  <h3>Fluxo Principal — Exportação Excel</h3>
+  <p><code>exportarExcel()</code> usa <code>XLSX.utils.json_to_sheet</code> sobre os próprios <code>wizardRegistros</code> (todas as chaves do <code>varMap</code> como colunas) mais uma coluna adicional <code>documento_gerado</code> = <code>substituirVars(modelo.template, varMap, false)</code> — o HTML renderizado do documento inteiro, cru, dentro da célula. Diferente do PDF, não há separação por empresa: todos os registros saem juntos numa única planilha/aba (nome da aba truncado em 31 caracteres, limite do formato XLSX).</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Cabeçalho dos documentos (<code>_gerarCabecalhoModelo</code>) é gerado dinamicamente em runtime a partir de <code>wizardCabecalho</code> (completo/neutro/nenhum) + logo resolvida por <code>_logoEmpresaDe(varMap)</code> — não fica embutido no <code>template</code> do modelo (decisão histórica: os 9 modelos de Admissão tinham cabeçalho estático embutido até <code>schema-gerador-modelos-remove-header-embutido.sql</code>, migrado justamente para poder variar por empresa/registro e respeitar a escolha do wizard).</li>
+    <li><code>_logoEmpresaDe()</code> resolve a logo por <code>codigo_empresa</code> quando disponível, com fallback por <code>nome_empresa</code> — necessário porque no modo Excel puro o registro pode não ter <code>empresa.codigo_empresa</code> (só o nome, se a coluna foi detectada).</li>
+    <li>"Ajustar para caber em 1 página" (<code>wizardCaberUmaPagina</code>) não corta conteúdo: mede <code>scrollHeight</code> de cada <code>.pdf-fit-inner</code> contra a altura útil de uma A4 (273mm em px) dentro da própria janela de impressão (script injetado via <code>document.write</code>) e aplica <code>transform: scale()</code> só quando estoura — nunca amplia quem já cabe.</li>
+    <li>Descartar um registro na pré-visualização (<code>descartarRegistroPreview</code>) faz <code>wizardRegistros.splice()</code> direto — é destrutivo dentro da sessão do wizard; navegar de volta para um passo anterior e avançar de novo reconstrói <code>wizardRegistros</code> do zero via <code>construirRegistros()</code>, perdendo o descarte.</li>
+    <li>No modo Excel puro, a detecção de coluna de empresa (<code>_detectarColunaEmpresa</code>) casa por nome de cabeçalho normalizado contra uma lista fixa de candidatos ("empresa", "cliente", "razão social", "nome fantasia" etc.) — é heurística de nome de coluna, não inspeciona o conteúdo das células.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="dashboard-historico">
+  <h2>Dashboard e Histórico</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>index.html</code> — seção <code>#dashboard</code> (cards de estatística + duas listas "top 5") e seção <code>#historico</code> (tabela das últimas 100 gerações).</li>
+    <li><code>app.js</code> — <code>carregarDashboard()</code> e <code>carregarHistorico()</code>, ambas fazem leitura direta de <code>gm_geracoes</code> sem view/RPC intermediária.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Colunas-chave</th><th>Observações</th></tr></thead>
+    <tbody>
+      <tr><td><code>gm_geracoes</code></td><td><code>id</code>, <code>modelo_id</code> FK (<code>ON DELETE CASCADE</code>), <code>modelo_nome</code> (snapshot de texto — sobrevive à exclusão do modelo), <code>empresas_ids</code> (TEXT[] de <code>codigo_empresa</code>), <code>total_registros</code>, <code>cabecalho_usado</code>, <code>criado_por</code>, <code>evento_id</code> FK nullable</td><td>RLS <code>FOR ALL ... USING (true)</code> para autenticado — sem restrição por criador (diferente de <code>gm_modelos</code>/<code>gm_eventos</code>). Só metadados: não guarda o PDF/Excel gerado, nem o HTML final dos documentos.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p><code>registrarGeracao()</code> é chamada ao final tanto de <code>exportarPDF()</code> quanto de <code>exportarExcel()</code> — mesma função para os dois caminhos de exportação, sem coluna que diferencie "gerado como PDF" de "gerado como Excel" no histórico. Quando <code>wizardEventoAtivo</code> está setado, insere <strong>uma linha por modelo do evento</strong> (<code>evento.modelosOrdenados.map(...)</code>, todas com o mesmo <code>total_registros</code>/<code>empresas_ids</code>/<code>evento_id</code>) em vez de uma linha única para o evento — permite contar individualmente quantos de cada documento foram emitidos, ao custo de <code>total_registros</code> ficar “duplicado” N vezes por geração de evento com N modelos (soma agregada no Dashboard super-contaria registros se alguém decidisse somar por evento sem agrupar).</p>
+  <pre class="mermaid">
+flowchart TD
+    A[exportarPDF ou exportarExcel concluido] --> B[registrarGeracao]
+    B --> C{wizardEventoAtivo setado}
+    C -- sim --> D[1 insert em gm_geracoes por modelo do evento, mesmo evento_id]
+    C -- nao --> E[1 insert em gm_geracoes para o modelo unico]
+    D --> F[Historico/Dashboard leem gm_geracoes direto]
+    E --> F
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>"Gerações hoje" no Dashboard é calculado no cliente comparando <code>new Date(g.created_at).toDateString()</code> com <code>new Date().toDateString()</code> — usa o fuso horário do navegador de quem está olhando o dashboard, não um fuso fixo do servidor.</li>
+    <li>Sem paginação real no Histórico — a consulta já limita a leitura, mas não há botão "carregar mais"; qualquer geração além do corte simplesmente não aparece na tela.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Sem diferenciação de canal de exportação (PDF vs. Excel) no histórico — se for necessário no futuro, precisa de coluna nova em <code>gm_geracoes</code> e ajuste nos dois pontos de chamada de <code>registrarGeracao()</code>.</li>
+    <li><code>jsPDF</code>/<code>html2canvas</code> carregados sem uso: ou remover os <code>&lt;script&gt;</code> do <code>index.html</code> (peso morto no carregamento da página), ou decidir formalmente adotá-los para gerar PDF de verdade em vez de depender da caixa de impressão do navegador.</li>
+  </ul>
+</section>

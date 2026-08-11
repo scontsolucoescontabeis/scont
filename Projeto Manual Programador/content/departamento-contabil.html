@@ -1,0 +1,176 @@
+<p class="manual-intro">A Central do Departamento Contábil vive em <code>Projeto Onboarding Contabil/</code> (nome de pasta histórico — a ferramenta cresceu de um único onboarding de clientes novos para 4 sub-áreas). Stack: HTML + JS puro (sem framework/bundler), um módulo IIFE por tela, cliente Supabase próprio por arquivo (<code>supabase.createClient(SUPABASE_URL, SUPABASE_KEY)</code>), autenticação via <code>portal-auth-guard.js</code> compartilhado do portal. Sem build step — os arquivos são servidos como estão. PDFs usam jsPDF 2.5.1 + AutoTable 3.8.2 via CDN (cdnjs), mesma versão em todas as ferramentas do portal que geram PDF. As 4 sub-áreas (Onboarding, Mapeamento Estratégico, Diário Contábil, Configurações) são uma única linha em <code>ferramentas</code> (<code>url_base = ./Projeto Onboarding Contabil/index.html</code>) — o controle de quem edita o quê é 100% client-side, não RLS por linha (exceção: bancos/contato, ver abaixo).</p>
+
+<section class="manual-item" id="visao-geral-escopo">
+  <h2>Visão Geral e Escopo Compartilhado</h2>
+
+  <h3>Arquivos por sub-área</h3>
+  <ul>
+    <li><code>index.html</code> — hub: 4 cards (Onboarding, Mapeamento Estratégico, Diário Contábil, Configurações), sem lógica própria além do auth guard e do filtro "Configurações some pra Prestador de Serviço".</li>
+    <li><code>onboarding.html</code> + <code>onboarding.js</code> — levantamento de documentos de empresas ingressantes.</li>
+    <li><code>mapeamento.html</code> + <code>mapeamento.js</code> — perfil operacional/fiscal por empresa.</li>
+    <li><code>diario.html</code> + <code>diario.js</code> (arquivo central, ~1400 linhas) + <code>diario-relatorios.js</code> + <code>diario-validacoes.js</code> + <code>diario-historico.js</code> + <code>contabil-diario-util.js</code> (funções puras testadas, ex.: <code>calcularTemposFechamento</code>).</li>
+    <li><code>configuracoes.html</code> + <code>configuracoes.js</code> — empresas com contábil, responsáveis, alertas por e-mail.</li>
+    <li><code>migrar-diario-excel.html</code> + <code>.js</code> — importador único (já executado) do Excel legado de lançamentos.</li>
+    <li><code>test-contabil-diario-util.js</code> / <code>test-mapeamento-nivel-atencao.js</code> — únicos testes automatizados do módulo (Node puro, sem framework — rodar com <code>node test-*.js</code>).</li>
+  </ul>
+
+  <h3>Escopo de acesso (client-side, não RLS)</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Papel</th><th>Como é identificado</th><th>O que muda</th></tr></thead>
+    <tbody>
+      <tr><td>Admin</td><td><code>auth.isAdmin</code> (portal-auth-guard)</td><td>Vê e edita tudo, em todas as empresas.</td></tr>
+      <tr><td>Equipe SCONT</td><td><code>auth.userData.empresa</code> (case-insensitive) igual a "scont soluções contábeis"</td><td>Mesmos poderes de edição do admin dentro do módulo (não é <code>is_admin()</code> do banco).</td></tr>
+      <tr><td>Prestador de Serviço</td><td><code>auth.userData.empresa</code> igual a "prestador de serviço"</td><td>Só lê; só vê empresas onde está em <code>contabil_empresas_responsaveis</code>; tela Configurações some do hub.</td></tr>
+    </tbody>
+  </table>
+  <p>Cada arquivo recalcula esse escopo na própria <code>_resolverEscopoUsuario()</code> — não existe um módulo de auth compartilhado entre as 4 sub-áreas além do <code>portal-auth-guard.js</code> genérico do portal. Ao adicionar uma tela nova, replicar essa função, não assumir que o escopo "vem de algum lugar global".</p>
+
+  <h3>Divida técnica transversal</h3>
+  <ul>
+    <li>Gating de edição é só client-side na maior parte do módulo — um usuário técnico com a anon key consegue escrever direto via API em quase todas as tabelas <code>contabil_*</code> (RLS = <code>TO authenticated USING (true)</code>). As únicas exceções com RLS real são <code>contabil_mapeamento_bancos</code> e <code>contabil_mapeamento_contatos</code> (ver seção Mapeamento Estratégico).</li>
+    <li>Nenhuma das 4 sub-áreas usa um framework de componentes — toda tela é <code>innerHTML</code> de template string + <code>querySelectorAll</code> pra religar listeners a cada re-render. Funciona, mas qualquer refatoração pra um framework precisaria reescrever o módulo inteiro, não incrementalmente.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="onboarding-tecnico">
+  <h2>Onboarding</h2>
+
+  <h3>Modelo de dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>contabil_onboardings</code></td><td>1 linha por processo de onboarding (empresa, CNPJ, regime, respostas às perguntas-gatilho em colunas booleanas, status).</td></tr>
+      <tr><td><code>contabil_onboarding_itens</code></td><td>N linhas por onboarding — 1 por item do checklist. Coluna <code>secao</code> (A-G = checklist do cliente; H = validação interna) decide upload (A-G) vs. só status (H). Catálogo fixo de itens vem de <code>window.CONTABIL_CATALOGO</code> (script separado, não uma tabela) e é filtrado pelas respostas das perguntas-gatilho ao gerar o onboarding.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo de geração do checklist</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Novo Onboarding] --> B{Empresa nova?}
+    B -- Sim --> C[Cria linha em rh_empresas]
+    B -- Não --> D[Seleciona empresa existente]
+    C --> E[Responde perguntas-gatilho]
+    D --> E
+    E --> F[Filtra catalogo CONTABIL_CATALOGO pelas respostas]
+    F --> G[Gera linhas em contabil_onboarding_itens]
+    G --> H[Checklist A-G: cliente envia arquivo]
+    G --> I[Secao H: equipe SCONT so muda status]
+    H --> J{status = aprovado ou nao_aplicavel?}
+    I --> J
+    J -- todos sim --> K[Progresso = 100%]
+  </pre>
+
+  <h3>Decisões de design</h3>
+  <ul>
+    <li>Upload vai para o bucket Storage compartilhado <code>documentos</code> (mesmo bucket usado pelo balancete do Diário Contábil), path <code>onboarding-contabil/&lt;codigo_empresa&gt;/&lt;secao&gt;/&lt;item&gt;_&lt;nome_arquivo&gt;</code>. Leitura via <code>createSignedUrl</code> (60s), não URL pública.</li>
+    <li>Progresso é sempre calculado no cliente (<code>progressoDe()</code>), nunca persistido — evita a classe de bug "coluna denormalizada dessincroniza" (ver achado documentado no Manual do Programador de Certificado Digital, mesma categoria de problema já corrigida lá).</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="mapeamento-tecnico">
+  <h2>Mapeamento Estratégico</h2>
+
+  <h3>Modelo de dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel / RLS</th></tr></thead>
+    <tbody>
+      <tr><td><code>contabil_mapeamento</code></td><td>1 linha por empresa (upsert por <code>codigo_empresa</code>). Campos de perfil: periodicidade, regime, situação 2025/2026, financeiro interno/BPO, sistemas/entregáveis (arrays), nível de atenção + <code>nivel_atencao_travado</code>. RLS aberta (authenticated).</td></tr>
+      <tr><td><code>contabil_mapeamento_bancos</code></td><td>N por mapeamento. Guarda login/<strong>senha em texto puro</strong> (decisão deliberada do usuário, sem criptografia). RLS restrita: <code>contabil_pode_ver_bancos()</code> (SECURITY DEFINER) = <code>is_admin()</code> OU e-mail em <code>solicitacoes_acesso</code> com empresa = "scont soluções contábeis".</td></tr>
+      <tr><td><code>contabil_mapeamento_contatos</code></td><td>1:1 com mapeamento (<code>mapeamento_id UNIQUE</code>). Migrado de colunas soltas em <code>contabil_mapeamento</code> pra tabela própria (2026-08-10) especificamente pra poder aplicar RLS igual à de bancos — <code>contabil_pode_ver_contato()</code>, mesma lógica de <code>contabil_pode_ver_bancos()</code> só que função própria (não reaproveitada, por decisão de manter nomes semânticos por tabela).</td></tr>
+      <tr><td><code>contabil_mapeamento_relacionadas</code></td><td>Vínculo N:N simples entre empresas (<code>codigo_empresa</code> ↔ <code>codigo_empresa_relacionada</code>).</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Removida em 2026-08-10:</strong> <code>contabil_mapeamento_pendencias</code> — a tabela continua existindo no banco (dado histórico preservado), mas nenhuma tela lê/escreve mais nela. A coluna "Pendências" do Diário Contábil hoje deriva de <code>contabil_diario_status_mensal</code> (contagem de meses com <code>status='pendencia'</code>), não dessa tabela.</p>
+
+  <h3>Sincronização automática (Configurações → Mapeamento)</h3>
+  <p><code>configuracoes.js</code> sincroniza <code>responsavel_execucao</code> (de <code>contabil_empresas_responsaveis</code>) e <code>regime_tributario</code> (de <code>rh_empresas.regime_enquadramento</code>, normalizado por texto livre) pra <strong>todas</strong> as empresas ativas toda vez que a tela de Configurações carrega — sempre sobrescrevendo, mesmo que alguém tenha editado manualmente esses 2 campos direto no Mapeamento entre uma sincronização e outra.</p>
+
+  <h3>Algoritmo — Sugestão de Nível de Atenção</h3>
+  <p>Função pura em <code>mapeamento-nivel-atencao.js</code> (<code>calcularNivelSugerido</code>, com export duplo <code>window.*</code>/<code>module.exports</code> — por isso dá pra testar com Node puro em <code>test-mapeamento-nivel-atencao.js</code>):</p>
+  <div class="manual-formula">se situacao_2025_status == 'critico' OU situacao_2026_status == 'critico':
+    retorna 'critico'
+
+atraso = mesesEntre(ultimo_mes_fechado, hoje) - tolerancia(periodicidade)
+  tolerancia: mensal=1, trimestral=3, anual=12
+
+se atraso >= 3: 'critico'
+se atraso == 2: 'alto'
+se atraso == 1: 'medio'
+senao: 'baixo'</div>
+  <p>Uma edição manual do nível seta <code>nivel_atencao_travado = true</code>, que desliga o recálculo automático até algum campo-gatilho (<code>situacao_*</code>, <code>ultimo_mes_fechado</code>, <code>periodicidade</code>) ser alterado de novo — não existe UI de "destravar" direto, só editando o banco.</p>
+
+  <h3>Decisões de design</h3>
+  <ul>
+    <li>Sem acesso direto pelo hub por um tempo (2026-07-31) — voltou a ter card no hub em 2026-08-10, a pedido do usuário. Continua também acessível por empresa dentro do Diário (<code>mapeamento.html?empresa=X&amp;origem=diario</code>), os dois caminhos coexistem.</li>
+    <li>Relatório PDF (<code>gerarRelatorioPDF</code>) omite bancos e contato do PDF quando quem gera não pode editar — mesma regra client-side da tela, não é enforcement de verdade (a informação já não foi buscada do banco nesse caso, então nem tem o que vazar pro PDF por esse caminho específico).</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="diario-tecnico">
+  <h2>Diário Contábil</h2>
+
+  <h3>Modelo de dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>contabil_diario_lancamentos</code></td><td>Só-inclusão (sem UPDATE/DELETE na UI). Colunas: texto livre, <code>assunto</code> (TEXT livre, lista fixa <code>ASSUNTOS_LANCAMENTO</code> só no front, não é enum no banco), <code>mes_referencia</code>/<code>ano_referencia</code> opcionais, autor/timestamp automáticos de <code>sessionStorage.userAuth</code>.</td></tr>
+      <tr><td><code>contabil_diario_status_mensal</code></td><td>Upsert por <code>(codigo_empresa, ano, mes)</code> — 1 linha só quando o mês sai de "não iniciado". Coluna <code>status</code> com CHECK (<code>em_andamento</code>/<code>pendencia</code>/<code>concluido</code>) + <code>motivo_pendencia</code>.</td></tr>
+      <tr><td><code>contabil_diario_documentacao</code></td><td>Independente da anterior — só existe pra marcar "documentação já chegou" num mês ainda "não iniciado" (que não tem linha em <code>status_mensal</code>).</td></tr>
+      <tr><td><code>contabil_diario_fechamentos</code></td><td>Append-only (nunca UPDATE) — 1 linha por evento (<code>enviado</code>/<code>aprovado</code>/<code>rejeitado</code>). Status atual do fechamento é <strong>sempre derivado</strong> do evento mais recente, nunca armazenado numa coluna própria. Colunas <code>balancete_url</code>/<code>balancete_nome</code> (2026-08-10) apontam pro bucket <code>documentos</code>, path <code>diario-contabil-balancetes/&lt;codigo&gt;/&lt;ano&gt;-&lt;mes&gt;/...</code>, RLS de leitura restrita (ver Segurança abaixo).</td></tr>
+      <tr><td><code>contabil_diario_auditoria</code></td><td>Append-only — log de toda transição de status da grade e de documentação disponível. Alimenta a tela Histórico junto com os lançamentos.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Máquina de estados — Grade Mensal</h3>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> nao_iniciado
+    nao_iniciado --> em_andamento: clique simples
+    em_andamento --> pendencia: popover, motivo obrigatorio
+    em_andamento --> concluido: popover
+    pendencia --> em_andamento: clique simples (resolve)
+    concluido --> em_andamento: reabrir (confirm), so se fechamento != aprovado
+    concluido --> [*]: fechamento aprovado (trava)
+  </pre>
+
+  <h3>Máquina de estados — Fechamento/Validação</h3>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> aberto
+    aberto --> aguardando_validacao: Prestador encerra (evento "enviado")
+    aberto --> aprovado: equipe SCONT encerra (pula direto, sem evento "enviado")
+    aguardando_validacao --> aprovado: evento "aprovado"
+    aguardando_validacao --> aberto: evento "rejeitado" (motivo obrigatorio)
+    aprovado --> [*]
+  </pre>
+  <p>O status nunca é uma coluna — <code>statusFechamentoDoMes()</code> olha só o <code>tipo_evento</code> do registro mais recente em <code>contabil_diario_fechamentos</code> pra aquele <code>(codigo_empresa, ano, mes)</code>. Balancete (PDF) é obrigatório em qualquer caminho que feche o mês; a diferenciação "Prestador vs. equipe SCONT" é decidida em <code>podeValidar()</code> no momento do clique, não guardada em lugar nenhum.</p>
+
+  <h3>Segurança / RLS não-trivial</h3>
+  <ul>
+    <li><code>contabil_pode_ver_balancete(caminho)</code> (SECURITY DEFINER, policy em <code>storage.objects</code>): <code>is_admin()</code> OU equipe SCONT OU responsável pela empresa (via <code>contabil_empresas_responsaveis</code> + <code>storage.foldername(name)[2]</code> pra extrair o código da empresa do path). A policy antiga de leitura geral do bucket <code>documentos</code> teve que ganhar um <code>NOT (name LIKE 'diario-contabil-balancetes/%')</code> — sem isso as duas policies permissivas se somariam por OR e a nova não teria efeito nenhum (pegadinha real de RLS com múltiplas policies permissivas no mesmo comando).</li>
+  </ul>
+
+  <h3>Alertas por e-mail</h3>
+  <p>5 eventos (validação enviada, aprovado, rejeitado, pendência criada, pendência sanada), cada um com toggle global (não por empresa) em <code>contabil_config_geral</code>. Todos reusam a Edge Function compartilhada <code>enviar-email</code> (mesma função usada por Certificado Digital e Licenças, cada uma com seu próprio <code>tipo</code> de template dentro de <code>montarHtml()</code>).</p>
+</section>
+
+<section class="manual-item" id="configuracoes-tecnico">
+  <h2>Configurações</h2>
+
+  <h3>Modelo de dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>contabil_empresas_config</code></td><td><code>codigo_empresa</code> PK, <code>possui_contabil</code> boolean. <strong>Ausência de linha = incluída</strong> (não é backfill) — empresa nova entra automaticamente até ser desmarcada.</td></tr>
+      <tr><td><code>contabil_empresas_responsaveis</code></td><td>N:N <code>codigo_empresa</code> ↔ <code>usuario_id</code> (aponta pra <code>solicitacoes_acesso.id</code>, não <code>auth.users.id</code>). Alimenta tanto o filtro de empresas do Prestador quanto quem pode encerrar o mês.</td></tr>
+      <tr><td><code>contabil_config_geral</code></td><td>Singleton — e-mail(s) de alerta + 5 toggles booleanos por evento.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Decisões de design</h3>
+  <ul>
+    <li>Sem botão "Salvar" — todo toggle (contábil sim/não, responsável, alerta) grava direto no banco ao clicar; falha reverte a UI e mostra toast de erro.</li>
+    <li>Importação de planilha casa colunas por nome normalizado (sem acento/espaço, lowercase) contra uma lista de aliases — não é posicional. Linha com código não encontrado na base é ignorada silenciosamente (mantém o que já estava configurado).</li>
+  </ul>
+</section>

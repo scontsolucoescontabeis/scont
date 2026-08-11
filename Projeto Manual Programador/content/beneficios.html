@@ -1,0 +1,195 @@
+<p class="manual-intro">Existem <strong>dois sistemas de benefícios (VT/VA) independentes e não integrados</strong> no portal, com modelos de dados totalmente diferentes. (1) <code>Projeto Beneficios/</code> — app standalone (HTML + JS puro, IIFE único em <code>script.js</code>, ~1740 linhas, sem framework/bundler), cliente Supabase próprio, autenticação via <code>portal-auth-guard.js</code>; 4 telas: Lançamentos, Escalas, Férias, Configurações. (2) A tela <strong>"Gerar Benefícios"</strong> dentro de <code>Projeto RH/index.html</code> (ferramenta "Controle de Frequência", grupo <code>rh-controle-frequencia</code> no Manual — sem conteúdo técnico próprio ainda), que gera VT/VA a partir da escala de trabalho e da Folha de Ponto já lançadas naquele módulo. Esta página documenta os dois, porque resolvem o mesmo problema de formas diferentes — um mantenedor precisa saber qual ferramenta o cliente realmente usa antes de mexer em qualquer uma. PDFs usam jsPDF 2.5.1 (+ AutoTable 3.8.2 no lado RH) via CDN, mesma versão do resto do portal. Nenhum dos dois tem teste automatizado, exceto o módulo puro <code>escala-calculo.js</code> do lado RH (compartilhado com a tela "Gerar Escala").</p>
+
+<section class="manual-item" id="beneficios-standalone-lancamentos">
+  <h2>Projeto Beneficios — Lançamentos VA/VT (app standalone)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>Projeto Beneficios/index.html</code> — shell único com as 4 telas (<code>.screen</code>, alternadas via <code>showScreen()</code>), <code>Projeto Beneficios/script.js</code> — toda a lógica num objeto de estado global <code>S</code>, sem módulos.</li>
+    <li>Libs via CDN: <code>@supabase/supabase-js@2</code>, <code>xlsx@0.18.5</code> (importação de grade), <code>pdf.js 3.11.174</code> (parser do PDF de férias).</li>
+    <li>Sem arquivo de config próprio — <code>SUPABASE_URL</code>/<code>SUPABASE_KEY</code> vêm de <code>../supabase-config.js</code> (mesmo projeto Supabase do Portal SCONT usado pelas demais ferramentas de RH).</li>
+    <li><code>Projeto Beneficios/schema_beneficios.sql</code> — schema único do módulo, idempotente (<code>CREATE TABLE IF NOT EXISTS</code>), já executado.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_beneficios_config</code></td><td>1 linha por <code>(codigo_empresa, tipo)</code> com <code>tipo IN ('vt','va')</code> — rubrica, tipo de processo e valor/dia <strong>padrão da empresa</strong>.</td></tr>
+      <tr><td><code>rh_beneficios_individuais</code></td><td>1 linha por <code>(codigo_empresa, codigo_empregado)</code> — <code>vt_valor_dia</code>/<code>va_valor_dia</code> podem ser <code>NULL</code> (usa o padrão da empresa) ou um valor que sobrescreve o padrão só para aquele empregado.</td></tr>
+      <tr><td><code>rh_beneficios_lancamentos</code></td><td>1 linha por <code>(codigo_empresa, competencia_pagamento)</code> — grade inteira salva como <code>linhas_json</code> (array de objetos <code>{cod_emp, vt_dia, va_dia, dias, total_vt, total_va, status}</code>), não normalizada em linhas de tabela. <code>mes_referencia</code> é opcional e serve só de anotação/exibição — nada no banco garante a relação com <code>competencia_pagamento</code>.</td></tr>
+      <tr><td><code>rh_beneficios_empresa_obs</code></td><td><code>codigo_empresa</code> PK — observação de texto livre exibida como banner de aviso na tela de Lançamentos daquela empresa.</td></tr>
+      <tr><td><code>rh_beneficios_ferias</code></td><td>1 linha por nome de empresa <em>como extraído do PDF</em> (não é <code>codigo_empresa</code>) — <code>funcionarios_json</code> com a programação de férias inteira. Ver seção Férias.</td></tr>
+    </tbody>
+  </table>
+  <p>RLS de todas as 5 tabelas: <code>TO authenticated USING (TRUE) WITH CHECK (TRUE)</code> — sem restrição por linha, igual ao padrão geral do módulo RH.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Seleciona Empresa] --> B[loadConfig + loadEmpregados + loadIndividuais]
+    B --> C[Digita Competencia de Pagamento]
+    C --> D[Digita Mes de Referencia dos Dias]
+    D --> E{Lancamento ja existe para empresa+compPgto?}
+    E -- sim --> F[tryLoadLancamento carrega linhas_json salvo]
+    E -- nao --> G[buildGrade gera 1 linha por empregado com vt/va padrao ou individual]
+    F --> H[Grade editavel]
+    G --> H
+    H --> I{Edicao diverge do valor configurado?}
+    I -- sim --> J[mostrarModalDivergencia - confirma e marca status=divergente]
+    I -- nao --> K[Salvar linha, status=padrao ou individual]
+    J --> K
+    K --> L[Salvar - upsert em rh_beneficios_lancamentos]
+    K --> M[Gerar TXT - gera arquivo p/ folha, nao persiste]
+  </pre>
+  <p>Banner fixo no topo mostra as duas competências lado a lado ("Competência de Pagamento" ← paga benefícios referentes a → "Mês de Referência dos Dias") — reforça na UI que o VT/VA do mês trabalhado (mês de referência) é pago no mês seguinte (competência de pagamento). Essa relação é só convenção visual/de digitação: nenhuma validação no código força <code>compPgto = mesRef + 1</code>.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><code>buildGrade()</code> descarta e reconstrói <code>S.lancamento.linhas</code> do zero a partir de <code>S.empregados</code> — só é chamado quando não há lançamento salvo para a competência ou quando o filtro de empregados muda; edições manuais em campos individuais da grade não usam essa função (por isso não são perdidas ao digitar).</li>
+    <li>Divergência (valor digitado ≠ valor configurado em <code>rh_beneficios_config</code>/<code>individuais</code>) sempre pede confirmação via modal, tanto na edição manual da grade quanto na importação de Excel — mesma função de UI (<code>mostrarModalDivergencia</code>) reaproveitada nos dois fluxos.</li>
+    <li>Importação de Excel (<code>importarExcel</code>) casa por posição de coluna fixa (<code>row[1]</code>=código, <code>row[2]</code>=VT, <code>row[3]</code>=VA, <code>row[4]</code>=dias), não por cabeçalho nomeado — diferente do padrão de "casar por nome normalizado" usado em outras importações do portal (ex.: Configurações do Diário Contábil).</li>
+    <li>Geração de TXT (<code>gerarTxt</code>) usa a competência de pagamento digitada diretamente (<code>compToAaaamm(compPgto)</code>), sem deslocamento de mês — diferente da convenção usada pelo lado RH de "Gerar Benefícios" (ver <code>_mesAnterior</code> na seção seguinte), que desloca a competência interna do TXT em -1 mês. São dois formatos de TXT com regras de competência diferentes para o mesmo tipo de lançamento (VT/VA).</li>
+    <li>Formato do TXT: linha fixa <code>10</code> + código do empregado (10) + competência AAAAMM + rubrica (9) + tipo de processo (2) + valor em centavos (9) + código da empresa (10), tudo com <code>pad()</code> (zero-fill). Só gera linha quando o valor em centavos é <code>&gt; 0</code>.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="beneficios-standalone-escalas">
+  <h2>Projeto Beneficios — Escalas (cálculo de dias úteis)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Mesma <code>Projeto Beneficios/script.js</code> — não é um módulo separado, é um bloco de funções (<code>calcularDiasUteis</code>, <code>calcDiasSemana</code>, <code>calcRevezamento</code>, <code>calcManual</code>) dentro do mesmo arquivo do resto do app.</li>
+    <li>Feriados vêm de <code>rh_saves.feriados_json</code> (a versão mais recente salva para a empresa na Folha de Ponto do <code>Projeto RH</code>) — <strong>não</strong> da tabela global <code>rh_feriados</code> usada pelo lado RH. É uma fonte de feriados diferente e específica desta tela.</li>
+  </ul>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Seleciona Empresa e Mes de Referencia] --> B{Modo}
+    B -- Semana --> C[calcDiasSemana - dias da semana marcados]
+    B -- Revezamento --> D[calcRevezamento - ciclo trabalho/folga a partir de data ancora]
+    B -- Manual --> E[calcManual - clique dia a dia no calendario]
+    C --> F[Desconta feriados marcados, se Considerar Feriados = sim]
+    D --> F
+    E --> F
+    F --> G[Total de dias trabalhados no mes]
+    G --> H[Aplicar nos Lancamentos]
+    H --> I[Preenche lancDias e lancMesRef na tela Lancamentos]
+  </pre>
+  <p>Esse cálculo é <strong>puramente client-side e não persiste em tabela própria</strong> — o único efeito é preencher o campo "Dias a Trabalhar" da tela Lançamentos ao clicar em "Aplicar nos Lançamentos" (<code>aplicarNosLancamentos()</code>). Reabrir a tela Escalas depois não recupera a configuração usada; ela não é salva em lugar nenhum.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Concepção completamente independente da tela "Gerar Escala" do <code>Projeto RH</code> (que persiste em <code>rh_escala_trabalho</code>) — mesmo nome de conceito ("escala"), implementação e fonte de dados diferentes, sem nenhum ponto de integração entre as duas.</li>
+    <li>Modo revezamento usa uma data-âncora (<code>revInicio</code>) + ciclo <code>revTrab</code>/<code>revFolga</code> dias, com aritmética de módulo sobre a diferença de dias em relação à âncora — mesma técnica usada em <code>calcularTipoDiaVariavelPadrao</code> do lado RH (<code>escala-calculo.js</code>), mas reimplementada do zero aqui, não compartilhada.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="beneficios-standalone-ferias">
+  <h2>Projeto Beneficios — Férias (Programação de Férias)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Parsing do PDF acontece 100% no navegador via <code>pdf.js</code> — função <code>parsePdfFerias()</code> em <code>script.js</code>, usando bandas de coordenada X fixas (<code>FERIAS_COLS</code>) calibradas para o layout específico do relatório "Programação de Férias" da SCONT.</li>
+    <li><code>Projeto Beneficios/pdf_ferias.py</code> — script Python solto na pasta, <strong>não é executado pela aplicação</strong> (o app não tem backend); é uma ferramenta de apoio para depurar/recalibrar as bandas de coluna offline, fora do fluxo de produção.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Usa <code>rh_beneficios_ferias</code> (ver tabela na seção Lançamentos). <code>salvarFeriasSupabase()</code> faz <strong>substituição total</strong>: apaga todas as linhas (<code>DELETE ... neq id 00000000...</code>) e insere de novo a cada upload de PDF — não há upsert incremental por empresa.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Upload do PDF Programacao de Ferias] --> B[parsePdfFerias - agrupa palavras por linha via coordenadas Y, +-2px]
+    B --> C[Detecta nome da empresa pela linha com Pagina]
+    C --> D[Extrai colunas fixas por banda de X - codigo, empregado, ini_gozo, dias, etc]
+    D --> E[Linhas sem codigo mas com periodo aquisitivo viram extras do funcionario anterior]
+    E --> F[salvarFeriasSupabase - DELETE tudo + INSERT por empresa]
+    F --> G[Tela Lancamentos - feriasDaEmpresaNaComp casa nome da empresa do PDF com nome_empresa do Supabase]
+    G --> H[bannerFerias mostra aviso de ferias na grade]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>O vínculo entre a empresa do PDF e a empresa do Supabase é por <strong>nome, não código</strong>: <code>feriasDaEmpresaNaComp()</code> compara os 15 primeiros caracteres do nome (case-insensitive, um contido no outro) — frágil a mudanças de nome fantasia ou truncamento do PDF, sem fallback por CNPJ/código.</li>
+    <li>Dentro de cada empresa, o vínculo funcionário↔linha do PDF é por <code>codigo_empregado</code> exato (<code>codPdf === codigo_empregado</code>), então esse casamento é robusto — só o de empresa é por heurística de texto.</li>
+    <li><code>FERIAS_SKIP</code> é uma regex grande com todos os textos de cabeçalho/rodapé conhecidos do relatório PDF para descartar como não sendo linha de dado — qualquer mudança de layout do relatório original quebra o parser silenciosamente (linhas ignoradas ou mal classificadas), sem alerta.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="beneficios-standalone-config">
+  <h2>Projeto Beneficios — Configurações (padrão/individual/observações)</h2>
+
+  <h3>Fluxo Principal</h3>
+  <p>Tela com 3 abas por empresa: Padrão (upsert em <code>rh_beneficios_config</code>, 1 linha VT + 1 linha VA por <code>saveConfigPadrao</code>), Individual (grade de overrides por empregado, salvos linha a linha ou em lote via <code>saveAllIndividuais</code>) e Observações (texto livre em <code>rh_beneficios_empresa_obs</code>, exibido como banner de aviso amarelo na tela de Lançamentos).</p>
+
+  <h3>Decisões de Design</h3>
+  <ul>
+    <li>Sem botão de confirmação por campo — cada aba tem seu próprio botão de salvar, mas nada impede sair da tela com edições não salvas (não há alerta de "unsaved changes").</li>
+    <li>Placeholder dos campos individuais mostra o valor padrão da empresa em tempo real ("padrão R$ X,XX") — a UI comunica visualmente o fallback sem duplicar o valor no campo.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="rh-gerar-beneficios">
+  <h2>Gerar Benefícios (Controle de Frequência — Projeto RH)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Vive dentro de <code>Projeto RH/index.html</code> (tela <code>#beneficiosScreen</code>) + <code>Projeto RH/script.js</code> (arquivo monolítico de toda a ferramenta "Controle de Frequência" — a lógica de Gerar Benefícios ocupa aproximadamente as linhas 3787-4700 e 4798-4970, funções prefixadas com <code>_</code> quando privadas ao módulo).</li>
+    <li><code>Projeto RH/escala-calculo.js</code> — módulo puro (sem DOM/Supabase), compartilhado com a tela "Gerar Escala"; exporta via <code>window.*</code> e <code>module.exports</code>, testado em <code>test-escala-calculo.js</code> (Node puro).</li>
+    <li>Reaproveita infraestrutura já existente da Folha de Ponto: <code>_buscarConfigRubricas</code>/<code>rh_config_rubricas_txt</code> (rubricas por empresa), <code>_montarLinhaTxt</code> (mesmo formato de linha TXT usado por outros lançamentos, ex. Ajuda de Custo ITC 350), grupos de empresas (<code>gruposScreen</code>), envio por e-mail (edge function compartilhada).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_valores_va_vt</code></td><td>1 linha por <code>(codigo_empresa, codigo_empregado)</code> com <code>valor_vt</code>/<code>valor_va</code> diário. <strong>Sem conceito de "valor padrão da empresa" com override</strong> — diferente de <code>rh_beneficios_config</code>/<code>individuais</code> do app standalone; aqui é só um valor final por empregado, cadastrado individualmente (tela "Valores VT/VA" na sidebar).</td></tr>
+      <tr><td><code>rh_escala_trabalho</code></td><td>1 linha por <code>(codigo_empresa, codigo_empregado)</code>, configurada na tela "Gerar Escala". <code>tipo_escala</code> = <code>fixa</code> (dias da semana fixos), <code>variavel_datas</code> (trabalha todo dia exceto datas de folga listadas) ou <code>variavel_padrao</code> (ciclo de blocos trabalho/folga a partir de uma data-âncora). Empregado sem linha assume padrão 5×2 (seg-sex trabalho).</td></tr>
+      <tr><td><code>rh_escala_excecoes</code></td><td>Folga pontual por dia, marcada clicando no mini-calendário da tela "Gerar Escala" — sobrepõe o resultado do cálculo sem alterar a escala configurada. Prioridade: férias &gt; exceção &gt; escala.</td></tr>
+      <tr><td><code>rh_ferias_calculadas</code></td><td><code>codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim</code> — alimentada pela tela "Informações de Férias" em <code>admin.js</code> (fora do escopo desta página). Dia em período de férias sempre vira folga no cálculo de "Dias a Trabalhar", com prioridade máxima.</td></tr>
+      <tr><td><code>rh_feriados</code></td><td>Calendário global de feriados (não por empresa), formato <code>"DD/MM"</code> recorrente ou <code>"DD/MM/AAAA"</code> específico. Consultada só quando a config <code>beneficios_excluir_feriados</code> da empresa está ativa (default: excluir).</td></tr>
+      <tr><td><code>rh_saves</code></td><td>Folha de Ponto já processada/salva da competência — fonte de "Dias a Descontar" (conta faltas/atestados integrais em <code>flags_folga</code>). <strong>Não</strong> é fonte de "Dias a Trabalhar" (comentário no código explicita: o DSR salvo marca só folgas específicas, não o padrão semanal, e não é indicador confiável de fim de semana/dia útil).</td></tr>
+      <tr><td><code>rh_config_rubricas_txt</code></td><td>Reaproveitada para persistir a rubrica de VT/VA escolhida por empresa (eventos <code>beneficios_rub_vt</code>/<code>beneficios_rub_va</code>) entre uma geração de lançamento e outra.</td></tr>
+    </tbody>
+  </table>
+  <p>Nenhuma tabela guarda a "prévia" gerada (linhas com Dias a Trabalhar/Descontar/Pagar) — ela só existe em memória (<code>state._beneficiosLinhas</code>) enquanto a tela está aberta. Diferente do app standalone, aqui <strong>não há persistência de lançamentos</strong>: cada geração de recibo/TXT/Excel é recalculada do zero a partir das tabelas acima, sem histórico do que já foi gerado (exceto o rastro indireto em <code>rh_config_rubricas_txt</code> e no registro de "Ajuda de Custo já gerada" para a competência).</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Gerar Escala configura rh_escala_trabalho por empregado] --> E[Digita competencia + seleciona empresas/grupos]
+    B[Valores VT/VA cadastra rh_valores_va_vt por empregado] --> E
+    C[Folha de Ponto processada/salva - rh_saves da competencia] --> E
+    D[Informacoes de Ferias em Administracao - rh_ferias_calculadas] --> E
+    E --> F[gerarPreviaBeneficios]
+    F --> G[calcularResumoMes por empregado - escala + ferias + excecoes + feriados opcionais]
+    G --> H[Dias a Trabalhar]
+    F --> I[conta faltas/atestados da folha salva]
+    I --> J[Dias a Descontar]
+    H --> K[Dias a Pagar = max 0, Trabalhar - Descontar]
+    J --> K
+    K --> L[Previa editavel em memoria - state._beneficiosLinhas]
+    L --> M[Gerar Recibo - PDF por empregado ou lote]
+    L --> N[Gerar Lancamentos na Folha - TXT com rubrica por empresa]
+    L --> O[Gerar Excel]
+    L --> P[Enviar por E-mail]
+  </pre>
+  <p>Confirmado no código: a tela em si documenta essa dependência ("'Dias a Trabalhar' vem da escala configurada em 'Gerar Escala'... 'Dias a Descontar' vem das faltas/atestados lançados na Folha de Ponto") e <code>gerarPreviaBeneficios()</code> de fato lê <code>rh_escala_trabalho</code>/<code>rh_escala_excecoes</code> (não algum cache local) a cada geração de prévia.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>Convenção "mês trabalhado é pago/lançado no mês seguinte" confirmada, mas de forma indireta e não óbvia</strong>: o campo "Competência de referência" da tela é o mês que o empregado <em>vai trabalhar</em> (não o mês de pagamento). Ao gerar o TXT de lançamento (<code>_construirTxtLancamentoVaVt</code>) ou de Ajuda de Custo ITC, a competência gravada dentro do arquivo é <code>_mesAnterior(comp)</code> — comentário no código: <em>"competência ('MM/AAAA') - 1 mês, usada nos TXTs de lançamento cuja competência interna é a competência do recibo (mês trabalhado) menos 1 mês"</em>. É uma regra de negócio do sistema de folha de destino (não documentada aqui em mais detalhe), replicada de forma idêntica entre VT/VA e Ajuda de Custo ITC 350 (ver <code>project_rh_ajuda_custo_itc_350</code> na memória do projeto).</li>
+    <li>"Período de apuração de Benefícios" (config por empresa, <code>beneficios_periodo_ativo</code>) é <strong>independente</strong> do período de apuração da Frequência (<code>_resolverPeriodoApuracao</code>) — mesma mecânica (dia de início/fim customizado fora do mês calendário), configs separadas, e com a convenção de meses <em>invertida</em> em relação a <code>gerarDiasDoMes</code>: para Benefícios, o intervalo vai do dia de início <strong>no mês da competência</strong> ao dia de fim <strong>no mês seguinte</strong> — por isso o código passa <code>_competenciaMesSeguinte(comp)</code> para a função genérica de geração de dias, em vez de reescrever a lógica.</li>
+    <li>Exclusão de feriados nacionais do cálculo de "Dias a Trabalhar" é opt-out por empresa (default: excluir) — a escala em si (<code>calcularResumoMes</code>) não considera feriados, só dias da semana/ciclo/exceções; o filtro de feriado é aplicado depois, em <code>gerarPreviaBeneficios</code>, não dentro de <code>escala-calculo.js</code>.</li>
+    <li>"Dias a Trabalhar" e "Dias a Descontar" são <strong>sempre editáveis</strong> na prévia (inputs numéricos por linha, <code>_recalcularLinhaBeneficios</code>) — o cálculo automático é só um ponto de partida, não uma trava.</li>
+    <li>Empresa 350 (ITC) tem uma regra hardcoded de bloqueio: se houver empregados dessa empresa na seleção e a Ajuda de Custo da competência ainda não foi gerada, o fluxo de Recibo/Lançamento é interrompido e reencaminhado para o modal de Ajuda de Custo antes de continuar (<code>_verificarPendenciaAjudaCustoITC</code>).</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Duplicação funcional real com o app standalone <code>Projeto Beneficios/</code>: dois cálculos de "dias a trabalhar" (escala vs. calculadora de dias úteis embutida), dois cadastros de valor de VT/VA por empregado (<code>rh_valores_va_vt</code> vs. <code>rh_beneficios_config</code>/<code>individuais</code>), dois formatos/regras de competência para o mesmo TXT de lançamento. Não há indicação no código de qual delas é a fonte de verdade atual — qualquer manutenção precisa primeiro confirmar com o usuário qual ferramenta está em uso ativo antes de alterar regras de cálculo.</li>
+    <li>Sem persistência da prévia gerada em "Gerar Benefícios" — não há como auditar depois "quais dias/valores foram efetivamente usados" numa geração passada, diferente do app standalone que salva a grade em <code>rh_beneficios_lancamentos</code>.</li>
+  </ul>
+</section>

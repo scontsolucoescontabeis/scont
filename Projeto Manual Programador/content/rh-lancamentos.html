@@ -1,0 +1,128 @@
+<p class="manual-intro">Lançamentos de Folha vive em <code>Projeto RH/lancamentos.html</code> + <code>lancamentos.js</code> (~1120 linhas, um único arquivo sem módulos) + <code>styles_lancamento.css</code>. Stack idêntica ao resto do RH: HTML/JS puro sem framework/bundler, cliente Supabase próprio (<code>supabase.createClient(SUPABASE_URL, SUPABASE_KEY)</code> lido de <code>../supabase-config.js</code>), <code>portal-auth-guard.js</code> como único gate de acesso (<code>PortalAuthGuard.init(1)</code> — não há diferenciação de papel dentro da própria tela, ao contrário da Central do Departamento Contábil). A característica mais importante da ferramenta: <strong>ela não grava nada no Supabase</strong>. É um assistente de 4 passos (mais um "3.5" de acúmulo) que só <em>lê</em> empresas/empregados/rubricas do banco e monta, inteiramente no cliente, um arquivo <code>.txt</code> de layout fixo para importação em lote no sistema de folha de pagamento. Todo o estado (empresas/empregados selecionados, grade de valores, parametrizações acumuladas) vive em variáveis globais no módulo JS e é perdido a qualquer refresh — não há rascunho persistido.</p>
+
+<section class="manual-item" id="lancamentos-fluxo-assistente">
+  <h2>Fluxo do Assistente (Passos 1 a 4)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>lancamentos.html</code> — os 5 "step-cards" (Passo 1 a 4, mais o 3.5), modal de mensagem genérico e modal "Configurações de Rubricas". CSS de layout embutido em <code>&lt;style&gt;</code> inline no próprio HTML (não está todo em <code>styles_lancamento.css</code>).</li>
+    <li><code>lancamentos.js</code> — arquivo único, sem separação em módulos. Toda a lógica de busca, validação, montagem de grade, geração de layout TXT e exportação está aqui.</li>
+    <li>Nenhum arquivo <code>.sql</code> próprio — a ferramenta só lê tabelas definidas em <code>schema_rh.sql</code> (compartilhadas com o resto do RH). O único <code>.sql</code> da pasta com "lancamentos" no nome (<code>schema_rh_ajuda_custo_lancamentos.sql</code>, tabela <code>rh_ajuda_custo_lancamentos</code>) <strong>não tem relação com este arquivo</strong> — é de outra funcionalidade (controle de geração de ajuda de custo ITC, rubrica 201); confirmado por grep, não há nenhuma referência a essa tabela em <code>lancamentos.js</code>.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Uso nesta tela</th></tr></thead>
+    <tbody>
+      <tr><td><code>rh_empresas</code></td><td>Popula o Passo 1. Só entram empresas cujo <code>status_situacao</code> começa com "ativ" (ou é vazio/nulo — mesmo critério usado na Administração). Só leitura.</td></tr>
+      <tr><td><code>rh_empregados</code></td><td>Popula o Passo 2, filtrado por <code>codigo_empresa IN (empresas selecionadas)</code>. Empregados com <code>situacao = 'Demitido'</code> são excluídos no cliente (nunca entram em lançamento de folha). Só leitura.</td></tr>
+      <tr><td><code>rh_rubricas</code></td><td>Catálogo de rubricas por empresa (<code>codigo_empresa, codigo_rubrica, descricao_rubrica, tipo</code>), mantido pela Administração (<code>admin.js</code> — grava; esta tela só lê). Alimenta o seletor de rubrica do Passo 3 e o datalist do modo manual.</td></tr>
+      <tr><td><code>rh_config_rubricas_txt</code></td><td>Presets de 8 eventos fixos + observações por empresa. Escrito pelo Controle de Frequência (<code>script.js</code>, tela de Configurações daquele módulo) — em <code>lancamentos.js</code> é <strong>somente leitura</strong>, usada só para exibir a nota de observações do lote (<code>renderObservacoesLote</code>) e no modal "⚙️ Configurações" (ver seção de Configurações abaixo).</td></tr>
+    </tbody>
+  </table>
+  <p>Todas as 4 tabelas têm RLS <code>TO authenticated USING (true)</code> — qualquer usuário autenticado do portal lê e, tecnicamente, escreveria direto via API se quisesse; o controle de quem pode gerar lançamentos é 100% o <code>portal-auth-guard.js</code> genérico (login), sem gate de papel específico para esta tela.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Passo 1 - Competencia e Empresas] --> B{Empregados encontrados}
+    B -- Nao --> A
+    B -- Sim --> C[Passo 2 - Selecao de Empregados]
+    C --> D[Passo 3 - Grade Empregado x Rubrica]
+    D --> E[Clique em Gerar Parametrizacoes]
+    E --> F{Validacao de formato e catalogo OK}
+    F -- Nao, mostra erro --> D
+    F -- Sim --> G[Passo 3.5 - Parametrizacoes Acumuladas]
+    G --> H{Usuario quer adicionar outra leva}
+    H -- Sim, Nova Parametrizacao --> A
+    H -- Nao, Finalizar e Exportar --> I[Passo 4 - Previa e Exportacao]
+    I --> J[Baixar Arquivo TXT]
+    J --> K[Estado zerado, volta ao Passo 1]
+  </pre>
+  <p>Cada "leva" (passos 1 a 3) pode ter empresas e empregados diferentes da anterior — o array <code>parametrizacoesAcumuladas</code> sobrevive entre levas dentro da mesma sessão de página, só é zerado no download final (<code>baixarTXT</code>) ou ao remover manualmente cada item.</p>
+
+  <h3>A grade Empregado x Rubrica (Passo 3)</h3>
+  <ul>
+    <li>O seletor de rubrica (<code>renderSeletorRubricaCatalogo</code>) agrupa <code>rh_rubricas</code> de todas as empresas do lote <strong>por descrição</strong> (<code>descricao_rubrica.toLowerCase()</code>), não por código — assim uma coluna da grade como "Horas Extras 50%" cobre automaticamente códigos de rubrica diferentes por empresa (<code>codigosPorEmpresa</code>), e <code>resolverCodigoRubrica</code> escolhe o código certo por empregado na hora de montar o TXT.</li>
+    <li>Existe um modo "Outra rubrica" com código digitado manualmente (<code>gradeRubricaCodigo</code>). Nesse modo o código é único e fixo para todos os empregados da coluna, independente da empresa — não passa pelo <code>codigosPorEmpresa</code> nem é validado contra o catálogo de cada empresa (só valida "somente dígitos").</li>
+    <li>Rubricas cuja descrição contém "DIAS FALTAS" (função <code>detectarFaltaTipo</code>) travam automaticamente o tipo de valor para "dias" e mudam o formato de entrada esperado: em vez de um valor numérico único, o campo aceita uma lista de dias do mês separados por vírgula (ex: <code>5,12,20</code>), validada contra o último dia da competência informada (<code>validarFormatoDiasFalta</code>).</li>
+  </ul>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Sem botão "salvar rascunho" e sem tabela de histórico — a única saída da ferramenta é o arquivo <code>.txt</code> baixado. Se a aba fechar antes do download, o trabalho do lote inteiro se perde.</li>
+    <li><code>gerarParametrizacoes()</code> valida a grade inteira antes de aceitar qualquer coluna: primeiro erro de formato ou de rubrica não cadastrada para a empresa do empregado interrompe a função inteira com <code>return</code> — nenhuma parametrização parcial é criada nessa leva (tudo ou nada por clique).</li>
+    <li>Rubricas de uma coluna sem nenhum valor preenchido por nenhum empregado são silenciosamente ignoradas (não geram parametrização, nem erro) — só entram na mensagem final como "rubricas ignoradas".</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="lancamentos-layout-txt">
+  <h2>Layout do Arquivo TXT e Cálculo de DSR</h2>
+
+  <h3>Formato do registro (gerarConteudoTXT)</h3>
+  <p>Cada rubrica com valor gera uma linha "10" (linha de valor) por empregado, largura fixa, campos com zero à esquerda:</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Campo</th><th>Tamanho</th><th>Conteúdo</th></tr></thead>
+    <tbody>
+      <tr><td>Tipo de registro</td><td>2</td><td>Fixo "10"</td></tr>
+      <tr><td>Código do empregado</td><td>10</td><td><code>codigo_empregado</code>, zero-padded</td></tr>
+      <tr><td>Competência</td><td>6</td><td>AAAAMM (competência digitada MM/AAAA, invertida)</td></tr>
+      <tr><td>Código da rubrica</td><td>9</td><td>Resolvido por empregado via <code>resolverCodigoRubrica</code>, zero-padded</td></tr>
+      <tr><td>Tipo do processo</td><td>2</td><td>11/41/42/51/52/70, zero-padded</td></tr>
+      <tr><td>Valor</td><td>9</td><td>Ver codificação por tipo abaixo, zero-padded</td></tr>
+      <tr><td>Código da empresa</td><td>10</td><td><code>codigo_empresa</code> do empregado, zero-padded</td></tr>
+    </tbody>
+  </table>
+  <p>Codificação do valor (<code>encodeValorParaTipo</code>): <strong>horas</strong> "HH:MM" → inteiro HHMM (ex: "01:30" → 130); <strong>monetário</strong> remove tudo que não é dígito (ex: "150,50" → 15050, ou seja, já em centavos); <strong>dias</strong> inteiro direto. Para colunas de "Dias Faltas", o valor da linha "10" não é o texto digitado — é a <em>quantidade</em> de dias informados, e cada dia individual vira uma linha de detalhe "11" adicional logo em seguida.</p>
+
+  <h3>Linha de detalhe de Dias Faltas — duas codificações diferentes</h3>
+  <p>Existem <strong>dois formatos distintos</strong> para a linha "11", dependendo de quem a gera — isso não é óbvio lendo só uma das duas funções isoladamente:</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Origem</th><th>Formato da linha "11"</th><th>Motivo</th></tr></thead>
+    <tbody>
+      <tr><td>Falta manual (<code>gerarConteudoTXT</code>, coluna com <code>faltaTipo</code>)</td><td>"11" + competência AAAAMM (6) + dia (2) + flag (1) = 11 chars. Flag "1" = falta normal, "2" = falta com DSR.</td><td>O dia sempre pertence ao mês/ano da própria competência do lançamento.</td></tr>
+      <tr><td>DSR automático (<code>calcularParametrizacaoDsrAutomatica</code>)</td><td>"11" + data completa AAAAMMDD (8) + flag fixo "2" = 11 chars (mesmo tamanho, campos diferentes).</td><td>O domingo seguinte a uma falta pode cair no mês seguinte à competência — precisa da data completa, competência+dia não bastaria.</td></tr>
+    </tbody>
+  </table>
+  <p>Um refactor que tentasse "unificar" as duas funções assumindo o mesmo layout de detalhe quebraria o DSR automático em qualquer falta lançada na última semana do mês.</p>
+
+  <h3>Cálculo Automático de DSR</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Coluna Dias Faltas normal com valores preenchidos] --> B{Checkbox Calcular DSR automatico marcado}
+    B -- Nao --> Z[So a parametrizacao normal e gerada]
+    B -- Sim --> C[Para cada empregado, converte os dias digitados em datas]
+    C --> D[Calcula o domingo seguinte de cada data, semana segunda a sabado]
+    D --> E[Deduplica domingos repetidos por empregado]
+    E --> F{Empresa do empregado tem rubrica Dias Faltas DSR no catalogo}
+    F -- Nao --> G[Empresa entra em empresasSemRubricaDsr, aviso ao usuario ao final]
+    F -- Sim --> H[Gera parametrizacao extra rotulada rubrica DSR automatico]
+    H --> I[Linhas de detalhe usam data completa AAAAMMDD]
+  </pre>
+  <p>A parametrização de DSR automático entra como um item <em>separado</em> na lista acumulada (rótulo "&lt;rubrica&gt; → DSR (automático)"), não é mesclada na parametrização da falta original — cada uma tem seu próprio <code>conteudoTXT</code>, concatenados em sequência na exportação final.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>O checkbox "Calcular DSR automaticamente" (<code>calcularDsrAutomatico</code>) vem marcado por padrão e só se aplica a colunas com <code>faltaTipo === 'normal'</code> — colunas "DIAS FALTAS DSR" adicionadas manualmente não dispara o cálculo automático de novo (evita duplicar desconto de DSR).</li>
+    <li>Resolver a rubrica de DSR por empresa depende de existir, no catálogo <code>rh_rubricas</code> daquela empresa, uma rubrica cuja descrição contenha "DIAS FALTAS" e "DSR" (<code>resolverCodigoRubricaDsrPorEmpresa</code>). Se a empresa nunca cadastrou essa rubrica, o desconto de DSR daquele empregado simplesmente não é gerado — só um aviso no modal de sucesso, nada bloqueia a exportação do restante.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="lancamentos-config-modal">
+  <h2>Modal "Configurações de Rubricas"</h2>
+
+  <h3>Fluxo</h3>
+  <p>Botão no header (<code>⚙️ Configurações</code>) abre um modal somente-leitura: busca de empresa → mostra os 8 eventos fixos de <code>EVENTOS_FIXOS_RUBRICA</code> (mesmos usados pelo Controle de Frequência: horas trabalhadas, HE 50%/100%, adicional noturno, atraso, falta, desconto VT/VA) com o código de rubrica configurado para cada um, e o texto de observações da empresa — tudo lido de <code>rh_config_rubricas_txt</code> via <code>_buscarLinhasConfigRubricas</code>.</p>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>O modal existe só para consulta rápida — não há nenhum formulário de edição aqui. Para alterar esses códigos ou observações, o programador precisa ir até a tela de Configurações do Controle de Frequência (<code>script.js</code>), que é quem faz o <code>upsert</code> em <code>rh_config_rubricas_txt</code>.</li>
+    <li>Os 8 eventos fixos mostrados no modal não são as mesmas rubricas usadas na grade do Passo 3 (que vêm de <code>rh_rubricas</code>, catálogo livre por empresa) — são conjuntos paralelos que só coincidem se o usuário cadastrar a mesma rubrica nos dois lugares. Um programador dando manutenção pode facilmente confundir os dois catálogos por causa do nome parecido das tabelas (<code>rh_rubricas</code> vs. <code>rh_config_rubricas_txt</code>).</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Nenhuma tabela registra o histórico dos lotes de TXT já gerados/baixados por esta tela — não há como auditar depois "quem gerou o quê, quando" sem depender de logs externos ao Supabase.</li>
+    <li>RLS de todas as tabelas lidas aqui (<code>rh_empresas</code>, <code>rh_empregados</code>, <code>rh_rubricas</code>, <code>rh_config_rubricas_txt</code>) é aberta a qualquer usuário autenticado — mesmo padrão observado em outras ferramentas do RH, não é uma lacuna introduzida por esta tela especificamente, mas vale registrar: qualquer usuário logado no portal consegue gerar lançamentos de folha de qualquer empresa cadastrada, sem gate de papel dentro da própria ferramenta.</li>
+  </ul>
+</section>

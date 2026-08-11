@@ -1,0 +1,125 @@
+/**
+ * Mapa dos grupos do Manual do Programador.
+ *
+ * Cada grupo vira uma seção no menu lateral e carrega um fragmento HTML de
+ * content/<slug>.html. `prefixos` lista os começos de url_base (tabela
+ * `ferramentas`, minúsculo, sem acento no separador) que autorizam o grupo:
+ * se o usuário tem acesso a QUALQUER ferramenta cujo url_base comece com um
+ * desses prefixos, o grupo aparece para ele — mesma lógica de
+ * `Projeto Manual/tools-map.js` (Manual do Usuário). Os slugs/prefixos são
+ * intencionalmente idênticos aos de lá — quem já vê o manual de uso de uma
+ * ferramenta também vê a especificação técnica dela, e vice-versa.
+ *
+ * Para adicionar um novo grupo: acrescentar aqui + criar content/<slug>.html
+ * (e, se fizer sentido, o mesmo grupo em Projeto Manual/tools-map.js).
+ */
+window.MANUAL_GRUPOS = [
+    {
+        slug: 'rh-controle-frequencia',
+        nome: 'Controle de Frequência',
+        icone: '🕐',
+        prefixos: ['./projeto rh/index.html'],
+    },
+    {
+        slug: 'rh-lancamentos',
+        nome: 'Lançamentos de Folha',
+        icone: '📋',
+        prefixos: ['./projeto rh/lancamentos.html'],
+    },
+    {
+        slug: 'rh-admin',
+        nome: 'Administração RH',
+        icone: '⚙️',
+        prefixos: ['./projeto rh/admin.html'],
+    },
+    {
+        slug: 'rh-conversor-renomeador',
+        nome: 'Conversor e Renomeador de Arquivos',
+        icone: '📂',
+        prefixos: ['./projeto rh/conversor.html', './projeto rh/renomeador.html'],
+    },
+    {
+        slug: 'beneficios',
+        nome: 'Benefícios (VT/VA)',
+        icone: '🎫',
+        prefixos: ['./projeto beneficios/'],
+    },
+    {
+        slug: 'calendario-folha',
+        nome: 'Calendário da Folha',
+        icone: '📅',
+        prefixos: ['./projeto calendario folha/'],
+    },
+    {
+        slug: 'fechamento-folha',
+        nome: 'Fechamento de Folha',
+        icone: '📊',
+        prefixos: ['./projeto fechamento folha/'],
+    },
+    {
+        slug: 'simulador-folha',
+        nome: 'Simulador de Folha de Pagamento',
+        icone: '🧮',
+        prefixos: ['./projeto simulador folha/'],
+    },
+    {
+        slug: 'departamento-contabil',
+        nome: 'Departamento Contábil',
+        icone: '🧾',
+        prefixos: ['./projeto onboarding contabil/'],
+    },
+    {
+        slug: 'certificado-digital',
+        nome: 'Certificado Digital',
+        icone: '🔏',
+        prefixos: ['./projeto certificado digital/'],
+    },
+    {
+        slug: 'crm',
+        nome: 'CRM Messenger',
+        icone: '💬',
+        prefixos: ['./crm/'],
+    },
+    {
+        slug: 'departamento-pessoal',
+        nome: 'Departamento Pessoal',
+        icone: '👥',
+        prefixos: ['./projeto departamento pessoal/'],
+    },
+    {
+        slug: 'gerador-modelos',
+        nome: 'Gerador de Modelos',
+        icone: '📝',
+        prefixos: ['projeto gerador modelos/'],
+    },
+    {
+        slug: 'gerenciador-formularios',
+        nome: 'Gerenciador de Formulários',
+        icone: '🧷',
+        prefixos: ['./projeto gerenciador formularios/'],
+    },
+    {
+        slug: 'licencas',
+        nome: 'Controle de Licenças',
+        icone: '📜',
+        prefixos: ['./projeto licenças/'],
+    },
+    {
+        slug: 'mala-direta',
+        nome: 'Mala Direta',
+        icone: '✉️',
+        prefixos: ['./projeto mala direta/'],
+    },
+    {
+        slug: 'triagem',
+        nome: 'Triagem de Atendimentos',
+        icone: '🩺',
+        prefixos: ['./projeto triagem/'],
+    },
+    {
+        slug: 'boas-vindas',
+        nome: 'Portal de Boas-Vindas',
+        icone: '👋',
+        prefixos: ['./projeto boas vindas/'],
+    },
+];

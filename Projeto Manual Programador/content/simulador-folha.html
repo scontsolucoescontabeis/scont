@@ -1,0 +1,147 @@
+<p class="manual-intro">O Simulador de Folha vive inteiramente em <code>Projeto Simulador Folha/index.html</code> — um único arquivo (~3330 linhas: HTML + CSS + JS inline, sem separação em módulos, sem build step). Stack: HTML/CSS/JS puro, cliente Supabase próprio (<code>sbSim = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)</code>) usando as credenciais globais do portal (<code>../supabase-config.js</code>, mesmo projeto Supabase principal — não é um dos projetos <code>LIC_URL_A/B</code>). Autenticação/gating de acesso à ferramenta via <code>../portal-auth-guard.js</code> (<code>PortalAuthGuard.init(1)</code>), igual a qualquer outra ferramenta do portal. Diferente de boa parte do portal, aqui a persistência tem <strong>RLS real por usuário</strong> (não só filtro client-side) — ver <a href="#dados-persistencia">Dados e Persistência</a>. Não há geração de PDF (sem jsPDF): exportação é só CSV via <code>Blob</code> + link de download. Todo o estado das telas (cenários, configurações, cargos) fica em variáveis globais JS (<code>cenarios</code>, <code>configuracoesAvancadas</code>, <code>encargos</code>, <code>cargosPersonalizados</code>) recarregadas do Supabase a cada <code>DOMContentLoaded</code>; não há cache local (sem <code>localStorage</code>).</p>
+
+<section class="manual-item" id="estrutura-geral">
+  <h2>Estrutura Geral</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>Projeto Simulador Folha/index.html</code> — arquivo único: 5 abas (<code>Dashboard</code>, <code>Cenários</code>, <code>Comparação</code>, <code>Memória</code>, <code>Configurações</code>) trocadas via <code>mostrarTab()</code> mostrando/escondendo <code>.tab-content</code>, sem roteamento por URL nem recarregamento de página.</li>
+    <li>Sem arquivo JS separado — todo o código está entre <code>&lt;script&gt;...&lt;/script&gt;</code> dentro do próprio HTML. Sem framework de componentes: cada aba é montada via template string + <code>innerHTML</code>/<code>insertAdjacentHTML</code>, e os listeners são <code>onclick</code>/<code>onchange</code> inline no HTML gerado.</li>
+    <li>Dependências externas via CDN: <code>@supabase/supabase-js@2</code> (jsDelivr) e Font Awesome 6.4.0 (cdnjs). Nenhuma lib de PDF/planilha.</li>
+    <li><code>schema_simulador.sql</code> na raiz do portal (fora da pasta da ferramenta) — único artefato SQL da ferramenta: cria as 4 tabelas <code>sim_*</code> e todas as policies de RLS.</li>
+  </ul>
+
+  <h3>Fluxo de Inicialização</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[DOMContentLoaded] --> B[configurarNavegacao]
+    B --> C[carregarConfiguracoesAvancadas]
+    C --> D[carregarCargosPersonalizados]
+    D --> E[adicionarColaborador x3 linhas em branco]
+    E --> F[carregarCenarios]
+    F --> G[atualizarDashboard]
+    G --> H[PortalAuthGuard.init overlay removido]
+  </pre>
+  <p>A ordem importa: <code>carregarConfiguracoesAvancadas()</code> roda antes de <code>carregarCenarios()</code> justamente para que o objeto global <code>encargos</code> (usado por <code>calcularCenario</code>) já reflita a configuração salva do usuário quando os cenários existentes forem recalculados no carregamento — ver particularidade sobre defaults divergentes abaixo.</p>
+</section>
+
+<section class="manual-item" id="dados-persistencia">
+  <h2>Dados e Persistência</h2>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th><th>Colunas-chave</th></tr></thead>
+    <tbody>
+      <tr><td><code>sim_cenarios</code></td><td>1 linha por cenário salvo. <code>usuario_id</code> referencia <code>solicitacoes_acesso(id)</code>, não <code>auth.users</code>.</td><td><code>id</code>, <code>usuario_id</code>, <code>nome</code>, <code>regime</code> (CHECK <code>simples</code>/<code>lucro</code>), <code>faturamento</code>, <code>dias_uteis</code> (default 22), <code>vale_alimentacao</code>, <code>plano_saude</code>, <code>av_alvo</code> (default 0.10), <code>criado_em</code>, <code>atualizado_em</code>.</td></tr>
+      <tr><td><code>sim_colaboradores</code></td><td>N por cenário, FK <code>cenario_id</code> com <code>ON DELETE CASCADE</code> — apagar o cenário apaga os colaboradores automaticamente. Substituídos por completo (delete + insert) a cada edição de cenário, nunca faz UPDATE linha a linha.</td><td><code>id</code>, <code>cenario_id</code>, <code>ordem</code>, <code>nome</code>, <code>cargo</code>, <code>tipo</code> (CHECK <code>celetista</code>/<code>comissionado</code>), <code>salario</code>, <code>comissao</code>.</td></tr>
+      <tr><td><code>sim_configuracoes</code></td><td>Singleton por usuário (<code>UNIQUE(usuario_id)</code>), upsert com <code>onConflict: 'usuario_id'</code>. Só guarda os percentuais editáveis — FGTS é fixo em 8% no código, não persistido.</td><td><code>usuario_id</code>, <code>aliquota_simples</code> (default 0.06), <code>aliquota_lucro</code> (default 0.15), <code>inss_lucro</code> (default 0.20), <code>rat_lucro</code> (default 0.02), <code>terceiros_lucro</code> (default 0.018).</td></tr>
+      <tr><td><code>sim_cargos</code></td><td>Lista de cargos personalizados por usuário (substitui a lista default <code>['Vendedor','Gerente','Supervisor']</code> só quando o usuário já tem alguma linha salva). <code>UNIQUE(usuario_id, nome)</code>.</td><td><code>usuario_id</code>, <code>nome</code>, <code>ordem</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>RLS — exceção no portal</h3>
+  <p>Diferente da maioria das ferramentas do portal (onde o isolamento por usuário costuma ser só client-side, com RLS aberta para <code>authenticated</code>), o Simulador de Folha tem RLS real e restritiva nas 4 tabelas: cada policy (SELECT/INSERT/UPDATE/DELETE) resolve <code>usuario_id IN (SELECT id FROM solicitacoes_acesso WHERE email = auth.email())</code> — em <code>sim_colaboradores</code> a checagem é indireta, via subquery em <code>sim_cenarios</code>. Ou seja, um usuário autenticado só enxerga/edita seus próprios cenários mesmo acessando a API diretamente com a anon key; não depende do front-end respeitar <code>usuario_id</code> nos filtros. <code>getSimUsuarioId()</code> lê <code>auth.userId</code> de <code>sessionStorage.userAuth</code> (o mesmo <code>id</code> de <code>solicitacoes_acesso</code> usado pelas policies) — se essa chave não bater com a sessão Supabase Auth ativa (<code>auth.email()</code>), as queries simplesmente retornam vazio, silenciosamente.</p>
+</section>
+
+<section class="manual-item" id="engine-calculo">
+  <h2>Engine de Cálculo (calcularCenario)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li>Função pura <code>calcularCenario(colaboradores, regime, faturamento, diasUteis, valeAlimentacao, planosaude, avAlvo, vendaIndividual)</code>, linha ~2522 de <code>index.html</code>. Não lê nem grava nada no Supabase — recebe os dados já carregados e devolve um objeto de totais + <code>detalhes[]</code> (1 item por colaborador).</li>
+    <li>Chamada em 3 pontos: <code>criarCenario()</code> (ao salvar/editar um cenário), <code>carregarCenarios()</code> (recalcula todo cenário vindo do banco no load — os totais não ficam persistidos, só os inputs), e <code>salvarConfiguracoesAvancadas()</code> (recalcula todos os cenários já em memória quando os percentuais de encargos mudam).</li>
+    <li>Os totais (<code>custoMensal</code>, <code>encargos</code>, <code>av</code> etc.) nunca são gravados no banco — só os campos de entrada (<code>sim_cenarios</code>/<code>sim_colaboradores</code>). Isso implica que mudar a configuração de encargos/alíquota recalcula retroativamente todos os cenários existentes; não há "congelamento" do cálculo no momento em que o cenário foi criado.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Esta função não persiste nada por si própria — ver tabelas em <a href="#dados-persistencia">Dados e Persistência</a> (ela só consome/produz esses registros via as funções que a chamam).</p>
+
+  <h3>Memórias de Cálculo</h3>
+  <p>Por colaborador, a partir da venda individual (faturamento dividido igualmente entre todos os colaboradores do cenário, calculado fora da função, em <code>criarCenario</code>/<code>carregarCenarios</code>):</p>
+  <div class="manual-formula">vendaIndividual = faturamento / colaboradores.length
+comissao = vendaIndividual * (colab.comissao / 100)
+diasNaoUteis = 30 - diasUteis
+
+se colab.tipo === 'celetista':
+    remuneracao = colab.salario + comissao
+    baseDSR     = comissao
+senao (comissionado):
+    remuneracao = max(comissao, colab.salario)
+    baseDSR     = (comissao > colab.salario) ? comissao : colab.salario
+
+dsr = (baseDSR / diasUteis) * diasNaoUteis
+baseEncargos = remuneracao + dsr
+encargosColab = baseEncargos * encargosRegime.total</div>
+
+  <p>Provisões, por colaborador (FGTS sempre 8% fixo no código, não configurável mesmo para Lucro Presumido):</p>
+  <div class="manual-formula">ferias   = baseEncargos / 12
+terco    = ferias / 3
+decimo   = baseEncargos / 12          // mesma formula/valor de "ferias"
+fgts13   = decimo * 0.08
+fgtsFerias = ferias * 0.08
+fgtsTerco  = terco  * 0.08
+multa40  = (fgts13 + fgtsFerias + fgtsTerco) * 0.40
+rescisao = fgts13 + fgtsFerias + fgtsTerco + multa40</div>
+
+  <p>Totais do cenário (soma de todos os colaboradores + benefícios agregados):</p>
+  <div class="manual-formula">beneficios = valeAlimentacao * diasUteis * colaboradores.length
+           + planosaude * colaboradores.length
+
+custoMensal = remuneracaoTotal + encargosTotal + dsrTotal + feriasTotal
+            + tercoTotal + decimoTotal + rescisaoTotal + beneficiosTotal
+custoAnual  = custoMensal * 12
+
+impostoAnual   = (faturamento * 12) * aliquotaTributaria(regime)
+custoTotalAnual = custoAnual + impostoAnual
+
+av = custoMensal / faturamento
+se av > avAlvo + 0.02  -> statusEficiencia = 'critico'
+senao se av > avAlvo   -> statusEficiencia = 'atencao'
+senao                  -> statusEficiencia = 'saudavel'</div>
+
+  <p><strong>Percentuais de encargos e alíquota tributária, por regime</strong> — vêm de dois objetos globais em paralelo, <code>encargos</code> (efetivamente usado no cálculo dos encargos sociais) e <code>configuracoesAvancadas</code> (fonte da alíquota tributária e dos valores exibidos/persistidos na tela de Configurações). Valores hardcoded no carregamento inicial do script (antes de qualquer leitura do Supabase):</p>
+  <table class="manual-tabela">
+    <thead><tr><th>Regime</th><th>Objeto</th><th>FGTS</th><th>INSS</th><th>RAT</th><th>Terceiros</th><th>Total</th><th>Alíquota tributária</th></tr></thead>
+    <tbody>
+      <tr><td>Simples Nacional</td><td><code>encargos.simples</code></td><td>0.08</td><td>0</td><td>0</td><td>0</td><td>0.08</td><td>—</td></tr>
+      <tr><td>Simples Nacional</td><td><code>configuracoesAvancadas.simples</code></td><td>0.08</td><td>0</td><td>0</td><td>0</td><td>0.08</td><td>0.06</td></tr>
+      <tr><td>Lucro Presumido</td><td><code>encargos.lucro</code></td><td>0.08</td><td>0.20</td><td>0.018</td><td>0.05</td><td>0.348</td><td>—</td></tr>
+      <tr><td>Lucro Presumido</td><td><code>configuracoesAvancadas.lucro</code></td><td>0.08</td><td>0.20</td><td>0.02</td><td>0.018</td><td>0.318</td><td>0.15</td></tr>
+    </tbody>
+  </table>
+  <p>Reparem que para Lucro Presumido os dois objetos <strong>não concordam</strong> em RAT/Terceiros nem no total (34,8% vs. 31,8%) — ver particularidade abaixo, é a divergência mais arriscada da ferramenta.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Usuario preenche loja e colaboradores] --> B[Clica Criar Cenario]
+    B --> C[Le inputs do DOM colaboradoresData]
+    C --> D{colaboradoresData vazio?}
+    D -- Sim --> E[Erro - adicione um colaborador]
+    D -- Nao --> F[vendaIndividual = faturamento / n colaboradores]
+    F --> G[Prompt - nome do cenario]
+    G --> H[calcularCenario]
+    H --> I{editandoCenarioId definido?}
+    I -- Sim --> J[UPDATE sim_cenarios + DELETE sim_colaboradores antigos]
+    I -- Nao --> K[INSERT sim_cenarios]
+    J --> L[INSERT sim_colaboradores novos]
+    K --> L
+    L --> M[Atualiza arrays em memoria cenarios]
+    M --> N[Rerenderiza Cenarios Comparacao Memoria Dashboard]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>Dois "defaults" divergentes para Lucro Presumido.</strong> O objeto <code>encargos.lucro</code> (usado de fato no cálculo enquanto <code>atualizarConfiguracao()</code> não roda) tem RAT=1,8%/Terceiros=5%/total 34,8% — herdado de antes da feature de configuração existir. O objeto <code>configuracoesAvancadas.lucro</code> (e os <code>value=</code> dos inputs HTML da aba Configurações, e o default do <code>schema_simulador.sql</code>) tem RAT=2%/Terceiros=1,8%/total 31,8%. <code>carregarConfiguracoesAvancadas()</code> só chama <code>atualizarConfiguracao()</code> (que recalcula <code>encargos.lucro.total</code> a partir de <code>configuracoesAvancadas</code>) quando já existe uma linha em <code>sim_configuracoes</code> para o usuário — se <code>data</code> vier <code>null</code> (usuário nunca salvou configuração), a função retorna sem chamar <code>atualizarUIConfiguracao()</code>/<code>atualizarConfiguracao()</code>, então o cálculo de Lucro Presumido roda silenciosamente com 34,8% de encargos enquanto a aba Configurações mostra 31,8% como "padrão". Isso só se resolve quando o usuário visita a aba Configurações e clica em Salvar (ou em qualquer <code>onchange</code> de input lá, que chama <code>atualizarConfiguracao()</code>) pelo menos uma vez.</li>
+    <li>Os totais do cenário nunca são persistidos — só os inputs (<code>sim_cenarios</code>/<code>sim_colaboradores</code>). Toda leitura recalcula via <code>calcularCenario</code>. Consequência: mudar os percentuais em Configurações recalcula retroativamente todos os cenários já salvos (comportamento intencional, documentado no Manual do Usuário), incluindo cenários antigos que foram criados sob outra config.</li>
+    <li><code>editarCenario(id)</code> remove o cenário do array local <code>cenarios</code> (para preencher o formulário e evitar duplicidade visual) mas <strong>não</strong> apaga a linha no Supabase. Se o usuário navegar para outra aba/recarregar a página sem clicar em "Criar Cenário" para confirmar a edição, o cenário reaparece ao recarregar (a exclusão local era só de UI) — não há de fato perda de dado, mas o comportamento "sumiu da tela" pode confundir quem só olhar o client-side.</li>
+    <li>FGTS incidente sobre férias/13º/rescisão é sempre 8% fixo no código (não lido de <code>configuracoesAvancadas.*.fgts</code> dentro de <code>calcularCenario</code>, apesar de existir esse campo no objeto) — só o FGTS-encargo mensal (dentro de <code>encargosRegime.total</code>) usa o valor configurável.</li>
+    <li>Cargo é <code>TEXT</code> livre em <code>sim_colaboradores.cargo</code>, mas o valor gravado é o <code>value</code> do <code>&lt;option&gt;</code> gerado a partir do nome do cargo personalizado, normalizado (<code>toLowerCase().replace(/\s+/g,'_')</code>) — não há de-normalização ao exibir de volta; se o cargo personalizado for renomeado/excluído em <code>sim_cargos</code>, colaboradores salvos anteriormente mantêm o slug antigo e <code>gerarOpcoesCargoHtml</code> simplesmente não vai encontrar opção correspondente pré-selecionada.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Unificar os dois objetos de encargos (<code>encargos</code> e <code>configuracoesAvancadas</code>) e garantir que <code>carregarConfiguracoesAvancadas()</code> sempre chame <code>atualizarConfiguracao()</code> — inclusive quando não há linha salva no banco — para eliminar a divergência 34,8%/31,8% descrita acima.</li>
+    <li>Não há teste automatizado para <code>calcularCenario</code> (diferente de outros módulos do portal, como <code>contabil-diario-util.js</code>, que têm teste Node puro dedicado).</li>
+  </ul>
+</section>

@@ -1,0 +1,391 @@
+<p class="manual-intro">O Fechamento Folha (pasta <code>Projeto Fechamento Folha/</code>, raiz do Portal Scont — não confundir com o Projeto Onboarding Contábil) é a área mais complexa do portal: processa a folha mensal de três empresas com layout de planilha totalmente diferente entre si — <strong>Quadrante Etiquetas</strong> (cód. 453, mais <strong>Quadrante Rótulos</strong> cód. 457 desde 2026-08), <strong>Track &amp; Field</strong> (cód. <code>TF</code>, seis lojas com código próprio dentro da mesma planilha) e <strong>Anankê</strong> (cód. 293) — e converte cada uma no mesmo formato de TXT de lançamento de rubricas aceito pelo sistema de folha. As três empresas compartilham a mesma engine conceitual de "coluna da planilha → rubrica → valor", mas cada arquivo (<code>quadrante.js</code>, <code>trackfield.js</code>, <code>ananke.js</code>) reimplementa essa engine de forma independente e sem módulo compartilhado — isso é tratado em detalhe na primeira seção e retomado como dívida técnica transversal. Além das três empresas, o módulo tem quatro ferramentas satélites com maturidade técnica bem diferente entre si: Fluxo de Fechamento (checklist 100% local, sem Supabase), Controle de Fechamento (máquina de estados real, com Supabase e e-mail — não documentada no Manual do Usuário), Programação de Férias (extração de texto de PDF por coordenadas, sem persistência) e Aviso de Férias (split de PDF com <code>pdf-lib</code>, também sem persistência).</p>
+
+<section class="manual-item" id="quadrante">
+  <h2>Quadrante Etiquetas (453) e Quadrante Rótulos (457)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>quadrante.html</code> + <code>quadrante.js</code> (~2820 linhas) — tela única que cobre Planilha, Relatório Líquido (etiquetas bancárias) e Configurações via query string (<code>?tela=liquido</code>, <code>?tela=config-rubricas</code>); sem roteador, é só <code>if</code> no <code>DOMContentLoaded</code> lendo <code>URLSearchParams</code>.</li>
+    <li><code>formulario_quadrante.html</code> — formulário manual standalone (HTML+JS inline, não usa <code>quadrante.js</code>), preenchimento por empregado, grava em <code>quadrante_folha_envios</code> para <code>quadrante.js</code> consumir depois.</li>
+    <li>HTML+JS puro, sem build, cliente Supabase próprio (<code>supabase.createClient</code>) em cada arquivo. Bibliotecas via CDN: SheetJS <code>xlsx</code> 0.18.5 (leitura do Excel), jsPDF 2.5.1 + AutoTable 3.8.2 (PDF do Relatório Líquido), pdf.js 3.11.174 (carregado mas não usado nesta tela — herdado do template comum de cabeçalho).</li>
+    <li>Auth via <code>PortalAuthGuard.init(1, ...)</code> (<code>portal-auth-guard.js</code> do portal), igual ao resto do módulo.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>fechamento_rubricas_config</code></td><td>1 linha por <code>(codigo_empresa, coluna_planilha)</code>. Define <code>codigo_rubrica</code>, <code>tipo_processo</code> padrão, <code>tipo_valor</code> (<code>monetario</code>/<code>minutos</code>/<code>dias</code>/<code>booleano</code>) e, para booleano, <code>valor_cota</code> (valor fixo lançado quando a célula é "Sim"). Tabela central, compartilhada pelas 3 empresas (chaveada por <code>codigo_empresa</code>) e também pelas colunas especiais de Track&amp;Field (R$87, desconto VT/VA — ver seção própria).</td></tr>
+      <tr><td><code>fechamento_rubricas_cota_historico</code></td><td>Agendamento de mudança de <code>valor_cota</code> por competência de vigência, FK para <code>fechamento_rubricas_config.id</code>. Resolução: entre os registros com <code>competencia_vigencia &lt;= competência da folha</code>, usa o de vigência mais recente; sem nenhum ainda vigente, cai no <code>valor_cota</code> base da config.</td></tr>
+      <tr><td><code>fechamento_empregados_config</code></td><td>Override de <code>(codigo_empresa, nome_planilha)</code> → <code>codigo_empregado</code>. Consultada <strong>antes</strong> de <code>rh_empregados</code> em <code>buscarCodigoEmpregado()</code> — existe para os casos em que o nome na planilha do cliente nunca vai bater (apelido, nome de casada não atualizado etc.) sem forçar edição em <code>rh_empregados</code>.</td></tr>
+      <tr><td><code>fechamento_rubricas_ignoradas</code></td><td><code>(codigo_empresa, coluna_planilha)</code> marcadas para excluir do TXT mesmo com rubrica resolvida — usado quando uma coluna existe na planilha só para conferência visual, sem lançamento correspondente.</td></tr>
+      <tr><td><code>quadrante_folha_rascunho</code></td><td>Rascunho do formulário manual. Chave <code>(empresa_codigo, competencia, tipo_folha)</code>, coluna <code>dados JSONB</code> com o payload inteiro do formulário. <code>formulario_quadrante.html</code> grava sempre com <code>empresa_codigo='453'</code> fixo — o formulário manual não existe para a 457 (ver Particularidades).</td></tr>
+      <tr><td><code>fechamento_dados_bancarios</code></td><td>Cadastro bancário por <code>(codigo_empresa, codigo_empregado)</code> para o Relatório Líquido — <code>tipo_conta</code> nunca é sobrescrito por reimportação, só editável manualmente na tela.</td></tr>
+      <tr><td><code>fechamento_rubrica_associacoes</code></td><td>Existe no schema (<code>schema_config_associacoes.sql</code>) e tem RLS configurada, mas <strong>nenhum arquivo <code>.js</code> do módulo faz <code>select</code>/<code>insert</code> nela</strong> — é dado morto. O único resquício é o badge visual "★ Associação da ferramenta" em <code>renderizarRelatorio()</code> (quadrante.js e ananke.js), que testa <code>fonteRubrica === 'associacao'</code>, valor que <code>resolverColuna()</code> nunca produz (só retorna <code>'config'</code> ou <code>null</code>). Ver Dívida Técnica.</td></tr>
+      <tr><td><code>quadrante_folha_envios</code></td><td>Fila de envios do formulário manual (<code>empresa_codigo</code>, <code>competencia</code>, <code>tipo_folha</code>, <code>dados JSONB</code>, <code>processado</code>), lida por <code>carregarEnvios()</code>/<code>processarDadosFormulario()</code> em <code>quadrante.js</code>, <code>trackfield.js</code> e <code>ananke.js</code>. Nome herdado da Quadrante (primeira empresa implementada) mas compartilhada pelas 3. <strong>Não existe <code>CREATE TABLE</code> para ela em nenhum <code>schema_*.sql</code> do repositório</strong> — foi criada direto no Supabase (dashboard ou migração não versionada). Ver Dívida Técnica.</td></tr>
+      <tr><td>Todas com RLS <code>TO authenticated USING (TRUE)</code></td><td>Igual ao restante do portal (ver Manual do Programador da Central do Departamento Contábil) — controle de quem pode editar rubricas/config é 100% de UI, não de banco.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal — algoritmo coluna → rubrica → valor</h3>
+  <p>Este é o núcleo replicado (com pequenas variações) nas 3 empresas. Casamento de coluna com rubrica, em <code>resolverColuna(header, competencia)</code>:</p>
+  <div class="manual-formula">1. normaliza header (trim, lowercase, remove acentos, colapsa espaços)
+2. match exato contra coluna_planilha OU descricao em fechamento_rubricas_config
+   -> encontrado: usa esse registro
+3. senao, match fuzzy (Levenshtein normalizado) contra as mesmas 2 colunas
+   -> melhor score >= 0.80: usa esse registro
+4. senao: sem rubrica (codigo_rubrica = null, exige cadastro manual na tela)</div>
+  <p>Casamento de empregado por nome, em <code>buscarCodigoEmpregado(nome)</code>:</p>
+  <div class="manual-formula">1. fechamento_empregados_config (override desta ferramenta) - match exato
+2. rh_empregados (funcionariosMap, ja filtrado por tipo_empregado != 'Contribuinte') - match exato
+3. rh_empregados - fuzzy (Levenshtein normalizado), melhor score >= 0.75
+4. senao: sem codigo (exige "+ Definir codigo" manual na linha)</div>
+  <p>Conversão do valor bruto da célula para inteiro do TXT, por <code>tipo_valor</code>:</p>
+  <div class="manual-formula">valorInt = tipoValor === 'booleano'
+    ? (celula.trim().lower() === 'sim' &amp;&amp; valorCota ? round(valorCota * 100) : 0)
+    : tipoValor === 'monetario' ? parseMoney(celula)   // "R$ 2.990,26" -> 299026
+    : tipoValor === 'minutos'   ? parseHoras(celula)   // "4h30m"/"12:18:00" -> HHMM (430/1218)
+    : tipoValor === 'dias'      ? parseDias(celula)    // numero, ou contagem de datas DD/MM/AAAA
+    : 0</div>
+  <p><code>valorCota</code> em booleano vem de <code>valorCotaEmCompetencia(rubricaConfigId, competencia)</code>, que resolve o histórico de agendamento descrito na tabela <code>fechamento_rubricas_cota_historico</code> acima — e não do valor bruto da célula (a célula só indica presença/ausência).</p>
+
+  <pre class="mermaid">
+flowchart TD
+    A[Upload Excel linha 4 = cabecalho] --> B[Para cada coluna a partir do indice 2]
+    B --> C[resolverColuna header competencia]
+    C -->|match exato ou fuzzy >= 0.80| D[codigo_rubrica + tipo_valor resolvidos]
+    C -->|sem match| E[sem rubrica - exige cadastro manual]
+    D --> F[Para cada linha de empregado]
+    F --> G[buscarCodigoEmpregado nome]
+    G -->|config ou rh_empregados exato/fuzzy >= 0.75| H[codigo_empregado resolvido]
+    G -->|sem match| I[sem funcionario - exige cadastro manual]
+    H --> J{tipo_valor}
+    J -->|monetario| K[parseMoney - centavos]
+    J -->|minutos| L[parseHoras - HHMM]
+    J -->|dias| M[parseDias - qtd ou contagem de datas]
+    J -->|booleano| N[Sim mais valor_cota da competencia, senao zero]
+    K --> O[linhasRelatorio]
+    L --> O
+    M --> O
+    N --> O
+    O --> P[Revisao na tela - correcao manual de empregado/rubrica]
+    P --> Q[Escolha do Tipo de Processo]
+    Q --> R[gerarLinhaTxt por linha valida]
+    R --> S[Download do TXT]
+  </pre>
+
+  <p>Segundo fluxo, paralelo ao de planilha, entrando pelo formulário manual (só empresa 453):</p>
+  <pre class="mermaid">
+flowchart TD
+    A[formulario_quadrante.html] --> B[autosave 3s - upsert quadrante_folha_rascunho]
+    B --> C[Envio final - insert em quadrante_folha_envios processado=false]
+    C --> D[quadrante.js carregarEnvios - lista envios pendentes]
+    D --> E[processarDadosFormulario envioRow]
+    E --> F[Mesmo campoParaHeader -> resolverColuna -> valorParaTxt do fluxo de planilha]
+    F --> G[Unimed - cada linha de convenio vira lancamento propio]
+    G --> H[linhasRelatorio identico ao fluxo de planilha]
+    H --> I[UPDATE quadrante_folha_envios SET processado=true]
+  </pre>
+
+  <p>Layout fixo da linha do TXT (<code>gerarLinhaTxt</code>), idêntico nas 3 empresas:</p>
+  <div class="manual-formula">"10" + codEmpregado(10, zero-pad)
+     + competencia AAAAMM(6)
+     + codigoRubrica somente-digitos(9, zero-pad)
+     + tipoProcesso(2, zero-pad)
+     + valorInt(9, zero-pad)
+     + codEmpresa(10, zero-pad)</div>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>DSR de faltas nunca vem pronto da planilha.</strong> A célula de "Faltas DSR" (quando booleana) só indica se o desconto deve ou não ocorrer (<code>ehNegativoBooleano</code> — só bloqueia com "não"/"n"/"0"/"false" explícito; vazio não bloqueia). A quantidade real é sempre recalculada a partir das datas digitadas na coluna "Faltas" normal: cada falta gera um domingo de DSR perdido (<code>proximoDomingo</code>, sem duplicar por semana). Editar as datas de falta na tela recalcula o DSR em tempo real (<code>atualizarFaltaAuto</code> → <code>atualizarDsrAuto</code>).</li>
+    <li><strong>Empresa 457 (Quadrante Rótulos) foi criada replicando as rubricas da 453</strong> via <code>schema_rubricas_replicar_453_para_457.sql</code> (script de replicação única, idempotente por causa da constraint <code>UNIQUE(codigo_empresa, coluna_planilha)</code>). O formulário manual não foi replicado — só existe fluxo de Planilha para a 457 (o <code>avisoFormularioEmpresa</code> em <code>atualizarTextosEmpresa()</code> mostra um aviso explícito quando <code>empresaAtiva !== '453'</code>).</li>
+    <li><strong>Plano Unimed é uma particularidade do formulário da Quadrante</strong>, não da Anankê (apesar do nome "plano de saúde" existir também na planilha Excel da 453, rubrica <code>' Plano Saúde  '</code>). No formulário, cada card de convênio (<code>d.convenios</code>) vira uma linha de TXT independente, casada ao empregado pelo <strong>primeiro nome apenas</strong> (<code>normalizarNome(...).split(' ')[0]</code>) — risco real de colisão em empresas com dois empregados de primeiro nome igual.</li>
+    <li>Relatório Líquido (etiquetas bancárias) é uma ferramenta à parte dentro do mesmo arquivo (<code>quadrante.js</code>, seção "RELATÓRIO LÍQUIDO — ETIQUETAS BANCÁRIAS"): lê a aba "Líquido" da planilha, casa por <code>codigo_empregado</code> (fallback CPF) contra <code>fechamento_dados_bancarios</code>, agrupa por banco via tabela FEBRABAN embutida no código, e bloqueia a geração do PDF se houver empregado sem cadastro bancário. Funciona para qualquer empresa cadastrada em <code>rh_empresas</code>, não só a Quadrante.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li><strong>Engine de resolução (Levenshtein/normalização/parse de valor) está triplicada</strong> — <code>quadrante.js</code>, <code>trackfield.js</code> e <code>ananke.js</code> têm cada um sua própria cópia de <code>levenshtein</code>, <code>similaridade</code>, <code>normalizarNome</code>, <code>parseMoney</code> etc. Não há módulo compartilhado. Uma correção de bug num parser precisa ser replicada manualmente nos 3 arquivos.</li>
+    <li><code>quadrante_folha_envios</code> não tem <code>CREATE TABLE</code> versionado em nenhum <code>schema_*.sql</code> do repositório, apesar de ser lida/escrita pelas 3 empresas. Schema real só existe no banco.</li>
+    <li><code>fechamento_rubrica_associacoes</code> é uma tabela com RLS configurada e nunca consultada pelo código — o "fonte de associação" que a UI sinaliza (★) nunca é de fato produzido por <code>resolverColuna()</code>.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="trackfield">
+  <h2>Track &amp; Field (TF)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>trackfield.html</code> + <code>trackfield.js</code> (~2164 linhas) — mesmo padrão de tela única com steps (Planilha → Relatório → TXT) e Configurações via query string (<code>?tela=config</code>).</li>
+    <li><code>formulario_trackfield.html</code> (~1159 linhas) — formulário manual standalone, mesmo padrão de rascunho + fila de envio da Quadrante, mas com <code>EMPRESA_CODIGO</code> único genérico (não por loja) no rascunho.</li>
+    <li>Mesmas libs CDN da Quadrante (xlsx 0.18.5, jsPDF+AutoTable, pdf.js).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela / Constante</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>LOJAS_TF</code> (constante em <code>trackfield.js</code>, não é tabela)</td><td>Mapa fixo <code>nome da loja no Excel → {codTxt, codDB}</code>: Aeroporto (113), Conjunto Nacional / TR Conjunto (128), Pátio Brasil / Patio Brasil (126), DF Plaza (115), TR CNB (464). <code>codTxt</code> vai no TXT e em <code>fechamento_rubricas_config.codigo_empresa</code>; <code>codDB</code> é usado para buscar em <code>rh_empregados</code> — hoje sempre iguais, mas são conceitos deliberadamente separados no código.</td></tr>
+      <tr><td><code>fechamento_rubricas_config</code></td><td>Mesma tabela da Quadrante, uma configuração <strong>por loja</strong> (chaveada pelo <code>codTxt</code> de cada uma — não há fallback genérico entre lojas). Reaproveitada também para: coluna <code>valor_garantia</code> (garantia de comissão dom./feriado) e para as colunas sintéticas de desconto manual de VT/VA (ver abaixo) — não existem tabelas dedicadas para essas duas regras.</td></tr>
+      <tr><td>Colunas sintéticas em <code>fechamento_rubricas_config.coluna_planilha</code></td><td><code>'COMISSÃO DOMINGOS/FERIADOS - DOMINGO - R87'</code> / <code>'... FERIADO - R87'</code> (rubrica de garantia, com <code>valor_garantia</code> preenchido) e <code>'... DOMINGO'</code> / <code>'... FERIADO'</code> (rubrica normal); <code>'DESCONTO VALE TRANSPORTE (MANUAL)'</code> / <code>'DESCONTO VALE ALIMENTAÇÃO (MANUAL)'</code> (rubrica de desconto, sem <code>valor_garantia</code>). Não correspondem a colunas reais do Excel — são chaves usadas só para guardar o código de rubrica dessas regras especiais dentro da mesma tabela genérica.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Estrutura da planilha: linha 1 = "TRACK &amp; FIELD", linha 2 = "VERIFICAR FERIADOS", linha 3 = cabeçalho real (<code>LINHA_CABECALHO=3</code>), coluna 0 = loja, coluna 3 = nome do colaborador, colunas 4–12 = rubricas. Cada linha da planilha já vem etiquetada com a loja, então uma única planilha cobre a rede inteira e gera um único TXT com o código de empresa certo embutido por linha (<code>gerarLinhaTxt(..., codEmpresa)</code>).</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Upload Excel unico com todas as lojas] --> B[Por linha - resolve loja via LOJAS_TF]
+    B --> C[codTxt para o TXT, codDB para buscar em rh_empregados]
+    C --> D{Coluna e Domingo/Feriado?}
+    D -->|nao| E[Engine generica coluna -> rubrica -> valor, igual Quadrante]
+    D -->|sim| F[expandirDomingosFeriados - celula pode ter varios R$ por linha]
+    F --> G{Para cada ocorrencia - centavos == valor_garantia da loja?}
+    G -->|sim| H[ehGarantia = true]
+    G -->|nao| I[ehGarantia = false]
+    H --> J[Usuario classifica manualmente - Domingo ou Feriado - classificar87]
+    I --> J
+    J -->|ehGarantia| K[usa rubrica R87 dedicada, valor = centavos apurados]
+    J -->|normal| L[usa rubrica normal de comissao dom/feriado]
+    E --> M[linhasRelatorio consolidado]
+    K --> M
+    L --> M
+    M --> N[gerarTxt - soma por empregado+rubrica+empresa+tipoProcesso]
+  </pre>
+
+  <p>Fluxo do lançamento manual de desconto de VT/VA por falta/atestado, disparado ao gerar o TXT:</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Clique em Gerar TXT] --> B{Ha desconto de VT/VA nesta competencia?}
+    B -->|Nao informar| C[gerarTxt direto, sem lancamentos extras]
+    B -->|Sim| D[Modal - seleciona empresa/loja e empregado do roster]
+    D --> E{Rubrica VT/VA cadastrada para a loja?}
+    E -->|nao| F[Bloqueia - pede cadastro em Configuracoes]
+    E -->|sim| G[Adiciona linha a descontoPendentes]
+    G --> H[confirmarDescontosEGerarTxt - injeta linhas extras em linhasRelatorio]
+    H --> I[gerarTxt roda normalmente]
+    I --> J[linhasRelatorio volta ao tamanho original - lancamento nao fica salvo]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>A classificação de "garantia" é por igualdade exata de valor, não por "abaixo de um mínimo".</strong> <code>_tipoValorDomFer()</code> testa <code>centavos === valorGarantiaCentavos</code> — o Excel já registra o valor efetivamente pago (que é o mínimo garantido quando a comissão apurada ficou abaixo dele), então bater exatamente com o <code>valor_garantia</code> configurado é o sinal usado para decidir a rubrica. Uma célula de comissão que coincidir por acaso com esse valor exato é classificada como garantia mesmo sem ter havido garantia real — risco baixo mas existente.</li>
+    <li>Coluna de comissão dom./feriado pode ter <strong>múltiplas ocorrências numa única célula</strong> (vários "R$ x,xx" por linha ou por quebra de linha) — <code>expandirDomingosFeriados()</code> primeiro tenta separar por linha ou <code>;</code>, com fallback para múltiplos "R$" na mesma string. Cada ocorrência vira uma linha de <code>linhasRelatorio</code> separada, sem data associada — o usuário classifica manualmente Domingo/Feriado por linha (<code>classificar87</code>), não há inferência automática do dia da semana.</li>
+    <li><strong>Duas fontes de roster diferentes, dependendo de como se chegou ao TXT</strong> — comentário explícito no código (<code>_rosterParaDesconto</code>, trackfield.js linhas ~1147-1151): <code>planilhaData</code> só é populado por upload de Excel na mesma sessão; o fluxo normal via fila de envios (<code>processarEnvio</code>) nunca preenche <code>planilhaData</code>, só <code>linhasRelatorio</code> — por isso o seletor de empregado do modal de desconto usa sempre <code>linhasRelatorio</code> como fallback e nunca pode assumir que <code>planilhaData</code> existe.</li>
+    <li>Consolidação do TXT (<code>gerarTxt</code>) soma valores por chave <code>codEmpregado|codigoRubrica|codEmpresa|tipoProcesso</code> antes de gerar as linhas — várias entradas da mesma rubrica (ex.: múltiplas ocorrências de comissão de domingo) viram uma única linha somada no TXT final, exceto minutos, que são somados à parte e convertidos de volta para HHMM.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="ananke">
+  <h2>Anankê (293)</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>ananke.html</code> + <code>ananke.js</code> (~1545 linhas) — mesmo padrão de tela única com steps; Configurações via <code>?tela=config</code>.</li>
+    <li><code>formulario_ananke.html</code> (~1259 linhas) — formulário manual standalone; <strong>sem</strong> nenhum campo de convênio/plano de saúde (ver Particularidades).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Reaproveita exatamente as mesmas tabelas da Quadrante (<code>fechamento_rubricas_config</code>, <code>fechamento_empregados_config</code>, <code>fechamento_rubricas_ignoradas</code>, <code>quadrante_folha_envios</code>), chaveadas por <code>codigo_empresa='293'</code>. Nenhuma tabela nova específica da Anankê.</p>
+
+  <h3>Fluxo Principal</h3>
+  <p>Planilha da Anankê tem cabeçalho em <strong>duas linhas</strong>: linha 3 = nome da rubrica (<code>LINHA_CABECALHO=3</code>), linha 4 = qualificador percentual (<code>LINHA_SUB_CABECALHO=4</code>), usado só para as colunas de insalubridade — o Excel guarda 20%/40% como número (0.2/0.4), não texto. Colunas de rubrica começam no índice 7 (<code>COL_RUBRICAS_START</code>); a aba lida é a que tiver "MATRIZ" no nome (fallback: primeira aba).</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Upload Excel - aba MATRIZ] --> B[Le linha 3 = headers e linha 4 = subHeaders]
+    B --> C{Header vazio - celula mesclada?}
+    C -->|sim| D[resolverHeaderInsalubridade sub-header]
+    D -->|0.2| E[header = INSALUBRIDADE 20%]
+    D -->|0.4| F[header = INSALUBRIDADE 40%]
+    D -->|nem 0.2 nem 0.4| G[coluna realmente vazia - ignorar]
+    C -->|nao, e contem Insalubridade| H[Mesma logica - qualifica pelo sub-header]
+    C -->|nao, outra rubrica| I[header usado como esta]
+    E --> J[resolverColuna sobre o header ja qualificado]
+    F --> J
+    H --> J
+    I --> J
+    J --> K[Mesma engine generica coluna -> rubrica -> valor da Quadrante]
+    K --> L[linhasRelatorio]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>O código de empregado da própria planilha é lido mas nunca usado.</strong> A coluna <code>COL_REG</code> (índice 5) é capturada em <code>codEmpregadoSheet</code> ao montar <code>planilhaData</code>, mas <code>construirRelatorio()</code> resolve o empregado exclusivamente via <code>buscarCodigoEmpregado(func.nome)</code> — casamento por nome, idêntico ao das outras duas empresas. <code>codEmpregadoSheet</code> não aparece em nenhum outro ponto do arquivo (confirmado por busca completa). Isso diverge do que o Manual do Usuário descreve ("o código costuma vir direto de uma coluna da planilha") — na prática, hoje, não vem: é campo morto.</li>
+    <li><strong>Não existe lançamento de plano Unimed na Anankê</strong> — nem em <code>ananke.js</code> nem em <code>formulario_ananke.html</code> há qualquer referência a convênio/plano de saúde. Essa funcionalidade existe apenas no formulário da <a href="#quadrante">Quadrante</a> (<code>formulario_quadrante.html</code> / <code>quadrante.js</code>, seção <code>d.convenios</code>). A rubrica "Plano de Saúde" que a Anankê eventualmente tiver na planilha segue o fluxo genérico de coluna → rubrica → valor, sem tratamento especial.</li>
+    <li>Insalubridade 20%/40% não tem nenhuma regra de negócio própria além da resolução de header — cada percentual vira uma <code>coluna_planilha</code> distinta em <code>fechamento_rubricas_config</code> (cadastradas manualmente em Configurações, cada uma com seu próprio código de rubrica), tratada depois como qualquer outra coluna monetária.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="fluxo">
+  <h2>Fluxo de Fechamento</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>fluxo.html</code> (~927 linhas, tudo inline — sem <code>.js</code> separado). Duas abas na mesma página: "Fluxo" (checklist de etapas do fechamento mensal) e "Calendário" (tarefas recorrentes do Departamento Pessoal por dia do mês).</li>
+    <li><strong>Sem Supabase para os dados de conteúdo</strong> — só usa <code>PortalAuthGuard.init(1, ...)</code> para autenticação. Todo o estado (etapas, checklists, dias do calendário, marcação de concluído) é <code>localStorage</code> puro, chaves <code>qf_s</code>/<code>qf_c</code>/<code>qf_d</code> (fluxo) e <code>qc_d</code>/<code>qc_c</code> (calendário).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Chave localStorage</th><th>Conteúdo</th></tr></thead>
+    <tbody>
+      <tr><td><code>qf_s</code></td><td>Array de etapas do fluxo (<code>fSteps</code>) — se ausente, inicializa a partir da constante <code>FLOW_DATA</code> embutida no HTML.</td></tr>
+      <tr><td><code>qf_c</code> / <code>qf_d</code></td><td>Checklist marcado (<code>fChk</code>) e etapas concluídas (<code>fDone</code>) por id de etapa.</td></tr>
+      <tr><td><code>qc_d</code></td><td>Dias do calendário e suas tarefas (<code>cDays</code>) — inicializa a partir de <code>CAL_DATA</code>.</td></tr>
+      <tr><td><code>qc_c</code></td><td>Tarefas marcadas como concluídas (<code>cChk</code>).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[DOMContentLoaded] --> B[loadState le localStorage]
+    B --> C{Existe estado salvo?}
+    C -->|nao| D[Usa deepCopy de FLOW_DATA / CAL_DATA como default]
+    C -->|sim| E[Usa o estado salvo]
+    D --> F[renderFlow + renderCal]
+    E --> F
+    F --> G[Usuario edita etapas/checklist/tarefas]
+    G --> H[saveState grava tudo de volta no localStorage a cada mudanca]
+    H --> I[exportAll - opcional, baixa JSON do estado atual]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><strong>Estado é por navegador, não por usuário nem compartilhado.</strong> Duas pessoas da equipe abrindo "Fluxo de Fechamento" em máquinas diferentes veem cada uma sua própria cópia — não há sincronização entre elas. <code>exportAll()</code>/import existem como válvula de escape manual, não como mecanismo de sync real.</li>
+    <li>Apesar do nome semelhante e do mesmo objetivo geral ("acompanhar o fechamento do mês"), esta ferramenta não tem nenhuma relação de código com <a href="#controle-fechamento">Controle de Fechamento</a> — são implementações completamente independentes, uma local e outra em Supabase.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Sem persistência multiusuário: se o objetivo do módulo evoluir para acompanhamento de equipe, esta tela precisaria ser reescrita para Supabase — o que na prática já foi feito em paralelo como uma ferramenta nova (Controle de Fechamento) em vez de migrar esta.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="controle-fechamento">
+  <h2>Controle de Fechamento</h2>
+  <p>Não documentada no Manual do Usuário. É a versão multiusuário/Supabase do acompanhamento de fechamento — tecnicamente não relacionada ao <a href="#fluxo">Fluxo de Fechamento</a> acima, apesar do nome parecido.</p>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>controle.html</code> (397 linhas) + <code>controle.js</code> (~1235 linhas). Duas telas: Dashboard (status do fechamento por empresa/competência) e Configuração (fases por empresa, quem tem folha, responsáveis, alerta por e-mail).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>fechamento_fases_catalogo</code></td><td>Catálogo global de fases sugeridas (10 pré-cadastradas: Apuração da Frequência, Lançamento na Domínio, ..., Geração dos Benefícios), só apoio de UI na Configuração.</td></tr>
+      <tr><td><code>fechamento_config_empresa_fase</code></td><td>Fluxo de fases configurado por empresa (nome + ordem + ativo). É o "molde" copiado para cada novo ciclo mensal.</td></tr>
+      <tr><td><code>fechamento_ciclo</code></td><td>1 linha por <code>(codigo_empresa, competencia)</code>. <code>responsavel_id</code> aponta para <code>public.usuarios</code> (não <code>solicitacoes_acesso</code>, diferente do padrão usado no módulo de Departamento Contábil). <code>concluido_em</code> só é preenchido no fechamento explícito, nunca inferido.</td></tr>
+      <tr><td><code>fechamento_ciclo_fase</code></td><td>Fases instanciadas de um ciclo específico, copiadas de <code>fechamento_config_empresa_fase</code> no momento de <code>iniciarCiclo()</code> — uma alteração posterior na configuração da empresa não retroage sobre ciclos já iniciados.</td></tr>
+      <tr><td><code>fechamento_empresas_config</code></td><td><code>codigo_empresa</code> PK + <code>possui_folha</code> boolean. Ausência de linha = <code>false</code> (oposto da convenção "ausência = incluída" usada em <code>contabil_empresas_config</code> do Departamento Contábil) — só empresas explicitamente marcadas aparecem no Dashboard.</td></tr>
+      <tr><td><code>fechamento_empresas_responsaveis</code></td><td>N:N <code>codigo_empresa</code> ↔ <code>usuario_id</code> (FK <code>public.usuarios</code>), define quem recebe o e-mail de conclusão daquela empresa.</td></tr>
+      <tr><td><code>fechamento_config_geral</code></td><td>Singleton (<code>id=1</code>): <code>competencia_atual</code> (sobrepõe o mês corrente calculado automaticamente) e <code>email_alerta_fechamento</code> (destinatários adicionais, além dos responsáveis por empresa).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Status de cada empresa/competência é <strong>sempre derivado</strong>, nunca armazenado numa coluna própria (mesmo padrão do Diário Contábil):</p>
+  <div class="manual-formula">statusCiclo(entry):
+  sem ciclo                                    -> nao_iniciada
+  ciclo.concluido_em preenchido                 -> fechada
+  todas as fases com status = concluida         -> pronta_fechar
+  senao                                         -> em_execucao</div>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> nao_iniciada
+    nao_iniciada --> em_execucao: iniciarCiclo - copia fases de fechamento_config_empresa_fase
+    em_execucao --> em_execucao: atualizarStatusFase - marca/desmarca fase
+    em_execucao --> pronta_fechar: todas as fases concluidas
+    pronta_fechar --> em_execucao: desmarca qualquer fase
+    pronta_fechar --> fechada: fecharFolha - grava concluido_em e dispara e-mail
+    fechada --> em_execucao: desmarcar fase reabre e zera concluido_em
+    fechada --> [*]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>"Fechar Folha" (<code>fecharFolha</code>) só fica disponível quando <code>status === 'pronta_fechar'</code> — marcar a última fase como concluída não fecha sozinho, é uma ação explícita separada que grava <code>concluido_em</code> e dispara <code>notificarFechamentoConcluido()</code>.</li>
+    <li>Notificação reaproveita a mesma Edge Function compartilhada <code>enviar-email</code> usada pelo Diário Contábil e por Certificado Digital/Licenças, com <code>tipo: 'fechamento_folha_concluido'</code>. Destinatários = união dos responsáveis cadastrados para a empresa (<code>fechamento_empresas_responsaveis</code>) + e-mails gerais de <code>fechamento_config_geral.email_alerta_fechamento</code> (lista separada por vírgula).</li>
+    <li>Import em lote de "quais empresas têm folha" (<code>handleImportarPlanilhaFolhaCF</code>) e replicação de fluxo de fases entre empresas (<code>confirmarReplicarFluxoCF</code>) existem como ferramentas de configuração em massa, evitando cadastro manual empresa a empresa.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="ferias">
+  <h2>Programação de Férias</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>ferias.html</code> (~1277 linhas, tudo inline). pdf.js 3.11.174 para extração de texto do PDF de origem, jsPDF 2.5.1 + AutoTable 3.8.2 para o PDF de saída. <strong>Sem tabela Supabase</strong> — ferramenta totalmente stateless, cada uso é um PDF de entrada → configuração na tela → PDF de saída, nada persiste entre sessões.</li>
+    <li>Ferramenta genérica de qualquer empresa (não fixada em nenhum código de empresa) — acessível tanto pelo menu lateral quanto por atalhos dentro de Quadrante/Track&amp;Field/Anankê, mas é o mesmo <code>ferias.html</code> em todos os casos.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Nenhum. Único contato com o banco seria indireto (nenhum encontrado) — a ferramenta lê e escreve só na memória do navegador durante a sessão.</p>
+
+  <h3>Fluxo Principal</h3>
+  <p>Extração é por <strong>agrupamento de itens de texto do PDF por coordenada</strong>, não por biblioteca de tabelas — cada item retornado por <code>page.getTextContent()</code> vem com posição <code>x</code>/<code>y</code>; linhas são reconstituídas agrupando itens com <code>y</code> a menos de 6pt de distância, colunas são atribuídas por faixas de <code>x</code> derivadas da posição dos cabeçalhos.</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Upload PDF] --> B[pdf.js - coleta todos os itens de texto de todas as paginas]
+    B --> C[Agrupa itens em linhas por proximidade vertical - tolerancia 6pt]
+    C --> D[Localiza linha de cabecalho - contem Codigo e Empregado]
+    D --> E[Linhas acima do cabecalho - extrai nome da empresa e CNPJ por regex]
+    E --> F[Calcula fronteiras de coluna - ponto medio entre cabecalhos adjacentes]
+    F --> G[Cada pagina seguinte - detecta e descarta cabecalho repetido/rodape]
+    G --> H[Cada linha de dados - atribui itens as colunas pela posicao x]
+    H --> I[agruparLinhas - linha com numero nas 3 primeiras colunas = registro novo]
+    I --> J[Linhas seguintes sem esse padrao = continuacao do registro anterior]
+    J --> K[Usuario escolhe/reordena/renomeia colunas exibidas]
+    K --> L[Ordenacao e busca client-side]
+    L --> M[gerarPDF - jsPDF+AutoTable, paisagem, largura por coluna escolhida]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>A 1ª coluna (Código do empregado) recebe uma fronteira de <code>x</code> alargada (90% do espaço até a próxima coluna, em vez dos 50% padrão) porque códigos curtos ("86") ficam alinhados à direita no PDF de origem e, com fronteira no meio do caminho, seriam erroneamente atribuídos à coluna "Empregado" ao lado.</li>
+    <li>Registros que ocupam mais de uma linha no PDF original (ex.: múltiplos períodos de férias do mesmo empregado) são detectados heuristicamente: uma linha é "principal" se alguma das 3 primeiras colunas for só dígitos (padrão de código de empregado); qualquer linha sem esse padrão é tratada como continuação da linha principal anterior.</li>
+    <li>Valores placeholder do PDF original (sequências de <code>.</code>/<code>-</code>/<code>/</code>/espaço, usadas pelo sistema de origem para campos vazios) são normalizados para string vazia — mas um <code>-</code> isolado é preservado por ser dado real em alguns campos.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="aviso-ferias">
+  <h2>Aviso de Férias</h2>
+  <p>Não documentada no Manual do Usuário. Ferramenta separada de Programação de Férias — parte de um PDF diferente (o "Aviso de Férias" individual, não a listagem consolidada) e faz o caminho inverso: separa um PDF único com avisos de várias empresas em um PDF por empresa.</p>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>aviso-ferias.html</code> (216 linhas) + <code>aviso-ferias.js</code> (352 linhas) + <code>aviso-ferias-parser.js</code> (215 linhas, módulo puro). pdf.js (extração), <strong>pdf-lib</strong> 1.17.1 (recorte/remontagem de páginas em novos PDFs — única ferramenta do módulo que usa pdf-lib em vez de jsPDF) e JSZip 3.10.1 (download em lote quando há mais de uma empresa no PDF de origem).</li>
+    <li><code>aviso-ferias-parser.js</code> é desenhado para ser testável isoladamente: nenhuma referência a DOM/Supabase/pdf.js, com export duplo (<code>window.*</code> no browser, <code>module.exports</code> em Node) — por isso <code>test-aviso-ferias-parser.js</code> roda com <code>node test-aviso-ferias-parser.js</code> puro, sem framework, mesmo padrão usado em <code>test-mapeamento-nivel-atencao.js</code> do Departamento Contábil.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Sem tabela própria. Único uso de Supabase é leitura de <code>rh_empresas</code> (CNPJ → <code>codigo_empresa</code>), para nomear os arquivos separados com o código correto em vez do CNPJ cru.</p>
+
+  <h3>Fluxo Principal</h3>
+  <p>O PDF de origem alterna páginas de dois tipos: "Aviso de Férias" (dados do empregado/período) e, opcionalmente logo em seguida, "Solicitação de Abono" (que é onde o CNPJ da empresa realmente aparece de forma confiável).</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Upload PDF unico com N avisos] --> B[pdf.js - reconstroi linhas de cada pagina por proximidade em y]
+    B --> C[classificarTipoPagina pela 1a linha nao vazia - aviso ou abono]
+    C --> D[montarRegistrosEmpregados - percorre paginas em ordem]
+    D --> E{Proxima pagina e abono do mesmo empregado?}
+    E -->|sim| F[Junta aviso+abono num registro so - CNPJ vem do abono]
+    E -->|nao| G[Registro so com dados do aviso - sem CNPJ]
+    F --> H[agruparPorEmpresa - chave = CNPJ normalizado, ou nome da empresa se sem CNPJ]
+    G --> H
+    H --> I[resolverCodigoEmpresa - CNPJ para codigo_empresa via rh_empresas]
+    I --> J[pdf-lib - para cada grupo, copia as paginas do PDF original para um PDF novo]
+    J --> K{Mais de 1 empresa?}
+    K -->|sim| L[JSZip - empacota todos os PDFs separados]
+    K -->|nao| M[Download direto do PDF unico]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>O nome da empresa e o CNPJ não vêm necessariamente da mesma página: o CNPJ é extraído da página de abono (regex <code>Empresa:\s*(.+?)\s*CNPJ:\s*(...)</code>), mas o nome "oficial" de exibição vem do bloco de assinatura da própria página de aviso (<code>_extrairNomeEmpresaAssinatura</code>, localizado a partir da frase-âncora "...anotações necessárias." e do primeiro trecho de texto que contém o nome do empregado, para descartar o texto de preenchimento em volta).</li>
+    <li>Agrupamento por empresa cai para <strong>agrupar por nome normalizado</strong> quando não há CNPJ disponível (registro só com página de aviso, sem abono correspondente) — nesses casos o nome do arquivo final não tem o código da empresa, só o nome cru.</li>
+    <li>Páginas de aviso sem abono seguinte compatível (nome de empregado não bate) não travam o processamento — são reportadas numa lista de avisos/pendências (<code>avisos</code>, retornado por <code>_montarRegistrosEmpregados</code>) em vez de lançar erro.</li>
+  </ul>
+</section>

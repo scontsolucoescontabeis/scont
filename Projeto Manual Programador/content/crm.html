@@ -1,0 +1,460 @@
+<p class="manual-intro">O CRM WhatsApp vive em <code>Projeto CRM/</code> e é a <strong>única ferramenta do portal construída como SPA React</strong> — todo o resto do Portal Scont é HTML/JS vanilla sem build step. Stack real: React 18 + React Router 6 (<code>HashRouter</code>, base <code>/scont/crm/</code>) + Vite 6 + Supabase JS v2, com Tailwind 3 configurado no projeto mas praticamente não usado (a UI é quase 100% <code>style={{...}}</code> inline; a única tela com <code>className</code> Tailwind é <code>ConexaoWhatsAppPage.jsx</code>). <code>recharts</code> é usado só em Métricas; <code>xlsx</code> só em Contatos (importação) e Tarefas (exportação). <code>npm run build</code> gera <code>dist/</code> e o Vite copia o resultado para <code>../crm</code> — ou seja, o build final vira a pasta <code>crm/</code> na raiz do portal, que é o que está de fato linkado em <code>ferramentas</code>. O app roteado real fica em <code>src/pages/</code> + <code>src/components/</code> + <code>src/hooks/</code> + <code>src/services/crm.service.js</code>, todos importados a partir de <code>src/App.jsx</code>. Existe uma árvore paralela <code>src/modules/crm/</code> e <code>src/demo/DemoApp.jsx</code> que <strong>não é importada por <code>App.jsx</code> em nenhum ponto</strong> — código morto, não documentado aqui como funcionalidade ativa (ver Dívida Técnica em cada seção para os pontos onde isso importa de verdade). <code>src/contexts/AuthContext.jsx</code> e <code>CRMContext.jsx</code> também estão vazios — apesar do nome da pasta, não há Context API real; sessão e perfil vivem em <code>useState</code> dentro de <code>App.jsx</code> e descem por props. Autenticação é Supabase Auth (e-mail/senha) mais SSO via hash — o portal abre o CRM em nova aba passando <code>access_token</code>/<code>refresh_token</code> no hash da URL, que <code>App.jsx</code> captura e grava com <code>supabase.auth.setSession</code>. Canais de WhatsApp: dois canais mutuamente exclusivos controlados pela tabela singleton <code>whatsapp_config</code> — <strong>API Oficial</strong> (Meta Cloud API, webhook com validação HMAC) e <strong>QR Code</strong> (Evolution API/Baileys auto-hospedada, webhook autenticado só por token de query string). O envio (<code>send-message</code>) decide o canal em tempo de execução lendo <code>whatsapp_config.canal_ativo</code>; o recebimento depende de qual webhook está de fato configurado do lado de fora (Meta Business Manager ou instância Evolution).</p>
+
+<section class="manual-item" id="atendimento">
+  <h2>Atendimento — Conversas e Chat</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>src/pages/CRMPage.jsx</code> — orquestra <code>ConversaList</code> + <code>ChatPanel</code> + <code>PainelSLA</code> + <code>PainelDireito</code>; carrega <code>sla_config</code>/<code>classificacao_sla_config</code> uma vez e os repassa como props.</li>
+    <li><code>src/components/ConversaList/ConversaList.jsx</code> + <code>ConversaCard.jsx</code> — busca/filtro por departamento/abas de status client-side; largura da coluna redimensionável salva em <code>localStorage</code> (chave <code>crm_lista_width</code>).</li>
+    <li><code>src/components/ChatPanel/ChatPanel.jsx</code>, <code>MessageBubble.jsx</code>, <code>InputBar.jsx</code>, <code>PickerMensagensProntas.jsx</code>, <code>ModalTransferencia.jsx</code>, <code>ModalTarefa.jsx</code>.</li>
+    <li><code>src/components/PainelDireito/PainelDireito.jsx</code> — dados do contato, contexto do bot, timeline de transferências, histórico de conversas. <code>PainelLGPD.jsx</code> existe na mesma pasta mas está <strong>vazio</strong> e não é importado por nada — ver Dívida Técnica.</li>
+    <li><code>src/components/PainelSLA/PainelSLA.jsx</code> — painel de alertas agrupado por departamento (consome <code>useSLA</code>, ver seção SLA).</li>
+    <li><code>src/hooks/useConversas.js</code>, <code>useMensagens.js</code>, <code>useRealtime.js</code>, <code>useWhatsApp.js</code>.</li>
+    <li><code>src/pages/MensagensProntasPage.jsx</code> — tela própria de CRUD, consumida também dentro do chat via <code>PickerMensagensProntas</code>.</li>
+    <li><code>src/lib/supabaseClient.js</code> — cliente único do app; lê <code>window.SUPABASE_URL</code>/<code>window.SUPABASE_KEY</code> injetados por <code>&lt;script src="../supabase-config.js"&gt;</code> no <code>index.html</code> (mesmo arquivo compartilhado pelo resto do portal), com fallback para <code>VITE_SUPABASE_URL</code>/<code>VITE_SUPABASE_ANON_KEY</code> em <code>.env.local</code> durante desenvolvimento local.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel / RLS</th></tr></thead>
+    <tbody>
+      <tr><td><code>contatos</code></td><td><code>telefone</code> UNIQUE, nome/email/cpf_cnpj/observacoes. RLS aberta para <code>authenticated</code>.</td></tr>
+      <tr><td><code>contatos_empresas</code></td><td>N:N contato ↔ empresa em texto livre (não FK para <code>rh_empresas</code>), com <code>cargo</code>, <code>cnpj</code>, <code>classificacao</code> (BRONZE/PRATA/OURO, migration 014). Substituiu colunas soltas <code>empresa</code>/<code>cargo</code> de <code>contatos</code> (migration 012).</td></tr>
+      <tr><td><code>conversas</code></td><td><code>departamento</code>/<code>status</code> enum, <code>agente_id</code>, <code>protocolo</code> gerado por trigger <code>gerar_protocolo()</code> (formato <code>SCT-YYYYMMDD-NNNNNN</code>). Colunas <code>bot_*</code> (departamento/categoria/subcategoria/categoria_id/empresa/cnpj/classificacao_empresa) preenchidas pelo chatbot. <code>REPLICA IDENTITY FULL</code> (migration 017) — necessário para o Realtime aplicar RLS em eventos UPDATE. RLS: ADMIN vê tudo, AGENTE só vê <code>departamento = ANY(get_user_departamentos())</code>.</td></tr>
+      <tr><td><code>mensagens</code></td><td><code>origem</code> enum CLIENTE/AGENTE/SISTEMA/BOT, <code>tipo</code> text/image/audio/document/video, <code>media_url</code> = path no bucket privado <code>crm-midia</code> (não URL pública), <code>whatsapp_msg_id</code>, <code>lida</code>. INSERT liberado para qualquer <code>authenticated</code> (<code>WITH CHECK (true)</code>).</td></tr>
+      <tr><td><code>anotacoes_internas</code></td><td>Notas internas por conversa — nunca enviadas ao WhatsApp.</td></tr>
+      <tr><td><code>transferencias</code></td><td>Log append-only (de/para departamento e agente, motivo).</td></tr>
+      <tr><td><code>tags</code> / <code>conversa_tags</code></td><td>Existem no schema desde a migration 001 e <strong>são escritas de verdade</strong> pelo chatbot (<code>aplicarTagsAutomaticas</code> em <code>chatbot-processor.ts</code>, uma tag por departamento + uma por categoria, normalizadas). Nenhuma tela da árvore ativa (<code>src/pages</code>/<code>src/components</code>) lê ou exibe essas tags — só a árvore morta <code>src/modules/crm</code> as usa. O dado acumula no banco sem consumo hoje.</td></tr>
+      <tr><td><code>mensagens_prontas</code></td><td>Título/conteúdo/categoria/departamento opcional, <code>compartilhada</code> boolean. RLS: SELECT próprias OU compartilhadas; INSERT/UPDATE/DELETE de compartilhadas exige <code>auth_is_admin()</code> (checa <code>usuarios.role = 'ADMIN'</code> diretamente — não usa <code>get_user_role()</code>, então não considera <code>is_admin</code> do portal, ver Dívida Técnica em Conexão WhatsApp para o mesmo padrão).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Recebimento — webhook até a tela do agente:</p>
+  <pre class="mermaid">
+sequenceDiagram
+    participant Meta as Meta Cloud API
+    participant WH as whatsapp-webhook
+    participant Bot as chatbot-processor
+    participant DB as Postgres
+    participant RT as Supabase Realtime
+    participant UI as ChatPanel React
+
+    Meta->>WH: POST mensagem recebida
+    WH->>WH: valida assinatura HMAC
+    WH->>DB: obterOuCriarContato e obterOuCriarConversa
+    WH->>DB: insert mensagens origem CLIENTE
+    WH->>Bot: processarMensagemBot
+    Bot->>DB: insert mensagens origem BOT ou SISTEMA
+    Bot->>Meta: envia menu ou resposta via Graph API
+    DB-->>RT: replica change postgres_changes
+    RT-->>UI: evento INSERT em mensagens
+    UI->>UI: adicionarMensagem no timeline
+  </pre>
+
+  <p>Envio — agente digita e clica em enviar:</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Agente digita e envia] --> B[useWhatsApp.enviarMensagem]
+    B --> C[insert direto em mensagens via client Supabase]
+    C --> D[update conversas atualizado_em e status]
+    D --> E[chama Edge Function send-message]
+    E --> F{Chamada teve sucesso?}
+    F -- Sim --> G[Mensagem sai de fato pelo WhatsApp]
+    F -- Falhou ou Edge Function indisponivel --> H[erro é engolido em try catch]
+    H --> I[Mensagem fica salva no CRM mas nunca chega ao cliente]
+    I --> J[Nenhum aviso é mostrado ao agente]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>O envio de mensagem é <strong>otimista e fire-and-forget</strong>: <code>useWhatsApp.enviarMensagem</code> grava direto em <code>mensagens</code> pelo client (RLS aberta) e só depois chama <code>supabase.functions.invoke('send-message', ...)</code> dentro de um try/catch que silencia qualquer erro (<code>_tentarEnviarWhatsApp</code>). Se a Edge Function falhar, não estiver deployada, ou o canal não estiver configurado, a mensagem fica visível no CRM como enviada mas nunca sai pelo WhatsApp — sem qualquer sinalização para o agente.</li>
+    <li><strong>As Edge Functions <code>encerrar-conversa</code> e <code>transferir-conversa</code> (que enviam a mensagem de encerramento e disparam o CSAT via Meta API, ou registram a transferência) não são chamadas por nenhum código da árvore ativa.</strong> O hook realmente montado (<code>src/hooks/useWhatsApp.js</code>) reimplementa a mesma lógica só com updates diretos no banco (<code>conversas</code>/<code>mensagens</code>/<code>transferencias</code>), sem invocar essas duas funções. Confirmado por <code>grep</code>: as únicas referências a <code>encerrar-conversa</code>/<code>transferir-conversa</code> fora da própria pasta <code>supabase/functions</code> estão em <code>src/modules/crm/hooks/useWhatsApp.js</code> — árvore morta. Na prática, hoje, clicar em <strong>Encerrar</strong> no ChatPanel real <strong>não envia</strong> a mensagem de despedida nem a pesquisa CSAT pelo WhatsApp.</li>
+    <li>Mídia recebida é baixada da Graph API pelo próprio <code>whatsapp-webhook</code> e reenviada para o bucket privado <code>crm-midia</code> (path <code>&lt;conversaId&gt;/&lt;timestamp&gt;.&lt;ext&gt;</code>); falha de upload é silenciosa e não bloqueia o processamento do webhook. Leitura no front via <code>createSignedUrl(mediaPath, 3600)</code> — URL expira em 1h.</li>
+    <li>Polling de 20s em <code>useConversas</code> coexiste com o Realtime como fallback, caso um evento seja perdido.</li>
+    <li>Tailwind está no <code>package.json</code>/<code>tailwind.config.js</code>/<code>index.css</code> mas a interface inteira é construída com objetos <code>style</code> inline — a única exceção encontrada no código ativo é <code>className="animate-spin"</code> em <code>ConexaoWhatsAppPage.jsx</code>. Ao editar qualquer tela, manter o padrão inline em vez de migrar parcialmente para classes Tailwind.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li><code>src/contexts/AuthContext.jsx</code> e <code>CRMContext.jsx</code> estão vazios (arquivo em branco) — apesar do nome da pasta, não existe Context API de fato no app; todo estado de sessão/perfil vive em <code>useState</code> dentro de <code>App.jsx</code>.</li>
+    <li><code>PainelLGPD.jsx</code> está vazio e não é importado por nada; a Edge Function <code>lgpd-direitos/index.ts</code> também está vazia (um arquivo em branco); e a migration <code>002_lgpd.sql</code> tem 1 linha em branco — o módulo de LGPD parece nunca ter passado do nome dos arquivos.</li>
+    <li>Migration <code>007_contatos_observacoes.sql</code> tem 0 linhas (arquivo vazio) — a coluna <code>observacoes</code> usada por <code>ContatosPage.jsx</code> existe no banco, mas não veio dessa migration; checar o schema real antes de assumir que o histórico de migrations reflete o estado atual da tabela <code>contatos</code>.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="tarefas">
+  <h2>Tarefas</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>src/pages/TarefasPage.jsx</code> — quadro Kanban com 4 colunas fixas (ABERTA/EM_EXECUCAO/CONCLUIDA/CANCELADA), filtro por departamento.</li>
+    <li><code>src/components/ChatPanel/ModalTarefa.jsx</code> — formulário de criação, reaproveitado tanto a partir do botão "Tarefa" no chat (com <code>conversa</code> preenchida) quanto do botão "Nova Tarefa" da própria página (<code>conversa=null</code>).</li>
+    <li><code>src/hooks/useTarefas.js</code> — <code>useTarefas()</code> (hook de listagem) e <code>criarTarefa</code>/<code>atualizarStatusTarefa</code>/<code>editarTarefa</code> como funções soltas exportadas do mesmo arquivo, chamadas diretamente pelos componentes sem passar por outro hook.</li>
+    <li><code>src/utils/exportarTarefas.js</code> — export para Excel via <code>xlsx</code>, com estilo de cabeçalho, zebra e uma segunda aba "Resumo" com contagem por status.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel / RLS</th></tr></thead>
+    <tbody>
+      <tr><td><code>tarefas</code></td><td><code>status</code> enum ABERTA/EM_EXECUCAO/CONCLUIDA/CANCELADA, <code>prioridade</code> enum BAIXA/NORMAL/ALTA/URGENTE, <code>conversa_id</code> opcional (<code>ON DELETE SET NULL</code>), <code>criado_por</code>/<code>atribuido_a</code>/<code>concluido_por</code> → <code>usuarios.id</code>. Trigger <code>atualizar_tarefa_em()</code> mantém <code>atualizado_em</code>. RLS: ADMIN vê tudo; AGENTE vê tarefas do próprio departamento OU atribuídas a si OU criadas por si; INSERT exige <code>criado_por = auth.uid()</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> ABERTA
+    ABERTA --> EM_EXECUCAO: botao Iniciar
+    EM_EXECUCAO --> CONCLUIDA: botao Concluir
+    ABERTA --> CANCELADA: botao Cancelar
+    EM_EXECUCAO --> CANCELADA: botao Cancelar
+    CONCLUIDA --> [*]
+    CANCELADA --> [*]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><code>concluido_em</code>/<code>concluido_por</code> só são setados quando <code>atualizarStatusTarefa</code> recebe exatamente <code>'CONCLUIDA'</code> — cancelar uma tarefa não grava esses campos.</li>
+    <li>A exportação Excel respeita o filtro de departamento atualmente aplicado na tela (não exporta tudo, exporta o que está visível no Kanban).</li>
+    <li>Sem paginação no Kanban — <code>useTarefas</code> carrega todas as tarefas do filtro de uma vez.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="contatos">
+  <h2>Contatos</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>src/pages/ContatosPage.jsx</code> — página única com <code>ModalContato</code> (criar/editar, com sub-formulário de empresas vinculadas) e <code>ContatoCard</code> (expansível, carrega histórico/empresas sob demanda) definidos no mesmo arquivo. Paginação client-side de 20 por página.</li>
+    <li><code>src/components/ContatosImport/ModalImportarPlanilha.jsx</code> (+ <code>.test.jsx</code>) — importação em massa via planilha, usa <code>xlsx</code> para ler/gerar arquivos.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>contatos</code></td><td>1 linha por telefone (UNIQUE). <code>atualizado_por</code>/<code>atualizado_em</code> setados a cada save.</td></tr>
+      <tr><td><code>contatos_empresas</code></td><td>N vínculos por contato, <code>UNIQUE(contato_id, empresa)</code> — texto livre da empresa, não FK para <code>rh_empresas</code>. Editar um contato deleta todos os vínculos antigos e reinsere os atuais (não faz diff/update parcial).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Importação por planilha — <code>parsearEProcessar</code> casa cada linha pelo telefone (não por CPF/CNPJ):</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Upload da planilha xlsx] --> B[normalizarLinhas remove nao digitos do telefone]
+    B --> C{Telefone ja existe em contatos?}
+    C -- Nao --> D[status = novo_contato]
+    C -- Sim --> E{Mesma empresa ja vinculada a esse contato?}
+    E -- Nao --> F[status = nova_empresa]
+    E -- Sim --> G[status = conflito, exige escolha manual]
+    G --> H{Usuario escolhe}
+    H -- Atualizar --> I[update em contatos_empresas]
+    H -- Ignorar --> J[linha pulada na confirmacao]
+    D --> K[confirmarImportacao grava linha a linha]
+    F --> K
+    I --> K
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>O telefone normalizado (só dígitos) é a chave de correspondência da importação — duas linhas com o mesmo telefone e empresas diferentes viram dois vínculos para o mesmo contato, não dois contatos.</li>
+    <li><code>confirmarImportacao</code> processa linha a linha com <code>await</code> sequencial (não em lote/transação) — uma falha no meio da planilha não desfaz o que já foi gravado antes dela.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="chatbot">
+  <h2>Chatbot de Roteamento</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>src/pages/ChatbotPage.jsx</code> — arquivo único e grande com 5 abas internas (Geral/Menus/Horários/Avaliações/Calendário), cada uma um componente <code>AbaX</code> declarado no mesmo arquivo, sem separação em subpastas.</li>
+    <li><code>supabase/functions/whatsapp-webhook/chatbot-processor.ts</code> — a máquina de estados real roda inteira no servidor, dentro da Edge Function que recebe o webhook da Meta. O front nunca decide o próximo estado do bot, só lê/edita configuração.</li>
+    <li><code>src/services/crm.service.js</code> — funções <code>buscarChatbotConfig</code>/<code>salvarChatbotConfig</code>, <code>buscarChatbotDeptConfig</code>/<code>salvarChatbotDeptConfig</code>, <code>buscar/criar/atualizar/excluirMenu</code>, <code>reordenarMenus</code>, <code>buscarMediaCsat</code>/<code>buscarAvaliacoesCsat</code>, <code>buscar/criar/atualizar/excluirFeriado</code>.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel / RLS</th></tr></thead>
+    <tbody>
+      <tr><td><code>chatbot_config</code></td><td>Singleton (<code>id=1</code>): ativo, horário global, dias da semana, timeout, máx. tentativas, mensagens de boas-vindas padrão + por tier (bronze/prata/ouro), mensagem fora de horário, mensagem de fila. UPDATE só ADMIN.</td></tr>
+      <tr><td><code>chatbot_dept_config</code></td><td>1 linha por departamento (seed automático), override de horário e mensagem específica; <code>ativo=false</code> desliga o bot só para aquele departamento.</td></tr>
+      <tr><td><code>chatbot_menus</code></td><td>Árvore auto-referenciada (<code>parent_id</code>), <code>nivel</code> 1=categoria/2=subcategoria, <code>CHECK(nivel IN (1,2))</code>. <code>ON DELETE CASCADE</code> em <code>parent_id</code> — excluir uma categoria apaga as subcategorias junto.</td></tr>
+      <tr><td><code>chatbot_sessoes</code></td><td>1:1 com <code>conversas</code> (<code>conversa_id UNIQUE</code>), campo <code>estado</code> com <code>CHECK</code> explícito (NOVO/AGUARD_EMPRESA/AGUARD_DEPT/AGUARD_CAT/AGUARD_SUB/AGUARD_CONF/AGUARD_AVAL/CONCLUIDO). SELECT liberado para <code>authenticated</code>, mas <strong>INSERT/UPDATE só via <code>service_role</code></strong> — o front nunca escreve nessa tabela diretamente, só a Edge Function.</td></tr>
+      <tr><td><code>chatbot_avaliacoes</code></td><td>CSAT: <code>conversa_id</code>, nota 1–5, comentário opcional. INSERT só via <code>service_role</code>.</td></tr>
+      <tr><td><code>chatbot_feriados</code></td><td><code>tipo</code> FERIADO ou DATA_PICO, <code>msg_especifica</code> opcional. Índice parcial em <code>data WHERE ativo=true</code> (é a query mais frequente, 1x por mensagem recebida).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Máquina de estados executada em <code>processarMensagemBot</code> a cada mensagem recebida:</p>
+  <pre class="mermaid">
+stateDiagram-v2
+    [*] --> NOVO
+    NOVO --> CONCLUIDO: feriado ou fora do horario, escalona
+    NOVO --> AGUARD_EMPRESA: contato tem empresas vinculadas
+    NOVO --> AGUARD_DEPT: contato recorrente ou novo sem empresa
+    AGUARD_EMPRESA --> AGUARD_SUB: empresa e categoria recorrente combinadas
+    AGUARD_EMPRESA --> AGUARD_DEPT: empresa escolhida, novo assunto
+    AGUARD_DEPT --> AGUARD_CAT: departamento escolhido
+    AGUARD_CAT --> AGUARD_SUB: categoria tem subcategorias
+    AGUARD_CAT --> AGUARD_CONF: categoria sem subcategorias
+    AGUARD_SUB --> AGUARD_CONF: subcategoria escolhida
+    AGUARD_CONF --> AGUARD_DEPT: cliente corrige
+    AGUARD_CONF --> CONCLUIDO: cliente confirma, roteia para fila humana
+    NOVO --> CONCLUIDO: cliente digita 0 ou atendente, escalona direto
+    CONCLUIDO --> AGUARD_AVAL: encerrar-conversa envia pesquisa CSAT
+    AGUARD_AVAL --> CONCLUIDO: nota registrada ou tentativa esgotada
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li><code>dentroDoHorario()</code> converte o horário atual manualmente para America/Sao_Paulo via <code>toLocaleString</code> porque a Edge Function roda em UTC no runtime Deno — não usa nenhuma lib de timezone.</li>
+    <li><code>enviarMenu</code> tenta lista interativa da Meta primeiro (máx. 10 linhas — acima disso trunca em 9 + opção "Outros"); se a chamada falhar, cai para um menu numerado em texto puro. O espelho em texto é <strong>sempre</strong> gravado como mensagem BOT no banco, mesmo quando a lista interativa funciona — garante histórico legível independente do formato de envio.</li>
+    <li>Quando feriado e data-pico caem no mesmo dia, <code>buscarEventoHoje</code> desempata ordenando por <code>tipo</code> alfabeticamente — "FERIADO" vem antes de "DATA_PICO", então feriado sempre ganha a prioridade (comentário no código confirma que é intencional).</li>
+    <li>Detecção de cliente recorrente olha a última conversa <code>ENCERRADA</code> com <code>bot_departamento</code> preenchido nos últimos 30 dias do mesmo contato, e oferece repetir departamento+categoria com um único clique.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>O estado <code>AGUARD_AVAL</code> (avaliação CSAT) só é criado pela Edge Function <code>encerrar-conversa</code> — e essa função não é chamada por nenhum código da árvore ativa do front (ver seção Atendimento). Na prática, hoje, nenhuma sessão chega a <code>AGUARD_AVAL</code> em produção: a aba "Avaliações" do <code>ChatbotPage</code> e a tabela <code>chatbot_avaliacoes</code> existem e funcionam tecnicamente, mas não recebem dados pelo fluxo real de encerramento usado pelos agentes.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="conexao-whatsapp">
+  <h2>Conexão WhatsApp</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>src/pages/ConexaoWhatsAppPage.jsx</code> + <code>src/hooks/useWhatsAppConexao.js</code>.</li>
+    <li><code>supabase/functions/evolution-connect/index.ts</code> — só ADMIN; reconecta uma instância Evolution existente ou cria uma nova já com o webhook configurado, extrai o QR code em base64 da resposta.</li>
+    <li><code>supabase/functions/evolution-webhook/index.ts</code> — recebe eventos da Evolution API (MESSAGES_UPSERT, CONNECTION_UPDATE, QRCODE_UPDATED), autenticado só por token na query string (<code>?token=EVOLUTION_WEBHOOK_TOKEN</code>), sem HMAC.</li>
+    <li><code>supabase/functions/send-message/index.ts</code> — usado tanto pelo canal QR Code quanto API Oficial; decide o endpoint de destino lendo <code>whatsapp_config.canal_ativo</code> a cada envio.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel / RLS</th></tr></thead>
+    <tbody>
+      <tr><td><code>whatsapp_config</code></td><td>Singleton (<code>id=1</code>, <code>CHECK(id=1)</code>). <code>canal_ativo</code> enum QR_CODE/API_OFICIAL, <code>status_conexao</code> enum DESCONECTADO/CONECTANDO/CONECTADO, <code>qrcode_base64</code>. RLS de leitura e escrita restrita a <code>EXISTS (SELECT 1 FROM usuarios WHERE id = auth.uid() AND role = 'ADMIN')</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+sequenceDiagram
+    participant UI as ConexaoWhatsAppPage
+    participant EC as evolution-connect
+    participant Evo as Evolution API
+    participant EW as evolution-webhook
+    participant DB as whatsapp_config
+
+    UI->>EC: invoke evolution-connect
+    EC->>DB: status_conexao = CONECTANDO
+    EC->>Evo: GET instance connect
+    alt instancia ja existe
+        Evo-->>EC: retorna QR code base64
+    else instancia nao existe
+        EC->>Evo: POST instance create com webhook configurado
+        Evo-->>EC: retorna QR code base64
+    end
+    EC->>DB: grava qrcode_base64
+    DB-->>UI: Realtime UPDATE, mostra QR na tela
+    Note over Evo,EW: usuario escaneia no celular
+    Evo->>EW: POST CONNECTION_UPDATE state open
+    EW->>DB: status_conexao = CONECTADO, limpa qrcode_base64
+    DB-->>UI: Realtime UPDATE, mostra Conectado
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Trocar de canal (<code>trocarCanal</code>) é um simples <code>UPDATE</code> em <code>canal_ativo</code>, sem validar se o canal escolhido está de fato pronto — é possível trocar para API Oficial sem as variáveis <code>WHATSAPP_*</code> configuradas e só descobrir no próximo envio, quando <code>send-message</code> falhar.</li>
+    <li>RLS de <code>whatsapp_config</code> checa <code>usuarios.role = 'ADMIN'</code> diretamente na tabela, diferente do padrão usado no resto do CRM (<code>get_user_role()</code>, que também reconhece <code>is_admin=true</code> do portal). Um admin do portal cujo <code>usuarios.role</code> não esteja explicitamente setado como <code>'ADMIN'</code> pode ver a página no app (que usa <code>get_meu_perfil_crm()</code>) mas ter a query de leitura/escrita em <code>whatsapp_config</code> bloqueada pela RLS. O mesmo padrão de checagem direta em <code>role</code> aparece em <code>sla_config</code> (ver seção SLA) e em <code>mensagens_prontas</code>.</li>
+    <li><code>evolution-webhook</code> não valida assinatura, só um token estático de query string — mais fraco que a validação HMAC do <code>whatsapp-webhook</code> da Meta.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="sla">
+  <h2>SLA de Atendimento</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>src/pages/SLAConfigPage.jsx</code> — tela de configuração por departamento (tempo máximo/avisos) e multiplicadores por classificação, dois botões de salvar independentes.</li>
+    <li><code>src/hooks/useSLA.js</code> — exporta a função pura <code>calcSLAStatus(conversa, slaConfig, classificacaoConfig)</code> e o hook <code>useSLA</code> que a reaplica a cada 1s via <code>setInterval</code>.</li>
+    <li>Consumido em <code>CRMPage.jsx</code> (alimenta <code>PainelSLA</code>) e em <code>ConversaList.jsx</code>/<code>ConversaCard.jsx</code> (badge de contagem regressiva por conversa na lista).</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel / RLS</th></tr></thead>
+    <tbody>
+      <tr><td><code>sla_config</code></td><td><code>departamento</code> PK (TEXT, não enum), <code>tempo_maximo_min</code>, <code>threshold_aviso_min</code>, <code>threshold_critico_min</code>, <code>ativo</code>. RLS de escrita: <code>EXISTS (... WHERE id=auth.uid() AND role='ADMIN')</code> — mesmo padrão direto-na-coluna de <code>whatsapp_config</code>.</td></tr>
+      <tr><td><code>classificacao_sla_config</code></td><td><code>classificacao</code> PK (OURO/PRATA/BRONZE/SEM_CLASSIFICACAO), <code>multiplicador</code> NUMERIC &gt; 0. RLS de UPDATE aberta para qualquer <code>authenticated</code> (não checa role) — inconsistente com a escrita de <code>sla_config</code>, que exige ADMIN.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Fluxo Principal</h3>
+  <p>Lógica confirmada em <code>calcSLAStatus</code> — só é avaliada para conversas com <code>status = 'ABERTA'</code> e sem nenhuma mensagem de origem AGENTE ainda:</p>
+  <div class="manual-formula">maxMs     = tempo_maximo_min * multiplicador_da_classificacao * 60000
+avisoMs   = threshold_aviso_min * 60000
+criticoMs = threshold_critico_min * 60000
+elapsed   = agora - aberto_em
+restante  = maxMs - elapsed
+
+restante &lt;= 0          -&gt; VENCIDO
+restante &lt;= criticoMs  -&gt; CRITICO
+restante &lt;= avisoMs    -&gt; AVISO
+caso contrario          -&gt; OK, sem alerta</div>
+  <p><strong>Só o tempo máximo é multiplicado pela classificação do cliente</strong> — os thresholds de aviso e crítico continuam em minutos absolutos, iguais para qualquer tier.</p>
+  <pre class="mermaid">
+flowchart TD
+    A[Conversa esta ABERTA?] -->|Nao| Z[sla_status = OK, sem alerta]
+    A -->|Sim| B[Ja existe mensagem de origem AGENTE?]
+    B -->|Sim| Z
+    B -->|Nao| C[Busca sla_config do departamento]
+    C --> D{ativo = true?}
+    D -->|Nao| Z
+    D -->|Sim| E[calcula maxMs com multiplicador do tier]
+    E --> F[restante = maxMs menos tempo decorrido]
+    F --> G{restante menor ou igual a zero}
+    G -->|Sim| H[VENCIDO]
+    G -->|Nao| I{restante menor ou igual ao critico}
+    I -->|Sim| J[CRITICO, pisca]
+    I -->|Nao| K{restante menor ou igual ao aviso}
+    K -->|Sim| L[AVISO]
+    K -->|Nao| M[OK]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>SLA é 100% calculado no client, recalculado a cada 1s; não existe coluna persistida nem cron/Edge Function dedicada — sair e voltar da tela recalcula do zero a partir de <code>aberto_em</code>.</li>
+    <li><code>calcSLAStatus</code> depende de <code>conversa.mensagens</code> vir embutido no <code>select</code> de <code>useConversas</code> (join sem limite) só para checar se existe alguma mensagem de agente. Isso significa que o <code>select</code> de conversas traz <strong>todas</strong> as mensagens de cada conversa (mesmo as antigas e fora do chat aberto) — sem paginação nem limite, o que pode pesar em conversas longas.</li>
+    <li>O relógio do SLA para na primeira mensagem de AGENTE <em>ou</em> quando o agente clica em Assumir (que muda o status para <code>EM_ATENDIMENTO</code>, tirando a conversa do universo <code>status='ABERTA'</code> filtrado por <code>calcSLAStatus</code>) — os dois caminhos levam ao mesmo resultado por rotas diferentes do código.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="usuarios-admin">
+  <h2>Usuários e Permissões</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>src/pages/UsuariosPage.jsx</code> — lista "Com acesso"/"Sem acesso" e <code>ModalEdicao</code> definido no mesmo arquivo.</li>
+    <li><code>src/services/crm.service.js</code> — <code>buscarTodosUsuariosPortal</code>, <code>buscarTodosAgentes</code>, <code>buscarAgentesDoDepto</code>, <code>configurarAcessoCRM</code>, <code>revogarAcessoCRM</code>.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <table class="manual-tabela">
+    <thead><tr><th>Tabela</th><th>Papel</th></tr></thead>
+    <tbody>
+      <tr><td><code>usuarios</code></td><td>Tabela do <strong>portal inteiro</strong>, compartilhada com as demais ferramentas (<code>id = auth.users.id</code>, FK direta). O CRM só adiciona colunas: <code>departamento</code> (legado, singular), <code>departamentos</code> (array, migration 005), <code>role</code> enum ADMIN/AGENTE, <code>ativo</code>. A coluna <code>is_admin</code> já existia no portal e não é exclusiva do CRM.</td></tr>
+    </tbody>
+  </table>
+  <p><code>get_meu_perfil_crm()</code> (RPC, <code>SECURITY DEFINER</code>) resolve o perfil efetivo: se <code>is_admin=true</code> o app sempre trata como ADMIN CRM com todos os departamentos, independente do que estiver em <code>role</code>/<code>departamentos</code>.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+flowchart TD
+    A[Admin clica em Conceder ou Editar acesso] --> B[ModalEdicao escolhe deptos e perfil]
+    B --> C[configurarAcessoCRM tenta update com coluna departamentos array]
+    C --> D{Erro menciona departamentos na mensagem?}
+    D -- Nao --> E[Sucesso, grava departamento singular tambem]
+    D -- Sim --> F[Assume migration 005 nao rodou]
+    F --> G[Refaz o update so com a coluna departamento singular]
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>Portal admin (<code>is_admin=true</code>) sempre vira ADMIN do CRM em todos os departamentos automaticamente — a tela só permite editar departamentos/perfil de quem <strong>não</strong> é admin do portal (o botão de editar fica desabilitado/redundante para eles).</li>
+    <li>O fallback de <code>configurarAcessoCRM</code>/<code>revogarAcessoCRM</code> para a migration 005 ainda não ter rodado detecta a ausência da coluna checando se a <strong>mensagem de erro</strong> do Postgres contém a substring <code>'departamentos'</code> — se o texto do erro do Supabase mudar de formato, esse fallback deixa de funcionar silenciosamente.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="metricas">
+  <h2>Painel de Métricas</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>src/pages/MetricasPage.jsx</code> — 4 abas internas (Geral/Equipe/Tempo/Qualidade) mais <code>LiveStrip</code> (faixa "ao vivo" com Realtime), tudo no mesmo arquivo. Único ponto do CRM que usa <code>recharts</code> (<code>BarChart</code>, <code>PieChart</code>).</li>
+    <li><code>src/services/crm.service.js</code> — <code>calcPeriodo</code>, <code>buscarMetricasVivo</code>, <code>buscarMetricasGeral</code>, <code>buscarMetricasEquipe</code>, <code>buscarMetricasTempo</code>, <code>buscarMetricasQualidade</code>.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Não existe tabela ou view própria de métricas. Tudo é calculado sob demanda no client a partir de <code>conversas</code>, <code>mensagens</code> e <code>transferencias</code> — sem RPC agregada nem materialized view no Postgres.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+sequenceDiagram
+    participant DB as conversas
+    participant RT as Supabase Realtime
+    participant Live as LiveStrip
+    participant Tab as Aba selecionada
+
+    RT->>Live: postgres_changes qualquer evento em conversas
+    Live->>DB: 4 selects count exact head aberta/em_atendimento/aguardando/agentes
+    DB-->>Live: contadores atualizados
+    Note over Tab: troca de aba ou periodo
+    Tab->>DB: select bruto do periodo, sem RPC agregada
+    DB-->>Tab: linhas de conversas ou mensagens ou transferencias
+    Tab->>Tab: agregacao feita em JavaScript no client
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>TMA na aba Tempo mede o <strong>tempo total de vida da conversa</strong> (<code>encerrado_em - aberto_em</code>) — é uma métrica diferente do SLA (que mede só até a primeira resposta do agente). As duas convivem em telas separadas com definições de tempo distintas.</li>
+    <li>"Agentes ativos" na faixa ao vivo é o tamanho do <code>Set</code> de <code>agente_id</code> distintos entre conversas <code>EM_ATENDIMENTO</code> — um agente com 5 conversas conta 1x; um agente só com conversas <code>AGUARDANDO</code>/<code>ABERTA</code> (que ainda não assumiu nada) não conta.</li>
+    <li>Cada evento Realtime em <code>conversas</code> (qualquer INSERT/UPDATE/DELETE) dispara 4 novas queries <code>count</code> na faixa ao vivo — sem debounce.</li>
+    <li>Delta percentual vs. período anterior é calculado no client comparando com uma segunda query do mesmo tamanho de intervalo, imediatamente anterior (<code>calcPeriodo</code> calcula <code>inicioPrev</code>/<code>fimPrev</code>).</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Sem cache nem agregação no banco — em volumes grandes de conversas, <code>buscarMetricasGeral</code>/<code>buscarMetricasEquipe</code>/<code>buscarMetricasQualidade</code> trazem linha a linha (status/departamento/datas) de todas as conversas do período para agregar em JavaScript no navegador, a cada troca de aba ou período.</li>
+  </ul>
+</section>
+
+<section class="manual-item" id="simulador-whatsapp">
+  <h2>Simulador WhatsApp</h2>
+
+  <h3>Stack e Estrutura de Arquivos</h3>
+  <ul>
+    <li><code>Projeto CRM/public/docs/simulador-whatsapp.html</code> (com uma segunda cópia em <code>docs/simulador-whatsapp.html</code>, fora de <code>public/</code> — <strong>não é idêntica</strong>: caminhos relativos de <code>supabase-config.js</code>/<code>portal-auth-guard.js</code> têm profundidade diferente entre as duas, e uma chama <code>PortalAuthGuard.init(2)</code> enquanto a outra chama <code>init(3)</code>) — <strong>HTML/JS vanilla, sem Vite/React</strong>, arquitetonicamente igual ao resto do portal e não à árvore React do CRM. Carrega Supabase JS via CDN UMD (<code>unpkg.com/@supabase/supabase-js@2</code>), autentica com o mesmo <code>portal-auth-guard.js</code> e <code>supabase-config.js</code> usados pelas ferramentas vanilla do portal. É registrado no portal como ferramenta separada, mas fica fisicamente dentro da árvore do CRM; <code>public/docs/</code> é copiado literalmente pelo Vite para <code>dist/docs/</code>, que vira <code>crm/docs/</code> no build final.</li>
+    <li><code>supabase/functions/dev-message/index.ts</code> — Edge Function que fabrica um payload no formato do webhook da Meta e o repassa para <code>whatsapp-webhook</code>.</li>
+  </ul>
+
+  <h3>Modelo de Dados</h3>
+  <p>Sem tabela dedicada. A lista de "telefones simulados" fica só em <code>localStorage</code> do navegador (chaves <code>wpp_sim_clientes</code> e <code>wpp_sim_config</code>) — não é sincronizada entre dispositivos ou usuários. As conversas/mensagens simuladas gravam nas mesmas tabelas <code>contatos</code>/<code>conversas</code>/<code>mensagens</code> do tráfego real.</p>
+
+  <h3>Fluxo Principal</h3>
+  <pre class="mermaid">
+sequenceDiagram
+    participant Sim as simulador-whatsapp.html
+    participant DM as dev-message
+    participant WH as whatsapp-webhook
+    participant Bot as chatbot-processor
+    participant RT as Supabase Realtime
+
+    Sim->>DM: POST phone, name, message, bypass_token
+    DM->>WH: POST payload no formato Meta, header X-Dev-Bypass-Token
+    WH->>WH: bypass_token valido, pula validacao HMAC
+    WH->>Bot: processarMensagemBot, mesmo fluxo de producao
+    Bot-->>WH: grava respostas em mensagens
+    WH-->>DM: retorna conversa_id, contato_id, protocolo
+    DM->>DM: busca historico completo com service role
+    DM-->>Sim: retorna mensagens ja carregadas
+    RT-->>Sim: subscricao propria por conversa_id, novas mensagens em tempo real
+  </pre>
+
+  <h3>Decisões de Design / Particularidades</h3>
+  <ul>
+    <li>O simulador chama <code>dev-message</code> usando o <code>access_token</code> da própria sessão autenticada do usuário do portal (com fallback para a anon key) no header <code>Authorization</code> — mas quem efetivamente autoriza o bypass da assinatura HMAC no <code>whatsapp-webhook</code> é o <code>DEV_BYPASS_TOKEN</code> enviado em <code>X-Dev-Bypass-Token</code>, configurado nas variáveis de ambiente da Edge Function e digitado manualmente na tela do simulador (⚙ Configuração).</li>
+    <li>Migration <code>011_dev_simulator.sql</code> abre SELECT sem nenhuma restrição em <code>mensagens</code>, <code>conversas</code> e <code>usuarios</code>, com um comentário explícito "usar apenas em ambiente de dev" — mas a policy fica ativa em qualquer ambiente onde a migration tenha rodado, sem flag para desligá-la em produção.</li>
+  </ul>
+
+  <h3>Dívida Técnica / Pendências</h3>
+  <ul>
+    <li>Existem duas cópias do arquivo (<code>public/docs/simulador-whatsapp.html</code> e <code>docs/simulador-whatsapp.html</code>) e elas já divergem hoje — não são só paths relativos diferentes, o argumento passado a <code>PortalAuthGuard.init()</code> também é diferente entre as duas (<code>2</code> vs. <code>3</code>). Como é <code>public/docs/</code> que o Vite copia para o build publicado, essa é a versão que roda de verdade; <code>docs/</code> (fora de <code>public/</code>) parece ser uma cópia esquecida ou desatualizada — checar as duas ao editar, ou apagar a que não é servida, para não divergirem mais.</li>
+  </ul>
+</section>
