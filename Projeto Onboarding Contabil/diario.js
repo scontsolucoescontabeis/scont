@@ -515,7 +515,9 @@
     const meses = Array.from({ length: 12 }, (_, idx) => ({ ano: anoAtual, mes: idx + 1 }));
     return `<span class="mapa-mini-grade">${meses.map(({ ano, mes }) => {
       const status = statusDoMes(codigoEmpresa, ano, mes);
-      return `<span class="mini-quad status-${status}" title="${String(mes).padStart(2, '0')}/${ano}"></span>`;
+      const aprovado = statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado';
+      const titulo = `${String(mes).padStart(2, '0')}/${ano}${aprovado ? ' — fechamento aprovado pela equipe Scont' : ''}`;
+      return `<span class="mini-quad status-${status}${aprovado ? ' fechamento-aprovado' : ''}" title="${titulo}"></span>`;
     }).join('')}</span>`;
   }
 
