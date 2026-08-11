@@ -746,6 +746,7 @@ async function sendAlertEmail(tipo, params) {
 
 function openCertModal(id = null) {
   const form = q('#certForm');
+  const senhaEl = q('#senha');
   if (id) {
     const cert = APP_STATE._allCertificates.find(c => c.id === id);
     if (cert) {
@@ -757,7 +758,26 @@ function openCertModal(id = null) {
       q('#autoridade').value   = cert.autoridade_id || '';
       q('#emissao').value      = toISODate(cert.data_emissao);
       q('#vencimento').value   = toISODate(cert.data_vencimento);
-      q('#senha').value        = cert.senha_hash || '';
+      // Nunca usar cert.senha_hash diretamente: isso pulava o controle
+      // de podeVerSenha e mostrava a senha em texto puro pra qualquer
+      // um que abrisse o modal de edição. A senha só entra no campo
+      // vinda da mesma RPC segura usada na tela Segurança
+      // (fn_decifrar_senha_certificado), e só se o usuário tiver permissão.
+      senhaEl.value = '';
+      if (APP_STATE.podeVerSenha) {
+        senhaEl.disabled = true;
+        senhaEl.placeholder = 'Carregando...';
+        supabaseClient.rpc('fn_decifrar_senha_certificado', { p_id: cert.id })
+          .then(({ data, error }) => {
+            if (q('#certId').value !== cert.id) return; // modal já mudou
+            senhaEl.disabled = false;
+            senhaEl.placeholder = '';
+            senhaEl.value = error ? '' : (data || '');
+          });
+      } else {
+        senhaEl.disabled = true;
+        senhaEl.placeholder = 'Sem permissão para ver/alterar a senha';
+      }
       q('#situacao').value     = cert.situacao;
       q('#responsavel').value  = cert.responsavel_nome || '';
       q('#email').value        = cert.responsavel_email || '';
@@ -778,6 +798,8 @@ function openCertModal(id = null) {
     q('#certModalTitle').textContent = 'Novo certificado';
     form.reset();
     q('#certId').value = '';
+    senhaEl.disabled = false;
+    senhaEl.placeholder = '';
     const ativoEl = q('#ativo');
     if (ativoEl) { ativoEl.checked = false; }
     const warning = q('#ativoWarning');
@@ -1069,7 +1091,6 @@ async function saveCertificate(formData) {
       autoridade_id:            formData.get('autoridade') || null,
       data_emissao:             formData.get('emissao')    || null,
       data_vencimento:          formData.get('vencimento'),
-      senha_hash:               formData.get('senha')      || null,
       situacao:                 formData.get('situacao'),
       responsavel_nome:         formData.get('responsavel') || null,
       responsavel_email:        formData.get('email')       || null,
@@ -1082,6 +1103,15 @@ async function saveCertificate(formData) {
       ativo:                    !(q('#ativo')?.checked),
       atualizado_por:           APP_STATE.currentUser?.usuario_id
     };
+
+    // Senha: campo desabilitado (sem podeVerSenha) é omitido do FormData
+    // pelo próprio navegador, então nunca sobrescreve/apaga a senha
+    // existente por engano. Em certificado novo, sempre grava (o próprio
+    // usuário acabou de digitar a senha). Em edição, só grava se o
+    // usuário tem permissão de ver/alterar senhas.
+    if (!id || APP_STATE.podeVerSenha) {
+      cert.senha_hash = formData.get('senha') || null;
+    }
 
     if (id) {
       const { error } = await supabaseClient.from(TABLE_NAMES.CERTIFICADOS).update(cert).eq('id', id);
