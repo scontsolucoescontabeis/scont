@@ -1427,8 +1427,9 @@ async function gerarEEnviarPDFAlterado(formOriginal, dadosAtualizados, sociosAtu
             });
         }
 
-        // 6. Gerar o arquivo PDF (Blob)
+        // 6. Gerar o arquivo PDF (Blob) + base64 (pra anexar em e-mail, ex. pedido de validação ao cliente)
         const pdfBlob = doc.output('blob');
+        const pdfBase64 = doc.output('datauristring').split(',')[1];
 
         // 7. Montar o nome do arquivo e o caminho
         const sanitizarNomeArquivo = (nome) => {
@@ -1479,8 +1480,8 @@ async function gerarEEnviarPDFAlterado(formOriginal, dadosAtualizados, sociosAtu
         }
 
         console.log('✅ PDF atualizado salvo com sucesso no Storage!', data);
-        return data;
-        
+        return { ...data, pdfBase64, nomeArquivo };
+
     } catch (err) {
         console.error('❌ Falha crítica ao gerar/enviar PDF:', err);
         throw err;
@@ -1753,13 +1754,14 @@ async function saveChanges() {
         } catch (e) { console.warn('⚠️ Histórico não registrado'); }
 
         // 4. GERAR E ENVIAR PDF ATUALIZADO
+        let pdfGerado = null;
         try {
             const btnSalvar = document.querySelector('#editModal .btn-primary');
             const textoOriginal = btnSalvar.innerText;
             btnSalvar.innerText = 'Gerando PDF...';
             btnSalvar.disabled = true;
 
-            await gerarEEnviarPDFAlterado(form, updateData, sociosAtualizados, responsavel);
+            pdfGerado = await gerarEEnviarPDFAlterado(form, updateData, sociosAtualizados, responsavel);
 
             btnSalvar.innerText = textoOriginal;
             btnSalvar.disabled = false;
@@ -1767,13 +1769,17 @@ async function saveChanges() {
             console.error('Erro ao gerar/enviar PDF:', pdfError);
         }
 
-        // 5. Pedido de validação ao cliente (só quando o status acabou de mudar pra isso)
+        // 5. Pedido de validação ao cliente (só quando o status acabou de mudar pra isso),
+        //    com o PDF recém-gerado em anexo
         if (newStatus === 'aguardando_validacao_cliente' && statusMudou && tokenValidacao) {
             const nomeExibicao = tipo === 'empregado'
                 ? (updateData.nome_completo || form.nome_completo || '')
                 : (updateData.nome_empresa || form.nome_empresa || '');
+            const anexoPdf = pdfGerado && pdfGerado.pdfBase64
+                ? { nome: pdfGerado.nomeArquivo, conteudoBase64: pdfGerado.pdfBase64 }
+                : null;
             try {
-                await window.enviarSolicitacaoValidacaoCliente(tipo, formId, nomeExibicao, emailValidacaoCliente, tokenValidacao);
+                await window.enviarSolicitacaoValidacaoCliente(tipo, formId, nomeExibicao, emailValidacaoCliente, tokenValidacao, anexoPdf);
             } catch (e) {
                 console.warn('⚠️ Falha ao enviar pedido de validação ao cliente:', e);
             }

@@ -68,7 +68,7 @@ const _TIPO_LABEL_VALIDACAO = {
     empregado: 'Admissão de Empregado',
 };
 
-window.enviarSolicitacaoValidacaoCliente = async function enviarSolicitacaoValidacaoCliente(tipo, formId, nomeExibicao, emailCliente, token) {
+window.enviarSolicitacaoValidacaoCliente = async function enviarSolicitacaoValidacaoCliente(tipo, formId, nomeExibicao, emailCliente, token, anexoPdf) {
     try {
         const tipoLabel = _TIPO_LABEL_VALIDACAO[tipo];
         if (!tipoLabel) {
@@ -102,6 +102,7 @@ window.enviarSolicitacaoValidacaoCliente = async function enviarSolicitacaoValid
                     linkValidar,
                     linkRejeitar,
                 },
+                ...(anexoPdf && anexoPdf.conteudoBase64 ? { anexos: [anexoPdf] } : {}),
             }),
         });
 
