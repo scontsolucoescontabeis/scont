@@ -22,7 +22,7 @@
       <tr><td><code>mala_direta_envios</code></td><td>1 linha por (campanha × destinatário) — é o snapshot do envio, não um FK "vivo" para contato: <code>nome/email/telefone/empresa/cargo</code> são copiados no momento da criação (<code>contato_id</code> é opcional, pode ser <code>NULL</code> para destinatário avulso). <code>mensagem_final</code> guarda o template já com variáveis substituídas. <code>token</code> UUID hex de 32 chars (<code>crypto.randomUUID().replace(/-/g,'')</code>), gerado no front, é a "senha" de acesso à página de confirmação — não há verificação adicional. <code>status_envio</code> (<code>pendente|enviado</code>) e <code>status_confirmacao</code> (<code>pendente|lido|confirmado|recusado</code>) são independentes. RLS tem policy dedicada pro <code>anon</code>: só pode fazer UPDATE se <code>status_envio='enviado' AND status_confirmacao='pendente'</code>, e só pode escrever um novo <code>status_confirmacao</code> válido — evita dupla resposta e resposta antes do envio real.</td></tr>
       <tr><td><code>mala_direta_grupos</code> / <code>mala_direta_grupo_contatos</code></td><td>Agrupamento N:N simples de contatos, usado só para pré-selecionar destinatários ao montar uma campanha (não persiste vínculo grupo↔campanha).</td></tr>
       <tr><td><code>mala_direta_regras</code></td><td>Regras recorrentes geradas pelo Conversor PDF: <code>tipos</code> (array de tipos de evento reconhecidos), <code>frequencia</code> (<code>semanal|mensal|unica</code>), <code>dia_envio</code>/<code>dia_envio_tipo</code> (<code>'ultimo'</code> para último dia do mês), <code>agrupar_empresa</code>, <code>template</code>, <code>ultima_execucao</code>, <code>metodo_envio</code> (mailto/brevo — não está no schema.sql original, coluna adicionada depois). Execução é sempre manual (usuário clica "Executar" na tela); não há cron/edge function — a regra só dispara um aviso visual quando alguém abre a tela no dia programado.</td></tr>
-      <tr><td><code>mala_direta_config</code></td><td>Tabela chave/valor (<code>chave</code>, <code>valor</code>, <code>atualizado_em</code>) usada só para <code>brevo_key</code>/<code>brevo_nome</code>/<code>brevo_email</code>. Não documentada em <code>schema-mala-direta.sql</code>. A chave de API do Brevo fica em texto puro no banco (mesma categoria de decisão que <code>contabil_mapeamento_bancos</code> em Departamento Contábil) e também trafega para o cliente sem mascaramento (fica no <code>value</code> do input ao abrir Configurações).</td></tr>
+      <tr><td><code>mala_direta_config</code></td><td>Tabela chave/valor (<code>chave</code>, <code>valor</code>, <code>atualizado_em</code>) usada para <code>brevo_key</code>/<code>brevo_nome</code>/<code>brevo_email</code> e a flag <code>brevo_configurado</code>. Não documentada em <code>schema-mala-direta.sql</code> — <code>schema-mala-direta-brevo-seguranca.sql</code> (raiz de <code>Projeto Mala Direta/</code>) é quem define a RLS atual. <strong>Corrigido (2026-08-10):</strong> a chave <code>brevo_key</code> continua em texto puro no banco, mas a policy de SELECT agora exclui essa linha (<code>chave &lt;&gt; 'brevo_key'</code>) para qualquer <code>authenticated</code> — só a Edge Function (service role) lê o valor real. O cliente usa a flag booleana não-secreta <code>brevo_configurado</code> pra saber "está configurado?" sem precisar ler a chave de volta.</td></tr>
     </tbody>
   </table>
   <p>Configurações de lote de Outlook (<code>loteMax</code>, <code>loteIntervalo</code>, <code>loteDelay</code>) e o modo de template (texto/HTML) ficam só em <code>localStorage</code> do navegador (<code>md_lote_max</code>, <code>md_lote_intervalo</code>, <code>md_lote_delay</code>, <code>md_modo_html</code>) — não sincronizam entre máquinas/usuários, diferente da config do Brevo que é compartilhada via <code>mala_direta_config</code>.</p>
@@ -47,29 +47,27 @@ flowchart TD
     L --> M[Aviso na tela Envios Recorrentes no dia programado]
     M --> N[Execucao manual reimporta PDF do dia]
   </pre>
-  <p>Envio automático via Brevo (<code>executarEnvioBrevo()</code>, linha ~5077) — chamada HTTP direta do navegador para a API do Brevo, sem intermediário no Supabase:</p>
+  <p>Envio automático via Brevo (<code>executarEnvioBrevo()</code>) — <strong>corrigido em 2026-08-10:</strong> antes era um <code>fetch</code> direto do navegador pra <code>api.brevo.com</code> com a API key exposta no client-side; agora passa pela Edge Function <code>enviar-mala-direta-brevo</code>, que lê a chave via service role e faz a chamada Brevo server-side:</p>
   <pre class="mermaid">
 sequenceDiagram
     participant U as Usuario (navegador)
     participant JS as index.html (client-side)
     participant SB as Supabase REST
+    participant EF as Edge Function enviar-mala-direta-brevo
     participant BR as api.brevo.com
 
     U->>JS: clica Enviar via Brevo
     JS->>SB: SELECT mala_direta_envios pendentes da campanha
-    loop cada destinatario pendente
-        JS->>JS: applyTemplate + _buildConfirmButton (token do envio)
-        JS->>BR: POST v3/smtp/email (api-key no header, sender, to, htmlContent)
-        BR-->>JS: 201 ou erro
-        alt sucesso
-            JS->>SB: UPDATE mala_direta_envios SET status_envio=enviado
-        else falha
-            JS->>JS: acumula em lista de erros, segue para o proximo
-        end
-        JS->>JS: sleep 300ms
-    end
+    JS->>JS: monta destinatarios + assunto + corpo (sem a chave)
+    JS->>EF: POST modo=enviar {destinatarios, assunto, htmlContent}
+    EF->>SB: le brevo_key/brevo_nome/brevo_email (service role, ignora RLS)
+    EF->>BR: POST v3/smtp/email (api-key no header, sender, to, htmlContent)
+    BR-->>EF: 201 ou erro
+    EF-->>JS: resultado por destinatario (ok/erro)
+    JS->>SB: UPDATE mala_direta_envios SET status_envio=enviado (por sucesso)
     JS-->>U: barra de progresso + toast com total ok/erro
   </pre>
+  <p>O modo <code>modo=testar</code> da mesma Edge Function faz um <code>GET v3/account</code> na Brevo pra validar a chave configurada, usado pelo botão "Testar conexão" em Configurações — também nunca expõe a chave de volta ao cliente, só devolve nome/email da conta associada.</p>
   <p>Envio manual via mailto e lote pelo Outlook: <code>window.open('mailto:...')</code> monta um rascunho no cliente de email padrão do SO com destinatário/assunto/corpo (texto) já preenchidos; o corpo HTML não é aceito por <code>mailto:</code>, por isso o modo "HTML formatado" copia o HTML para a área de transferência e pede Ctrl+V manual. O "Envio em Lote" (<code>iniciarEnvioEmLote()</code>) só automatiza a abertura sequencial de rascunhos, respeitando <code>loteMax</code>/<code>loteIntervalo</code>/<code>loteDelay</code> do <code>localStorage</code> — cada rascunho ainda exige clique em Enviar dentro do Outlook; o job roda num objeto de estado global (<code>emailBatchJob</code>) que sobrevive à troca de tela dentro da SPA (mesma aba do navegador), mas é perdido se a aba fechar.</p>
 
   <h3>Decisões de Design / Particularidades</h3>
@@ -78,14 +76,14 @@ sequenceDiagram
     <li><code>mala_direta_envios</code> é desnormalizada de propósito (snapshot de nome/email/etc. no momento do envio) — editar um contato depois não altera envios já criados a partir dele, e destinatário avulso funciona sem precisar de linha em <code>mala_direta_contatos</code>.</li>
     <li>O link de confirmação embutido no HTML (<code>_buildConfirmButton</code>) é montado com URL <strong>relativa</strong> à própria página (<code>window.location.href</code> menos o querystring), então aponta para onde quer que o <code>index.html</code> esteja hospedado no momento do envio — diferente da versão Electron, que usa uma URL fixa do GitHub Pages (ver seção Desktop/Electron, Decisões).</li>
     <li>Variáveis de template (<code>{{campo}}</code>) casam por nome de coluna case-insensitive contra as chaves da linha do envio; no preview, uma variável sem valor fica destacada em amarelo (<code>applyTemplateHighlight</code>) em vez de silenciosamente virar string vazia, para o usuário perceber antes de disparar.</li>
-    <li>Envio via Brevo não passa por nenhuma Edge Function do Supabase — é <code>fetch</code> direto do navegador para <code>api.brevo.com</code> com a API key exposta no client-side (qualquer um com acesso ao DevTools da sessão logada vê a chave).</li>
+    <li><strong>Corrigido (2026-08-10):</strong> envio via Brevo não passa mais direto do navegador para <code>api.brevo.com</code> — a chamada HTTP à Brevo e a leitura da <code>brevo_key</code> agora acontecem só dentro da Edge Function <code>enviar-mala-direta-brevo</code> (service role); o cliente manda apenas destinatários/assunto/corpo.</li>
   </ul>
 
   <h3>Dívida Técnica / Pendências</h3>
   <ul>
-    <li><code>mala_direta_config</code> (config do Brevo) não está em <code>schema-mala-direta.sql</code> — quem for recriar o banco do zero a partir desse arquivo vai faltar essa tabela; precisa ser extraída do banco vivo antes de qualquer migração.</li>
+    <li><code>mala_direta_config</code> (config do Brevo) não está em <code>schema-mala-direta.sql</code> — quem for recriar o banco do zero a partir desse arquivo vai faltar essa tabela; precisa ser extraída do banco vivo antes de qualquer migração. A RLS de segurança da chave está em <code>schema-mala-direta-brevo-seguranca.sql</code>, também não incorporada ao schema base.</li>
     <li>Coluna <code>metodo_envio</code> de <code>mala_direta_regras</code> (referenciada no JS) também não aparece no schema.sql — mesmo tipo de gap.</li>
-    <li>Chave de API do Brevo e senha nenhuma de criptografia: fica em texto puro no banco e é enviada ao client inteira sempre que a tela de Configurações carrega.</li>
+    <li><strong>Corrigido (2026-08-10):</strong> a chave de API do Brevo deixou de ser lida pelo cliente — RLS de <code>mala_direta_config</code> bloqueia SELECT da linha <code>brevo_key</code> para qualquer <code>authenticated</code>, e o envio/teste de conexão passaram a rodar server-side na Edge Function <code>enviar-mala-direta-brevo</code>. A chave em si continua em texto puro no banco (não criptografada), só deixou de trafegar pro navegador.</li>
     <li>Progresso de envio em lote (Outlook) só existe em memória JS de uma aba — fechar a aba no meio de um lote perde o acompanhamento (os emails já efetivamente enviados continuam marcados no banco, mas o restante do lote não é retomado automaticamente).</li>
   </ul>
 </section>

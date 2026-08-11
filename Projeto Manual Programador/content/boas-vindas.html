@@ -32,8 +32,8 @@
   <table class="manual-tabela">
     <thead><tr><th>Política</th><th>Comando</th><th>Regra</th></tr></thead>
     <tbody>
-      <tr><td>apresentacoes: leitura pública ativa</td><td>SELECT</td><td><code>USING (ativo = TRUE)</code> — qualquer chave anon, sem login, lê qualquer linha com <code>ativo = true</code>. Não restringe por <code>id</code> (ver Dívida Técnica).</td></tr>
       <tr><td>apresentacoes: admin gerencia</td><td>ALL</td><td><code>USING/WITH CHECK (public.is_admin())</code> — insert/update/delete só por admin autenticado.</td></tr>
+      <tr><td colspan="3"><strong>Corrigido (2026-08-10):</strong> a policy pública de SELECT (<code>USING (ativo = TRUE)</code>, sem filtro por <code>id</code>) foi removida — e junto com ela uma <strong>segunda</strong> policy permissiva, <code>bv_anon_select</code>, que não existia em nenhum <code>.sql</code> versionado do repo (só foi encontrada consultando <code>pg_policy</code> direto no banco de produção) e sozinha já bastava pra vazar a tabela inteira, mesmo com a primeira removida — policies permissivas do Postgres se somam por OR. Leitura pública agora só passa pela função <code>fn_buscar_apresentacao_publica(p_id uuid)</code> (ver Página Pública do Cliente). SQL: <code>_sql/apresentacoes_restringir_leitura_publica.sql</code>.</td></tr>
     </tbody>
   </table>
 
@@ -144,7 +144,7 @@ flowchart TD
   <table class="manual-tabela">
     <thead><tr><th>Operação</th><th>Detalhe</th></tr></thead>
     <tbody>
-      <tr><td>Leitura</td><td><code>db.from('apresentacoes').select('*').eq('id', id).eq('ativo', true).single()</code> — usa a chave anon; a policy "leitura pública ativa" já é quem realmente autoriza o acesso (o filtro <code>.eq('id', id)</code> no client é redundante em relação à RLS, que libera qualquer linha ativa, não só a solicitada).</td></tr>
+      <tr><td>Leitura</td><td><strong>Corrigido (2026-08-10):</strong> <code>db.rpc('fn_buscar_apresentacao_publica', { p_id: id })</code> — antes era <code>db.from('apresentacoes').select('*').eq('id', id).eq('ativo', true).single()</code>, e quem de fato autorizava o acesso era a RLS (<code>USING (ativo=true)</code>, sem filtro por linha), não o <code>.eq('id', id)</code> do client. A RPC é <code>SECURITY DEFINER</code>, filtra por <code>id = p_id AND ativo = true</code> dentro da função e devolve só essa linha — agora o filtro por <code>id</code> é regra do banco, não escolha da query.</td></tr>
       <tr><td>Contagem de acesso</td><td><code>db.rpc('fn_registrar_acesso_apresentacao', { p_id: id })</code> — função <code>SECURITY DEFINER</code>, <code>GRANT EXECUTE ... TO anon, authenticated</code>. Faz um <code>UPDATE acessos = acessos + 1 WHERE id = p_id AND ativo = TRUE</code> direto em SQL, sem round-trip de leitura+escrita no cliente (evita race condition de contagem).</td></tr>
     </tbody>
   </table>
@@ -156,20 +156,22 @@ sequenceDiagram
     participant DB as Supabase apresentacoes
     participant Cliente
     participant Pagina as index.html
+    participant BuscaRPC as fn_buscar_apresentacao_publica
     participant RPC as fn_registrar_acesso_apresentacao
 
     Admin->>DB: insert apresentacoes ver secao Criar
     Admin->>Cliente: envia link index.html?id=uuid por email ou WhatsApp
     Cliente->>Pagina: abre o link
-    Pagina->>DB: select apresentacoes where id=uuid and ativo=true
+    Pagina->>BuscaRPC: rpc fn_buscar_apresentacao_publica p_id=uuid
+    BuscaRPC->>DB: select apresentacoes where id=p_id and ativo=true (dentro da funcao)
     alt registro encontrado e ativo
-        DB-->>Pagina: dados cadastrais
+        BuscaRPC-->>Pagina: dados cadastrais so dessa linha
         Pagina->>Pagina: personalizarHero e preencherDadosCadastrais
         Pagina->>RPC: rpc fn_registrar_acesso_apresentacao p_id=uuid
         RPC-->>DB: UPDATE acessos = acessos plus 1
         Note over Pagina,RPC: chamada fire and forget, catch silencioso
     else sem id, id invalido ou desativado
-        DB-->>Pagina: erro ou linha vazia
+        BuscaRPC-->>Pagina: linha vazia
         Pagina->>Pagina: mostra guia generico sem dados cadastrais
     end
   </pre>
@@ -184,6 +186,6 @@ sequenceDiagram
 
   <h3>Dívida Técnica / Pendências</h3>
   <ul>
-    <li><strong>Risco real de exposição de dados:</strong> a policy de RLS "apresentacoes: leitura pública ativa" autoriza <code>SELECT</code> em <em>qualquer</em> linha com <code>ativo = true</code>, sem restringir por <code>id</code>. O filtro por <code>id</code> em <code>index.html</code> é só uma escolha da query do cliente, não uma regra do banco — uma chamada REST direta contra a API do Supabase com a chave anon pública (a mesma exposta em <code>supabase-config.js</code>), por exemplo <code>GET /rest/v1/apresentacoes?ativo=eq.true&amp;select=*</code>, retorna razão social, CNPJ, telefone, e-mail e nome do contato de <strong>todos</strong> os clientes com apresentação ativa, não só de quem tem o link. Dado que a migração LGPD (<code>_sql/lgpd_compliance_migration.sql</code>) já classifica essa tabela como contendo dados pessoais (Art. 5º, I), essa policy provavelmente deveria restringir a leitura a um <code>id</code> específico (ex.: via função <code>SECURITY DEFINER</code> equivalente à de acesso, em vez de <code>SELECT</code> aberto) — não foi corrigido até o momento desta documentação.</li>
+    <li><strong>Corrigido (2026-08-10) — era risco real de exposição de dados (LGPD):</strong> as duas policies de SELECT público (<code>USING (ativo = true)</code>, sem filtro por <code>id</code> — ver seção RLS em Criar Apresentação) foram removidas; leitura pública agora só passa pela RPC <code>fn_buscar_apresentacao_publica(p_id)</code>, que filtra <code>id = p_id AND ativo = true</code> dentro da função. Antes, uma chamada REST direta como <code>GET /rest/v1/apresentacoes?ativo=eq.true&amp;select=*</code> com a chave anon pública retornava razão social, CNPJ, telefone, e-mail e nome do contato de <strong>todos</strong> os clientes com apresentação ativa. Testado após a correção: leitura em massa via REST volta <code>[]</code>; a RPC com um <code>id</code> válido continua trazendo os dados certos.</li>
   </ul>
 </section>

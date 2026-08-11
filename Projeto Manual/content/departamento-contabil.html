@@ -20,6 +20,7 @@
     <li>Upload direto por item, com link para reabrir o arquivo já enviado a qualquer momento.</li>
     <li>Progresso calculado automaticamente e mostrado na lista lateral de cada onboarding em andamento.</li>
     <li>Separação clara entre o que é responsabilidade do cliente enviar (Seções A-G) e o que é conferência interna da equipe (Seção H).</li>
+    <li>Um onboarding pode ser excluído pela lista lateral — a ação pede confirmação e não pode ser desfeita (os arquivos já enviados para aquele onboarding não são recuperáveis depois).</li>
   </ul>
 
   <h3>Memórias de cálculo</h3>
@@ -84,7 +85,7 @@
 
   <h3>Como usar</h3>
   <ol>
-    <li>Na <strong>Visão Geral</strong>, use os filtros (empresa por código/nome, regime, responsável, status do mês, documentação disponível, mês/ano) para localizar as empresas que precisam de atenção. A coluna "Pendências" mostra quantos meses da grade daquela empresa já foram marcados como pendência (somando todos os anos).</li>
+    <li>Na <strong>Visão Geral</strong>, use os filtros (empresa por código/nome, regime, responsável, status do mês, documentação disponível, mês/ano) para localizar as empresas que precisam de atenção. A busca por empresa aceita tanto o código quanto o nome, em qualquer um dos dois campos (filtro da Visão Geral e busca da barra lateral), e a empresa sempre aparece no formato <strong>{código} - {nome}</strong> nas listas e seletores. A coluna "Pendências" mostra quantos meses da grade daquela empresa já foram marcados como pendência (somando todos os anos).</li>
     <li>Clique numa empresa (ou use o campo de busca da barra lateral, também por código ou nome) para abrir a página dela: um resumo do Mapeamento Estratégico (com atalho para editar), a grade mensal do ano e a lista de lançamentos.</li>
     <li>Na grade mensal, clique num mês "Não Iniciado" para começar (vira "Em Andamento"). Clique de novo para escolher entre <strong>Marcar Pendência</strong> (exige descrever o motivo) ou <strong>Marcar Concluído</strong>. Um mês em pendência volta para "Em Andamento" com um clique simples assim que for resolvido.</li>
     <li>Use as setas ‹ › acima da grade para navegar entre anos.</li>
@@ -94,7 +95,8 @@
 
   <h3>Funcionalidades</h3>
   <ul>
-    <li>O selo <strong>📄</strong> no canto de um mês "Não Iniciado" indica que a documentação do cliente já chegou e dá para começar a lançar — só a equipe SCONT/administradores marcam esse selo; outros usuários só o veem quando já está marcado.</li>
+    <li>O selo <strong>📄</strong> no canto de um mês "Não Iniciado" indica que a documentação do cliente já chegou e dá para começar a lançar — só a equipe SCONT/administradores marcam (e desmarcam) esse selo, clicando nele; outros usuários só o veem quando já está marcado. Marcar o selo pode disparar um e-mail de aviso (ligado/desligado em Configurações → Alertas por E-mail, opção "documentação disponível").</li>
+    <li>O filtro "Documentação Disponível" da Visão Geral usa a mesma marcação do selo: filtra empresas que têm pelo menos um mês (dentro do ano selecionado, se houver filtro de ano) com documentação já sinalizada como recebida mas ainda não iniciada.</li>
     <li>Um mês "Concluído" pode ser reaberto manualmente (com confirmação), a menos que o fechamento dele já tenha sido aprovado — nesse caso a célula fica travada.</li>
     <li>Um Prestador de Serviço só vê, nos seletores de empresa do Diário, as empresas onde está cadastrado como responsável (em Configurações); a equipe SCONT/administradores veem todas.</li>
   </ul>
@@ -155,7 +157,16 @@
     <li>As colunas do Relatório misturam campos do Mapeamento Estratégico e do Diário — a coluna "Contato" só aparece como opção para quem pode editar o Mapeamento (mesma restrição do perfil da empresa).</li>
     <li>Os filtros de período/mês de referência de lançamentos só afetam as colunas "Qtd. Lançamentos" e "Último Lançamento" — não tiram nenhuma empresa da lista de resultados.</li>
     <li>Na tela de Validações, cada fechamento pendente mostra o tempo total já decorrido, para ajudar a priorizar o que validar primeiro.</li>
+    <li>O Histórico combina, na mesma linha do tempo, eventos de fontes diferentes (lançamento novo, mudança de status na grade, documentação marcada como disponível) — não é preciso visitar cada empresa separadamente para saber o que mudou recentemente na carteira inteira.</li>
   </ul>
+
+  <h3>Perguntas frequentes</h3>
+  <dl>
+    <dt>O relatório em PDF sai igual para todo mundo, independente de quem gerar?</dt>
+    <dd>Não. As colunas disponíveis para escolher dependem do perfil de quem está gerando — por exemplo, "Contato" só aparece pra quem também pode editar o Mapeamento Estratégico (equipe SCONT/administradores).</dd>
+    <dt>Por que não vejo nenhum item em Validações?</dt>
+    <dd>A lista só mostra o que precisa da sua ação agora: se você é da equipe SCONT, aparecem fechamentos aguardando sua aprovação; se você é Prestador de Serviço, aparecem só os fechamentos que você mesmo encerrou e que foram rejeitados, aguardando reenvio. Se não há nada em nenhuma das duas situações, a lista fica vazia — não é um erro.</dd>
+  </dl>
 </section>
 
 <section class="manual-item" id="configuracoes">
@@ -166,7 +177,7 @@
     <li>Na tabela de empresas, clique no botão Sim/Não da coluna "Contabilidade" para marcar se aquela empresa deve aparecer nos seletores do Onboarding e do Diário — a mudança salva na hora, sem precisar de botão Salvar.</li>
     <li>Use <strong>📊 Importar planilha</strong> para atualizar várias empresas de uma vez (a planilha precisa ter uma coluna de código da empresa e uma de contabilidade Sim/Não); linhas que não aparecerem na planilha ou com código não encontrado mantêm a configuração atual.</li>
     <li>Atribua um ou mais responsáveis por empresa — isso define tanto quem consegue encerrar o mês daquela empresa no Diário quanto quais empresas um Prestador de Serviço enxerga nos seletores.</li>
-    <li>Em "Alertas por E-mail", ligue ou desligue cada tipo de notificação (envio para validação, aprovação, rejeição, pendência criada, pendência sanada) — o ajuste vale para todo mundo, não é por empresa.</li>
+    <li>Em "Alertas por E-mail", ligue ou desligue cada tipo de notificação (envio para validação, aprovação, rejeição, pendência criada, pendência sanada, documentação disponível marcada) — o ajuste vale para todo mundo, não é por empresa.</li>
   </ol>
 
   <h3>Funcionalidades</h3>
