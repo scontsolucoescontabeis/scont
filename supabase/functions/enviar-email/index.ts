@@ -51,6 +51,13 @@ function _fechamento(): string {
 </body></html>`;
 }
 
+// ── Escapa HTML (usado nos templates que levam texto livre vindo
+//    de páginas públicas sem autenticação, ex. motivo de pendência) ──
+function _escapeHtml(str: string): string {
+    return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+        .replace(/\n/g, '<br>');
+}
+
 // ── Monta o HTML do e-mail ────────────────────────────────────
 function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>, nomeDestinatario: string): string {
     const nomeDest      = nomeDestinatario || 'Cliente';
@@ -388,6 +395,72 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
             Segue${destino ? `m em anexo os documentos de <strong>${tipoDocumento}</strong> de <strong>${destino}</strong>` : ' em anexo os documentos'}
             referentes à competência <strong>${competencia}</strong>.
           </p>
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
+    // ── Pedido de validação de formulário (para o cliente) ─────
+    if (tipo === 'solicitacao_validacao_formulario') {
+        const tipoLabel    = _escapeHtml((params.tipoFormularioLabel as string) || 'Formulário');
+        const nomeExibicao = _escapeHtml((params.nomeExibicao as string)        || '');
+        const linkValidar  = (params.linkValidar as string)         || '';
+        const linkRejeitar = (params.linkRejeitar as string)        || '';
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#4e1820;margin:0 0 8px;font-size:20px;">📋 Validação necessária</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            Olá, ${nomeDest}! Preparamos o <strong>${tipoLabel}</strong>${nomeExibicao ? ` de <strong>${nomeExibicao}</strong>` : ''}
+            e precisamos que você confira os dados antes de seguirmos. Por favor, revise as informações e escolha uma das opções abaixo.
+          </p>
+
+          <table width="100%" cellpadding="0" cellspacing="0"><tr>
+            <td align="center" style="padding:8px 6px 24px;">
+              <a href="${linkValidar}" style="background-color:#e8f5e9;color:#1b5e20;border:2px solid #1b5e20;padding:13px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;">
+                ✅ Confirmar Dados
+              </a>
+            </td>
+            <td align="center" style="padding:8px 6px 24px;">
+              <a href="${linkRejeitar}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;">
+                ✏️ Solicitar Correção
+              </a>
+            </td>
+          </tr></table>
+
+          <p style="color:#888;font-size:12px;line-height:1.6;">Se você não solicitou isso, pode ignorar este e-mail com segurança.</p>
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
+    // ── Cliente validou o formulário (para a equipe Scont) ─────
+    if (tipo === 'formulario_validado_cliente') {
+        const tipoLabel    = _escapeHtml((params.tipoFormularioLabel as string) || 'Formulário');
+        const nomeExibicao = _escapeHtml((params.nomeExibicao as string)        || '');
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#33aa23;margin:0 0 8px;font-size:20px;">✅ Cliente validou</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            O cliente confirmou os dados do <strong>${tipoLabel}</strong>${nomeExibicao ? ` — <strong>${nomeExibicao}</strong>` : ''}.
+            O status já foi atualizado para <strong style="color:#33aa23;">Validado</strong> no Gerenciador de Formulários.
+          </p>
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
+    // ── Cliente reportou pendência (para a equipe Scont) ────────
+    if (tipo === 'formulario_pendencia_cliente') {
+        const tipoLabel    = _escapeHtml((params.tipoFormularioLabel as string) || 'Formulário');
+        const nomeExibicao = _escapeHtml((params.nomeExibicao as string)        || '');
+        const motivo       = _escapeHtml((params.motivo as string)              || '');
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#E74C3C;margin:0 0 8px;font-size:20px;">⚠️ Pendência reportada pelo cliente</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            O cliente pediu correção no <strong>${tipoLabel}</strong>${nomeExibicao ? ` — <strong>${nomeExibicao}</strong>` : ''}.
+            O status foi atualizado para <strong style="color:#E74C3C;">Pendência de Preenchimento/Documentação</strong>.
+          </p>
+
+          ${motivo ? `
+          <div style="background:#FFF1F2;border-left:4px solid #E74C3C;border-radius:0 6px 6px 0;padding:14px 18px;margin-bottom:20px;">
+            <p style="margin:0;font-size:13px;color:#991B1B;font-weight:600;">O que o cliente pediu:</p>
+            <p style="margin:6px 0 0;font-size:13px;color:#434343;line-height:1.6;">${motivo}</p>
+          </div>` : ''}
         ` + _rodape(nomeRemetente) + _fechamento();
     }
 

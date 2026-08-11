@@ -55,3 +55,61 @@ window.notificarNovoFormulario = async function notificarNovoFormulario(tipo, ti
         console.warn('[notificar-formulario] erro ao notificar novo formulário:', err);
     }
 };
+
+// ============================================================
+// Pedido de validação ao cliente: e-mail com links "Confirmar
+// Dados" e "Solicitar Correção" (validar-formulario.html /
+// rejeitar-formulario.html). Best-effort, mesmo padrão acima.
+// ============================================================
+
+const _TIPO_LABEL_VALIDACAO = {
+    registro:  'Registro de Empresa',
+    alteracao: 'Alteração de Empresa',
+    empregado: 'Admissão de Empregado',
+};
+
+window.enviarSolicitacaoValidacaoCliente = async function enviarSolicitacaoValidacaoCliente(tipo, formId, nomeExibicao, emailCliente, token) {
+    try {
+        const tipoLabel = _TIPO_LABEL_VALIDACAO[tipo];
+        if (!tipoLabel) {
+            console.warn('[notificar-formulario] tipo desconhecido para validação:', tipo);
+            return;
+        }
+        if (!emailCliente) {
+            console.warn('[notificar-formulario] sem e-mail de destino para pedido de validação');
+            return;
+        }
+
+        const baseDir = window.location.origin + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+        const query = `id=${encodeURIComponent(formId)}&tipo=${encodeURIComponent(tipo)}&token=${encodeURIComponent(token)}`;
+        const linkValidar = `${baseDir}validar-formulario.html?${query}`;
+        const linkRejeitar = `${baseDir}rejeitar-formulario.html?${query}`;
+
+        const resp = await fetch(`${window.SUPABASE_URL}/functions/v1/enviar-email`, {
+            method:  'POST',
+            headers: {
+                'Content-Type':  'application/json',
+                'Authorization': `Bearer ${window.SUPABASE_KEY}`,
+                'apikey':        window.SUPABASE_KEY,
+            },
+            body: JSON.stringify({
+                destinatario: emailCliente,
+                assunto:      `📋 Validação necessária — ${tipoLabel} — ${nomeExibicao}`,
+                params: {
+                    tipo: 'solicitacao_validacao_formulario',
+                    tipoFormularioLabel: tipoLabel,
+                    nomeExibicao,
+                    linkValidar,
+                    linkRejeitar,
+                },
+            }),
+        });
+
+        const json = await resp.json().catch(() => ({}));
+        if (!resp.ok || json.ok === false) {
+            console.warn('[notificar-formulario] falha ao enviar pedido de validação:', json.error || resp.status);
+        }
+    } catch (err) {
+        console.warn('[notificar-formulario] erro ao enviar pedido de validação:', err);
+    }
+};

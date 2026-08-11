@@ -49,6 +49,10 @@
                     <span class="icon">📁</span>
                     <span>Central de Documentos</span>
                 </a>
+                <a href="configuracoes.html" class="nav-item" id="navConfiguracoes" style="display:none;">
+                    <span class="icon">⚙️</span>
+                    <span>Configurações</span>
+                </a>
                 <div style="height:1px;background:var(--border-color);margin:var(--spacing-md) 0;"></div>
                 <a href="../portal.html" class="nav-item">
                     <span class="icon">🏠</span>
@@ -101,6 +105,8 @@
                         <option value="recebido" selected>Recebido</option>
                         <option value="validado">Validado</option>
                         <option value="rejeitado">Rejeitado</option>
+                        <option value="aguardando_validacao_cliente">Aguardando Validação do Cliente</option>
+                        <option value="pendencia_preenchimento_documentacao">Pendência de Preenchimento/Documentação</option>
                     </select>
                 </div>
             </section>
@@ -280,6 +286,9 @@
             }
             if (!hasEmpregados) {
                 document.getElementById('navEmpregado').style.display = 'none';
+            }
+            if (auth.isAdmin) {
+                document.getElementById('navConfiguracoes').style.display = '';
             }
 
             document.getElementById('portalAuthOverlay').remove();

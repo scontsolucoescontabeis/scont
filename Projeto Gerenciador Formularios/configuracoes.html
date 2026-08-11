@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações - Gerenciamento de Formulários - SCONT</title>
+    <link rel="icon" type="image/x-icon" href="../assets/icons/gerenciador-formularios/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/icons/gerenciador-formularios/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../assets/icons/gerenciador-formularios/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/icons/gerenciador-formularios/apple-touch-icon.png" />
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- SIDEBAR -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="Logo SCONT" class="company-logo">
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">
+                    <span class="icon">📋</span>
+                    <span>Todos os Formulários</span>
+                </a>
+                <a href="historico.html" class="nav-item">
+                    <span class="icon">📊</span>
+                    <span>Histórico de Edições</span>
+                </a>
+                <a href="documentos.html" class="nav-item">
+                    <span class="icon">📁</span>
+                    <span>Central de Documentos</span>
+                </a>
+                <a href="configuracoes.html" class="nav-item active">
+                    <span class="icon">⚙️</span>
+                    <span>Configurações</span>
+                </a>
+                <div style="height:1px;background:var(--border-color);margin:var(--spacing-md) 0;"></div>
+                <a href="../portal.html" class="nav-item">
+                    <span class="icon">🏠</span>
+                    <span>Voltar ao Portal</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h1 id="pageTitle">Configurações</h1>
+                    <p>E-mails da equipe Scont que recebem o aviso quando o cliente valida ou reporta pendência</p>
+                </div>
+            </header>
+
+            <section class="form-details">
+                <div class="detail-section">
+                    <div class="detail-section-title">Validação do Cliente por E-mail</div>
+                    <p style="font-size:13px;color:var(--gray-600);margin:0 0 var(--spacing-md);">
+                        Quando um formulário é marcado como "Aguardando Validação do Cliente" e o cliente confirma
+                        ou pede correção pelo link recebido, um aviso é enviado para o e-mail cadastrado aqui,
+                        conforme o tipo do formulário.
+                    </p>
+                    <div id="linhasConfigEmail">
+                        <div class="loading-spinner"><div class="spinner"></div><p>Carregando...</p></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="../supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../portal-auth-guard.js"></script>
+    <script src="configuracoes.js"></script>
+    <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
+</body>
+</html>

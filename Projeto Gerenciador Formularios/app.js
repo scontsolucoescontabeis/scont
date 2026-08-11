@@ -137,7 +137,7 @@ function createFormCard(form) {
             <div class="form-card-header">
                 <div class="form-card-title-wrapper">
                     <div class="form-card-title">${sanitizeOutput(nome)}</div>
-                    <span class="form-card-status status-${status}">${status.toUpperCase()}</span>
+                    <span class="form-card-status status-${status}">${getStatusLabel(status)}</span>
                 </div>
                 <div class="form-card-badges">
                     <span class="form-card-type">${iconTipo} ${tipo}</span>
@@ -810,7 +810,7 @@ function createDetailContent(form, sociosDoBanco = [], dependentesDoBanco = []) 
             <div class="detail-row">
                 <div class="detail-field">
                     <span class="detail-label">Status Atual</span>
-                    <div class="detail-value" style="font-weight: bold; color: var(--primary-color); background: transparent; border: none; padding: 0;">${status.toUpperCase()}</div>
+                    <div class="detail-value" style="font-weight: bold; color: var(--primary-color); background: transparent; border: none; padding: 0;">${getStatusLabel(status)}</div>
                 </div>
                 <div class="detail-field">
                     <span class="detail-label">Data de Envio</span>
@@ -909,12 +909,28 @@ async function editFormCard(formId) {
             }
         }
 
+        // Se já houver empresa vinculada (pedido de validação anterior), busca o nome pra mostrar na busca
+        let empresaVinculada = null;
+        if (form.rh_empresa_id && supabaseClient) {
+            try {
+                const { data: emp } = await supabaseClient
+                    .from('rh_empresas')
+                    .select('id, nome_empresa, email_responsavel')
+                    .eq('id', form.rh_empresa_id)
+                    .maybeSingle();
+                if (emp) empresaVinculada = emp;
+            } catch (e) {
+                console.warn('⚠️ Erro ao buscar empresa vinculada:', e);
+            }
+        }
+
         // Passa os dados para a função que cria o formulário
-        modalBody.innerHTML = createEditForm(form, sociosDoBanco, dependentesDoBanco);
+        modalBody.innerHTML = createEditForm(form, sociosDoBanco, dependentesDoBanco, empresaVinculada);
         window.currentFormId = formId;
         window.currentForm = form;
         window.currentSocios = sociosDoBanco;
         window.currentDependentes = dependentesDoBanco;
+        atualizarCamposValidacaoCliente();
 
     } catch (error) {
         console.error('❌ Erro ao abrir edição:', error);
@@ -923,7 +939,7 @@ async function editFormCard(formId) {
     }
 }
 
-function createEditForm(form, sociosDoBanco = [], dependentesDoBanco = []) {
+function createEditForm(form, sociosDoBanco = [], dependentesDoBanco = [], empresaVinculada = null) {
     const tipo = form.tipo_formulario || 'formulario';
     
     let camposEdicao = `
@@ -932,15 +948,45 @@ function createEditForm(form, sociosDoBanco = [], dependentesDoBanco = []) {
             <div class="detail-row">
                 <div class="detail-field">
                     <label class="detail-label">Status</label>
-                    <select id="editStatus" class="filter-select" style="padding: var(--spacing-md);">
+                    <select id="editStatus" class="filter-select" style="padding: var(--spacing-md);" onchange="atualizarCamposValidacaoCliente()">
                         <option value="recebido" ${form.status === 'recebido' ? 'selected' : ''}>Recebido</option>
                         <option value="validado" ${form.status === 'validado' ? 'selected' : ''}>Validado</option>
                         <option value="rejeitado" ${form.status === 'rejeitado' ? 'selected' : ''}>Rejeitado</option>
+                        <option value="aguardando_validacao_cliente" ${form.status === 'aguardando_validacao_cliente' ? 'selected' : ''}>Aguardando Validação do Cliente</option>
+                        <option value="pendencia_preenchimento_documentacao" ${form.status === 'pendencia_preenchimento_documentacao' ? 'selected' : ''}>Pendência de Preenchimento/Documentação</option>
                     </select>
                 </div>
                 <div class="detail-field">
                     <label class="detail-label">Responsável</label>
                     <input type="text" id="editResponsavel" class="search-input" placeholder="Seu nome" style="padding: var(--spacing-md);" value="${localStorage.getItem('lastUser') ? JSON.parse(localStorage.getItem('lastUser')) : ''}">
+                </div>
+            </div>
+            <div class="detail-row full" id="blocoValidacaoCliente" style="display:none;">
+                <div class="detail-field" style="width:100%;">
+                    ${tipo === 'registro' ? `
+                        <label class="detail-label">E-mail do cliente para validação</label>
+                        <input type="email" id="editEmailValidacaoCliente" class="search-input" style="padding: var(--spacing-md);"
+                               placeholder="cliente@empresa.com.br"
+                               value="${sanitizeOutput(form.email_validacao_cliente || form.email_comercial || form.emailComercial || '')}">
+                        <p style="font-size:12px;color:var(--gray-600);margin-top:4px;">Empresa nova, ainda sem cadastro em RH → Empresas. Confirme o e-mail antes de enviar.</p>
+                    ` : `
+                        <label class="detail-label">Empresa (para localizar o e-mail do responsável)</label>
+                        <input type="text" id="editBuscaEmpresa" class="search-input" style="padding: var(--spacing-md);"
+                               placeholder="Buscar empresa por nome..." autocomplete="off"
+                               value="${sanitizeOutput(empresaVinculada?.nome_empresa || '')}"
+                               oninput="buscarEmpresaValidacao(this.value)">
+                        <div id="resultadosBuscaEmpresa" style="position:relative;"></div>
+                        <input type="hidden" id="editRhEmpresaId" value="${sanitizeOutput(form.rh_empresa_id || '')}">
+                        <div style="margin-top:8px;">
+                            <label class="detail-label">E-mail do responsável</label>
+                            <input type="email" id="editEmailValidacaoCliente" class="search-input" style="padding: var(--spacing-md);"
+                                   placeholder="Selecione a empresa acima"
+                                   value="${sanitizeOutput(form.email_validacao_cliente || empresaVinculada?.email_responsavel || '')}"
+                                   ${form.rh_empresa_id ? 'readonly' : ''}>
+                            <button type="button" class="btn btn-secondary" style="margin-top:6px;font-size:12px;padding:4px 10px;" onclick="document.getElementById('editEmailValidacaoCliente').removeAttribute('readonly'); document.getElementById('editEmailValidacaoCliente').focus();">Trocar e-mail</button>
+                        </div>
+                        <p id="avisoEmailVazio" style="font-size:12px;color:var(--danger-color, #D32F2F);margin-top:4px;display:${(form.rh_empresa_id && !(form.email_validacao_cliente || empresaVinculada?.email_responsavel)) ? 'block' : 'none'};">Cadastre o e-mail do responsável em RH → Empresas antes de enviar, ou digite um e-mail manualmente acima.</p>
+                    `}
                 </div>
             </div>
         </div>
@@ -1320,7 +1366,7 @@ async function gerarEEnviarPDFAlterado(formOriginal, dadosAtualizados, sociosAtu
         yPosition += lineHeight;
         doc.text(`Alterado por: ${responsavel}`, margin, yPosition);
         yPosition += lineHeight;
-        doc.text(`Status Atual: ${form.status.toUpperCase()}`, margin, yPosition);
+        doc.text(`Status Atual: ${getStatusLabel(form.status)}`, margin, yPosition);
         yPosition += lineHeight * 2;
 
         // Função auxiliar para imprimir linhas no PDF
@@ -1441,6 +1487,110 @@ async function gerarEEnviarPDFAlterado(formOriginal, dadosAtualizados, sociosAtu
     }
 }
 
+// ===== VALIDAÇÃO DO CLIENTE: campos condicionais do modal =====
+
+function atualizarCamposValidacaoCliente() {
+    const statusEl = document.getElementById('editStatus');
+    if (!statusEl) return;
+    const status = statusEl.value;
+
+    const bloco = document.getElementById('blocoValidacaoCliente');
+    if (bloco) bloco.style.display = status === 'aguardando_validacao_cliente' ? 'block' : 'none';
+
+    const obsEl = document.getElementById('editObservacoes');
+    if (obsEl) {
+        if (status === 'pendencia_preenchimento_documentacao') {
+            obsEl.placeholder = 'Descreva a pendência de preenchimento/documentação (obrigatório)...';
+            obsEl.style.borderColor = '#D32F2F';
+        } else {
+            obsEl.placeholder = 'Adicione observações...';
+            obsEl.style.borderColor = '';
+        }
+    }
+}
+
+let _empresaValidacaoSearchTimer = null;
+
+function buscarEmpresaValidacao(termo) {
+    clearTimeout(_empresaValidacaoSearchTimer);
+
+    // Qualquer edição no campo de busca invalida a empresa selecionada antes
+    const hiddenId = document.getElementById('editRhEmpresaId');
+    if (hiddenId) hiddenId.value = '';
+    const emailEl = document.getElementById('editEmailValidacaoCliente');
+    if (emailEl) emailEl.removeAttribute('readonly');
+    const aviso = document.getElementById('avisoEmailVazio');
+    if (aviso) aviso.style.display = 'none';
+
+    const resultsEl = document.getElementById('resultadosBuscaEmpresa');
+    const termoLimpo = (termo || '').trim();
+    if (!resultsEl) return;
+    if (termoLimpo.length < 2) { resultsEl.innerHTML = ''; return; }
+
+    _empresaValidacaoSearchTimer = setTimeout(async () => {
+        if (!supabaseClient) return;
+        try {
+            const { data, error } = await supabaseClient
+                .from('rh_empresas')
+                .select('id, nome_empresa, email_responsavel')
+                .ilike('nome_empresa', `%${termoLimpo}%`)
+                .order('nome_empresa', { ascending: true })
+                .limit(8);
+            if (error) throw error;
+            renderResultadosBuscaEmpresa(data || []);
+        } catch (e) {
+            console.warn('⚠️ Erro ao buscar empresas em rh_empresas:', e);
+        }
+    }, 300);
+}
+
+function renderResultadosBuscaEmpresa(empresas) {
+    const resultsEl = document.getElementById('resultadosBuscaEmpresa');
+    if (!resultsEl) return;
+    resultsEl.innerHTML = '';
+
+    const dropdown = document.createElement('div');
+    dropdown.style.cssText = 'position:absolute;z-index:10;background:#fff;border:1px solid var(--border-color);border-radius:var(--radius-sm);width:100%;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.12);';
+
+    if (!empresas.length) {
+        const vazio = document.createElement('div');
+        vazio.style.cssText = 'padding:8px 12px;font-size:13px;color:var(--gray-600);';
+        vazio.textContent = 'Nenhuma empresa encontrada.';
+        dropdown.appendChild(vazio);
+    } else {
+        empresas.forEach(emp => {
+            const item = document.createElement('div');
+            item.style.cssText = 'padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--border-color);';
+            item.textContent = emp.nome_empresa + (emp.email_responsavel ? '' : ' (sem e-mail cadastrado)');
+            item.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // evita o blur do input cancelar o clique
+                selecionarEmpresaValidacao(emp.id, emp.nome_empresa, emp.email_responsavel || '');
+            });
+            dropdown.appendChild(item);
+        });
+    }
+
+    resultsEl.appendChild(dropdown);
+}
+
+function selecionarEmpresaValidacao(id, nome, email) {
+    const buscaEl = document.getElementById('editBuscaEmpresa');
+    const hiddenId = document.getElementById('editRhEmpresaId');
+    const emailEl = document.getElementById('editEmailValidacaoCliente');
+    const aviso = document.getElementById('avisoEmailVazio');
+    const resultsEl = document.getElementById('resultadosBuscaEmpresa');
+
+    if (buscaEl) buscaEl.value = nome;
+    if (hiddenId) hiddenId.value = id;
+    if (emailEl) {
+        emailEl.value = email || '';
+        if (email) emailEl.setAttribute('readonly', 'readonly');
+        else emailEl.removeAttribute('readonly');
+    }
+    if (aviso) aviso.style.display = email ? 'none' : 'block';
+    if (resultsEl) resultsEl.innerHTML = '';
+}
+
 async function saveChanges() {
     try {
         const formId = window.currentFormId;
@@ -1455,12 +1605,49 @@ async function saveChanges() {
         const form = window.currentForm;
         const tipo = form.tipo_formulario;
         const tableName = tipo === 'empregado' ? 'empregados' : 'formularios';
+        const statusAnterior = form.status || 'recebido';
+        const statusMudou = newStatus !== statusAnterior;
+
+        // Validações dos 2 status novos antes de tocar no banco
+        let emailValidacaoCliente = '';
+        let rhEmpresaIdSelecionado = null;
+        let tokenValidacao = null;
+
+        if (newStatus === 'aguardando_validacao_cliente') {
+            const emailEl = document.getElementById('editEmailValidacaoCliente');
+            emailValidacaoCliente = emailEl ? emailEl.value.trim() : '';
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValidacaoCliente)) {
+                return showError('Informe um e-mail válido do cliente para enviar o pedido de validação.');
+            }
+            if (tipo !== 'registro') {
+                const hiddenId = document.getElementById('editRhEmpresaId');
+                rhEmpresaIdSelecionado = hiddenId && hiddenId.value ? hiddenId.value : null;
+            }
+            if (statusMudou) {
+                tokenValidacao = crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                        const r = Math.random() * 16 | 0;
+                        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+                    });
+            }
+        }
+
+        if (newStatus === 'pendencia_preenchimento_documentacao' && !observacoes.trim()) {
+            return showError('Descreva a pendência de preenchimento/documentação no campo Observações antes de salvar.');
+        }
 
         const updateData = {
             status: newStatus,
             observacoes: observacoes,
             updated_at: new Date().toISOString()
         };
+
+        if (newStatus === 'aguardando_validacao_cliente') {
+            updateData.email_validacao_cliente = emailValidacaoCliente;
+            if (tipo !== 'registro') updateData.rh_empresa_id = rhEmpresaIdSelecionado;
+            if (statusMudou) updateData.token_validacao = tokenValidacao;
+        }
 
         // Salvar campos baseados no tipo de formulário
         if (tipo === 'registro') {
@@ -1578,6 +1765,18 @@ async function saveChanges() {
             btnSalvar.disabled = false;
         } catch (pdfError) {
             console.error('Erro ao gerar/enviar PDF:', pdfError);
+        }
+
+        // 5. Pedido de validação ao cliente (só quando o status acabou de mudar pra isso)
+        if (newStatus === 'aguardando_validacao_cliente' && statusMudou && tokenValidacao) {
+            const nomeExibicao = tipo === 'empregado'
+                ? (updateData.nome_completo || form.nome_completo || '')
+                : (updateData.nome_empresa || form.nome_empresa || '');
+            try {
+                await window.enviarSolicitacaoValidacaoCliente(tipo, formId, nomeExibicao, emailValidacaoCliente, tokenValidacao);
+            } catch (e) {
+                console.warn('⚠️ Falha ao enviar pedido de validação ao cliente:', e);
+            }
         }
 
         showSuccess('Formulário atualizado e PDF gerado com sucesso!');
@@ -1879,6 +2078,18 @@ function sanitizeOutput(text) {
 function getTipoFormulario(tipo) {
     const tipos = { 'registro': 'Registro de Empresa', 'alteracao': 'Alteração de Empresa', 'empregado': 'Registro de Empregado' };
     return tipos[tipo] || tipo || 'Formulário';
+}
+
+function getStatusLabel(status) {
+    const labels = {
+        recebido: 'RECEBIDO',
+        validado: 'VALIDADO',
+        rejeitado: 'REJEITADO',
+        excluido: 'EXCLUÍDO',
+        aguardando_validacao_cliente: 'AGUARDANDO VALIDAÇÃO DO CLIENTE',
+        pendencia_preenchimento_documentacao: 'PENDÊNCIA DE PREENCHIMENTO/DOCUMENTAÇÃO',
+    };
+    return labels[status] || String(status || '').toUpperCase();
 }
 
 function formatCurrency(value) {

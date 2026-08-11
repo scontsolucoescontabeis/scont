@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validação de Formulário - SCONT</title>
+
+    <script src="../supabase-config.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #8B3A3A;
+            --primary-hover: #6B2A2A;
+            --success-color: #388E3C;
+            --danger-color: #D32F2F;
+            --background-color: #F4F7F6;
+            --card-bg: #FFFFFF;
+            --text-primary: #2C3E50;
+            --text-secondary: #7F8C8D;
+            --border-color: #E0E6ED;
+            --radius-lg: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            max-width: 480px;
+            width: 100%;
+            padding: 40px 32px;
+            text-align: center;
+        }
+
+        .card img { height: 40px; margin-bottom: 24px; }
+
+        .icon { font-size: 56px; margin-bottom: 16px; }
+
+        h1 { font-size: 20px; margin-bottom: 12px; color: var(--text-primary); }
+
+        p { font-size: 14px; color: var(--text-secondary); }
+
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid rgba(139, 58, 58, 0.2);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .sucesso h1 { color: var(--success-color); }
+        .erro h1 { color: var(--danger-color); }
+    </style>
+</head>
+<body>
+    <div class="card" id="card">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="Logo SCONT">
+        <div class="spinner"></div>
+        <h1>Processando...</h1>
+        <p>Estamos confirmando os dados, um instante.</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const card = document.getElementById('card');
+            const params = new URLSearchParams(window.location.search);
+            const id = params.get('id');
+            const tipo = params.get('tipo');
+            const token = params.get('token');
+
+            if (!id || !tipo || !token) {
+                mostrarErro('Link incompleto. Verifique se você abriu o link inteiro recebido por e-mail.');
+                return;
+            }
+
+            try {
+                const resp = await fetch(`${window.SUPABASE_URL}/functions/v1/processar-validacao-formulario`, {
+                    method:  'POST',
+                    headers: {
+                        'Content-Type':  'application/json',
+                        'Authorization': `Bearer ${window.SUPABASE_KEY}`,
+                        'apikey':        window.SUPABASE_KEY,
+                    },
+                    body: JSON.stringify({ id, tipo, token, acao: 'validar' }),
+                });
+                const json = await resp.json().catch(() => ({}));
+
+                if (!resp.ok || json.ok === false) {
+                    mostrarErro('Este link não é mais válido. Se ainda precisar validar ou corrigir informações, entre em contato com a Scont.');
+                    return;
+                }
+
+                mostrarSucesso(json.tipoFormularioLabel, json.nomeExibicao);
+            } catch (err) {
+                console.error(err);
+                mostrarErro('Não foi possível processar sua confirmação agora. Tente novamente em alguns minutos ou entre em contato com a Scont.');
+            }
+
+            function mostrarSucesso(tipoLabel, nome) {
+                card.className = 'card sucesso';
+                card.innerHTML = `
+                    <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="Logo SCONT">
+                    <div class="icon">✅</div>
+                    <h1>${escapeHtml(tipoLabel || 'Formulário')}${nome ? ` — ${escapeHtml(nome)}` : ''} validado com sucesso!</h1>
+                    <p>Obrigado por confirmar. A equipe Scont já foi avisada e vai seguir com o processo.</p>
+                `;
+            }
+
+            function mostrarErro(mensagem) {
+                card.className = 'card erro';
+                card.innerHTML = `
+                    <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="Logo SCONT">
+                    <div class="icon">⚠️</div>
+                    <h1>Link inválido ou expirado</h1>
+                    <p>${escapeHtml(mensagem)}</p>
+                `;
+            }
+
+            function escapeHtml(str) {
+                const div = document.createElement('div');
+                div.textContent = str == null ? '' : String(str);
+                return div.innerHTML;
+            }
+        });
+    </script>
+</body>
+</html>

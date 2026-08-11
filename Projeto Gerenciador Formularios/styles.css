@@ -367,6 +367,16 @@ html, body {
     color: #D32F2F;
 }
 
+.status-aguardando_validacao_cliente {
+    background: #FFF3E0;
+    color: #E65100;
+}
+
+.status-pendencia_preenchimento_documentacao {
+    background: #FBE9E7;
+    color: #BF360C;
+}
+
 .form-card-info {
     margin: var(--spacing-md) 0;
     font-size: 13px;
