@@ -42,6 +42,15 @@
   async function iniciar() {
     const auth = await window.PortalAuthGuard.init(1);
     if (!auth) return;
+
+    // Onboarding não é acessível para "Prestador de Serviço" — só tem
+    // acesso ao Diário Contábil, mesma convenção de restrição do módulo.
+    const empresaUsuario = (auth.userData?.empresa || '').trim().toLowerCase();
+    if (!auth.isAdmin && empresaUsuario === 'prestador de serviço') {
+      window.location.href = 'diario.html';
+      return;
+    }
+
     usuarioAtual = auth;
     document.getElementById('authOverlay')?.remove();
 

@@ -28,10 +28,10 @@
     if (!auth) return;
 
     // Tela de Configurações não é visível para "Prestador de Serviço" —
-    // mesma convenção de enforcement client-side do restante do módulo.
+    // ele só tem acesso ao Diário Contábil.
     const empresaUsuario = (auth.userData?.empresa || '').trim().toLowerCase();
     if (!auth.isAdmin && empresaUsuario === 'prestador de serviço') {
-      window.location.href = 'index.html';
+      window.location.href = 'diario.html';
       return;
     }
 

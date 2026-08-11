@@ -72,14 +72,16 @@
   document.addEventListener('DOMContentLoaded', async () => {
     const auth = await window.PortalAuthGuard.init(1);
     if (!auth) return;
-    document.getElementById('authOverlay')?.remove();
 
-    // Configurações não é visível para "Prestador de Serviço" — mesma
-    // convenção de enforcement client-side do restante do módulo.
+    // "Prestador de Serviço" só tem acesso ao Diário Contábil — não há
+    // hub de escolha pra ele, entra direto na única ferramenta permitida.
     const empresaUsuario = (auth.userData?.empresa || '').trim().toLowerCase();
     if (!auth.isAdmin && empresaUsuario === 'prestador de serviço') {
-      document.getElementById('cardConfiguracoes')?.remove();
+      window.location.href = 'diario.html';
+      return;
     }
+
+    document.getElementById('authOverlay')?.remove();
   });
 </script>
 </body>

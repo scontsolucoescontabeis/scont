@@ -65,27 +65,46 @@
   async function iniciar() {
     const auth = await window.PortalAuthGuard.init(1);
     if (!auth) return;
-    document.getElementById('authOverlay')?.remove();
 
     await _resolverEscopoUsuario(auth);
 
-    document.getElementById('btnDashboard').addEventListener('click', () => {
-      mapeamentoAtualId = null;
-      mapeamentoAtual = null;
-      document.getElementById('seletorEmpresa').value = '';
-      renderDashboard();
-    });
-    document.getElementById('seletorEmpresa').addEventListener('change', (ev) => {
-      if (ev.target.value) selecionarEmpresa(ev.target.value);
-    });
-
-    await carregarDados();
-    renderDashboard();
-    renderSeletorEmpresas();
-
     const params = new URLSearchParams(window.location.search);
     const empresaNaUrl = params.get('empresa');
-    if (params.get('origem') === 'diario' && empresaNaUrl) _origemDiarioEmpresa = empresaNaUrl;
+    const vemDoDiarioParaEmpresaPermitida = params.get('origem') === 'diario' && !!empresaNaUrl && _meusResponsaveisSet.has(empresaNaUrl);
+
+    // Prestador de Serviço não navega livremente pelo Mapeamento Estratégico
+    // (sem dashboard da carteira, sem trocar de empresa pelo seletor) — só
+    // acessa a página de visualização somente-leitura da empresa específica
+    // sob sua responsabilidade, chegando pelo link do Diário Contábil.
+    if (_restringirSeletor && !vemDoDiarioParaEmpresaPermitida) {
+      window.location.href = 'diario.html';
+      return;
+    }
+
+    document.getElementById('authOverlay')?.remove();
+
+    if (_restringirSeletor) {
+      document.getElementById('btnDashboard').style.display = 'none';
+      document.querySelector('.seletor-empresa-wrap').style.display = 'none';
+    } else {
+      document.getElementById('btnDashboard').addEventListener('click', () => {
+        mapeamentoAtualId = null;
+        mapeamentoAtual = null;
+        document.getElementById('seletorEmpresa').value = '';
+        renderDashboard();
+      });
+      document.getElementById('seletorEmpresa').addEventListener('change', (ev) => {
+        if (ev.target.value) selecionarEmpresa(ev.target.value);
+      });
+    }
+
+    await carregarDados();
+    if (!_restringirSeletor) {
+      renderDashboard();
+      renderSeletorEmpresas();
+    }
+
+    if (vemDoDiarioParaEmpresaPermitida) _origemDiarioEmpresa = empresaNaUrl;
     if (empresaNaUrl && empresas.some((e) => e.codigo_empresa === empresaNaUrl)) {
       selecionarEmpresa(empresaNaUrl);
     }
