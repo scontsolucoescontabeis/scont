@@ -4974,7 +4974,14 @@ Equipe SCONT`,
     document.getElementById('cfg-lote-max').value       = s.loteMax;
     document.getElementById('cfg-lote-intervalo').value = s.loteIntervalo;
     document.getElementById('cfg-lote-delay').value     = s.loteDelay;
-    document.getElementById('cfg-brevo-key').value      = _brevoConfig.key;
+    // A chave não é mais legível pelo navegador (RLS bloqueia a leitura
+    // dessa linha) — o campo fica sempre em branco; o placeholder avisa
+    // se já existe uma configurada, pra não parecer que sumiu.
+    const keyInput = document.getElementById('cfg-brevo-key');
+    keyInput.value = '';
+    keyInput.placeholder = _brevoConfig.configurado
+      ? '•••••••• (chave já configurada — deixe em branco para manter)'
+      : 'xkeysib-…';
     document.getElementById('cfg-brevo-nome').value     = _brevoConfig.nome  || 'SCONT';
     document.getElementById('cfg-brevo-email').value    = _brevoConfig.email;
   }
@@ -4995,33 +5002,47 @@ Equipe SCONT`,
     const bEmail = document.getElementById('cfg-brevo-email').value.trim();
 
     try {
+      const agora = new Date().toISOString();
       const upserts = [
-        { chave: 'brevo_key',   valor: bKey,   atualizado_em: new Date().toISOString() },
-        { chave: 'brevo_nome',  valor: bNome,  atualizado_em: new Date().toISOString() },
-        { chave: 'brevo_email', valor: bEmail, atualizado_em: new Date().toISOString() },
+        { chave: 'brevo_nome',  valor: bNome,  atualizado_em: agora },
+        { chave: 'brevo_email', valor: bEmail, atualizado_em: agora },
       ];
+      // Só sobrescreve a chave se o admin digitou uma nova — o campo fica
+      // sempre em branco (não dá mais pra ler a chave salva de volta), então
+      // deixar em branco e salvar não pode apagar a chave já configurada.
+      if (bKey) {
+        upserts.push({ chave: 'brevo_key', valor: bKey, atualizado_em: agora });
+        upserts.push({ chave: 'brevo_configurado', valor: 'true', atualizado_em: agora });
+      }
       const { error } = await sb.from('mala_direta_config')
         .upsert(upserts, { onConflict: 'chave' });
       if (error) throw error;
 
-      _brevoConfig = { key: bKey, nome: bNome, email: bEmail };
+      _brevoConfig = { ..._brevoConfig, nome: bNome, email: bEmail, configurado: _brevoConfig.configurado || !!bKey };
+      document.getElementById('cfg-brevo-key').value = '';
       toast('Configurações salvas!', 'success');
     } catch(e) {
       toast('Erro ao salvar: ' + e.message, 'error');
     }
   }
 
-  let _brevoConfig = { key: '', nome: 'SCONT', email: '' };
+  // A chave da Brevo NÃO fica mais aqui — RLS bloqueia a leitura de
+  // 'brevo_key' pra qualquer usuário autenticado (ver
+  // schema-mala-direta-brevo-seguranca.sql). Só a Edge Function
+  // enviar-mala-direta-brevo, com service role, consegue ler a chave; o
+  // envio de verdade acontece só lá dentro. `configurado` é uma flag
+  // não-secreta que diz se já existe uma chave salva, sem revelar o valor.
+  let _brevoConfig = { nome: 'SCONT', email: '', configurado: false };
 
   async function loadBrevoConfig() {
     try {
       const { data } = await sb.from('mala_direta_config')
         .select('chave,valor')
-        .in('chave', ['brevo_key', 'brevo_nome', 'brevo_email']);
+        .in('chave', ['brevo_configurado', 'brevo_nome', 'brevo_email']);
       (data || []).forEach(r => {
-        if (r.chave === 'brevo_key')   _brevoConfig.key   = r.valor || '';
-        if (r.chave === 'brevo_nome')  _brevoConfig.nome  = r.valor || 'SCONT';
-        if (r.chave === 'brevo_email') _brevoConfig.email = r.valor || '';
+        if (r.chave === 'brevo_configurado') _brevoConfig.configurado = r.valor === 'true';
+        if (r.chave === 'brevo_nome')         _brevoConfig.nome       = r.valor || 'SCONT';
+        if (r.chave === 'brevo_email')        _brevoConfig.email      = r.valor || '';
       });
     } catch(_) {}
   }
@@ -5030,16 +5051,23 @@ Equipe SCONT`,
     return { ..._brevoConfig };
   }
 
+  async function chamarEdgeFunctionBrevo(payload) {
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/enviar-mala-direta-brevo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}` },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+    return data;
+  }
+
   async function testarBrevo() {
     const cfg = getBrevoConfig();
-    if (!cfg.key || !cfg.email) { toast('Configure a chave e o email remetente primeiro.', 'error'); return; }
+    if (!cfg.configurado || !cfg.email) { toast('Configure a chave e o email remetente primeiro.', 'error'); return; }
     try {
-      const r = await fetch('https://api.brevo.com/v3/account', {
-        headers: { 'api-key': cfg.key, 'accept': 'application/json' }
-      });
-      if (!r.ok) throw new Error('Chave inválida ou sem permissão.');
-      const d = await r.json();
-      toast(`✅ Conectado! Conta: ${d.email || d.companyName || 'OK'}`, 'success');
+      const d = await chamarEdgeFunctionBrevo({ modo: 'testar' });
+      toast(`✅ Conectado! Conta: ${d.conta || 'OK'}`, 'success');
     } catch(e) {
       toast('Erro: ' + e.message, 'error');
     }
@@ -5062,7 +5090,7 @@ Equipe SCONT`,
     document.getElementById('brevo-stat-pend').textContent  = pendentes.length;
     document.getElementById('brevo-stat-sem').textContent   = semEmail.length;
 
-    const semCfg = !cfg.key || !cfg.email;
+    const semCfg = !cfg.configurado || !cfg.email;
     document.getElementById('brevo-cfg-warn').style.display  = semCfg ? '' : 'none';
     document.getElementById('brevo-form-wrap').style.display = '';
     document.getElementById('brevo-progress').style.display  = 'none';
@@ -5079,7 +5107,7 @@ Equipe SCONT`,
     const assunto  = document.getElementById('brevo-assunto').value.trim() || campanhaAtual?.nome || '';
     const pendentes = envios.filter(e => e.email && e.canal !== 'whatsapp' && e.status_envio !== 'enviado');
 
-    if (!cfg.key || !cfg.email) { toast('Configure o Brevo em Configurações.', 'error'); return; }
+    if (!cfg.configurado || !cfg.email) { toast('Configure o Brevo em Configurações.', 'error'); return; }
     if (!pendentes.length)      { toast('Nenhum pendente.', 'error'); return; }
 
     document.getElementById('btn-brevo-enviar').disabled = true;
@@ -5109,21 +5137,13 @@ Equipe SCONT`,
 
       try {
         if (!emailsList.length) throw new Error(`Email inválido: "${e.email}"`);
-        const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'api-key': cfg.key },
-          body: JSON.stringify({
-            sender:      { name: cfg.nome, email: cfg.email.trim() },
-            to:          emailsList.map(em => ({ email: em, name: (e.nome || '').trim() })),
-            subject:     assuntoFn,
-            htmlContent: htmlFinal,
-            textContent: _htmlParaTexto(htmlFinal),
-          }),
+        await chamarEdgeFunctionBrevo({
+          modo: 'enviar',
+          destinatarios: emailsList.map(em => ({ email: em, nome: (e.nome || '').trim() })),
+          assunto:     assuntoFn,
+          htmlContent: htmlFinal,
+          textContent: _htmlParaTexto(htmlFinal),
         });
-        if (!resp.ok) {
-          const err = await resp.json().catch(() => ({}));
-          throw new Error(err.message || `HTTP ${resp.status}`);
-        }
 
         await sb.from('mala_direta_envios')
           .update({ status_envio: 'enviado', data_envio: new Date().toISOString() })
