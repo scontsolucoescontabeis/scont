@@ -9,6 +9,19 @@
   const SITUACAO_LABELS = { regularizado: 'Regularizado', em_regularizacao: 'Em Regularização', pendente: 'Pendente', critico: 'Crítico' };
   const FINANCEIRO_LABELS = { interno: 'Interno', bpo_scont: 'BPO Scont', bpo_terceiro: 'BPO Terceiro', nao_possui: 'Não possui' };
   const PERIODICIDADE_LABELS = { mensal: 'Mensal', trimestral: 'Trimestral', anual: 'Anual' };
+  const SITUACAO_FISCAL_LABELS = { regular: 'Regular', irregular: 'Irregular' };
+
+  // Campos "Sim/Não" adicionados à seção Execução (label exibido + coluna).
+  const CAMPOS_SIM_NAO = [
+    { campo: 'retirada_acima_50k', label: 'Retirada > R$50 mil' },
+    { campo: 'pejotizacao', label: 'Pejotização?' },
+    { campo: 'risco_sonegacao', label: 'Risco de Sonegação?' },
+    { campo: 'licitacoes', label: 'Licitações' },
+    { campo: 'financiamentos_emprestimos', label: 'Financiamentos e Empréstimos' },
+    { campo: 'caixa', label: 'Caixa?' },
+    { campo: 'conta_fornecedor_analitica', label: 'Conta Fornecedor Analítica?' },
+  ];
+  const CAMPOS_SIM_NAO_SET = new Set(CAMPOS_SIM_NAO.map((c) => c.campo));
 
   const BANCOS_SUGERIDOS = ['Itaú', 'Bradesco', 'Banco do Brasil', 'Caixa', 'Santander', 'Sicoob', 'Sicredi', 'Inter', 'Nubank'];
   const OBRIGACOES_SUGERIDAS = ['SPED Fiscal', 'SPED Contribuições', 'ECD', 'ECF', 'DCTF', 'DCTFWeb', 'EFD-Reinf', 'DAS', 'DEFIS', 'DIRF'];
@@ -267,6 +280,16 @@
     `).join('');
 
     main.innerHTML = `
+      ${_podeEditar ? `
+        <div class="onboarding-header">
+          <div><h2>Visão Geral</h2></div>
+          <div class="onboarding-header-actions">
+            <button type="button" class="btn btn-secondary" id="btnBaixarModeloImportacao">📥 Baixar modelo</button>
+            <button type="button" class="btn btn-primary" id="btnImportarPlanilhaMapeamento">📊 Importar planilha</button>
+            <input type="file" id="fileImportarMapeamento" accept=".xlsx,.xls,.csv" style="display:none">
+          </div>
+        </div>
+      ` : ''}
       <div class="mapa-dashboard-cards">${cardsHtml}</div>
       <div class="mapa-filtros">
         <input type="text" id="filtroBusca" value="${escapeHtml(filtro.busca)}" placeholder="Buscar por código ou nome...">
@@ -300,6 +323,14 @@
     document.getElementById('filtroRegime').addEventListener('change', (ev) => { filtro.regime = ev.target.value; renderDashboard(); });
     document.getElementById('filtroFinanceiro').addEventListener('change', (ev) => { filtro.financeiro = ev.target.value; renderDashboard(); });
     ligarCliquesLinhasDashboard();
+
+    if (_podeEditar) {
+      document.getElementById('btnBaixarModeloImportacao').addEventListener('click', baixarModeloImportacao);
+      document.getElementById('btnImportarPlanilhaMapeamento').addEventListener('click', () => {
+        document.getElementById('fileImportarMapeamento').click();
+      });
+      document.getElementById('fileImportarMapeamento').addEventListener('change', handleImportarPlanilhaMapeamento);
+    }
   }
 
   // ─── SIDEBAR: SELETOR DE EMPRESA ─────────────────────────────
@@ -375,6 +406,13 @@
           </div>
           <div><label>Responsável pela Execução</label><input type="text" data-campo="responsavel_execucao" value="${escapeHtml(m.responsavel_execucao || '')}"></div>
           <div><label>Último Mês Fechado</label><input type="month" data-campo="ultimo_mes_fechado" value="${m.ultimo_mes_fechado ? String(m.ultimo_mes_fechado).slice(0, 7) : ''}"></div>
+          <div><label>Situação Fiscal</label>
+            <select data-campo="situacao_fiscal">
+              <option value="">Selecione...</option>
+              ${Object.entries(SITUACAO_FISCAL_LABELS).map(([v, l]) => `<option value="${v}" ${m.situacao_fiscal === v ? 'selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </div>
+          ${CAMPOS_SIM_NAO.map(({ campo, label }) => renderSimNaoSelect(campo, label, m)).join('')}
           ${RO ? `
             <div class="full"><label>Contato</label><p class="mapa-empty">🔒 Contato da empresa visível apenas para a equipe Scont.</p></div>
           ` : `
@@ -511,6 +549,19 @@
     `;
   }
 
+  function renderSimNaoSelect(campo, label, m) {
+    const valor = m[campo];
+    return `
+      <div><label>${label}</label>
+        <select data-campo="${campo}">
+          <option value="">Selecione...</option>
+          <option value="true" ${valor === true ? 'selected' : ''}>Sim</option>
+          <option value="false" ${valor === false ? 'selected' : ''}>Não</option>
+        </select>
+      </div>
+    `;
+  }
+
   function renderTagsInput(campo, label, valores, sugestoes) {
     valores = valores || [];
     const tagsHtml = valores.map((v) => `<span class="mapa-tag">${escapeHtml(v)}<button type="button" data-remover-tag="${campo}" data-valor="${escapeHtml(v)}">×</button></span>`).join('');
@@ -633,6 +684,7 @@
     const campo = el.getAttribute('data-campo');
     let valor = el.type === 'checkbox' ? el.checked : el.value;
     if (el.type === 'month' && valor) valor = `${valor}-01`;
+    if (CAMPOS_SIM_NAO_SET.has(campo)) valor = valor === '' ? null : valor === 'true';
     if (el.tagName !== 'SELECT' && el.type !== 'checkbox' && el.type !== 'month' && valor === '') valor = null;
 
     mapeamentoAtual[campo] = valor;
@@ -822,6 +874,255 @@
     });
   }
 
+  // ─── IMPORTAÇÃO EM MASSA (PLANILHA) ─────────────────────────
+  // Empresa é localizada pelo NOME (normalizado — sem acento, sem
+  // maiúsculas, sem pontuação), não pelo código. O campo Regime nunca é
+  // gravado por aqui: ele já vem sincronizado de rh_empresas (ver
+  // configuracoes.js); a planilha só serve para APONTAR divergências, que
+  // são exibidas no resultado da importação e não persistidas.
+
+  const COLUNAS_MODELO_IMPORTACAO = [
+    'Empresa', 'Periodicidade do contábil', 'Retirada > R$50 mil', 'Situação Fiscal', 'Regime',
+    'Pejotização?', 'Risco de Sonegação?', 'Licitações', 'Financiamentos e Empréstimos',
+    'Documentação em Dia', 'Caixa?', 'Conta Fornecedor Analítica?',
+  ];
+
+  const ALIASES_COLUNA_EMPRESA = ['empresa', 'nomeempresa', 'razaosocial'];
+  const ALIASES_COLUNA_PERIODICIDADE = ['periodicidadedocontabil', 'periodicidade'];
+  const ALIASES_COLUNA_RETIRADA_50K = ['retiradar50mil', 'retiradaacima50mil', 'retiradaacimade50mil', 'retiradasuperior50mil'];
+  const ALIASES_COLUNA_SITUACAO_FISCAL = ['situacaofiscal'];
+  const ALIASES_COLUNA_REGIME = ['regime'];
+  const ALIASES_COLUNA_PEJOTIZACAO = ['pejotizacao'];
+  const ALIASES_COLUNA_RISCO_SONEGACAO = ['riscodesonegacao'];
+  const ALIASES_COLUNA_LICITACOES = ['licitacoes'];
+  const ALIASES_COLUNA_FINANCIAMENTOS = ['financiamentoseemprestimos', 'financiamentosemprestimos'];
+  const ALIASES_COLUNA_CAIXA = ['caixa'];
+  const ALIASES_COLUNA_CONTA_FORNECEDOR = ['contafornecedoranalitica'];
+
+  // mapa: coluna do formulário → { campo (coluna em contabil_mapeamento), aliases }
+  const MAPA_COLUNAS_SIM_NAO_IMPORTACAO = [
+    { campo: 'retirada_acima_50k', aliases: ALIASES_COLUNA_RETIRADA_50K },
+    { campo: 'pejotizacao', aliases: ALIASES_COLUNA_PEJOTIZACAO },
+    { campo: 'risco_sonegacao', aliases: ALIASES_COLUNA_RISCO_SONEGACAO },
+    { campo: 'licitacoes', aliases: ALIASES_COLUNA_LICITACOES },
+    { campo: 'financiamentos_emprestimos', aliases: ALIASES_COLUNA_FINANCIAMENTOS },
+    { campo: 'caixa', aliases: ALIASES_COLUNA_CAIXA },
+    { campo: 'conta_fornecedor_analitica', aliases: ALIASES_COLUNA_CONTA_FORNECEDOR },
+  ];
+
+  const REGIME_PLANILHA_PARA_CODIGO = { LP: 'lucro_presumido', LR: 'lucro_real', SN: 'simples_nacional' };
+
+  function normalizarChaveImportacao(str) {
+    return String(str ?? '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  function normalizarNomeEmpresaImportacao(str) {
+    return String(str ?? '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[.,\-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function interpretarSimNaoImportacao(valor) {
+    if (valor === null || valor === undefined) return null;
+    const v = normalizarChaveImportacao(valor);
+    if (!v) return null;
+    if (['sim', 's', 'true', '1', 'yes', 'y'].includes(v)) return true;
+    if (['nao', 'n', 'false', '0', 'no'].includes(v)) return false;
+    return null;
+  }
+
+  function interpretarSituacaoFiscalImportacao(valor) {
+    const v = normalizarChaveImportacao(valor);
+    if (!v) return null;
+    if (v.includes('irregular')) return 'irregular';
+    if (v.includes('regular')) return 'regular';
+    return null;
+  }
+
+  function interpretarPeriodicidadeImportacao(valor) {
+    const v = normalizarChaveImportacao(valor);
+    if (v === 'mensal' || v === 'trimestral' || v === 'anual') return v;
+    return null;
+  }
+
+  function interpretarRegimeImportacao(valor) {
+    const v = String(valor ?? '').trim().toUpperCase();
+    return REGIME_PLANILHA_PARA_CODIGO[v] || null;
+  }
+
+  function baixarModeloImportacao() {
+    const ws = XLSX.utils.aoa_to_sheet([COLUNAS_MODELO_IMPORTACAO]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Modelo');
+    XLSX.writeFile(wb, 'Modelo_Importacao_Mapeamento_Estrategico.xlsx');
+  }
+
+  function lerPlanilhaImportacao(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          if (!sheet) throw new Error('Não foi possível ler o conteúdo deste arquivo.');
+          resolve(XLSX.utils.sheet_to_json(sheet, { defval: null }));
+        } catch (err) { reject(err); }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  async function handleImportarPlanilhaMapeamento(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    let linhas;
+    try {
+      linhas = await lerPlanilhaImportacao(file);
+    } catch (err) {
+      console.error(err);
+      mostrarToast('Erro ao ler a planilha.', 'erro');
+      return;
+    }
+    if (!linhas.length) { mostrarToast('Planilha vazia.', 'erro'); return; }
+
+    const cabecalhos = Object.keys(linhas[0]);
+    const encontrarColuna = (aliases) => cabecalhos.find((h) => aliases.includes(normalizarChaveImportacao(h)));
+
+    const chaveEmpresa = encontrarColuna(ALIASES_COLUNA_EMPRESA);
+    if (!chaveEmpresa) {
+      mostrarToast('Planilha inválida: a coluna "Empresa" não foi encontrada.', 'erro');
+      return;
+    }
+    const chavePeriodicidade = encontrarColuna(ALIASES_COLUNA_PERIODICIDADE);
+    const chaveSituacaoFiscal = encontrarColuna(ALIASES_COLUNA_SITUACAO_FISCAL);
+    const chaveRegime = encontrarColuna(ALIASES_COLUNA_REGIME);
+    const colunasSimNao = MAPA_COLUNAS_SIM_NAO_IMPORTACAO
+      .map(({ campo, aliases }) => ({ campo, chave: encontrarColuna(aliases) }))
+      .filter((c) => c.chave);
+
+    // mapa nome normalizado → [codigo_empresa, ...] (mais de um = ambíguo)
+    const codigosPorNomeNormalizado = {};
+    empresas.forEach((e) => {
+      const chave = normalizarNomeEmpresaImportacao(e.nome_empresa);
+      (codigosPorNomeNormalizado[chave] = codigosPorNomeNormalizado[chave] || []).push(e.codigo_empresa);
+    });
+
+    const atualizacoesPorCodigo = {};
+    const naoEncontradas = [];
+    const ambiguas = [];
+    const divergenciasRegime = [];
+
+    linhas.forEach((linha) => {
+      const nomeEmpresa = String(linha[chaveEmpresa] ?? '').trim();
+      if (!nomeEmpresa) return;
+
+      const codigos = codigosPorNomeNormalizado[normalizarNomeEmpresaImportacao(nomeEmpresa)] || [];
+      if (codigos.length === 0) { naoEncontradas.push(nomeEmpresa); return; }
+      if (codigos.length > 1) { ambiguas.push(nomeEmpresa); return; }
+      const codigo = codigos[0];
+
+      const payload = atualizacoesPorCodigo[codigo] || { codigo_empresa: codigo };
+
+      if (chavePeriodicidade && linha[chavePeriodicidade] != null && String(linha[chavePeriodicidade]).trim() !== '') {
+        const v = interpretarPeriodicidadeImportacao(linha[chavePeriodicidade]);
+        if (v) payload.periodicidade = v;
+      }
+      if (chaveSituacaoFiscal && linha[chaveSituacaoFiscal] != null && String(linha[chaveSituacaoFiscal]).trim() !== '') {
+        const v = interpretarSituacaoFiscalImportacao(linha[chaveSituacaoFiscal]);
+        if (v) payload.situacao_fiscal = v;
+      }
+      colunasSimNao.forEach(({ campo, chave }) => {
+        if (linha[chave] == null || String(linha[chave]).trim() === '') return;
+        const v = interpretarSimNaoImportacao(linha[chave]);
+        if (v !== null) payload[campo] = v;
+      });
+      if (chaveRegime && linha[chaveRegime] != null && String(linha[chaveRegime]).trim() !== '') {
+        const regimeCodigo = interpretarRegimeImportacao(linha[chaveRegime]);
+        const regimeAtual = mapeamentoDe(codigo)?.regime_tributario;
+        if (regimeCodigo && regimeAtual && regimeCodigo !== regimeAtual) {
+          divergenciasRegime.push({ empresa: nomeEmpresa, planilha: REGIME_LABELS[regimeCodigo], sistema: REGIME_LABELS[regimeAtual] });
+        }
+      }
+
+      atualizacoesPorCodigo[codigo] = payload;
+    });
+
+    // linhas que só localizaram a empresa mas não trouxeram nenhum dado
+    // reconhecido não geram upsert (evita registros "vazios" desnecessários).
+    const atualizacoes = Object.values(atualizacoesPorCodigo).filter((p) => Object.keys(p).length > 1);
+
+    if (atualizacoes.length) {
+      const btn = document.getElementById('btnImportarPlanilhaMapeamento');
+      if (btn) { btn.disabled = true; btn.textContent = 'Importando...'; }
+      const { error } = await supabaseClient.from('contabil_mapeamento').upsert(atualizacoes, { onConflict: 'codigo_empresa' });
+      if (btn) { btn.disabled = false; btn.textContent = '📊 Importar planilha'; }
+      if (error) {
+        console.error(error);
+        mostrarToast('Erro ao salvar as alterações importadas. Veja o console (F12) para detalhes.', 'erro');
+        return;
+      }
+      await carregarDados();
+      renderDashboard();
+      renderSeletorEmpresas();
+    }
+
+    abrirModalResultadoImportacao({ atualizadas: atualizacoes.length, naoEncontradas, ambiguas, divergenciasRegime });
+  }
+
+  function abrirModalResultadoImportacao({ atualizadas, naoEncontradas, ambiguas, divergenciasRegime }) {
+    let modal = document.getElementById('modalResultadoImportacao');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalResultadoImportacao';
+      modal.className = 'modal';
+      document.body.appendChild(modal);
+    }
+
+    const listaHtml = (titulo, itens) => itens.length
+      ? `<p><strong>${titulo} (${itens.length}):</strong></p><div class="mapa-tags">${itens.map((v) => `<span class="mapa-tag">${escapeHtml(v)}</span>`).join('')}</div>`
+      : '';
+
+    const divergenciasHtml = divergenciasRegime.length
+      ? `<p><strong>Divergências de Regime Tributário (${divergenciasRegime.length}):</strong></p>
+         <table class="mapa-table">
+           <thead><tr><th>Empresa</th><th>Na planilha</th><th>No sistema</th></tr></thead>
+           <tbody>${divergenciasRegime.map((d) => `<tr><td>${escapeHtml(d.empresa)}</td><td>${escapeHtml(d.planilha)}</td><td>${escapeHtml(d.sistema)}</td></tr>`).join('')}</tbody>
+         </table>`
+      : '';
+
+    modal.innerHTML = `
+      <div class="modal-content large">
+        <div class="modal-header">
+          <h3>Resultado da Importação</h3>
+          <button class="modal-close" id="fecharModalResultadoImportacao">✕</button>
+        </div>
+        <div class="modal-body">
+          <p><strong>${atualizadas}</strong> empresa(s) atualizada(s) com sucesso.</p>
+          ${listaHtml('Não encontradas na base (verifique o nome)', naoEncontradas)}
+          ${listaHtml('Nome ambíguo (mais de uma empresa com esse nome)', ambiguas)}
+          ${divergenciasHtml}
+          ${!naoEncontradas.length && !ambiguas.length && !divergenciasRegime.length ? '<p class="mapa-empty">Nenhuma pendência encontrada.</p>' : ''}
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" id="fecharModalResultadoImportacao2">Fechar</button>
+        </div>
+      </div>
+    `;
+    modal.classList.add('active');
+    const fechar = () => modal.classList.remove('active');
+    document.getElementById('fecharModalResultadoImportacao').addEventListener('click', fechar);
+    document.getElementById('fecharModalResultadoImportacao2').addEventListener('click', fechar);
+  }
+
   // ─── RELATÓRIO PDF ──────────────────────────────────────────
 
   function secaoTabelaPdf(doc, titulo, linhas, startY, pageW, margem) {
@@ -850,6 +1151,7 @@
     const nomeEmpresa = empresaNome(m.codigo_empresa);
 
     const texto = (v) => (v == null || v === '' ? '—' : String(v));
+    const simNao = (v) => (v === true ? 'Sim' : v === false ? 'Não' : '—');
     const tags = (arr) => (arr && arr.length ? arr.join(', ') : '—');
     const tagsComOutros = (arr, detalhe) => {
       if (!arr || !arr.length) return '—';
@@ -873,6 +1175,8 @@
       ['Periodicidade', m.periodicidade ? PERIODICIDADE_LABELS[m.periodicidade] : '—'],
       ['Regime Tributário', m.regime_tributario ? REGIME_LABELS[m.regime_tributario] : '—'],
       ['Responsável pela Execução', texto(m.responsavel_execucao)],
+      ['Situação Fiscal', m.situacao_fiscal ? SITUACAO_FISCAL_LABELS[m.situacao_fiscal] : '—'],
+      ...CAMPOS_SIM_NAO.map(({ campo, label }) => [label, simNao(m[campo])]),
     ];
     // Contato não entra no PDF para quem não pode editar o Mapeamento
     // (Prestador de Serviço) — mesma restrição da tela e da RLS da tabela.
