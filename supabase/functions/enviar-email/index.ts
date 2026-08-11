@@ -402,8 +402,10 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
     if (tipo === 'solicitacao_validacao_formulario') {
         const tipoLabel    = _escapeHtml((params.tipoFormularioLabel as string) || 'Formulário');
         const nomeExibicao = _escapeHtml((params.nomeExibicao as string)        || '');
-        const linkValidar  = (params.linkValidar as string)         || '';
-        const linkRejeitar = (params.linkRejeitar as string)        || '';
+        // & precisa virar &amp; dentro do atributo href (HTML), senão alguns
+        // clientes de e-mail truncam a URL no primeiro "&" e derrubam tipo/token
+        const linkValidar  = ((params.linkValidar as string)  || '').replace(/&/g, '&amp;');
+        const linkRejeitar = ((params.linkRejeitar as string) || '').replace(/&/g, '&amp;');
 
         return _cabecalho(nomeRemetente) + `
           <h2 style="color:#4e1820;margin:0 0 8px;font-size:20px;">📋 Validação necessária</h2>

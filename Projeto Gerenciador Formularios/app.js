@@ -1648,6 +1648,11 @@ async function saveChanges() {
             updateData.email_validacao_cliente = emailValidacaoCliente;
             if (tipo !== 'registro') updateData.rh_empresa_id = rhEmpresaIdSelecionado;
             if (statusMudou) updateData.token_validacao = tokenValidacao;
+        } else if (statusMudou && statusAnterior === 'aguardando_validacao_cliente') {
+            // Saiu de "Aguardando Validação do Cliente" por outro caminho que não o
+            // link do cliente (ex.: staff mudou o status na mão) — invalida qualquer
+            // link pendente daquele envio, em vez de deixar um token órfão no banco.
+            updateData.token_validacao = null;
         }
 
         // Salvar campos baseados no tipo de formulário
