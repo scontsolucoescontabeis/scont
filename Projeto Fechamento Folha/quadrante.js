@@ -186,63 +186,17 @@ function atualizarFaltaAuto(faltaKey) {
     construirTotais(linhasRelatorio);
 }
 
-function normalizarNome(s) {
-    return (s || '').trim().toLowerCase()
-        .normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .replace(/\s+/g, ' ');
-}
-
-function levenshtein(a, b) {
-    const m = a.length, n = b.length;
-    if (m === 0) return n;
-    if (n === 0) return m;
-    const dp = [];
-    for (let i = 0; i <= m; i++) { dp[i] = [i]; }
-    for (let j = 0; j <= n; j++) { dp[0][j] = j; }
-    for (let i = 1; i <= m; i++)
-        for (let j = 1; j <= n; j++)
-            dp[i][j] = a[i-1] === b[j-1]
-                ? dp[i-1][j-1]
-                : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
-    return dp[m][n];
-}
-
-function similaridade(a, b) {
-    const na = normalizarNome(a), nb = normalizarNome(b);
-    if (na === nb) return 1;
-    if (!na || !nb) return 0;
-    const dist = levenshtein(na, nb);
-    return 1 - dist / Math.max(na.length, nb.length);
-}
+// normalizarNome/levenshtein/similaridade/parseMoney (básico) agora vêm de
+// fechamento-matching-shared.js (carregado antes deste script no HTML) —
+// eram idênticas em quadrante.js e ananke.js, só duplicadas.
+const { normalizarNome, levenshtein, similaridade, encontrarMelhorCorrespondenciaFuzzy, parseMoneyBasico: parseMoney } = window.FechamentoMatching;
 
 // Retorna codigo_empregado: prioridade config da ferramenta > rh_empregados (exact > fuzzy 0.75)
 function buscarCodigoEmpregado(nome) {
     const norm = normalizarNome(nome);
     if (empregadosConfig[norm]) return empregadosConfig[norm];
     if (funcionariosMap[norm]) return funcionariosMap[norm];
-    let melhorScore = 0, melhorCod = null;
-    for (const [chave, cod] of Object.entries(funcionariosMap)) {
-        const s = similaridade(norm, chave);
-        if (s > melhorScore) { melhorScore = s; melhorCod = cod; }
-    }
-    return melhorScore >= 0.75 ? melhorCod : null;
-}
-
-// Converte "R$ 2.990,26" ou 2990.26 (número do Excel) → 299026 (centavos inteiros)
-function parseMoney(s) {
-    if (!s && s !== 0) return 0;
-    const str = String(s).replace(/R\$|\s/g, '').trim();
-    if (!str) return 0;
-    let num;
-    if (str.includes(',')) {
-        // Formato brasileiro: 2.990,26 — ponto é milhar, vírgula é decimal
-        num = parseFloat(str.replace(/\./g, '').replace(',', '.'));
-    } else {
-        // Número puro do Excel: 2990.26 — ponto é decimal
-        num = parseFloat(str.replace(/[^\d.]/g, ''));
-    }
-    if (isNaN(num) || num <= 0) return 0;
-    return Math.round(num * 100);
+    return encontrarMelhorCorrespondenciaFuzzy(norm, funcionariosMap);
 }
 
 // Converte "12:18:00", "04h:30M", "4h30m", "4h" → HHMM (ex: 1218, 430)

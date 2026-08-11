@@ -108,33 +108,14 @@ function registrarFaltaDatas(key, valor) {
     faltaDatasMap[key] = valor;
 }
 
-function normalizarNome(s) {
-    return (s || '').trim().toLowerCase()
-        .normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .replace(/\s+/g, ' ');
-}
-
-function levenshtein(a, b) {
-    const m = a.length, n = b.length;
-    if (m === 0) return n;
-    if (n === 0) return m;
-    const dp = [];
-    for (let i = 0; i <= m; i++) { dp[i] = [i]; }
-    for (let j = 0; j <= n; j++) { dp[0][j] = j; }
-    for (let i = 1; i <= m; i++)
-        for (let j = 1; j <= n; j++)
-            dp[i][j] = a[i-1] === b[j-1]
-                ? dp[i-1][j-1]
-                : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
-    return dp[m][n];
-}
-
-function similaridade(a, b) {
-    const na = normalizarNome(a), nb = normalizarNome(b);
-    if (na === nb) return 1;
-    if (!na || !nb) return 0;
-    return 1 - levenshtein(na, nb) / Math.max(na.length, nb.length);
-}
+// normalizarNome/levenshtein/similaridade agora vêm de
+// fechamento-matching-shared.js (carregado antes deste script no HTML) —
+// eram idênticas em quadrante.js/trackfield.js/ananke.js, só duplicadas.
+// buscarCodigoEmpregado/parseMoney continuam próprias daqui: esta empresa
+// já tinha divergido de propósito (mapas por loja, soma de múltiplos "R$"
+// em COMISSÃO DOMINGOS/FERIADOS) — não são cópias acidentais, são extensões
+// reais, então não foram unificadas com as outras duas.
+const { normalizarNome, levenshtein, similaridade } = window.FechamentoMatching;
 
 function buscarCodigoEmpregado(nome, codEmpresaDB) {
     const norm = normalizarNome(nome);
