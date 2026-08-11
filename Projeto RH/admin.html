@@ -815,7 +815,8 @@
                         <button type="button" onclick="vgSelecionarTodasEmpresas(false)" style="padding:3px 8px;border:1px solid #C0C0C0;border-radius:4px;background:white;cursor:pointer;font-size:11px;font-weight:600;">Nenhuma</button>
                         <span id="vgQtdEmpresas" style="font-size:11px;color:#7F8C8D;"></span>
                     </div>
-                    <div id="vgFiltroEmpresas" style="max-height:110px;overflow-y:auto;border:1px solid #DEE2E6;border-radius:6px;background:white;padding:6px 8px;display:flex;flex-direction:column;gap:3px;"></div>
+                    <input type="text" id="vgBuscaEmpresa" placeholder="Buscar empresa..." oninput="_vgFiltrarListaEmpresas()" style="width:100%;padding:6px 8px;border:1px solid #DEE2E6;border-radius:6px 6px 0 0;font-size:12px;box-sizing:border-box;border-bottom:none;">
+                    <div id="vgFiltroEmpresas" style="max-height:110px;overflow-y:auto;border:1px solid #DEE2E6;border-radius:0 0 6px 6px;background:white;padding:6px 8px;display:flex;flex-direction:column;gap:3px;"></div>
                 </div>
                 <div style="flex:0 0 auto;">
                     <button type="button" class="btn-save" onclick="atualizarVisaoGerencial()" style="padding:10px 20px;">🔄 Atualizar</button>

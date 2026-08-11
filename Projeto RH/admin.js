@@ -764,6 +764,14 @@ function _vgToggleEmpresa(cb) {
     _vgAtualizarQtdEmpresas(document.querySelectorAll('#vgFiltroEmpresas input[type=checkbox]').length);
 }
 
+function _vgFiltrarListaEmpresas() {
+    const busca = (document.getElementById('vgBuscaEmpresa')?.value || '').toLowerCase().trim();
+    document.querySelectorAll('#vgFiltroEmpresas label').forEach(label => {
+        const texto = label.textContent.toLowerCase();
+        label.style.display = (!busca || texto.includes(busca)) ? '' : 'none';
+    });
+}
+
 function vgSelecionarTodasEmpresas(marcar) {
     document.querySelectorAll('#vgFiltroEmpresas input[type=checkbox]').forEach(cb => {
         cb.checked = marcar;
