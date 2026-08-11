@@ -585,14 +585,13 @@
   function linhasDashboardHtml() {
     const linhas = empresasFiltradasDashboard().map((e) => {
       const m = mapeamentoDe(e.codigo_empresa);
-      const nivel = nivelDe(e.codigo_empresa);
       const mesesPendencia = mesesComPendenciaDe(e.codigo_empresa);
       return `
         <tr data-codigo="${escapeHtml(e.codigo_empresa)}">
           <td>${escapeHtml(e.codigo_empresa)} - ${escapeHtml(e.nome_empresa)}</td>
           <td>${m && m.regime_tributario ? (REGIME_LABELS[m.regime_tributario] || m.regime_tributario) : '—'}</td>
           <td>${m && m.responsavel_execucao ? escapeHtml(m.responsavel_execucao) : '—'}</td>
-          <td><span class="badge-nivel nivel-${nivel}">${NIVEL_LABELS[nivel]}</span></td>
+          <td>${m && m.periodicidade ? PERIODICIDADE_LABELS[m.periodicidade] : '—'}</td>
           <td>${mesesPendencia}</td>
           <td>${miniGradeDocumentacaoHtml(e.codigo_empresa)}</td>
           <td>${miniGradeHtml(e.codigo_empresa)}</td>
@@ -669,7 +668,7 @@
         </div>
       </div>
       <table class="mapa-table">
-        <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Nível</th><th>Pendências</th><th>Documentação — Ano Atual</th><th>Contabilidade — Ano Atual</th></tr></thead>
+        <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Periodicidade</th><th>Pendências</th><th>Documentação — Ano Atual</th><th>Contabilidade — Ano Atual</th></tr></thead>
         <tbody id="tbodyDashboard">${linhasDashboardHtml()}</tbody>
       </table>
     `;
