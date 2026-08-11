@@ -111,7 +111,8 @@ body {
 .manual-conteudo {
     flex: 1;
     padding: 36px 48px;
-    max-width: 900px;
+    max-width: none;
+    width: 100%;
 }
 
 .manual-header-conteudo {
