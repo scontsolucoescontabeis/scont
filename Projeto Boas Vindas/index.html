@@ -1730,12 +1730,14 @@
         document.getElementById('navCadastro').style.display = '';
 
         try {
-            const { data, error } = await db
-                .from('apresentacoes')
-                .select('*')
-                .eq('id', id)
-                .eq('ativo', true)
-                .single();
+            // Leitura pública passa por uma função (SECURITY DEFINER) em vez
+            // de SELECT direto na tabela — a RLS de leitura pública foi
+            // removida porque não restringia por id, só por ativo=true, e
+            // qualquer requisição direta na API sem esse filtro do cliente
+            // conseguia ler os dados de TODOS os clientes ativos.
+            const { data: linhas, error } = await db
+                .rpc('fn_buscar_apresentacao_publica', { p_id: id });
+            const data = linhas && linhas[0];
 
             if (error || !data) {
                 // Link inválido/desativado: volta ao modo genérico
