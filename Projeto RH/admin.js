@@ -751,6 +751,7 @@ function abrirVisaoGerencial() {
     if (inpAnoAte && !inpAnoAte.value) inpAnoAte.value = String(hoje.getFullYear());
 
     _vgInicializarFiltroEmpresas();
+    _vgInicializarFiltroSituacoes();
     document.getElementById('modalVisaoGerencial').classList.add('active');
     atualizarVisaoGerencial();
 }
@@ -815,6 +816,31 @@ function _vgAtualizarQtdEmpresas(total) {
     if (span) span.textContent = _vgEmpresasSelecionadas.size === total ? `(todas — ${total})` : `(${_vgEmpresasSelecionadas.size} de ${total})`;
 }
 
+let _vgSituacoesSelecionadas = new Set(_TODAS_SITUACOES);
+
+function _vgInicializarFiltroSituacoes() {
+    const container = document.getElementById('vgFiltroSituacao');
+    if (!container || container.dataset.inicializado) return;
+    container.innerHTML = _TODAS_SITUACOES.map(sit => `
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+            <input type="checkbox" value="${sit}" checked onchange="_vgToggleSituacao(this)"> <span>${sit}</span>
+        </label>`).join('');
+    container.dataset.inicializado = '1';
+}
+
+function _vgToggleSituacao(cb) {
+    if (cb.checked) _vgSituacoesSelecionadas.add(cb.value);
+    else _vgSituacoesSelecionadas.delete(cb.value);
+}
+
+function vgSelecionarTodasSituacoes(marcar) {
+    document.querySelectorAll('#vgFiltroSituacao input[type=checkbox]').forEach(cb => {
+        cb.checked = marcar;
+        if (marcar) _vgSituacoesSelecionadas.add(cb.value);
+        else _vgSituacoesSelecionadas.delete(cb.value);
+    });
+}
+
 const _VG_TIPOS = ['Empregado', 'Estágiario', 'Contribuinte'];
 
 /** Empregado conta no mês se admitido até o fim do mês e (sem demissão ou demitido depois do fim do mês). */
@@ -842,10 +868,16 @@ function _vgCalcularContagem(mes, ano, empresasConsideradas) {
         porEmpresa[cod] = { nome: _nomeEmpresa(cod) || cod, total: 0, porTipo: {}, porSituacao: {} };
     });
 
+    const todasSituacoes = _vgSituacoesSelecionadas.size === _TODAS_SITUACOES.length;
+
     _todosEmpregados.forEach(e => {
         const cod = e.codigo_empresa;
         if (!porEmpresa[cod]) return;
         if (!_vgContaNoMes(e, inicioMes, fimMes)) return;
+        if (!todasSituacoes) {
+            if (_vgSituacoesSelecionadas.size === 0) return;
+            if (!_vgSituacoesSelecionadas.has(e.situacao || '')) return;
+        }
 
         const tipo = _VG_TIPOS.includes(e.tipo_empregado) ? e.tipo_empregado : 'Outros';
         const situacao = e.situacao || 'Não informado';

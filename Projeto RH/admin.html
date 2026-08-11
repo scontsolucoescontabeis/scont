@@ -916,6 +916,15 @@
                 <div id="vgFiltroEmpresas" class="vg-empresas-lista"></div>
             </div>
 
+            <div class="vg-filtro-box">
+                <label class="vg-filtro-label" style="margin-bottom:8px;">Situação</label>
+                <div class="vg-empresas-toolbar">
+                    <button type="button" onclick="vgSelecionarTodasSituacoes(true)" class="vg-btn-chip">Todas</button>
+                    <button type="button" onclick="vgSelecionarTodasSituacoes(false)" class="vg-btn-chip">Nenhuma</button>
+                </div>
+                <div id="vgFiltroSituacao" class="vg-empresas-lista"></div>
+            </div>
+
             <div id="vgResumo" style="font-size:12px;color:#7F8C8D;margin-bottom:8px;"></div>
             <div id="vgGraficoContainer" style="display:none;background:white;border:1px solid #E0E0E0;border-radius:8px;padding:16px;margin-bottom:16px;">
                 <canvas id="vgChartSerie" height="90"></canvas>
