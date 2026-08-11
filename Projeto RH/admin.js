@@ -187,6 +187,49 @@ function renderizarTabelaEmpresas() {
     `;
 }
 
+function exportarEmpresasExcel() {
+    if (!_empresasFiltradas.length) {
+        mostrarStatus('statusEmpresas', 'Nenhuma empresa para exportar com os filtros atuais.', 'error');
+        return;
+    }
+    const fmtCnpjExport = v => {
+        if (!v) return '';
+        const s = String(v).replace(/\D/g, '');
+        return s.length === 14
+            ? `${s.slice(0,2)}.${s.slice(2,5)}.${s.slice(5,8)}/${s.slice(8,12)}-${s.slice(12)}`
+            : v;
+    };
+    const fmtDataExport = v => {
+        if (!v) return '';
+        const d = new Date(v + 'T00:00:00');
+        return isNaN(d) ? v : d.toLocaleDateString('pt-BR');
+    };
+
+    const headers = ['Cód.', 'Empresa', 'CNPJ', 'Regime', 'Insc. Estadual', 'Insc. Municipal', 'Município', 'Status', 'Dt. Cadastro', 'Endereço', 'CEP', 'Cidade', 'UF', 'E-mail Responsável'];
+    const rows = _empresasFiltradas.map(e => [
+        e.codigo_empresa || '',
+        e.nome_empresa || '',
+        fmtCnpjExport(e.cnpj),
+        e.regime_enquadramento || '',
+        e.inscricao_estadual || '',
+        e.inscricao_municipal || '',
+        e.municipio || '',
+        e.status_situacao || 'Ativo',
+        fmtDataExport(e.data_cadastro),
+        e.endereco || '',
+        e.cep || '',
+        e.cidade || '',
+        e.uf || '',
+        e.email_responsavel || '',
+    ]);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = headers.map(() => ({ wch: 20 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Empresas');
+    const hoje = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `empresas_export_${hoje}.xlsx`);
+}
+
 function mudarPaginaEmpresas(pag) {
     const totalPags = Math.ceil(_empresasFiltradas.length / _porPaginaEmpresas);
     if (pag < 1 || pag > totalPags) return;
