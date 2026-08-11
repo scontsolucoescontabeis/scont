@@ -70,7 +70,31 @@
         .vg-detalhe-row { padding: 7px 10px; font-size: 12.5px; color: #444; border-bottom: 1px solid #EFE7E7; border-radius: 4px; }
         .vg-detalhe-row:last-child { border-bottom: none; }
         .vg-detalhe-row:hover { background: #F3E7E7; }
+        .vg-detalhe-row--clicavel { cursor: pointer; }
         .vg-empty { text-align: center; color: #95A5A6; padding: 10px; font-size: 12px; }
+        .vg-arrow-mini { display: inline-block; color: #8B3A3A; font-size: 9px; margin-right: 4px; transition: transform 0.18s ease; }
+        .vg-arrow-mini.expandido { transform: rotate(90deg); }
+        .vg-detalhe-sub { margin: 2px 0 6px 20px; padding: 2px 0 2px 12px; border-left: 2px solid #E8D6D6; }
+        .vg-detalhe-sub .vg-detalhe-head, .vg-detalhe-sub .vg-detalhe-row { font-size: 11.5px; padding: 5px 8px; }
+
+        /* Filtros da Visão Gerencial */
+        .vg-filtro-box { background: #F8F9FA; border: 1px solid #DEE2E6; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+        .vg-filtro-linha { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end; }
+        .vg-filtro-campo { display: flex; flex-direction: column; gap: 5px; }
+        .vg-filtro-label { font-weight: 600; color: #2C3E50; font-size: 12.5px; }
+        .vg-filtro-divisor { width: 1px; align-self: stretch; background: #DEE2E6; min-height: 38px; }
+        .vg-filtro-periodo { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+        .vg-modo-opcoes { display: flex; gap: 14px; font-size: 12.5px; padding-top: 6px; }
+        .vg-modo-opcao { display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: 600; color: #2C3E50; white-space: nowrap; }
+        .vg-btn-atualizar { margin-left: auto; padding: 10px 22px; }
+        .vg-empresas-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+        .vg-empresas-toolbar input[type=text] { flex: 1; min-width: 220px; padding: 8px 10px; border: 1px solid #DEE2E6; border-radius: 6px; font-size: 12.5px; box-sizing: border-box; }
+        .vg-btn-chip { padding: 5px 12px; border: 1px solid #C0C0C0; border-radius: 5px; background: white; cursor: pointer; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+        .vg-btn-chip:hover { background: #F0F0F0; }
+        .vg-empresas-lista { max-height: 130px; overflow-y: auto; border: 1px solid #DEE2E6; border-radius: 6px; background: white; padding: 8px 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px 14px; }
+        @media (max-width: 640px) {
+            .vg-filtro-divisor { display: none; }
+        }
     </style>
 </head>
 <body>
@@ -797,44 +821,23 @@
         </div>
         <div class="modal-body">
             <p style="color:#7F8C8D;font-size:12px;margin-bottom:14px;">Quantidade de empregados, estagiários e contribuintes vinculados em cada empresa, com base na data de admissão e de demissão. Um empregado admitido durante o mês já conta nesse mês; um empregado demitido durante o mês não conta mais a partir desse mês.</p>
-            <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:16px;background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:14px 16px;">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>Modo</label>
-                    <div style="display:flex;gap:12px;font-size:12px;padding-top:8px;">
-                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:600;color:#2C3E50;"><input type="radio" name="vgModo" value="unico" checked onchange="_vgMudarModo()"> Mês único</label>
-                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:600;color:#2C3E50;"><input type="radio" name="vgModo" value="serie" onchange="_vgMudarModo()"> Série histórica</label>
+
+            <div class="vg-filtro-box">
+                <div class="vg-filtro-linha">
+                    <div class="vg-filtro-campo">
+                        <label class="vg-filtro-label">Modo</label>
+                        <div class="vg-modo-opcoes">
+                            <label class="vg-modo-opcao"><input type="radio" name="vgModo" value="unico" checked onchange="_vgMudarModo()"> Mês único</label>
+                            <label class="vg-modo-opcao"><input type="radio" name="vgModo" value="serie" onchange="_vgMudarModo()"> Série histórica</label>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:14px 16px;">
-                <div id="vgCamposUnico" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
-                    <div class="form-group" style="margin-bottom:0;min-width:150px;">
-                        <label>Mês</label>
-                        <select id="vgMes">
-                            <option value="1">Janeiro</option>
-                            <option value="2">Fevereiro</option>
-                            <option value="3">Março</option>
-                            <option value="4">Abril</option>
-                            <option value="5">Maio</option>
-                            <option value="6">Junho</option>
-                            <option value="7">Julho</option>
-                            <option value="8">Agosto</option>
-                            <option value="9">Setembro</option>
-                            <option value="10">Outubro</option>
-                            <option value="11">Novembro</option>
-                            <option value="12">Dezembro</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-bottom:0;min-width:90px;">
-                        <label>Ano</label>
-                        <input type="number" id="vgAno" min="2000" max="2100" style="width:100px;">
-                    </div>
-                </div>
-                <div id="vgCamposSerie" style="display:none;gap:16px;flex-wrap:wrap;align-items:flex-end;">
-                    <div class="form-group" style="margin-bottom:0;min-width:150px;">
-                        <label>De (mês/ano)</label>
-                        <div style="display:flex;gap:6px;">
-                            <select id="vgMesDe">
+
+                    <div class="vg-filtro-divisor"></div>
+
+                    <div id="vgCamposUnico" class="vg-filtro-periodo">
+                        <div class="vg-filtro-campo">
+                            <label class="vg-filtro-label">Mês</label>
+                            <select id="vgMes">
                                 <option value="1">Janeiro</option>
                                 <option value="2">Fevereiro</option>
                                 <option value="3">Março</option>
@@ -848,45 +851,75 @@
                                 <option value="11">Novembro</option>
                                 <option value="12">Dezembro</option>
                             </select>
-                            <input type="number" id="vgAnoDe" min="2000" max="2100" style="width:80px;">
+                        </div>
+                        <div class="vg-filtro-campo">
+                            <label class="vg-filtro-label">Ano</label>
+                            <input type="number" id="vgAno" min="2000" max="2100" style="width:90px;">
                         </div>
                     </div>
-                    <div class="form-group" style="margin-bottom:0;min-width:150px;">
-                        <label>Até (mês/ano)</label>
-                        <div style="display:flex;gap:6px;">
-                            <select id="vgMesAte">
-                                <option value="1">Janeiro</option>
-                                <option value="2">Fevereiro</option>
-                                <option value="3">Março</option>
-                                <option value="4">Abril</option>
-                                <option value="5">Maio</option>
-                                <option value="6">Junho</option>
-                                <option value="7">Julho</option>
-                                <option value="8">Agosto</option>
-                                <option value="9">Setembro</option>
-                                <option value="10">Outubro</option>
-                                <option value="11">Novembro</option>
-                                <option value="12">Dezembro</option>
-                            </select>
-                            <input type="number" id="vgAnoAte" min="2000" max="2100" style="width:80px;">
+
+                    <div id="vgCamposSerie" class="vg-filtro-periodo" style="display:none;">
+                        <div class="vg-filtro-campo">
+                            <label class="vg-filtro-label">De</label>
+                            <div style="display:flex;gap:6px;">
+                                <select id="vgMesDe">
+                                    <option value="1">Janeiro</option>
+                                    <option value="2">Fevereiro</option>
+                                    <option value="3">Março</option>
+                                    <option value="4">Abril</option>
+                                    <option value="5">Maio</option>
+                                    <option value="6">Junho</option>
+                                    <option value="7">Julho</option>
+                                    <option value="8">Agosto</option>
+                                    <option value="9">Setembro</option>
+                                    <option value="10">Outubro</option>
+                                    <option value="11">Novembro</option>
+                                    <option value="12">Dezembro</option>
+                                </select>
+                                <input type="number" id="vgAnoDe" min="2000" max="2100" style="width:75px;">
+                            </div>
+                        </div>
+                        <div class="vg-filtro-campo">
+                            <label class="vg-filtro-label">Até</label>
+                            <div style="display:flex;gap:6px;">
+                                <select id="vgMesAte">
+                                    <option value="1">Janeiro</option>
+                                    <option value="2">Fevereiro</option>
+                                    <option value="3">Março</option>
+                                    <option value="4">Abril</option>
+                                    <option value="5">Maio</option>
+                                    <option value="6">Junho</option>
+                                    <option value="7">Julho</option>
+                                    <option value="8">Agosto</option>
+                                    <option value="9">Setembro</option>
+                                    <option value="10">Outubro</option>
+                                    <option value="11">Novembro</option>
+                                    <option value="12">Dezembro</option>
+                                </select>
+                                <input type="number" id="vgAnoAte" min="2000" max="2100" style="width:75px;">
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div style="flex:1;min-width:240px;">
-                    <label style="display:block;font-weight:600;color:#2C3E50;font-size:13px;margin-bottom:5px;">Empresas</label>
-                    <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">
-                        <button type="button" onclick="vgSelecionarTodasEmpresas(true)" style="padding:3px 8px;border:1px solid #C0C0C0;border-radius:4px;background:white;cursor:pointer;font-size:11px;font-weight:600;">Todas</button>
-                        <button type="button" onclick="vgSelecionarTodasEmpresas(false)" style="padding:3px 8px;border:1px solid #C0C0C0;border-radius:4px;background:white;cursor:pointer;font-size:11px;font-weight:600;">Nenhuma</button>
-                        <span id="vgQtdEmpresas" style="font-size:11px;color:#7F8C8D;"></span>
-                    </div>
-                    <input type="text" id="vgBuscaEmpresa" placeholder="Buscar empresa..." oninput="_vgFiltrarListaEmpresas()" style="width:100%;padding:6px 8px;border:1px solid #DEE2E6;border-radius:6px 6px 0 0;font-size:12px;box-sizing:border-box;border-bottom:none;">
-                    <div id="vgFiltroEmpresas" style="max-height:110px;overflow-y:auto;border:1px solid #DEE2E6;border-radius:0 0 6px 6px;background:white;padding:6px 8px;display:flex;flex-direction:column;gap:3px;"></div>
-                </div>
-                <div style="flex:0 0 auto;">
-                    <button type="button" class="btn-save" onclick="atualizarVisaoGerencial()" style="padding:10px 20px;">🔄 Atualizar</button>
+
+                    <button type="button" class="btn-save vg-btn-atualizar" onclick="atualizarVisaoGerencial()">🔄 Atualizar</button>
                 </div>
             </div>
+
+            <div class="vg-filtro-box">
+                <label class="vg-filtro-label" style="margin-bottom:8px;">Empresas</label>
+                <div class="vg-empresas-toolbar">
+                    <input type="text" id="vgBuscaEmpresa" placeholder="🔎 Buscar empresa por código ou nome..." oninput="_vgFiltrarListaEmpresas()">
+                    <button type="button" onclick="vgSelecionarTodasEmpresas(true)" class="vg-btn-chip">Todas</button>
+                    <button type="button" onclick="vgSelecionarTodasEmpresas(false)" class="vg-btn-chip">Nenhuma</button>
+                    <span id="vgQtdEmpresas" style="font-size:11px;color:#7F8C8D;white-space:nowrap;"></span>
+                </div>
+                <div id="vgFiltroEmpresas" class="vg-empresas-lista"></div>
+            </div>
+
             <div id="vgResumo" style="font-size:12px;color:#7F8C8D;margin-bottom:8px;"></div>
+            <div id="vgGraficoContainer" style="display:none;background:white;border:1px solid #E0E0E0;border-radius:8px;padding:16px;margin-bottom:16px;">
+                <canvas id="vgChartSerie" height="90"></canvas>
+            </div>
             <div class="table-container" style="overflow-x:auto;">
                 <table class="admin-table">
                     <thead><tr>
@@ -946,6 +979,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="ferias-parser.js"></script>
 <script src="jornada-parser.js"></script>
 <script src="../portal-auth-guard.js"></script>

@@ -780,8 +780,8 @@ function _vgInicializarFiltroEmpresas() {
         const nome = _nomeEmpresa(cod);
         const label = nome ? `<strong>${cod}</strong> — ${nome}` : `<strong>${cod}</strong>`;
         const checked = _vgEmpresasSelecionadas.has(cod) ? 'checked' : '';
-        return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:nowrap;">
-            <input type="checkbox" value="${cod}" ${checked} onchange="_vgToggleEmpresa(this)"> ${label}
+        return `<label title="${cod}${nome ? ' — ' + nome : ''}" style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <input type="checkbox" value="${cod}" ${checked} onchange="_vgToggleEmpresa(this)" style="flex:0 0 auto;"> <span style="overflow:hidden;text-overflow:ellipsis;">${label}</span>
         </label>`;
     }).join('');
     _vgAtualizarQtdEmpresas(codigos.length);
@@ -882,6 +882,8 @@ function _vgAtualizarUnico() {
         return;
     }
 
+    _vgOcultarGrafico();
+
     const porEmpresa = _vgCalcularContagem(mes, ano, empresasConsideradas);
     _vgRenderizarTabela(porEmpresa);
 
@@ -917,9 +919,50 @@ function _vgAtualizarSerie() {
     const dados = periodos.map(p => ({ ...p, porEmpresa: _vgCalcularContagem(p.mes, p.ano, empresasConsideradas) }));
 
     _vgRenderizarTabelaSerie(dados);
+    _vgRenderizarGrafico(dados);
 
     const primeiro = periodos[0], ultimo = periodos[periodos.length - 1];
     if (resumo) resumo.textContent = `Série de ${periodos.length} mês(es), de ${_VG_NOMES_MES[primeiro.mes - 1]}/${primeiro.ano} até ${_VG_NOMES_MES[ultimo.mes - 1]}/${ultimo.ano}, em ${empresasConsideradas.length} empresa(s) selecionada(s).`;
+}
+
+let _vgChartInstance = null;
+
+/** Desenha o gráfico de barras empilhadas (Empregados/Estagiários/Contribuintes) por mês da série histórica. */
+function _vgRenderizarGrafico(dados) {
+    const container = document.getElementById('vgGraficoContainer');
+    const canvas = document.getElementById('vgChartSerie');
+    if (!container || !canvas || typeof Chart === 'undefined') return;
+    container.style.display = 'block';
+
+    const labels = dados.map(p => `${_VG_NOMES_MES[p.mes - 1].slice(0, 3)}/${String(p.ano).slice(-2)}`);
+    const somaPorTipo = (p, tipo) => Object.values(p.porEmpresa).reduce((s, r) => s + (r.porTipo[tipo] || 0), 0);
+
+    const datasets = [
+        { label: 'Empregados', data: dados.map(p => somaPorTipo(p, 'Empregado')), backgroundColor: '#8B3A3A' },
+        { label: 'Estagiários', data: dados.map(p => somaPorTipo(p, 'Estágiario')), backgroundColor: '#E67E22' },
+        { label: 'Contribuintes', data: dados.map(p => somaPorTipo(p, 'Contribuinte')), backgroundColor: '#17A2B8' }
+    ];
+
+    if (_vgChartInstance) _vgChartInstance.destroy();
+    _vgChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+            scales: {
+                x: { stacked: true, ticks: { font: { size: 11 } } },
+                y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+            }
+        }
+    });
+}
+
+function _vgOcultarGrafico() {
+    const container = document.getElementById('vgGraficoContainer');
+    if (container) container.style.display = 'none';
+    if (_vgChartInstance) { _vgChartInstance.destroy(); _vgChartInstance = null; }
 }
 
 function _vgRenderizarTabela(porEmpresa) {
@@ -989,6 +1032,14 @@ function _vgToggleLinha(chave) {
     atualizarVisaoGerencial();
 }
 
+/** Alterna, dentro do detalhamento de um mês da série histórica, o detalhamento por situação de uma empresa específica. */
+function _vgToggleLinhaSerieEmpresa(chaveMes, cod) {
+    const chave = `${chaveMes}|${cod}`;
+    if (_vgLinhasExpandidas.has(chave)) _vgLinhasExpandidas.delete(chave);
+    else _vgLinhasExpandidas.add(chave);
+    atualizarVisaoGerencial();
+}
+
 /** Renderiza a série histórica: uma linha por mês/ano, expansível para o detalhamento por empresa daquele mês. */
 function _vgRenderizarTabelaSerie(dados) {
     const tbody = document.getElementById('vgTableBody');
@@ -1008,14 +1059,37 @@ function _vgRenderizarTabelaSerie(dados) {
 
         let linhaDetalhe = '';
         if (expandido) {
-            const linhasEmpresa = registrosEmpresa.map(([cod, r]) => `
-                <div class="vg-detalhe-grid vg-detalhe-row">
-                    <span><strong>${cod}</strong> — ${r.nome}</span>
+            const linhasEmpresa = registrosEmpresa.map(([cod, r]) => {
+                const chaveEmpresa = `${p.chave}|${cod}`;
+                const expandidoEmpresa = _vgLinhasExpandidas.has(chaveEmpresa);
+                const situacoes = Object.entries(r.porSituacao).sort((a, b) => b[1].total - a[1].total);
+
+                let detalheSituacao = '';
+                if (expandidoEmpresa) {
+                    const linhasSituacao = situacoes.map(([situacao, s]) => `
+                        <div class="vg-detalhe-grid vg-detalhe-row">
+                            <span>${situacao}</span>
+                            <span>${s.total}</span>
+                            <span>${s.porTipo['Empregado'] || 0}</span>
+                            <span>${s.porTipo['Estágiario'] || 0}</span>
+                            <span>${s.porTipo['Contribuinte'] || 0}</span>
+                        </div>`).join('');
+                    detalheSituacao = `<div class="vg-detalhe-sub">
+                        <div class="vg-detalhe-grid vg-detalhe-head">
+                            <span>Situação</span><span>Total</span><span>Empregados</span><span>Estagiários</span><span>Contribuintes</span>
+                        </div>
+                        ${linhasSituacao || '<div class="vg-empty">Sem vínculos no período.</div>'}
+                    </div>`;
+                }
+
+                return `<div class="vg-detalhe-grid vg-detalhe-row vg-detalhe-row--clicavel" onclick="_vgToggleLinhaSerieEmpresa('${p.chave}','${cod}')">
+                    <span><span class="vg-arrow-mini${expandidoEmpresa ? ' expandido' : ''}">▶</span><strong>${cod}</strong> — ${r.nome}</span>
                     <span>${r.total}</span>
                     <span>${r.porTipo['Empregado'] || 0}</span>
                     <span>${r.porTipo['Estágiario'] || 0}</span>
                     <span>${r.porTipo['Contribuinte'] || 0}</span>
-                </div>`).join('');
+                </div>${detalheSituacao}`;
+            }).join('');
             linhaDetalhe = `<tr id="vgDetalheSerie-${p.chave}"><td colspan="6" style="padding:0;border:none;background:#FCFAF9;">
                 <div style="padding:6px 16px 14px 46px;">
                     <div class="vg-detalhe-grid vg-detalhe-head">
