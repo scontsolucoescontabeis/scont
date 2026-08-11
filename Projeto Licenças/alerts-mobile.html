@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Alertas | SCONT</title>
+  <script src="../supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
@@ -528,9 +529,7 @@
   </div>
 
   <script>
-    // CONFIGURAÇÃO SUPABASE
-    const SUPABASE_URL = 'https://graxaoomeffhsazuzkvg.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyYXhhb29tZWZmaHNhenV6a3ZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MTUxMDUsImV4cCI6MjA5MDI5MTEwNX0.ZpbVoNVS4momTyf7NME4mcYuI4oCQUvNFSDbORCHktI';
+    // CONFIGURAÇÃO SUPABASE — mesmo projeto do portal (window.SUPABASE_URL/KEY vêm de ../supabase-config.js)
 
     let supabaseClient = null;
     let allAlerts = [];
@@ -542,7 +541,7 @@
       console.log('📱 Inicializando página mobile de alertas...');
       
       const { createClient } = window.supabase;
-      supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+      supabaseClient = createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
 
       try {
         loadConfig();
