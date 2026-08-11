@@ -176,6 +176,10 @@
                 <h2>Gerenciar Empregados</h2>
                 <div id="statusEmpregados" class="status-message"></div>
 
+                <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+                    <button type="button" class="btn-save" onclick="abrirVisaoGerencial()" style="padding:9px 18px;font-size:13px;">📊 Visão Gerencial</button>
+                </div>
+
                 <div style="background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:16px;margin-bottom:14px;">
                     <div style="display:flex;gap:15px;align-items:flex-start;flex-wrap:wrap;">
                         <div style="flex:1;min-width:220px;">
@@ -769,6 +773,71 @@
         <div class="modal-footer">
             <button type="button" class="btn" onclick="fecharModalJornadaEdit()">Cancelar</button>
             <button type="button" class="btn btn-primary" onclick="salvarJornadaEdit()">Salvar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: VISÃO GERENCIAL DE EMPREGADOS -->
+<div id="modalVisaoGerencial" class="modal">
+    <div class="modal-content" style="max-width:980px;">
+        <div class="modal-header">
+            <h3>📊 Visão Gerencial de Empregados</h3>
+            <button type="button" class="modal-close" onclick="fecharVisaoGerencial()">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:#7F8C8D;font-size:12px;margin-bottom:14px;">Quantidade de empregados, estagiários e contribuintes vinculados em cada empresa no mês/ano selecionado, com base na data de admissão e de demissão. Um empregado admitido durante o mês já conta nesse mês; um empregado demitido durante o mês não conta mais a partir desse mês.</p>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:14px 16px;">
+                <div class="form-group" style="margin-bottom:0;min-width:150px;">
+                    <label>Mês</label>
+                    <select id="vgMes">
+                        <option value="1">Janeiro</option>
+                        <option value="2">Fevereiro</option>
+                        <option value="3">Março</option>
+                        <option value="4">Abril</option>
+                        <option value="5">Maio</option>
+                        <option value="6">Junho</option>
+                        <option value="7">Julho</option>
+                        <option value="8">Agosto</option>
+                        <option value="9">Setembro</option>
+                        <option value="10">Outubro</option>
+                        <option value="11">Novembro</option>
+                        <option value="12">Dezembro</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0;min-width:90px;">
+                    <label>Ano</label>
+                    <input type="number" id="vgAno" min="2000" max="2100" style="width:100px;">
+                </div>
+                <div style="flex:1;min-width:240px;">
+                    <label style="display:block;font-weight:600;color:#2C3E50;font-size:13px;margin-bottom:5px;">Empresas</label>
+                    <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;">
+                        <button type="button" onclick="vgSelecionarTodasEmpresas(true)" style="padding:3px 8px;border:1px solid #C0C0C0;border-radius:4px;background:white;cursor:pointer;font-size:11px;font-weight:600;">Todas</button>
+                        <button type="button" onclick="vgSelecionarTodasEmpresas(false)" style="padding:3px 8px;border:1px solid #C0C0C0;border-radius:4px;background:white;cursor:pointer;font-size:11px;font-weight:600;">Nenhuma</button>
+                        <span id="vgQtdEmpresas" style="font-size:11px;color:#7F8C8D;"></span>
+                    </div>
+                    <div id="vgFiltroEmpresas" style="max-height:110px;overflow-y:auto;border:1px solid #DEE2E6;border-radius:6px;background:white;padding:6px 8px;display:flex;flex-direction:column;gap:3px;"></div>
+                </div>
+                <div style="flex:0 0 auto;">
+                    <button type="button" class="btn-save" onclick="atualizarVisaoGerencial()" style="padding:10px 20px;">🔄 Atualizar</button>
+                </div>
+            </div>
+            <div id="vgResumo" style="font-size:12px;color:#7F8C8D;margin-bottom:8px;"></div>
+            <div class="table-container" style="overflow-x:auto;">
+                <table class="admin-table">
+                    <thead><tr>
+                        <th style="width:26px;"></th>
+                        <th>Empresa</th>
+                        <th>Total</th>
+                        <th>Empregados</th>
+                        <th>Estagiários</th>
+                        <th>Contribuintes</th>
+                    </tr></thead>
+                    <tbody id="vgTableBody"><tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:20px;">Selecione o mês/ano e clique em Atualizar.</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn" onclick="fecharVisaoGerencial()">Fechar</button>
         </div>
     </div>
 </div>

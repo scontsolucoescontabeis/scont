@@ -717,6 +717,193 @@ async function deletarEmpregado(codigoEmpresa, codigoEmpregado) {
     } catch (erro) { mostrarStatus('statusEmpregados', 'Erro ao deletar empregado: ' + erro.message, 'error'); }
 }
 
+// --- VISÃO GERENCIAL DE EMPREGADOS ---
+
+let _vgEmpresasSelecionadas = new Set(); // vazio até inicializar
+let _vgLinhasExpandidas = new Set();
+
+function abrirVisaoGerencial() {
+    const hoje = new Date();
+    const selMes = document.getElementById('vgMes');
+    const inpAno = document.getElementById('vgAno');
+    if (selMes && !selMes.dataset.inicializado) {
+        selMes.value = String(hoje.getMonth() + 1);
+        selMes.dataset.inicializado = '1';
+    }
+    if (inpAno && !inpAno.value) {
+        inpAno.value = String(hoje.getFullYear());
+    }
+    _vgInicializarFiltroEmpresas();
+    document.getElementById('modalVisaoGerencial').classList.add('active');
+    atualizarVisaoGerencial();
+}
+
+function fecharVisaoGerencial() {
+    document.getElementById('modalVisaoGerencial').classList.remove('active');
+}
+
+function _vgInicializarFiltroEmpresas() {
+    const container = document.getElementById('vgFiltroEmpresas');
+    if (!container) return;
+    const codigos = [...new Set(_todosEmpregados.map(e => e.codigo_empresa).filter(Boolean))].sort();
+    if (_vgEmpresasSelecionadas.size === 0) _vgEmpresasSelecionadas = new Set(codigos);
+    container.innerHTML = codigos.map(cod => {
+        const nome = _nomeEmpresa(cod);
+        const label = nome ? `<strong>${cod}</strong> — ${nome}` : `<strong>${cod}</strong>`;
+        const checked = _vgEmpresasSelecionadas.has(cod) ? 'checked' : '';
+        return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" value="${cod}" ${checked} onchange="_vgToggleEmpresa(this)"> ${label}
+        </label>`;
+    }).join('');
+    _vgAtualizarQtdEmpresas(codigos.length);
+}
+
+function _vgToggleEmpresa(cb) {
+    if (cb.checked) _vgEmpresasSelecionadas.add(cb.value);
+    else _vgEmpresasSelecionadas.delete(cb.value);
+    _vgAtualizarQtdEmpresas(document.querySelectorAll('#vgFiltroEmpresas input[type=checkbox]').length);
+}
+
+function vgSelecionarTodasEmpresas(marcar) {
+    document.querySelectorAll('#vgFiltroEmpresas input[type=checkbox]').forEach(cb => {
+        cb.checked = marcar;
+        if (marcar) _vgEmpresasSelecionadas.add(cb.value);
+        else _vgEmpresasSelecionadas.delete(cb.value);
+    });
+    _vgAtualizarQtdEmpresas(document.querySelectorAll('#vgFiltroEmpresas input[type=checkbox]').length);
+}
+
+function _vgAtualizarQtdEmpresas(total) {
+    const span = document.getElementById('vgQtdEmpresas');
+    if (span) span.textContent = _vgEmpresasSelecionadas.size === total ? `(todas — ${total})` : `(${_vgEmpresasSelecionadas.size} de ${total})`;
+}
+
+const _VG_TIPOS = ['Empregado', 'Estágiario', 'Contribuinte'];
+
+/** Empregado conta no mês se admitido até o fim do mês e (sem demissão ou demitido depois do fim do mês). */
+function _vgContaNoMes(empregado, inicioMes, fimMes) {
+    if (!empregado.data_admissao) return false;
+    const admissao = new Date(empregado.data_admissao + 'T00:00:00');
+    if (isNaN(admissao) || admissao > fimMes) return false;
+    if (empregado.data_demissao) {
+        const demissao = new Date(empregado.data_demissao + 'T00:00:00');
+        if (!isNaN(demissao) && demissao <= fimMes) return false;
+    }
+    return true;
+}
+
+function atualizarVisaoGerencial() {
+    const mes = parseInt(document.getElementById('vgMes')?.value, 10);
+    const ano = parseInt(document.getElementById('vgAno')?.value, 10);
+    const tbody = document.getElementById('vgTableBody');
+    const resumo = document.getElementById('vgResumo');
+    if (!tbody || !mes || !ano) return;
+
+    const inicioMes = new Date(ano, mes - 1, 1);
+    const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+
+    const empresasConsideradas = [..._vgEmpresasSelecionadas];
+    if (empresasConsideradas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:20px;">Nenhuma empresa selecionada.</td></tr>';
+        if (resumo) resumo.textContent = '';
+        return;
+    }
+
+    // { codigo_empresa: { nome, total, porTipo:{}, porSituacao:{ situacao: { total, porTipo:{} } } } }
+    const porEmpresa = {};
+    empresasConsideradas.forEach(cod => {
+        porEmpresa[cod] = { nome: _nomeEmpresa(cod) || cod, total: 0, porTipo: {}, porSituacao: {} };
+    });
+
+    _todosEmpregados.forEach(e => {
+        const cod = e.codigo_empresa;
+        if (!porEmpresa[cod]) return;
+        if (!_vgContaNoMes(e, inicioMes, fimMes)) return;
+
+        const tipo = _VG_TIPOS.includes(e.tipo_empregado) ? e.tipo_empregado : 'Outros';
+        const situacao = e.situacao || 'Não informado';
+
+        const registro = porEmpresa[cod];
+        registro.total++;
+        registro.porTipo[tipo] = (registro.porTipo[tipo] || 0) + 1;
+
+        if (!registro.porSituacao[situacao]) registro.porSituacao[situacao] = { total: 0, porTipo: {} };
+        registro.porSituacao[situacao].total++;
+        registro.porSituacao[situacao].porTipo[tipo] = (registro.porSituacao[situacao].porTipo[tipo] || 0) + 1;
+    });
+
+    _vgRenderizarTabela(porEmpresa);
+
+    const totalGeral = Object.values(porEmpresa).reduce((s, r) => s + r.total, 0);
+    if (resumo) resumo.textContent = `${totalGeral} vínculo(s) ativo(s) em ${String(mes).padStart(2, '0')}/${ano} nas ${empresasConsideradas.length} empresa(s) selecionada(s).`;
+}
+
+function _vgRenderizarTabela(porEmpresa) {
+    const tbody = document.getElementById('vgTableBody');
+    const linhas = Object.entries(porEmpresa).sort((a, b) => a[1].nome.localeCompare(b[1].nome));
+
+    if (linhas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:20px;">Nenhuma empresa selecionada.</td></tr>';
+        return;
+    }
+
+    let totalGeral = 0;
+    const totalPorTipo = {};
+
+    let html = linhas.map(([cod, r]) => {
+        totalGeral += r.total;
+        _VG_TIPOS.forEach(t => { totalPorTipo[t] = (totalPorTipo[t] || 0) + (r.porTipo[t] || 0); });
+
+        const expandido = _vgLinhasExpandidas.has(cod);
+        const situacoes = Object.entries(r.porSituacao).sort((a, b) => b[1].total - a[1].total);
+
+        let linhaDetalhe = '';
+        if (expandido) {
+            const linhasSituacao = situacoes.map(([situacao, s]) => `
+                <tr style="background:#FAFAFA;">
+                    <td></td>
+                    <td style="padding-left:24px;color:#555;">${situacao}</td>
+                    <td>${s.total}</td>
+                    <td>${s.porTipo['Empregado'] || 0}</td>
+                    <td>${s.porTipo['Estágiario'] || 0}</td>
+                    <td>${s.porTipo['Contribuinte'] || 0}</td>
+                </tr>`).join('');
+            linhaDetalhe = `<tr id="vgDetalhe-${cod}"><td colspan="6" style="padding:0;border:none;">
+                <table class="admin-table" style="width:100%;">
+                    <thead><tr><th style="width:26px;"></th><th>Situação</th><th>Total</th><th>Empregados</th><th>Estagiários</th><th>Contribuintes</th></tr></thead>
+                    <tbody>${linhasSituacao || '<tr><td colspan="6" style="text-align:center;color:#95A5A6;padding:10px;">Sem vínculos no período.</td></tr>'}</tbody>
+                </table>
+            </td></tr>`;
+        }
+
+        return `<tr>
+            <td style="cursor:pointer;text-align:center;" onclick="_vgToggleLinha('${cod}')">${expandido ? '▼' : '▶'}</td>
+            <td><strong>${cod}</strong> — ${r.nome}</td>
+            <td>${r.total}</td>
+            <td>${r.porTipo['Empregado'] || 0}</td>
+            <td>${r.porTipo['Estágiario'] || 0}</td>
+            <td>${r.porTipo['Contribuinte'] || 0}</td>
+        </tr>${linhaDetalhe}`;
+    }).join('');
+
+    html += `<tr style="font-weight:700;background:#F0F0F0;">
+        <td></td>
+        <td>Total Geral</td>
+        <td>${totalGeral}</td>
+        <td>${totalPorTipo['Empregado'] || 0}</td>
+        <td>${totalPorTipo['Estágiario'] || 0}</td>
+        <td>${totalPorTipo['Contribuinte'] || 0}</td>
+    </tr>`;
+
+    tbody.innerHTML = html;
+}
+
+function _vgToggleLinha(cod) {
+    if (_vgLinhasExpandidas.has(cod)) _vgLinhasExpandidas.delete(cod);
+    else _vgLinhasExpandidas.add(cod);
+    atualizarVisaoGerencial();
+}
+
 // --- FÉRIAS (INFORMAÇÕES) ---
 
 let _todasFeriasInfo = [];
