@@ -67,13 +67,15 @@
   // O encerramento/validação do Diário segue a periodicidade do contábil
   // (contabil_mapeamento.periodicidade): mensal fecha todo mês (como
   // sempre foi); trimestral fecha só em Mar/Jun/Set/Dez, cobrindo os 3
-  // meses do trimestre; anual fecha só em Dezembro, cobrindo o ano
+  // meses do trimestre; semestral fecha só em Jun/Dez, cobrindo os 6
+  // meses do semestre; anual fecha só em Dezembro, cobrindo o ano
   // inteiro. A grade de 3 estados (Não Iniciado/Pendência/Concluído)
   // continua granular por mês para todas as periodicidades — só o
   // ENCERRAMENTO (contabil_diario_fechamentos) muda de cadência.
 
   function qtdMesesNoPeriodo(periodicidade) {
     if (periodicidade === 'trimestral') return 3;
+    if (periodicidade === 'semestral') return 6;
     if (periodicidade === 'anual') return 12;
     return 1;
   }
@@ -82,6 +84,7 @@
   // fechamento ao qual ele pertence, conforme a periodicidade.
   function mesFinalDoPeriodo(mes, periodicidade) {
     if (periodicidade === 'trimestral') return Math.ceil(mes / 3) * 3;
+    if (periodicidade === 'semestral') return mes <= 6 ? 6 : 12;
     if (periodicidade === 'anual') return 12;
     return mes;
   }
@@ -93,6 +96,10 @@
     if (periodicidade === 'trimestral') {
       const trimestre = Math.ceil(mesFinal / 3);
       return `${trimestre}º Trimestre/${ano}`;
+    }
+    if (periodicidade === 'semestral') {
+      const semestre = mesFinal <= 6 ? 1 : 2;
+      return `${semestre}º Semestre/${ano}`;
     }
     if (periodicidade === 'anual') return String(ano);
     return `${MESES_LABELS[mesFinal - 1]}/${ano}`;

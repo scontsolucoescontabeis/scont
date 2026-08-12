@@ -8,7 +8,7 @@
   const REGIME_LABELS = { simples_nacional: 'Simples Nacional', lucro_presumido: 'Lucro Presumido', lucro_real: 'Lucro Real', mei: 'MEI' };
   const SITUACAO_LABELS = { regularizado: 'Regularizado', em_regularizacao: 'Em Regularização', pendente: 'Pendente', critico: 'Crítico' };
   const FINANCEIRO_LABELS = { interno: 'Interno', bpo_scont: 'BPO Scont', bpo_terceiro: 'BPO Terceiro', nao_possui: 'Não possui' };
-  const PERIODICIDADE_LABELS = { mensal: 'Mensal', trimestral: 'Trimestral', anual: 'Anual' };
+  const PERIODICIDADE_LABELS = { mensal: 'Mensal', trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual' };
 
   let empresas = [];
   let mapeamentos = [];
@@ -1198,8 +1198,8 @@
     }, 0);
   }
 
-  const ROTULO_UNIDADE_PERIODO = { mensal: 'mês', trimestral: 'trimestre', anual: 'ano' };
-  const ROTULO_UNIDADE_PERIODO_CAP = { mensal: 'Mês', trimestral: 'Trimestre', anual: 'Ano' };
+  const ROTULO_UNIDADE_PERIODO = { mensal: 'mês', trimestral: 'trimestre', semestral: 'semestre', anual: 'ano' };
+  const ROTULO_UNIDADE_PERIODO_CAP = { mensal: 'Mês', trimestral: 'Trimestre', semestral: 'Semestre', anual: 'Ano' };
 
   function iconeInfoFechamento(statusFech, periodicidade) {
     const unidade = ROTULO_UNIDADE_PERIODO[periodicidade] || 'mês';

@@ -16,12 +16,14 @@
 
   // Meses de atraso além da tolerância normal do ciclo de fechamento: para
   // periodicidade mensal, ter fechado até o mês anterior é normal (tolerância
-  // de 1 mês); trimestral tolera 1 trimestre; anual tolera 1 ano.
+  // de 1 mês); trimestral tolera 1 trimestre; semestral tolera 1 semestre;
+  // anual tolera 1 ano.
+  const TOLERANCIA_MESES_POR_PERIODICIDADE = { trimestral: 3, semestral: 6, anual: 12 };
   function atrasoEmMeses(ultimoMesFechado, periodicidade, hoje) {
     if (!ultimoMesFechado) return 99;
     const fechado = parseDataLocal(ultimoMesFechado);
     const gap = mesesEntre(fechado, hoje);
-    const tolerancia = periodicidade === 'trimestral' ? 3 : periodicidade === 'anual' ? 12 : 1;
+    const tolerancia = TOLERANCIA_MESES_POR_PERIODICIDADE[periodicidade] || 1;
     return Math.max(0, gap - tolerancia);
   }
 

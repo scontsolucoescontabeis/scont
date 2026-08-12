@@ -8,7 +8,7 @@
   const REGIME_LABELS = { simples_nacional: 'Simples Nacional', lucro_presumido: 'Lucro Presumido', lucro_real: 'Lucro Real', mei: 'MEI' };
   const SITUACAO_LABELS = { regularizado: 'Regularizado', em_regularizacao: 'Em Regularização', pendente: 'Pendente', critico: 'Crítico' };
   const FINANCEIRO_LABELS = { interno: 'Interno', bpo_scont: 'BPO Scont', bpo_terceiro: 'BPO Terceiro', nao_possui: 'Não possui' };
-  const PERIODICIDADE_LABELS = { mensal: 'Mensal', trimestral: 'Trimestral', anual: 'Anual' };
+  const PERIODICIDADE_LABELS = { mensal: 'Mensal', trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual' };
   const SITUACAO_FISCAL_LABELS = { regular: 'Regular', irregular: 'Irregular' };
 
   // Campos "Sim/Não" adicionados à seção Execução (label exibido + coluna).
@@ -393,9 +393,7 @@
           <div><label>Periodicidade</label>
             <select data-campo="periodicidade">
               <option value="">Selecione...</option>
-              <option value="mensal" ${m.periodicidade === 'mensal' ? 'selected' : ''}>Mensal</option>
-              <option value="trimestral" ${m.periodicidade === 'trimestral' ? 'selected' : ''}>Trimestral</option>
-              <option value="anual" ${m.periodicidade === 'anual' ? 'selected' : ''}>Anual</option>
+              ${Object.entries(PERIODICIDADE_LABELS).map(([v, l]) => `<option value="${v}" ${m.periodicidade === v ? 'selected' : ''}>${l}</option>`).join('')}
             </select>
           </div>
           <div><label>Regime Tributário</label>
@@ -947,7 +945,7 @@
 
   function interpretarPeriodicidadeImportacao(valor) {
     const v = normalizarChaveImportacao(valor);
-    if (v === 'mensal' || v === 'trimestral' || v === 'anual') return v;
+    if (v === 'mensal' || v === 'trimestral' || v === 'semestral' || v === 'anual') return v;
     return null;
   }
 

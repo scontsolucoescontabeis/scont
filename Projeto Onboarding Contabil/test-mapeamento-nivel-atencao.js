@@ -81,4 +81,20 @@ caso(
   'baixo'
 );
 
+caso(
+  'semestral, 1 mes alem da tolerancia de 6 meses -> medio',
+  { periodicidade: 'semestral', ultimo_mes_fechado: '2025-12-01', situacao_2025_status: 'regularizado', situacao_2026_status: 'regularizado' },
+  [],
+  HOJE,
+  'medio'
+);
+
+caso(
+  'semestral dentro da tolerancia de 6 meses -> baixo',
+  { periodicidade: 'semestral', ultimo_mes_fechado: '2026-01-01', situacao_2025_status: 'regularizado', situacao_2026_status: 'regularizado' },
+  [],
+  HOJE,
+  'baixo'
+);
+
 console.log('Todos os testes passaram.');
