@@ -63,7 +63,45 @@
     return `${min}min`;
   }
 
-  const api = { ultimosNMeses, MESES_LABELS, calcularTemposFechamento, formatarDuracaoHumana };
+  // ─── PERIODICIDADE DE FECHAMENTO ────────────────────────────
+  // O encerramento/validação do Diário segue a periodicidade do contábil
+  // (contabil_mapeamento.periodicidade): mensal fecha todo mês (como
+  // sempre foi); trimestral fecha só em Mar/Jun/Set/Dez, cobrindo os 3
+  // meses do trimestre; anual fecha só em Dezembro, cobrindo o ano
+  // inteiro. A grade de 3 estados (Não Iniciado/Pendência/Concluído)
+  // continua granular por mês para todas as periodicidades — só o
+  // ENCERRAMENTO (contabil_diario_fechamentos) muda de cadência.
+
+  function qtdMesesNoPeriodo(periodicidade) {
+    if (periodicidade === 'trimestral') return 3;
+    if (periodicidade === 'anual') return 12;
+    return 1;
+  }
+
+  // Dado um mês qualquer (1-12), devolve o mês final do período de
+  // fechamento ao qual ele pertence, conforme a periodicidade.
+  function mesFinalDoPeriodo(mes, periodicidade) {
+    if (periodicidade === 'trimestral') return Math.ceil(mes / 3) * 3;
+    if (periodicidade === 'anual') return 12;
+    return mes;
+  }
+
+  // Rótulo do período de fechamento para exibição (título de modal, ícone,
+  // e-mail, linha do tempo). `mesFinal` é o mês final do período (já
+  // resolvido por mesFinalDoPeriodo).
+  function descricaoPeriodo(periodicidade, ano, mesFinal) {
+    if (periodicidade === 'trimestral') {
+      const trimestre = Math.ceil(mesFinal / 3);
+      return `${trimestre}º Trimestre/${ano}`;
+    }
+    if (periodicidade === 'anual') return String(ano);
+    return `${MESES_LABELS[mesFinal - 1]}/${ano}`;
+  }
+
+  const api = {
+    ultimosNMeses, MESES_LABELS, calcularTemposFechamento, formatarDuracaoHumana,
+    qtdMesesNoPeriodo, mesFinalDoPeriodo, descricaoPeriodo,
+  };
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;

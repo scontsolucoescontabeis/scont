@@ -22,8 +22,14 @@
     return e ? e.nome_empresa : codigoEmpresa;
   }
 
-  function mesAno(ano, mes) {
-    return `${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+  // `mes` aqui é sempre o mês final do período de fechamento (ver
+  // diario.js — todo evento é gravado com o mês final do período da
+  // empresa), então basta resolver a periodicidade dela para rotular
+  // corretamente: "MAR/2026" (mensal), "1º Trimestre/2026" (trimestral)
+  // ou "2026" (anual).
+  function mesAno(ctx, codigoEmpresa, ano, mes) {
+    const periodicidade = ctx.mapeamentoDe(codigoEmpresa)?.periodicidade || 'mensal';
+    return window.ContabilDiarioUtil.descricaoPeriodo(periodicidade, ano, mes);
   }
 
   function formatarDataHora(iso) {
@@ -98,7 +104,7 @@
       return `
         <tr data-chave="${chave}">
           <td>${ctx.escapeHtml(nomeEmpresa(ctx, t.codigo_empresa))}</td>
-          <td>${mesAno(t.ano, t.mes)}</td>
+          <td>${mesAno(ctx, t.codigo_empresa, t.ano, t.mes)}</td>
           <td>${ctx.escapeHtml(evento.usuario_nome || evento.usuario_email || '—')}</td>
           <td>${formatarDataHora(evento.created_at)}</td>
           <td>${evento.balancete_url ? `<a href="#" class="arquivo-link" data-ver-balancete="${ctx.escapeHtml(evento.balancete_url)}">📄 ${ctx.escapeHtml(evento.balancete_nome || 'ver')}</a>` : '—'}</td>
@@ -124,7 +130,7 @@
         <div class="mapa-secao-header">Pendentes para você (${pendentes.length})</div>
         <div class="mapa-secao-body">
           <table class="mapa-table full">
-            <thead><tr><th>Empresa</th><th>Mês/Ano</th><th>Enviado por</th><th>Enviado em</th><th>Balancete</th><th>Tempo total</th><th>Ação</th></tr></thead>
+            <thead><tr><th>Empresa</th><th>Período</th><th>Enviado por</th><th>Enviado em</th><th>Balancete</th><th>Tempo total</th><th>Ação</th></tr></thead>
             <tbody>${linhasHtml}</tbody>
           </table>
         </div>
@@ -174,7 +180,7 @@
       return `
         <tr>
           <td>${ctx.escapeHtml(nomeEmpresa(ctx, t.codigo_empresa))}</td>
-          <td>${mesAno(t.ano, t.mes)}</td>
+          <td>${mesAno(ctx, t.codigo_empresa, t.ano, t.mes)}</td>
           <td>${ctx.escapeHtml(evento.mensagem || '—')}</td>
           <td>${formatarDataHora(evento.created_at)}</td>
           <td><button type="button" class="btn btn-primary btn-reenviar-validacao" data-codigo="${ctx.escapeHtml(t.codigo_empresa)}" data-ano="${t.ano}" data-mes="${t.mes}">Reenviar para validação</button></td>
@@ -187,7 +193,7 @@
         <div class="mapa-secao-header">Pendentes para você (${pendentes.length})</div>
         <div class="mapa-secao-body">
           <table class="mapa-table full">
-            <thead><tr><th>Empresa</th><th>Mês/Ano</th><th>Motivo da rejeição</th><th>Rejeitado em</th><th>Ação</th></tr></thead>
+            <thead><tr><th>Empresa</th><th>Período</th><th>Motivo da rejeição</th><th>Rejeitado em</th><th>Ação</th></tr></thead>
             <tbody>${linhasHtml}</tbody>
           </table>
         </div>
@@ -228,7 +234,7 @@
 
   function rotuloEvento(ctx, evento) {
     const nomeEmp = nomeEmpresa(ctx, evento.codigo_empresa);
-    const quando = mesAno(evento.ano, evento.mes);
+    const quando = mesAno(ctx, evento.codigo_empresa, evento.ano, evento.mes);
     const autor = evento.usuario_nome || evento.usuario_email || 'alguém';
 
     if (evento.tipo_evento === 'enviado') {

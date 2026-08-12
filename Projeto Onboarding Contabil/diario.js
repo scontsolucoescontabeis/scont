@@ -222,13 +222,39 @@
   }
 
   // ─── FECHAMENTO — STATUS DERIVADO E EVENTOS ─────────────────
+  // O encerramento segue a periodicidade do contábil da empresa (ver
+  // contabil-diario-util.js): mensal fecha todo mês; trimestral só em
+  // Mar/Jun/Set/Dez (cobrindo os 3 meses); anual só em Dezembro
+  // (cobrindo o ano). Todo evento de contabil_diario_fechamentos é
+  // sempre gravado com `mes` = mês final do período — por isso, para
+  // qualquer mês individual pedido, resolvemos primeiro o mês final do
+  // período ao qual ele pertence antes de consultar os eventos.
+
+  function periodicidadeDe(codigoEmpresa) {
+    const m = mapeamentoDe(codigoEmpresa);
+    return (m && m.periodicidade) || 'mensal';
+  }
+
+  function mesFinalFechamento(codigoEmpresa, mes) {
+    return window.ContabilDiarioUtil.mesFinalDoPeriodo(mes, periodicidadeDe(codigoEmpresa));
+  }
+
+  // Rótulo do período de fechamento (ex.: "MAR/2026", "1º Trimestre/2026",
+  // "2026") para o mês final já resolvido — usado no modal de encerramento,
+  // no assunto/corpo dos e-mails e na tela Validações.
+  function descricaoPeriodoDe(codigoEmpresa, ano, mesFinal) {
+    return window.ContabilDiarioUtil.descricaoPeriodo(periodicidadeDe(codigoEmpresa), ano, mesFinal);
+  }
 
   function eventosFechamentoDoMes(codigoEmpresa, ano, mes) {
-    return fechamentosPorChave[`${codigoEmpresa}|${ano}|${mes}`] || [];
+    const mesChave = mesFinalFechamento(codigoEmpresa, mes);
+    return fechamentosPorChave[`${codigoEmpresa}|${ano}|${mesChave}`] || [];
   }
 
   // Deriva o status a partir do evento mais recente — nunca armazenado
-  // como coluna própria (ver spec §1.1).
+  // como coluna própria (ver spec §1.1). Todos os meses do mesmo período
+  // (ex.: os 3 meses de um trimestre) compartilham o mesmo status, pois
+  // resolvem para a mesma chave de evento.
   function statusFechamentoDoMes(codigoEmpresa, ano, mes) {
     const eventos = eventosFechamentoDoMes(codigoEmpresa, ano, mes);
     if (!eventos.length) return 'aberto';
@@ -320,7 +346,7 @@
     if (!session) return;
 
     const nomeEmp = empresaNome(codigoEmpresa);
-    const mesAno = `${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+    const mesAno = descricaoPeriodoDe(codigoEmpresa, ano, mes);
     const assunto = `🔔 Fechamento aguardando validação — ${nomeEmp} — ${mesAno}`;
     const params = {
       tipo: 'validacao_fechamento',
@@ -367,7 +393,7 @@
     if (!session) return;
 
     const nomeEmp = empresaNome(codigoEmpresa);
-    const mesAno = `${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+    const mesAno = descricaoPeriodoDe(codigoEmpresa, ano, mes);
     const assunto = aprovado
       ? `✅ Fechamento aprovado — ${nomeEmp} — ${mesAno}`
       : `❌ Fechamento rejeitado — ${nomeEmp} — ${mesAno}`;
@@ -1172,14 +1198,18 @@
     }, 0);
   }
 
-  const ICONE_FECHAMENTO = {
-    aberto: { icone: '📤', titulo: 'Encerrar mês contábil' },
-    aguardando_validacao: { icone: '⏳', titulo: 'Aguardando validação' },
-    aprovado: { icone: '✅', titulo: 'Fechamento aprovado' },
-  };
+  const ROTULO_UNIDADE_PERIODO = { mensal: 'mês', trimestral: 'trimestre', anual: 'ano' };
+  const ROTULO_UNIDADE_PERIODO_CAP = { mensal: 'Mês', trimestral: 'Trimestre', anual: 'Ano' };
 
-  function iconeFechamentoHtml(mes, statusFech) {
-    const info = ICONE_FECHAMENTO[statusFech];
+  function iconeInfoFechamento(statusFech, periodicidade) {
+    const unidade = ROTULO_UNIDADE_PERIODO[periodicidade] || 'mês';
+    if (statusFech === 'aberto') return { icone: '📤', titulo: `Encerrar ${unidade} contábil` };
+    if (statusFech === 'aguardando_validacao') return { icone: '⏳', titulo: 'Aguardando validação' };
+    return { icone: '✅', titulo: 'Fechamento aprovado' };
+  }
+
+  function iconeFechamentoHtml(mes, statusFech, periodicidade) {
+    const info = iconeInfoFechamento(statusFech, periodicidade);
     return `<button type="button" class="btn-icone-fechamento" data-mes-fechamento="${mes}" title="${info.titulo}">${info.icone}</button>`;
   }
 
@@ -1199,6 +1229,24 @@
     return `<${tag}${atributoTipo} class="btn-icone-doc ${classe}" data-mes-doc="${mes}" title="${titulo}">📄</${tag}>`;
   }
 
+  // Só true no mês final do período de fechamento (mensal: todo mês;
+  // trimestral: Mar/Jun/Set/Dez; anual: Dez) — único mês onde o ícone de
+  // encerrar pode aparecer.
+  function ehMesFinalDoPeriodo(codigoEmpresa, mes) {
+    return window.ContabilDiarioUtil.mesFinalDoPeriodo(mes, periodicidadeDe(codigoEmpresa)) === mes;
+  }
+
+  // Para periodicidade trimestral/anual, o encerramento só fica disponível
+  // quando TODOS os meses do período já estão "Concluído" na grade de 3
+  // estados (não só o mês final).
+  function todosMesesDoPeriodoConcluidos(codigoEmpresa, ano, mesFinal) {
+    const qtd = window.ContabilDiarioUtil.qtdMesesNoPeriodo(periodicidadeDe(codigoEmpresa));
+    for (let i = 0; i < qtd; i++) {
+      if (statusDoMes(codigoEmpresa, ano, mesFinal - i) !== 'concluido') return false;
+    }
+    return true;
+  }
+
   function renderGradeMensal() {
     const el = document.getElementById('secaoGradeMensal');
     const meses = window.ContabilDiarioUtil.MESES_LABELS;
@@ -1210,11 +1258,14 @@
       const travada = statusFech === 'aprovado';
       const motivo = motivoPendenciaDoMes(empresaAtualCodigo, anoGradeAtual, mes);
       const docDisponivel = status === 'nao_iniciado' && documentacaoDisponivelDoMes(empresaAtualCodigo, anoGradeAtual, mes);
-      const titulo = `${label}/${anoGradeAtual} — ${STATUS_GRADE_LABELS[status]}${travada ? ' (fechamento aprovado — travado)' : ''}${motivo ? ` — ${motivo}` : ''}${docDisponivel ? ' — Documentação disponível' : ''}`;
+      const ehFinalDoPeriodo = ehMesFinalDoPeriodo(empresaAtualCodigo, mes);
+      const periodoCompleto = ehFinalDoPeriodo && status === 'concluido' && todosMesesDoPeriodoConcluidos(empresaAtualCodigo, anoGradeAtual, mes);
+      const aguardandoDemaisMeses = ehFinalDoPeriodo && status === 'concluido' && !periodoCompleto;
+      const titulo = `${label}/${anoGradeAtual} — ${STATUS_GRADE_LABELS[status]}${travada ? ' (fechamento aprovado — travado)' : ''}${motivo ? ` — ${motivo}` : ''}${docDisponivel ? ' — Documentação disponível' : ''}${aguardandoDemaisMeses ? ' — aguardando os demais meses do período para poder encerrar' : ''}`;
       return `
         <div class="mapa-grade-cel status-${status}${travada ? ' grade-travada' : ''}" data-mes="${mes}" title="${escapeHtml(titulo)}">
           <span class="mapa-grade-mes">${label}</span>
-          ${status === 'concluido' ? iconeFechamentoHtml(mes, statusFech) : ''}
+          ${periodoCompleto ? iconeFechamentoHtml(mes, statusFech, periodicidadeDe(empresaAtualCodigo)) : ''}
           ${status === 'nao_iniciado' ? iconeDocumentacaoHtml(mes, docDisponivel) : ''}
         </div>
       `;
@@ -1276,12 +1327,13 @@
 
   function timelineFechamentoHtml(codigoEmpresa, ano, mes) {
     const eventos = eventosFechamentoDoMes(codigoEmpresa, ano, mes);
-    if (!eventos.length) return '<p class="mapa-empty">Nenhum evento registrado ainda para este mês.</p>';
+    if (!eventos.length) return '<p class="mapa-empty">Nenhum evento registrado ainda para este período.</p>';
+    const unidadeCap = ROTULO_UNIDADE_PERIODO_CAP[periodicidadeDe(codigoEmpresa)] || 'Mês';
     return eventos.map((ev) => `
       <div class="fechamento-evento">
         <div><strong>${TIPO_EVENTO_LABEL[ev.tipo_evento] || ev.tipo_evento}</strong> — ${escapeHtml(ev.usuario_nome || ev.usuario_email || 'desconhecido')} <span class="mapa-empty">(${formatarDataHoraFechamento(ev.created_at)})</span></div>
         ${ev.mensagem ? `<div class="fechamento-evento-msg">${escapeHtml(ev.mensagem)}</div>` : ''}
-        ${ev.balancete_url ? `<div><a href="#" class="arquivo-link" data-ver-balancete="${escapeHtml(ev.balancete_url)}">📄 ${escapeHtml(ev.balancete_nome || 'Balancete do mês')}</a></div>` : ''}
+        ${ev.balancete_url ? `<div><a href="#" class="arquivo-link" data-ver-balancete="${escapeHtml(ev.balancete_url)}">📄 ${escapeHtml(ev.balancete_nome || `Balancete do ${unidadeCap.toLowerCase()}`)}</a></div>` : ''}
       </div>
     `).join('');
   }
@@ -1312,7 +1364,7 @@
     }
 
     document.getElementById('modalFechamentoTitulo').textContent =
-      `Fechamento — ${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano} — ${empresaNome(codigoEmpresa)}`;
+      `Fechamento — ${descricaoPeriodoDe(codigoEmpresa, ano, mes)} — ${empresaNome(codigoEmpresa)}`;
     _etapaEncerramento = 'form';
     _arquivoBalanceteSelecionado = null;
     _observacaoEncerramentoPendente = '';
@@ -1333,12 +1385,14 @@
     `;
   }
 
-  function acaoEncerramentoFormHtml(autoAprovar) {
+  function acaoEncerramentoFormHtml(autoAprovar, periodicidade) {
+    const unidade = ROTULO_UNIDADE_PERIODO[periodicidade] || 'mês';
+    const unidadeCap = ROTULO_UNIDADE_PERIODO_CAP[periodicidade] || 'Mês';
     return `
       <div class="mapa-secao-body" style="padding:0 0 16px;">
-        <div class="full"><label>Balancete do Mês (PDF) — obrigatório</label><input type="file" id="fechBalanceteArquivo" accept="application/pdf,.pdf"></div>
+        <div class="full"><label>Balancete do ${unidadeCap} (PDF) — obrigatório</label><input type="file" id="fechBalanceteArquivo" accept="application/pdf,.pdf"></div>
         <div class="full"><label>Observação (opcional)</label><textarea id="fechObservacaoEnvio" rows="2" placeholder="Alguma observação para a equipe Scont...">${escapeHtml(_observacaoEncerramentoPendente)}</textarea></div>
-        <div class="full"><button type="button" class="btn btn-primary" id="btnEncerrarMes">${autoAprovar ? 'Revisar e Encerrar' : 'Encerrar mês contábil'}</button></div>
+        <div class="full"><button type="button" class="btn btn-primary" id="btnEncerrarMes">${autoAprovar ? 'Revisar e Encerrar' : `Encerrar ${unidade} contábil`}</button></div>
       </div>
     `;
   }
@@ -1348,7 +1402,7 @@
       <div class="mapa-secao-body" style="padding:0 0 16px;">
         <div class="full"><p class="mapa-empty" style="margin:0;">
           Revise antes de confirmar — ${escapeHtml(empresaNome(codigoEmpresa))},
-          ${window.ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}.
+          ${descricaoPeriodoDe(codigoEmpresa, ano, mes)}.
         </p></div>
         <div class="full"><label>Balancete anexado</label><span>📄 ${escapeHtml(_arquivoBalanceteSelecionado ? _arquivoBalanceteSelecionado.name : '—')}</span></div>
         ${_observacaoEncerramentoPendente ? `<div class="full"><label>Observação</label><span>${escapeHtml(_observacaoEncerramentoPendente)}</span></div>` : ''}
@@ -1369,17 +1423,20 @@
     const statusFech = statusFechamentoDoMes(codigoEmpresa, ano, mes);
     const ultimo = eventosFechamentoDoMes(codigoEmpresa, ano, mes)[0];
     const autoAprovar = podeValidar();
+    const periodicidade = periodicidadeDe(codigoEmpresa);
+    const unidade = ROTULO_UNIDADE_PERIODO[periodicidade] || 'mês';
+    const unidadeCap = ROTULO_UNIDADE_PERIODO_CAP[periodicidade] || 'Mês';
 
     let acaoHtml = '';
     if (statusFech === 'aberto' && podeEncerrar(codigoEmpresa)) {
       acaoHtml = _etapaEncerramento === 'revisao' && autoAprovar
         ? acaoEncerramentoRevisaoHtml(codigoEmpresa, ano, mes)
-        : acaoEncerramentoFormHtml(autoAprovar);
+        : acaoEncerramentoFormHtml(autoAprovar, periodicidade);
     } else if (statusFech === 'aguardando_validacao') {
       if (podeValidar()) {
         acaoHtml = `
           <div class="mapa-secao-body" style="padding:0 0 16px;">
-            ${ultimo && ultimo.balancete_url ? `<div class="full"><label>Balancete do Mês</label><a href="#" class="arquivo-link" data-ver-balancete="${escapeHtml(ultimo.balancete_url)}">📄 ${escapeHtml(ultimo.balancete_nome || 'ver balancete')}</a></div>` : ''}
+            ${ultimo && ultimo.balancete_url ? `<div class="full"><label>Balancete do ${unidadeCap}</label><a href="#" class="arquivo-link" data-ver-balancete="${escapeHtml(ultimo.balancete_url)}">📄 ${escapeHtml(ultimo.balancete_nome || 'ver balancete')}</a></div>` : ''}
             <div class="full"><button type="button" class="btn btn-primary" id="btnAprovarFechamento">Aprovar</button></div>
             <div class="full"><label>Motivo da rejeição (obrigatório para rejeitar)</label><textarea id="fechMotivoRejeicao" rows="2" placeholder="Explique o que precisa ser corrigido..."></textarea></div>
             <div class="full"><button type="button" class="btn btn-secondary" id="btnRejeitarFechamento">Rejeitar</button></div>
@@ -1389,7 +1446,7 @@
         acaoHtml = `<p class="mapa-empty">Aguardando validação da equipe Scont${ultimo ? ` (enviado por ${escapeHtml(ultimo.usuario_nome || ultimo.usuario_email || '—')})` : ''}.</p>`;
       }
     } else if (statusFech === 'aprovado') {
-      acaoHtml = '<p class="mapa-empty status-aprovado">Fechamento aprovado — mês travado.</p>';
+      acaoHtml = `<p class="mapa-empty status-aprovado">Fechamento aprovado — ${unidade} travado.</p>`;
     }
 
     const eventosGrade = await buscarEventosStatusGrade(codigoEmpresa, ano, mes);
@@ -1413,7 +1470,7 @@
     if (btnEncerrar) {
       btnEncerrar.addEventListener('click', async () => {
         const arquivo = document.getElementById('fechBalanceteArquivo').files[0];
-        if (!arquivo) { mostrarToast('Anexe o balancete do mês em PDF antes de encerrar.', 'erro'); return; }
+        if (!arquivo) { mostrarToast(`Anexe o balancete do ${unidade} em PDF antes de encerrar.`, 'erro'); return; }
         const mensagem = document.getElementById('fechObservacaoEnvio').value.trim();
 
         if (autoAprovar) {
@@ -1429,8 +1486,8 @@
         if (errUpload) { console.error(errUpload); btnEncerrar.disabled = false; mostrarToast('Erro ao enviar o balancete.', 'erro'); return; }
         const { error } = await criarEventoFechamento(codigoEmpresa, ano, mes, 'enviado', mensagem, balancete);
         btnEncerrar.disabled = false;
-        if (error) { console.error(error); mostrarToast('Erro ao encerrar o mês.', 'erro'); return; }
-        mostrarToast('Mês encerrado e enviado para validação da equipe Scont.', 'sucesso');
+        if (error) { console.error(error); mostrarToast(`Erro ao encerrar o ${unidade}.`, 'erro'); return; }
+        mostrarToast(`${unidadeCap} encerrado e enviado para validação da equipe Scont.`, 'sucesso');
         renderModalFechamentoBody(codigoEmpresa, ano, mes);
         renderGradeMensal();
       });
@@ -1453,8 +1510,8 @@
         if (errUpload) { console.error(errUpload); btnConfirmarEncerramento.disabled = false; mostrarToast('Erro ao enviar o balancete.', 'erro'); return; }
         const { error } = await criarEventoFechamento(codigoEmpresa, ano, mes, 'aprovado', _observacaoEncerramentoPendente, balancete);
         btnConfirmarEncerramento.disabled = false;
-        if (error) { console.error(error); mostrarToast('Erro ao encerrar o mês.', 'erro'); return; }
-        mostrarToast('Mês encerrado e aprovado diretamente pela equipe Scont.', 'sucesso');
+        if (error) { console.error(error); mostrarToast(`Erro ao encerrar o ${unidade}.`, 'erro'); return; }
+        mostrarToast(`${unidadeCap} encerrado e aprovado diretamente pela equipe Scont.`, 'sucesso');
         _etapaEncerramento = 'form';
         _arquivoBalanceteSelecionado = null;
         _observacaoEncerramentoPendente = '';
@@ -1485,7 +1542,7 @@
         const { error } = await criarEventoFechamento(codigoEmpresa, ano, mes, 'rejeitado', motivo);
         btnRejeitar.disabled = false;
         if (error) { console.error(error); mostrarToast('Erro ao rejeitar o fechamento.', 'erro'); return; }
-        mostrarToast('Fechamento rejeitado — o mês voltou para aberto.', 'sucesso');
+        mostrarToast(`Fechamento rejeitado — o ${unidade} voltou para aberto.`, 'sucesso');
         renderModalFechamentoBody(codigoEmpresa, ano, mes);
         renderGradeMensal();
       });
