@@ -835,6 +835,7 @@ function _vgToggleEmpresa(cb) {
     if (cb.checked) _vgEmpresasSelecionadas.add(cb.value);
     else _vgEmpresasSelecionadas.delete(cb.value);
     _vgAtualizarQtdEmpresas(document.querySelectorAll('#vgFiltroEmpresas input[type=checkbox]').length);
+    atualizarVisaoGerencial();
 }
 
 function _vgFiltrarListaEmpresas() {
@@ -852,6 +853,7 @@ function vgSelecionarTodasEmpresas(marcar) {
         else _vgEmpresasSelecionadas.delete(cb.value);
     });
     _vgAtualizarQtdEmpresas(document.querySelectorAll('#vgFiltroEmpresas input[type=checkbox]').length);
+    atualizarVisaoGerencial();
 }
 
 function _vgAtualizarQtdEmpresas(total) {
@@ -874,6 +876,7 @@ function _vgInicializarFiltroSituacoes() {
 function _vgToggleSituacao(cb) {
     if (cb.checked) _vgSituacoesSelecionadas.add(cb.value);
     else _vgSituacoesSelecionadas.delete(cb.value);
+    atualizarVisaoGerencial();
 }
 
 function vgSelecionarTodasSituacoes(marcar) {
@@ -882,6 +885,7 @@ function vgSelecionarTodasSituacoes(marcar) {
         if (marcar) _vgSituacoesSelecionadas.add(cb.value);
         else _vgSituacoesSelecionadas.delete(cb.value);
     });
+    atualizarVisaoGerencial();
 }
 
 const _VG_TIPOS = ['Empregado', 'Estágiario', 'Contribuinte'];
@@ -1186,6 +1190,88 @@ function _vgRenderizarTabelaSerie(dados) {
     }).join('');
 
     tbody.innerHTML = html;
+}
+
+/** Exporta para Excel o recorte atual da Visão Gerencial (empresas/situações/período selecionados), com resumo + detalhamento por Situação. */
+function exportarVisaoGerencialExcel() {
+    const modo = document.querySelector('input[name="vgModo"]:checked')?.value || 'unico';
+    const empresasConsideradas = [..._vgEmpresasSelecionadas];
+    if (empresasConsideradas.length === 0) { alert('Nenhuma empresa selecionada.'); return; }
+
+    const situacoesOrdenadas = r => Object.entries(r.porSituacao).sort((a, b) => b[1].total - a[1].total);
+    const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+
+    let headers, rows = [], nomeArquivo;
+
+    if (modo === 'unico') {
+        const mes = parseInt(document.getElementById('vgMes')?.value, 10);
+        const ano = parseInt(document.getElementById('vgAno')?.value, 10);
+        if (!mes || !ano) { alert('Informe mês e ano.'); return; }
+
+        headers = ['Empresa', 'Situação', 'Total', 'Empregados', 'Estagiários', 'Contribuintes'];
+        const porEmpresa = _vgCalcularContagem(mes, ano, empresasConsideradas);
+        const linhasEmpresa = Object.entries(porEmpresa).sort((a, b) => a[1].nome.localeCompare(b[1].nome));
+
+        let totalGeral = 0;
+        const totalPorTipo = {};
+        linhasEmpresa.forEach(([cod, r]) => {
+            totalGeral += r.total;
+            _VG_TIPOS.forEach(t => { totalPorTipo[t] = (totalPorTipo[t] || 0) + (r.porTipo[t] || 0); });
+            const empresaLabel = `${cod} — ${r.nome}`;
+            rows.push([empresaLabel, '', r.total, r.porTipo['Empregado'] || 0, r.porTipo['Estágiario'] || 0, r.porTipo['Contribuinte'] || 0]);
+            situacoesOrdenadas(r).forEach(([situacao, s]) => {
+                rows.push([empresaLabel, situacao, s.total, s.porTipo['Empregado'] || 0, s.porTipo['Estágiario'] || 0, s.porTipo['Contribuinte'] || 0]);
+            });
+        });
+        rows.push(['Total Geral', '', totalGeral, totalPorTipo['Empregado'] || 0, totalPorTipo['Estágiario'] || 0, totalPorTipo['Contribuinte'] || 0]);
+
+        nomeArquivo = `visao_gerencial_empregados_${hoje}.xlsx`;
+    } else {
+        const mesDe = parseInt(document.getElementById('vgMesDe')?.value, 10);
+        const anoDe = parseInt(document.getElementById('vgAnoDe')?.value, 10);
+        const mesAte = parseInt(document.getElementById('vgMesAte')?.value, 10);
+        const anoAte = parseInt(document.getElementById('vgAnoAte')?.value, 10);
+        if (!mesDe || !anoDe || !mesAte || !anoAte) { alert('Informe o período (De/Até).'); return; }
+
+        let chaveInicio = anoDe * 12 + (mesDe - 1);
+        let chaveFim = anoAte * 12 + (mesAte - 1);
+        if (chaveInicio > chaveFim) { const tmp = chaveInicio; chaveInicio = chaveFim; chaveFim = tmp; }
+
+        const periodos = [];
+        for (let c = chaveInicio; c <= chaveFim; c++) periodos.push({ ano: Math.floor(c / 12), mes: (c % 12) + 1 });
+
+        headers = ['Mês/Ano', 'Empresa', 'Situação', 'Total', 'Empregados', 'Estagiários', 'Contribuintes'];
+
+        periodos.forEach(p => {
+            const porEmpresa = _vgCalcularContagem(p.mes, p.ano, empresasConsideradas);
+            const linhasEmpresa = Object.entries(porEmpresa).sort((a, b) => a[1].nome.localeCompare(b[1].nome));
+            const mesAno = `${_VG_NOMES_MES[p.mes - 1]}/${p.ano}`;
+
+            let totalMes = 0;
+            const totalPorTipoMes = {};
+            linhasEmpresa.forEach(([, r]) => {
+                totalMes += r.total;
+                _VG_TIPOS.forEach(t => { totalPorTipoMes[t] = (totalPorTipoMes[t] || 0) + (r.porTipo[t] || 0); });
+            });
+            rows.push([mesAno, '', '', totalMes, totalPorTipoMes['Empregado'] || 0, totalPorTipoMes['Estágiario'] || 0, totalPorTipoMes['Contribuinte'] || 0]);
+
+            linhasEmpresa.forEach(([cod, r]) => {
+                const empresaLabel = `${cod} — ${r.nome}`;
+                rows.push([mesAno, empresaLabel, '', r.total, r.porTipo['Empregado'] || 0, r.porTipo['Estágiario'] || 0, r.porTipo['Contribuinte'] || 0]);
+                situacoesOrdenadas(r).forEach(([situacao, s]) => {
+                    rows.push([mesAno, empresaLabel, situacao, s.total, s.porTipo['Empregado'] || 0, s.porTipo['Estágiario'] || 0, s.porTipo['Contribuinte'] || 0]);
+                });
+            });
+        });
+
+        nomeArquivo = `visao_gerencial_empregados_serie_${hoje}.xlsx`;
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    ws['!cols'] = headers.map(() => ({ wch: 22 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Visão Gerencial');
+    XLSX.writeFile(wb, nomeArquivo);
 }
 
 // --- FÉRIAS (INFORMAÇÕES) ---
