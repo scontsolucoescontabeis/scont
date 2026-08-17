@@ -24,6 +24,7 @@
   // resetados só pelo botão "Limpar filtros" ou ao trocar de aba).
   let dashboardFiltroBusca = ''; // código ou nome da empresa
   let dashboardFiltroRegime = '';
+  let dashboardFiltroPeriodicidade = '';
   let dashboardFiltroResponsavel = '';
   let dashboardFiltroStatus = '';
   let dashboardFiltroDocumentacao = '';
@@ -590,6 +591,7 @@
       const m = mapeamentoDe(e.codigo_empresa);
       if (termoBusca && !e.codigo_empresa.toLowerCase().includes(termoBusca) && !e.nome_empresa.toLowerCase().includes(termoBusca)) return false;
       if (dashboardFiltroRegime && (!m || m.regime_tributario !== dashboardFiltroRegime)) return false;
+      if (dashboardFiltroPeriodicidade && (!m || m.periodicidade !== dashboardFiltroPeriodicidade)) return false;
       if (dashboardFiltroResponsavel && (!m || m.responsavel_execucao !== dashboardFiltroResponsavel)) return false;
       if (dashboardFiltroStatus) {
         const bate = dashboardFiltroMes === null
@@ -660,6 +662,13 @@
               ${responsaveis.map((r) => `<option value="${escapeHtml(r)}" ${dashboardFiltroResponsavel === r ? 'selected' : ''}>${escapeHtml(r)}</option>`).join('')}
             </select>
           </div>
+          <div>
+            <label>Periodicidade</label>
+            <select id="filtroDashPeriodicidade">
+              <option value="">Todas</option>
+              ${Object.entries(PERIODICIDADE_LABELS).map(([v, l]) => `<option value="${v}" ${dashboardFiltroPeriodicidade === v ? 'selected' : ''}>${l}</option>`).join('')}
+            </select>
+          </div>
           <div class="full" style="display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap;">
             <div style="flex:1; min-width:200px;">
               <label>Status do Mês</label>
@@ -713,6 +722,7 @@
 
     document.getElementById('filtroDashBusca').addEventListener('input', (ev) => { dashboardFiltroBusca = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashRegime').addEventListener('change', (ev) => { dashboardFiltroRegime = ev.target.value; atualizarTabelaDashboard(); });
+    document.getElementById('filtroDashPeriodicidade').addEventListener('change', (ev) => { dashboardFiltroPeriodicidade = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashResponsavel').addEventListener('change', (ev) => { dashboardFiltroResponsavel = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashStatus').addEventListener('change', (ev) => { dashboardFiltroStatus = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashDocumentacao').addEventListener('change', (ev) => { dashboardFiltroDocumentacao = ev.target.value; atualizarTabelaDashboard(); });
@@ -721,6 +731,7 @@
     document.getElementById('btnLimparFiltrosDash').addEventListener('click', () => {
       dashboardFiltroBusca = '';
       dashboardFiltroRegime = '';
+      dashboardFiltroPeriodicidade = '';
       dashboardFiltroResponsavel = '';
       dashboardFiltroStatus = '';
       dashboardFiltroDocumentacao = '';

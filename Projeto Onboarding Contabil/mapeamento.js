@@ -44,7 +44,7 @@
   let relacionadasPorEmpresa = {};  // cache simples { codigo_empresa: [codigo_empresa_relacionada, ...] }
   let mapeamentoAtualId = null;     // codigo_empresa selecionado (null = dashboard)
   let mapeamentoAtual = null;       // linha de contabil_mapeamento selecionada
-  let filtro = { nivel: null, regime: '', financeiro: '', busca: '' };
+  let filtro = { nivel: null, regime: '', periodicidade: '', financeiro: '', busca: '' };
 
   // ─── ESCOPO: "Prestador de Serviço" só vê empresas onde é responsável ──
   // Mesma convenção client-side já usada no Diário Contábil (diario.js).
@@ -239,6 +239,7 @@
       if (termoBusca && !e.codigo_empresa.toLowerCase().includes(termoBusca) && !e.nome_empresa.toLowerCase().includes(termoBusca)) return false;
       if (filtro.nivel && nivelDe(e.codigo_empresa) !== filtro.nivel) return false;
       if (filtro.regime && (!m || m.regime_tributario !== filtro.regime)) return false;
+      if (filtro.periodicidade && (!m || m.periodicidade !== filtro.periodicidade)) return false;
       if (filtro.financeiro && (!m || m.financeiro_interno_bpo !== filtro.financeiro)) return false;
       return true;
     });
@@ -297,6 +298,10 @@
           <option value="">Todos os regimes</option>
           ${Object.entries(REGIME_LABELS).map(([v, l]) => `<option value="${v}" ${filtro.regime === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
+        <select id="filtroPeriodicidade">
+          <option value="">Todas as periodicidades</option>
+          ${Object.entries(PERIODICIDADE_LABELS).map(([v, l]) => `<option value="${v}" ${filtro.periodicidade === v ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
         <select id="filtroFinanceiro">
           <option value="">Financeiro (todos)</option>
           ${Object.entries(FINANCEIRO_LABELS).map(([v, l]) => `<option value="${v}" ${filtro.financeiro === v ? 'selected' : ''}>${l}</option>`).join('')}
@@ -321,6 +326,7 @@
       ligarCliquesLinhasDashboard();
     });
     document.getElementById('filtroRegime').addEventListener('change', (ev) => { filtro.regime = ev.target.value; renderDashboard(); });
+    document.getElementById('filtroPeriodicidade').addEventListener('change', (ev) => { filtro.periodicidade = ev.target.value; renderDashboard(); });
     document.getElementById('filtroFinanceiro').addEventListener('change', (ev) => { filtro.financeiro = ev.target.value; renderDashboard(); });
     ligarCliquesLinhasDashboard();
 
