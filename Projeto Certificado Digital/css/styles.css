@@ -1093,7 +1093,13 @@ body.dark-mode .modal {
 .timeline-item.warning::before  { background: var(--warning); }
 .timeline-item.success::before  { background: var(--success); }
 
-.timeline-content { flex: 1; }
+.timeline-content {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+}
 .timeline-title   { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 .timeline-meta    { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
