@@ -8,6 +8,9 @@
 -- Idempotente — pode ser executado mais de uma vez.
 -- ============================================================
 
+-- responsavel referencia auth.users(id) (produção já tinha essa FK antes deste
+-- script existir). O frontend grava o usuario_id logado e resolve o nome para
+-- exibição via public.usuarios (ver resolveResponsavelNomes em js/app.js).
 create table if not exists public.historico_certificados (
   id              uuid primary key default gen_random_uuid(),
   certificado_id  uuid references public.certificados(id) on delete cascade,
@@ -16,7 +19,7 @@ create table if not exists public.historico_certificados (
   campo_alterado  text,
   valor_anterior  text,
   valor_novo      text,
-  responsavel     text,
+  responsavel     uuid references auth.users(id),
   data_alteracao  timestamptz not null default now()
 );
 

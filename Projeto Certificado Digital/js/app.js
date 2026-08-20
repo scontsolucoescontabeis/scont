@@ -412,7 +412,8 @@ async function fetchHistory() {
       .order('data_alteracao', { ascending: false })
       .limit(100);
     if (error) throw error;
-    APP_STATE.historyLog = data || [];
+    const nomes = await resolveResponsavelNomes((data || []).map(l => l.responsavel));
+    APP_STATE.historyLog = (data || []).map(l => ({ ...l, responsavel: nomes[l.responsavel] || null }));
   } catch (err) {
     console.error('Erro ao buscar histórico:', err);
   }
@@ -954,7 +955,7 @@ async function saveRenewal() {
         campo_alterado: 'renovação',
         valor_anterior: valorAnterior,
         valor_novo: valorNovo,
-        responsavel: APP_STATE.currentUser?.nome_usuario || APP_STATE.currentUser?.usuario_email || null
+        responsavel: APP_STATE.currentUser?.usuario_id || null
       }]);
     if (histError) console.error('Erro ao registrar histórico de renovação:', histError);
 
@@ -968,6 +969,24 @@ async function saveRenewal() {
   }
 }
 
+// responsavel em historico_certificados é FK para auth.users(id) — resolve para nome exibível via public.usuarios.
+// Usuários não-admin só enxergam o próprio nome (RLS "usuarios: leitura própria"); nos demais casos o campo fica em branco.
+async function resolveResponsavelNomes(ids) {
+  const unicos = [...new Set(ids.filter(Boolean))];
+  if (!unicos.length) return {};
+  try {
+    const { data, error } = await supabaseClient
+      .from('usuarios')
+      .select('id, nome')
+      .in('id', unicos);
+    if (error) throw error;
+    return Object.fromEntries((data || []).map(u => [u.id, u.nome]));
+  } catch (err) {
+    console.error('Erro ao resolver nomes de responsáveis:', err);
+    return {};
+  }
+}
+
 async function fetchCertRenewalHistory(id) {
   try {
     const { data, error } = await supabaseClient
@@ -977,7 +996,8 @@ async function fetchCertRenewalHistory(id) {
       .eq('tipo_alteracao', 'Renovação')
       .order('data_alteracao', { ascending: false });
     if (error) throw error;
-    return data || [];
+    const nomes = await resolveResponsavelNomes((data || []).map(r => r.responsavel));
+    return (data || []).map(r => ({ ...r, responsavel: nomes[r.responsavel] || null }));
   } catch (err) {
     console.error('Erro ao buscar histórico de renovações:', err);
     return [];
