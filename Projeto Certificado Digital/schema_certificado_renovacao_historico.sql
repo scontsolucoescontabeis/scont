@@ -20,15 +20,6 @@ create table if not exists public.historico_certificados (
   data_alteracao  timestamptz not null default now()
 );
 
--- Corrige divergência encontrada em produção: a tabela já existia com
--- responsavel tipado uuid (de uma criação anterior a este script), o que
--- fazia o INSERT de saveRenewal() falhar sempre (22P02 invalid input
--- syntax for type uuid) ao enviar o nome/e-mail do usuário — silenciosamente,
--- pois o erro só ia para o console. Realinha com o design pretendido
--- (nome legível, usado nas timelines e na busca).
-alter table public.historico_certificados
-  alter column responsavel type text using responsavel::text;
-
 create index if not exists idx_historico_certificados_certificado_id
   on public.historico_certificados (certificado_id);
 
