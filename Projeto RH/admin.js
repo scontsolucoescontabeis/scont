@@ -300,6 +300,10 @@ const _TODAS_SITUACOES = [
 ];
 let _situacoesSelecionadas = new Set(_TODAS_SITUACOES);
 
+// Filtros por coluna (estilo Excel): { [coluna]: { tipo: 'valores'|'data', selecionados: Set<string> } }
+let _filtrosColuna = {};
+const _MESES_ABREV = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
 function toggleSituacaoFiltro() {
     _situacoesSelecionadas = new Set(
         [...document.querySelectorAll('#filtroSituacaoEmp input[type=checkbox]:checked')].map(cb => cb.value)
@@ -427,8 +431,11 @@ function _atualizarQtdEmpresasFiltro(selecionadas, total) {
 
 function toggleCampoEmp(cb) {
     if (cb.checked) _colsSelecionadas.add(cb.value);
-    else _colsSelecionadas.delete(cb.value);
-    renderizarTabelaEmpregados();
+    else {
+        _colsSelecionadas.delete(cb.value);
+        delete _filtrosColuna[cb.value];
+    }
+    filtrarEmpregados();
 }
 
 function selecionarTodosCampos(marcar) {
@@ -436,29 +443,71 @@ function selecionarTodosCampos(marcar) {
         _colsSelecionadas = new Set(_COLS_EMPREGADOS);
     } else {
         _colsSelecionadas = new Set(['codigo_empresa','codigo_empregado','nome_empregado']);
+        Object.keys(_filtrosColuna).forEach(col => {
+            if (!_colsSelecionadas.has(col)) delete _filtrosColuna[col];
+        });
     }
     document.querySelectorAll('#camposSeletorEmp input[type=checkbox]').forEach(cb => {
         cb.checked = _colsSelecionadas.has(cb.value);
     });
-    renderizarTabelaEmpregados();
+    filtrarEmpregados();
 }
 
-function filtrarEmpregados() {
+function limparTodosFiltrosColuna() {
+    _filtrosColuna = {};
+    filtrarEmpregados();
+}
+
+function _condicoesFiltroBaseEmp() {
     const nome = (document.getElementById('filtroNomeEmp')?.value || '').toLowerCase().trim();
     const tipoEmp = document.getElementById('filtroTipoEmp')?.value || '';
     const totalEmpresas = document.querySelectorAll('#filtroEmpresaEmp input[type=checkbox]').length;
     const todasMarcadas = _empresasSelecionadas.size === totalEmpresas;
     const todasSituacoes = _situacoesSelecionadas.size === _TODAS_SITUACOES.length;
-    _empregadosFiltrados = _todosEmpregados.filter(e => {
-        if (!todasMarcadas && !_empresasSelecionadas.has(e.codigo_empresa)) return false;
-        if (nome && !((e.nome_empregado || '').toLowerCase().includes(nome) || (e.codigo_empregado || '').toLowerCase().includes(nome))) return false;
-        if (!todasSituacoes && _situacoesSelecionadas.size > 0 && !_situacoesSelecionadas.has(e.situacao || '')) return false;
-        if (_situacoesSelecionadas.size === 0) return false;
-        if (tipoEmp === 'EMP_ESTAG') {
-            if (!['Empregado', 'Estágiario'].includes(e.tipo_empregado || '')) return false;
-        } else if (tipoEmp && (e.tipo_empregado || '') !== tipoEmp) return false;
-        return true;
-    });
+    return { nome, tipoEmp, todasMarcadas, todasSituacoes };
+}
+
+function _empregadoPassaFiltroBase(e, cond) {
+    const { nome, tipoEmp, todasMarcadas, todasSituacoes } = cond;
+    if (!todasMarcadas && !_empresasSelecionadas.has(e.codigo_empresa)) return false;
+    if (nome && !((e.nome_empregado || '').toLowerCase().includes(nome) || (e.codigo_empregado || '').toLowerCase().includes(nome))) return false;
+    if (!todasSituacoes && _situacoesSelecionadas.size > 0 && !_situacoesSelecionadas.has(e.situacao || '')) return false;
+    if (_situacoesSelecionadas.size === 0) return false;
+    if (tipoEmp === 'EMP_ESTAG') {
+        if (!['Empregado', 'Estágiario'].includes(e.tipo_empregado || '')) return false;
+    } else if (tipoEmp && (e.tipo_empregado || '') !== tipoEmp) return false;
+    return true;
+}
+
+function _chaveAnoMesColuna(v) {
+    if (!v) return '__BLANK__';
+    const d = new Date(v + 'T00:00:00');
+    if (isNaN(d)) return '__BLANK__';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function _chaveValorColuna(v) {
+    return (v === null || v === undefined || v === '') ? '__BLANK__' : String(v);
+}
+
+function _empregadoPassaFiltrosColuna(e, colExcluida) {
+    for (const col in _filtrosColuna) {
+        if (col === colExcluida) continue;
+        const filtro = _filtrosColuna[col];
+        if (!filtro || !filtro.selecionados || filtro.selecionados.size === 0) continue;
+        const chave = filtro.tipo === 'data' ? _chaveAnoMesColuna(e[col]) : _chaveValorColuna(e[col]);
+        if (!filtro.selecionados.has(chave)) return false;
+    }
+    return true;
+}
+
+function _empregadosComFiltroBase(colExcluida) {
+    const cond = _condicoesFiltroBaseEmp();
+    return _todosEmpregados.filter(e => _empregadoPassaFiltroBase(e, cond) && _empregadoPassaFiltrosColuna(e, colExcluida));
+}
+
+function filtrarEmpregados() {
+    _empregadosFiltrados = _empregadosComFiltroBase(null);
     _paginaEmpregados = 1;
     renderizarTabelaEmpregados();
 }
@@ -485,7 +534,15 @@ function renderizarTabelaEmpregados() {
     const pagina = _empregadosFiltrados.slice(inicio, inicio + _porPaginaEmpregados);
 
     if (thead) {
-        const ths = colsAtivas.map(c => `<th title="${_headerParaCol(c)}">${_headerParaCol(c)}</th>`).join('');
+        const ths = colsAtivas.map(c => {
+            const ativo = _filtrosColuna[c] ? ' filtro-col-ativo' : '';
+            return `<th title="${_headerParaCol(c)}">
+                <span style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                    <span>${_headerParaCol(c)}</span>
+                    <span class="filtro-col-icone${ativo}" onclick="abrirFiltroColuna(event, '${c}')" title="Filtrar ${_headerParaCol(c)}">▾</span>
+                </span>
+            </th>`;
+        }).join('');
         thead.innerHTML = `<tr>${ths}<th>Ações</th></tr>`;
     }
 
@@ -529,6 +586,205 @@ function renderizarTabelaEmpregados() {
             <button onclick="mudarPaginaEmpregados(${_paginaEmpregados + 1})" ${_paginaEmpregados === totalPags ? 'disabled' : ''}>Próxima ›</button>
         `;
     }
+}
+
+// --- FILTRO DE COLUNA (estilo Excel) ---
+
+function _fmtValorFiltroColuna(col, v) {
+    if (v === null || v === undefined || v === '') return '(Vazios)';
+    if (col === 'salario') {
+        const n = parseFloat(v);
+        return isNaN(n) ? String(v) : n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    if (col === 'cpf') {
+        const s = String(v).replace(/\D/g, '').padStart(11, '0');
+        return s.length === 11 ? `${s.slice(0, 3)}.${s.slice(3, 6)}.${s.slice(6, 9)}-${s.slice(9)}` : String(v);
+    }
+    return String(v);
+}
+
+function abrirFiltroColuna(ev, col) {
+    ev.stopPropagation();
+    _fecharFiltroColunaDropdown();
+
+    const icone = ev.currentTarget;
+    const rect = icone.getBoundingClientRect();
+    const baseRows = _empregadosComFiltroBase(col);
+    const filtroAtual = _filtrosColuna[col];
+    const isData = _DATE_COLS_EMPREGADOS.has(col);
+
+    const painel = document.createElement('div');
+    painel.id = 'filtroColunaDropdown';
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - 280));
+    painel.style.cssText = `position:fixed;top:${rect.bottom + 4}px;left:${left}px;width:260px;max-height:360px;background:white;border:1px solid #C0C0C0;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.25);z-index:100000;display:flex;flex-direction:column;font-size:12px;`;
+    painel.innerHTML = `
+        <div style="padding:8px;border-bottom:1px solid #EEE;">
+            <input type="text" id="buscaFiltroColuna" placeholder="Buscar..." oninput="_buscarFiltroColunaLista()" style="width:100%;padding:5px 7px;border:1px solid #DEE2E6;border-radius:5px;font-size:12px;box-sizing:border-box;">
+        </div>
+        <div style="padding:6px 8px;border-bottom:1px solid #EEE;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;">
+                <input type="checkbox" id="filtroColunaSelecionarTudo" checked onchange="_toggleSelecionarTudoFiltroColuna(this.checked)"> Selecionar tudo
+            </label>
+        </div>
+        <div id="filtroColunaLista" style="flex:1;overflow-y:auto;padding:6px 8px;display:flex;flex-direction:column;gap:2px;"></div>
+        <div style="padding:8px;border-top:1px solid #EEE;display:flex;justify-content:space-between;gap:8px;">
+            <button type="button" onclick="_limparFiltroColuna('${col}')" style="padding:5px 10px;border:1px solid #C0C0C0;border-radius:5px;background:white;cursor:pointer;font-size:11px;">Limpar filtro</button>
+            <button type="button" onclick="_aplicarFiltroColunaOk('${col}')" style="padding:5px 14px;border:none;border-radius:5px;background:#8B3A3A;color:white;cursor:pointer;font-size:11px;font-weight:600;">OK</button>
+        </div>
+    `;
+    document.body.appendChild(painel);
+
+    const lista = painel.querySelector('#filtroColunaLista');
+    if (isData) _renderizarFiltroColunaData(col, lista, baseRows, filtroAtual);
+    else _renderizarFiltroColunaValores(col, lista, baseRows, filtroAtual);
+
+    _atualizarSelecionarTudoFiltroColuna();
+
+    setTimeout(() => document.addEventListener('mousedown', _cliqueForaFiltroColuna), 0);
+}
+
+function _cliqueForaFiltroColuna(ev) {
+    const painel = document.getElementById('filtroColunaDropdown');
+    if (painel && !painel.contains(ev.target)) _fecharFiltroColunaDropdown();
+}
+
+function _fecharFiltroColunaDropdown() {
+    const painel = document.getElementById('filtroColunaDropdown');
+    if (painel) painel.remove();
+    document.removeEventListener('mousedown', _cliqueForaFiltroColuna);
+}
+
+function _renderizarFiltroColunaValores(col, container, baseRows, filtroAtual) {
+    const chaves = new Map(); // chave -> label
+    baseRows.forEach(e => {
+        const chave = _chaveValorColuna(e[col]);
+        if (!chaves.has(chave)) chaves.set(chave, _fmtValorFiltroColuna(col, e[col]));
+    });
+    const ordenadas = [...chaves.entries()].sort((a, b) => {
+        if (a[0] === '__BLANK__') return 1;
+        if (b[0] === '__BLANK__') return -1;
+        return a[1].localeCompare(b[1], 'pt-BR');
+    });
+    container.innerHTML = ordenadas.map(([chave, label]) => {
+        const checked = filtroAtual ? filtroAtual.selecionados.has(chave) : true;
+        const escapado = chave.replace(/"/g, '&quot;');
+        return `<label class="filtro-col-item" data-texto="${label.toLowerCase()}" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:2px 0;">
+            <input type="checkbox" class="filtro-col-check" value="${escapado}" ${checked ? 'checked' : ''} onchange="_atualizarSelecionarTudoFiltroColuna()"> <span style="white-space:normal;">${label}</span>
+        </label>`;
+    }).join('') || '<div style="color:#95A5A6;padding:6px 0;">Nenhum valor</div>';
+}
+
+function _renderizarFiltroColunaData(col, container, baseRows, filtroAtual) {
+    const mapa = {}; // ano -> Set(mes)
+    let temVazio = false;
+    baseRows.forEach(e => {
+        const v = e[col];
+        if (!v) { temVazio = true; return; }
+        const d = new Date(v + 'T00:00:00');
+        if (isNaN(d)) { temVazio = true; return; }
+        const ano = d.getFullYear();
+        const mes = d.getMonth() + 1;
+        if (!mapa[ano]) mapa[ano] = new Set();
+        mapa[ano].add(mes);
+    });
+    const anos = Object.keys(mapa).map(Number).sort((a, b) => b - a);
+    const checkKey = chave => filtroAtual ? filtroAtual.selecionados.has(chave) : true;
+
+    let html = '';
+    anos.forEach(ano => {
+        const meses = [...mapa[ano]].sort((a, b) => a - b);
+        const todosChecados = meses.every(m => checkKey(`${ano}-${String(m).padStart(2, '0')}`));
+        const algumChecado = meses.some(m => checkKey(`${ano}-${String(m).padStart(2, '0')}`));
+        html += `<div class="filtro-col-item" data-texto="${ano}">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;padding:2px 0;">
+                <input type="checkbox" class="filtro-col-check-ano" data-ano="${ano}" ${todosChecados ? 'checked' : ''} ${(!todosChecados && algumChecado) ? 'data-indeterminate="1"' : ''} onchange="_toggleAnoFiltroColuna(${ano}, this.checked)"> ${ano}
+            </label>
+            <div style="padding-left:18px;display:flex;flex-direction:column;gap:1px;">
+                ${meses.map(m => {
+                    const chave = `${ano}-${String(m).padStart(2, '0')}`;
+                    return `<label class="filtro-col-item" data-texto="${_MESES_ABREV[m - 1].toLowerCase()} ${ano}" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:1px 0;">
+                        <input type="checkbox" class="filtro-col-check filtro-col-check-mes" data-ano="${ano}" value="${chave}" ${checkKey(chave) ? 'checked' : ''} onchange="_atualizarEstadoAnoFiltroColuna(${ano}); _atualizarSelecionarTudoFiltroColuna();"> ${_MESES_ABREV[m - 1]}
+                    </label>`;
+                }).join('')}
+            </div>
+        </div>`;
+    });
+    if (temVazio) {
+        html += `<label class="filtro-col-item" data-texto="vazios" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:2px 0;">
+            <input type="checkbox" class="filtro-col-check" value="__BLANK__" ${checkKey('__BLANK__') ? 'checked' : ''} onchange="_atualizarSelecionarTudoFiltroColuna()"> (Vazios)
+        </label>`;
+    }
+    container.innerHTML = html || '<div style="color:#95A5A6;padding:6px 0;">Nenhum valor</div>';
+    container.querySelectorAll('.filtro-col-check-ano').forEach(cb => {
+        if (cb.dataset.indeterminate === '1') cb.indeterminate = true;
+    });
+}
+
+function _toggleAnoFiltroColuna(ano, marcar) {
+    document.querySelectorAll(`#filtroColunaLista .filtro-col-check-mes[data-ano="${ano}"]`).forEach(cb => cb.checked = marcar);
+    _atualizarSelecionarTudoFiltroColuna();
+}
+
+function _atualizarEstadoAnoFiltroColuna(ano) {
+    const meses = [...document.querySelectorAll(`#filtroColunaLista .filtro-col-check-mes[data-ano="${ano}"]`)];
+    const anoCb = document.querySelector(`#filtroColunaLista .filtro-col-check-ano[data-ano="${ano}"]`);
+    if (!anoCb) return;
+    const todos = meses.every(cb => cb.checked);
+    const nenhum = meses.every(cb => !cb.checked);
+    anoCb.checked = todos;
+    anoCb.indeterminate = !todos && !nenhum;
+}
+
+function _toggleSelecionarTudoFiltroColuna(marcar) {
+    document.querySelectorAll('#filtroColunaLista input[type=checkbox]').forEach(cb => {
+        cb.checked = marcar;
+        cb.indeterminate = false;
+    });
+}
+
+function _atualizarSelecionarTudoFiltroColuna() {
+    const master = document.getElementById('filtroColunaSelecionarTudo');
+    if (!master) return;
+    const folhas = [...document.querySelectorAll('#filtroColunaLista .filtro-col-check')];
+    if (folhas.length === 0) { master.checked = true; master.indeterminate = false; return; }
+    const todos = folhas.every(cb => cb.checked);
+    const nenhum = folhas.every(cb => !cb.checked);
+    master.checked = todos;
+    master.indeterminate = !todos && !nenhum;
+}
+
+function _buscarFiltroColunaLista() {
+    const busca = (document.getElementById('buscaFiltroColuna')?.value || '').toLowerCase().trim();
+    document.querySelectorAll('#filtroColunaLista .filtro-col-item').forEach(item => {
+        const texto = item.getAttribute('data-texto') || '';
+        item.style.display = (!busca || texto.includes(busca)) ? '' : 'none';
+    });
+}
+
+function _limparFiltroColuna(col) {
+    delete _filtrosColuna[col];
+    _fecharFiltroColunaDropdown();
+    filtrarEmpregados();
+}
+
+function _aplicarFiltroColunaOk(col) {
+    const isData = _DATE_COLS_EMPREGADOS.has(col);
+    const folhas = [...document.querySelectorAll('#filtroColunaLista .filtro-col-check')];
+    const selecionados = new Set(folhas.filter(cb => cb.checked).map(cb => cb.value));
+
+    // Se a seleção cobre todos os valores possíveis da coluna (dataset completo, sem
+    // considerar outros filtros), equivale a "sem filtro" — removemos em vez de armazenar.
+    const todosPossiveis = new Set();
+    _todosEmpregados.forEach(e => {
+        todosPossiveis.add(isData ? _chaveAnoMesColuna(e[col]) : _chaveValorColuna(e[col]));
+    });
+    const cobreTudo = selecionados.size === todosPossiveis.size && [...todosPossiveis].every(k => selecionados.has(k));
+
+    if (cobreTudo) delete _filtrosColuna[col];
+    else _filtrosColuna[col] = { tipo: isData ? 'data' : 'valores', selecionados };
+
+    _fecharFiltroColunaDropdown();
+    filtrarEmpregados();
 }
 
 function mudarPaginaEmpregados(pag) {
