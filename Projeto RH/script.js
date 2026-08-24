@@ -2468,17 +2468,20 @@ async function salvarAssociacoesJornadaEmpregados() {
     const selects = Array.from(document.querySelectorAll('.jornada-assoc-select'));
     if (selects.length === 0) { mostrarMensagem('Aviso', 'Não há empregados para associar.'); return; }
 
-    const rows = selects.map(sel => ({
-        codigo_empresa: codigoEmpresa,
-        codigo_empregado: sel.dataset.codigoEmpregado,
-        jornada_id: sel.value || null,
-    }));
-
+    // UPDATE, nunca upsert: estes empregados já existem (a lista vem de um SELECT
+    // na própria rh_empregados). Um upsert com payload parcial nula as colunas
+    // NOT NULL ausentes (ex: nome_empregado) porque o ON CONFLICT DO UPDATE do
+    // PostgREST usa EXCLUDED para TODAS as colunas da tabela, não só as enviadas.
     try {
-        const { error } = await supabaseClient
-            .from('rh_empregados')
-            .upsert(rows, { onConflict: 'codigo_empresa,codigo_empregado' });
-        if (error) throw error;
+        const resultados = await Promise.all(selects.map(sel =>
+            supabaseClient
+                .from('rh_empregados')
+                .update({ jornada_id: sel.value || null })
+                .eq('codigo_empresa', codigoEmpresa)
+                .eq('codigo_empregado', sel.dataset.codigoEmpregado)
+        ));
+        const erro = resultados.find(r => r.error)?.error;
+        if (erro) throw erro;
         await _carregarEmpregadosConfigAssociacao(codigoEmpresa);
         _renderizarAssociacaoEmpregadosConfig();
         mostrarMensagem('Sucesso', '✅ Associações salvas com sucesso!');
