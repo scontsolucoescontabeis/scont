@@ -3946,14 +3946,46 @@ function _periodosFeriasNoMesTexto(periodos, competencia, diaInicio = null, diaF
         .join('; ');
 }
 
-// Conta só os dias de falta/atestado integral sobre uma Folha de Ponto já salva
+// Datas (DD/MM/AAAA) de falta/atestado integral sobre uma Folha de Ponto já salva
 // (mesmo critério de desconto usado em _construirConteudoTXTExportacao). "Dias a
 // Trabalhar" NÃO vem daqui — é sempre a estimativa de dias úteis (5x2), já que o
 // DSR salvo na folha marca só folgas específicas, não o padrão semanal, e não é
 // um indicador confiável de fim de semana/dia útil.
-function _calcularDiasDescontarFolhaSalva(save) {
+function _datasDescontarFolhaSalva(save) {
     const flagsFolga = JSON.parse(save.flags_folga || '{}');
-    return Object.values(flagsFolga).filter(flag => flag === 'falta' || flag === 'atestado').length;
+    return Object.entries(flagsFolga).filter(([, flag]) => flag === 'falta' || flag === 'atestado').map(([data]) => data);
+}
+
+// Jornada Padrão da empresa (config em rh_config_rubricas_txt, mesma origem lida
+// pela tela Configurações), no formato esperado por beneficios-va-calculo.js.
+function _jornadaPadraoDeConfig(cfg) {
+    return {
+        jornadaDiaria: cfg?.['jornada_diaria']?.cod || '08:00',
+        jornadaSextaAtiva: cfg?.['jornada_sexta_ativa']?.cod === '1',
+        jornadaSexta: cfg?.['jornada_sexta']?.cod || '04:00',
+        jornadaSabadoAtiva: cfg?.['jornada_sabado_ativa']?.cod === '1',
+        jornadaSabado: cfg?.['jornada_sabado']?.cod || '04:00',
+        sabadoSempreExtra: cfg?.['sabado_sempre_extra']?.cod === '1',
+    };
+}
+
+// Jornada nomeada (rh_jornadas), no mesmo formato.
+function _jornadaDeRow(row) {
+    return {
+        jornadaDiaria: row.jornada_diaria || '08:00',
+        jornadaSextaAtiva: !!row.jornada_sexta_ativa,
+        jornadaSexta: row.jornada_sexta || '04:00',
+        jornadaSabadoAtiva: !!row.jornada_sabado_ativa,
+        jornadaSabado: row.jornada_sabado || '04:00',
+        sabadoSempreExtra: !!row.sabado_sempre_extra,
+    };
+}
+
+// Divide "Dias a Trabalhar" (base do VT) do "Dias a Pagar" de VT/VA: VA desconta
+// também os dias de jornada <= 4h (diasReduzidosVA), VT nunca é afetado por isso.
+function _diasPagarBeneficio(linha, tipo) {
+    const base = tipo === 'va' ? Math.max(0, linha.diasTrabalhar - (linha.diasReduzidosVA || 0)) : linha.diasTrabalhar;
+    return Math.max(0, base - linha.diasDescontar);
 }
 
 async function gerarPreviaBeneficios() {
@@ -3972,14 +4004,16 @@ async function gerarPreviaBeneficios() {
             { data: savesData, error: errSaves },
             { data: escalasData, error: errEsc },
             { data: excecoesData, error: errExc },
+            { data: jornadasData, error: errJorn },
         ] = await Promise.all([
             supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, cnpj').in('codigo_empresa', codigosEmpresas),
-            supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, situacao, tipo_empregado').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, situacao, tipo_empregado, jornada_id').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_valores_va_vt').select('codigo_empresa, codigo_empregado, valor_vt, valor_va').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_ferias_calculadas').select('codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_saves').select('*').in('empresa_codigo', codigosEmpresas).eq('competencia', comp).order('data_criacao', { ascending: false }),
             supabaseClient.from('rh_escala_trabalho').select('*').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_escala_excecoes').select('codigo_empresa, codigo_empregado, data').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_jornadas').select('id, codigo_empresa, jornada_diaria, jornada_sexta_ativa, jornada_sexta, jornada_sabado_ativa, jornada_sabado, sabado_sempre_extra').in('codigo_empresa', codigosEmpresas),
         ]);
         if (errEmp) throw errEmp;
         if (errFunc) throw errFunc;
@@ -3988,6 +4022,7 @@ async function gerarPreviaBeneficios() {
         if (errSaves) throw errSaves;
         if (errEsc) throw errEsc;
         if (errExc) throw errExc;
+        if (errJorn) throw errJorn;
 
         const empresasMapa = {};
         (empresasData || []).forEach(e => { empresasMapa[e.codigo_empresa] = e; });
@@ -4019,6 +4054,9 @@ async function gerarPreviaBeneficios() {
             (excecoesMapa[chave] ??= []).push(e.data);
         });
 
+        const jornadasMapa = {};
+        (jornadasData || []).forEach(j => { jornadasMapa[j.id] = _jornadaDeRow(j); });
+
         // Config por empresa: se deve excluir feriados nacionais do cálculo de "Dias a Trabalhar"
         // (a escala em si não considera feriados — ver [[project_rh_escala_trabalho]]), e se a
         // empresa apura "Dias a Trabalhar" sobre um período customizado (fora do mês calendário).
@@ -4028,6 +4066,7 @@ async function gerarPreviaBeneficios() {
         const compMesSeguinte = _competenciaMesSeguinte(comp);
         const excluirFeriadosPorEmpresa = {};
         const periodoBeneficiosPorEmpresa = {};
+        const jornadaPadraoPorEmpresa = {};
         const observacoesPorEmpresa = [];
         const periodosCustomPorEmpresa = [];
         await Promise.all(codigosEmpresas.map(async cod => {
@@ -4035,6 +4074,7 @@ async function gerarPreviaBeneficios() {
             excluirFeriadosPorEmpresa[cod] = cfg?.['beneficios_excluir_feriados']?.cod !== '0'; // default: excluir (true)
             const periodo = _resolverPeriodoBeneficios(cfg);
             periodoBeneficiosPorEmpresa[cod] = periodo;
+            jornadaPadraoPorEmpresa[cod] = _jornadaPadraoDeConfig(cfg);
             const observacao = (cfg?.['observacoes']?.cod || '').trim();
             if (observacao) observacoesPorEmpresa.push({ codigo_empresa: cod, observacao });
             if (periodo.diaInicio !== null && periodo.diaFim !== null) {
@@ -4053,6 +4093,7 @@ async function gerarPreviaBeneficios() {
             document.getElementById('beneficiosPreviaContainer').style.display = 'none';
             _renderizarObservacoesBeneficios([]);
             _renderizarPeriodosBeneficios([]);
+            _renderizarAlertaJornadaReduzidaBeneficios([]);
             return;
         }
 
@@ -4066,10 +4107,14 @@ async function gerarPreviaBeneficios() {
             const periodoAtivo = diaInicio !== null && diaFim !== null;
             const compParaDias = periodoAtivo ? compMesSeguinte : comp;
             const resumoEscala = calcularResumoMes(escala, compParaDias, periodos, diaInicio, diaFim, excecoesFolga);
-            const diasTrabalhar = resumoEscala.dias.filter(d =>
+            const diasTrabalhoConsiderados = resumoEscala.dias.filter(d =>
                 d.tipo === 'trabalho' && !(excluirFeriados && _isFeriadoNoDia(d.data))
-            ).length;
-            const diasDescontar = save ? _calcularDiasDescontarFolhaSalva(save) : 0;
+            );
+            const diasTrabalhar = diasTrabalhoConsiderados.length;
+            const datasDescontar = save ? _datasDescontarFolhaSalva(save) : [];
+            const diasDescontar = datasDescontar.length;
+            const jornadaEmpregado = jornadasMapa[emp.jornada_id] || jornadaPadraoPorEmpresa[emp.codigo_empresa];
+            const reducaoVA = calcularDiasReduzidosVA(diasTrabalhoConsiderados, jornadaEmpregado, datasDescontar);
             const valores = valoresMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || { vt: 0, va: 0 };
             const empresa = empresasMapa[emp.codigo_empresa] || { nome_empresa: emp.codigo_empresa, cnpj: '' };
             return {
@@ -4082,6 +4127,8 @@ async function gerarPreviaBeneficios() {
                 feriasTexto: _periodosFeriasNoMesTexto(periodos, compParaDias, diaInicio, diaFim),
                 diasTrabalhar,
                 diasDescontar,
+                diasReduzidosVA: reducaoVA.total,
+                diasReduzidosVADatas: reducaoVA.dias,
                 vtDiario: valores.vt,
                 vaDiario: valores.va,
                 selecionado: true,
@@ -4093,6 +4140,15 @@ async function gerarPreviaBeneficios() {
         observacoesPorEmpresa.forEach(o => { o.nome_empresa = (empresasMapa[o.codigo_empresa] || {}).nome_empresa || o.codigo_empresa; });
         observacoesPorEmpresa.sort((a, b) => a.nome_empresa.localeCompare(b.nome_empresa));
 
+        const alertaJornadaReduzida = linhas
+            .filter(l => l.diasReduzidosVA > 0)
+            .map(l => ({
+                codigo_empresa: l.codigo_empresa, nome_empresa: l.nome_empresa,
+                nome_empregado: l.nome_empregado, codigo_empregado: l.codigo_empregado,
+                diasReduzidosVA: l.diasReduzidosVA, diasReduzidosVADatas: l.diasReduzidosVADatas,
+            }))
+            .sort((a, b) => (a.nome_empresa + a.nome_empregado).localeCompare(b.nome_empresa + b.nome_empregado));
+
         periodosCustomPorEmpresa.forEach(p => { p.nome_empresa = (empresasMapa[p.codigo_empresa] || {}).nome_empresa || p.codigo_empresa; });
         periodosCustomPorEmpresa.sort((a, b) => a.nome_empresa.localeCompare(b.nome_empresa));
 
@@ -4101,6 +4157,7 @@ async function gerarPreviaBeneficios() {
         _renderizarPreviaBeneficios(linhas);
         _renderizarObservacoesBeneficios(observacoesPorEmpresa);
         _renderizarPeriodosBeneficios(periodosCustomPorEmpresa);
+        _renderizarAlertaJornadaReduzidaBeneficios(alertaJornadaReduzida);
     } catch (erro) {
         console.error('Erro ao gerar prévia de benefícios:', erro);
         fecharModalMensagem();
@@ -4113,7 +4170,12 @@ function _renderizarPreviaBeneficios(linhas) {
     const container = document.getElementById('beneficiosPreviaContainer');
 
     tbody.innerHTML = linhas.map((l, i) => {
-        const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
+        const diasPagarVt = _diasPagarBeneficio(l, 'vt');
+        const diasPagarVa = _diasPagarBeneficio(l, 'va');
+        const temReducaoVA = (l.diasReduzidosVA || 0) > 0;
+        const tituloReducao = temReducaoVA
+            ? `${l.diasReduzidosVA} dia(s) com jornada ≤ 4h, sem direito a VA: ${(l.diasReduzidosVADatas || []).join(', ')}`
+            : '';
         return `
         <tr data-idx="${i}">
             <td style="padding:6px 8px; text-align:center;"><input type="checkbox" class="ben-selecionado" ${l.selecionado !== false ? 'checked' : ''} onchange="_toggleLinhaBeneficios(${i}, this.checked)"></td>
@@ -4123,11 +4185,12 @@ function _renderizarPreviaBeneficios(linhas) {
             <td style="padding:6px 8px; text-align:center; white-space:normal;">${l.feriasTexto ? `🏖️ ${l.feriasTexto}` : ''}</td>
             <td style="padding:6px 8px; text-align:center;"><input type="number" min="0" class="ben-dias-trabalhar" value="${l.diasTrabalhar}" style="width:60px;" oninput="_recalcularLinhaBeneficios(${i})"></td>
             <td style="padding:6px 8px; text-align:center;"><input type="number" min="0" class="ben-dias-descontar" value="${l.diasDescontar}" style="width:60px;" oninput="_recalcularLinhaBeneficios(${i})"></td>
-            <td style="padding:6px 8px; text-align:center;" class="ben-dias-pagar">${diasPagar}</td>
+            <td style="padding:6px 8px; text-align:center;" class="ben-dias-pagar-vt">${diasPagarVt}</td>
+            <td style="padding:6px 8px; text-align:center;" class="ben-dias-pagar-va">${diasPagarVa}${temReducaoVA ? ` <span title="${tituloReducao}" style="cursor:help;">⚠️</span>` : ''}</td>
             <td style="padding:6px 8px; text-align:center;">${l.vtDiario ? l.vtDiario.toFixed(2).replace('.', ',') : ''}</td>
             <td style="padding:6px 8px; text-align:center;">${l.vaDiario ? l.vaDiario.toFixed(2).replace('.', ',') : ''}</td>
-            <td style="padding:6px 8px; text-align:center;" class="ben-vt-mensal">${(diasPagar * l.vtDiario).toFixed(2).replace('.', ',')}</td>
-            <td style="padding:6px 8px; text-align:center;" class="ben-va-mensal">${(diasPagar * l.vaDiario).toFixed(2).replace('.', ',')}</td>
+            <td style="padding:6px 8px; text-align:center;" class="ben-vt-mensal">${(diasPagarVt * l.vtDiario).toFixed(2).replace('.', ',')}</td>
+            <td style="padding:6px 8px; text-align:center;" class="ben-va-mensal">${(diasPagarVa * l.vaDiario).toFixed(2).replace('.', ',')}</td>
         </tr>`;
     }).join('');
     container.style.display = 'block';
@@ -4174,6 +4237,32 @@ function _renderizarPeriodosBeneficios(periodosPorEmpresa) {
     div.style.display = 'block';
 }
 
+// Alerta de dias com jornada <= 4h (sem direito a VA nesse dia específico, VT
+// não é afetado). itens: [{codigo_empresa, nome_empresa, codigo_empregado,
+// nome_empregado, diasReduzidosVA, diasReduzidosVADatas}, ...].
+function _renderizarAlertaJornadaReduzidaBeneficios(itens) {
+    const div = document.getElementById('beneficiosAlertaJornadaContainer');
+    if (!div) return;
+    if (!itens || itens.length === 0) {
+        div.style.display = 'none';
+        div.innerHTML = '';
+        return;
+    }
+    div.innerHTML = `
+        <div style="display:flex; gap:10px; align-items:flex-start; background:#fef3c7; border:1px solid #fde68a; color:#92400e; border-radius:8px; padding:12px 16px; margin-bottom:8px;">
+            <span style="font-size:16px; line-height:1;">⚠️</span>
+            <div>
+                <div style="font-size:13px; font-weight:700; margin-bottom:4px;">
+                    ${itens.length} empregado(s) com dia(s) de jornada ≤ 4h no período — Vale Alimentação ajustado automaticamente nesses dias (Vale Transporte não é afetado).
+                </div>
+                <ul style="margin:0; padding-left:18px; font-size:12px; line-height:1.6;">
+                    ${itens.map(it => `<li>${it.codigo_empresa} - ${it.nome_empresa} · ${it.codigo_empregado} - ${it.nome_empregado}: ${it.diasReduzidosVA} dia(s) (${(it.diasReduzidosVADatas || []).join(', ')})</li>`).join('')}
+                </ul>
+            </div>
+        </div>`;
+    div.style.display = 'block';
+}
+
 function _atualizarInfoBeneficios() {
     const info = document.getElementById('beneficiosPreviaInfo');
     const checkTodos = document.getElementById('beneficiosSelecionarTodos');
@@ -4202,12 +4291,19 @@ function _recalcularLinhaBeneficios(idx) {
     if (!tr || !linha) return;
     const diasTrabalhar = parseInt(tr.querySelector('.ben-dias-trabalhar').value, 10) || 0;
     const diasDescontar = parseInt(tr.querySelector('.ben-dias-descontar').value, 10) || 0;
-    const diasPagar = Math.max(0, diasTrabalhar - diasDescontar);
     linha.diasTrabalhar = diasTrabalhar;
     linha.diasDescontar = diasDescontar;
-    tr.querySelector('.ben-dias-pagar').textContent = diasPagar;
-    tr.querySelector('.ben-vt-mensal').textContent = (diasPagar * linha.vtDiario).toFixed(2).replace('.', ',');
-    tr.querySelector('.ben-va-mensal').textContent = (diasPagar * linha.vaDiario).toFixed(2).replace('.', ',');
+    const diasPagarVt = _diasPagarBeneficio(linha, 'vt');
+    const diasPagarVa = _diasPagarBeneficio(linha, 'va');
+    tr.querySelector('.ben-dias-pagar-vt').textContent = diasPagarVt;
+    const celVa = tr.querySelector('.ben-dias-pagar-va');
+    const temReducaoVA = (linha.diasReduzidosVA || 0) > 0;
+    const tituloReducao = temReducaoVA
+        ? `${linha.diasReduzidosVA} dia(s) com jornada ≤ 4h, sem direito a VA: ${(linha.diasReduzidosVADatas || []).join(', ')}`
+        : '';
+    celVa.innerHTML = `${diasPagarVa}${temReducaoVA ? ` <span title="${tituloReducao}" style="cursor:help;">⚠️</span>` : ''}`;
+    tr.querySelector('.ben-vt-mensal').textContent = (diasPagarVt * linha.vtDiario).toFixed(2).replace('.', ',');
+    tr.querySelector('.ben-va-mensal').textContent = (diasPagarVa * linha.vaDiario).toFixed(2).replace('.', ',');
 }
 
 function exportarBeneficiosExcel() {
@@ -4215,29 +4311,32 @@ function exportarBeneficiosExcel() {
     const linhas = state._beneficiosLinhas.filter(l => l.selecionado !== false);
     if (linhas.length === 0) { mostrarMensagem('Aviso', 'Selecione ao menos um empregado antes de exportar.'); return; }
 
-    const cabecalho = ['Cód Emp', 'NOME', 'CNPJ', 'Cód Epr', 'Nome', 'Descrição cargo', 'DIAS', 'DESCONTAR', 'DIAS A PAGAR', 'VT DIARIO', 'VA DIARIO', 'VT MENSAL', 'VA MENSAL'];
+    // "DIAS A PAGAR" virou duas colunas (VT/VA) porque dias com jornada <= 4h
+    // (ver beneficios-va-calculo.js) não geram VA, mas continuam contando para VT.
+    const cabecalho = ['Cód Emp', 'NOME', 'CNPJ', 'Cód Epr', 'Nome', 'Descrição cargo', 'DIAS', 'DESCONTAR', 'DIAS A PAGAR (VT)', 'DIAS A PAGAR (VA)', 'VT DIARIO', 'VA DIARIO', 'VT MENSAL', 'VA MENSAL'];
     // VT/VA (diário e mensal) saem como texto com 2 casas decimais (não número),
     // conforme exigido para importação em outros sistemas.
     const linhasExcel = linhas.map(l => {
-        const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
+        const diasPagarVt = _diasPagarBeneficio(l, 'vt');
+        const diasPagarVa = _diasPagarBeneficio(l, 'va');
         const vtDiario = l.vtDiario || 0;
         const vaDiario = l.vaDiario || 0;
         return [
             l.codigo_empresa, l.nome_empresa, l.cnpj, l.codigo_empregado, l.nome_empregado, l.desc_cargo,
-            l.diasTrabalhar, l.diasDescontar, diasPagar,
+            l.diasTrabalhar, l.diasDescontar, diasPagarVt, diasPagarVa,
             l.vtDiario ? vtDiario.toFixed(2).replace('.', ',') : '',
             l.vaDiario ? vaDiario.toFixed(2).replace('.', ',') : '',
-            (diasPagar * vtDiario).toFixed(2).replace('.', ','),
-            (diasPagar * vaDiario).toFixed(2).replace('.', ',')
+            (diasPagarVt * vtDiario).toFixed(2).replace('.', ','),
+            (diasPagarVa * vaDiario).toFixed(2).replace('.', ',')
         ];
     });
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([cabecalho, ...linhasExcel]);
-    ws['!cols'] = [10, 28, 20, 10, 28, 22, 8, 10, 12, 10, 10, 12, 12].map(w => ({ wch: w }));
-    // Garante que VT/VA (colunas 9 a 12: diário e mensal) fiquem como texto no
+    ws['!cols'] = [10, 28, 20, 10, 28, 22, 8, 10, 12, 12, 10, 10, 12, 12].map(w => ({ wch: w }));
+    // Garante que VT/VA (colunas 10 a 13: diário e mensal) fiquem como texto no
     // arquivo, mesmo que o Excel tente reinterpretar o conteúdo como número.
-    const COLS_VALOR_TEXTO = [9, 10, 11, 12];
+    const COLS_VALOR_TEXTO = [10, 11, 12, 13];
     for (let r = 1; r < linhasExcel.length + 1; r++) {
         COLS_VALOR_TEXTO.forEach(c => {
             const addr = XLSX.utils.encode_cell({ r, c });
@@ -4405,7 +4504,7 @@ function _reciboViaHTML(d) {
 }
 
 function _reciboSheetHTML(tipo, linha, periodoTexto) {
-    const diasPagar = Math.max(0, linha.diasTrabalhar - linha.diasDescontar);
+    const diasPagar = _diasPagarBeneficio(linha, tipo);
     const cfg = tipo === 'va'
         ? { tituloBeneficio: 'Vale Alimentação', pluralDesc: 'vales alimentação', diarioValor: linha.vaDiario, mensalValor: diasPagar * linha.vaDiario, comFooter: false }
         : { tituloBeneficio: 'Vale Transporte', pluralDesc: 'vales transporte', diarioValor: linha.vtDiario, mensalValor: diasPagar * linha.vtDiario, comFooter: true };
@@ -4529,7 +4628,7 @@ async function _gerarPdfsRecibosBeneficios(linhas, comp) {
     porEmpresa.forEach((grupo, codigoEmpresa) => {
         [['va', 'Vale Alimentação'], ['vt', 'Vale Transporte']].forEach(([tipo, label]) => {
             const elegiveis = grupo.linhas.filter(l => {
-                const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
+                const diasPagar = _diasPagarBeneficio(l, tipo);
                 const diario = tipo === 'va' ? l.vaDiario : l.vtDiario;
                 return diasPagar * (diario || 0) > 0;
             });
@@ -4626,27 +4725,28 @@ function _relatorioLiquidoBeneficiosPDF(grupo, comp, periodoTexto, mesFmt, ano) 
 
     let totalVt = 0, totalVa = 0, totalGeral = 0;
     const body = grupo.linhas.map(l => {
-        const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
-        const vtMensal = diasPagar * (l.vtDiario || 0);
-        const vaMensal = diasPagar * (l.vaDiario || 0);
+        const diasPagarVt = _diasPagarBeneficio(l, 'vt');
+        const diasPagarVa = _diasPagarBeneficio(l, 'va');
+        const vtMensal = diasPagarVt * (l.vtDiario || 0);
+        const vaMensal = diasPagarVa * (l.vaDiario || 0);
         totalVt += vtMensal; totalVa += vaMensal; totalGeral += vtMensal + vaMensal;
         return [
             l.codigo_empregado, l.nome_empregado, l.desc_cargo,
-            l.diasTrabalhar, l.diasDescontar, diasPagar,
+            l.diasTrabalhar, l.diasDescontar, diasPagarVt, diasPagarVa,
             l.vtDiario ? _fmtMoedaRecibo(l.vtDiario) : '',
             l.vaDiario ? _fmtMoedaRecibo(l.vaDiario) : '',
             _fmtMoedaRecibo(vtMensal), _fmtMoedaRecibo(vaMensal), _fmtMoedaRecibo(vtMensal + vaMensal),
         ];
     });
     body.push([
-        { content: 'Total Geral:', colSpan: 8, styles: { fontStyle: 'bold', halign: 'right' } },
+        { content: 'Total Geral:', colSpan: 9, styles: { fontStyle: 'bold', halign: 'right' } },
         { content: _fmtMoedaRecibo(totalVt), styles: { fontStyle: 'bold' } },
         { content: _fmtMoedaRecibo(totalVa), styles: { fontStyle: 'bold' } },
         { content: _fmtMoedaRecibo(totalGeral), styles: { fontStyle: 'bold' } },
     ]);
 
     doc.autoTable({
-        head: [['Código', 'Empregado', 'Cargo', 'Dias Trab.', 'Descontar', 'A Pagar', 'VT Diário', 'VA Diário', 'VT Mensal', 'VA Mensal', 'Total']],
+        head: [['Código', 'Empregado', 'Cargo', 'Dias Trab.', 'Descontar', 'A Pagar VT', 'A Pagar VA', 'VT Diário', 'VA Diário', 'VT Mensal', 'VA Mensal', 'Total']],
         body,
         startY: MARGEM + alturaBarra + 4,
         margin: { left: MARGEM, right: MARGEM },
@@ -4693,9 +4793,8 @@ async function _registrarAjudaCustoITCGerado(comp) {
 
 function _calcularItensAjudaCustoITC(linhasITC) {
     return linhasITC.map(l => {
-        const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
-        const vtMensal = diasPagar * (l.vtDiario || 0);
-        const vaMensal = diasPagar * (l.vaDiario || 0);
+        const vtMensal = _diasPagarBeneficio(l, 'vt') * (l.vtDiario || 0);
+        const vaMensal = _diasPagarBeneficio(l, 'va') * (l.vaDiario || 0);
         const soma = vtMensal + vaMensal;
         return {
             codigo_empregado: l.codigo_empregado,
@@ -4911,9 +5010,8 @@ function _construirTxtLancamentoVaVt() {
     linhas.forEach(l => {
         const rub = rubricasPorEmpresa[l.codigo_empresa];
         if (!rub) return;
-        const diasPagar = Math.max(0, l.diasTrabalhar - l.diasDescontar);
-        const vtMensal = diasPagar * (l.vtDiario || 0);
-        const vaMensal = diasPagar * (l.vaDiario || 0);
+        const vtMensal = _diasPagarBeneficio(l, 'vt') * (l.vtDiario || 0);
+        const vaMensal = _diasPagarBeneficio(l, 'va') * (l.vaDiario || 0);
         conteudo += _montarLinhaTxt(l.codigo_empregado, compFmt, l.codigo_empresa, rub.vt, '11', Math.round(vtMensal * 100));
         conteudo += _montarLinhaTxt(l.codigo_empregado, compFmt, l.codigo_empresa, rub.va, '11', Math.round(vaMensal * 100));
     });

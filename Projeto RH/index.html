@@ -281,7 +281,9 @@
                     diários configurados e dos dias a trabalhar/descontar (sempre editáveis). "Dias a Trabalhar" vem da
                     escala configurada em "Gerar Escala" (dias úteis 5x2 se não houver escala), descontando férias e,
                     opcionalmente, feriados nacionais (configurável por empresa). "Dias a Descontar" vem das faltas/atestados
-                    lançados na Folha de Ponto da competência.
+                    lançados na Folha de Ponto da competência. Dias em que a Jornada de Trabalho (Configurações) está
+                    configurada para até 4 horas não geram direito a Vale Alimentação naquele dia específico — o Vale
+                    Transporte não é afetado por isso.
                 </p>
             </div>
 
@@ -313,6 +315,7 @@
             </div>
 
             <div id="beneficiosPreviaContainer" style="display:none;">
+                <div id="beneficiosAlertaJornadaContainer" style="display:none;"></div>
                 <div id="beneficiosPeriodosContainer" style="display:none;"></div>
                 <div id="beneficiosObservacoesContainer" style="display:none;"></div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
@@ -335,7 +338,8 @@
                                 <th style="padding:8px; text-align:center;">Férias</th>
                                 <th style="padding:8px; text-align:center;">Dias a Trabalhar</th>
                                 <th style="padding:8px; text-align:center;">Dias a Descontar</th>
-                                <th style="padding:8px; text-align:center;">Dias a Pagar</th>
+                                <th style="padding:8px; text-align:center;">Dias a Pagar (VT)</th>
+                                <th style="padding:8px; text-align:center;">Dias a Pagar (VA)</th>
                                 <th style="padding:8px; text-align:center;">VT Diário</th>
                                 <th style="padding:8px; text-align:center;">VA Diário</th>
                                 <th style="padding:8px; text-align:center;">VT Mensal</th>
@@ -1509,6 +1513,7 @@
 
     <script src="escala-calculo.js"></script>
     <script src="folha-ponto-calculo.js"></script>
+    <script src="beneficios-va-calculo.js"></script>
     <script src="envio-email-frequencia.js"></script>
     <script src="script.js"></script>
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
