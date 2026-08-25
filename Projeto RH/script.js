@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     inicializarEventos();
     state.terceiroTurno = localStorage.getItem('rh_terceiro_turno') === 'true';
     document.getElementById('terceiroTurno').checked = state.terceiroTurno;
+    _carregarPendentesConfigNovos();
 });
 
 window.toggleJornadaSexta = function(ativa) {
@@ -3310,9 +3311,10 @@ async function _carregarTabelaValoresVaVt(codigoEmpresa) {
 
         tabela.innerHTML = empregados.map(emp => {
             const v = mapaValores[emp.codigo_empregado] || {};
+            const destaque = _pendentesConfigNovos.some(p => p.codigo_empresa === codigoEmpresa && p.codigo_empregado === emp.codigo_empregado);
             return `
-                <div style="padding: 8px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; align-items: center;">
-                    <span style="font-size: 13px;">${emp.codigo_empregado} - ${emp.nome_empregado}</span>
+                <div style="padding: 8px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; align-items: center; ${destaque ? 'background:#EAF7EE;' : ''}">
+                    <span style="font-size: 13px;">${emp.codigo_empregado} - ${emp.nome_empregado}${destaque ? ' <span style="font-size:11px; font-weight:700; color:#1E8449; background:white; padding:2px 8px; border-radius:10px;">🆕 novo</span>' : ''}</span>
                     <input type="number" step="0.01" min="0" data-codigo-empregado="${emp.codigo_empregado}" class="vv-input-vt" value="${v.valor_vt ?? ''}" placeholder="0,00" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;">
                     <input type="number" step="0.01" min="0" data-codigo-empregado="${emp.codigo_empregado}" class="vv-input-va" value="${v.valor_va ?? ''}" placeholder="0,00" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;">
                 </div>
@@ -5202,6 +5204,114 @@ function _atualizarResumoEmpresasSelecionadasEscala() {
     info.textContent = `${marcados.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
 }
 
+// ===== EMPREGADOS NOVOS PENDENTES DE CONFIGURAÇÃO (ESCALA/VT-VA) =====
+// Hand-off vindo da importação de Empregados na Administração (admin.js
+// grava em rh_pendentes_config_novos via localStorage). Aqui só lemos,
+// podamos e oferecemos atalhos pra Escala e Valores VT/VA.
+
+const _PENDENTES_CONFIG_NOVOS_KEY = 'rh_pendentes_config_novos';
+let _pendentesConfigNovos = [];
+
+async function _carregarPendentesConfigNovos() {
+    let lista = [];
+    try { lista = JSON.parse(localStorage.getItem(_PENDENTES_CONFIG_NOVOS_KEY) || '[]'); } catch (_) { lista = []; }
+    if (!Array.isArray(lista)) lista = [];
+
+    if (lista.length > 0) {
+        const LIMITE_DIAS = 30;
+        const agora = Date.now();
+        lista = lista.filter(p => {
+            const t = Date.parse(p.criado_em);
+            return isNaN(t) || (agora - t) <= LIMITE_DIAS * 86400000;
+        });
+    }
+
+    if (lista.length === 0) {
+        localStorage.removeItem(_PENDENTES_CONFIG_NOVOS_KEY);
+        _pendentesConfigNovos = [];
+        _atualizarBannerPendentesConfigNovos();
+        return;
+    }
+
+    try {
+        const empresas = [...new Set(lista.map(p => p.codigo_empresa))];
+        const [{ data: escalas, error: errEsc }, { data: valores, error: errVal }] = await Promise.all([
+            supabaseClient.from('rh_escala_trabalho').select('codigo_empresa, codigo_empregado').in('codigo_empresa', empresas),
+            supabaseClient.from('rh_valores_va_vt').select('codigo_empresa, codigo_empregado').in('codigo_empresa', empresas),
+        ]);
+        if (errEsc) throw errEsc;
+        if (errVal) throw errVal;
+
+        const escalaSet = new Set((escalas || []).map(e => `${e.codigo_empresa}|${e.codigo_empregado}`));
+        const valorSet  = new Set((valores  || []).map(v => `${v.codigo_empresa}|${v.codigo_empregado}`));
+        lista = lista.filter(p => {
+            const chave = `${p.codigo_empresa}|${p.codigo_empregado}`;
+            return !(escalaSet.has(chave) && valorSet.has(chave));
+        });
+    } catch (erro) {
+        console.error('Falha ao verificar pendências de configuração de empregados novos:', erro);
+    }
+
+    if (lista.length === 0) {
+        localStorage.removeItem(_PENDENTES_CONFIG_NOVOS_KEY);
+    } else {
+        localStorage.setItem(_PENDENTES_CONFIG_NOVOS_KEY, JSON.stringify(lista));
+    }
+    _pendentesConfigNovos = lista;
+    _atualizarBannerPendentesConfigNovos();
+}
+
+function _atualizarBannerPendentesConfigNovos() {
+    const banner = document.getElementById('pendentesConfigNovosBanner');
+    const texto  = document.getElementById('pendentesConfigNovosTexto');
+    if (!banner || !texto) return;
+    if (_pendentesConfigNovos.length === 0) { banner.style.display = 'none'; return; }
+
+    const empresas = [...new Set(_pendentesConfigNovos.map(p => p.codigo_empresa))];
+    const nomesEmpresas = empresas.map(cod => state.empresas.find(e => e.codigo_empresa === cod)?.nome_empresa || cod);
+    texto.textContent = `🆕 ${_pendentesConfigNovos.length} empregado(s) novo(s) aguardando configuração de escala e VT/VA (${nomesEmpresas.join(', ')}).`;
+    banner.style.display = 'flex';
+}
+
+function _dispensarPendentesConfigNovos() {
+    localStorage.removeItem(_PENDENTES_CONFIG_NOVOS_KEY);
+    _pendentesConfigNovos = [];
+    _atualizarBannerPendentesConfigNovos();
+}
+
+function _competenciaAtual() {
+    const d = new Date();
+    return String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
+}
+
+function _irConfigurarEscalaPendentes() {
+    if (_pendentesConfigNovos.length === 0) return;
+    const empresas = [...new Set(_pendentesConfigNovos.map(p => p.codigo_empresa))];
+    state._escalaDestaqueNovos = new Set(_pendentesConfigNovos.map(p => `${p.codigo_empresa}|${p.codigo_empregado}`));
+
+    mostrarTela('escalaScreen');
+    empresas.forEach(cod => {
+        const cb = document.querySelector(`.escala-emp-check[value="${cod}"]`);
+        if (cb) cb.checked = true;
+    });
+    _atualizarResumoEmpresasSelecionadasEscala();
+    const comp = document.getElementById('escalaCompetencia');
+    if (comp) comp.value = _competenciaAtual();
+    gerarEscala();
+}
+
+function _irConfigurarValoresVaVtPendentes() {
+    if (_pendentesConfigNovos.length === 0) return;
+    const empresas = [...new Set(_pendentesConfigNovos.map(p => p.codigo_empresa))];
+    abrirModalValoresVaVt();
+    const primeira = state.empresas.find(e => e.codigo_empresa === empresas[0]);
+    if (primeira) selecionarEmpresaValoresVaVt(primeira.codigo_empresa, primeira.nome_empresa);
+    if (empresas.length > 1) {
+        setTimeout(() => mostrarMensagem('Várias empresas pendentes',
+            `Há empregados novos em ${empresas.length} empresas. Configure uma de cada vez — depois de salvar esta, use "Configurar Valores VT/VA" de novo pra ir pra próxima.`), 300);
+    }
+}
+
 // ===== GERAR FOLHAS DE PONTO =====
 
 function _iniciarTelaFolhaPonto() {
@@ -5791,6 +5901,12 @@ async function gerarEscala() {
 
         linhas.sort((a, b) => (a.nome_empresa + a.nome_empregado).localeCompare(b.nome_empresa + b.nome_empregado));
 
+        if (state._escalaDestaqueNovos && state._escalaDestaqueNovos.size) {
+            linhas.forEach(l => {
+                if (state._escalaDestaqueNovos.has(`${l.codigo_empresa}|${l.codigo_empregado}`)) l.expandido = true;
+            });
+        }
+
         fecharModalMensagem();
         state._escalaLinhas = linhas;
         state._escalaCompetencia = comp;
@@ -5816,11 +5932,16 @@ function _renderizarListaEscala() {
     const info = document.getElementById('escalaResultadoInfo');
     info.textContent = `${linhas.length} empregado(s)`;
 
-    container.innerHTML = linhas.map((l, i) => `
-        <div class="escala-linha" data-idx="${i}" style="border:1px solid var(--border-color); border-radius:8px; margin-bottom:10px; overflow:hidden;">
+    const destaqueSet = state._escalaDestaqueNovos;
+
+    container.innerHTML = linhas.map((l, i) => {
+        const destaque = destaqueSet && destaqueSet.has(`${l.codigo_empresa}|${l.codigo_empregado}`);
+        return `
+        <div class="escala-linha" data-idx="${i}" style="border:1px solid ${destaque ? '#27AE60' : 'var(--border-color)'}; border-radius:8px; margin-bottom:10px; overflow:hidden;">
             <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; flex-wrap:wrap; gap:8px; cursor:pointer;" onclick="_toggleExpandirEscala(${i})">
                 <div>
                     <strong>${l.codigo_empregado} - ${l.nome_empregado}</strong>
+                    ${destaque ? '<span style="margin-left:8px; font-size:11px; font-weight:700; color:#1E8449; background:#EAF7EE; padding:2px 8px; border-radius:10px;">🆕 novo</span>' : ''}
                     <div style="font-size:12px; color:var(--text-secondary);">${l.codigo_empresa} - ${l.nome_empresa}</div>
                     ${l.feriasTexto ? `<div style="font-size:12px; color:#2C7BE5; margin-top:2px;">🏖️ Férias: ${l.feriasTexto}</div>` : ''}
                 </div>
@@ -5835,7 +5956,8 @@ function _renderizarListaEscala() {
                 ${l.expandido ? _renderizarDetalheEscala(l, i) : ''}
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 
     document.getElementById('escalaResultadoContainer').style.display = 'block';
 }

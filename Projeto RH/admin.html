@@ -655,6 +655,7 @@
                                 </div>
                             </div>
                         </div>
+                        <div id="resumoImportarEmpregados" style="font-size:11px;color:#7F8C8D;"></div>
                         <div id="ultimaImportacaoEmpregados" style="font-size:11px;color:#7F8C8D;display:none;">📅 Última importação: <span></span></div>
                     </div>
 
@@ -984,6 +985,22 @@
             <button id="modalBtnCancelar" style="padding:10px 16px;border:1px solid #CCC;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;background:white;color:#555;">
                 Cancelar
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Comparação com a listagem atual (Empregados) -->
+<div id="modalComparacaoEmpregados" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:99998;align-items:center;justify-content:center;">
+    <div style="background:white;border-radius:14px;padding:28px;max-width:640px;width:94%;max-height:82vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.25);">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+            <span style="font-size:28px;">🔍</span>
+            <h3 style="color:#2C3E50;font-size:17px;margin:0;">Comparação com a listagem atual</h3>
+        </div>
+        <p style="color:#555;font-size:13px;margin-bottom:16px;">O arquivo importado tem diferenças em relação ao que já está cadastrado. Revise antes de continuar.</p>
+        <div id="comparacaoEmpregadosConteudo"></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+            <button type="button" id="comparacaoBtnCancelar" style="padding:10px 16px;border:1px solid #CCC;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;background:white;color:#555;">Cancelar</button>
+            <button type="button" id="comparacaoBtnContinuar" style="padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;background:linear-gradient(135deg,#27AE60,#1E8449);color:white;">Continuar →</button>
         </div>
     </div>
 </div>

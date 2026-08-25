@@ -97,6 +97,16 @@
         </div>
     </div>
 
+    <!-- BANNER DE EMPREGADOS NOVOS PENDENTES DE CONFIGURAÇÃO (vindo da importação na Administração) -->
+    <div id="pendentesConfigNovosBanner" style="display:none; background:#EAF7EE; border:1px solid #A9DFBF; color:#1E8449; border-radius:8px; padding:12px 16px; margin:0 20px 16px; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <span id="pendentesConfigNovosTexto" style="font-size:13px; font-weight:600;"></span>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary btn-small" onclick="_irConfigurarEscalaPendentes()">📅 Configurar Escala</button>
+            <button type="button" class="btn btn-primary btn-small" onclick="_irConfigurarValoresVaVtPendentes()">💰 Configurar Valores VT/VA</button>
+            <button type="button" class="btn btn-danger btn-small" onclick="_dispensarPendentesConfigNovos()">✖ Dispensar</button>
+        </div>
+    </div>
+
     <!-- CONTAINER PRINCIPAL -->
     <div class="container">
 

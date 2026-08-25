@@ -3154,6 +3154,8 @@ function handleImportarEmpregados(event) {
 
 async function importarEmpregadosIndividual(file) {
     const ENT = 'Empregados';
+    const resumoEl = document.getElementById('resumoImportarEmpregados');
+    if (resumoEl) resumoEl.innerHTML = '';
     try {
         setStatusImport(ENT, 'Lendo arquivo...', 'info');
         setProgresso(ENT, 10);
@@ -3161,10 +3163,6 @@ async function importarEmpregadosIndividual(file) {
         const raw = await lerPlanilhaEmpregados(file);
 
         if (!raw.length) throw new Error('Arquivo vazio ou sem dados reconhecíveis.');
-
-        // Mostra o modal com total bruto do arquivo
-        const modo = await confirmarModoImportacao('Empregados', raw.length);
-        if (!modo) { setStatusImport(ENT, '', ''); setProgresso(ENT, null); return; }
 
         setProgresso(ENT, 20);
         setStatusImport(ENT, 'Processando linhas...', 'info');
@@ -3190,6 +3188,18 @@ async function importarEmpregadosIndividual(file) {
 
         if (!rows.length) throw new Error(`Nenhuma linha válida encontrada (${raw.length} linhas lidas). Verifique se o arquivo segue o modelo — as 3 primeiras colunas devem ser Cód. Empresa, Cód. Empregado e Nome.`);
 
+        setStatusImport(ENT, 'Comparando com a listagem atual...', 'info');
+        const comparacao = await _compararListagemEmpregados(rows);
+        const totalDivergencias = comparacao.novos.length + comparacao.situacaoAlterada.length + comparacao.sumidos.length;
+        if (totalDivergencias > 0) {
+            const prosseguir = await _mostrarModalComparacaoEmpregados(comparacao);
+            if (!prosseguir) { setStatusImport(ENT, '', ''); setProgresso(ENT, null); return; }
+        }
+
+        // Mostra o modal com total bruto do arquivo
+        const modo = await confirmarModoImportacao('Empregados', raw.length);
+        if (!modo) { setStatusImport(ENT, '', ''); setProgresso(ENT, null); return; }
+
         setProgresso(ENT, 40);
         setStatusImport(ENT, `Salvando ${rows.length} empregado(s)...`, 'info');
 
@@ -3212,12 +3222,159 @@ async function importarEmpregadosIndividual(file) {
         setStatusImport(ENT, `✅ ${rows.length} empregado(s) importado(s) com sucesso!`, 'success');
         _salvarTimestampImportacao('Empregados');
         carregarEmpregados();
+
+        if (comparacao.novos.length > 0) _salvarPendentesConfigNovos(comparacao.novos);
+        _renderizarResumoImportacaoEmpregados(comparacao);
     } catch (err) {
         setProgresso(ENT, null);
         setStatusImport(ENT, '❌ ' + err.message, 'error');
     } finally {
         limparInput('fileEmpregados');
     }
+}
+
+// ── COMPARAÇÃO COM A LISTAGEM ATUAL (EMPREGADOS) ─────────────────
+// Compara a listagem importada com o que já está em rh_empregados para as
+// mesmas empresas, para destacar empregados novos, mudança de situação e
+// empregados que sumiram do arquivo (sem presumir o motivo).
+
+async function _compararListagemEmpregados(rows) {
+    const dedup = new Map();
+    rows.forEach(r => dedup.set(`${r.codigo_empresa}|${r.codigo_empregado}`, r));
+    const linhas = [...dedup.values()];
+
+    const empresasEnvolvidas = [...new Set(linhas.map(r => r.codigo_empresa))];
+    const { data: atuais, error } = await supabaseClient
+        .from('rh_empregados')
+        .select('codigo_empresa, codigo_empregado, nome_empregado, situacao')
+        .in('codigo_empresa', empresasEnvolvidas);
+    if (error) throw error;
+
+    const atualMap = new Map();
+    (atuais || []).forEach(e => atualMap.set(`${e.codigo_empresa}|${e.codigo_empregado}`, e));
+
+    const novoKeys = new Set();
+    const novos = [];
+    const situacaoAlterada = [];
+    linhas.forEach(r => {
+        const chave = `${r.codigo_empresa}|${r.codigo_empregado}`;
+        novoKeys.add(chave);
+        const atual = atualMap.get(chave);
+        if (!atual) {
+            novos.push({ codigo_empresa: r.codigo_empresa, codigo_empregado: r.codigo_empregado, nome_empregado: r.nome_empregado });
+        } else {
+            const situacaoAntiga = (atual.situacao || '').trim();
+            const situacaoNova = (r.situacao || '').trim();
+            if (situacaoAntiga !== situacaoNova) {
+                situacaoAlterada.push({
+                    codigo_empresa: r.codigo_empresa,
+                    codigo_empregado: r.codigo_empregado,
+                    nome_empregado: r.nome_empregado,
+                    situacaoAntiga: situacaoAntiga || '(vazio)',
+                    situacaoNova: situacaoNova || '(vazio)',
+                });
+            }
+        }
+    });
+
+    const sumidos = [];
+    atualMap.forEach((e, chave) => {
+        if (!novoKeys.has(chave)) {
+            sumidos.push({
+                codigo_empresa: e.codigo_empresa,
+                codigo_empregado: e.codigo_empregado,
+                nome_empregado: e.nome_empregado,
+                situacaoAtual: (e.situacao || '').trim() || '(vazio)',
+            });
+        }
+    });
+
+    return { novos, situacaoAlterada, sumidos, empresasEnvolvidas };
+}
+
+function _linhaComparacaoEmpregados(item, extraHtml) {
+    return `
+        <div style="padding:6px 10px;border-bottom:1px solid #f2f2f2;font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+            <span><strong>${item.codigo_empregado}</strong> - ${item.nome_empregado} <span style="color:#999;">(${item.codigo_empresa})</span></span>
+            ${extraHtml || ''}
+        </div>`;
+}
+
+function _secaoComparacaoEmpregados(titulo, cor, itens, montarExtra) {
+    if (!itens.length) return '';
+    return `
+        <details open style="margin-bottom:12px;">
+            <summary style="cursor:pointer;font-weight:700;color:${cor};font-size:13px;">${titulo} (${itens.length})</summary>
+            <div style="max-height:220px;overflow-y:auto;margin-top:8px;border:1px solid #eee;border-radius:6px;">
+                ${itens.map(item => _linhaComparacaoEmpregados(item, montarExtra ? montarExtra(item) : '')).join('')}
+            </div>
+        </details>`;
+}
+
+function _mostrarModalComparacaoEmpregados(comparacao) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('modalComparacaoEmpregados');
+        const conteudo = document.getElementById('comparacaoEmpregadosConteudo');
+        conteudo.innerHTML = [
+            _secaoComparacaoEmpregados('🆕 Novos', '#1E8449', comparacao.novos),
+            _secaoComparacaoEmpregados('🔄 Situação alterada', '#B8860B', comparacao.situacaoAlterada,
+                item => `<span style="color:#B8860B;white-space:nowrap;">${item.situacaoAntiga} → ${item.situacaoNova}</span>`),
+            _secaoComparacaoEmpregados('⚠️ Sumiram da lista', '#C0392B', comparacao.sumidos,
+                item => `<span style="color:#999;white-space:nowrap;">situação atual: ${item.situacaoAtual}</span>`),
+        ].join('');
+
+        const fechar = resultado => { modal.style.display = 'none'; resolve(resultado); };
+        document.getElementById('comparacaoBtnCancelar').onclick  = () => fechar(false);
+        document.getElementById('comparacaoBtnContinuar').onclick = () => fechar(true);
+        modal.style.display = 'flex';
+    });
+}
+
+// ── PENDÊNCIA DE CONFIGURAÇÃO (ESCALA/VT-VA) PARA EMPREGADOS NOVOS ──
+// Hand-off pro Controle de Frequência (index.html), que tem as telas de
+// Escala e Valores VT/VA. Mesmo padrão de localStorage já usado pra
+// timestamps de importação — sem tabela nova.
+
+const _PENDENTES_CONFIG_NOVOS_KEY = 'rh_pendentes_config_novos';
+
+function _salvarPendentesConfigNovos(novos) {
+    let atuais = [];
+    try { atuais = JSON.parse(localStorage.getItem(_PENDENTES_CONFIG_NOVOS_KEY) || '[]'); } catch (_) { atuais = []; }
+    if (!Array.isArray(atuais)) atuais = [];
+
+    const chaves = new Set(atuais.map(p => `${p.codigo_empresa}|${p.codigo_empregado}`));
+    const agora = new Date().toISOString();
+    novos.forEach(n => {
+        const chave = `${n.codigo_empresa}|${n.codigo_empregado}`;
+        if (!chaves.has(chave)) {
+            atuais.push({ codigo_empresa: n.codigo_empresa, codigo_empregado: n.codigo_empregado, nome_empregado: n.nome_empregado, criado_em: agora });
+            chaves.add(chave);
+        }
+    });
+    localStorage.setItem(_PENDENTES_CONFIG_NOVOS_KEY, JSON.stringify(atuais));
+}
+
+function _renderizarResumoImportacaoEmpregados(comparacao) {
+    const container = document.getElementById('resumoImportarEmpregados');
+    if (!container) return;
+
+    let html = '';
+    if (comparacao.novos.length > 0) {
+        html += `
+            <div style="margin-top:8px;padding:10px 12px;background:#EAF7EE;border-left:3px solid #27AE60;border-radius:4px;">
+                🆕 <strong>${comparacao.novos.length} empregado(s) novo(s)</strong> precisam de configuração de escala e valores de VT/VA.
+                <div style="margin-top:6px;">
+                    <a href="index.html" style="display:inline-block;padding:6px 12px;background:#27AE60;color:white;border-radius:6px;text-decoration:none;font-weight:600;font-size:12px;">Configurar agora →</a>
+                </div>
+            </div>`;
+    }
+    if (comparacao.situacaoAlterada.length > 0 || comparacao.sumidos.length > 0) {
+        const partes = [];
+        if (comparacao.situacaoAlterada.length) partes.push(`🔄 ${comparacao.situacaoAlterada.length} com situação alterada`);
+        if (comparacao.sumidos.length) partes.push(`⚠️ ${comparacao.sumidos.length} sumiram da lista`);
+        html += `<div style="margin-top:8px;">${partes.join(' · ')}</div>`;
+    }
+    container.innerHTML = html;
 }
 
 // ── RUBRICAS ──────────────────────────────────────────────────
