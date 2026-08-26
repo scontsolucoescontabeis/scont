@@ -91,7 +91,9 @@ function registrarFaltaDatas(key, valor) {
 }
 
 function parseDataBR(str) {
-    const m = String(str || '').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    // Dia/mês aceitam 1 ou 2 dígitos (ex: "5/7/2026" == "05/07/2026") — mesma
+    // tolerância que parseDias já tinha para contar a quantidade de faltas.
+    const m = String(str || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (!m) return null;
     const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
     return isNaN(d.getTime()) ? null : d;
@@ -1293,8 +1295,8 @@ function confirmarTipoProcesso() {
         if (isColunaFalta(l.coluna)) {
             const _datas = (faltaDatasMap[`${l.codEmpregado}::${normalizarNome(l.coluna)}`] || '').split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
             _datas.forEach(d => {
-                const _m = d.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-                if (_m) _empData[l.codEmpregado].rubricas.push(`11${_m[3]}${_m[2]}${_m[1]}1`);
+                const _d = parseDataBR(d);
+                if (_d) _empData[l.codEmpregado].rubricas.push(`11${formatarDataBR(_d).split('/').reverse().join('')}1`);
             });
         }
     });
