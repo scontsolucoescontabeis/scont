@@ -5903,7 +5903,10 @@ async function gerarEscala() {
 
         if (state._escalaDestaqueNovos && state._escalaDestaqueNovos.size) {
             linhas.forEach(l => {
-                if (state._escalaDestaqueNovos.has(`${l.codigo_empresa}|${l.codigo_empregado}`)) l.expandido = true;
+                if (state._escalaDestaqueNovos.has(`${l.codigo_empresa}|${l.codigo_empregado}`)) {
+                    l.expandido = true;
+                    _inicializarFormEscala(l, false);
+                }
             });
         }
 
