@@ -685,6 +685,23 @@ function renderizarRelatorio(linhas) {
     const tbody = document.getElementById('bodyRelatorio');
     tbody.innerHTML = '';
 
+    // Colunas cuja rubrica não foi reconhecida (sem match exato/fuzzy em
+    // fechamento_rubricas_config) não geram linha no TXT mesmo que a
+    // quantidade apareça certa no quadro de Totais — sinaliza pra não passar
+    // despercebido (ver fix do texto de "Faltas DSR (Dias)" no formulário).
+    const elAlertaRubrica = document.getElementById('alertaRubricaNaoReconhecida');
+    if (elAlertaRubrica) {
+        const colunasNaoReconhecidas = [...new Set(
+            linhas.filter(l => !l.codigoRubrica && !rubricasIgnoradas.has(normalizarNome(l.coluna))).map(l => l.coluna)
+        )];
+        if (colunasNaoReconhecidas.length) {
+            elAlertaRubrica.textContent = `⚠️ Rubrica não reconhecida para: ${colunasNaoReconhecidas.join(', ')}. Essas colunas não entram no TXT (confira o texto em Configurações · Rubricas).`;
+            elAlertaRubrica.style.display = 'block';
+        } else {
+            elAlertaRubrica.style.display = 'none';
+        }
+    }
+
     linhas.forEach((l, i) => {
         const semFuncionario = !l.codEmpregado;
         const semRubrica     = !l.codigoRubrica;
@@ -2035,7 +2052,7 @@ async function processarDadosFormulario(envioRow) {
         comissao:  'COMISSOES',
         premio:    'PREMIO',
         vt:        'VALE TRANSPORTE',
-        faltas:    'DIAS FALTAS',
+        faltas:    'Faltas (Dias)', // precisa bater com o "Coluna Planilha" cadastrado em Configurações · Rubricas (453: "Faltas (Dias)")
         faltasdsr: 'Faltas DSR (Dias)', // precisa bater com o "Coluna Planilha" cadastrado em Configurações · Rubricas (453: "Faltas DSR (Dias)")
         atrasos:   'HORAS FALTAS',
         descaut:   'DESCONTOS AUTORIZADOS',
