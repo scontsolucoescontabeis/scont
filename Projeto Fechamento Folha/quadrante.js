@@ -2036,7 +2036,7 @@ async function processarDadosFormulario(envioRow) {
         premio:    'PREMIO',
         vt:        'VALE TRANSPORTE',
         faltas:    'DIAS FALTAS',
-        faltasdsr: 'DIAS FALTAS DSR',
+        faltasdsr: 'Faltas DSR (Dias)', // precisa bater com o "Coluna Planilha" cadastrado em Configurações · Rubricas (453: "Faltas DSR (Dias)")
         atrasos:   'HORAS FALTAS',
         descaut:   'DESCONTOS AUTORIZADOS',
         plano:     'DESCONTO PLANO DE SAUDE',
