@@ -3244,11 +3244,26 @@ async function _compararListagemEmpregados(rows) {
     const linhas = [...dedup.values()];
 
     const empresasEnvolvidas = [...new Set(linhas.map(r => r.codigo_empresa))];
-    const { data: atuais, error } = await supabaseClient
-        .from('rh_empregados')
-        .select('codigo_empresa, codigo_empregado, nome_empregado, situacao')
-        .in('codigo_empresa', empresasEnvolvidas);
-    if (error) throw error;
+    // Busca paginada para superar o limite de 1000 linhas do Supabase (mesmo
+    // motivo de carregarEmpregados/_buscarTodasLinhasJornada) — sem isso,
+    // empresas com mais de 1000 empregados tinham o excedente tratado como
+    // "novo" no diff, por não aparecer em atualMap.
+    let atuais = [];
+    {
+        const PAGE = 1000;
+        let from = 0;
+        while (true) {
+            const { data, error } = await supabaseClient
+                .from('rh_empregados')
+                .select('codigo_empresa, codigo_empregado, nome_empregado, situacao')
+                .in('codigo_empresa', empresasEnvolvidas)
+                .range(from, from + PAGE - 1);
+            if (error) throw error;
+            atuais = atuais.concat(data || []);
+            if (!data || data.length < PAGE) break;
+            from += PAGE;
+        }
+    }
 
     const atualMap = new Map();
     (atuais || []).forEach(e => atualMap.set(`${e.codigo_empresa}|${e.codigo_empregado}`, e));
