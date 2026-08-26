@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Validação de Fechamento de Folha – SCONT</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="extrato-parser.js"></script>
+<script src="extrato-comparador.js"></script>
+</head>
+<body>
+<div class="container">
+    <header class="app-header">
+        <h1>Validação de Fechamento de Folha</h1>
+        <p>Suba o PDF "Extrato Mensal" com a competência atual e a anterior para comparar automaticamente.</p>
+    </header>
+
+    <section class="card" id="cardUpload">
+        <label class="upload-area" id="uploadArea">
+            <input type="file" id="inputArquivo" accept="application/pdf">
+            <div class="icone">📄</div>
+            <div>Clique ou arraste aqui o PDF do Extrato Mensal</div>
+            <div class="nome-arquivo" id="nomeArquivo"></div>
+        </label>
+
+        <div class="form-row">
+            <label for="inputLimiar">Destacar variações acima de</label>
+            <input type="number" id="inputLimiar" value="15" min="0" step="1">
+            <label for="inputLimiar">%</label>
+        </div>
+
+        <div class="form-row">
+            <button class="btn" id="btnProcessar" disabled>Processar</button>
+        </div>
+
+        <div class="spinner" id="spinner"><span class="anel"></span> Processando PDF…</div>
+        <div class="mensagem-erro" id="mensagemErro"></div>
+    </section>
+
+    <section class="resultado" id="resultado">
+        <div class="resumo-competencias" id="resumoCompetencias"></div>
+
+        <div class="cards-totais" id="cardsTotais"></div>
+
+        <div class="card">
+            <div class="secao-titulo">
+                Mudanças de quadro
+                <span class="contagem" id="contagemQuadro">0</span>
+            </div>
+            <div class="tabela-scroll" id="tabelaQuadro"></div>
+        </div>
+
+        <div class="card">
+            <div class="secao-titulo">
+                Variação de totais por empregado
+                <span class="contagem" id="contagemVariacao">0</span>
+            </div>
+            <div class="tabela-scroll" id="tabelaVariacao"></div>
+        </div>
+
+        <footer class="rodape-acoes">
+            <button class="btn secundario" id="btnNovaValidacao">Nova validação</button>
+        </footer>
+    </section>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
