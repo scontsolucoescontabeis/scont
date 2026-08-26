@@ -2075,13 +2075,30 @@ async function processarDadosFormulario(envioRow) {
 
         // Campos do formulário
         colunasRubrica.forEach(({ campo, header, resolucao }) => {
-            const bruto = emp[campo];
-            if (bruto === '' || bruto == null) return;
+            const bruto  = emp[campo];
+            const dsrCol = isColunaFaltaDsr(header);
+
+            if (bruto === '' || bruto == null) {
+                if (dsrCol) {
+                    // DSR nunca é digitado no formulário: mesmo com o campo vazio, a
+                    // linha precisa existir para o cálculo automático a partir da
+                    // Falta normal (mesma regra de construirRelatorio, fluxo planilha).
+                    const colFaltaNormal   = colunasRubrica.find(c => isColunaFalta(c.header) && !isColunaFaltaDsr(c.header));
+                    const brutoFaltaNormal = colFaltaNormal ? emp[colFaltaNormal.campo] : '';
+                    if (brutoFaltaNormal === '' || brutoFaltaNormal == null) return;
+                } else {
+                    return;
+                }
+            }
 
             const tipoValor = resolucao.tipo_valor;
             const valorCota = resolucao.valor_cota;
             let valorInt;
-            if (tipoValor === 'booleano') {
+            if (dsrCol) {
+                // Idem: nunca vem pronto do campo — é sempre calculado a partir das
+                // datas de Faltas normais (ver dsrBloqueado/obterDomingosDsr).
+                valorInt = 0;
+            } else if (tipoValor === 'booleano') {
                 valorInt = String(bruto).trim().toLowerCase() === 'sim' && valorCota
                     ? Math.round(parseFloat(valorCota) * 100)
                     : 0;
