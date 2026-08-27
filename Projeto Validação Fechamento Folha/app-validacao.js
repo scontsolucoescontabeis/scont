@@ -311,16 +311,16 @@ function renderizarMatriz() {
     const linhas = matriz.linhas.map(linha => `
         <tr>
             <td class="col-empregado">${escaparHTML(linha.matricula)} — ${escaparHTML(linha.nome)}</td>
-            ${linha.valores.map((v, i) => {
-                if (v === null) return '<td class="valor">—</td>';
-                const tipoClasse = matriz.colunas[i].tipo === 'P' ? 'tipo-provento' : 'tipo-desconto';
-                const partes = [];
-                if (state.mostrarQuantidade) partes.push(`<span class="celula-referencia">${escaparHTML(v.referencia)}</span>`);
-                if (state.mostrarValor) partes.push(`<span class="celula-valor ${tipoClasse}">${formatarBRL(v.valor)}</span>`);
-                return `<td class="valor"><div class="celula-matriz">${partes.join('')}</div></td>`;
-            }).join('')}
+            ${linha.valores.map((v, i) => construirCelulaMatriz(v, matriz.colunas[i].tipo)).join('')}
         </tr>
     `).join('');
+
+    const linhaTotais = `
+        <tr class="linha-totais">
+            <td class="col-empregado">Total</td>
+            ${matriz.totais.map((t, i) => construirCelulaMatriz(t, matriz.colunas[i].tipo)).join('')}
+        </tr>
+    `;
 
     els.tabelaMatriz.innerHTML = `
         <table class="tabela-dados tabela-matriz">
@@ -329,8 +329,19 @@ function renderizarMatriz() {
                 <tr>${cabecalhoRubricas}</tr>
             </thead>
             <tbody>${linhas}</tbody>
+            <tfoot>${linhaTotais}</tfoot>
         </table>
     `;
+}
+
+function construirCelulaMatriz(v, tipo) {
+    if (v === null) return '<td class="valor">—</td>';
+    const tipoClasse = tipo === 'P' ? 'tipo-provento' : 'tipo-desconto';
+    const partes = [];
+    if (state.mostrarQuantidade) partes.push(`<span class="celula-referencia">${escaparHTML(v.referencia)}</span>`);
+    if (state.mostrarValor) partes.push(`<span class="celula-valor ${tipoClasse}">${formatarBRL(v.valor)}</span>`);
+    const modo = partes.length === 2 ? 'dupla' : 'unica';
+    return `<td class="valor"><div class="celula-matriz ${modo}">${partes.join('')}</div></td>`;
 }
 
 function hexToRgb(hex) {
@@ -358,17 +369,20 @@ function gerarPDF() {
     }
     const competencia = state.competenciaAtual;
 
+    const textoCelulaPDF = (v) => {
+        if (v === null) return '—';
+        const partes = [];
+        if (state.mostrarQuantidade) partes.push(v.referencia);
+        if (state.mostrarValor) partes.push(formatarBRL(v.valor));
+        return partes.join('\n') || '—';
+    };
+
     const head = [['Empregado', ...matriz.colunas.map(c => c.descricao)]];
     const body = matriz.linhas.map(linha => [
         `${linha.matricula} — ${linha.nome}`,
-        ...linha.valores.map(v => {
-            if (v === null) return '—';
-            const partes = [];
-            if (state.mostrarQuantidade) partes.push(v.referencia);
-            if (state.mostrarValor) partes.push(formatarBRL(v.valor));
-            return partes.join('\n') || '—';
-        })
+        ...linha.valores.map(textoCelulaPDF)
     ]);
+    const foot = [['Total', ...matriz.totais.map(textoCelulaPDF)]];
 
     const MM_PER_COL = 16;
     const COL_EMPREGADO_MM = 55;
@@ -406,11 +420,12 @@ function gerarPDF() {
     const startY = MARGEM + barH + 4;
 
     doc.autoTable({
-        head, body, startY,
+        head, body, foot, startY,
         margin: { left: MARGEM, right: MARGEM },
         tableWidth: pageW - MARGEM * 2,
         styles: { fontSize: 6.5, cellPadding: 1.8, valign: 'middle', overflow: 'linebreak' },
         headStyles: { fillColor: [rgb.r, rgb.g, rgb.b], textColor: 255, fontStyle: 'bold', fontSize: 6.5 },
+        footStyles: { fillColor: [240, 240, 240], textColor: [40, 40, 40], fontStyle: 'bold', fontSize: 6.5, halign: 'right' },
         alternateRowStyles: { fillColor: [249, 250, 251] },
         columnStyles: { 0: { cellWidth: COL_EMPREGADO_MM, halign: 'left' } },
         bodyStyles: { halign: 'right' }

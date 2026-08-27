@@ -128,7 +128,15 @@ function construirMatriz(empregados, rubricasSelecionadasCodigos, empregadosSele
             };
         });
 
-    return { colunas, linhas, nProventos: colunasProvento.length };
+    const totais = colunas.map((col, i) => {
+        const preenchidas = linhas.map(l => l.valores[i]).filter(v => v !== null);
+        if (preenchidas.length === 0) return null;
+        const valor = Math.round(preenchidas.reduce((acc, v) => acc + v.valor, 0) * 100) / 100;
+        const referencia = _somarReferencias(preenchidas.map(v => v.referencia));
+        return { referencia, valor };
+    });
+
+    return { colunas, linhas, nProventos: colunasProvento.length, totais };
 }
 
 if (typeof module !== 'undefined' && module.exports) {

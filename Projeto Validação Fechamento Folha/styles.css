@@ -531,13 +531,25 @@ select {
     align-items: flex-end;
     gap: 1px;
 }
-.celula-referencia {
-    font-size: 11px;
-    color: var(--muted);
-}
-.celula-valor {
-    font-size: 13px;
-    font-weight: 600;
-}
+.celula-referencia { color: var(--muted); }
+.celula-valor { font-weight: 600; }
 .celula-valor.tipo-provento { color: var(--success); }
 .celula-valor.tipo-desconto { color: var(--danger); }
+
+/* quando os dois campos aparecem, dividem a célula no mesmo tamanho;
+   quando só um aparece, ele ocupa a célula inteira com fonte maior */
+.celula-matriz.dupla .celula-referencia,
+.celula-matriz.dupla .celula-valor {
+    font-size: 12px;
+}
+.celula-matriz.unica .celula-referencia,
+.celula-matriz.unica .celula-valor {
+    font-size: 15px;
+}
+
+.tabela-matriz tfoot .linha-totais td {
+    border-top: 2px solid var(--border);
+    font-weight: 700;
+    background: var(--bg-light);
+}
+.tabela-matriz tfoot .linha-totais td.col-empregado { background: var(--bg-light); }

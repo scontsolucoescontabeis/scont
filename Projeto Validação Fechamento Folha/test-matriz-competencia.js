@@ -134,4 +134,42 @@ teste('construirMatriz: marcar uma rubrica nova sempre a acrescenta ao final do 
     assert.deepStrictEqual(matriz.colunas.map(c => c.codigo), ['998', '981']);
 });
 
+teste('construirMatriz calcula o total por coluna somando valor e respeitando o tipo da referência (dias/decimal)', () => {
+    const empregados = [
+        empFixture({ matricula: '1', rubricas: [{ codigo: '8781', descricao: 'DIAS NORMAIS', referencia: '31,00', valor: 1000, tipo: 'P' }] }),
+        empFixture({ matricula: '2', rubricas: [{ codigo: '8781', descricao: 'DIAS NORMAIS', referencia: '15,00', valor: 500, tipo: 'P' }] })
+    ];
+    const matriz = construirMatriz(empregados, new Set(['8781']), new Set(['Empr:1', 'Empr:2']));
+    assert.deepStrictEqual(matriz.totais[0], { referencia: '46,00', valor: 1500 });
+});
+
+teste('construirMatriz calcula o total por coluna respeitando referência em formato hora (hh:mm)', () => {
+    const empregados = [
+        empFixture({ matricula: '1', rubricas: [{ codigo: '147', descricao: 'HORAS EXTRAS 65%', referencia: '10:30', valor: 300, tipo: 'P' }] }),
+        empFixture({ matricula: '2', rubricas: [{ codigo: '147', descricao: 'HORAS EXTRAS 65%', referencia: '2:45', valor: 80, tipo: 'P' }] })
+    ];
+    const matriz = construirMatriz(empregados, new Set(['147']), new Set(['Empr:1', 'Empr:2']));
+    assert.deepStrictEqual(matriz.totais[0], { referencia: '13:15', valor: 380 });
+});
+
+teste('construirMatriz ignora célula vazia (null) ao somar o total da coluna e não conta empregado não selecionado', () => {
+    const empregados = [
+        empFixture({ matricula: '1', rubricas: [{ codigo: '981', descricao: 'DESC.ADIANT.SALARIAL', referencia: '100,00', valor: 100, tipo: 'D' }] }),
+        empFixture({ matricula: '2', rubricas: [] }),
+        empFixture({ matricula: '3', rubricas: [{ codigo: '981', descricao: 'DESC.ADIANT.SALARIAL', referencia: '900,00', valor: 900, tipo: 'D' }] })
+    ];
+    // empregado 3 fora da seleção — não deve entrar no total
+    const matriz = construirMatriz(empregados, new Set(['981']), new Set(['Empr:1', 'Empr:2']));
+    assert.deepStrictEqual(matriz.totais[0], { referencia: '100,00', valor: 100 });
+});
+
+teste('construirMatriz devolve total null para coluna em que nenhum empregado selecionado tem a rubrica', () => {
+    const empregados = [
+        empFixture({ matricula: '1', rubricas: [] }),
+        empFixture({ matricula: '2', rubricas: [{ codigo: '981', descricao: 'DESC.ADIANT.SALARIAL', referencia: '100,00', valor: 100, tipo: 'D' }] })
+    ];
+    const matriz = construirMatriz(empregados, new Set(['981']), new Set(['Empr:1']));
+    assert.strictEqual(matriz.totais[0], null);
+});
+
 console.log(`\n${testesExecutados} teste(s) passaram.`);
