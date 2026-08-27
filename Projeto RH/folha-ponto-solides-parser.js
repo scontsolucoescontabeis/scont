@@ -4,7 +4,7 @@
  * como <script> global no navegador e via require() em Node (para os testes).
  */
 
-function _linhasDaPagina(items) {
+function _agruparLinhas(items) {
     const validos = (items || []).filter(it => it && it.str && it.str.trim().length > 0);
     if (validos.length === 0) return [];
 
@@ -17,14 +17,21 @@ function _linhasDaPagina(items) {
     for (const it of ordenadosPorY) {
         const y = it.transform[5];
         if (grupoAtual === null || Math.abs(y - anchorY) > LIMIAR_Y) {
-            grupoAtual = [];
+            grupoAtual = { y, itens: [] };
             grupos.push(grupoAtual);
             anchorY = y;
         }
-        grupoAtual.push({ str: it.str.trim(), x: it.transform[4] });
+        grupoAtual.itens.push({ str: it.str.trim(), x: it.transform[4] });
     }
 
-    return grupos.map(g => g.slice().sort((a, b) => a.x - b.x).map(i => i.str).join(' '));
+    return grupos.map(g => ({
+        y: g.y,
+        str: g.itens.slice().sort((a, b) => a.x - b.x).map(i => i.str).join(' ')
+    }));
+}
+
+function _linhasDaPagina(items) {
+    return _agruparLinhas(items).map(l => l.str);
 }
 
 function _pareceSolides(textoCompleto) {
@@ -153,6 +160,78 @@ function _extrairDiasPontos(textoPagina, ano) {
     });
 }
 
+const _RE_ANCHOR_DIA = /^(\d{2})\/(\d{2})\s+(segunda-feira|ter[çc]a-feira|quarta-feira|quinta-feira|sexta-feira|s[áa]bado|domingo)/i;
+
+/**
+ * Um fragmento de pontos é uma linha do grid que contém só marcação de ponto
+ * (horários, "|", "(m)", "-") ou um status conhecido — nunca cabeçalho ou rodapé.
+ */
+function _pareceFragmentoPonto(str) {
+    const s = (str || '').trim();
+    if (!s) return false;
+    if (/\d{1,2}:\d{2}/.test(s)) return true;      // contém horário
+    if (/^[|\-\s()m]+$/i.test(s)) return true;     // só separadores / "(m)"
+    if (_extrairStatus(s)) return true;            // status conhecido (ATESTADO, FALTA, ...)
+    return false;
+}
+
+/**
+ * Extrai os dias a partir das linhas POSICIONADAS ({ y, str }).
+ *
+ * Quando um dia tem 3 períodos, o Sólides quebra a célula PONTOS em duas linhas
+ * físicas e o PDF.js as reporta em Y ~±3,5 da linha do dia. A reconstrução por
+ * Y do _agruparLinhas separa isso em 3 linhas distintas: a 1ª "flutua" acima da
+ * âncora do dia (grudando no dia anterior) e a linha da âncora fica só com as
+ * colunas de resumo. Aqui religamos cada fragmento de ponto à âncora de dia
+ * verticalmente mais próxima, remontando os 3 períodos.
+ */
+function _extrairDiasPontosPosicional(linhas, ano) {
+    const anchors = [];
+    (linhas || []).forEach((l, i) => {
+        const m = l.str.match(_RE_ANCHOR_DIA);
+        if (m) anchors.push({ i, y: l.y, dia: m[1], mes: m[2], prefixoLen: m[0].length });
+    });
+    if (!anchors.length) return [];
+
+    // Região do grid de dias: do 1º dia até a linha "Total:" (rodapé)
+    let fimRegiao = linhas.length;
+    for (let i = anchors[0].i + 1; i < linhas.length; i++) {
+        if (linhas[i].str.includes('Total:')) { fimRegiao = i; break; }
+    }
+
+    const ehAncora = new Set(anchors.map(a => a.i));
+    const fragmentosPorDia = anchors.map(() => []);
+
+    for (let i = anchors[0].i; i < fimRegiao; i++) {
+        if (ehAncora.has(i)) continue;
+        const l = linhas[i];
+        if (!_pareceFragmentoPonto(l.str)) continue;
+        let melhor = 0, menorDist = Infinity;
+        anchors.forEach((a, ai) => {
+            const d = Math.abs(a.y - l.y);
+            if (d < menorDist) { menorDist = d; melhor = ai; }
+        });
+        fragmentosPorDia[melhor].push(l.str);
+    }
+
+    return anchors.map((a, ai) => {
+        const resto = linhas[a.i].str.slice(a.prefixoLen);
+        const temPeriodoNaAncora = resto.includes('|');
+        let corpo;
+        if (temPeriodoNaAncora || fragmentosPorDia[ai].length === 0) {
+            // dia normal (uma linha só) — idêntico ao comportamento anterior
+            corpo = resto;
+        } else {
+            // dia com pontos quebrados em linhas separadas: remonta os pontos ANTES do resumo
+            corpo = fragmentosPorDia[ai].join(' ') + ' ' + resto;
+        }
+        const idxTotal = corpo.indexOf('Total:');
+        if (idxTotal !== -1) corpo = corpo.substring(0, idxTotal);
+        const dados = _parsearCorpoDia(corpo);
+        return Object.assign({ data: `${a.dia}/${a.mes}/${ano}` }, dados);
+    });
+}
+
 const _DIAS_SEMANA_ABREV = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
 function _gerarDiasDoMes(competencia) {
@@ -211,11 +290,12 @@ function _melhorMatchEmpregado(nomeExtraido, empregados) {
 }
 
 function _parsearPaginaColaborador(items, anoFallback) {
-    const texto = _linhasDaPagina(items).join('\n');
+    const linhas = _agruparLinhas(items);
+    const texto = linhas.map(l => l.str).join('\n');
     const cabecalho = _extrairCabecalhoColaborador(texto);
     const competencia = _extrairCompetencia(texto);
     const ano = competencia ? competencia.split('/')[1] : String(anoFallback || new Date().getFullYear());
-    const diasExtraidos = _extrairDiasPontos(texto, ano);
+    const diasExtraidos = _extrairDiasPontosPosicional(linhas, ano);
     const diasBase = competencia ? _gerarDiasDoMes(competencia) : [];
     const dias = diasBase.length ? _mesclarDias(diasBase, diasExtraidos) : diasExtraidos;
     return Object.assign({ competencia, dias }, cabecalho);
@@ -223,13 +303,16 @@ function _parsearPaginaColaborador(items, anoFallback) {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        _agruparLinhas,
         _linhasDaPagina,
         _pareceSolides,
         _extrairCabecalhoColaborador,
         _extrairCompetencia,
         _dividirBlocosDia,
         _parsearCorpoDia,
+        _pareceFragmentoPonto,
         _extrairDiasPontos,
+        _extrairDiasPontosPosicional,
         _gerarDiasDoMes,
         _mesclarDias,
         _normalizarNome,

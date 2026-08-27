@@ -223,6 +223,117 @@ teste('_extrairDiasPontos monta a data completa (DD/MM/AAAA) para cada dia encon
 });
 
 const {
+    _agruparLinhas,
+    _pareceFragmentoPonto,
+    _extrairDiasPontosPosicional
+} = require('./folha-ponto-solides-parser.js');
+
+// ===== _extrairDiasPontosPosicional =====
+// Dados reais da página 3 do PDF do Sólides (colaborador Kelvin): dias com 3
+// períodos têm a célula PONTOS quebrada em 2 linhas físicas, reportadas pelo
+// PDF.js em Y ~±3,5 da linha do dia — o que fazia esses dias saírem em branco.
+
+teste('_extrairDiasPontosPosicional remonta os 3 períodos de um dia cuja célula PONTOS quebrou em duas linhas', () => {
+    const linhas = [
+        { y: 561.8, str: '03/08 segunda-feira 08:28 12:16 | 13:20 18:02 | 08:30 09:00 -00:30' },
+        { y: 541.8, str: '05/08 quarta-feira 08:02 12:38 | 13:38 17:01 | 07:59 09:00 -1:01' },
+        { y: 533.8, str: '08:10 12:36 | (m)13:36 17:58 | 20:01' },
+        { y: 530.3, str: '06/08 quinta-feira 10:46 09:00 01:46' },
+        { y: 526.9, str: '21:59 |' },
+        { y: 518.8, str: '07/08 sexta-feira (m)08:06 12:05 | (m)12:51 17:00 | 08:08 08:00 00:08' },
+        { y: 293.7, str: 'Total: 158:06 00:00 168:00 -1:48' }
+    ];
+    const dias = _extrairDiasPontosPosicional(linhas, '2026');
+    const d6 = dias.find(d => d.data === '06/08/2026');
+    assert.strictEqual(d6.entrada1, '08:10');
+    assert.strictEqual(d6.saida1, '12:36');
+    assert.strictEqual(d6.entrada2, '13:36');
+    assert.strictEqual(d6.saida2, '17:58');
+    assert.strictEqual(d6.entrada3, '20:01');
+    assert.strictEqual(d6.saida3, '21:59');
+    assert.strictEqual(d6.ocorrencia, '');
+});
+
+teste('_extrairDiasPontosPosicional não deixa o fragmento de cima contaminar o dia anterior', () => {
+    const linhas = [
+        { y: 541.8, str: '05/08 quarta-feira 08:02 12:38 | 13:38 17:01 | 07:59 09:00 -1:01' },
+        { y: 533.8, str: '08:10 12:36 | (m)13:36 17:58 | 20:01' },
+        { y: 530.3, str: '06/08 quinta-feira 10:46 09:00 01:46' },
+        { y: 526.9, str: '21:59 |' }
+    ];
+    const d5 = _extrairDiasPontosPosicional(linhas, '2026').find(d => d.data === '05/08/2026');
+    assert.strictEqual(d5.entrada1, '08:02');
+    assert.strictEqual(d5.saida1, '12:38');
+    assert.strictEqual(d5.entrada2, '13:38');
+    assert.strictEqual(d5.saida2, '17:01');
+    assert.strictEqual(d5.entrada3, '', 'o fragmento do dia 06 não pode virar 3º período do dia 05');
+});
+
+teste('_extrairDiasPontosPosicional mantém dias normais (2 períodos) idênticos ao comportamento anterior', () => {
+    const linhas = [
+        { y: 561.8, str: '03/08 segunda-feira 08:28 12:16 | 13:20 18:02 | 08:30 09:00 -00:30' },
+        { y: 551.8, str: '04/08 terça-feira 08:18 12:06 | (m)13:06 18:02 | 08:44 09:00 -00:16' },
+        { y: 465.8, str: '12/08 quarta-feira 08:05 12:11 | 17:59 | 04:06 09:00 -4:54' },
+        { y: 293.7, str: 'Total: 158:06' }
+    ];
+    const dias = _extrairDiasPontosPosicional(linhas, '2026');
+    assert.strictEqual(dias.length, 3);
+    assert.deepStrictEqual(
+        [dias[0].entrada1, dias[0].saida1, dias[0].entrada2, dias[0].saida2, dias[0].entrada3],
+        ['08:28', '12:16', '13:20', '18:02', '']
+    );
+    assert.strictEqual(dias[1].entrada2, '13:06');
+    assert.strictEqual(dias[2].entrada1, '08:05');
+    assert.strictEqual(dias[2].entrada2, '', 'segmento de 1 horário ("17:59 |") não vira período nem contamina');
+});
+
+teste('_extrairDiasPontosPosicional preserva ocorrência de dia inteiro (FALTA) e dia sem expediente ("-")', () => {
+    const linhas = [
+        { y: 369.8, str: '21/08 sexta-feira FALTA NAO JUSTIFICADA 08:00' },
+        { y: 359.8, str: '22/08 sabado -' },
+        { y: 293.7, str: 'Total: x' }
+    ];
+    const dias = _extrairDiasPontosPosicional(linhas, '2026');
+    assert.strictEqual(dias[0].ocorrencia, 'FALTA NAO JUSTIFICADA');
+    assert.strictEqual(dias[1].entrada1, '');
+    assert.strictEqual(dias[1].ocorrencia, '');
+});
+
+teste('_extrairDiasPontosPosicional ignora linhas de rodapé abaixo de "Total:"', () => {
+    const linhas = [
+        { y: 309.8, str: '27/08 quinta-feira 07:59 12:18 | 12:59 | 04:19 09:00 -4:41' },
+        { y: 293.7, str: 'Total: 158:06 00:00 168:00 -1:48' },
+        { y: 244.5, str: 'Saldo Acumulado até 27/08/2026: 456:05' }
+    ];
+    const dias = _extrairDiasPontosPosicional(linhas, '2026');
+    assert.strictEqual(dias.length, 1);
+    assert.strictEqual(dias[0].entrada1, '07:59');
+    assert.strictEqual(dias[0].entrada3, '', 'o "456:05" do rodapé não pode virar 3º período');
+});
+
+teste('_pareceFragmentoPonto aceita marcação de ponto e status; recusa texto de cabeçalho', () => {
+    assert.strictEqual(_pareceFragmentoPonto('08:10 12:36 | (m)13:36 17:58 | 20:01'), true);
+    assert.strictEqual(_pareceFragmentoPonto('21:59 |'), true);
+    assert.strictEqual(_pareceFragmentoPonto('|'), true);
+    assert.strictEqual(_pareceFragmentoPonto('FALTA NAO JUSTIFICADA'), true);
+    assert.strictEqual(_pareceFragmentoPonto('Dias Faltosos'), false);
+    assert.strictEqual(_pareceFragmentoPonto(''), false);
+});
+
+teste('_agruparLinhas mantém o Y do grupo e ainda separa a linha quebrada (mecanismo do bug)', () => {
+    const items = [
+        item('08:10 12:36 | (m)13:36 17:58 | 20:01', 127, 533.8),
+        item('06/08', 22.5, 530.3),
+        item('quinta-feira', 47, 530.3),
+        item('21:59 |', 127, 526.9)
+    ];
+    const linhas = _agruparLinhas(items);
+    assert.strictEqual(linhas.length, 3);
+    assert.strictEqual(linhas[1].str, '06/08 quinta-feira');
+    assert.strictEqual(linhas[1].y, 530.3);
+});
+
+const {
     _gerarDiasDoMes,
     _mesclarDias,
     _normalizarNome,
