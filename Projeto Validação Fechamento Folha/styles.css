@@ -514,9 +514,12 @@ select {
 .tabela-matriz thead th.col-empregado { background: var(--bg-light); z-index: 2; }
 .tabela-matriz th.grupo-provento { background: #E6F7EE; color: var(--success); text-align: center; }
 .tabela-matriz th.grupo-desconto { background: #FDECEA; color: var(--danger); text-align: center; }
+.tabela-matriz {
+    --fonte-titulo-rubrica: 11px;
+}
 .tabela-matriz th.col-rubrica {
     text-align: center;
-    font-size: 11px;
+    font-size: var(--fonte-titulo-rubrica);
     white-space: normal;
     max-width: 120px;
     line-height: 1.3;
@@ -537,14 +540,14 @@ select {
 .celula-valor.tipo-desconto { color: var(--danger); }
 
 /* quando os dois campos aparecem, dividem a célula no mesmo tamanho;
-   quando só um aparece, ele ocupa a célula inteira com fonte maior */
+   quando só um aparece, usa o mesmo tamanho do título da coluna (rubrica) */
 .celula-matriz.dupla .celula-referencia,
 .celula-matriz.dupla .celula-valor {
     font-size: 12px;
 }
 .celula-matriz.unica .celula-referencia,
 .celula-matriz.unica .celula-valor {
-    font-size: 15px;
+    font-size: var(--fonte-titulo-rubrica);
 }
 
 .tabela-matriz tfoot .linha-totais td {
