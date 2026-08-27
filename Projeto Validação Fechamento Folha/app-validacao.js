@@ -264,13 +264,20 @@ function renderizarMatriz() {
     ].join('');
 
     const cabecalhoRubricas = matriz.colunas.map(col => `
-        <th class="col-rubrica ${col.tipo === 'P' ? 'tipo-provento' : 'tipo-desconto'}" title="${col.descricao}">${col.codigo}</th>
+        <th class="col-rubrica ${col.tipo === 'P' ? 'tipo-provento' : 'tipo-desconto'}" title="${col.codigo} — ${col.descricao}">${col.descricao}</th>
     `).join('');
 
     const linhas = matriz.linhas.map(linha => `
         <tr>
             <td class="col-empregado">${linha.matricula} — ${linha.nome}</td>
-            ${linha.valores.map(v => `<td class="valor">${v === null ? '—' : formatarBRL(v)}</td>`).join('')}
+            ${linha.valores.map((v, i) => {
+                if (v === null) return '<td class="valor">—</td>';
+                const tipoClasse = matriz.colunas[i].tipo === 'P' ? 'tipo-provento' : 'tipo-desconto';
+                return `<td class="valor celula-matriz">
+                    <span class="celula-referencia">${v.referencia}</span>
+                    <span class="celula-valor ${tipoClasse}">${formatarBRL(v.valor)}</span>
+                </td>`;
+            }).join('')}
         </tr>
     `).join('');
 

@@ -1,5 +1,5 @@
 const assert = require('node:assert');
-const { _descricaoCanonica, construirRubricasDistintas, construirMatriz } = require('./matriz-competencia.js');
+const { _descricaoCanonica, _somarReferencias, construirRubricasDistintas, construirMatriz } = require('./matriz-competencia.js');
 
 let testesExecutados = 0;
 function teste(nome, fn) {
@@ -25,13 +25,13 @@ function empFixture(overrides) {
 teste('construirRubricasDistintas agrupa por código, separa por tipo e ordena numericamente', () => {
     const empregados = [
         empFixture({ matricula: '1', rubricas: [
-            { codigo: '8781', descricao: 'DIAS NORMAIS', valor: 1000, tipo: 'P' },
-            { codigo: '998', descricao: 'I.N.S.S.', valor: 100, tipo: 'D' },
-            { codigo: '37', descricao: 'COMISSOES', valor: 500, tipo: 'P' }
+            { codigo: '8781', descricao: 'DIAS NORMAIS', referencia: '31,00', valor: 1000, tipo: 'P' },
+            { codigo: '998', descricao: 'I.N.S.S.', referencia: '7,99', valor: 100, tipo: 'D' },
+            { codigo: '37', descricao: 'COMISSOES', referencia: '500,00', valor: 500, tipo: 'P' }
         ] }),
         empFixture({ matricula: '2', rubricas: [
-            { codigo: '8781', descricao: 'DIAS NORMAIS', valor: 900, tipo: 'P' },
-            { codigo: '981', descricao: 'DESC.ADIANT.SALARIAL', valor: 300, tipo: 'D' }
+            { codigo: '8781', descricao: 'DIAS NORMAIS', referencia: '31,00', valor: 900, tipo: 'P' },
+            { codigo: '981', descricao: 'DESC.ADIANT.SALARIAL', referencia: '300,00', valor: 300, tipo: 'D' }
         ] })
     ];
     const { proventos, descontos } = construirRubricasDistintas(empregados);
@@ -41,48 +41,56 @@ teste('construirRubricasDistintas agrupa por código, separa por tipo e ordena n
 
 teste('construirRubricasDistintas usa a descrição canônica do primeiro empregado em que o código aparece', () => {
     const empregados = [
-        empFixture({ matricula: '1', rubricas: [{ codigo: '9751', descricao: 'DESC EMP CRED TRAB FE Nº AAA111', valor: 100, tipo: 'D' }] }),
-        empFixture({ matricula: '2', rubricas: [{ codigo: '9751', descricao: 'DESC EMP CRED TRAB FE Nº BBB222', valor: 200, tipo: 'D' }] })
+        empFixture({ matricula: '1', rubricas: [{ codigo: '9751', descricao: 'DESC EMP CRED TRAB FE Nº AAA111', referencia: '100,00', valor: 100, tipo: 'D' }] }),
+        empFixture({ matricula: '2', rubricas: [{ codigo: '9751', descricao: 'DESC EMP CRED TRAB FE Nº BBB222', referencia: '200,00', valor: 200, tipo: 'D' }] })
     ];
     const { descontos } = construirRubricasDistintas(empregados);
     assert.strictEqual(descontos[0].descricao, 'DESC EMP CRED TRAB FE');
 });
 
-teste('construirMatriz soma valores quando o mesmo código aparece mais de uma vez no mesmo empregado', () => {
+teste('_somarReferencias soma decimais brasileiros', () => {
+    assert.strictEqual(_somarReferencias(['100,00', '50,00']), '150,00');
+});
+
+teste('_somarReferencias soma horas no formato hh:mm', () => {
+    assert.strictEqual(_somarReferencias(['1:30', '0:45']), '2:15');
+});
+
+teste('construirMatriz soma valor e referência quando o mesmo código aparece mais de uma vez no mesmo empregado', () => {
     const empregados = [
         empFixture({ matricula: '1', rubricas: [
-            { codigo: '202', descricao: 'DESC EMP CRED TRAB Nº 111', valor: 100, tipo: 'D' },
-            { codigo: '202', descricao: 'DESC EMP CRED TRAB Nº 222', valor: 50, tipo: 'D' }
+            { codigo: '202', descricao: 'DESC EMP CRED TRAB Nº 111', referencia: '100,00', valor: 100, tipo: 'D' },
+            { codigo: '202', descricao: 'DESC EMP CRED TRAB Nº 222', referencia: '50,00', valor: 50, tipo: 'D' }
         ] })
     ];
     const selecaoRubricas = new Set(['202']);
     const selecaoEmpregados = new Set(['Empr:1']);
     const matriz = construirMatriz(empregados, selecaoRubricas, selecaoEmpregados);
-    assert.strictEqual(matriz.linhas[0].valores[0], 150);
+    assert.deepStrictEqual(matriz.linhas[0].valores[0], { referencia: '150,00', valor: 150 });
 });
 
 teste('construirMatriz retorna null na célula quando o empregado não tem aquela rubrica', () => {
     const empregados = [
-        empFixture({ matricula: '1', rubricas: [{ codigo: '8781', descricao: 'DIAS NORMAIS', valor: 1000, tipo: 'P' }] }),
+        empFixture({ matricula: '1', rubricas: [{ codigo: '8781', descricao: 'DIAS NORMAIS', referencia: '31,00', valor: 1000, tipo: 'P' }] }),
         empFixture({ matricula: '2', rubricas: [] })
     ];
     const selecaoRubricas = new Set(['8781']);
     const selecaoEmpregados = new Set(['Empr:1', 'Empr:2']);
     const matriz = construirMatriz(empregados, selecaoRubricas, selecaoEmpregados);
     assert.strictEqual(matriz.linhas.length, 2);
-    assert.strictEqual(matriz.linhas[0].valores[0], 1000);
+    assert.deepStrictEqual(matriz.linhas[0].valores[0], { referencia: '31,00', valor: 1000 });
     assert.strictEqual(matriz.linhas[1].valores[0], null);
 });
 
 teste('construirMatriz respeita seleção parcial de empregados e rubricas, mantendo colunas proventos antes de descontos', () => {
     const empregados = [
         empFixture({ matricula: '1', rubricas: [
-            { codigo: '8781', descricao: 'DIAS NORMAIS', valor: 1000, tipo: 'P' },
-            { codigo: '998', descricao: 'I.N.S.S.', valor: 100, tipo: 'D' }
+            { codigo: '8781', descricao: 'DIAS NORMAIS', referencia: '31,00', valor: 1000, tipo: 'P' },
+            { codigo: '998', descricao: 'I.N.S.S.', referencia: '9,00', valor: 100, tipo: 'D' }
         ] }),
         empFixture({ matricula: '2', rubricas: [
-            { codigo: '8781', descricao: 'DIAS NORMAIS', valor: 900, tipo: 'P' },
-            { codigo: '998', descricao: 'I.N.S.S.', valor: 90, tipo: 'D' }
+            { codigo: '8781', descricao: 'DIAS NORMAIS', referencia: '31,00', valor: 900, tipo: 'P' },
+            { codigo: '998', descricao: 'I.N.S.S.', referencia: '9,00', valor: 90, tipo: 'D' }
         ] })
     ];
     const selecaoRubricas = new Set(['8781', '998']);

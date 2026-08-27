@@ -467,7 +467,32 @@ select {
 .tabela-matriz thead th.col-empregado { background: var(--bg-light); z-index: 2; }
 .tabela-matriz th.grupo-provento { background: #E6F7EE; color: var(--success); text-align: center; }
 .tabela-matriz th.grupo-desconto { background: #FDECEA; color: var(--danger); text-align: center; }
-.tabela-matriz th.col-rubrica { text-align: right; font-size: 12px; }
+.tabela-matriz th.col-rubrica {
+    text-align: center;
+    font-size: 11px;
+    white-space: normal;
+    max-width: 120px;
+    line-height: 1.3;
+}
 .tabela-matriz th.col-rubrica.tipo-provento { background: #F2FBF6; }
 .tabela-matriz th.col-rubrica.tipo-desconto { background: #FDF3F2; }
+
 .tabela-matriz td.valor { text-align: right; font-variant-numeric: tabular-nums; }
+.celula-matriz {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 1px;
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+}
+.celula-referencia {
+    font-size: 11px;
+    color: var(--muted);
+}
+.celula-valor {
+    font-size: 13px;
+    font-weight: 600;
+}
+.celula-valor.tipo-provento { color: var(--success); }
+.celula-valor.tipo-desconto { color: var(--danger); }
