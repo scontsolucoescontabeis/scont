@@ -102,4 +102,36 @@ teste('construirMatriz respeita seleção parcial de empregados e rubricas, mant
     assert.deepStrictEqual(matriz.colunas.map(c => c.codigo), ['8781', '998']);
 });
 
+teste('construirMatriz ordena colunas pela ordem de seleção (não pelo código) dentro de cada grupo', () => {
+    const empregados = [
+        empFixture({ matricula: '1', rubricas: [
+            { codigo: '147', descricao: 'HORAS EXTRAS 65%', referencia: '10:00', valor: 300, tipo: 'P' },
+            { codigo: '37', descricao: 'COMISSOES', referencia: '500,00', valor: 500, tipo: 'P' },
+            { codigo: '999', descricao: 'IMPOSTO DE RENDA', referencia: '50,00', valor: 50, tipo: 'D' },
+            { codigo: '981', descricao: 'DESC.ADIANT.SALARIAL', referencia: '100,00', valor: 100, tipo: 'D' }
+        ] })
+    ];
+    // selecionado nesta ordem: 147 (P), 999 (D), 37 (P), 981 (D) — código não crescente
+    const selecaoRubricas = new Set(['147', '999', '37', '981']);
+    const selecaoEmpregados = new Set(['Empr:1']);
+    const matriz = construirMatriz(empregados, selecaoRubricas, selecaoEmpregados);
+    // proventos mantêm a ordem de seleção entre si (147 antes de 37), idem descontos (999 antes de 981),
+    // mas o grupo Proventos inteiro continua antes do grupo Descontos
+    assert.deepStrictEqual(matriz.colunas.map(c => c.codigo), ['147', '37', '999', '981']);
+    assert.strictEqual(matriz.nProventos, 2);
+});
+
+teste('construirMatriz: marcar uma rubrica nova sempre a acrescenta ao final do seu grupo', () => {
+    const empregados = [
+        empFixture({ matricula: '1', rubricas: [
+            { codigo: '998', descricao: 'I.N.S.S.', referencia: '9,00', valor: 100, tipo: 'D' },
+            { codigo: '981', descricao: 'DESC.ADIANT.SALARIAL', referencia: '100,00', valor: 100, tipo: 'D' }
+        ] })
+    ];
+    const selecao = new Set(['998']);
+    selecao.add('981'); // simula o usuário marcando 981 depois de 998
+    const matriz = construirMatriz(empregados, selecao, new Set(['Empr:1']));
+    assert.deepStrictEqual(matriz.colunas.map(c => c.codigo), ['998', '981']);
+});
+
 console.log(`\n${testesExecutados} teste(s) passaram.`);

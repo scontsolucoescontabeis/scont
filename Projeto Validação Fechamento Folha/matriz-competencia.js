@@ -91,17 +91,26 @@ function _agruparPorCodigo(empregado) {
 
 /**
  * Monta a matriz final: linhas = empregados selecionados (na ordem
- * original), colunas = rubricas selecionadas (proventos, depois
- * descontos). Cada célula é { referencia, valor } daquele código para
- * aquele empregado, ou null se o empregado não tiver aquela rubrica.
+ * original), colunas = rubricas selecionadas — agrupadas em
+ * Proventos/Descontos, mas dentro de cada grupo na ORDEM EM QUE FORAM
+ * SELECIONADAS (não por código), para que a tabela cresça da esquerda
+ * para a direita conforme o usuário vai marcando as rubricas.
+ * `rubricasSelecionadasCodigos` precisa ser um iterável que preserva a
+ * ordem de inserção (ex.: Set) — a ordem de iteração dele é o que
+ * decide a ordem das colunas dentro de cada grupo.
+ * Cada célula é { referencia, valor } daquele código para aquele
+ * empregado, ou null se o empregado não tiver aquela rubrica.
  */
 function construirMatriz(empregados, rubricasSelecionadasCodigos, empregadosSelecionadosChaves, chaveEmpregadoFn) {
     const chaveDe = chaveEmpregadoFn || ((e) => `${e.tipo}:${e.matricula}`);
     const { proventos, descontos } = construirRubricasDistintas(empregados);
-    const colunas = [
-        ...proventos.filter(r => rubricasSelecionadasCodigos.has(r.codigo)),
-        ...descontos.filter(r => rubricasSelecionadasCodigos.has(r.codigo))
-    ];
+    const mapaProventos = new Map(proventos.map(r => [r.codigo, r]));
+    const mapaDescontos = new Map(descontos.map(r => [r.codigo, r]));
+
+    const codigosNaOrdemDeSelecao = Array.from(rubricasSelecionadasCodigos);
+    const colunasProvento = codigosNaOrdemDeSelecao.filter(c => mapaProventos.has(c)).map(c => mapaProventos.get(c));
+    const colunasDesconto = codigosNaOrdemDeSelecao.filter(c => mapaDescontos.has(c)).map(c => mapaDescontos.get(c));
+    const colunas = [...colunasProvento, ...colunasDesconto];
 
     const linhas = empregados
         .filter(e => empregadosSelecionadosChaves.has(chaveDe(e)))
@@ -119,7 +128,7 @@ function construirMatriz(empregados, rubricasSelecionadasCodigos, empregadosSele
             };
         });
 
-    return { colunas, linhas, nProventos: proventos.filter(r => rubricasSelecionadasCodigos.has(r.codigo)).length };
+    return { colunas, linhas, nProventos: colunasProvento.length };
 }
 
 if (typeof module !== 'undefined' && module.exports) {
