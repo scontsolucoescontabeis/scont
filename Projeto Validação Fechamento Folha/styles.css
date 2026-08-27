@@ -516,6 +516,7 @@ select {
 .tabela-matriz th.grupo-desconto { background: #FDECEA; color: var(--danger); text-align: center; }
 .tabela-matriz {
     --fonte-titulo-rubrica: 11px;
+    --fonte-nome-empregado: 13px;
 }
 .tabela-matriz th.col-rubrica {
     text-align: center;
@@ -540,14 +541,14 @@ select {
 .celula-valor.tipo-desconto { color: var(--danger); }
 
 /* quando os dois campos aparecem, dividem a célula no mesmo tamanho;
-   quando só um aparece, usa o mesmo tamanho do título da coluna (rubrica) */
+   quando só um aparece, usa o mesmo tamanho do nome do empregado */
 .celula-matriz.dupla .celula-referencia,
 .celula-matriz.dupla .celula-valor {
     font-size: 12px;
 }
 .celula-matriz.unica .celula-referencia,
 .celula-matriz.unica .celula-valor {
-    font-size: var(--fonte-titulo-rubrica);
+    font-size: var(--fonte-nome-empregado);
 }
 
 .tabela-matriz tfoot .linha-totais td {
