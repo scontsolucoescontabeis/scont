@@ -13,6 +13,36 @@
 <script src="extrato-comparador.js"></script>
 </head>
 <body>
+
+<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+        <h2>Validação de Fechamento</h2>
+        <p>Conferência de Folha</p>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="sidebar-section">Ferramenta</div>
+        <a href="index.html" class="sidebar-item active">
+            <span class="sidebar-item-icon">🔍</span> Comparar Extrato Mensal
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <a href="../portal.html" class="sidebar-item" style="margin-bottom:10px;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
+            <span class="sidebar-item-icon">🏠</span> Voltar ao Portal
+        </a>
+        <div class="sidebar-footer-info">
+            <strong>Validação de Fechamento</strong>
+            SCONT · Módulo de Folha
+        </div>
+    </div>
+</aside>
+
+<div class="main-content">
 <div class="container">
     <header class="app-header">
         <h1>Validação de Fechamento de Folha</h1>
@@ -67,6 +97,7 @@
         </footer>
     </section>
 </div>
+</div><!-- /main-content -->
 
 <script src="app.js"></script>
 </body>
