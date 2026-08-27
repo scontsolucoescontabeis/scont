@@ -9,6 +9,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../portal-auth-guard.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="extrato-parser.js"></script>
 <script src="matriz-competencia.js"></script>
 <script src="sidebar.js"></script>
@@ -108,6 +110,7 @@
             <div class="secao-titulo">
                 Folha da Competência
                 <span class="contagem" id="contagemMatriz">0</span>
+                <button class="btn btn-pdf" id="btnGerarPdf">📄 Gerar PDF</button>
             </div>
             <div class="tabela-scroll" id="tabelaMatriz"></div>
         </div>

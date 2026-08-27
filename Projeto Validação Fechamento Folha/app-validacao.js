@@ -8,7 +8,8 @@ const state = {
     competencias: [],
     competenciaAtual: null,
     empregadosSelecionados: new Set(),
-    rubricasSelecionadas: new Set()
+    rubricasSelecionadas: new Set(),
+    matrizAtual: null
 };
 
 const els = {
@@ -32,7 +33,8 @@ const els = {
     btnNenhumEmpregado: document.getElementById('btnNenhumEmpregado'),
     btnTodasRubricas: document.getElementById('btnTodasRubricas'),
     btnNenhumaRubrica: document.getElementById('btnNenhumaRubrica'),
-    btnNovaValidacao: document.getElementById('btnNovaValidacao')
+    btnNovaValidacao: document.getElementById('btnNovaValidacao'),
+    btnGerarPdf: document.getElementById('btnGerarPdf')
 };
 
 function formatarBRL(valor) {
@@ -99,6 +101,8 @@ function configurarEventos() {
         renderizarMatriz();
     });
 
+    els.btnGerarPdf.addEventListener('click', gerarPDF);
+
     els.btnNovaValidacao.addEventListener('click', () => {
         els.resultado.classList.remove('visivel');
         els.cardUpload.style.display = '';
@@ -109,6 +113,7 @@ function configurarEventos() {
         state.competenciaAtual = null;
         state.empregadosSelecionados = new Set();
         state.rubricasSelecionadas = new Set();
+        state.matrizAtual = null;
         els.btnProcessar.disabled = true;
         limparErro();
     });
@@ -259,6 +264,7 @@ function renderizarMatriz() {
         state.empregadosSelecionados,
         chaveEmpregado
     );
+    state.matrizAtual = matriz;
 
     els.contagemMatriz.textContent = `${matriz.linhas.length} empregado(s) × ${matriz.colunas.length} rubrica(s)`;
 
@@ -302,6 +308,86 @@ function renderizarMatriz() {
             <tbody>${linhas}</tbody>
         </table>
     `;
+}
+
+function hexToRgb(hex) {
+    return {
+        r: parseInt(hex.slice(1, 3), 16),
+        g: parseInt(hex.slice(3, 5), 16),
+        b: parseInt(hex.slice(5, 7), 16)
+    };
+}
+
+function sanitizarNomeArquivo(str) {
+    return String(str).replace(/[/\\:*?"<>|]/g, '_');
+}
+
+// ── PDF — jsPDF + AutoTable, mesmo padrão de cabeçalho do relatório de
+// Programação de Férias (Fechamento Folha): barra colorida com
+// empresa/CNPJ à esquerda e título/data à direita, paisagem com
+// largura dinâmica conforme o número de colunas. ──
+function gerarPDF() {
+    limparErro();
+    const matriz = state.matrizAtual;
+    if (!matriz || matriz.colunas.length === 0 || matriz.linhas.length === 0) {
+        mostrarErro('Selecione ao menos um empregado e uma rubrica antes de gerar o PDF.');
+        return;
+    }
+    const competencia = state.competenciaAtual;
+
+    const head = [['Empregado', ...matriz.colunas.map(c => c.descricao)]];
+    const body = matriz.linhas.map(linha => [
+        `${linha.matricula} — ${linha.nome}`,
+        ...linha.valores.map(v => v === null ? '—' : `${v.referencia}\n${formatarBRL(v.valor)}`)
+    ]);
+
+    const MM_PER_COL = 16;
+    const COL_EMPREGADO_MM = 55;
+    const MARGEM = 10;
+    const pageW = Math.max(297, COL_EMPREGADO_MM + matriz.colunas.length * MM_PER_COL + MARGEM * 2);
+    const pageH = 210;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: 'landscape' });
+
+    const rgb = hexToRgb('#8B3A3A');
+    const empresa = competencia.empresaCodigo
+        ? `${competencia.empresaCodigo} — ${competencia.empresaNome || ''}`
+        : (competencia.empresaNome || '');
+    const titulo = `Validação Competência — ${competencia.competencia}`;
+    const dataGer = new Date().toLocaleDateString('pt-BR');
+
+    const barH = competencia.cnpj ? 18 : 13;
+    doc.setFillColor(rgb.r, rgb.g, rgb.b);
+    doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, barH, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    if (empresa) {
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+        doc.text(empresa, MARGEM + 4, MARGEM + 6);
+    }
+    if (competencia.cnpj) {
+        doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+        doc.text('CNPJ: ' + competencia.cnpj, MARGEM + 4, MARGEM + 12);
+    }
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+    doc.text(titulo, pageW - MARGEM - 4, MARGEM + 6, { align: 'right' });
+    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+    doc.text(`Gerado em ${dataGer} · ${matriz.linhas.length} empregado(s) × ${matriz.colunas.length} rubrica(s)`,
+        pageW - MARGEM - 4, MARGEM + 12, { align: 'right' });
+    const startY = MARGEM + barH + 4;
+
+    doc.autoTable({
+        head, body, startY,
+        margin: { left: MARGEM, right: MARGEM },
+        tableWidth: pageW - MARGEM * 2,
+        styles: { fontSize: 6.5, cellPadding: 1.8, valign: 'middle', overflow: 'linebreak' },
+        headStyles: { fillColor: [rgb.r, rgb.g, rgb.b], textColor: 255, fontStyle: 'bold', fontSize: 6.5 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: { 0: { cellWidth: COL_EMPREGADO_MM, halign: 'left' } },
+        bodyStyles: { halign: 'right' }
+    });
+
+    doc.save(sanitizarNomeArquivo(titulo) + '.pdf');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
