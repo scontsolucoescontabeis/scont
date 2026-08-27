@@ -38,6 +38,16 @@ function classeDelta(valor) {
     return valor > 0 ? 'positivo' : 'negativo';
 }
 
+function escaparHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function mostrarErro(msg) {
     els.mensagemErro.textContent = msg;
     els.mensagemErro.classList.add('visivel');
@@ -139,10 +149,10 @@ async function processarArquivo() {
 
 function renderizarResultado(resultado, anterior, atual) {
     els.resumoCompetencias.innerHTML = `
-        <span>${anterior.empresaCodigo ? anterior.empresaCodigo + ' — ' : ''}${atual.empresaNome || ''}</span>
-        <strong>${resultado.competenciaAnterior}</strong>
+        <span>${anterior.empresaCodigo ? escaparHTML(anterior.empresaCodigo) + ' — ' : ''}${escaparHTML(atual.empresaNome || '')}</span>
+        <strong>${escaparHTML(resultado.competenciaAnterior)}</strong>
         <span class="seta">→</span>
-        <strong>${resultado.competenciaAtual}</strong>
+        <strong>${escaparHTML(resultado.competenciaAtual)}</strong>
         <span>· limiar de destaque: ${resultado.limiarPercentual}%</span>
     `;
 
@@ -183,11 +193,11 @@ const ROTULO_MUDANCA = {
 
 function detalheMudanca(m) {
     switch (m.tipo) {
-        case 'admissao': return `Situação: ${m.situacao}`;
-        case 'saida': return m.demissao ? `Demitido em ${m.demissao.data} — ${m.demissao.motivo}` : `Última situação: ${m.situacaoAnterior}`;
-        case 'entrouFerias': return `${m.ferias.inicio} - ${m.ferias.fim}`;
-        case 'voltouFerias': return `Estava de férias: ${m.feriasAnterior.inicio} - ${m.feriasAnterior.fim}`;
-        case 'mudancaSituacao': return `${m.situacaoAnterior} → ${m.situacaoAtual}`;
+        case 'admissao': return `Situação: ${escaparHTML(m.situacao)}`;
+        case 'saida': return m.demissao ? `Demitido em ${escaparHTML(m.demissao.data)} — ${escaparHTML(m.demissao.motivo)}` : `Última situação: ${escaparHTML(m.situacaoAnterior)}`;
+        case 'entrouFerias': return `${escaparHTML(m.ferias.inicio)} - ${escaparHTML(m.ferias.fim)}`;
+        case 'voltouFerias': return `Estava de férias: ${escaparHTML(m.feriasAnterior.inicio)} - ${escaparHTML(m.feriasAnterior.fim)}`;
+        case 'mudancaSituacao': return `${escaparHTML(m.situacaoAnterior)} → ${escaparHTML(m.situacaoAtual)}`;
         default: return '';
     }
 }
@@ -200,9 +210,9 @@ function renderizarTabelaQuadro(mudancas) {
     }
     const linhas = mudancas.map(m => `
         <tr>
-            <td>${m.matricula}</td>
-            <td>${m.nome}</td>
-            <td><span class="badge-mudanca ${m.tipo}">${ROTULO_MUDANCA[m.tipo] || m.tipo}</span></td>
+            <td>${escaparHTML(m.matricula)}</td>
+            <td>${escaparHTML(m.nome)}</td>
+            <td><span class="badge-mudanca ${m.tipo}">${escaparHTML(ROTULO_MUDANCA[m.tipo] || m.tipo)}</span></td>
             <td>${detalheMudanca(m)}</td>
         </tr>
     `).join('');
@@ -222,8 +232,8 @@ function renderizarTabelaVariacao(linhasVariacao) {
     }
     const linhas = linhasVariacao.map(v => `
         <tr class="${v.acimaDoLimiar ? 'linha-alerta' : ''}">
-            <td>${v.matricula}</td>
-            <td>${v.nome}</td>
+            <td>${escaparHTML(v.matricula)}</td>
+            <td>${escaparHTML(v.nome)}</td>
             <td>${formatarBRL(v.proventos.anterior)} → ${formatarBRL(v.proventos.atual)}</td>
             <td class="${classeDelta(v.proventos.deltaPercentual)}">${formatarPct(v.proventos.deltaPercentual)}</td>
             <td>${formatarBRL(v.descontos.anterior)} → ${formatarBRL(v.descontos.atual)}</td>

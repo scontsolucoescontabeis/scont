@@ -483,8 +483,6 @@ select {
     flex-direction: column;
     align-items: flex-end;
     gap: 1px;
-    padding-top: 6px !important;
-    padding-bottom: 6px !important;
 }
 .celula-referencia {
     font-size: 11px;

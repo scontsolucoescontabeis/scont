@@ -40,6 +40,16 @@ function formatarBRL(valor) {
     return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function escaparHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function mostrarErro(msg) {
     els.mensagemErro.textContent = msg;
     els.mensagemErro.classList.add('visivel');
@@ -163,7 +173,7 @@ function popularSelectCompetencia(competencias) {
         const [mb, ab] = b.competencia.split('/').map(Number);
         return (ab * 100 + mb) - (aa * 100 + ma);
     });
-    els.selectCompetencia.innerHTML = ordenadas.map(c => `<option value="${c.competencia}">${c.competencia}</option>`).join('');
+    els.selectCompetencia.innerHTML = ordenadas.map(c => `<option value="${escaparHTML(c.competencia)}">${escaparHTML(c.competencia)}</option>`).join('');
 }
 
 function selecionarCompetencia(competenciaStr) {
@@ -191,8 +201,8 @@ function renderizarListaEmpregados() {
         const marcado = state.empregadosSelecionados.has(chave) ? 'checked' : '';
         return `
             <label class="selecao-item">
-                <input type="checkbox" data-chave="${chave}" ${marcado}>
-                <span>${emp.matricula} — ${emp.nome}</span>
+                <input type="checkbox" data-chave="${escaparHTML(chave)}" ${marcado}>
+                <span>${escaparHTML(emp.matricula)} — ${escaparHTML(emp.nome)}</span>
             </label>
         `;
     }).join('');
@@ -214,12 +224,12 @@ function renderizarGrupoRubricas(rotulo, rubricas, classeTipo) {
         const marcado = state.rubricasSelecionadas.has(r.codigo) ? 'checked' : '';
         return `
             <label class="selecao-item">
-                <input type="checkbox" data-codigo="${r.codigo}" ${marcado}>
-                <span>${r.codigo} — ${r.descricao}</span>
+                <input type="checkbox" data-codigo="${escaparHTML(r.codigo)}" ${marcado}>
+                <span>${escaparHTML(r.codigo)} — ${escaparHTML(r.descricao)}</span>
             </label>
         `;
     }).join('');
-    return `<div class="selecao-grupo-rotulo ${classeTipo}">${rotulo}</div>${itens}`;
+    return `<div class="selecao-grupo-rotulo ${classeTipo}">${escaparHTML(rotulo)}</div>${itens}`;
 }
 
 function renderizarListaRubricas() {
@@ -264,18 +274,20 @@ function renderizarMatriz() {
     ].join('');
 
     const cabecalhoRubricas = matriz.colunas.map(col => `
-        <th class="col-rubrica ${col.tipo === 'P' ? 'tipo-provento' : 'tipo-desconto'}" title="${col.codigo} — ${col.descricao}">${col.descricao}</th>
+        <th class="col-rubrica ${col.tipo === 'P' ? 'tipo-provento' : 'tipo-desconto'}" title="${escaparHTML(col.codigo)} — ${escaparHTML(col.descricao)}">${escaparHTML(col.descricao)}</th>
     `).join('');
 
     const linhas = matriz.linhas.map(linha => `
         <tr>
-            <td class="col-empregado">${linha.matricula} — ${linha.nome}</td>
+            <td class="col-empregado">${escaparHTML(linha.matricula)} — ${escaparHTML(linha.nome)}</td>
             ${linha.valores.map((v, i) => {
                 if (v === null) return '<td class="valor">—</td>';
                 const tipoClasse = matriz.colunas[i].tipo === 'P' ? 'tipo-provento' : 'tipo-desconto';
-                return `<td class="valor celula-matriz">
-                    <span class="celula-referencia">${v.referencia}</span>
-                    <span class="celula-valor ${tipoClasse}">${formatarBRL(v.valor)}</span>
+                return `<td class="valor">
+                    <div class="celula-matriz">
+                        <span class="celula-referencia">${escaparHTML(v.referencia)}</span>
+                        <span class="celula-valor ${tipoClasse}">${formatarBRL(v.valor)}</span>
+                    </div>
                 </td>`;
             }).join('')}
         </tr>
