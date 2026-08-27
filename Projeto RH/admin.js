@@ -289,7 +289,7 @@ let _empregadosFiltrados = [];
 let _paginaEmpregados = 1;
 const _porPaginaEmpregados = 50;
 
-const _COLS_DEFAULT_EMP = ['codigo_empresa','codigo_empregado','nome_empregado','data_admissao','situacao','cpf'];
+const _COLS_DEFAULT_EMP = ['codigo_empresa','codigo_empregado','nome_empregado','data_admissao','situacao','cpf','tipo_empregado'];
 let _colsSelecionadas = new Set(_COLS_DEFAULT_EMP);
 let _empresasSelecionadas = new Set(); // vazio = todas
 
@@ -1792,10 +1792,13 @@ function analisarQSA() {
         return;
     }
 
-    // Índices de empregados por CPF e por nome normalizado
+    // Índices de empregados por CPF e por nome normalizado.
+    // Só entram vínculos com tipo_empregado = "Empregado" (a sobreposição
+    // considera admissão × demissão desse tipo de vínculo).
     const porCpf = new Map();
     const porNome = new Map();
     for (const e of _todosEmpregados) {
+        if ((e.tipo_empregado || '').trim() !== 'Empregado') continue;
         const cpf = _soDigitos(e.cpf);
         if (cpf.length === 11) {
             if (!porCpf.has(cpf)) porCpf.set(cpf, []);
@@ -1868,7 +1871,7 @@ function renderResultadoQSA() {
 
     if (!_resultadoQSA.length) {
         btnExp.style.display = 'none';
-        conteudo.innerHTML = '<p style="color:#1E7E34;font-weight:600;margin:0">✅ Nenhum sócio esteve cadastrado como empregado da mesma empresa em período sobreposto.</p>';
+        conteudo.innerHTML = '<p style="color:#1E7E34;font-weight:600;margin:0">✅ Nenhum sócio esteve cadastrado como empregado (tipo "Empregado") da mesma empresa em período sobreposto.</p>';
         return;
     }
     btnExp.style.display = '';
@@ -1903,7 +1906,7 @@ function renderResultadoQSA() {
             <tbody>${linhas}</tbody>
         </table>
     </div>
-    <p style="font-size:11px;color:#95A5A6;margin:8px 0 0">Linhas em amarelo: match por nome (sócio sem CPF cadastrado) — confirmar manualmente.</p>`;
+    <p style="font-size:11px;color:#95A5A6;margin:8px 0 0">Considera apenas vínculos com tipo "Empregado", pela sobreposição entre admissão→demissão e o período como sócio, na mesma empresa. Linhas em amarelo: match por nome (sócio sem CPF cadastrado) — confirmar manualmente.</p>`;
 }
 
 function exportarQSAExcel() {
