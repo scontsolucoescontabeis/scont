@@ -1827,6 +1827,8 @@ function analisarQSA() {
         }
 
         for (const e of candidatos) {
+            // Só interessa quando sócio e empregado são da MESMA empresa
+            if ((e.codigo_empresa || '') !== (s.codigo_empresa || '')) continue;
             if (!_periodosSobrepoem(s.data_entrada, s.data_saida, e.data_admissao, e.data_demissao)) continue;
             const obs = [];
             if (!s.data_entrada && !s.data_saida) obs.push('período do sócio indefinido');
@@ -1834,12 +1836,10 @@ function analisarQSA() {
             ocorrencias.push({
                 nome_socio:      s.nome_socio || '',
                 cpf:             s.cpf || '',
-                empresa_socio:   s.codigo_empresa || '',
-                empresa_socio_nome: empNome(s.codigo_empresa),
+                empresa:         s.codigo_empresa || '',
+                empresa_nome:    empNome(s.codigo_empresa),
                 socio_entrada:   s.data_entrada || null,
                 socio_saida:     s.data_saida || null,
-                empresa_vinculo: e.codigo_empresa || '',
-                empresa_vinculo_nome: empNome(e.codigo_empresa),
                 codigo_empregado: e.codigo_empregado || '',
                 nome_empregado:  e.nome_empregado || '',
                 vinculo_admissao: e.data_admissao || null,
@@ -1852,7 +1852,7 @@ function analisarQSA() {
 
     ocorrencias.sort((a, b) =>
         (a.nome_socio || '').localeCompare(b.nome_socio || '', 'pt-BR') ||
-        (a.empresa_vinculo || '').localeCompare(b.empresa_vinculo || ''));
+        (a.empresa || '').localeCompare(b.empresa || ''));
     _resultadoQSA = ocorrencias;
 
     renderResultadoQSA();
@@ -1868,7 +1868,7 @@ function renderResultadoQSA() {
 
     if (!_resultadoQSA.length) {
         btnExp.style.display = 'none';
-        conteudo.innerHTML = '<p style="color:#1E7E34;font-weight:600;margin:0">✅ Nenhum sócio esteve cadastrado como empregado no mesmo período.</p>';
+        conteudo.innerHTML = '<p style="color:#1E7E34;font-weight:600;margin:0">✅ Nenhum sócio esteve cadastrado como empregado da mesma empresa em período sobreposto.</p>';
         return;
     }
     btnExp.style.display = '';
@@ -1883,9 +1883,8 @@ function renderResultadoQSA() {
         <tr${possivel ? ' style="background:#FFF8E1"' : ''}>
             <td><strong>${esc(o.nome_socio)}</strong></td>
             <td style="font-size:12px">${esc(o.cpf) || '—'}</td>
-            <td style="font-size:12px">${esc(o.empresa_socio)}<br><span style="font-size:11px;color:#555">${esc(o.empresa_socio_nome)}</span></td>
+            <td style="font-size:12px">${esc(o.empresa)}<br><span style="font-size:11px;color:#555">${esc(o.empresa_nome)}</span></td>
             <td style="font-size:12px">${per(o.socio_entrada, o.socio_saida)}</td>
-            <td style="font-size:12px">${esc(o.empresa_vinculo)}<br><span style="font-size:11px;color:#555">${esc(o.empresa_vinculo_nome)}</span></td>
             <td style="font-size:12px">${esc(o.codigo_empregado) || '—'}</td>
             <td style="font-size:12px">${per(o.vinculo_admissao, o.vinculo_demissao)}</td>
             <td style="font-size:12px">${esc(o.tipo_match)}</td>
@@ -1897,8 +1896,8 @@ function renderResultadoQSA() {
     <div class="table-container">
         <table class="admin-table">
             <thead><tr>
-                <th>Sócio</th><th>CPF</th><th>Empresa (sócio)</th><th>Período como sócio</th>
-                <th>Empresa (vínculo)</th><th>Cód. Empregado</th><th>Período do vínculo</th>
+                <th>Sócio</th><th>CPF</th><th>Empresa</th><th>Período como sócio</th>
+                <th>Cód. Empregado</th><th>Período do vínculo</th>
                 <th>Match</th><th>Observação</th>
             </tr></thead>
             <tbody>${linhas}</tbody>
@@ -1911,20 +1910,20 @@ function exportarQSAExcel() {
     if (!_resultadoQSA.length) { mostrarStatus('statusSocios', 'Nada para exportar.', 'error'); return; }
     const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '';
     const aoa = [[
-        'SÓCIO', 'CPF', 'CÓD. EMPRESA (SÓCIO)', 'EMPRESA (SÓCIO)', 'INGRESSO SÓCIO', 'SAÍDA SÓCIO',
-        'CÓD. EMPRESA (VÍNCULO)', 'EMPRESA (VÍNCULO)', 'CÓD. EMPREGADO', 'NOME NO CADASTRO DE EMPREGADO',
+        'SÓCIO', 'CPF', 'CÓD. EMPRESA', 'EMPRESA', 'INGRESSO SÓCIO', 'SAÍDA SÓCIO',
+        'CÓD. EMPREGADO', 'NOME NO CADASTRO DE EMPREGADO',
         'ADMISSÃO', 'DEMISSÃO', 'TIPO DE MATCH', 'OBSERVAÇÃO'
     ]];
     for (const o of _resultadoQSA) {
         aoa.push([
-            o.nome_socio, o.cpf, o.empresa_socio, o.empresa_socio_nome, fmt(o.socio_entrada), fmt(o.socio_saida),
-            o.empresa_vinculo, o.empresa_vinculo_nome, o.codigo_empregado, o.nome_empregado,
+            o.nome_socio, o.cpf, o.empresa, o.empresa_nome, fmt(o.socio_entrada), fmt(o.socio_saida),
+            o.codigo_empregado, o.nome_empregado,
             fmt(o.vinculo_admissao), fmt(o.vinculo_demissao), o.tipo_match, o.observacao
         ]);
     }
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [32, 16, 12, 28, 14, 14, 12, 28, 14, 32, 12, 12, 16, 30].map(w => ({ wch: w }));
+    ws['!cols'] = [32, 16, 12, 28, 14, 14, 14, 32, 12, 12, 16, 30].map(w => ({ wch: w }));
     XLSX.utils.book_append_sheet(wb, ws, 'Analise QSA');
     const hoje = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `analise_qsa_${hoje}.xlsx`);
