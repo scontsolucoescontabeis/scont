@@ -1735,6 +1735,201 @@ function renderPaginacaoSocios(total) {
     `;
 }
 
+// --- ANÁLISE DO QSA × rh_empregados ---
+//
+// Verifica, para cada sócio cadastrado (rh_socios), se a mesma pessoa
+// esteve registrada como empregado (rh_empregados) num período que se
+// sobrepõe ao período em que foi sócio. Match principal por CPF; quando
+// o sócio não tem CPF, tenta por nome normalizado (menor confiança).
+// A análise usa _todosSocios e _todosEmpregados já carregados em memória
+// (paginados e respeitando o escopo do usuário).
+
+let _resultadoQSA = [];
+
+function _soDigitos(v) { return String(v ?? '').replace(/\D/g, ''); }
+
+function _normalizarNome(v) {
+    return String(v ?? '')
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Sobreposição de dois intervalos, tratando datas ausentes como
+ * limite aberto (−∞ para início, +∞ para fim). Retorna true se há
+ * qualquer dia em comum.
+ */
+function _periodosSobrepoem(ini1, fim1, ini2, fim2) {
+    const MIN = -8.64e15, MAX = 8.64e15;
+    const t = (d, fallback) => {
+        if (!d) return fallback;
+        const ms = new Date(d + 'T00:00:00').getTime();
+        return isNaN(ms) ? fallback : ms;
+    };
+    const a1 = t(ini1, MIN), b1 = t(fim1, MAX);
+    const a2 = t(ini2, MIN), b2 = t(fim2, MAX);
+    return a1 <= b2 && a2 <= b1;
+}
+
+function analisarQSA() {
+    const painel = document.getElementById('painelQSA');
+    const conteudo = document.getElementById('conteudoQSA');
+    const resumo = document.getElementById('resumoQSA');
+    painel.style.display = '';
+
+    if (!_todosSocios.length) {
+        _resultadoQSA = [];
+        resumo.textContent = '';
+        conteudo.innerHTML = '<p style="color:#95A5A6;margin:0">Nenhum sócio cadastrado para analisar.</p>';
+        document.getElementById('btnExportarQSA').style.display = 'none';
+        return;
+    }
+    if (!_todosEmpregados.length) {
+        _resultadoQSA = [];
+        resumo.textContent = '';
+        conteudo.innerHTML = '<p style="color:#95A5A6;margin:0">Cadastro de empregados ainda carregando. Aguarde alguns segundos e tente novamente.</p>';
+        document.getElementById('btnExportarQSA').style.display = 'none';
+        return;
+    }
+
+    // Índices de empregados por CPF e por nome normalizado
+    const porCpf = new Map();
+    const porNome = new Map();
+    for (const e of _todosEmpregados) {
+        const cpf = _soDigitos(e.cpf);
+        if (cpf.length === 11) {
+            if (!porCpf.has(cpf)) porCpf.set(cpf, []);
+            porCpf.get(cpf).push(e);
+        }
+        const nome = _normalizarNome(e.nome_empregado);
+        if (nome) {
+            if (!porNome.has(nome)) porNome.set(nome, []);
+            porNome.get(nome).push(e);
+        }
+    }
+
+    const empNome = cod => {
+        const emp = _todasEmpresas.find(x => x.codigo_empresa === cod);
+        return emp ? emp.nome_empresa : '';
+    };
+
+    const ocorrencias = [];
+    for (const s of _todosSocios) {
+        const cpfSocio = _soDigitos(s.cpf);
+        let candidatos, tipoMatch;
+        if (cpfSocio.length === 11) {
+            candidatos = porCpf.get(cpfSocio) || [];
+            tipoMatch = 'CPF';
+        } else {
+            const nomeSocio = _normalizarNome(s.nome_socio);
+            candidatos = nomeSocio ? (porNome.get(nomeSocio) || []) : [];
+            tipoMatch = 'Nome (possível)';
+        }
+
+        for (const e of candidatos) {
+            if (!_periodosSobrepoem(s.data_entrada, s.data_saida, e.data_admissao, e.data_demissao)) continue;
+            const obs = [];
+            if (!s.data_entrada && !s.data_saida) obs.push('período do sócio indefinido');
+            else if (!s.data_entrada || !s.data_saida) obs.push('período do sócio parcialmente indefinido');
+            ocorrencias.push({
+                nome_socio:      s.nome_socio || '',
+                cpf:             s.cpf || '',
+                empresa_socio:   s.codigo_empresa || '',
+                empresa_socio_nome: empNome(s.codigo_empresa),
+                socio_entrada:   s.data_entrada || null,
+                socio_saida:     s.data_saida || null,
+                empresa_vinculo: e.codigo_empresa || '',
+                empresa_vinculo_nome: empNome(e.codigo_empresa),
+                codigo_empregado: e.codigo_empregado || '',
+                nome_empregado:  e.nome_empregado || '',
+                vinculo_admissao: e.data_admissao || null,
+                vinculo_demissao: e.data_demissao || null,
+                tipo_match:      tipoMatch,
+                observacao:      obs.join('; ')
+            });
+        }
+    }
+
+    ocorrencias.sort((a, b) =>
+        (a.nome_socio || '').localeCompare(b.nome_socio || '', 'pt-BR') ||
+        (a.empresa_vinculo || '').localeCompare(b.empresa_vinculo || ''));
+    _resultadoQSA = ocorrencias;
+
+    renderResultadoQSA();
+}
+
+function renderResultadoQSA() {
+    const conteudo = document.getElementById('conteudoQSA');
+    const resumo = document.getElementById('resumoQSA');
+    const btnExp = document.getElementById('btnExportarQSA');
+
+    const nSocios = _todosSocios.length;
+    resumo.textContent = `${nSocios} sócio(s) analisado(s) · ${_resultadoQSA.length} ocorrência(s) de sobreposição`;
+
+    if (!_resultadoQSA.length) {
+        btnExp.style.display = 'none';
+        conteudo.innerHTML = '<p style="color:#1E7E34;font-weight:600;margin:0">✅ Nenhum sócio esteve cadastrado como empregado no mesmo período.</p>';
+        return;
+    }
+    btnExp.style.display = '';
+
+    const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const per = (i, f) => `${fmt(i)} → ${fmt(f)}`;
+
+    const linhas = _resultadoQSA.map(o => {
+        const possivel = o.tipo_match !== 'CPF';
+        return `
+        <tr${possivel ? ' style="background:#FFF8E1"' : ''}>
+            <td><strong>${esc(o.nome_socio)}</strong></td>
+            <td style="font-size:12px">${esc(o.cpf) || '—'}</td>
+            <td style="font-size:12px">${esc(o.empresa_socio)}<br><span style="font-size:11px;color:#555">${esc(o.empresa_socio_nome)}</span></td>
+            <td style="font-size:12px">${per(o.socio_entrada, o.socio_saida)}</td>
+            <td style="font-size:12px">${esc(o.empresa_vinculo)}<br><span style="font-size:11px;color:#555">${esc(o.empresa_vinculo_nome)}</span></td>
+            <td style="font-size:12px">${esc(o.codigo_empregado) || '—'}</td>
+            <td style="font-size:12px">${per(o.vinculo_admissao, o.vinculo_demissao)}</td>
+            <td style="font-size:12px">${esc(o.tipo_match)}</td>
+            <td style="font-size:12px;color:#7F8C8D">${esc(o.observacao) || '—'}</td>
+        </tr>`;
+    }).join('');
+
+    conteudo.innerHTML = `
+    <div class="table-container">
+        <table class="admin-table">
+            <thead><tr>
+                <th>Sócio</th><th>CPF</th><th>Empresa (sócio)</th><th>Período como sócio</th>
+                <th>Empresa (vínculo)</th><th>Cód. Empregado</th><th>Período do vínculo</th>
+                <th>Match</th><th>Observação</th>
+            </tr></thead>
+            <tbody>${linhas}</tbody>
+        </table>
+    </div>
+    <p style="font-size:11px;color:#95A5A6;margin:8px 0 0">Linhas em amarelo: match por nome (sócio sem CPF cadastrado) — confirmar manualmente.</p>`;
+}
+
+function exportarQSAExcel() {
+    if (!_resultadoQSA.length) { mostrarStatus('statusSocios', 'Nada para exportar.', 'error'); return; }
+    const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '';
+    const aoa = [[
+        'SÓCIO', 'CPF', 'CÓD. EMPRESA (SÓCIO)', 'EMPRESA (SÓCIO)', 'INGRESSO SÓCIO', 'SAÍDA SÓCIO',
+        'CÓD. EMPRESA (VÍNCULO)', 'EMPRESA (VÍNCULO)', 'CÓD. EMPREGADO', 'NOME NO CADASTRO DE EMPREGADO',
+        'ADMISSÃO', 'DEMISSÃO', 'TIPO DE MATCH', 'OBSERVAÇÃO'
+    ]];
+    for (const o of _resultadoQSA) {
+        aoa.push([
+            o.nome_socio, o.cpf, o.empresa_socio, o.empresa_socio_nome, fmt(o.socio_entrada), fmt(o.socio_saida),
+            o.empresa_vinculo, o.empresa_vinculo_nome, o.codigo_empregado, o.nome_empregado,
+            fmt(o.vinculo_admissao), fmt(o.vinculo_demissao), o.tipo_match, o.observacao
+        ]);
+    }
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = [32, 16, 12, 28, 14, 14, 12, 28, 14, 32, 12, 12, 16, 30].map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, 'Analise QSA');
+    const hoje = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `analise_qsa_${hoje}.xlsx`);
+}
+
 async function salvarSocio() {
     const id      = document.getElementById('socioEditId').value;
     const empresa = document.getElementById('socioEmpresa').value.trim();
