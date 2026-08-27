@@ -9,7 +9,9 @@ const state = {
     competenciaAtual: null,
     empregadosSelecionados: new Set(),
     rubricasSelecionadas: new Set(),
-    matrizAtual: null
+    matrizAtual: null,
+    mostrarQuantidade: true,
+    mostrarValor: true
 };
 
 const els = {
@@ -34,7 +36,9 @@ const els = {
     btnTodasRubricas: document.getElementById('btnTodasRubricas'),
     btnNenhumaRubrica: document.getElementById('btnNenhumaRubrica'),
     btnNovaValidacao: document.getElementById('btnNovaValidacao'),
-    btnGerarPdf: document.getElementById('btnGerarPdf')
+    btnGerarPdf: document.getElementById('btnGerarPdf'),
+    chkMostrarQuantidade: document.getElementById('chkMostrarQuantidade'),
+    chkMostrarValor: document.getElementById('chkMostrarValor')
 };
 
 function formatarBRL(valor) {
@@ -103,6 +107,23 @@ function configurarEventos() {
 
     els.btnGerarPdf.addEventListener('click', gerarPDF);
 
+    els.chkMostrarQuantidade.addEventListener('change', () => {
+        if (!els.chkMostrarQuantidade.checked && !els.chkMostrarValor.checked) {
+            els.chkMostrarQuantidade.checked = true;
+            return;
+        }
+        state.mostrarQuantidade = els.chkMostrarQuantidade.checked;
+        renderizarMatriz();
+    });
+    els.chkMostrarValor.addEventListener('change', () => {
+        if (!els.chkMostrarValor.checked && !els.chkMostrarQuantidade.checked) {
+            els.chkMostrarValor.checked = true;
+            return;
+        }
+        state.mostrarValor = els.chkMostrarValor.checked;
+        renderizarMatriz();
+    });
+
     els.btnNovaValidacao.addEventListener('click', () => {
         els.resultado.classList.remove('visivel');
         els.cardUpload.style.display = '';
@@ -114,6 +135,10 @@ function configurarEventos() {
         state.empregadosSelecionados = new Set();
         state.rubricasSelecionadas = new Set();
         state.matrizAtual = null;
+        state.mostrarQuantidade = true;
+        state.mostrarValor = true;
+        els.chkMostrarQuantidade.checked = true;
+        els.chkMostrarValor.checked = true;
         els.btnProcessar.disabled = true;
         limparErro();
     });
@@ -289,12 +314,10 @@ function renderizarMatriz() {
             ${linha.valores.map((v, i) => {
                 if (v === null) return '<td class="valor">—</td>';
                 const tipoClasse = matriz.colunas[i].tipo === 'P' ? 'tipo-provento' : 'tipo-desconto';
-                return `<td class="valor">
-                    <div class="celula-matriz">
-                        <span class="celula-referencia">${escaparHTML(v.referencia)}</span>
-                        <span class="celula-valor ${tipoClasse}">${formatarBRL(v.valor)}</span>
-                    </div>
-                </td>`;
+                const partes = [];
+                if (state.mostrarQuantidade) partes.push(`<span class="celula-referencia">${escaparHTML(v.referencia)}</span>`);
+                if (state.mostrarValor) partes.push(`<span class="celula-valor ${tipoClasse}">${formatarBRL(v.valor)}</span>`);
+                return `<td class="valor"><div class="celula-matriz">${partes.join('')}</div></td>`;
             }).join('')}
         </tr>
     `).join('');
@@ -338,7 +361,13 @@ function gerarPDF() {
     const head = [['Empregado', ...matriz.colunas.map(c => c.descricao)]];
     const body = matriz.linhas.map(linha => [
         `${linha.matricula} — ${linha.nome}`,
-        ...linha.valores.map(v => v === null ? '—' : `${v.referencia}\n${formatarBRL(v.valor)}`)
+        ...linha.valores.map(v => {
+            if (v === null) return '—';
+            const partes = [];
+            if (state.mostrarQuantidade) partes.push(v.referencia);
+            if (state.mostrarValor) partes.push(formatarBRL(v.valor));
+            return partes.join('\n') || '—';
+        })
     ]);
 
     const MM_PER_COL = 16;

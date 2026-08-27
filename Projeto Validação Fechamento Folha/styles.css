@@ -331,6 +331,26 @@ header.app-header p {
     font-size: 13px;
 }
 
+.opcoes-exibicao {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: -4px 0 14px;
+}
+.opcoes-exibicao-rotulo {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+}
+.opcao-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+}
+
 table.tabela-dados {
     width: 100%;
     border-collapse: collapse;
