@@ -48,17 +48,36 @@ function limparErro() {
 }
 
 // ── upload ──
-els.uploadArea.addEventListener('dragover', (ev) => { ev.preventDefault(); els.uploadArea.classList.add('dragover'); });
-els.uploadArea.addEventListener('dragleave', () => els.uploadArea.classList.remove('dragover'));
-els.uploadArea.addEventListener('drop', (ev) => {
-    ev.preventDefault();
-    els.uploadArea.classList.remove('dragover');
-    if (ev.dataTransfer.files.length > 0) {
-        els.inputArquivo.files = ev.dataTransfer.files;
-        onArquivoSelecionado();
-    }
+function configurarEventos() {
+    els.uploadArea.addEventListener('dragover', (ev) => { ev.preventDefault(); els.uploadArea.classList.add('dragover'); });
+    els.uploadArea.addEventListener('dragleave', () => els.uploadArea.classList.remove('dragover'));
+    els.uploadArea.addEventListener('drop', (ev) => {
+        ev.preventDefault();
+        els.uploadArea.classList.remove('dragover');
+        if (ev.dataTransfer.files.length > 0) {
+            els.inputArquivo.files = ev.dataTransfer.files;
+            onArquivoSelecionado();
+        }
+    });
+    els.inputArquivo.addEventListener('change', onArquivoSelecionado);
+
+    els.btnProcessar.addEventListener('click', processarArquivo);
+    els.btnNovaValidacao.addEventListener('click', () => {
+        els.resultado.classList.remove('visivel');
+        els.cardUpload.style.display = '';
+        els.inputArquivo.value = '';
+        els.nomeArquivo.textContent = '';
+        state.arquivo = null;
+        els.btnProcessar.disabled = true;
+        limparErro();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+    if (!auth) return;
+    configurarEventos();
 });
-els.inputArquivo.addEventListener('change', onArquivoSelecionado);
 
 function onArquivoSelecionado() {
     const arquivo = els.inputArquivo.files[0];
@@ -74,17 +93,6 @@ function onArquivoSelecionado() {
     els.nomeArquivo.textContent = arquivo.name;
     els.btnProcessar.disabled = false;
 }
-
-els.btnProcessar.addEventListener('click', processarArquivo);
-els.btnNovaValidacao.addEventListener('click', () => {
-    els.resultado.classList.remove('visivel');
-    els.cardUpload.style.display = '';
-    els.inputArquivo.value = '';
-    els.nomeArquivo.textContent = '';
-    state.arquivo = null;
-    els.btnProcessar.disabled = true;
-    limparErro();
-});
 
 async function processarArquivo() {
     limparErro();
