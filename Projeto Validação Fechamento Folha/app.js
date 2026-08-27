@@ -19,10 +19,7 @@ const els = {
     contagemQuadro: document.getElementById('contagemQuadro'),
     tabelaVariacao: document.getElementById('tabelaVariacao'),
     contagemVariacao: document.getElementById('contagemVariacao'),
-    btnNovaValidacao: document.getElementById('btnNovaValidacao'),
-    hamburger: document.getElementById('hamburger'),
-    sidebar: document.getElementById('sidebar'),
-    sidebarOverlay: document.getElementById('sidebarOverlay')
+    btnNovaValidacao: document.getElementById('btnNovaValidacao')
 };
 
 function formatarBRL(valor) {
@@ -48,18 +45,6 @@ function mostrarErro(msg) {
 function limparErro() {
     els.mensagemErro.textContent = '';
     els.mensagemErro.classList.remove('visivel');
-}
-
-// ── sidebar (mobile) ──
-function configurarSidebar() {
-    els.hamburger.addEventListener('click', () => {
-        els.sidebar.classList.toggle('open');
-        els.sidebarOverlay.classList.toggle('active');
-    });
-    els.sidebarOverlay.addEventListener('click', () => {
-        els.sidebar.classList.remove('open');
-        els.sidebarOverlay.classList.remove('active');
-    });
 }
 
 // ── upload ──
@@ -89,7 +74,6 @@ function configurarEventos() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    configurarSidebar();
     const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
     if (!auth) return;
     configurarEventos();

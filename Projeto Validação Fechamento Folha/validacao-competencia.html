@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Comparação entre Competências – Validação de Fechamento de Folha</title>
+<title>Validação Competência – Validação de Fechamento de Folha</title>
 <link rel="stylesheet" href="styles.css">
 <script src="../supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../portal-auth-guard.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="extrato-parser.js"></script>
-<script src="extrato-comparador.js"></script>
+<script src="matriz-competencia.js"></script>
 <script src="sidebar.js"></script>
 </head>
 <body>
@@ -27,10 +27,10 @@
 
     <nav class="sidebar-nav">
         <div class="sidebar-section">Ferramenta</div>
-        <a href="index.html" class="sidebar-item active">
+        <a href="index.html" class="sidebar-item">
             <span class="sidebar-item-icon">🔍</span> Comparação entre Competências
         </a>
-        <a href="validacao-competencia.html" class="sidebar-item">
+        <a href="validacao-competencia.html" class="sidebar-item active">
             <span class="sidebar-item-icon">🧮</span> Validação Competência
         </a>
     </nav>
@@ -49,8 +49,8 @@
 <div class="main-content">
 <div class="container">
     <header class="app-header">
-        <h1>Comparação entre Competências</h1>
-        <p>Suba o PDF "Extrato Mensal" com a competência atual e a anterior para comparar automaticamente.</p>
+        <h1>Validação Competência</h1>
+        <p>Suba o PDF "Extrato Mensal", escolha a competência e selecione empregados/rubricas para montar a folha gerencial (empregados × rubricas).</p>
     </header>
 
     <section class="card" id="cardUpload">
@@ -62,12 +62,6 @@
         </label>
 
         <div class="form-row">
-            <label for="inputLimiar">Destacar variações acima de</label>
-            <input type="number" id="inputLimiar" value="15" min="0" step="1">
-            <label for="inputLimiar">%</label>
-        </div>
-
-        <div class="form-row">
             <button class="btn" id="btnProcessar" disabled>Processar</button>
         </div>
 
@@ -76,24 +70,46 @@
     </section>
 
     <section class="resultado" id="resultado">
-        <div class="resumo-competencias" id="resumoCompetencias"></div>
-
-        <div class="cards-totais" id="cardsTotais"></div>
+        <div class="card" id="cardCompetencia">
+            <div class="form-row">
+                <label for="selectCompetencia">Competência</label>
+                <select id="selectCompetencia"></select>
+                <span id="infoEmpresa" class="info-empresa"></span>
+            </div>
+        </div>
 
         <div class="card">
-            <div class="secao-titulo">
-                Mudanças de quadro
-                <span class="contagem" id="contagemQuadro">0</span>
+            <div class="secao-titulo">Seleção para o relatório</div>
+            <div class="selecao-grid">
+                <div class="selecao-painel">
+                    <div class="selecao-titulo-painel">
+                        <span>Empregados <span class="contagem" id="contagemEmpregados">0</span></span>
+                        <div class="selecao-acoes">
+                            <button class="link-btn" id="btnTodosEmpregados">todos</button>
+                            <button class="link-btn" id="btnNenhumEmpregado">nenhum</button>
+                        </div>
+                    </div>
+                    <div class="selecao-lista" id="listaEmpregados"></div>
+                </div>
+                <div class="selecao-painel">
+                    <div class="selecao-titulo-painel">
+                        <span>Rubricas <span class="contagem" id="contagemRubricas">0</span></span>
+                        <div class="selecao-acoes">
+                            <button class="link-btn" id="btnTodasRubricas">todas</button>
+                            <button class="link-btn" id="btnNenhumaRubrica">nenhuma</button>
+                        </div>
+                    </div>
+                    <div class="selecao-lista" id="listaRubricas"></div>
+                </div>
             </div>
-            <div class="tabela-scroll" id="tabelaQuadro"></div>
         </div>
 
         <div class="card">
             <div class="secao-titulo">
-                Variação de totais por empregado
-                <span class="contagem" id="contagemVariacao">0</span>
+                Folha da Competência
+                <span class="contagem" id="contagemMatriz">0</span>
             </div>
-            <div class="tabela-scroll" id="tabelaVariacao"></div>
+            <div class="tabela-scroll" id="tabelaMatriz"></div>
         </div>
 
         <footer class="rodape-acoes">
@@ -103,6 +119,6 @@
 </div>
 </div><!-- /main-content -->
 
-<script src="app.js"></script>
+<script src="app-validacao.js"></script>
 </body>
 </html>
