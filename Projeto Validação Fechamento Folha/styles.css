@@ -349,6 +349,28 @@ table.tabela-dados tbody tr:hover { background: var(--bg-light); }
 table.tabela-dados tr.linha-alerta td { background: #FDF3EC; }
 table.tabela-dados tr.linha-alerta:hover td { background: #FBE9DA; }
 
+tr.linha-variacao { cursor: pointer; }
+tr.linha-variacao .col-toggle {
+    color: var(--muted);
+    font-size: 11px;
+    width: 16px;
+    text-align: center;
+}
+tr.linha-detalhe-rubricas td {
+    background: var(--bg-light);
+    padding: 14px 16px 16px 40px;
+    cursor: default;
+    white-space: normal;
+}
+tr.linha-detalhe-rubricas:hover td { background: var(--bg-light); }
+.tabela-detalhe-rubricas {
+    font-size: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+.tabela-detalhe-rubricas th { background: var(--border-light); }
+
 .badge-mudanca {
     display: inline-block;
     padding: 2px 10px;

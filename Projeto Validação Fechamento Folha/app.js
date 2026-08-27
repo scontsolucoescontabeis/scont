@@ -1,7 +1,7 @@
 const ExtratoParser = window.ExtratoParser;
 const ExtratoComparador = window.ExtratoComparador;
 
-const state = { arquivo: null };
+const state = { arquivo: null, anterior: null, atual: null };
 
 const els = {
     inputArquivo: document.getElementById('inputArquivo'),
@@ -78,6 +78,8 @@ function configurarEventos() {
         els.inputArquivo.value = '';
         els.nomeArquivo.textContent = '';
         state.arquivo = null;
+        state.anterior = null;
+        state.atual = null;
         els.btnProcessar.disabled = true;
         limparErro();
     });
@@ -131,6 +133,9 @@ async function processarArquivo() {
         if (!anterior) {
             throw new Error(`O PDF contém apenas a competência ${atual.competencia}. Envie um PDF com a competência atual e a anterior (ex.: exporte um intervalo de 2 meses do sistema de folha).`);
         }
+
+        state.anterior = anterior;
+        state.atual = atual;
 
         const limiarPercentual = Number(els.inputLimiar.value) || 15;
         const resultado = ExtratoComparador.compararCompetencias(anterior, atual, { limiarPercentual });
@@ -231,7 +236,8 @@ function renderizarTabelaVariacao(linhasVariacao) {
         return;
     }
     const linhas = linhasVariacao.map(v => `
-        <tr class="${v.acimaDoLimiar ? 'linha-alerta' : ''}">
+        <tr class="linha-variacao ${v.acimaDoLimiar ? 'linha-alerta' : ''}" data-matricula="${escaparHTML(v.matricula)}" data-tipo="${escaparHTML(v.tipoRegistro)}" title="Clique para ver a variação rubrica a rubrica">
+            <td class="col-toggle">▸</td>
             <td>${escaparHTML(v.matricula)}</td>
             <td>${escaparHTML(v.nome)}</td>
             <td>${formatarBRL(v.proventos.anterior)} → ${formatarBRL(v.proventos.atual)}</td>
@@ -245,6 +251,7 @@ function renderizarTabelaVariacao(linhasVariacao) {
     els.tabelaVariacao.innerHTML = `
         <table class="tabela-dados">
             <thead><tr>
+                <th></th>
                 <th>Matrícula</th><th>Nome</th>
                 <th>Proventos</th><th>Δ%</th>
                 <th>Descontos</th><th>Δ%</th>
@@ -253,4 +260,53 @@ function renderizarTabelaVariacao(linhasVariacao) {
             <tbody>${linhas}</tbody>
         </table>
     `;
+
+    els.tabelaVariacao.querySelectorAll('tr.linha-variacao').forEach(tr => {
+        tr.addEventListener('click', () => toggleDetalheRubricas(tr));
+    });
+}
+
+function toggleDetalheRubricas(tr) {
+    const proximo = tr.nextElementSibling;
+    if (proximo && proximo.classList.contains('linha-detalhe-rubricas')) {
+        proximo.remove();
+        tr.querySelector('.col-toggle').textContent = '▸';
+        return;
+    }
+
+    // mantém só um detalhe aberto por vez, mais fácil de acompanhar
+    els.tabelaVariacao.querySelectorAll('tr.linha-detalhe-rubricas').forEach(el => el.remove());
+    els.tabelaVariacao.querySelectorAll('.col-toggle').forEach(el => { el.textContent = '▸'; });
+
+    const matricula = tr.dataset.matricula;
+    const tipo = tr.dataset.tipo;
+    const empAnterior = state.anterior.empregados.find(e => e.matricula === matricula && e.tipo === tipo) || null;
+    const empAtual = state.atual.empregados.find(e => e.matricula === matricula && e.tipo === tipo) || null;
+    const linhasRubricas = ExtratoComparador.compararRubricasEmpregado(empAnterior, empAtual);
+
+    tr.querySelector('.col-toggle').textContent = '▾';
+
+    const corpoDetalhe = linhasRubricas.length === 0
+        ? '<tr><td colspan="5" class="vazio">Nenhuma rubrica encontrada para este empregado.</td></tr>'
+        : linhasRubricas.map(r => `
+            <tr>
+                <td>${escaparHTML(r.descricao)}</td>
+                <td>${r.anterior === null ? '—' : formatarBRL(r.anterior)}</td>
+                <td>${r.atual === null ? '—' : formatarBRL(r.atual)}</td>
+                <td class="${classeDelta(r.deltaAbsoluto)}">${r.deltaAbsoluto >= 0 ? '+' : ''}${formatarBRL(r.deltaAbsoluto)}</td>
+                <td class="${classeDelta(r.deltaPercentual)}">${formatarPct(r.deltaPercentual)}</td>
+            </tr>
+        `).join('');
+
+    const detalheTr = document.createElement('tr');
+    detalheTr.className = 'linha-detalhe-rubricas';
+    detalheTr.innerHTML = `
+        <td colspan="9">
+            <table class="tabela-dados tabela-detalhe-rubricas">
+                <thead><tr><th>Rubrica</th><th>Antes</th><th>Agora</th><th>Δ</th><th>Δ%</th></tr></thead>
+                <tbody>${corpoDetalhe}</tbody>
+            </table>
+        </td>
+    `;
+    tr.after(detalheTr);
 }

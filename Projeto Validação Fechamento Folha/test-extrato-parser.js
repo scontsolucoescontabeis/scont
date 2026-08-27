@@ -1,6 +1,6 @@
 const assert = require('node:assert');
 const { _reconstruirLinhasPagina, _parseNumeroBR, _extrairRubricasDaLinha, parseExtratoMensal } = require('./extrato-parser.js');
-const { ordenarCompetencias, compararCompetencias, _deltaPercentual } = require('./extrato-comparador.js');
+const { ordenarCompetencias, compararCompetencias, compararRubricasEmpregado, _deltaPercentual } = require('./extrato-comparador.js');
 
 let testesExecutados = 0;
 function teste(nome, fn) {
@@ -286,6 +286,77 @@ teste('compararCompetencias compara totais gerais da empresa', () => {
     const atual = docFixture('08/2026', [], { proventos: 240533.23, descontos: 164056.52, liquido: 76476.71 });
     const resultado = compararCompetencias(anterior, atual);
     assert.strictEqual(resultado.totalGeral.liquido.deltaAbsoluto, -18043.73);
+});
+
+function rubricaFixture(overrides) {
+    return Object.assign({ codigo: '8781', descricao: 'DIAS NORMAIS', referencia: '31,00', valor: 1000, tipo: 'P' }, overrides);
+}
+
+teste('compararRubricasEmpregado calcula delta por código para rubricas presentes nas duas competências', () => {
+    const empAnterior = empFixture({ rubricas: [rubricaFixture({ codigo: '8781', valor: 1000 })] });
+    const empAtual = empFixture({ rubricas: [rubricaFixture({ codigo: '8781', valor: 1300 })] });
+    const linhas = compararRubricasEmpregado(empAnterior, empAtual);
+    assert.strictEqual(linhas.length, 1);
+    assert.strictEqual(linhas[0].codigo, '8781');
+    assert.strictEqual(linhas[0].anterior, 1000);
+    assert.strictEqual(linhas[0].atual, 1300);
+    assert.strictEqual(linhas[0].deltaAbsoluto, 300);
+    assert.strictEqual(linhas[0].deltaPercentual, 30);
+});
+
+teste('compararRubricasEmpregado marca rubrica nova (só na atual) com anterior null e percentual null', () => {
+    const empAnterior = empFixture({ rubricas: [] });
+    const empAtual = empFixture({ rubricas: [rubricaFixture({ codigo: '147', descricao: 'HORAS EXTRAS 65%', valor: 200, tipo: 'P' })] });
+    const linhas = compararRubricasEmpregado(empAnterior, empAtual);
+    assert.strictEqual(linhas.length, 1);
+    assert.strictEqual(linhas[0].anterior, null);
+    assert.strictEqual(linhas[0].atual, 200);
+    assert.strictEqual(linhas[0].deltaAbsoluto, 200);
+    assert.strictEqual(linhas[0].deltaPercentual, null);
+});
+
+teste('compararRubricasEmpregado marca rubrica que sumiu (só na anterior) com atual null', () => {
+    const empAnterior = empFixture({ rubricas: [rubricaFixture({ codigo: '981', descricao: 'DESC.ADIANT.SALARIAL', valor: 500, tipo: 'D' })] });
+    const empAtual = empFixture({ rubricas: [] });
+    const linhas = compararRubricasEmpregado(empAnterior, empAtual);
+    assert.strictEqual(linhas.length, 1);
+    assert.strictEqual(linhas[0].anterior, 500);
+    assert.strictEqual(linhas[0].atual, null);
+    assert.strictEqual(linhas[0].deltaAbsoluto, -500);
+});
+
+teste('compararRubricasEmpregado soma linhas duplicadas do mesmo código e usa descrição canônica sem número de contrato', () => {
+    const empAnterior = empFixture({ rubricas: [rubricaFixture({ codigo: '9750', descricao: 'DESC EMP CRED TRAB Nº 111', valor: 100, tipo: 'D' })] });
+    const empAtual = empFixture({ rubricas: [
+        rubricaFixture({ codigo: '9750', descricao: 'DESC EMP CRED TRAB Nº 222', valor: 60, tipo: 'D' }),
+        rubricaFixture({ codigo: '9750', descricao: 'DESC EMP CRED TRAB Nº 333', valor: 40, tipo: 'D' })
+    ] });
+    const linhas = compararRubricasEmpregado(empAnterior, empAtual);
+    assert.strictEqual(linhas.length, 1);
+    assert.strictEqual(linhas[0].descricao, 'DESC EMP CRED TRAB');
+    assert.strictEqual(linhas[0].anterior, 100);
+    assert.strictEqual(linhas[0].atual, 100);
+});
+
+teste('compararRubricasEmpregado ordena pela maior variação absoluta', () => {
+    const empAnterior = empFixture({ rubricas: [
+        rubricaFixture({ codigo: '1012', valor: 200, tipo: 'P' }),
+        rubricaFixture({ codigo: '998', valor: 100, tipo: 'D' })
+    ] });
+    const empAtual = empFixture({ rubricas: [
+        rubricaFixture({ codigo: '1012', valor: 210, tipo: 'P' }),
+        rubricaFixture({ codigo: '998', valor: 400, tipo: 'D' })
+    ] });
+    const linhas = compararRubricasEmpregado(empAnterior, empAtual);
+    assert.deepStrictEqual(linhas.map(l => l.codigo), ['998', '1012']);
+});
+
+teste('compararRubricasEmpregado tolera empregado ausente em um dos lados (null)', () => {
+    const empAtual = empFixture({ rubricas: [rubricaFixture({ codigo: '8781', valor: 1000 })] });
+    const linhas = compararRubricasEmpregado(null, empAtual);
+    assert.strictEqual(linhas.length, 1);
+    assert.strictEqual(linhas[0].anterior, null);
+    assert.strictEqual(linhas[0].atual, 1000);
 });
 
 console.log(`\n${testesExecutados} teste(s) passaram.`);

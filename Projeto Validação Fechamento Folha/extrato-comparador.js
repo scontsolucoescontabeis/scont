@@ -46,6 +46,50 @@ function _compararTotais(anteriorVal, atualVal) {
     };
 }
 
+function _descricaoCanonica(descricao) {
+    return (descricao || '').replace(/\s+N[º°]\s*[\w\d]+\s*$/, '').trim() || descricao;
+}
+
+function _agruparRubricasPorCodigo(rubricas) {
+    const grupos = new Map();
+    for (const r of rubricas || []) {
+        if (!grupos.has(r.codigo)) {
+            grupos.set(r.codigo, { codigo: r.codigo, descricao: _descricaoCanonica(r.descricao), tipo: r.tipo, valor: 0 });
+        }
+        grupos.get(r.codigo).valor += (r.valor || 0);
+    }
+    return grupos;
+}
+
+/**
+ * Compara, rubrica a rubrica, os lançamentos de UM empregado entre as
+ * duas competências (empAnterior/empAtual podem ser null quando o
+ * empregado não existe naquela competência). Devolve uma linha por
+ * código distinto (união entre as duas), ordenada pela maior variação
+ * absoluta — rubricas que só existem de um lado aparecem com o outro
+ * lado null.
+ */
+function compararRubricasEmpregado(empAnterior, empAtual) {
+    const gruposAnterior = _agruparRubricasPorCodigo(empAnterior ? empAnterior.rubricas : []);
+    const gruposAtual = _agruparRubricasPorCodigo(empAtual ? empAtual.rubricas : []);
+    const codigos = new Set([...gruposAnterior.keys(), ...gruposAtual.keys()]);
+
+    const linhas = Array.from(codigos).map(codigo => {
+        const a = gruposAnterior.get(codigo) || null;
+        const b = gruposAtual.get(codigo) || null;
+        const comparativo = _compararTotais(a ? a.valor : null, b ? b.valor : null);
+        return {
+            codigo,
+            descricao: (b || a).descricao,
+            tipo: (b || a).tipo,
+            ...comparativo
+        };
+    });
+
+    linhas.sort((x, y) => Math.abs(y.deltaAbsoluto) - Math.abs(x.deltaAbsoluto));
+    return linhas;
+}
+
 function _apurarMudancasQuadro(anterior, atual) {
     const mudancas = [];
     const mapaAnterior = new Map(anterior.empregados.map(e => [_chaveEmpregado(e), e]));
@@ -130,7 +174,8 @@ if (typeof module !== 'undefined' && module.exports) {
         _chaveEmpregado,
         _deltaPercentual,
         ordenarCompetencias,
-        compararCompetencias
+        compararCompetencias,
+        compararRubricasEmpregado
     };
 }
 if (typeof window !== 'undefined') {
@@ -139,6 +184,7 @@ if (typeof window !== 'undefined') {
         _chaveEmpregado,
         _deltaPercentual,
         ordenarCompetencias,
-        compararCompetencias
+        compararCompetencias,
+        compararRubricasEmpregado
     };
 }
