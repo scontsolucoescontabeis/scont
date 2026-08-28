@@ -1291,6 +1291,7 @@
             <button type="button" id="btnAnoAnterior">‹</button>
             <strong>${anoGradeAtual}</strong>
             <button type="button" id="btnAnoSeguinte">›</button>
+            <button type="button" class="btn btn-secondary" id="btnConsultarQSA" style="margin-left:auto;">👥 Consultar QSA</button>
           </div>
           <div class="full mapa-grade-linha">${celulasHtml}</div>
         </div>
@@ -1299,6 +1300,7 @@
 
     el.querySelector('#btnAnoAnterior').addEventListener('click', () => { anoGradeAtual -= 1; renderGradeMensal(); });
     el.querySelector('#btnAnoSeguinte').addEventListener('click', () => { anoGradeAtual += 1; renderGradeMensal(); });
+    el.querySelector('#btnConsultarQSA').addEventListener('click', () => abrirModalConsultaQSA(empresaAtualCodigo));
     el.querySelectorAll('.mapa-grade-cel').forEach((cel) => {
       cel.addEventListener('click', () => {
         const mes = Number(cel.getAttribute('data-mes'));
@@ -1596,12 +1598,12 @@
     return (a && m && dia) ? `${dia}/${m}/${a}` : d;
   }
 
-  function qsaPeriodoHtml(codigoEmpresa, ano, mes, socios) {
+  function qsaCorpoHtml(socios, meses) {
     if (socios === null) return '<p class="mapa-empty">Não foi possível carregar os sócios desta empresa.</p>';
     if (!socios.length) return '<p class="mapa-empty">Nenhum sócio cadastrado para esta empresa em Sócios (RH).</p>';
+    if (!meses.length) return '<p class="mapa-empty">Selecione uma competência inicial anterior ou igual à final.</p>';
 
     const Util = window.ContabilDiarioUtil;
-    const meses = Util.mesesDoPeriodoFechamento(ano, mesFinalFechamento(codigoEmpresa, mes), periodicidadeDe(codigoEmpresa));
     const analise = Util.analisarQsaPeriodo(socios, meses);
 
     const atualizacoes = socios.map((s) => (s.data_atualizacao_quadro ? String(s.data_atualizacao_quadro).slice(0, 10) : '')).filter(Boolean).sort();
@@ -1609,8 +1611,8 @@
 
     const r = analise.resumo;
     const resumoHtml = r.semAlteracao
-      ? '<p class="mapa-empty" style="margin:0 0 12px;">Sem alterações no QSA durante o período em análise.</p>'
-      : `<p class="mapa-empty" style="margin:0 0 12px;">No período: ${r.ingressos} ingresso(s), ${r.desligamentos} desligamento(s).</p>`;
+      ? '<p class="mapa-empty" style="margin:0 0 12px;">Sem alterações no QSA durante o intervalo selecionado.</p>'
+      : `<p class="mapa-empty" style="margin:0 0 12px;">No intervalo: ${r.ingressos} ingresso(s), ${r.desligamentos} desligamento(s).</p>`;
 
     const blocos = analise.meses.map((bloco) => {
       const linhas = bloco.socios.map((s) => {
@@ -1680,7 +1682,92 @@
 
     const socios = await carregarSociosEmpresa(codigoEmpresa);
     if (!modal.classList.contains('active')) return; // usuário já fechou
-    body.innerHTML = qsaPeriodoHtml(codigoEmpresa, ano, mes, socios);
+    const meses = window.ContabilDiarioUtil.mesesDoPeriodoFechamento(
+      ano, mesFinalFechamento(codigoEmpresa, mes), periodicidadeDe(codigoEmpresa));
+    body.innerHTML = qsaCorpoHtml(socios, meses);
+  }
+
+  // ─── MODAL: CONSULTA LIVRE DO QSA POR COMPETÊNCIA ──────────
+  // Aberto pelo botão "Consultar QSA" na grade mensal da empresa. Sem
+  // restrição de papel — qualquer usuário do Diário escolhe um intervalo
+  // de competências (mês/ano inicial → final) e vê o QSA daquela empresa
+  // mês a mês nesse intervalo. Reaproveita qsaCorpoHtml / carregarSociosEmpresa.
+
+  const _MESES_OPCOES = window.ContabilDiarioUtil.MESES_LABELS
+    .map((l, i) => `<option value="${i + 1}">${l}</option>`).join('');
+
+  function _anosOpcoes(anoRef) {
+    const opts = [];
+    for (let a = anoRef + 1; a >= anoRef - 12; a--) opts.push(`<option value="${a}">${a}</option>`);
+    return opts.join('');
+  }
+
+  async function abrirModalConsultaQSA(codigoEmpresa) {
+    let modal = document.getElementById('modalConsultaQSA');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalConsultaQSA';
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content large">
+          <div class="modal-header">
+            <h3 id="modalConsultaQSATitulo">Consultar QSA</h3>
+            <button class="modal-close" id="fecharModalConsultaQSA">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="mapa-secao-body" style="padding:0 0 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+              <div><label>Competência inicial</label>
+                <div style="display:flex;gap:6px;">
+                  <select id="qsaMesIni">${_MESES_OPCOES}</select>
+                  <select id="qsaAnoIni"></select>
+                </div>
+              </div>
+              <div><label>Competência final</label>
+                <div style="display:flex;gap:6px;">
+                  <select id="qsaMesFim">${_MESES_OPCOES}</select>
+                  <select id="qsaAnoFim"></select>
+                </div>
+              </div>
+              <button type="button" class="btn btn-primary" id="btnQsaConsultarExec">Consultar</button>
+            </div>
+            <div id="modalConsultaQSABody"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="fecharModalConsultaQSA2">Fechar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      const fechar = () => modal.classList.remove('active');
+      document.getElementById('fecharModalConsultaQSA').addEventListener('click', fechar);
+      document.getElementById('fecharModalConsultaQSA2').addEventListener('click', fechar);
+      modal.addEventListener('click', (ev) => { if (ev.target === modal) fechar(); });
+    }
+
+    const anoRef = anoGradeAtual;
+    modal.querySelector('#qsaAnoIni').innerHTML = _anosOpcoes(anoRef);
+    modal.querySelector('#qsaAnoFim').innerHTML = _anosOpcoes(anoRef);
+    modal.querySelector('#qsaMesIni').value = 1;
+    modal.querySelector('#qsaAnoIni').value = anoRef;
+    modal.querySelector('#qsaMesFim').value = 12;
+    modal.querySelector('#qsaAnoFim').value = anoRef;
+
+    document.getElementById('modalConsultaQSATitulo').textContent = `Consultar QSA — ${empresaNome(codigoEmpresa)}`;
+    const body = document.getElementById('modalConsultaQSABody');
+    body.innerHTML = '<p class="mapa-empty">Carregando sócios…</p>';
+    modal.classList.add('active');
+
+    const socios = await carregarSociosEmpresa(codigoEmpresa);
+    if (!modal.classList.contains('active')) return;
+
+    const consultar = () => {
+      const meses = window.ContabilDiarioUtil.mesesNoIntervalo(
+        Number(modal.querySelector('#qsaAnoIni').value), Number(modal.querySelector('#qsaMesIni').value),
+        Number(modal.querySelector('#qsaAnoFim').value), Number(modal.querySelector('#qsaMesFim').value));
+      body.innerHTML = qsaCorpoHtml(socios, meses);
+    };
+    modal.querySelector('#btnQsaConsultarExec').onclick = consultar;
+    consultar();
   }
 
   // ─── LANÇAMENTOS DO DIÁRIO ──────────────────────────────────

@@ -158,6 +158,22 @@
     return ultimosNMeses(ano, mesFinal, qtdMesesNoPeriodo(periodicidade));
   }
 
+  // Lista de meses { ano, mes } em ordem cronológica crescente, do mês
+  // (anoIni, mesIni) ao (anoFim, mesFim) inclusive. Intervalo invertido
+  // (fim antes do início) devolve lista vazia. Teto de segurança de 600
+  // meses para não travar num intervalo absurdo.
+  function mesesNoIntervalo(anoIni, mesIni, anoFim, mesFim) {
+    const resultado = [];
+    const alvo = anoFim * 12 + (mesFim - 1);
+    let cursor = anoIni * 12 + (mesIni - 1);
+    if (alvo < cursor) return resultado;
+    while (cursor <= alvo && resultado.length < 600) {
+      resultado.push({ ano: Math.floor(cursor / 12), mes: (cursor % 12) + 1 });
+      cursor += 1;
+    }
+    return resultado;
+  }
+
   // Análise completa do QSA para uma lista de meses (crescente). Marca,
   // em cada mês, quem ingressou ou se desligou naquele mês, e resume
   // ingressos/desligamentos do período inteiro.
@@ -196,7 +212,7 @@
   const api = {
     ultimosNMeses, MESES_LABELS, calcularTemposFechamento, formatarDuracaoHumana,
     qtdMesesNoPeriodo, mesFinalDoPeriodo, descricaoPeriodo,
-    socioAtivoNoMes, qsaDoMes, mesesDoPeriodoFechamento, analisarQsaPeriodo,
+    socioAtivoNoMes, qsaDoMes, mesesDoPeriodoFechamento, mesesNoIntervalo, analisarQsaPeriodo,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

@@ -1,7 +1,7 @@
 const assert = require('assert');
 const {
   ultimosNMeses, MESES_LABELS, calcularTemposFechamento, formatarDuracaoHumana,
-  socioAtivoNoMes, qsaDoMes, mesesDoPeriodoFechamento, analisarQsaPeriodo,
+  socioAtivoNoMes, qsaDoMes, mesesDoPeriodoFechamento, mesesNoIntervalo, analisarQsaPeriodo,
 } = require('./contabil-diario-util.js');
 
 assert.deepStrictEqual(
@@ -141,6 +141,19 @@ assert.deepStrictEqual(
 );
 assert.strictEqual(mesesDoPeriodoFechamento(2026, 12, 'anual').length, 12);
 console.log('OK: mesesDoPeriodoFechamento cobre o período da periodicidade');
+
+// mesesNoIntervalo: intervalo livre de competências.
+assert.deepStrictEqual(
+  mesesNoIntervalo(2026, 1, 2026, 3),
+  [{ ano: 2026, mes: 1 }, { ano: 2026, mes: 2 }, { ano: 2026, mes: 3 }]
+);
+assert.deepStrictEqual(
+  mesesNoIntervalo(2025, 11, 2026, 2),
+  [{ ano: 2025, mes: 11 }, { ano: 2025, mes: 12 }, { ano: 2026, mes: 1 }, { ano: 2026, mes: 2 }]
+);
+assert.deepStrictEqual(mesesNoIntervalo(2026, 5, 2026, 5), [{ ano: 2026, mes: 5 }]);
+assert.deepStrictEqual(mesesNoIntervalo(2026, 5, 2026, 2), []);
+console.log('OK: mesesNoIntervalo cobre intervalo livre e cruza virada de ano');
 
 // analisarQsaPeriodo: quadro estável no mês -> sem alteração.
 {
