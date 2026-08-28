@@ -5611,14 +5611,19 @@ function _tabelaFolhaPontoPreviaHtml(emp) {
 }
 
 // Card colapsável de um empregado — cabeçalho sempre visível, tabela some/aparece ao clicar.
-function _cardEmpregadoFolhaPontoHtml(emp) {
+// A caixa de seleção define se esta folha entra no PDF e no e-mail.
+function _cardEmpregadoFolhaPontoHtml(emp, codigoEmpresa) {
     const totalFerias = emp.linhas.filter(l => l.ferias).length;
     return `
         <div style="border:1px solid var(--border-color); border-radius:8px; margin-bottom:8px; overflow:hidden;">
             <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; cursor:pointer; flex-wrap:wrap; gap:6px;" onclick="_toggleFolhaPontoEmpregado(this)">
-                <div>
-                    <strong>${emp.codigo_empregado} - ${emp.nome_empregado}</strong>
-                    <div style="font-size:11px; color:var(--text-secondary);">${emp.desc_cargo || '—'}${emp.desc_dpto ? ' · ' + emp.desc_dpto : ''}</div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <input type="checkbox" class="folhaPonto-previa-check" data-empresa="${codigoEmpresa}" data-empregado="${emp.codigo_empregado}" checked
+                        onclick="event.stopPropagation()" onchange="_atualizarSelecaoFolhaPonto()" title="Incluir esta folha no PDF e no e-mail">
+                    <div>
+                        <strong>${emp.codigo_empregado} - ${emp.nome_empregado}</strong>
+                        <div style="font-size:11px; color:var(--text-secondary);">${emp.desc_cargo || '—'}${emp.desc_dpto ? ' · ' + emp.desc_dpto : ''}</div>
+                    </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:10px; font-size:12px;">
                     ${totalFerias ? `<span style="color:#2C7BE5;">🏖️ ${totalFerias} dia(s) de férias</span>` : ''}
@@ -5649,11 +5654,14 @@ function _renderizarListaFolhaPonto(avisos) {
     const container = document.getElementById('folhaPontoListaEmpregados');
     container.innerHTML = dados.empresas.map(emp => `
         <div style="border:1px solid var(--border-color); border-radius:8px; margin-bottom:14px; padding:12px 14px;">
-            <strong>${emp.codigo_empresa} - ${emp.nome_empresa}</strong>
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" class="folhaPonto-previa-empresa-check" data-empresa="${emp.codigo_empresa}" checked onchange="_toggleTodosEmpregadosFolhaPonto(this)">
+                <strong>${emp.codigo_empresa} - ${emp.nome_empresa}</strong>
+            </label>
             <div style="font-size:12px; color:var(--text-secondary); margin-top:2px; margin-bottom:10px;">
                 ${emp.empregados.length} empregado(s) · Período: ${emp.periodoTexto}
             </div>
-            ${emp.empregados.map(e => _cardEmpregadoFolhaPontoHtml(e)).join('')}
+            ${emp.empregados.map(e => _cardEmpregadoFolhaPontoHtml(e, emp.codigo_empresa)).join('')}
         </div>
     `).join('') + (avisos && avisos.length ? `
         <div style="font-size:12px; color:#B8860B; margin-top:6px;">
@@ -5662,6 +5670,65 @@ function _renderizarListaFolhaPonto(avisos) {
     ` : '');
 
     document.getElementById('folhaPontoResultadoContainer').style.display = 'block';
+    _atualizarSelecaoFolhaPonto();
+}
+
+// ── Seleção de folhas na prévia — define o que entra no PDF e no e-mail ──
+
+function _folhaPontoChecksEmpregado() {
+    return Array.from(document.querySelectorAll('.folhaPonto-previa-check'));
+}
+
+function _toggleTodosEmpregadosFolhaPonto(cbEmpresa) {
+    document.querySelectorAll(`.folhaPonto-previa-check[data-empresa="${cbEmpresa.dataset.empresa}"]`)
+        .forEach(cb => { cb.checked = cbEmpresa.checked; });
+    _atualizarSelecaoFolhaPonto();
+}
+
+function _atualizarSelecaoFolhaPonto() {
+    const checks = _folhaPontoChecksEmpregado();
+    const marcados = checks.filter(cb => cb.checked);
+
+    // Caixa "marcar todos" de cada empresa: marcada / parcial / vazia.
+    document.querySelectorAll('.folhaPonto-previa-empresa-check').forEach(cbEmp => {
+        const filhos = checks.filter(cb => cb.dataset.empresa === cbEmp.dataset.empresa);
+        const n = filhos.filter(cb => cb.checked).length;
+        cbEmp.checked = filhos.length > 0 && n === filhos.length;
+        cbEmp.indeterminate = n > 0 && n < filhos.length;
+    });
+
+    const info = document.getElementById('folhaPontoSelecaoInfo');
+    if (info) info.textContent = checks.length
+        ? `${marcados.length} de ${checks.length} folha(s) selecionada(s) para PDF/e-mail`
+        : '';
+
+    const btnBaixar = document.getElementById('folhaPontoBtnBaixar');
+    const btnEmail  = document.getElementById('folhaPontoBtnEnviarEmail');
+    if (btnBaixar) btnBaixar.disabled = marcados.length === 0;
+    if (btnEmail)  btnEmail.disabled  = marcados.length === 0;
+
+    // Qualquer mudança na seleção invalida os PDFs já gerados: obriga a clicar
+    // em "Baixar PDF(s)" de novo antes do envio, pra nunca mandar um conjunto
+    // diferente do que está marcado.
+    state._folhaPontoArquivosGerados = {};
+}
+
+// Cópia de state._folhaPontoDados só com os empregados marcados na prévia
+// (e só com as empresas que ficaram com ≥ 1 empregado).
+function _dadosFolhaPontoSelecionados() {
+    const dados = state._folhaPontoDados;
+    if (!dados) return null;
+    const marcadas = new Set(
+        _folhaPontoChecksEmpregado().filter(cb => cb.checked)
+            .map(cb => `${cb.dataset.empresa}_${cb.dataset.empregado}`)
+    );
+    const empresas = dados.empresas
+        .map(emp => ({
+            ...emp,
+            empregados: emp.empregados.filter(e => marcadas.has(`${emp.codigo_empresa}_${e.codigo_empregado}`)),
+        }))
+        .filter(emp => emp.empregados.length > 0);
+    return { competencia: dados.competencia, empresas };
 }
 
 // Desenha a página de folha de ponto de 1 empregado na posição atual do doc (sem
@@ -5757,8 +5824,11 @@ function _construirPdfEmpregadoFolhaPonto(empresaDados, emp) {
 }
 
 async function baixarPdfsFolhaPonto() {
-    const dados = state._folhaPontoDados;
-    if (!dados || dados.empresas.length === 0) return;
+    const dados = _dadosFolhaPontoSelecionados();
+    if (!dados || dados.empresas.length === 0) {
+        mostrarMensagem('Aviso', 'Selecione ao menos uma folha na prévia.');
+        return;
+    }
     const [mm, aaaa] = dados.competencia.split('/');
 
     const cfgsPorEmpresa = {};
