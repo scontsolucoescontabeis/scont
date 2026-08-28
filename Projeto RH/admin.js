@@ -1737,39 +1737,14 @@ function renderPaginacaoSocios(total) {
 
 // --- ANÁLISE DO QSA × rh_empregados ---
 //
-// Verifica, para cada sócio cadastrado (rh_socios), se a mesma pessoa
-// esteve registrada como empregado (rh_empregados) num período que se
-// sobrepõe ao período em que foi sócio. Match principal por CPF; quando
-// o sócio não tem CPF, tenta por nome normalizado (menor confiança).
-// A análise usa _todosSocios e _todosEmpregados já carregados em memória
-// (paginados e respeitando o escopo do usuário).
+// Cruza rh_socios × rh_empregados: mesma pessoa que foi sócia E empregada
+// ("Empregado") da mesma empresa em períodos sobrepostos. A lógica pura
+// vive em qsa-analise.js (QsaAnalise.computarOcorrencias) — compartilhada
+// com a análise automática pós-importação (_analisarQsaPosImportacao).
+// Aqui usa _todosSocios / _todosEmpregados já em memória (paginados e no
+// escopo do usuário).
 
 let _resultadoQSA = [];
-
-function _soDigitos(v) { return String(v ?? '').replace(/\D/g, ''); }
-
-function _normalizarNome(v) {
-    return String(v ?? '')
-        .normalize('NFD').replace(/[̀-ͯ]/g, '')
-        .toUpperCase().replace(/\s+/g, ' ').trim();
-}
-
-/**
- * Sobreposição de dois intervalos, tratando datas ausentes como
- * limite aberto (−∞ para início, +∞ para fim). Retorna true se há
- * qualquer dia em comum.
- */
-function _periodosSobrepoem(ini1, fim1, ini2, fim2) {
-    const MIN = -8.64e15, MAX = 8.64e15;
-    const t = (d, fallback) => {
-        if (!d) return fallback;
-        const ms = new Date(d + 'T00:00:00').getTime();
-        return isNaN(ms) ? fallback : ms;
-    };
-    const a1 = t(ini1, MIN), b1 = t(fim1, MAX);
-    const a2 = t(ini2, MIN), b2 = t(fim2, MAX);
-    return a1 <= b2 && a2 <= b1;
-}
 
 function analisarQSA() {
     const painel = document.getElementById('painelQSA');
@@ -1792,72 +1767,7 @@ function analisarQSA() {
         return;
     }
 
-    // Índices de empregados por CPF e por nome normalizado.
-    // Só entram vínculos com tipo_empregado = "Empregado" (a sobreposição
-    // considera admissão × demissão desse tipo de vínculo).
-    const porCpf = new Map();
-    const porNome = new Map();
-    for (const e of _todosEmpregados) {
-        if ((e.tipo_empregado || '').trim() !== 'Empregado') continue;
-        const cpf = _soDigitos(e.cpf);
-        if (cpf.length === 11) {
-            if (!porCpf.has(cpf)) porCpf.set(cpf, []);
-            porCpf.get(cpf).push(e);
-        }
-        const nome = _normalizarNome(e.nome_empregado);
-        if (nome) {
-            if (!porNome.has(nome)) porNome.set(nome, []);
-            porNome.get(nome).push(e);
-        }
-    }
-
-    const empNome = cod => {
-        const emp = _todasEmpresas.find(x => x.codigo_empresa === cod);
-        return emp ? emp.nome_empresa : '';
-    };
-
-    const ocorrencias = [];
-    for (const s of _todosSocios) {
-        const cpfSocio = _soDigitos(s.cpf);
-        let candidatos, tipoMatch;
-        if (cpfSocio.length === 11) {
-            candidatos = porCpf.get(cpfSocio) || [];
-            tipoMatch = 'CPF';
-        } else {
-            const nomeSocio = _normalizarNome(s.nome_socio);
-            candidatos = nomeSocio ? (porNome.get(nomeSocio) || []) : [];
-            tipoMatch = 'Nome (possível)';
-        }
-
-        for (const e of candidatos) {
-            // Só interessa quando sócio e empregado são da MESMA empresa
-            if ((e.codigo_empresa || '') !== (s.codigo_empresa || '')) continue;
-            if (!_periodosSobrepoem(s.data_entrada, s.data_saida, e.data_admissao, e.data_demissao)) continue;
-            const obs = [];
-            if (!s.data_entrada && !s.data_saida) obs.push('período do sócio indefinido');
-            else if (!s.data_entrada || !s.data_saida) obs.push('período do sócio parcialmente indefinido');
-            ocorrencias.push({
-                nome_socio:      s.nome_socio || '',
-                cpf:             s.cpf || '',
-                empresa:         s.codigo_empresa || '',
-                empresa_nome:    empNome(s.codigo_empresa),
-                socio_entrada:   s.data_entrada || null,
-                socio_saida:     s.data_saida || null,
-                codigo_empregado: e.codigo_empregado || '',
-                nome_empregado:  e.nome_empregado || '',
-                vinculo_admissao: e.data_admissao || null,
-                vinculo_demissao: e.data_demissao || null,
-                tipo_match:      tipoMatch,
-                observacao:      obs.join('; ')
-            });
-        }
-    }
-
-    ocorrencias.sort((a, b) =>
-        (a.nome_socio || '').localeCompare(b.nome_socio || '', 'pt-BR') ||
-        (a.empresa || '').localeCompare(b.empresa || ''));
-    _resultadoQSA = ocorrencias;
-
+    _resultadoQSA = QsaAnalise.computarOcorrencias(_todosSocios, _todosEmpregados, _todasEmpresas);
     renderResultadoQSA();
 }
 
@@ -1882,9 +1792,10 @@ function renderResultadoQSA() {
 
     const linhas = _resultadoQSA.map(o => {
         const possivel = o.tipo_match !== 'CPF';
+        const bg = o.ocorrendo_agora ? '#FDECEA' : (possivel ? '#FFF8E1' : '');
         return `
-        <tr${possivel ? ' style="background:#FFF8E1"' : ''}>
-            <td><strong>${esc(o.nome_socio)}</strong></td>
+        <tr${bg ? ` style="background:${bg}"` : ''}>
+            <td><strong>${esc(o.nome_socio)}</strong>${o.ocorrendo_agora ? ' <span style="font-size:10px;font-weight:700;color:#fff;background:#C0392B;border-radius:4px;padding:1px 5px;white-space:nowrap">🔴 ATIVO HOJE</span>' : ''}</td>
             <td style="font-size:12px">${esc(o.cpf) || '—'}</td>
             <td style="font-size:12px">${esc(o.empresa)}<br><span style="font-size:11px;color:#555">${esc(o.empresa_nome)}</span></td>
             <td style="font-size:12px">${per(o.socio_entrada, o.socio_saida)}</td>
@@ -1906,7 +1817,7 @@ function renderResultadoQSA() {
             <tbody>${linhas}</tbody>
         </table>
     </div>
-    <p style="font-size:11px;color:#95A5A6;margin:8px 0 0">Considera apenas vínculos com tipo "Empregado", pela sobreposição entre admissão→demissão e o período como sócio, na mesma empresa. Linhas em amarelo: match por nome (sócio sem CPF cadastrado) — confirmar manualmente.</p>`;
+    <p style="font-size:11px;color:#95A5A6;margin:8px 0 0">Considera apenas vínculos com tipo "Empregado", pela sobreposição entre admissão→demissão e o período como sócio, na mesma empresa. Linhas em vermelho: sócio e vínculo de empregado ainda ativos hoje. Linhas em amarelo: match por nome (sócio sem CPF cadastrado) — confirmar manualmente.</p>`;
 }
 
 function exportarQSAExcel() {
@@ -1915,21 +1826,170 @@ function exportarQSAExcel() {
     const aoa = [[
         'SÓCIO', 'CPF', 'CÓD. EMPRESA', 'EMPRESA', 'INGRESSO SÓCIO', 'SAÍDA SÓCIO',
         'CÓD. EMPREGADO', 'NOME NO CADASTRO DE EMPREGADO',
-        'ADMISSÃO', 'DEMISSÃO', 'TIPO DE MATCH', 'OBSERVAÇÃO'
+        'ADMISSÃO', 'DEMISSÃO', 'TIPO DE MATCH', 'ATIVO HOJE', 'OBSERVAÇÃO'
     ]];
     for (const o of _resultadoQSA) {
         aoa.push([
             o.nome_socio, o.cpf, o.empresa, o.empresa_nome, fmt(o.socio_entrada), fmt(o.socio_saida),
             o.codigo_empregado, o.nome_empregado,
-            fmt(o.vinculo_admissao), fmt(o.vinculo_demissao), o.tipo_match, o.observacao
+            fmt(o.vinculo_admissao), fmt(o.vinculo_demissao), o.tipo_match,
+            o.ocorrendo_agora ? 'SIM' : 'não', o.observacao
         ]);
     }
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = [32, 16, 12, 28, 14, 14, 14, 32, 12, 12, 16, 30].map(w => ({ wch: w }));
+    ws['!cols'] = [32, 16, 12, 28, 14, 14, 14, 32, 12, 12, 16, 10, 30].map(w => ({ wch: w }));
     XLSX.utils.book_append_sheet(wb, ws, 'Analise QSA');
     const hoje = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `analise_qsa_${hoje}.xlsx`);
+}
+
+// --- ANÁLISE DO QSA AUTOMÁTICA APÓS IMPORTAÇÃO ---
+//
+// Disparada ao final da importação de rh_empregados ou de rh_socios.
+// Roda a mesma análise do botão da tela de Sócios sobre a base recém
+// atualizada (buscada fresca, no escopo do usuário). Se houver qualquer
+// sobreposição, abre um modal; as ocorrências que estão ativas na data
+// da importação (sócio e vínculo de empregado ainda abertos) vêm em
+// destaque e disparam um e-mail de alerta para a equipe SCONT.
+
+const _QSA_ALERTA_EMAIL = 'herbertglj@gmail.com';
+
+async function _buscarDadosParaQsa() {
+    // Empregados: busca paginada (mesmo motivo de carregarEmpregados).
+    let empregados = [];
+    {
+        const PAGE = 1000;
+        let from = 0;
+        while (true) {
+            const { data, error } = await supabaseClient
+                .from('rh_empregados')
+                .select('cpf, nome_empregado, codigo_empresa, codigo_empregado, tipo_empregado, data_admissao, data_demissao')
+                .range(from, from + PAGE - 1);
+            if (error) throw error;
+            empregados = empregados.concat(data || []);
+            if (!data || data.length < PAGE) break;
+            from += PAGE;
+        }
+    }
+    const { data: socios, error: errS } = await supabaseClient
+        .from('rh_socios')
+        .select('cpf, nome_socio, codigo_empresa, data_entrada, data_saida');
+    if (errS) throw errS;
+
+    return {
+        socios: _filtrarPorEscopo(socios || []),
+        empregados: _filtrarPorEscopo(empregados),
+    };
+}
+
+async function _analisarQsaPosImportacao(origem) {
+    let dados;
+    try {
+        dados = await _buscarDadosParaQsa();
+    } catch (e) {
+        console.error('QSA pós-importação: falha ao buscar dados', e);
+        return;
+    }
+
+    const ocorrencias = QsaAnalise.computarOcorrencias(dados.socios, dados.empregados, _todasEmpresas);
+    if (!ocorrencias.length) return;
+
+    const ativos = ocorrencias.filter(o => o.ocorrendo_agora);
+    let emailMsg = '';
+    if (ativos.length) emailMsg = await _enviarAlertaQsaImportacao(ativos, origem);
+
+    _mostrarModalQsaImportacao(ocorrencias, ativos, origem, emailMsg);
+}
+
+async function _enviarAlertaQsaImportacao(casos, origem) {
+    try {
+        const { data, error } = await supabaseClient.functions.invoke('enviar-email', {
+            body: {
+                destinatario: _QSA_ALERTA_EMAIL,
+                assunto: '⚠️ QSA — sócio ativo também é empregado ativo',
+                params: {
+                    tipo: 'alerta_qsa_importacao',
+                    origem,
+                    data_importacao: new Date().toLocaleDateString('pt-BR'),
+                    casos: casos.map(c => ({
+                        nome_socio:       c.nome_socio,
+                        cpf:              c.cpf,
+                        empresa:          c.empresa,
+                        empresa_nome:     c.empresa_nome,
+                        socio_entrada:    c.socio_entrada,
+                        socio_saida:      c.socio_saida,
+                        codigo_empregado: c.codigo_empregado,
+                        nome_empregado:   c.nome_empregado,
+                        vinculo_admissao: c.vinculo_admissao,
+                        vinculo_demissao: c.vinculo_demissao,
+                        tipo_match:       c.tipo_match,
+                    })),
+                },
+            },
+        });
+        if (error || (data && data.ok === false)) {
+            throw new Error((error && error.message) || (data && data.error) || 'erro desconhecido');
+        }
+        return `✉️ E-mail de alerta enviado para ${_QSA_ALERTA_EMAIL}.`;
+    } catch (e) {
+        console.error('QSA pós-importação: falha ao enviar e-mail', e);
+        return `⚠️ Não foi possível enviar o e-mail de alerta automaticamente (${e.message}). Avise a equipe SCONT.`;
+    }
+}
+
+function _mostrarModalQsaImportacao(ocorrencias, ativos, origem, emailMsg) {
+    const modal = document.getElementById('modalQsaImportacao');
+    const conteudo = document.getElementById('qsaImportacaoConteudo');
+    if (!modal || !conteudo) return;
+
+    const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—';
+    const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const per = (i, f) => `${fmt(i)} → ${fmt(f)}`;
+
+    // Ativos primeiro; o resto mantém a ordem por nome vinda da análise.
+    const ordenadas = [...ativos, ...ocorrencias.filter(o => !o.ocorrendo_agora)];
+
+    const linhas = ordenadas.map(o => {
+        const possivel = o.tipo_match !== 'CPF';
+        const bg = o.ocorrendo_agora ? '#FDECEA' : (possivel ? '#FFF8E1' : '');
+        return `
+        <tr${bg ? ` style="background:${bg}"` : ''}>
+            <td><strong>${esc(o.nome_socio)}</strong>${o.ocorrendo_agora ? ' <span style="font-size:10px;font-weight:700;color:#fff;background:#C0392B;border-radius:4px;padding:1px 5px;white-space:nowrap">🔴 ATIVO HOJE</span>' : ''}</td>
+            <td style="font-size:12px">${esc(o.cpf) || '—'}</td>
+            <td style="font-size:12px">${esc(o.empresa)}<br><span style="font-size:11px;color:#555">${esc(o.empresa_nome)}</span></td>
+            <td style="font-size:12px">${per(o.socio_entrada, o.socio_saida)}</td>
+            <td style="font-size:12px">${esc(o.codigo_empregado) || '—'}</td>
+            <td style="font-size:12px">${per(o.vinculo_admissao, o.vinculo_demissao)}</td>
+            <td style="font-size:12px">${esc(o.tipo_match)}</td>
+        </tr>`;
+    }).join('');
+
+    const origemLabel = origem === 'Socios' ? 'sócios' : 'empregados';
+    const alerta = ativos.length
+        ? `<div style="background:#FDECEA;border-left:4px solid #C0392B;border-radius:0 6px 6px 0;padding:12px 16px;margin-bottom:14px;">
+               <strong style="color:#C0392B;">🔴 ${ativos.length} caso(s) ocorrendo agora</strong> — a pessoa é sócia ativa E empregada ativa da mesma empresa nesta data. Verifique com prioridade.
+               ${emailMsg ? `<div style="font-size:12px;color:#555;margin-top:6px;">${esc(emailMsg)}</div>` : ''}
+           </div>`
+        : `<div style="background:#EEF6FF;border-left:4px solid #2C7BE5;border-radius:0 6px 6px 0;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#333;">
+               Nenhum caso está ativo nesta data — as ocorrências abaixo são apenas históricas (períodos já encerrados).
+           </div>`;
+
+    conteudo.innerHTML = `
+        <p style="color:#555;font-size:13px;margin:0 0 14px;">A importação de ${origemLabel} encontrou ${ocorrencias.length} sobreposição(ões) entre o QSA e o cadastro de empregados.</p>
+        ${alerta}
+        <div class="table-container" style="max-height:52vh;overflow:auto;">
+            <table class="admin-table">
+                <thead><tr>
+                    <th>Sócio</th><th>CPF</th><th>Empresa</th><th>Período como sócio</th>
+                    <th>Cód. Empregado</th><th>Período do vínculo</th><th>Match</th>
+                </tr></thead>
+                <tbody>${linhas}</tbody>
+            </table>
+        </div>`;
+
+    document.getElementById('qsaImportacaoBtnFechar').onclick = () => { modal.style.display = 'none'; };
+    modal.style.display = 'flex';
 }
 
 async function salvarSocio() {
@@ -3418,10 +3478,11 @@ async function importarEmpregadosIndividual(file) {
         setProgresso(ENT, null);
         setStatusImport(ENT, `✅ ${rows.length} empregado(s) importado(s) com sucesso!`, 'success');
         _salvarTimestampImportacao('Empregados');
-        carregarEmpregados();
+        await carregarEmpregados();
 
         if (comparacao.novos.length > 0) _salvarPendentesConfigNovos(comparacao.novos);
         _renderizarResumoImportacaoEmpregados(comparacao);
+        await _analisarQsaPosImportacao('Empregados');
     } catch (err) {
         setProgresso(ENT, null);
         setStatusImport(ENT, '❌ ' + err.message, 'error');
@@ -3696,10 +3757,11 @@ async function processarPdfSocios(file) {
 
         setStatusImport(ENT, `Salvando ${registros.length} sócio(s)...`, 'info');
         setProgresso(ENT, 60);
-        await _salvarSociosSnapshot(ENT, registros, avisos);
+        const okSalvou = await _salvarSociosSnapshot(ENT, registros, avisos);
         setProgresso(ENT, null);
         _salvarTimestampImportacao('Socios');
-        carregarSocios();
+        await carregarSocios();
+        if (okSalvou) await _analisarQsaPosImportacao('Socios');
     } catch (erro) {
         console.error('Erro ao processar PDF de sócios:', erro);
         setProgresso(ENT, null);
@@ -3725,7 +3787,7 @@ async function _salvarSociosSnapshot(ENT, registros, avisos) {
     const { error: errDelete } = await supabaseClient.from('rh_socios').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     if (errDelete) {
         setStatusImport(ENT, 'Falha ao limpar os dados existentes antes de salvar.', 'error');
-        return;
+        return false;
     }
 
     const LOTE = 500;
@@ -3735,13 +3797,14 @@ async function _salvarSociosSnapshot(ENT, registros, avisos) {
         if (error) {
             console.error('Erro ao salvar sócios:', error);
             setStatusImport(ENT, `Falha ao salvar registros no banco: ${error.message}`, 'error');
-            return;
+            return false;
         }
     }
 
     const empresas = new Set(registrosParaSalvar.map(r => r.codigo_empresa));
     setStatusImport(ENT, `✅ ${registrosParaSalvar.length} sócio(s) salvos em ${empresas.size} empresa(s)`, 'success');
     _renderizarResumoImportacaoSocios(registrosParaSalvar.length, empresas.size, duplicatasNoArquivo, avisos);
+    return true;
 }
 
 function _renderizarResumoImportacaoSocios(qtdSocios, qtdEmpresas, duplicatasNoArquivo, avisos) {

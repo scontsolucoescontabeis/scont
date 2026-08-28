@@ -466,6 +466,58 @@ function montarHtml(cfg: Record<string, string>, params: Record<string, unknown>
         ` + _rodape(nomeRemetente) + _fechamento();
     }
 
+    // ── Alerta: QSA × empregados — sócio ativo também é empregado ativo ──
+    if (tipo === 'alerta_qsa_importacao') {
+        const origem         = (params.origem as string) === 'Socios' ? 'sócios' : 'empregados';
+        const dataImportacao = _escapeHtml((params.data_importacao as string) || '');
+        const casos = Array.isArray(params.casos)
+            ? params.casos as Array<Record<string, string | null>>
+            : [];
+
+        const fmt = (d: string | null) => {
+            if (!d) return '—';
+            const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+            return m ? `${m[3]}/${m[2]}/${m[1]}` : String(d);
+        };
+
+        const linhasCasos = casos.map((c) => `
+            <tr>
+              <td style="padding:8px 10px;border-bottom:1px solid #f0f2f5;font-size:13px;">
+                <strong style="color:#4e1820;">${_escapeHtml(c.nome_socio || '')}</strong>
+                ${c.cpf ? `<br><span style="font-size:11px;color:#888;">CPF ${_escapeHtml(c.cpf)}</span>` : ''}
+                ${c.tipo_match && c.tipo_match !== 'CPF' ? `<br><span style="font-size:11px;color:#b26a00;">match por nome — confirmar</span>` : ''}
+              </td>
+              <td style="padding:8px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#434343;">
+                ${_escapeHtml(c.empresa_nome || '')}${c.empresa ? ` (${_escapeHtml(c.empresa)})` : ''}
+              </td>
+              <td style="padding:8px 10px;border-bottom:1px solid #f0f2f5;font-size:12px;color:#434343;white-space:nowrap;">
+                sócio: ${fmt(c.socio_entrada ?? null)} → ${fmt(c.socio_saida ?? null)}<br>
+                vínculo${c.codigo_empregado ? ` ${_escapeHtml(c.codigo_empregado)}` : ''}: ${fmt(c.vinculo_admissao ?? null)} → ${fmt(c.vinculo_demissao ?? null)}
+              </td>
+            </tr>`).join('');
+
+        return _cabecalho(nomeRemetente) + `
+          <h2 style="color:#C0392B;margin:0 0 8px;font-size:20px;">🔴 QSA — sócio ativo também é empregado ativo</h2>
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            A importação de <strong>${origem}</strong>${dataImportacao ? ` de <strong>${dataImportacao}</strong>` : ''}
+            detectou <strong>${casos.length} caso(s)</strong> em que a mesma pessoa consta, nesta data, como
+            <strong>sócia ativa</strong> e como <strong>empregada ativa (tipo "Empregado")</strong> da mesma empresa.
+            Verifique com prioridade.
+          </p>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e0e6ed;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+            <tr style="background:#f5eae9;">
+              <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#4e1820;">Sócio</td>
+              <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#4e1820;">Empresa</td>
+              <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#4e1820;">Períodos</td>
+            </tr>
+            ${linhasCasos || '<tr><td colspan="3" style="padding:12px;color:#888;font-size:13px;">Sem detalhes.</td></tr>'}
+          </table>
+
+          <p style="color:#888;font-size:12px;line-height:1.6;">Alerta automático gerado pelo módulo de Administração do RH ao importar dados.</p>
+        ` + _rodape(nomeRemetente) + _fechamento();
+    }
+
     // ── Template padrão (apresentação) ────────────────────────
     const empresa          = (params.empresa as string)           || '';
     const mensagem         = (params.mensagem as string)          || 'Preparamos uma apresentação personalizada para sua empresa. Acesse o link abaixo!';
