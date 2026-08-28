@@ -8,11 +8,13 @@
  * reaproveitado aqui — no navegador via global, em Node via require.
  */
 
-// `_dataBRparaISO` vem de ferias-parser.js: no navegador é global (script
-// carregado antes); em Node vem via require para os testes.
-const _dataBRparaISO = (typeof module !== 'undefined' && module.exports)
+// Reaproveita `_dataBRparaISO` de ferias-parser.js. No navegador ele é uma
+// função global (script carregado antes) — NÃO redeclarar com esse nome aqui,
+// senão `const` colide com a propriedade global não-configurável. Em Node vem
+// via require para os testes.
+const _dataISO = (typeof module !== 'undefined' && module.exports)
     ? require('./ferias-parser.js')._dataBRparaISO
-    : window._dataBRparaISO;
+    : _dataBRparaISO; // eslint-disable-line no-undef
 
 // Documento do sócio: CPF (NNN.NNN.NNN-NN) ou CNPJ (NN.NNN.NNN/NNNN-NN).
 // O gerador do PDF insere espaços de kerning entre dígitos, então cada par
@@ -90,8 +92,8 @@ function _parsearSocio(linha, contexto) {
         cpf:                     doc,
         nome_socio:              nome,
         participacao:            participacao,
-        data_entrada:            datas[0] ? _dataBRparaISO(datas[0]) : null,
-        data_saida:              datas[1] ? _dataBRparaISO(datas[1]) : null,
+        data_entrada:            datas[0] ? _dataISO(datas[0]) : null,
+        data_saida:              datas[1] ? _dataISO(datas[1]) : null,
         email_socio:             emailM ? emailM[0] : null,
     };
 }
@@ -119,7 +121,7 @@ function _parsearLinhasSocios(linhas) {
                 contexto = {
                     codigo_empresa:          codigo,
                     capital_social:          _moedaBRparaFloat(mEmp[3]),
-                    data_atualizacao_quadro: mEmp[4] ? _dataBRparaISO(mEmp[4]) : null,
+                    data_atualizacao_quadro: mEmp[4] ? _dataISO(mEmp[4]) : null,
                     email_empresa:           mEmp[5] ? mEmp[5].trim() : null,
                 };
                 continue;
