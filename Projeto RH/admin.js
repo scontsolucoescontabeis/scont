@@ -3661,110 +3661,110 @@ async function importarRubricasIndividual(file) {
     }
 }
 
-// ── SÓCIOS ────────────────────────────────────────────────────
-
-function baixarModeloSocios() {
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([[
-        'CODIGO DA EMPRESA',
-        'CAPITAL SOCIAL',
-        'EMAIL EMPRESA',
-        'DATA ATUALIZAÇÃO QUADRO SOCIETÁRIO',
-        'CPF DO SOCIO',
-        'NOME DO SOCIO',
-        'PARTICIPAÇÃO',
-        'INGRESSO',
-        'SAIDA',
-        'EMAIL SOCIO'
-    ]]);
-    ws['!cols'] = [18, 16, 28, 36, 16, 35, 14, 14, 14, 28].map(w => ({ wch: w }));
-    XLSX.utils.book_append_sheet(wb, ws, 'Socios');
-    XLSX.writeFile(wb, 'modelo_socios.xlsx');
-}
+// ── SÓCIOS (PDF) ──────────────────────────────────────────────
 
 function handleImportarSocios(event) {
     const file = event.target.files?.[0];
-    if (file) importarSocios(file);
+    if (file) processarPdfSocios(file);
 }
 
-async function importarSocios(file) {
+async function processarPdfSocios(file) {
     const ENT = 'Socios';
+    const resumo = document.getElementById('resumoImportarSocios');
+    if (resumo) resumo.innerHTML = '';
     try {
-        setStatusImport(ENT, 'Lendo arquivo...', 'info');
+        setStatusImport(ENT, 'Lendo o PDF "Sócios Vinculados nas Empresas"...', 'info');
         setProgresso(ENT, 10);
 
-        const cols = [
-            'codigo_empresa', 'capital_social', 'email_empresa',
-            'data_atualizacao_quadro', 'cpf', 'nome_socio',
-            'participacao', 'data_entrada', 'data_saida', 'email_socio'
-        ];
-        const fmtDate = v => {
-            if (!v) return null;
-            if (v instanceof Date) return isNaN(v) ? null : v.toISOString().split('T')[0];
-            const s = String(v).trim();
-            if (!s) return null;
-            // DD/MM/AAAA → AAAA-MM-DD
-            const br = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-            if (br) return `${br[3]}-${br[2].padStart(2,'0')}-${br[1].padStart(2,'0')}`;
-            // Já em ISO AAAA-MM-DD
-            if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-            // Serial numérico do Excel
-            const n = parseFloat(s);
-            if (!isNaN(n) && n > 1000) {
-                const d = new Date(Math.round((n - 25569) * 86400 * 1000));
-                return d.toISOString().split('T')[0];
-            }
-            return null;
-        };
-        const rows = (await lerPlanilha(file, cols))
-            .filter(r => r.codigo_empresa && r.nome_socio)
-            .map(r => ({
-                codigo_empresa:          String(r.codigo_empresa).trim(),
-                capital_social:          r.capital_social !== '' && r.capital_social != null ? parseFloat(String(r.capital_social).replace(/[^\d,.-]/g,'').replace(',','.')) || null : null,
-                email_empresa:           r.email_empresa ? String(r.email_empresa).trim() : null,
-                data_atualizacao_quadro: fmtDate(r.data_atualizacao_quadro),
-                cpf:                     r.cpf ? String(r.cpf).trim() : null,
-                nome_socio:              String(r.nome_socio).trim(),
-                participacao:            r.participacao !== '' && r.participacao != null ? parseFloat(String(r.participacao).replace(',', '.')) || null : null,
-                data_entrada:            fmtDate(r.data_entrada),
-                data_saida:              fmtDate(r.data_saida),
-                email_socio:             r.email_socio ? String(r.email_socio).trim() : null,
-            }));
-
-        if (!rows.length) throw new Error('Nenhuma linha válida encontrada. Verifique se o arquivo segue o modelo.');
-
-        // Deduplica por (codigo_empresa + nome_socio) — última ocorrência prevalece
-        const deduped = [...new Map(rows.map(r => [`${r.codigo_empresa}|${r.nome_socio}`, r])).values()];
-        const duplicatas = rows.length - deduped.length;
-
-        const modo = await confirmarModoImportacao('Sócios', deduped.length);
-        if (!modo) { setStatusImport(ENT, '', ''); setProgresso(ENT, null); return; }
-
-        setProgresso(ENT, 50);
-        setStatusImport(ENT, `Salvando ${deduped.length} sócio(s)...`, 'info');
-
-        if (modo === 'substituir') {
-            const codigos = [...new Set(deduped.map(r => r.codigo_empresa))];
-            const { error: delErr } = await supabaseClient.from('rh_socios').delete().in('codigo_empresa', codigos);
-            if (delErr) throw delErr;
-            const { error } = await supabaseClient.from('rh_socios').insert(deduped);
-            if (error) throw error;
-        } else {
-            const { error } = await supabaseClient.from('rh_socios').upsert(deduped, { onConflict: 'codigo_empresa,nome_socio' });
-            if (error) throw error;
+        const buffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+        let todasLinhas = [];
+        for (let p = 1; p <= pdf.numPages; p++) {
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+            todasLinhas = todasLinhas.concat(_reconstruirLinhasPagina(content.items));
+            setProgresso(ENT, 10 + Math.round((p / pdf.numPages) * 40));
         }
 
+        const { registros, avisos } = _parsearLinhasSocios(todasLinhas);
+
+        if (registros.length === 0) {
+            setProgresso(ENT, null);
+            setStatusImport(ENT, 'Nenhum sócio foi reconhecido neste PDF. Verifique se o arquivo é o "Sócios Vinculados nas Empresas".', 'error');
+            return;
+        }
+
+        setStatusImport(ENT, `Salvando ${registros.length} sócio(s)...`, 'info');
+        setProgresso(ENT, 60);
+        await _salvarSociosSnapshot(ENT, registros, avisos);
         setProgresso(ENT, null);
-        const aviso = duplicatas > 0 ? ` (${duplicatas} duplicata(s) ignorada(s))` : '';
-        setStatusImport(ENT, `✅ ${deduped.length} sócio(s) importado(s) com sucesso!${aviso}`, 'success');
         _salvarTimestampImportacao('Socios');
         carregarSocios();
-    } catch (err) {
+    } catch (erro) {
+        console.error('Erro ao processar PDF de sócios:', erro);
         setProgresso(ENT, null);
-        setStatusImport(ENT, '❌ ' + err.message, 'error');
+        setStatusImport(ENT, '❌ Falha ao processar o PDF. Verifique se o arquivo é válido.', 'error');
     } finally {
         limparInput('fileSocios');
     }
+}
+
+async function _salvarSociosSnapshot(ENT, registros, avisos) {
+    // Snapshot completo: o PDF traz todas as empresas de uma vez, então cada
+    // importação substitui todo o conteúdo de rh_socios. Uma chave duplicada
+    // (mesma empresa + nome do sócio) no próprio arquivo mantém a última.
+    const porChave = new Map();
+    let duplicatasNoArquivo = 0;
+    for (const r of registros) {
+        const chave = `${r.codigo_empresa}|${r.nome_socio}`;
+        if (porChave.has(chave)) duplicatasNoArquivo++;
+        porChave.set(chave, r);
+    }
+    const registrosParaSalvar = [...porChave.values()];
+
+    const { error: errDelete } = await supabaseClient.from('rh_socios').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (errDelete) {
+        setStatusImport(ENT, 'Falha ao limpar os dados existentes antes de salvar.', 'error');
+        return;
+    }
+
+    const LOTE = 500;
+    for (let i = 0; i < registrosParaSalvar.length; i += LOTE) {
+        const pedaco = registrosParaSalvar.slice(i, i + LOTE);
+        const { error } = await supabaseClient.from('rh_socios').insert(pedaco);
+        if (error) {
+            console.error('Erro ao salvar sócios:', error);
+            setStatusImport(ENT, `Falha ao salvar registros no banco: ${error.message}`, 'error');
+            return;
+        }
+    }
+
+    const empresas = new Set(registrosParaSalvar.map(r => r.codigo_empresa));
+    setStatusImport(ENT, `✅ ${registrosParaSalvar.length} sócio(s) salvos em ${empresas.size} empresa(s)`, 'success');
+    _renderizarResumoImportacaoSocios(registrosParaSalvar.length, empresas.size, duplicatasNoArquivo, avisos);
+}
+
+function _renderizarResumoImportacaoSocios(qtdSocios, qtdEmpresas, duplicatasNoArquivo, avisos) {
+    const container = document.getElementById('resumoImportarSocios');
+    if (!container) return;
+    let html = `<div style="margin-top:8px;">${qtdSocios} sócio(s) em ${qtdEmpresas} empresa(s) — toda a tabela de sócios foi substituída pelo conteúdo do PDF.</div>`;
+
+    if (duplicatasNoArquivo > 0) {
+        html += `<div style="margin-top:6px;color:#92400e;">⚠️ ${duplicatasNoArquivo} linha(s) duplicada(s) no arquivo (mesma empresa/nome) — mantida a última ocorrência.</div>`;
+    }
+
+    if (avisos.length > 0) {
+        html += `
+            <details style="margin-top:8px;">
+                <summary style="cursor:pointer; color:#92400e; font-weight:600;">⚠️ ${avisos.length} linha(s) não reconhecida(s) — cadastre manualmente</summary>
+                <ul style="margin-top:6px; padding-left:18px; color:#78350f;">
+                    ${avisos.map(a => `<li><strong>${a.motivo}:</strong> ${a.linha}</li>`).join('')}
+                </ul>
+            </details>
+        `;
+    }
+
+    container.innerHTML = html;
 }
 
 

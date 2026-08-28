@@ -770,27 +770,27 @@
                             <span class="import-card-icon">🤝</span>
                             <div>
                                 <div class="import-card-title">Sócios</div>
-                                <div class="import-card-subtitle">10 campos</div>
+                                <div class="import-card-subtitle">PDF do sistema fonte</div>
                             </div>
-                            <button class="btn-modelo" onclick="baixarModeloSocios()">⬇️ Modelo</button>
                         </div>
-                        <div class="import-fields">Código da Empresa · Capital Social · Email Empresa · Data Atualização Quadro Societário · CPF do Sócio · Nome do Sócio · Participação · Ingresso · Saída · Email Sócio</div>
+                        <div class="import-fields">PDF "Sócios Vinculados nas Empresas" (todas as empresas) · Cód. da Empresa · Capital Social · Data do Quadro Societário · E-mail da Empresa · CPF/CNPJ · Nome do Sócio · Participação · Ingresso · Saída · E-mail do Sócio. Cada importação substitui toda a tabela de sócios (snapshot atual do quadro societário).</div>
                         <div id="statusImportarSocios" class="status-message"></div>
                         <div class="upload-area-sm" onclick="document.getElementById('fileSocios').click()"
                              ondragover="event.preventDefault();this.style.borderColor='#8B3A3A'"
                              ondragleave="this.style.borderColor=''"
                              ondrop="event.preventDefault();this.style.borderColor='';handleImportarSocios({target:{files:event.dataTransfer.files}})">
-                            📊 Clique ou arraste o arquivo (.xlsx / .csv)
+                            📄 Clique ou arraste o arquivo (.pdf)
                         </div>
-                        <input type="file" id="fileSocios" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportarSocios(event)">
+                        <input type="file" id="fileSocios" accept=".pdf" style="display:none" onchange="handleImportarSocios(event)">
                         <div id="progressSocios" style="display:none;">
                             <div style="background:#D1ECF1;padding:10px;border-radius:6px;font-size:12px;color:#0C5460;">
-                                <strong>Importando sócios...</strong>
+                                <strong>Processando PDF de sócios...</strong>
                                 <div style="margin-top:6px;background:white;border-radius:4px;height:8px;overflow:hidden;">
                                     <div id="progressBarSocios" style="background:#17A2B8;height:100%;width:0%;transition:width 0.3s;"></div>
                                 </div>
                             </div>
                         </div>
+                        <div id="resumoImportarSocios" style="font-size:11px;color:#7F8C8D;"></div>
                         <div id="ultimaImportacaoSocios" style="font-size:11px;color:#7F8C8D;display:none;">📅 Última importação: <span></span></div>
                     </div>
 
@@ -1028,6 +1028,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="ferias-parser.js"></script>
 <script src="jornada-parser.js"></script>
+<script src="socios-parser.js"></script>
 <script src="../portal-auth-guard.js"></script>
 <script src="admin.js"></script>
 
