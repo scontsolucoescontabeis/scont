@@ -37,11 +37,45 @@ function montarLinhasFolhaPonto(dias, jornadaPorDiaSemana) {
     });
 }
 
+const _DIAS_SEMANA_ORDEM = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'];
+const _DIA_CHAVE_PARA_ABREV = {
+    segunda: 'Seg', terca: 'Ter', quarta: 'Qua', quinta: 'Qui',
+    sexta: 'Sex', sabado: 'Sáb', domingo: 'Dom'
+};
+
+// Resume a jornada da semana numa linha compacta para o cabeçalho da folha,
+// agrupando dias consecutivos com o mesmo horário: "Seg a Sex: 08:00-12:00 /
+// 13:00-17:48 · Sáb: 08:00-12:00". Dias sem registro quebram o agrupamento e
+// não aparecem. Retorna '' quando não há nenhuma jornada cadastrada.
+function resumirJornadaSemana(jornadaPorDiaSemana) {
+    const mapa = jornadaPorDiaSemana || {};
+    const grupos = [];
+    let atual = null;
+    for (const dia of _DIAS_SEMANA_ORDEM) {
+        const registro = mapa[dia];
+        if (!registro) { atual = null; continue; }
+        const horario = formatarHorarioJornadaDia(registro);
+        if (atual && atual.horario === horario) {
+            atual.fim = dia;
+        } else {
+            atual = { inicio: dia, fim: dia, horario };
+            grupos.push(atual);
+        }
+    }
+    return grupos.map(g => {
+        const rotulo = g.inicio === g.fim
+            ? _DIA_CHAVE_PARA_ABREV[g.inicio]
+            : `${_DIA_CHAVE_PARA_ABREV[g.inicio]} a ${_DIA_CHAVE_PARA_ABREV[g.fim]}`;
+        return `${rotulo}: ${g.horario}`;
+    }).join(' · ');
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         _DIA_ABREV_PARA_CHAVE,
         agruparJornadaPorDiaSemana,
         formatarHorarioJornadaDia,
-        montarLinhasFolhaPonto
+        montarLinhasFolhaPonto,
+        resumirJornadaSemana
     };
 }

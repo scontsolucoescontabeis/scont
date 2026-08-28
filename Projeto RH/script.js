@@ -5531,6 +5531,7 @@ async function gerarPreviaFolhaPonto() {
                     nome_empregado: emp.nome_empregado,
                     desc_cargo: emp.desc_cargo || '',
                     desc_dpto: emp.desc_dpto || '',
+                    horarioJornada: resumirJornadaSemana(jornadaPorDiaSemana),
                     linhas: montarLinhasFolhaPonto(resumo.dias, jornadaPorDiaSemana),
                 };
             }).sort((a, b) => a.nome_empregado.localeCompare(b.nome_empregado));
@@ -5570,11 +5571,9 @@ async function gerarPreviaFolhaPonto() {
 // preenchimento, ou "FÉRIAS" nas colunas preenchíveis quando o dia é de férias.
 function _linhaFolhaPontoPreviaHtml(l) {
     const estiloFolga = (l.tipo === 'folga' && !l.ferias) ? 'background:#EDEDED;' : '';
-    const celulaPrevisto = `<td style="padding:4px 6px; text-align:center; border:1px solid var(--border-color); font-weight:600;">${l.horarioPrevisto || '—'}</td>`;
     if (l.ferias) {
         return `<tr style="${estiloFolga}">
             <td style="padding:4px 6px; text-align:left; border:1px solid var(--border-color);">${l.data.slice(0, 2)} ${l.diaSemana}</td>
-            ${celulaPrevisto}
             <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
             <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
             <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
@@ -5585,7 +5584,6 @@ function _linhaFolhaPontoPreviaHtml(l) {
     }
     return `<tr style="${estiloFolga}">
         <td style="padding:4px 6px; text-align:left; border:1px solid var(--border-color);">${l.data.slice(0, 2)} ${l.diaSemana}</td>
-        ${celulaPrevisto}
         ${Array(6).fill('<td style="padding:4px 6px; border:1px solid var(--border-color);"></td>').join('')}
     </tr>`;
 }
@@ -5598,7 +5596,6 @@ function _tabelaFolhaPontoPreviaHtml(emp) {
                 <thead>
                     <tr style="background:#8B3A3A; color:white;">
                         <th style="padding:5px 6px; width:56px; text-align:center; border:1px solid var(--border-color);">Dia</th>
-                        <th style="padding:5px 6px; border:1px solid var(--border-color);">Horário Previsto</th>
                         <th style="padding:5px 6px; border:1px solid var(--border-color);">Entrada 1</th>
                         <th style="padding:5px 6px; border:1px solid var(--border-color);">Saída 1</th>
                         <th style="padding:5px 6px; border:1px solid var(--border-color);">Entrada 2</th>
@@ -5627,6 +5624,7 @@ function _cardEmpregadoFolhaPontoHtml(emp, codigoEmpresa) {
                     <div>
                         <strong>${emp.codigo_empregado} - ${emp.nome_empregado}</strong>
                         <div style="font-size:11px; color:var(--text-secondary);">${emp.desc_cargo || '—'}${emp.desc_dpto ? ' · ' + emp.desc_dpto : ''}</div>
+                        <div style="font-size:11px; color:var(--text-secondary);">🕒 Horário previsto: ${emp.horarioJornada || 'jornada não cadastrada'}</div>
                     </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:10px; font-size:12px;">
@@ -5758,25 +5756,28 @@ function _desenharPaginaFolhaPontoEmpregado(doc, empresaDados, emp, MARGEM, page
         linhaCabecalho(y, `Nome: ${emp.codigo_empregado} - ${emp.nome_empregado}`, `Departamento: ${emp.desc_dpto || ''}`);
         y += 5;
         linhaCabecalho(y, `Função: ${emp.desc_cargo || ''}`, '');
+        y += 5;
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+        doc.text(`Horário previsto: ${emp.horarioJornada || 'jornada não cadastrada'}`, MARGEM, y);
+        doc.setFont('helvetica', 'normal');
         y += 4;
 
         const body = emp.linhas.map(l => {
-            const previsto = l.horarioPrevisto || '—';
             if (l.ferias) {
-                return [`${l.data.slice(0, 2)} ${l.diaSemana}`, previsto, '', '', '', '', 'FÉRIAS', ''];
+                return [`${l.data.slice(0, 2)} ${l.diaSemana}`, '', '', '', '', 'FÉRIAS', ''];
             }
-            return [`${l.data.slice(0, 2)} ${l.diaSemana}`, previsto, '', '', '', '', '', ''];
+            return [`${l.data.slice(0, 2)} ${l.diaSemana}`, '', '', '', '', '', ''];
         });
 
         doc.autoTable({
-            head: [['Dia', 'Horário Previsto', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Observações', 'Assinatura']],
+            head: [['Dia', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Observações', 'Assinatura']],
             body,
             startY: y,
             margin: { left: MARGEM, right: MARGEM },
             theme: 'grid',
             styles: { fontSize: 8, cellPadding: 1.6, valign: 'middle', halign: 'center', lineWidth: 0.1, lineColor: [0, 0, 0] },
             headStyles: { fillColor: [139, 58, 58], textColor: 255, fontStyle: 'bold', fontSize: 8, lineWidth: 0.1, lineColor: [0, 0, 0] },
-            columnStyles: { 0: { halign: 'left', cellWidth: 14 }, 1: { cellWidth: 30, fontStyle: 'bold' }, 6: { cellWidth: 30 }, 7: { cellWidth: 30 } },
+            columnStyles: { 0: { halign: 'left', cellWidth: 14 }, 5: { cellWidth: 34 }, 6: { cellWidth: 34 } },
             didParseCell: (data) => {
                 if (data.section === 'head') {
                     data.cell.styles.halign = 'center';

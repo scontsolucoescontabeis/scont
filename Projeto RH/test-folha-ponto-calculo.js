@@ -1,7 +1,7 @@
 const assert = require('node:assert');
 const {
     _DIA_ABREV_PARA_CHAVE, agruparJornadaPorDiaSemana,
-    formatarHorarioJornadaDia, montarLinhasFolhaPonto
+    formatarHorarioJornadaDia, montarLinhasFolhaPonto, resumirJornadaSemana
 } = require('./folha-ponto-calculo.js');
 
 let testesExecutados = 0;
@@ -76,6 +76,35 @@ teste('montarLinhasFolhaPonto: preserva ferias e excecao no retorno', () => {
     const dias = [{ data: '10/08/2026', diaSemana: 'Seg', tipo: 'folga', ferias: true, excecao: false }];
     const linhas = montarLinhasFolhaPonto(dias, {});
     assert.strictEqual(linhas[0].ferias, true);
+});
+
+const _jorSegSex = { entrada: '08:00', intervalo_inicio: '12:00', intervalo_fim: '13:00', saida: '17:48' };
+
+teste('resumirJornadaSemana: Seg a Sex idêntico, sem sábado', () => {
+    const jornada = { segunda: _jorSegSex, terca: _jorSegSex, quarta: _jorSegSex, quinta: _jorSegSex, sexta: _jorSegSex };
+    assert.strictEqual(resumirJornadaSemana(jornada), 'Seg a Sex: 08:00-12:00 / 13:00-17:48');
+});
+
+teste('resumirJornadaSemana: sexta diferente vira grupo separado', () => {
+    const sexCurta = { entrada: '08:00', intervalo_inicio: null, intervalo_fim: null, saida: '13:00' };
+    const jornada = { segunda: _jorSegSex, terca: _jorSegSex, quarta: _jorSegSex, quinta: _jorSegSex, sexta: sexCurta };
+    assert.strictEqual(resumirJornadaSemana(jornada), 'Seg a Qui: 08:00-12:00 / 13:00-17:48 · Sex: 08:00-13:00');
+});
+
+teste('resumirJornadaSemana: Seg a Sex + sábado', () => {
+    const sab = { entrada: '08:00', intervalo_inicio: null, intervalo_fim: null, saida: '12:00' };
+    const jornada = { segunda: _jorSegSex, terca: _jorSegSex, quarta: _jorSegSex, quinta: _jorSegSex, sexta: _jorSegSex, sabado: sab };
+    assert.strictEqual(resumirJornadaSemana(jornada), 'Seg a Sex: 08:00-12:00 / 13:00-17:48 · Sáb: 08:00-12:00');
+});
+
+teste('resumirJornadaSemana: dia sem registro no meio quebra o agrupamento', () => {
+    const jornada = { segunda: _jorSegSex, quarta: _jorSegSex, quinta: _jorSegSex, sexta: _jorSegSex };
+    assert.strictEqual(resumirJornadaSemana(jornada), 'Seg: 08:00-12:00 / 13:00-17:48 · Qua a Sex: 08:00-12:00 / 13:00-17:48');
+});
+
+teste('resumirJornadaSemana: sem jornada cadastrada retorna string vazia', () => {
+    assert.strictEqual(resumirJornadaSemana({}), '');
+    assert.strictEqual(resumirJornadaSemana(null), '');
 });
 
 console.log(`\n${testesExecutados} teste(s) executado(s) com sucesso.`);
