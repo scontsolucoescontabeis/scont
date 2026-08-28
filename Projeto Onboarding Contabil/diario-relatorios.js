@@ -72,11 +72,6 @@
       <div class="mapa-secao">
         <div class="mapa-secao-header">Filtros</div>
         <div class="mapa-secao-body">
-          ${window.ContabilGrupos.contabil().length ? `
-          <div class="full">
-            <label>Grupo de Empresas</label>
-            <select id="filtroGrupoRelatorio">${window.ContabilGrupos.opcoesSelectContabil('')}</select>
-          </div>` : ''}
           <div class="full">
             <label>Nível de Atenção</label>
             <div class="mapa-checkbox-grupo">${checkboxGrupo('filtroNivel', Object.entries(ctx.NIVEL_LABELS).map(([value, label]) => ({ value, label })))}</div>
@@ -164,7 +159,6 @@
     const valorMes = document.getElementById('filtroGradeMes').value;
     const todosAnos = document.getElementById('chkGradeTodosAnos').checked;
     return {
-      grupo: document.getElementById('filtroGrupoRelatorio')?.value || null,
       niveis: valoresMarcados('filtroNivel'),
       situacoesAno: valoresMarcados('filtroSituacaoAno'),
       statusGrade: document.getElementById('filtroStatusGrade').value || null,
@@ -213,9 +207,7 @@
   }
 
   function aplicarFiltros(ctx, filtros) {
-    const codigosGrupo = filtros.grupo ? window.ContabilGrupos.codigosDoGrupo(filtros.grupo) : null;
     return ctx.empresas.filter((e) => {
-      if (codigosGrupo && !codigosGrupo.has(e.codigo_empresa)) return false;
       const m = ctx.mapeamentoDe(e.codigo_empresa);
       const nivel = m ? (m.nivel_atencao || 'baixo') : 'baixo';
       if (filtros.niveis.length && !filtros.niveis.includes(nivel)) return false;
@@ -262,7 +254,7 @@
 
     const empresasHtml = encontradas.map((e) => `
       <label class="mapa-checkbox-item">
-        <input type="checkbox" data-empresa-codigo="${ctx.escapeHtml(e.codigo_empresa)}" checked> ${ctx.escapeHtml(e.nome_empresa)}
+        <input type="checkbox" data-empresa-codigo="${ctx.escapeHtml(e.codigo_empresa)}" checked> ${e.is_grupo ? '👥 ' : ''}${ctx.escapeHtml(e.nome_empresa)}${e.is_grupo ? ` <span class="mapa-empty">(${ctx.escapeHtml(e.membros_nomes || '')})</span>` : ''}
       </label>
     `).join('');
 
@@ -324,10 +316,21 @@
   }
 
   async function buscarInfoLancamentos(ctx, codigos, filtros) {
+    // Para uma unidade-grupo, os lançamentos incluem os das empresas membro
+    // (chave 'grupo-<id>' + códigos membro); o resultado é atribuído à chave
+    // do grupo.
+    const chaveDaConsulta = {}; // codigo real -> chave da unidade
+    const codigosConsulta = [];
+    codigos.forEach((codigo) => {
+      const u = ctx.empresas.find((x) => x.codigo_empresa === codigo);
+      const reais = u && u.is_grupo ? [codigo, ...(u.membros_codigos || [])] : [codigo];
+      reais.forEach((c) => { chaveDaConsulta[c] = codigo; codigosConsulta.push(c); });
+    });
+
     let query = ctx.supabaseClient
       .from('contabil_diario_lancamentos')
       .select('codigo_empresa, data, texto, criado_por_nome, criado_por_email, created_at, mes_referencia, ano_referencia, assunto')
-      .in('codigo_empresa', codigos)
+      .in('codigo_empresa', codigosConsulta)
       .order('data', { ascending: false })
       .order('created_at', { ascending: false });
     if (filtros.periodoDe) query = query.gte('data', filtros.periodoDe);
@@ -340,7 +343,8 @@
 
     const porEmpresa = {};
     (data || []).forEach((l) => {
-      const bucket = (porEmpresa[l.codigo_empresa] = porEmpresa[l.codigo_empresa] || { qtd: 0, ultimo: null });
+      const chave = chaveDaConsulta[l.codigo_empresa] || l.codigo_empresa;
+      const bucket = (porEmpresa[chave] = porEmpresa[chave] || { qtd: 0, ultimo: null });
       bucket.qtd += 1;
       if (!bucket.ultimo) bucket.ultimo = l;
     });
@@ -352,10 +356,6 @@
   // do PDF pra deixar claro quais parâmetros geraram aquele relatório.
   function resumoFiltrosTexto(ctx, filtros) {
     const partes = [];
-    if (filtros.grupo) {
-      const g = window.ContabilGrupos.porId(filtros.grupo);
-      if (g) partes.push(`Grupo de Empresas: ${g.nome_grupo}`);
-    }
     if (filtros.niveis.length) partes.push(`Nível de Atenção: ${filtros.niveis.map((v) => ctx.NIVEL_LABELS[v] || v).join(', ')}`);
     if (filtros.situacoesAno.length) partes.push(`Situação do Ano Corrente (${anoAtualStr()}): ${filtros.situacoesAno.map((v) => ctx.SITUACAO_LABELS[v] || v).join(', ')}`);
     if (filtros.statusGrade) {
@@ -395,7 +395,10 @@
 
       return colunas.map((c) => {
         switch (c.key) {
-          case 'empresa': return e ? e.nome_empresa : codigo;
+          case 'empresa': {
+            if (!e) return codigo;
+            return e.is_grupo ? `${e.nome_empresa} (grupo: ${e.membros_nomes || ''})` : e.nome_empresa;
+          }
           case 'regime': return m && m.regime_tributario ? (ctx.REGIME_LABELS[m.regime_tributario] || m.regime_tributario) : '—';
           case 'periodicidade': return m && m.periodicidade ? (ctx.PERIODICIDADE_LABELS[m.periodicidade] || m.periodicidade) : '—';
           case 'responsavel': return m && m.responsavel_execucao ? m.responsavel_execucao : '—';

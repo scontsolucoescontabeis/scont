@@ -3,7 +3,8 @@
 
   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  let empresas = []; // [{ codigo_empresa, nome_empresa }]
+  let empresas = []; // [{ codigo_empresa, nome_empresa }] — TODAS as ativas (o editor de grupos precisa da lista completa)
+  let unidadesContabil = []; // empresas avulsas + uma entrada por grupo contábil ('grupo-<id>') — usada na tabela "Empresas com Contábil" e no vínculo de responsáveis
   let configPorEmpresa = {}; // { codigo_empresa: boolean } — espelha o que já está salvo no banco
   let usuariosAprovados = []; // [{ id, nome, email, empresa }]
   let responsaveisPorEmpresa = {}; // { codigo_empresa: Set<usuario_id> }
@@ -67,6 +68,8 @@
 
     const ativa = (s) => !s || String(s).trim().toLowerCase().startsWith('ativ');
     empresas = (dataEmpresas || []).filter((e) => ativa(e.status_situacao));
+    await window.ContabilGrupos.carregar(supabaseClient);
+    unidadesContabil = window.ContabilGrupos.montarUnidades(empresas, empresas);
 
     configPorEmpresa = {};
     (dataConfig || []).forEach((c) => { configPorEmpresa[c.codigo_empresa] = c.possui_contabil; });
@@ -82,8 +85,6 @@
     emailAlertaValidacao = dataConfigGeral?.email_alerta_validacao || '';
     notificacoesEventos = {};
     EVENTOS_EMAIL.forEach((ev) => { notificacoesEventos[ev.coluna] = dataConfigGeral?.[ev.coluna] !== false; });
-
-    await window.ContabilGrupos.carregar(supabaseClient);
   }
 
   async function salvarEmailAlertaValidacao(valor) {
@@ -139,7 +140,8 @@
   }
 
   async function syncMapeamentoEmpresa(codigoEmpresa) {
-    const empresa = empresas.find((e) => e.codigo_empresa === codigoEmpresa);
+    const empresa = empresas.find((e) => e.codigo_empresa === codigoEmpresa)
+      || unidadesContabil.find((e) => e.codigo_empresa === codigoEmpresa);
     const payload = { codigo_empresa: codigoEmpresa, responsavel_execucao: nomesResponsaveisTexto(codigoEmpresa) };
     const regime = normalizarRegimeTributario(empresa?.regime_enquadramento);
     if (regime) payload.regime_tributario = regime;
@@ -152,7 +154,7 @@
   async function sincronizarMapeamentoTodasEmpresas() {
     const comRegime = [];
     const semRegime = [];
-    empresas.forEach((e) => {
+    unidadesContabil.forEach((e) => {
       const regime = normalizarRegimeTributario(e.regime_enquadramento);
       const responsavel_execucao = nomesResponsaveisTexto(e.codigo_empresa);
       if (regime) comRegime.push({ codigo_empresa: e.codigo_empresa, regime_tributario: regime, responsavel_execucao });
@@ -280,8 +282,10 @@
   // ─── TELA: EMPRESAS COM CONTÁBIL ────────────────────────────
 
   function renderTelaEmpresas() {
+    // Reflete alterações de composição de grupos feitas na subtela ao lado.
+    unidadesContabil = window.ContabilGrupos.montarUnidades(empresas, empresas);
     abrirMain('Empresas com Contábil', `
-      <p class="full mapa-empty" style="margin-bottom:4px;">Marque as empresas que possuem contábil na Scont. Somente as marcadas aqui aparecem nos seletores e filtros do Onboarding e do Diário Contábil. As alterações são salvas automaticamente.</p>
+      <p class="full mapa-empty" style="margin-bottom:4px;">Marque as empresas que possuem contábil na Scont. Somente as marcadas aqui aparecem nos seletores e filtros do Onboarding e do Diário Contábil. As alterações são salvas automaticamente. Grupos marcados em "Grupos de Empresas" aparecem como uma linha só (👥) e são tratados como uma unidade no Diário.</p>
       <div class="full mapa-filtros">
         <input type="text" id="buscaEmpresaConfig" placeholder="Buscar empresa...">
         <button type="button" class="btn btn-secondary" id="btnMarcarTodas">Marcar todas</button>
@@ -428,6 +432,14 @@
     chkUsar.addEventListener('change', async () => {
       if (!g.id) return;
       const valor = chkUsar.checked;
+      if (valor) {
+        const conflitos = window.ContabilGrupos.gruposContabilComConflito(Array.from(g.empresas || []).map((x) => x.codigo_empresa || x), g.id);
+        if (conflitos.length) {
+          chkUsar.checked = false;
+          mostrarToast(`Não é possível: empresa(s) deste grupo já estão no grupo contábil "${conflitos[0].nome_grupo}". Uma empresa só pode estar em um grupo contábil.`, 'erro');
+          return;
+        }
+      }
       chkUsar.disabled = true;
       const { error } = await window.ContabilGrupos.definirUsarContabil(g.id, valor);
       chkUsar.disabled = false;
@@ -522,6 +534,15 @@
   async function salvarGrupoConfig() {
     const g = grupoConfigAtual;
     if (!g || !(g.nome_grupo || '').trim()) { mostrarToast('Informe o nome do grupo.', 'erro'); return; }
+    // Se o grupo é (ou está prestes a virar) contábil, nenhuma empresa dele
+    // pode já estar em outro grupo contábil.
+    if (g.usarContabil) {
+      const conflitos = window.ContabilGrupos.gruposContabilComConflito(g.empresas.map((e) => e.codigo_empresa), g.id);
+      if (conflitos.length) {
+        mostrarToast(`Empresa(s) deste grupo já estão no grupo contábil "${conflitos[0].nome_grupo}". Uma empresa só pode estar em um grupo contábil.`, 'erro');
+        return;
+      }
+    }
     const btn = document.getElementById('btnSalvarGrupoConfig');
     btn.disabled = true;
     const { id, error } = await window.ContabilGrupos.salvarGrupo({
@@ -559,8 +580,10 @@
 
   function empresasVisiveis() {
     const termo = (document.getElementById('buscaEmpresaConfig').value || '').trim().toLowerCase();
-    if (!termo) return empresas;
-    return empresas.filter((e) => e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo));
+    if (!termo) return unidadesContabil;
+    return unidadesContabil.filter((e) => e.nome_empresa.toLowerCase().includes(termo)
+      || e.codigo_empresa.toLowerCase().includes(termo)
+      || (e.membros_nomes || '').toLowerCase().includes(termo));
   }
 
   function toggleHtml(codigoEmpresa) {
@@ -585,9 +608,9 @@
     corpo.innerHTML = visiveis.length
       ? visiveis.map((e) => `
         <tr>
-          <td>${escapeHtml(e.codigo_empresa)}</td>
-          <td>${escapeHtml(e.nome_empresa)}</td>
-          <td>${toggleHtml(e.codigo_empresa)}</td>
+          <td>${e.is_grupo ? '👥' : escapeHtml(e.codigo_empresa)}</td>
+          <td>${escapeHtml(e.nome_empresa)}${e.is_grupo ? ` <span class="mapa-empty">(grupo — ${escapeHtml(e.membros_nomes || '')})</span>` : ''}</td>
+          <td>${e.is_grupo ? '<span class="contabil-badge-grupo" title="Composição definida em Grupos de Empresas">👥 Grupo</span>' : toggleHtml(e.codigo_empresa)}</td>
           <td>${responsavelHtml(e.codigo_empresa)}</td>
         </tr>
       `).join('')
@@ -599,7 +622,7 @@
     corpo.querySelectorAll('.btn-editar-responsavel').forEach((btn) => {
       btn.addEventListener('click', () => {
         const codigo = btn.getAttribute('data-empresa-codigo');
-        const empresa = empresas.find((e) => e.codigo_empresa === codigo);
+        const empresa = unidadesContabil.find((e) => e.codigo_empresa === codigo);
         abrirModalResponsaveis(codigo, empresa ? empresa.nome_empresa : codigo);
       });
     });
@@ -729,8 +752,10 @@
 
   function empresasVisiveisModalUsuario() {
     const termo = (document.getElementById('buscaEmpresaModalUsuario').value || '').trim().toLowerCase();
-    if (!termo) return empresas;
-    return empresas.filter((e) => e.nome_empresa.toLowerCase().includes(termo) || e.codigo_empresa.toLowerCase().includes(termo));
+    if (!termo) return unidadesContabil;
+    return unidadesContabil.filter((e) => e.nome_empresa.toLowerCase().includes(termo)
+      || e.codigo_empresa.toLowerCase().includes(termo)
+      || (e.membros_nomes || '').toLowerCase().includes(termo));
   }
 
   function renderCorpoModalResponsavelUsuario() {
@@ -748,7 +773,7 @@
       return `
         <label class="responsavel-check-item">
           <input type="checkbox" class="chk-responsavel-usuario" value="${escapeAttr(e.codigo_empresa)}" ${marcado ? 'checked' : ''}>
-          <span>${escapeHtml(e.nome_empresa)} <small>(${escapeHtml(e.codigo_empresa)})</small></span>
+          <span>${e.is_grupo ? '👥 ' : ''}${escapeHtml(e.nome_empresa)} <small>(${e.is_grupo ? 'grupo' : escapeHtml(e.codigo_empresa)})</small></span>
         </label>
       `;
     }).join('');

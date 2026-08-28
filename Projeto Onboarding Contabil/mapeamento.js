@@ -44,7 +44,7 @@
   let relacionadasPorEmpresa = {};  // cache simples { codigo_empresa: [codigo_empresa_relacionada, ...] }
   let mapeamentoAtualId = null;     // codigo_empresa selecionado (null = dashboard)
   let mapeamentoAtual = null;       // linha de contabil_mapeamento selecionada
-  let filtro = { nivel: null, regime: '', periodicidade: '', financeiro: '', grupo: '', busca: '' };
+  let filtro = { nivel: null, regime: '', periodicidade: '', financeiro: '', busca: '' };
 
   // ─── ESCOPO: "Prestador de Serviço" só vê empresas onde é responsável ──
   // Mesma convenção client-side já usada no Diário Contábil (diario.js).
@@ -66,13 +66,18 @@
     _podeEditar = _isAdmin || _isScontTeam;
     _restringirSeletor = !_isAdmin && empresaUsuario === 'prestador de serviço';
 
+    // Grupos carregados aqui (não só em carregarDados) para que a checagem
+    // de escopo do Prestador logo abaixo já reconheça um link do Diário que
+    // aponta para a chave 'grupo-<id>'.
+    await window.ContabilGrupos.carregar(supabaseClient);
+
     if (!auth.userId) { _meusResponsaveisSet = new Set(); return; }
     const { data, error } = await supabaseClient
       .from('contabil_empresas_responsaveis')
       .select('codigo_empresa')
       .eq('usuario_id', auth.userId);
     if (error) { console.error(error); _meusResponsaveisSet = new Set(); return; }
-    _meusResponsaveisSet = new Set((data || []).map((r) => r.codigo_empresa));
+    _meusResponsaveisSet = window.ContabilGrupos.expandirResponsaveisComGrupos(new Set((data || []).map((r) => r.codigo_empresa)));
   }
 
   async function iniciar() {
@@ -133,14 +138,19 @@
     if (errMapeamentos) console.error(errMapeamentos);
     if (errConfig) console.error(errConfig);
 
-    await window.ContabilGrupos.carregar(supabaseClient);
+    // ContabilGrupos já foi carregado em _resolverEscopoUsuario.
 
     const configPorEmpresa = {};
     (dataConfig || []).forEach((c) => { configPorEmpresa[c.codigo_empresa] = c.possui_contabil; });
     const possuiContabil = (codigo) => configPorEmpresa[codigo] !== false;
 
+    // Grupos contábil viram UNIDADES (uma entrada 'grupo-<id>' no lugar dos
+    // membros) — ver spec 2026-08-28-grupo-unidade-fechamento-design.md.
     const ativa = (s) => !s || String(s).trim().toLowerCase().startsWith('ativ');
-    empresas = (dataEmpresas || []).filter((e) => ativa(e.status_situacao) && possuiContabil(e.codigo_empresa));
+    const todasAtivas = (dataEmpresas || []).filter((e) => ativa(e.status_situacao));
+    const comContabil = todasAtivas.filter((e) => possuiContabil(e.codigo_empresa));
+    empresas = window.ContabilGrupos.montarUnidades(comContabil, todasAtivas);
+    _meusResponsaveisSet = window.ContabilGrupos.expandirResponsaveis(_meusResponsaveisSet, empresas);
     if (_restringirSeletor) empresas = empresas.filter((e) => _meusResponsaveisSet.has(e.codigo_empresa));
     mapeamentos = dataMapeamentos || [];
 
@@ -236,11 +246,12 @@
 
   function empresasFiltradas() {
     const termoBusca = filtro.busca.trim().toLowerCase();
-    const codigosGrupo = filtro.grupo ? window.ContabilGrupos.codigosDoGrupo(filtro.grupo) : null;
     return empresas.filter((e) => {
       const m = mapeamentoDe(e.codigo_empresa);
-      if (codigosGrupo && !codigosGrupo.has(e.codigo_empresa)) return false;
-      if (termoBusca && !e.codigo_empresa.toLowerCase().includes(termoBusca) && !e.nome_empresa.toLowerCase().includes(termoBusca)) return false;
+      if (termoBusca
+        && !e.codigo_empresa.toLowerCase().includes(termoBusca)
+        && !e.nome_empresa.toLowerCase().includes(termoBusca)
+        && !(e.membros_nomes || '').toLowerCase().includes(termoBusca)) return false;
       if (filtro.nivel && nivelDe(e.codigo_empresa) !== filtro.nivel) return false;
       if (filtro.regime && (!m || m.regime_tributario !== filtro.regime)) return false;
       if (filtro.periodicidade && (!m || m.periodicidade !== filtro.periodicidade)) return false;
@@ -255,7 +266,7 @@
       const nivel = nivelDe(e.codigo_empresa);
       return `
         <tr data-codigo="${escapeHtml(e.codigo_empresa)}">
-          <td>${escapeHtml(e.codigo_empresa)} - ${escapeHtml(e.nome_empresa)}</td>
+          <td>${e.is_grupo ? `👥 ${escapeHtml(e.nome_empresa)} <span class="mapa-empty">(grupo · ${e.membros_codigos.length})</span>` : `${escapeHtml(e.codigo_empresa)} - ${escapeHtml(e.nome_empresa)}`}</td>
           <td>${m && m.regime_tributario ? (REGIME_LABELS[m.regime_tributario] || m.regime_tributario) : '—'}</td>
           <td>${m && m.responsavel_execucao ? escapeHtml(m.responsavel_execucao) : '—'}</td>
           <td>${m && m.ultimo_mes_fechado ? formatarMesAno(m.ultimo_mes_fechado) : '—'}</td>
@@ -310,7 +321,6 @@
           <option value="">Financeiro (todos)</option>
           ${Object.entries(FINANCEIRO_LABELS).map(([v, l]) => `<option value="${v}" ${filtro.financeiro === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
-        ${window.ContabilGrupos.contabil().length ? `<select id="filtroGrupo">${window.ContabilGrupos.opcoesSelectContabil(filtro.grupo)}</select>` : ''}
       </div>
       <table class="mapa-table">
         <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Último mês fechado</th><th>Nível</th></tr></thead>
@@ -332,7 +342,6 @@
     });
     document.getElementById('filtroRegime').addEventListener('change', (ev) => { filtro.regime = ev.target.value; renderDashboard(); });
     document.getElementById('filtroPeriodicidade').addEventListener('change', (ev) => { filtro.periodicidade = ev.target.value; renderDashboard(); });
-    document.getElementById('filtroGrupo')?.addEventListener('change', (ev) => { filtro.grupo = ev.target.value; renderDashboard(); });
     document.getElementById('filtroFinanceiro').addEventListener('change', (ev) => { filtro.financeiro = ev.target.value; renderDashboard(); });
     ligarCliquesLinhasDashboard();
 
@@ -351,7 +360,7 @@
     const select = document.getElementById('seletorEmpresa');
     const atual = select.value;
     select.innerHTML = '<option value="">Selecionar empresa...</option>' +
-      empresas.map((e) => `<option value="${escapeHtml(e.codigo_empresa)}">${escapeHtml(e.nome_empresa)}</option>`).join('');
+      empresas.map((e) => `<option value="${escapeHtml(e.codigo_empresa)}">${e.is_grupo ? '👥 ' : ''}${escapeHtml(e.nome_empresa)}</option>`).join('');
     select.value = atual;
   }
 

@@ -614,6 +614,7 @@ input,select,textarea{font:inherit}
 .contabil-toggle{ border:none; border-radius:999px; padding:4px 14px; font-size:12px; font-weight:700; cursor:pointer; min-width:52px; }
 .contabil-toggle.contabil-sim{ background:var(--success-soft); color:var(--success); }
 .contabil-toggle.contabil-nao{ background:var(--danger-soft); color:var(--danger); }
+.contabil-badge-grupo{ display:inline-block; border-radius:999px; padding:4px 12px; font-size:12px; font-weight:700; background:var(--surface-2); color:var(--muted); }
 
 .responsavel-cel{ display:flex; align-items:center; gap:8px; }
 .responsavel-nomes{ color:var(--text); flex:1; }

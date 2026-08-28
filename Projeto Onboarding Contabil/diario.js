@@ -28,7 +28,6 @@
   let dashboardFiltroResponsavel = '';
   let dashboardFiltroStatus = '';
   let dashboardFiltroDocumentacao = '';
-  let dashboardFiltroGrupo = '';
   let dashboardFiltroMes; // undefined = ainda não inicializado (default: mês atual); null = "Todos os meses" (seleção explícita)
   let dashboardFiltroAno = null;
 
@@ -142,8 +141,16 @@
     (dataConfig || []).forEach((c) => { configPorEmpresa[c.codigo_empresa] = c.possui_contabil; });
     const possuiContabil = (codigo) => configPorEmpresa[codigo] !== false;
 
+    // Grupos contábil viram UNIDADES: a lista `empresas` passa a conter as
+    // empresas avulsas + uma entrada por grupo (chave 'grupo-<id>'); os
+    // membros do grupo saem da lista. Ver
+    // docs/superpowers/specs/2026-08-28-grupo-unidade-fechamento-design.md.
+    await window.ContabilGrupos.carregar(supabaseClient);
     const ativa = (s) => !s || String(s).trim().toLowerCase().startsWith('ativ');
-    empresas = (dataEmpresas || []).filter((e) => ativa(e.status_situacao) && possuiContabil(e.codigo_empresa));
+    const todasAtivas = (dataEmpresas || []).filter((e) => ativa(e.status_situacao));
+    const comContabil = todasAtivas.filter((e) => possuiContabil(e.codigo_empresa));
+    empresas = window.ContabilGrupos.montarUnidades(comContabil, todasAtivas);
+    _meusResponsaveisSet = window.ContabilGrupos.expandirResponsaveis(_meusResponsaveisSet, empresas);
     if (_restringirSeletor) empresas = empresas.filter((e) => _meusResponsaveisSet.has(e.codigo_empresa));
     mapeamentos = dataMapeamentos || [];
 
@@ -183,7 +190,6 @@
     if (errStatus) console.error(errStatus);
     if (errDocumentacao) console.error(errDocumentacao);
 
-    await window.ContabilGrupos.carregar(supabaseClient);
     statusMensalPorEmpresa = {};
     motivoPendenciaPorEmpresa = {};
     (statusMensal || []).forEach((s) => {
@@ -210,6 +216,7 @@
       documentacaoPorEmpresa,
       NIVEL_LABELS, REGIME_LABELS, SITUACAO_LABELS, FINANCEIRO_LABELS, PERIODICIDADE_LABELS,
       ASSUNTOS_LANCAMENTO,
+      ehChaveGrupo: window.ContabilGrupos.ehChaveGrupo,
       mapeamentoDe,
       escapeHtml,
       fechamentos,
@@ -342,6 +349,12 @@
     if (cfg?.notificar_validacao_fechamento === false) return; // desligado em Configurações
 
     const destinatarios = (cfg?.email_alerta_validacao || '').split(',').map((s) => s.trim()).filter(Boolean);
+    // Para um grupo, soma o(s) e-mail(is) do responsável do grupo.
+    if (window.ContabilGrupos.ehChaveGrupo(codigoEmpresa)) {
+      window.ContabilGrupos.emailResponsavelPorChave(codigoEmpresa)
+        .split(',').map((s) => s.trim()).filter(Boolean)
+        .forEach((e) => { if (!destinatarios.includes(e)) destinatarios.push(e); });
+    }
     if (!destinatarios.length) {
       mostrarToast('Fechamento enviado, mas nenhum e-mail de alerta está configurado (Configurações → Alertas por E-mail).', 'erro');
       return;
@@ -509,12 +522,14 @@
       const termo = input.value.trim().toLowerCase();
       if (!termo) { lista.innerHTML = ''; lista.classList.remove('aberta'); return; }
       const resultados = empresas
-        .filter((e) => e.codigo_empresa.toLowerCase().includes(termo) || e.nome_empresa.toLowerCase().includes(termo))
+        .filter((e) => e.codigo_empresa.toLowerCase().includes(termo)
+          || e.nome_empresa.toLowerCase().includes(termo)
+          || (e.membros_nomes || '').toLowerCase().includes(termo))
         .slice(0, 20);
       if (!resultados.length) {
         lista.innerHTML = '<div class="combobox-item combobox-vazio">Nenhuma empresa encontrada.</div>';
       } else {
-        lista.innerHTML = resultados.map((e) => `<div class="combobox-item" data-codigo="${escapeHtml(e.codigo_empresa)}">${escapeHtml(e.codigo_empresa)} - ${escapeHtml(e.nome_empresa)}</div>`).join('');
+        lista.innerHTML = resultados.map((e) => `<div class="combobox-item" data-codigo="${escapeHtml(e.codigo_empresa)}">${e.is_grupo ? `👥 ${escapeHtml(e.nome_empresa)}` : `${escapeHtml(e.codigo_empresa)} - ${escapeHtml(e.nome_empresa)}`}</div>`).join('');
       }
       lista.classList.add('aberta');
     });
@@ -591,11 +606,12 @@
   // o ano inteiro, o filtro só decide quais empresas aparecem na lista.
   function empresasFiltradasDashboard() {
     const termoBusca = dashboardFiltroBusca.trim().toLowerCase();
-    const codigosGrupo = dashboardFiltroGrupo ? window.ContabilGrupos.codigosDoGrupo(dashboardFiltroGrupo) : null;
     return empresas.filter((e) => {
       const m = mapeamentoDe(e.codigo_empresa);
-      if (codigosGrupo && !codigosGrupo.has(e.codigo_empresa)) return false;
-      if (termoBusca && !e.codigo_empresa.toLowerCase().includes(termoBusca) && !e.nome_empresa.toLowerCase().includes(termoBusca)) return false;
+      if (termoBusca
+        && !e.codigo_empresa.toLowerCase().includes(termoBusca)
+        && !e.nome_empresa.toLowerCase().includes(termoBusca)
+        && !(e.membros_nomes || '').toLowerCase().includes(termoBusca)) return false;
       if (dashboardFiltroRegime && (!m || m.regime_tributario !== dashboardFiltroRegime)) return false;
       if (dashboardFiltroPeriodicidade && (!m || m.periodicidade !== dashboardFiltroPeriodicidade)) return false;
       if (dashboardFiltroResponsavel && (!m || m.responsavel_execucao !== dashboardFiltroResponsavel)) return false;
@@ -622,7 +638,7 @@
       const mesesPendencia = mesesComPendenciaDe(e.codigo_empresa);
       return `
         <tr data-codigo="${escapeHtml(e.codigo_empresa)}">
-          <td>${escapeHtml(e.codigo_empresa)} - ${escapeHtml(e.nome_empresa)}</td>
+          <td>${e.is_grupo ? `👥 ${escapeHtml(e.nome_empresa)} <span class="mapa-empty">(grupo · ${e.membros_codigos.length})</span>` : `${escapeHtml(e.codigo_empresa)} - ${escapeHtml(e.nome_empresa)}`}</td>
           <td>${m && m.regime_tributario ? (REGIME_LABELS[m.regime_tributario] || m.regime_tributario) : '—'}</td>
           <td>${m && m.responsavel_execucao ? escapeHtml(m.responsavel_execucao) : '—'}</td>
           <td>${m && m.periodicidade ? PERIODICIDADE_LABELS[m.periodicidade] : '—'}</td>
@@ -668,11 +684,6 @@
               ${responsaveis.map((r) => `<option value="${escapeHtml(r)}" ${dashboardFiltroResponsavel === r ? 'selected' : ''}>${escapeHtml(r)}</option>`).join('')}
             </select>
           </div>
-          ${window.ContabilGrupos.contabil().length ? `
-          <div>
-            <label>Grupo de Empresas</label>
-            <select id="filtroDashGrupo">${window.ContabilGrupos.opcoesSelectContabil(dashboardFiltroGrupo)}</select>
-          </div>` : ''}
           <div>
             <label>Periodicidade</label>
             <select id="filtroDashPeriodicidade">
@@ -734,7 +745,6 @@
     document.getElementById('filtroDashBusca').addEventListener('input', (ev) => { dashboardFiltroBusca = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashRegime').addEventListener('change', (ev) => { dashboardFiltroRegime = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashPeriodicidade').addEventListener('change', (ev) => { dashboardFiltroPeriodicidade = ev.target.value; atualizarTabelaDashboard(); });
-    document.getElementById('filtroDashGrupo')?.addEventListener('change', (ev) => { dashboardFiltroGrupo = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashResponsavel').addEventListener('change', (ev) => { dashboardFiltroResponsavel = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashStatus').addEventListener('change', (ev) => { dashboardFiltroStatus = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashDocumentacao').addEventListener('change', (ev) => { dashboardFiltroDocumentacao = ev.target.value; atualizarTabelaDashboard(); });
@@ -747,7 +757,6 @@
       dashboardFiltroResponsavel = '';
       dashboardFiltroStatus = '';
       dashboardFiltroDocumentacao = '';
-      dashboardFiltroGrupo = '';
       dashboardFiltroMes = hoje.getMonth() + 1;
       dashboardFiltroAno = hoje.getFullYear();
       renderDashboardDiario();
@@ -763,11 +772,19 @@
     renderPaginaEmpresa();
   }
 
+  function unidadeAtual() {
+    return empresas.find((e) => e.codigo_empresa === empresaAtualCodigo) || null;
+  }
+
   function renderPaginaEmpresa() {
     const main = document.getElementById('main');
+    const u = unidadeAtual();
+    const subtitulo = u && u.is_grupo
+      ? `<p class="mapa-empty" style="margin:2px 0 0;">👥 Grupo de Empresas — tratado como uma unidade. Empresas: ${escapeHtml(u.membros_nomes || '—')}</p>`
+      : '';
     main.innerHTML = `
       <div class="onboarding-header">
-        <div><h2>${escapeHtml(empresaNome(empresaAtualCodigo))}</h2></div>
+        <div><h2>${escapeHtml(empresaNome(empresaAtualCodigo))}</h2>${subtitulo}</div>
       </div>
       <div id="secaoResumoMapeamento"></div>
       <div id="secaoGradeMensal"></div>
@@ -1303,7 +1320,7 @@
             <button type="button" id="btnAnoAnterior">‹</button>
             <strong>${anoGradeAtual}</strong>
             <button type="button" id="btnAnoSeguinte">›</button>
-            <button type="button" class="btn btn-secondary" id="btnConsultarQSA" style="margin-left:auto;">👥 Consultar QSA</button>
+            ${window.ContabilGrupos.ehChaveGrupo(empresaAtualCodigo) ? '' : '<button type="button" class="btn btn-secondary" id="btnConsultarQSA" style="margin-left:auto;">👥 Consultar QSA</button>'}
           </div>
           <div class="full mapa-grade-linha">${celulasHtml}</div>
         </div>
@@ -1312,7 +1329,7 @@
 
     el.querySelector('#btnAnoAnterior').addEventListener('click', () => { anoGradeAtual -= 1; renderGradeMensal(); });
     el.querySelector('#btnAnoSeguinte').addEventListener('click', () => { anoGradeAtual += 1; renderGradeMensal(); });
-    el.querySelector('#btnConsultarQSA').addEventListener('click', () => abrirModalConsultaQSA(empresaAtualCodigo));
+    el.querySelector('#btnConsultarQSA')?.addEventListener('click', () => abrirModalConsultaQSA(empresaAtualCodigo));
     el.querySelectorAll('.mapa-grade-cel').forEach((cel) => {
       cel.addEventListener('click', () => {
         const mes = Number(cel.getAttribute('data-mes'));
@@ -1478,14 +1495,16 @@
     const eventosGrade = await buscarEventosStatusGrade(codigoEmpresa, ano, mes);
     const tempos = window.ContabilDiarioUtil.calcularTemposFechamento(eventosGrade);
 
+    const ehGrupo = window.ContabilGrupos.ehChaveGrupo(codigoEmpresa);
     body.innerHTML = `
       ${acaoHtml}
       ${temposFechamentoHtml(tempos)}
+      ${ehGrupo ? '' : `
       <div class="mapa-secao-header" style="margin:0 -20px 12px;padding-left:20px;">Quadro de Sócios e Administradores</div>
       <div class="mapa-secao-body" style="padding:0 0 16px;">
         <div class="full"><p class="mapa-empty" style="margin:0 0 8px;">Composição do QSA mês a mês do período em análise, a partir das datas de ingresso/saída cadastradas em Sócios (RH).</p></div>
         <div class="full"><button type="button" class="btn btn-secondary" id="btnVerQSA">👥 Ver QSA do período (${escapeHtml(descricaoPeriodoDe(codigoEmpresa, ano, mes))})</button></div>
-      </div>
+      </div>`}
       <div class="mapa-secao-header" style="margin:0 -20px 12px;padding-left:20px;">Linha do Tempo</div>
       <div id="fechTimeline">${timelineFechamentoHtml(codigoEmpresa, ano, mes)}</div>
     `;
@@ -1959,10 +1978,17 @@
     const refAno = document.getElementById('filtroLancamentoRefAno')?.value || null;
     const assunto = document.getElementById('filtroLancamentoAssunto')?.value || null;
 
+    // Para um grupo, o histórico inclui também os lançamentos antigos das
+    // empresas membro (feitos antes da virada para "grupo = unidade").
+    const u = unidadeAtual();
+    const codigosLancamento = u && u.is_grupo
+      ? [empresaAtualCodigo, ...(u.membros_codigos || [])]
+      : [empresaAtualCodigo];
+
     let query = supabaseClient
       .from('contabil_diario_lancamentos')
       .select('*')
-      .eq('codigo_empresa', empresaAtualCodigo);
+      .in('codigo_empresa', codigosLancamento);
     if (de) query = query.gte('data', de);
     if (ate) query = query.lte('data', ate);
     if (refMes) query = query.eq('mes_referencia', Number(refMes));

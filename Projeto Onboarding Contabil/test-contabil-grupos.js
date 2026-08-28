@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { montarGrupos, filtrarPorGrupo } = require('./contabil-grupos.js');
+const { montarGrupos, filtrarPorGrupo, montarUnidades, expandirResponsaveis, ehChaveGrupo, idDoGrupoNaChave } = require('./contabil-grupos.js');
 
 // ─── montarGrupos ──────────────────────────────────────────────
 
@@ -85,5 +85,62 @@ assert.deepStrictEqual(
   'getCodigo customizável'
 );
 console.log('OK: filtrarPorGrupo aceita getCodigo customizado');
+
+// ─── ehChaveGrupo / idDoGrupoNaChave ──────────────────────────
+
+assert.strictEqual(ehChaveGrupo('grupo-abc-123'), true);
+assert.strictEqual(ehChaveGrupo('453'), false);
+assert.strictEqual(ehChaveGrupo(null), false);
+assert.strictEqual(idDoGrupoNaChave('grupo-abc-123'), 'abc-123');
+assert.strictEqual(idDoGrupoNaChave('453'), null);
+console.log('OK: ehChaveGrupo / idDoGrupoNaChave');
+
+// ─── montarUnidades ──────────────────────────────────────────
+
+const todasAtivas = [
+  { codigo_empresa: '001', nome_empresa: 'Alfa', regime_enquadramento: 'Simples' },
+  { codigo_empresa: '002', nome_empresa: 'Beta' },
+  { codigo_empresa: '003', nome_empresa: 'Gama' },
+  { codigo_empresa: '004', nome_empresa: 'Delta' },
+];
+const comContabil = todasAtivas.filter((e) => e.codigo_empresa !== '004'); // 004 sem possui_contabil
+const gruposContabil = [
+  { id: 'g1', nome_grupo: 'Grupo Sul', empresas: new Set(['001', '004']) }, // 004 entra mesmo sem possui_contabil
+];
+
+const unidades = montarUnidades(comContabil, todasAtivas, gruposContabil);
+assert.deepStrictEqual(
+  unidades.map((u) => u.nome_empresa),
+  ['Beta', 'Gama', 'Grupo Sul'],
+  'membros do grupo saem da lista; grupo entra; ordenado por nome'
+);
+const uGrupo = unidades.find((u) => u.is_grupo);
+assert.strictEqual(uGrupo.codigo_empresa, 'grupo-g1');
+assert.deepStrictEqual(uGrupo.membros_codigos.sort(), ['001', '004'], 'membros incluem os sem possui_contabil');
+assert.strictEqual(uGrupo.membros_nomes, 'Alfa, Delta');
+assert.ok(!unidades.some((u) => u.codigo_empresa === '001'), '001 (membro) não aparece avulso');
+console.log('OK: montarUnidades absorve membros e adiciona a unidade-grupo');
+
+const unidadesSemGrupo = montarUnidades(comContabil, todasAtivas, []);
+assert.deepStrictEqual(unidadesSemGrupo.map((u) => u.codigo_empresa).sort(), ['001', '002', '003']);
+console.log('OK: montarUnidades sem grupos = lista original');
+
+// membro inativo (não está em todasAtivas) é ignorado na composição
+const unidades2 = montarUnidades(comContabil, todasAtivas, [
+  { id: 'g2', nome_grupo: 'Grupo X', empresas: new Set(['002', '999']) },
+]);
+assert.deepStrictEqual(unidades2.find((u) => u.is_grupo).membros_codigos, ['002'], 'código inexistente/inativo some');
+console.log('OK: montarUnidades ignora membro inativo');
+
+// ─── expandirResponsaveis ────────────────────────────────────
+
+const unidadesGrupo = [{ is_grupo: true, codigo_empresa: 'grupo-g1', membros_codigos: ['001', '004'] }];
+const exp1 = expandirResponsaveis(new Set(['001']), unidadesGrupo);
+assert.ok(exp1.has('grupo-g1') && exp1.has('001') && exp1.has('004'), 'responsável por membro cobre a chave do grupo e os demais membros');
+const exp2 = expandirResponsaveis(new Set(['grupo-g1']), unidadesGrupo);
+assert.ok(exp2.has('001') && exp2.has('004'), 'responsável pela chave do grupo cobre os membros');
+const exp3 = expandirResponsaveis(new Set(['777']), unidadesGrupo);
+assert.deepStrictEqual([...exp3].sort(), ['777'], 'sem interseção não expande');
+console.log('OK: expandirResponsaveis');
 
 console.log('\nTodos os testes de contabil-grupos passaram.');
