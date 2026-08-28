@@ -105,9 +105,98 @@
     return `${MESES_LABELS[mesFinal - 1]}/${ano}`;
   }
 
+  // ─── QSA (QUADRO DE SÓCIOS E ADMINISTRADORES) POR MÊS ───────
+  // Monta a composição do QSA mês a mês do período em análise no
+  // Diário, a partir das linhas de rh_socios (campos data_entrada /
+  // data_saida, strings 'YYYY-MM-DD' ou vazias). Usado no modal
+  // informativo da tela de validação de fechamento — só leitura, sem
+  // cruzamento com rh_empregados (isso é a "Análise do QSA" do RH).
+
+  function _dia(ano, mes) {
+    return String(ano) + '-' + String(mes).padStart(2, '0');
+  }
+
+  function _primeiroDiaMes(ano, mes) {
+    return _dia(ano, mes) + '-01';
+  }
+
+  function _ultimoDiaMes(ano, mes) {
+    return _dia(ano, mes) + '-' + String(new Date(ano, mes, 0).getDate()).padStart(2, '0');
+  }
+
+  function _dataStr(v) {
+    return v ? String(v).slice(0, 10) : '';
+  }
+
+  // A pessoa compõe o QSA no mês (ano, mes) se já havia ingressado até
+  // o último dia do mês e ainda não havia saído antes do primeiro dia
+  // (data_saida no próprio mês = ainda compõe o QSA daquele mês).
+  function socioAtivoNoMes(socio, ano, mes) {
+    const entrada = _dataStr(socio && socio.data_entrada);
+    const saida = _dataStr(socio && socio.data_saida);
+    if (entrada && entrada > _ultimoDiaMes(ano, mes)) return false;
+    if (saida && saida < _primeiroDiaMes(ano, mes)) return false;
+    return true;
+  }
+
+  function _dentroDoMes(dataStr, ano, mes) {
+    const d = _dataStr(dataStr);
+    return !!d && d >= _primeiroDiaMes(ano, mes) && d <= _ultimoDiaMes(ano, mes);
+  }
+
+  // Sócios que compõem o QSA no mês, ordenados por nome.
+  function qsaDoMes(socios, ano, mes) {
+    return (socios || [])
+      .filter((s) => socioAtivoNoMes(s, ano, mes))
+      .slice()
+      .sort((a, b) => String(a.nome_socio || '').localeCompare(String(b.nome_socio || ''), 'pt-BR'));
+  }
+
+  // Meses (crescente) cobertos pelo período de fechamento que termina
+  // em mesFinal, conforme a periodicidade.
+  function mesesDoPeriodoFechamento(ano, mesFinal, periodicidade) {
+    return ultimosNMeses(ano, mesFinal, qtdMesesNoPeriodo(periodicidade));
+  }
+
+  // Análise completa do QSA para uma lista de meses (crescente). Marca,
+  // em cada mês, quem ingressou ou se desligou naquele mês, e resume
+  // ingressos/desligamentos do período inteiro.
+  function analisarQsaPeriodo(socios, meses) {
+    const lista = meses || [];
+    const mesesRender = lista.map(({ ano, mes }) => ({
+      ano,
+      mes,
+      label: MESES_LABELS[mes - 1] + '/' + ano,
+      socios: qsaDoMes(socios, ano, mes).map((s) => ({
+        ...s,
+        ingressou: _dentroDoMes(s.data_entrada, ano, mes),
+        desligou: _dentroDoMes(s.data_saida, ano, mes),
+      })),
+    }));
+
+    let ingressos = 0;
+    let desligamentos = 0;
+    if (lista.length) {
+      const ini = _primeiroDiaMes(lista[0].ano, lista[0].mes);
+      const fim = _ultimoDiaMes(lista[lista.length - 1].ano, lista[lista.length - 1].mes);
+      (socios || []).forEach((s) => {
+        const e = _dataStr(s.data_entrada);
+        const sd = _dataStr(s.data_saida);
+        if (e && e >= ini && e <= fim) ingressos += 1;
+        if (sd && sd >= ini && sd <= fim) desligamentos += 1;
+      });
+    }
+
+    return {
+      meses: mesesRender,
+      resumo: { ingressos, desligamentos, semAlteracao: ingressos === 0 && desligamentos === 0 },
+    };
+  }
+
   const api = {
     ultimosNMeses, MESES_LABELS, calcularTemposFechamento, formatarDuracaoHumana,
     qtdMesesNoPeriodo, mesFinalDoPeriodo, descricaoPeriodo,
+    socioAtivoNoMes, qsaDoMes, mesesDoPeriodoFechamento, analisarQsaPeriodo,
   };
 
   if (typeof module !== 'undefined' && module.exports) {

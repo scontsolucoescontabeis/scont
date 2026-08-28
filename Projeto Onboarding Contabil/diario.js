@@ -40,6 +40,7 @@
   let _meusResponsaveisSet = new Set(); // empresas onde o usuário logado é responsável atribuído
   let fechamentos = []; // linhas cruas de contabil_diario_fechamentos
   let fechamentosPorChave = {}; // 'codigo|ano|mes' -> eventos (mais recente primeiro)
+  const sociosPorEmpresa = {}; // codigo_empresa -> linhas de rh_socios (cache do modal de QSA)
 
   // Modal de encerramento: quando quem encerra também pode validar (equipe
   // Scont/admin), o clique não envia direto — abre uma etapa de revisão
@@ -1466,9 +1467,19 @@
     body.innerHTML = `
       ${acaoHtml}
       ${temposFechamentoHtml(tempos)}
+      <div class="mapa-secao-header" style="margin:0 -20px 12px;padding-left:20px;">Quadro de Sócios e Administradores</div>
+      <div class="mapa-secao-body" style="padding:0 0 16px;">
+        <div class="full"><p class="mapa-empty" style="margin:0 0 8px;">Composição do QSA mês a mês do período em análise, a partir das datas de ingresso/saída cadastradas em Sócios (RH).</p></div>
+        <div class="full"><button type="button" class="btn btn-secondary" id="btnVerQSA">👥 Ver QSA do período (${escapeHtml(descricaoPeriodoDe(codigoEmpresa, ano, mes))})</button></div>
+      </div>
       <div class="mapa-secao-header" style="margin:0 -20px 12px;padding-left:20px;">Linha do Tempo</div>
       <div id="fechTimeline">${timelineFechamentoHtml(codigoEmpresa, ano, mes)}</div>
     `;
+
+    const btnVerQSA = document.getElementById('btnVerQSA');
+    if (btnVerQSA) {
+      btnVerQSA.addEventListener('click', () => abrirModalQSA(codigoEmpresa, ano, mes));
+    }
 
     body.querySelectorAll('[data-ver-balancete]').forEach((link) => {
       link.addEventListener('click', (ev) => {
@@ -1558,6 +1569,118 @@
         renderGradeMensal();
       });
     }
+  }
+
+  // ─── MODAL: QSA DO PERÍODO (informativo, só leitura) ────────
+  // Mostra à equipe Scont a composição do Quadro de Sócios e
+  // Administradores mês a mês do período em análise, para apoiar a
+  // validação do encerramento. Fonte: rh_socios (mesma instância
+  // Supabase; RLS de leitura para authenticated). Sem cruzamento com
+  // rh_empregados — isso é a "Análise do QSA" do módulo RH.
+
+  async function carregarSociosEmpresa(codigoEmpresa) {
+    if (sociosPorEmpresa[codigoEmpresa]) return sociosPorEmpresa[codigoEmpresa];
+    const { data, error } = await supabaseClient
+      .from('rh_socios')
+      .select('nome_socio, cpf, participacao, cargo, data_entrada, data_saida, data_atualizacao_quadro')
+      .eq('codigo_empresa', codigoEmpresa);
+    if (error) { console.error(error); return null; }
+    sociosPorEmpresa[codigoEmpresa] = data || [];
+    return sociosPorEmpresa[codigoEmpresa];
+  }
+
+  function fmtDataQSA(v) {
+    if (!v) return '—';
+    const d = String(v).slice(0, 10);
+    const [a, m, dia] = d.split('-');
+    return (a && m && dia) ? `${dia}/${m}/${a}` : d;
+  }
+
+  function qsaPeriodoHtml(codigoEmpresa, ano, mes, socios) {
+    if (socios === null) return '<p class="mapa-empty">Não foi possível carregar os sócios desta empresa.</p>';
+    if (!socios.length) return '<p class="mapa-empty">Nenhum sócio cadastrado para esta empresa em Sócios (RH).</p>';
+
+    const Util = window.ContabilDiarioUtil;
+    const meses = Util.mesesDoPeriodoFechamento(ano, mesFinalFechamento(codigoEmpresa, mes), periodicidadeDe(codigoEmpresa));
+    const analise = Util.analisarQsaPeriodo(socios, meses);
+
+    const atualizacoes = socios.map((s) => (s.data_atualizacao_quadro ? String(s.data_atualizacao_quadro).slice(0, 10) : '')).filter(Boolean).sort();
+    const ultimaAtualizacao = atualizacoes.length ? atualizacoes[atualizacoes.length - 1] : '';
+
+    const r = analise.resumo;
+    const resumoHtml = r.semAlteracao
+      ? '<p class="mapa-empty" style="margin:0 0 12px;">Sem alterações no QSA durante o período em análise.</p>'
+      : `<p class="mapa-empty" style="margin:0 0 12px;">No período: ${r.ingressos} ingresso(s), ${r.desligamentos} desligamento(s).</p>`;
+
+    const blocos = analise.meses.map((bloco) => {
+      const linhas = bloco.socios.map((s) => {
+        const marcadores = [];
+        if (s.ingressou) marcadores.push(`<span style="color:#16a34a;font-weight:600;white-space:nowrap;">▲ ingressou ${fmtDataQSA(s.data_entrada)}</span>`);
+        if (s.desligou) marcadores.push(`<span style="color:#dc2626;font-weight:600;white-space:nowrap;">▼ desliga-se ${fmtDataQSA(s.data_saida)}</span>`);
+        return `
+          <tr>
+            <td>${escapeHtml(s.nome_socio || '—')}</td>
+            <td style="font-size:12px;">${escapeHtml(s.cpf || '—')}</td>
+            <td style="text-align:right;">${s.participacao != null ? escapeHtml(String(s.participacao)) + '%' : '—'}</td>
+            <td>${escapeHtml(s.cargo || '—')}</td>
+            <td style="font-size:12px;">${fmtDataQSA(s.data_entrada)}</td>
+            <td style="font-size:12px;">${fmtDataQSA(s.data_saida)}</td>
+            <td style="font-size:12px;">${marcadores.join('<br>') || ''}</td>
+          </tr>`;
+      }).join('');
+      return `
+        <div class="mapa-secao-header" style="margin:0 -20px 10px;padding-left:20px;">${escapeHtml(bloco.label)} — ${bloco.socios.length} sócio(s)</div>
+        <div style="overflow-x:auto;margin-bottom:16px;">
+          ${bloco.socios.length ? `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="text-align:left;border-bottom:1px solid var(--line);">
+              <th>Sócio</th><th>CPF</th><th style="text-align:right;">Part.</th><th>Cargo</th><th>Entrada</th><th>Saída</th><th>No mês</th>
+            </tr></thead>
+            <tbody>${linhas}</tbody>
+          </table>` : '<p class="mapa-empty">Nenhum sócio compunha o QSA neste mês.</p>'}
+        </div>`;
+    }).join('');
+
+    const rodape = ultimaAtualizacao
+      ? `<p class="mapa-empty" style="margin:8px 0 0;">Quadro societário atualizado no RH em ${fmtDataQSA(ultimaAtualizacao)}.</p>`
+      : '';
+
+    return resumoHtml + blocos + rodape;
+  }
+
+  async function abrirModalQSA(codigoEmpresa, ano, mes) {
+    let modal = document.getElementById('modalQSA');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalQSA';
+      modal.className = 'modal';
+      modal.innerHTML = `
+        <div class="modal-content large">
+          <div class="modal-header">
+            <h3 id="modalQSATitulo">Quadro de Sócios e Administradores</h3>
+            <button class="modal-close" id="fecharModalQSA">✕</button>
+          </div>
+          <div class="modal-body" id="modalQSABody"></div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="fecharModalQSA2">Fechar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      const fechar = () => modal.classList.remove('active');
+      document.getElementById('fecharModalQSA').addEventListener('click', fechar);
+      document.getElementById('fecharModalQSA2').addEventListener('click', fechar);
+      modal.addEventListener('click', (ev) => { if (ev.target === modal) fechar(); });
+    }
+
+    document.getElementById('modalQSATitulo').textContent =
+      `QSA — ${descricaoPeriodoDe(codigoEmpresa, ano, mes)} — ${empresaNome(codigoEmpresa)}`;
+    const body = document.getElementById('modalQSABody');
+    body.innerHTML = '<p class="mapa-empty">Carregando sócios…</p>';
+    modal.classList.add('active');
+
+    const socios = await carregarSociosEmpresa(codigoEmpresa);
+    if (!modal.classList.contains('active')) return; // usuário já fechou
+    body.innerHTML = qsaPeriodoHtml(codigoEmpresa, ano, mes, socios);
   }
 
   // ─── LANÇAMENTOS DO DIÁRIO ──────────────────────────────────
