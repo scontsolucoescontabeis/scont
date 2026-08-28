@@ -34,6 +34,7 @@
   let empresas = [];
   let onboardings = []; // resumo (com itens já anexados para cálculo de progresso)
   let onboardingAtualId = null;
+  let filtroGrupoOnboarding = '';
   let abaAtual = 'checklist';
   let itemObsAberto = null;
 
@@ -57,7 +58,18 @@
     document.getElementById('btnNovoOnboarding').addEventListener('click', abrirFormNovoOnboarding);
     document.getElementById('buscaOnboarding').addEventListener('input', renderListaOnboardings);
 
-    await Promise.all([carregarEmpresas(), carregarOnboardings()]);
+    await Promise.all([carregarEmpresas(), carregarOnboardings(), window.ContabilGrupos.carregar(supabaseClient)]);
+    montarFiltroGrupoOnboarding();
+  }
+
+  function montarFiltroGrupoOnboarding() {
+    const sel = document.getElementById('filtroGrupoOnboarding');
+    if (!sel) return;
+    const grupos = window.ContabilGrupos.contabil();
+    if (!grupos.length) { sel.style.display = 'none'; return; }
+    sel.innerHTML = window.ContabilGrupos.opcoesSelectContabil(filtroGrupoOnboarding);
+    sel.style.display = '';
+    sel.addEventListener('change', () => { filtroGrupoOnboarding = sel.value; renderListaOnboardings(); });
   }
 
   // ─── CARREGAMENTO ───────────────────────────────────────────
@@ -120,9 +132,12 @@
     const nav = document.getElementById('listaOnboardings');
     const termo = (document.getElementById('buscaOnboarding').value || '').toLowerCase().trim();
 
-    const filtrados = termo
-      ? onboardings.filter((o) => (o.razao_social || '').toLowerCase().includes(termo) || (o.codigo_empresa || '').toLowerCase().includes(termo))
-      : onboardings;
+    const codigosGrupo = filtroGrupoOnboarding ? window.ContabilGrupos.codigosDoGrupo(filtroGrupoOnboarding) : null;
+    const filtrados = onboardings.filter((o) => {
+      if (codigosGrupo && !codigosGrupo.has(o.codigo_empresa)) return false;
+      if (!termo) return true;
+      return (o.razao_social || '').toLowerCase().includes(termo) || (o.codigo_empresa || '').toLowerCase().includes(termo);
+    });
 
     if (!filtrados.length) {
       nav.innerHTML = '<p class="nav-empty">Nenhum onboarding encontrado.</p>';

@@ -79,6 +79,8 @@
     emailAlertaValidacao = dataConfigGeral?.email_alerta_validacao || '';
     notificacoesEventos = {};
     EVENTOS_EMAIL.forEach((ev) => { notificacoesEventos[ev.coluna] = dataConfigGeral?.[ev.coluna] !== false; });
+
+    await window.ContabilGrupos.carregar(supabaseClient);
   }
 
   async function salvarEmailAlertaValidacao(valor) {
@@ -241,6 +243,21 @@
           </table>
         </div>
       </div>
+      <div class="mapa-secao">
+        <div class="mapa-secao-header">Grupos de Empresas</div>
+        <div class="mapa-secao-body">
+          <p class="full mapa-empty" style="margin-bottom:4px;">Grupos de empresas compartilhados com o Controle de Frequência do RH — criar ou editar aqui reflete lá. Marque "Utilizar no Departamento Contábil" nos grupos que devem aparecer como filtro no Mapeamento Estratégico, nos Relatórios, na Visão Geral do Diário e no Onboarding.</p>
+          <div class="full" style="display:flex; justify-content:flex-end;">
+            <button type="button" class="btn btn-primary" id="btnNovoGrupoConfig">➕ Novo Grupo</button>
+          </div>
+          <div class="full" style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
+            <div style="flex:0 0 240px; border:1px solid var(--line-soft); border-radius:8px; overflow:hidden;">
+              <div id="listaGruposConfig"></div>
+            </div>
+            <div style="flex:1 1 380px; border:1px solid var(--line-soft); border-radius:8px; padding:14px;" id="grupoDetalheConfig"></div>
+          </div>
+        </div>
+      </div>
     `;
 
     document.getElementById('btnSalvarEmailAlerta').addEventListener('click', async () => {
@@ -277,7 +294,239 @@
     document.getElementById('fileImportarConfig').addEventListener('change', handleImportarPlanilha);
     document.getElementById('btnResponsavelPorUsuario').addEventListener('click', abrirModalResponsavelPorUsuario);
 
+    document.getElementById('btnNovoGrupoConfig').addEventListener('click', novoGrupoConfig);
+
     renderTabela();
+    renderListaGruposConfig();
+    renderGrupoDetalheConfig();
+  }
+
+  // ─── GRUPOS DE EMPRESAS ─────────────────────────────────────
+  // Tabela compartilhada com o Controle de Frequência do RH
+  // (rh_grupos_empresas / rh_grupos_empresas_itens). O flag por grupo
+  // "usar no contábil" fica em contabil_grupos_config (via ContabilGrupos).
+
+  let grupoConfigAtual = null; // { id, nome_grupo, observacoes, email_responsavel, usarContabil, empresas:[{codigo_empresa, nome_empresa}] }
+  let _listenerFechaResultadosGrupo = false;
+
+  function nomeEmpresaPorCodigo(codigo) {
+    const e = empresas.find((x) => x.codigo_empresa === codigo);
+    return e ? e.nome_empresa : codigo;
+  }
+
+  function renderListaGruposConfig() {
+    const container = document.getElementById('listaGruposConfig');
+    if (!container) return;
+    const grupos = window.ContabilGrupos.todos();
+    if (!grupos.length) {
+      container.innerHTML = '<div style="padding:12px; color:var(--muted); font-size:13px;">Nenhum grupo cadastrado.</div>';
+      return;
+    }
+    container.innerHTML = grupos.map((g) => `
+      <div data-grupo-id="${escapeAttr(g.id)}"
+        style="padding:9px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--line-soft); display:flex; justify-content:space-between; gap:6px; ${grupoConfigAtual && grupoConfigAtual.id === g.id ? 'background:var(--surface-2); font-weight:600;' : ''}">
+        <span>${escapeHtml(g.nome_grupo)}${g.usarContabil ? ' <span title="Utilizado no Departamento Contábil">✅</span>' : ''}</span>
+        <span style="color:var(--muted);">(${g.empresas.size})</span>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-grupo-id]').forEach((el) => {
+      el.addEventListener('click', () => selecionarGrupoConfig(el.getAttribute('data-grupo-id')));
+    });
+  }
+
+  function novoGrupoConfig() {
+    grupoConfigAtual = { id: null, nome_grupo: '', observacoes: '', email_responsavel: '', usarContabil: false, empresas: [] };
+    renderListaGruposConfig();
+    renderGrupoDetalheConfig();
+  }
+
+  function selecionarGrupoConfig(id) {
+    const g = window.ContabilGrupos.porId(id);
+    if (!g) return;
+    grupoConfigAtual = {
+      id: g.id,
+      nome_grupo: g.nome_grupo,
+      observacoes: g.observacoes,
+      email_responsavel: g.email_responsavel,
+      usarContabil: g.usarContabil,
+      empresas: Array.from(g.empresas).map((codigo) => ({ codigo_empresa: codigo, nome_empresa: nomeEmpresaPorCodigo(codigo) })),
+    };
+    renderListaGruposConfig();
+    renderGrupoDetalheConfig();
+  }
+
+  function renderGrupoDetalheConfig() {
+    const container = document.getElementById('grupoDetalheConfig');
+    if (!container) return;
+    if (!grupoConfigAtual) {
+      container.innerHTML = '<p class="mapa-empty">Selecione um grupo à esquerda ou clique em "Novo Grupo".</p>';
+      return;
+    }
+    const g = grupoConfigAtual;
+    container.innerHTML = `
+      <div style="margin-bottom:12px;">
+        <label>Nome do Grupo</label>
+        <input type="text" id="grpNomeConfig" value="${escapeAttr(g.nome_grupo)}" placeholder="Ex: Grupo Shopping X">
+      </div>
+      <label class="responsavel-check-item" style="border:none; padding:0 0 12px;">
+        <input type="checkbox" id="grpUsarContabil" ${g.usarContabil ? 'checked' : ''} ${g.id ? '' : 'disabled'}>
+        <span>Utilizar este grupo no Departamento Contábil${g.id ? '' : ' <small>(salve o grupo primeiro)</small>'}</span>
+      </label>
+      <div style="margin-bottom:12px;">
+        <label>E-mail(is) do Responsável pelo Grupo</label>
+        <input type="text" id="grpEmailRespConfig" value="${escapeAttr(g.email_responsavel)}" placeholder="ex: financeiro@empresa.com, contabil@empresa.com">
+      </div>
+      <div style="margin-bottom:6px;">
+        <label>Empresas do Grupo</label>
+        <input type="text" id="grpBuscaEmpresaConfig" placeholder="Digite o nome ou código da empresa..." autocomplete="off">
+      </div>
+      <div id="grpResultadosConfig" style="border:1px solid var(--line-soft); border-radius:8px; margin-bottom:10px; max-height:160px; overflow-y:auto; display:none;"></div>
+      <div id="grpEmpresasListConfig" style="border:1px solid var(--line-soft); border-radius:8px; overflow:hidden; margin-bottom:12px;"></div>
+      <div style="margin-bottom:12px;">
+        <label>Observações do Grupo</label>
+        <textarea id="grpObsConfig" rows="5" placeholder="Particularidades das empresas, combinados com o cliente, exceções, prazos, etc.">${escapeHtml(g.observacoes)}</textarea>
+      </div>
+      <div style="display:flex; justify-content:space-between; gap:10px;">
+        ${g.id ? '<button type="button" class="btn btn-secondary" id="btnExcluirGrupoConfig">🗑 Excluir Grupo</button>' : '<span></span>'}
+        <button type="button" class="btn btn-primary" id="btnSalvarGrupoConfig">💾 Salvar Grupo</button>
+      </div>
+    `;
+
+    document.getElementById('grpNomeConfig').addEventListener('input', (e) => { g.nome_grupo = e.target.value; });
+    document.getElementById('grpEmailRespConfig').addEventListener('input', (e) => { g.email_responsavel = e.target.value; });
+    document.getElementById('grpObsConfig').addEventListener('input', (e) => { g.observacoes = e.target.value; });
+
+    const chkUsar = document.getElementById('grpUsarContabil');
+    chkUsar.addEventListener('change', async () => {
+      if (!g.id) return;
+      const valor = chkUsar.checked;
+      chkUsar.disabled = true;
+      const { error } = await window.ContabilGrupos.definirUsarContabil(g.id, valor);
+      chkUsar.disabled = false;
+      if (error) {
+        console.error(error);
+        chkUsar.checked = !valor;
+        mostrarToast('Erro ao salvar. Alteração desfeita.', 'erro');
+        return;
+      }
+      g.usarContabil = valor;
+      renderListaGruposConfig();
+      mostrarToast('Configuração do grupo salva.', 'sucesso');
+    });
+
+    const busca = document.getElementById('grpBuscaEmpresaConfig');
+    busca.addEventListener('input', () => filtrarEmpresasGrupoConfig(busca.value));
+    busca.addEventListener('focus', () => filtrarEmpresasGrupoConfig(busca.value));
+    if (!_listenerFechaResultadosGrupo) {
+      document.addEventListener('click', fecharResultadosGrupoConfigForaDoCampo);
+      _listenerFechaResultadosGrupo = true;
+    }
+
+    document.getElementById('btnSalvarGrupoConfig').addEventListener('click', salvarGrupoConfig);
+    const btnExcluir = document.getElementById('btnExcluirGrupoConfig');
+    if (btnExcluir) btnExcluir.addEventListener('click', excluirGrupoConfig);
+
+    renderEmpresasListGrupoConfig();
+  }
+
+  function fecharResultadosGrupoConfigForaDoCampo(ev) {
+    const box = document.getElementById('grpResultadosConfig');
+    const input = document.getElementById('grpBuscaEmpresaConfig');
+    if (!box || !input) return;
+    if (ev.target !== input && !box.contains(ev.target)) box.style.display = 'none';
+  }
+
+  function renderEmpresasListGrupoConfig() {
+    const container = document.getElementById('grpEmpresasListConfig');
+    if (!container) return;
+    if (!grupoConfigAtual.empresas.length) {
+      container.innerHTML = '<div style="padding:9px 12px; color:var(--muted); font-size:13px;">Nenhuma empresa adicionada.</div>';
+      return;
+    }
+    container.innerHTML = grupoConfigAtual.empresas.map((e) => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; border-bottom:1px solid var(--line-soft); font-size:13px;">
+        <span><strong>${escapeHtml(e.codigo_empresa)}</strong> — ${escapeHtml(e.nome_empresa)}</span>
+        <button type="button" class="btn btn-secondary" style="padding:2px 8px; font-size:11px;" data-remover-empresa="${escapeAttr(e.codigo_empresa)}">remover</button>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-remover-empresa]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const codigo = btn.getAttribute('data-remover-empresa');
+        grupoConfigAtual.empresas = grupoConfigAtual.empresas.filter((x) => x.codigo_empresa !== codigo);
+        renderEmpresasListGrupoConfig();
+      });
+    });
+  }
+
+  function filtrarEmpresasGrupoConfig(termo) {
+    const box = document.getElementById('grpResultadosConfig');
+    if (!box) return;
+    const norm = (termo || '').trim().toLowerCase();
+    const jaNoGrupo = new Set(grupoConfigAtual.empresas.map((e) => e.codigo_empresa));
+    const lista = empresas
+      .filter((e) => !jaNoGrupo.has(e.codigo_empresa))
+      .filter((e) => !norm || e.nome_empresa.toLowerCase().includes(norm) || e.codigo_empresa.toLowerCase().includes(norm))
+      .slice(0, 50);
+    if (!lista.length) {
+      box.innerHTML = '<div style="padding:9px 12px; color:var(--muted); font-size:13px;">Nenhuma empresa encontrada.</div>';
+      box.style.display = 'block';
+      return;
+    }
+    box.innerHTML = lista.map((e) => `
+      <div data-add-empresa="${escapeAttr(e.codigo_empresa)}" style="padding:8px 12px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--line-soft);">
+        <span style="font-family:monospace; font-weight:600; color:var(--brand); margin-right:8px;">${escapeHtml(e.codigo_empresa)}</span>${escapeHtml(e.nome_empresa)}
+      </div>
+    `).join('');
+    box.querySelectorAll('[data-add-empresa]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const codigo = el.getAttribute('data-add-empresa');
+        if (!grupoConfigAtual.empresas.some((x) => x.codigo_empresa === codigo)) {
+          grupoConfigAtual.empresas.push({ codigo_empresa: codigo, nome_empresa: nomeEmpresaPorCodigo(codigo) });
+        }
+        document.getElementById('grpBuscaEmpresaConfig').value = '';
+        box.style.display = 'none';
+        renderEmpresasListGrupoConfig();
+      });
+    });
+    box.style.display = 'block';
+  }
+
+  async function salvarGrupoConfig() {
+    const g = grupoConfigAtual;
+    if (!g || !(g.nome_grupo || '').trim()) { mostrarToast('Informe o nome do grupo.', 'erro'); return; }
+    const btn = document.getElementById('btnSalvarGrupoConfig');
+    btn.disabled = true;
+    const { id, error } = await window.ContabilGrupos.salvarGrupo({
+      id: g.id,
+      nome_grupo: g.nome_grupo,
+      observacoes: g.observacoes,
+      email_responsavel: g.email_responsavel,
+      empresas: g.empresas.map((e) => e.codigo_empresa),
+    });
+    btn.disabled = false;
+    if (error) {
+      console.error(error);
+      mostrarToast('Falha ao salvar o grupo: ' + error.message, 'erro');
+      return;
+    }
+    mostrarToast('Grupo salvo.', 'sucesso');
+    selecionarGrupoConfig(id);
+  }
+
+  async function excluirGrupoConfig() {
+    const g = grupoConfigAtual;
+    if (!g || !g.id) return;
+    if (!confirm(`Excluir o grupo "${g.nome_grupo}"? Isso também remove o grupo do Controle de Frequência do RH.`)) return;
+    const { error } = await window.ContabilGrupos.excluirGrupo(g.id);
+    if (error) {
+      console.error(error);
+      mostrarToast('Falha ao excluir o grupo: ' + error.message, 'erro');
+      return;
+    }
+    grupoConfigAtual = null;
+    renderListaGruposConfig();
+    renderGrupoDetalheConfig();
+    mostrarToast('Grupo excluído.', 'sucesso');
   }
 
   function empresasVisiveis() {

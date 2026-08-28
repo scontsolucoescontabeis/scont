@@ -44,7 +44,7 @@
   let relacionadasPorEmpresa = {};  // cache simples { codigo_empresa: [codigo_empresa_relacionada, ...] }
   let mapeamentoAtualId = null;     // codigo_empresa selecionado (null = dashboard)
   let mapeamentoAtual = null;       // linha de contabil_mapeamento selecionada
-  let filtro = { nivel: null, regime: '', periodicidade: '', financeiro: '', busca: '' };
+  let filtro = { nivel: null, regime: '', periodicidade: '', financeiro: '', grupo: '', busca: '' };
 
   // ─── ESCOPO: "Prestador de Serviço" só vê empresas onde é responsável ──
   // Mesma convenção client-side já usada no Diário Contábil (diario.js).
@@ -132,6 +132,8 @@
     if (errEmpresas) console.error(errEmpresas);
     if (errMapeamentos) console.error(errMapeamentos);
     if (errConfig) console.error(errConfig);
+
+    await window.ContabilGrupos.carregar(supabaseClient);
 
     const configPorEmpresa = {};
     (dataConfig || []).forEach((c) => { configPorEmpresa[c.codigo_empresa] = c.possui_contabil; });
@@ -234,8 +236,10 @@
 
   function empresasFiltradas() {
     const termoBusca = filtro.busca.trim().toLowerCase();
+    const codigosGrupo = filtro.grupo ? window.ContabilGrupos.codigosDoGrupo(filtro.grupo) : null;
     return empresas.filter((e) => {
       const m = mapeamentoDe(e.codigo_empresa);
+      if (codigosGrupo && !codigosGrupo.has(e.codigo_empresa)) return false;
       if (termoBusca && !e.codigo_empresa.toLowerCase().includes(termoBusca) && !e.nome_empresa.toLowerCase().includes(termoBusca)) return false;
       if (filtro.nivel && nivelDe(e.codigo_empresa) !== filtro.nivel) return false;
       if (filtro.regime && (!m || m.regime_tributario !== filtro.regime)) return false;
@@ -306,6 +310,7 @@
           <option value="">Financeiro (todos)</option>
           ${Object.entries(FINANCEIRO_LABELS).map(([v, l]) => `<option value="${v}" ${filtro.financeiro === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
+        ${window.ContabilGrupos.contabil().length ? `<select id="filtroGrupo">${window.ContabilGrupos.opcoesSelectContabil(filtro.grupo)}</select>` : ''}
       </div>
       <table class="mapa-table">
         <thead><tr><th>Empresa</th><th>Regime</th><th>Responsável</th><th>Último mês fechado</th><th>Nível</th></tr></thead>
@@ -327,6 +332,7 @@
     });
     document.getElementById('filtroRegime').addEventListener('change', (ev) => { filtro.regime = ev.target.value; renderDashboard(); });
     document.getElementById('filtroPeriodicidade').addEventListener('change', (ev) => { filtro.periodicidade = ev.target.value; renderDashboard(); });
+    document.getElementById('filtroGrupo')?.addEventListener('change', (ev) => { filtro.grupo = ev.target.value; renderDashboard(); });
     document.getElementById('filtroFinanceiro').addEventListener('change', (ev) => { filtro.financeiro = ev.target.value; renderDashboard(); });
     ligarCliquesLinhasDashboard();
 

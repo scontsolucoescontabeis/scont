@@ -28,6 +28,7 @@
   let dashboardFiltroResponsavel = '';
   let dashboardFiltroStatus = '';
   let dashboardFiltroDocumentacao = '';
+  let dashboardFiltroGrupo = '';
   let dashboardFiltroMes; // undefined = ainda não inicializado (default: mês atual); null = "Todos os meses" (seleção explícita)
   let dashboardFiltroAno = null;
 
@@ -181,6 +182,8 @@
     ]);
     if (errStatus) console.error(errStatus);
     if (errDocumentacao) console.error(errDocumentacao);
+
+    await window.ContabilGrupos.carregar(supabaseClient);
     statusMensalPorEmpresa = {};
     motivoPendenciaPorEmpresa = {};
     (statusMensal || []).forEach((s) => {
@@ -588,8 +591,10 @@
   // o ano inteiro, o filtro só decide quais empresas aparecem na lista.
   function empresasFiltradasDashboard() {
     const termoBusca = dashboardFiltroBusca.trim().toLowerCase();
+    const codigosGrupo = dashboardFiltroGrupo ? window.ContabilGrupos.codigosDoGrupo(dashboardFiltroGrupo) : null;
     return empresas.filter((e) => {
       const m = mapeamentoDe(e.codigo_empresa);
+      if (codigosGrupo && !codigosGrupo.has(e.codigo_empresa)) return false;
       if (termoBusca && !e.codigo_empresa.toLowerCase().includes(termoBusca) && !e.nome_empresa.toLowerCase().includes(termoBusca)) return false;
       if (dashboardFiltroRegime && (!m || m.regime_tributario !== dashboardFiltroRegime)) return false;
       if (dashboardFiltroPeriodicidade && (!m || m.periodicidade !== dashboardFiltroPeriodicidade)) return false;
@@ -663,6 +668,11 @@
               ${responsaveis.map((r) => `<option value="${escapeHtml(r)}" ${dashboardFiltroResponsavel === r ? 'selected' : ''}>${escapeHtml(r)}</option>`).join('')}
             </select>
           </div>
+          ${window.ContabilGrupos.contabil().length ? `
+          <div>
+            <label>Grupo de Empresas</label>
+            <select id="filtroDashGrupo">${window.ContabilGrupos.opcoesSelectContabil(dashboardFiltroGrupo)}</select>
+          </div>` : ''}
           <div>
             <label>Periodicidade</label>
             <select id="filtroDashPeriodicidade">
@@ -724,6 +734,7 @@
     document.getElementById('filtroDashBusca').addEventListener('input', (ev) => { dashboardFiltroBusca = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashRegime').addEventListener('change', (ev) => { dashboardFiltroRegime = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashPeriodicidade').addEventListener('change', (ev) => { dashboardFiltroPeriodicidade = ev.target.value; atualizarTabelaDashboard(); });
+    document.getElementById('filtroDashGrupo')?.addEventListener('change', (ev) => { dashboardFiltroGrupo = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashResponsavel').addEventListener('change', (ev) => { dashboardFiltroResponsavel = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashStatus').addEventListener('change', (ev) => { dashboardFiltroStatus = ev.target.value; atualizarTabelaDashboard(); });
     document.getElementById('filtroDashDocumentacao').addEventListener('change', (ev) => { dashboardFiltroDocumentacao = ev.target.value; atualizarTabelaDashboard(); });
@@ -736,6 +747,7 @@
       dashboardFiltroResponsavel = '';
       dashboardFiltroStatus = '';
       dashboardFiltroDocumentacao = '';
+      dashboardFiltroGrupo = '';
       dashboardFiltroMes = hoje.getMonth() + 1;
       dashboardFiltroAno = hoje.getFullYear();
       renderDashboardDiario();

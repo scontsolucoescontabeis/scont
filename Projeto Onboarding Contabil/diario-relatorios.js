@@ -72,6 +72,11 @@
       <div class="mapa-secao">
         <div class="mapa-secao-header">Filtros</div>
         <div class="mapa-secao-body">
+          ${window.ContabilGrupos.contabil().length ? `
+          <div class="full">
+            <label>Grupo de Empresas</label>
+            <select id="filtroGrupoRelatorio">${window.ContabilGrupos.opcoesSelectContabil('')}</select>
+          </div>` : ''}
           <div class="full">
             <label>Nível de Atenção</label>
             <div class="mapa-checkbox-grupo">${checkboxGrupo('filtroNivel', Object.entries(ctx.NIVEL_LABELS).map(([value, label]) => ({ value, label })))}</div>
@@ -159,6 +164,7 @@
     const valorMes = document.getElementById('filtroGradeMes').value;
     const todosAnos = document.getElementById('chkGradeTodosAnos').checked;
     return {
+      grupo: document.getElementById('filtroGrupoRelatorio')?.value || null,
       niveis: valoresMarcados('filtroNivel'),
       situacoesAno: valoresMarcados('filtroSituacaoAno'),
       statusGrade: document.getElementById('filtroStatusGrade').value || null,
@@ -207,7 +213,9 @@
   }
 
   function aplicarFiltros(ctx, filtros) {
+    const codigosGrupo = filtros.grupo ? window.ContabilGrupos.codigosDoGrupo(filtros.grupo) : null;
     return ctx.empresas.filter((e) => {
+      if (codigosGrupo && !codigosGrupo.has(e.codigo_empresa)) return false;
       const m = ctx.mapeamentoDe(e.codigo_empresa);
       const nivel = m ? (m.nivel_atencao || 'baixo') : 'baixo';
       if (filtros.niveis.length && !filtros.niveis.includes(nivel)) return false;
@@ -344,6 +352,10 @@
   // do PDF pra deixar claro quais parâmetros geraram aquele relatório.
   function resumoFiltrosTexto(ctx, filtros) {
     const partes = [];
+    if (filtros.grupo) {
+      const g = window.ContabilGrupos.porId(filtros.grupo);
+      if (g) partes.push(`Grupo de Empresas: ${g.nome_grupo}`);
+    }
     if (filtros.niveis.length) partes.push(`Nível de Atenção: ${filtros.niveis.map((v) => ctx.NIVEL_LABELS[v] || v).join(', ')}`);
     if (filtros.situacoesAno.length) partes.push(`Situação do Ano Corrente (${anoAtualStr()}): ${filtros.situacoesAno.map((v) => ctx.SITUACAO_LABELS[v] || v).join(', ')}`);
     if (filtros.statusGrade) {
