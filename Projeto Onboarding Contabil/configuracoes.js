@@ -38,7 +38,10 @@
     document.getElementById('authOverlay')?.remove();
 
     await carregarDados();
-    renderTela();
+    document.querySelectorAll('#configNav .sidebar-item[data-tela]').forEach((btn) => {
+      btn.addEventListener('click', () => mostrarTela(btn.getAttribute('data-tela')));
+    });
+    mostrarTela('empresas');
     sincronizarMapeamentoTodasEmpresas();
   }
 
@@ -198,67 +201,53 @@
     return { error: null };
   }
 
-  // ─── TELA ───────────────────────────────────────────────────
+  // ─── NAVEGAÇÃO ENTRE TELAS ──────────────────────────────────
+  // O sidebar tem 3 telas independentes; cada uma renderiza só o seu
+  // conteúdo em #main e liga os próprios eventos. Modais (responsáveis,
+  // atribuir por usuário) vivem no <body> e sobrevivem à troca de tela.
 
-  function renderTela() {
+  let telaAtual = 'empresas';
+
+  function mostrarTela(id) {
+    telaAtual = id;
+    document.querySelectorAll('#configNav .sidebar-item[data-tela]').forEach((btn) => {
+      btn.classList.toggle('active', btn.getAttribute('data-tela') === id);
+    });
+    if (id === 'email') renderTelaEmail();
+    else if (id === 'grupos') renderTelaGrupos();
+    else renderTelaEmpresas();
+  }
+
+  function abrirMain(titulo, corpoHtml) {
     const main = document.getElementById('main');
     main.classList.add('main-full');
     main.innerHTML = `
-      <div class="onboarding-header"><div><h2>Configurações</h2></div></div>
+      <div class="onboarding-header"><div><h2>${escapeHtml(titulo)}</h2></div></div>
       <div class="mapa-secao">
-        <div class="mapa-secao-header">Alertas por E-mail</div>
-        <div class="mapa-secao-body">
-          <p class="full mapa-empty" style="margin-bottom:4px;">E-mail(is) que recebem um alerta sempre que um fechamento mensal é enviado para validação no Diário Contábil. Separe vários e-mails por vírgula.</p>
-          <div class="full mapa-filtros">
-            <input type="text" id="inputEmailAlertaValidacao" placeholder="ex: herbertscont@gmail.com" style="flex:1;min-width:260px;" value="${escapeAttr(emailAlertaValidacao)}">
-            <button type="button" class="btn btn-primary" id="btnSalvarEmailAlerta">Salvar</button>
-          </div>
-          <p class="full mapa-empty" style="margin:16px 0 4px;">Escolha quais desses eventos disparam e-mail. Desmarcar um evento não afeta os demais; a alteração é salva ao clicar.</p>
-          <div class="full" id="listaEventosEmail">
-            ${EVENTOS_EMAIL.map((ev) => `
-              <label class="responsavel-check-item">
-                <input type="checkbox" class="chk-evento-email" data-coluna="${escapeAttr(ev.coluna)}" ${notificacoesEventos[ev.coluna] !== false ? 'checked' : ''}>
-                <span>${escapeHtml(ev.label)}</span>
-              </label>
-            `).join('')}
-          </div>
-        </div>
-      </div>
-      <div class="mapa-secao">
-        <div class="mapa-secao-header">Empresas com Contábil</div>
-        <div class="mapa-secao-body">
-          <p class="full mapa-empty" style="margin-bottom:4px;">Marque as empresas que possuem contábil na Scont. Somente as marcadas aqui aparecem nos seletores e filtros do Onboarding e do Diário Contábil. As alterações são salvas automaticamente.</p>
-          <div class="full mapa-filtros">
-            <input type="text" id="buscaEmpresaConfig" placeholder="Buscar empresa...">
-            <button type="button" class="btn btn-secondary" id="btnMarcarTodas">Marcar todas</button>
-            <button type="button" class="btn btn-secondary" id="btnDesmarcarTodas">Desmarcar todas</button>
-            <button type="button" class="btn btn-secondary" id="btnImportarPlanilha">📊 Importar planilha</button>
-            <button type="button" class="btn btn-secondary" id="btnResponsavelPorUsuario">👤 Atribuir por usuário</button>
-            <input type="file" id="fileImportarConfig" accept=".xlsx,.xls,.csv" style="display:none">
-          </div>
-          <p class="full mapa-empty" id="contadorEmpresasConfig"></p>
-          <table class="mapa-table full">
-            <thead><tr><th>Código Empresa</th><th>Nome Empresa</th><th>Contabilidade</th><th>Responsável(is)</th></tr></thead>
-            <tbody id="corpoTabelaConfig"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="mapa-secao">
-        <div class="mapa-secao-header">Grupos de Empresas</div>
-        <div class="mapa-secao-body">
-          <p class="full mapa-empty" style="margin-bottom:4px;">Grupos de empresas compartilhados com o Controle de Frequência do RH — criar ou editar aqui reflete lá. Marque "Utilizar no Departamento Contábil" nos grupos que devem aparecer como filtro no Mapeamento Estratégico, nos Relatórios, na Visão Geral do Diário e no Onboarding.</p>
-          <div class="full" style="display:flex; justify-content:flex-end;">
-            <button type="button" class="btn btn-primary" id="btnNovoGrupoConfig">➕ Novo Grupo</button>
-          </div>
-          <div class="full" style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
-            <div style="flex:0 0 240px; border:1px solid var(--line-soft); border-radius:8px; overflow:hidden;">
-              <div id="listaGruposConfig"></div>
-            </div>
-            <div style="flex:1 1 380px; border:1px solid var(--line-soft); border-radius:8px; padding:14px;" id="grupoDetalheConfig"></div>
-          </div>
-        </div>
+        <div class="mapa-secao-body">${corpoHtml}</div>
       </div>
     `;
+  }
+
+  // ─── TELA: ALERTAS POR E-MAIL ───────────────────────────────
+
+  function renderTelaEmail() {
+    abrirMain('Alertas por E-mail', `
+      <p class="full mapa-empty" style="margin-bottom:4px;">E-mail(is) que recebem um alerta sempre que um fechamento mensal é enviado para validação no Diário Contábil. Separe vários e-mails por vírgula.</p>
+      <div class="full mapa-filtros">
+        <input type="text" id="inputEmailAlertaValidacao" placeholder="ex: herbertscont@gmail.com" style="flex:1;min-width:260px;" value="${escapeAttr(emailAlertaValidacao)}">
+        <button type="button" class="btn btn-primary" id="btnSalvarEmailAlerta">Salvar</button>
+      </div>
+      <p class="full mapa-empty" style="margin:16px 0 4px;">Escolha quais desses eventos disparam e-mail. Desmarcar um evento não afeta os demais; a alteração é salva ao clicar.</p>
+      <div class="full" id="listaEventosEmail">
+        ${EVENTOS_EMAIL.map((ev) => `
+          <label class="responsavel-check-item">
+            <input type="checkbox" class="chk-evento-email" data-coluna="${escapeAttr(ev.coluna)}" ${notificacoesEventos[ev.coluna] !== false ? 'checked' : ''}>
+            <span>${escapeHtml(ev.label)}</span>
+          </label>
+        `).join('')}
+      </div>
+    `);
 
     document.getElementById('btnSalvarEmailAlerta').addEventListener('click', async () => {
       const btn = document.getElementById('btnSalvarEmailAlerta');
@@ -286,6 +275,27 @@
         mostrarToast('Configuração de e-mail salva.', 'sucesso');
       });
     });
+  }
+
+  // ─── TELA: EMPRESAS COM CONTÁBIL ────────────────────────────
+
+  function renderTelaEmpresas() {
+    abrirMain('Empresas com Contábil', `
+      <p class="full mapa-empty" style="margin-bottom:4px;">Marque as empresas que possuem contábil na Scont. Somente as marcadas aqui aparecem nos seletores e filtros do Onboarding e do Diário Contábil. As alterações são salvas automaticamente.</p>
+      <div class="full mapa-filtros">
+        <input type="text" id="buscaEmpresaConfig" placeholder="Buscar empresa...">
+        <button type="button" class="btn btn-secondary" id="btnMarcarTodas">Marcar todas</button>
+        <button type="button" class="btn btn-secondary" id="btnDesmarcarTodas">Desmarcar todas</button>
+        <button type="button" class="btn btn-secondary" id="btnImportarPlanilha">📊 Importar planilha</button>
+        <button type="button" class="btn btn-secondary" id="btnResponsavelPorUsuario">👤 Atribuir por usuário</button>
+        <input type="file" id="fileImportarConfig" accept=".xlsx,.xls,.csv" style="display:none">
+      </div>
+      <p class="full mapa-empty" id="contadorEmpresasConfig"></p>
+      <table class="mapa-table full">
+        <thead><tr><th>Código Empresa</th><th>Nome Empresa</th><th>Contabilidade</th><th>Responsável(is)</th></tr></thead>
+        <tbody id="corpoTabelaConfig"></tbody>
+      </table>
+    `);
 
     document.getElementById('buscaEmpresaConfig').addEventListener('input', renderTabela);
     document.getElementById('btnMarcarTodas').addEventListener('click', () => alternarVisiveis(true));
@@ -294,9 +304,27 @@
     document.getElementById('fileImportarConfig').addEventListener('change', handleImportarPlanilha);
     document.getElementById('btnResponsavelPorUsuario').addEventListener('click', abrirModalResponsavelPorUsuario);
 
+    renderTabela();
+  }
+
+  // ─── TELA: GRUPOS DE EMPRESAS ───────────────────────────────
+
+  function renderTelaGrupos() {
+    abrirMain('Grupos de Empresas', `
+      <p class="full mapa-empty" style="margin-bottom:4px;">Grupos de empresas compartilhados com o Controle de Frequência do RH — criar ou editar aqui reflete lá. Marque "Utilizar este grupo no Departamento Contábil" nos grupos que devem aparecer como filtro no Mapeamento Estratégico, nos Relatórios, na Visão Geral do Diário e no Onboarding.</p>
+      <div class="full" style="display:flex; justify-content:flex-end;">
+        <button type="button" class="btn btn-primary" id="btnNovoGrupoConfig">➕ Novo Grupo</button>
+      </div>
+      <div class="full" style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start;">
+        <div style="flex:0 0 240px; border:1px solid var(--line-soft); border-radius:8px; overflow:hidden;">
+          <div id="listaGruposConfig"></div>
+        </div>
+        <div style="flex:1 1 380px; border:1px solid var(--line-soft); border-radius:8px; padding:14px;" id="grupoDetalheConfig"></div>
+      </div>
+    `);
+
     document.getElementById('btnNovoGrupoConfig').addEventListener('click', novoGrupoConfig);
 
-    renderTabela();
     renderListaGruposConfig();
     renderGrupoDetalheConfig();
   }
