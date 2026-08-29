@@ -1,0 +1,8 @@
+# Documentos de exemplo / fixtures dos testes de integração.
+# Contêm dados reais de cliente (CPF, RG, endereço) — NÃO versionar.
+# Os testes de integração (tests/test-parser.js, tests/test-matcher.js)
+# rodam só quando estes arquivos estão presentes localmente.
+*.pdf
+*.docx
+*.xls
+*.xlsx

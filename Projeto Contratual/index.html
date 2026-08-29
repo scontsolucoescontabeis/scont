@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Alterações Contratuais – SCONT</title>
+<link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+<link rel="stylesheet" href="styles.css">
+<script src="../supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../portal-auth-guard.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+
+<header class="topbar">
+    <h1>📄 Controle de Alterações Contratuais</h1>
+    <a href="../portal.html">← Voltar ao portal</a>
+</header>
+
+<div class="container">
+    <p class="page-sub">
+        Envie a versão <strong>anterior</strong> e a versão <strong>nova</strong> do contrato
+        social (PDF ou Word). A ferramenta compara a consolidação cláusula a cláusula e gera um
+        documento de controle para enviar ao cliente.
+    </p>
+
+    <div id="alertas"></div>
+
+    <!-- 1. UPLOAD -->
+    <section class="painel" id="painelUpload">
+        <h2>1 · Arquivos</h2>
+        <div class="dropzones">
+            <label class="dropzone" id="dzAnt">
+                <input type="file" accept=".pdf,.docx,application/pdf">
+                <div class="rot">Versão anterior</div>
+                <div class="ico">📄</div>
+                <div class="hint">Arraste ou clique — PDF ou .docx</div>
+                <div class="arq"></div>
+            </label>
+            <label class="dropzone" id="dzNova">
+                <input type="file" accept=".pdf,.docx,application/pdf">
+                <div class="rot">Versão nova</div>
+                <div class="ico">📄</div>
+                <div class="hint">Arraste ou clique — PDF ou .docx</div>
+                <div class="arq"></div>
+            </label>
+        </div>
+        <div class="acoes">
+            <button class="btn btn-primary" id="btnComparar" disabled>Comparar</button>
+            <button class="btn btn-secondary oculto" id="btnInverter">↔ Inverter anterior/nova</button>
+            <span id="statusExtracao" style="font-size:12px;color:var(--text-light)"></span>
+        </div>
+    </section>
+
+    <!-- 2. RESULTADO -->
+    <section class="painel oculto" id="painelCapa">
+        <h2>2 · Dados da capa <span style="font-weight:400;font-size:12px;color:var(--muted)">(edite se necessário)</span></h2>
+        <div class="capa-grid">
+            <div class="campo"><label>Razão social</label><input id="cRazao"></div>
+            <div class="campo"><label>Nome fantasia</label><input id="cFantasia"></div>
+            <div class="campo"><label>CNPJ</label><input id="cCnpj"></div>
+            <div class="campo"><label>Nº da alteração</label><input id="cNumero"></div>
+            <div class="campo"><label>Data do ato</label><input id="cData"></div>
+            <div class="campo campo-largo"><label>Sócios (um por linha)</label><textarea id="cSocios"></textarea></div>
+        </div>
+    </section>
+
+    <section class="painel oculto" id="painelRevisao">
+        <h2>3 · Cláusulas</h2>
+        <div class="resumo-chips" id="resumoChips"></div>
+        <div class="tab-wrap">
+            <table class="revisao">
+                <thead><tr>
+                    <th>Cláusula</th><th>Classificação</th>
+                    <th>Redação anterior</th><th>Redação atual</th>
+                </tr></thead>
+                <tbody id="revisaoBody"></tbody>
+            </table>
+        </div>
+        <details class="accordion oculto" id="accIguais">
+            <summary></summary>
+            <div class="tab-wrap" style="margin-top:10px">
+                <table class="revisao"><tbody id="iguaisBody"></tbody></table>
+            </div>
+        </details>
+        <div class="acoes">
+            <button class="btn btn-primary" id="btnGerar">🖨️ Gerar PDF de controle</button>
+            <button class="btn btn-secondary" id="btnReset">Recomeçar</button>
+        </div>
+    </section>
+</div>
+
+<div id="printRoot"></div>
+
+<script src="js/differ.js"></script>
+<script src="js/parser.js"></script>
+<script src="js/matcher.js"></script>
+<script src="js/report.js"></script>
+<script src="js/extract.js"></script>
+<script src="js/app.js"></script>
+<script>
+if (window.PortalAuthGuard) window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+</script>
+
+</body>
+</html>
