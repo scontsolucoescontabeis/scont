@@ -14,17 +14,45 @@
 </head>
 <body>
 
-<header class="topbar">
-    <h1>📄 Controle de Alterações Contratuais</h1>
-    <a href="../portal.html">← Voltar ao portal</a>
-</header>
+<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
 
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+        <h2>Alterações Contratuais</h2>
+        <p>Controle de Alterações</p>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="sidebar-section">Ferramenta</div>
+        <a href="index.html" class="sidebar-item active">
+            <span class="sidebar-item-icon">📄</span> Comparar contratos
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <a href="../portal.html" class="sidebar-item" style="margin-bottom:10px;border:1px solid rgba(255,255,255,0.18);border-radius:8px;">
+            <span class="sidebar-item-icon">🏠</span> Voltar ao Portal
+        </a>
+        <div class="sidebar-footer-info">
+            <strong>Alterações Contratuais</strong>
+            SCONT · Societário
+        </div>
+    </div>
+</aside>
+
+<div class="main-content">
 <div class="container">
-    <p class="page-sub">
-        Envie a versão <strong>anterior</strong> e a versão <strong>nova</strong> do contrato
-        social (PDF ou Word). A ferramenta compara a consolidação cláusula a cláusula e gera um
-        documento de controle para enviar ao cliente.
-    </p>
+
+    <header class="app-header">
+        <h1>Controle de Alterações Contratuais</h1>
+        <p>
+            Envie a versão <strong>anterior</strong> e a versão <strong>nova</strong> do contrato
+            social (PDF ou Word). A ferramenta compara a consolidação cláusula a cláusula e gera um
+            documento de controle para enviar ao cliente.
+        </p>
+    </header>
 
     <div id="alertas"></div>
 
@@ -54,7 +82,7 @@
         </div>
     </section>
 
-    <!-- 2. RESULTADO -->
+    <!-- 2. CAPA -->
     <section class="painel oculto" id="painelCapa">
         <h2>2 · Dados da capa <span style="font-weight:400;font-size:12px;color:var(--muted)">(edite se necessário)</span></h2>
         <div class="capa-grid">
@@ -67,6 +95,7 @@
         </div>
     </section>
 
+    <!-- 3. CLÁUSULAS -->
     <section class="painel oculto" id="painelRevisao">
         <h2>3 · Cláusulas</h2>
         <div class="resumo-chips" id="resumoChips"></div>
@@ -90,6 +119,8 @@
             <button class="btn btn-secondary" id="btnReset">Recomeçar</button>
         </div>
     </section>
+
+</div>
 </div>
 
 <div id="printRoot"></div>
@@ -102,6 +133,12 @@
 <script src="js/app.js"></script>
 <script>
 if (window.PortalAuthGuard) window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+
+const hamburger = document.getElementById('hamburger');
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sidebarOverlay');
+hamburger.addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); });
+overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); });
 </script>
 
 </body>
