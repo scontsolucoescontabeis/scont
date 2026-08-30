@@ -347,7 +347,7 @@ export default function App() {
               <Route path="/" element={<Navigate to="/crm" replace />} />
               <Route path="/crm" element={<CRMPage perfil={perfil} />} />
               <Route path="/crm/tarefas" element={<TarefasPage perfil={perfil} />} />
-              <Route path="/crm/contatos" element={<ContatosPage />} />
+              <Route path="/crm/contatos" element={<ContatosPage perfil={perfil} />} />
               <Route path="/crm/mensagens-prontas" element={<MensagensProntasPage perfil={perfil} />} />
               {isAdmin && <Route path="/crm/chatbot" element={<ChatbotPage />} />}
               {isAdmin && <Route path="/crm/conexao" element={<ConexaoWhatsAppPage />} />}

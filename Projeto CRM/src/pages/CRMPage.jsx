@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ConversaList } from '@/components/ConversaList/ConversaList'
 import { ChatPanel } from '@/components/ChatPanel/ChatPanel'
 import { PainelDireito } from '@/components/PainelDireito/PainelDireito'
@@ -6,17 +7,27 @@ import { PainelSLA } from '@/components/PainelSLA/PainelSLA'
 import { useConversas } from '@/hooks/useConversas'
 import { useRealtime } from '@/hooks/useRealtime'
 import { useSLA } from '@/hooks/useSLA'
-import { buscarSLAConfig, buscarClassificacaoSLAConfig } from '@/services/crm.service'
+import { buscarSLAConfig, buscarClassificacaoSLAConfig, buscarConversaPorId } from '@/services/crm.service'
 
 export default function CRMPage({ perfil }) {
   const [conversaAtiva, setConversaAtiva] = useState(null)
   const [slaConfig, setSlaConfig]                             = useState([])
   const [classificacaoSLAConfig, setClassificacaoSLAConfig]   = useState([])
+  const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     buscarSLAConfig().then(setSlaConfig).catch(() => {})
     buscarClassificacaoSLAConfig().then(setClassificacaoSLAConfig).catch(() => {})
   }, [])
+
+  // Abre uma conversa específica quando chega via navegação (ex.: da tela Contatos)
+  useEffect(() => {
+    const id = location.state?.conversaId
+    if (!id) return
+    navigate(location.pathname, { replace: true, state: {} })
+    buscarConversaPorId(id).then(c => { if (c) setConversaAtiva(c) }).catch(() => {})
+  }, [location.state, navigate])
 
   // Conversas ABERTA independente de filtros — alimentam o PainelSLA.
   // RLS do Supabase garante que agentes só veem o próprio departamento.
@@ -41,7 +52,7 @@ export default function CRMPage({ perfil }) {
       <ConversaList
         conversaAtiva={conversaAtiva}
         onSelecionarConversa={setConversaAtiva}
-        perfilRole={perfil?.role}
+        perfil={perfil}
         slaConfig={slaConfig}
         classificacaoSLAConfig={classificacaoSLAConfig}
       />

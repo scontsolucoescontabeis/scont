@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabaseClient'
+import { normalizarTelefone, escolherConversaAberta } from './conversa.helpers'
 
 // Busca perfil CRM do usuário autenticado via RPC (vincula por email)
 export async function buscarMeuPerfil() {
@@ -597,4 +598,100 @@ export async function salvarCanalWhatsApp(canal) {
     .update({ canal_ativo: canal, atualizado_em: new Date().toISOString() })
     .eq('id', 1)
   if (error) throw error
+}
+
+// ─── Iniciar conversa (mensagem ativa para um contato) ─────────
+
+const SELECT_CONVERSA = `
+  id, protocolo, status, departamento,
+  aberto_em, atualizado_em, encerrado_em,
+  bot_departamento, bot_categoria, bot_subcategoria, bot_empresa, bot_cnpj, classificacao_empresa,
+  contatos ( id, telefone, nome ),
+  usuarios ( id, nome ),
+  mensagens ( id, conteudo, origem, criado_em, lida )
+`
+
+export async function buscarConversaPorId(id) {
+  const { data } = await supabase.from('conversas').select(SELECT_CONVERSA).eq('id', id).single()
+  return data
+}
+
+// Busca contatos pra o seletor do "Nova conversa".
+export async function buscarContatosParaConversa(termo) {
+  let q = supabase.from('contatos').select('id, nome, telefone').order('nome').limit(20)
+  if (termo?.trim()) {
+    const t = termo.trim()
+    q = q.or(`nome.ilike.%${t}%,telefone.ilike.%${t}%`)
+  }
+  const { data } = await q
+  return data ?? []
+}
+
+// Cria (ou reaproveita) uma conversa com o contato e envia a 1ª mensagem.
+// Devolve a conversa no mesmo shape que useConversas usa, pronta pra abrir na tela.
+export async function iniciarConversa({ contatoId = null, telefone = '', nome = '', departamento, conteudo }) {
+  if (!departamento)     throw new Error('Selecione o departamento.')
+  if (!conteudo?.trim()) throw new Error('Escreva a mensagem.')
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Sessão expirada. Faça login novamente.')
+
+  // 1. Resolve o contato (existente por id, existente por telefone, ou cria)
+  let contato
+  if (contatoId) {
+    const { data } = await supabase.from('contatos').select('id, nome, telefone').eq('id', contatoId).single()
+    contato = data
+  } else {
+    const digits = normalizarTelefone(telefone)
+    if (digits.length < 10) throw new Error('Número de telefone inválido.')
+    const variantes = [...new Set([
+      digits,
+      '+' + digits,
+      '+55' + (digits.startsWith('55') ? digits.slice(2) : digits),
+    ])]
+    const { data: achados } = await supabase.from('contatos').select('id, nome, telefone').in('telefone', variantes)
+    contato = achados?.[0]
+    if (!contato) {
+      const { data, error } = await supabase.from('contatos')
+        .insert({ nome: nome.trim() || digits, telefone: digits, atualizado_por: user.id, atualizado_em: new Date().toISOString() })
+        .select('id, nome, telefone').single()
+      if (error) throw error
+      contato = data
+    }
+  }
+  if (!contato) throw new Error('Não foi possível identificar o contato.')
+
+  // 2. Reaproveita uma conversa aberta desse contato, se houver
+  const { data: existentes } = await supabase
+    .from('conversas').select('id, status, aberto_em').eq('contato_id', contato.id)
+  let conversaId = escolherConversaAberta(existentes)?.id ?? null
+
+  // 3. Senão, cria uma nova
+  if (!conversaId) {
+    const { data, error } = await supabase.from('conversas')
+      .insert({ contato_id: contato.id, departamento, status: 'EM_ATENDIMENTO', agente_id: user.id })
+      .select('id').single()
+    if (error) throw error
+    conversaId = data.id
+  } else {
+    await supabase.from('conversas')
+      .update({ status: 'EM_ATENDIMENTO', agente_id: user.id, atualizado_em: new Date().toISOString() })
+      .eq('id', conversaId).in('status', ['ABERTA', 'AGUARDANDO'])
+  }
+
+  // 4. Grava a 1ª mensagem (fica salva mesmo se o envio falhar)
+  const { data: mensagem, error: errMsg } = await supabase.from('mensagens')
+    .insert({ conversa_id: conversaId, conteudo: conteudo.trim(), tipo: 'text', origem: 'AGENTE', agente_id: user.id, lida: true })
+    .select('id').single()
+  if (errMsg) throw errMsg
+
+  await supabase.from('conversas').update({ atualizado_em: new Date().toISOString() }).eq('id', conversaId)
+
+  // 5. Envia no WhatsApp — silencioso: a mensagem já está no banco
+  try {
+    await supabase.functions.invoke('send-message', { body: { mensagem_id: mensagem.id } })
+  } catch { /* canal offline */ }
+
+  const { data: conversa } = await supabase.from('conversas').select(SELECT_CONVERSA).eq('id', conversaId).single()
+  return conversa
 }

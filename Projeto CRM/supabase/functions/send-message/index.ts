@@ -40,20 +40,56 @@ serve(async (req) => {
       })
     }
 
-    const { conversa_id, conteudo, tipo = 'text' } = await req.json()
+    const body = await req.json()
+    const mensagemId: string | undefined = body.mensagem_id
 
-    if (!conversa_id || !conteudo) {
-      return new Response(JSON.stringify({ error: 'conversa_id e conteudo são obrigatórios' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    // Dois modos:
+    //  - mensagem_id: a mensagem JÁ está no banco (gravada pelo cliente). Só enviamos
+    //    no WhatsApp e carimbamos o whatsapp_msg_id — sem inserir de novo.
+    //  - conversa_id + conteudo: modo legado, insere a mensagem aqui.
+    let conversaId: string
+    let conteudo: string
+    let tipo = 'text'
+
+    if (mensagemId) {
+      const { data: msg } = await supabaseAdmin
+        .from('mensagens')
+        .select('id, conversa_id, conteudo, tipo, whatsapp_msg_id')
+        .eq('id', mensagemId)
+        .single()
+      if (!msg) {
+        return new Response(JSON.stringify({ error: 'Mensagem não encontrada' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      if (msg.whatsapp_msg_id) {
+        // Já foi enviada — evita reenvio em retries
+        return new Response(JSON.stringify({ mensagem: msg, jaEnviada: true }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      conversaId = msg.conversa_id
+      conteudo   = msg.conteudo
+      tipo       = msg.tipo || 'text'
+    } else {
+      conversaId = body.conversa_id
+      conteudo   = body.conteudo
+      tipo       = body.tipo || 'text'
+      if (!conversaId || !conteudo) {
+        return new Response(JSON.stringify({ error: 'Informe mensagem_id ou conversa_id + conteudo' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     // Busca número do contato via conversa
     const { data: conversa } = await supabaseAdmin
       .from('conversas')
       .select('id, contato_id, departamento, contatos(telefone)')
-      .eq('id', conversa_id)
+      .eq('id', conversaId)
       .single()
 
     if (!conversa) {
@@ -141,28 +177,41 @@ serve(async (req) => {
       whatsappMsgId = metaData?.messages?.[0]?.id
     }
 
-    // Salva mensagem no banco
-    const { data: mensagem, error: insertError } = await supabaseAdmin
-      .from('mensagens')
-      .insert({
-        conversa_id,
-        conteudo,
-        tipo,
-        whatsapp_msg_id: whatsappMsgId,
-        origem: 'AGENTE',
-        agente_id: user.id,
-        lida: true,
-      })
-      .select()
-      .single()
-
-    if (insertError) throw insertError
+    let mensagem
+    if (mensagemId) {
+      // Só carimba o id do WhatsApp na mensagem que o cliente já gravou
+      const { data, error: updateError } = await supabaseAdmin
+        .from('mensagens')
+        .update({ whatsapp_msg_id: whatsappMsgId ?? null })
+        .eq('id', mensagemId)
+        .select()
+        .single()
+      if (updateError) throw updateError
+      mensagem = data
+    } else {
+      // Modo legado: insere a mensagem
+      const { data, error: insertError } = await supabaseAdmin
+        .from('mensagens')
+        .insert({
+          conversa_id: conversaId,
+          conteudo,
+          tipo,
+          whatsapp_msg_id: whatsappMsgId,
+          origem: 'AGENTE',
+          agente_id: user.id,
+          lida: true,
+        })
+        .select()
+        .single()
+      if (insertError) throw insertError
+      mensagem = data
+    }
 
     // Atualiza timestamp da conversa
     await supabaseAdmin
       .from('conversas')
       .update({ atualizado_em: new Date().toISOString() })
-      .eq('id', conversa_id)
+      .eq('id', conversaId)
 
     return new Response(JSON.stringify({ mensagem }), {
       status: 200,

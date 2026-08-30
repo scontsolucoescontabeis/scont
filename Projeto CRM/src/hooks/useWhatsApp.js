@@ -30,7 +30,7 @@ export function useWhatsApp() {
         .in('status', ['ABERTA', 'AGUARDANDO'])   // só avança se ainda não estava em atendimento
 
       // Tenta enviar via WhatsApp (silencioso se não configurado)
-      _tentarEnviarWhatsApp(conversa_id, conteudo, tipo)
+      _tentarEnviarWhatsApp(data.id)
 
       return { data, error: null }
     } catch (err) {
@@ -146,10 +146,12 @@ export function useWhatsApp() {
 }
 
 // Tenta enviar pelo WhatsApp se as Edge Functions estiverem disponíveis.
+// A mensagem já foi gravada no banco pelo cliente — aqui só disparamos o envio,
+// passando o id pra função carimbar o whatsapp_msg_id (sem inserir de novo).
 // Falha silenciosa — não bloqueia o fluxo de testes.
-async function _tentarEnviarWhatsApp(conversa_id, conteudo, tipo) {
+async function _tentarEnviarWhatsApp(mensagem_id) {
   try {
-    await supabase.functions.invoke('send-message', { body: { conversa_id, conteudo, tipo } })
+    await supabase.functions.invoke('send-message', { body: { mensagem_id } })
   } catch {
     // Edge Function não deployada — ignorado em ambiente de testes
   }

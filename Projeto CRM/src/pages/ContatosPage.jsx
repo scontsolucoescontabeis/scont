@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Users, Plus, Search, X, Edit2, Phone, Building2, Mail, FileText, ChevronDown, ChevronUp, MessageSquare, FileSpreadsheet } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import ModalImportarPlanilha from '@/components/ContatosImport/ModalImportarPlanilha'
+import ModalNovaConversa from '@/components/NovaConversa/ModalNovaConversa'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -253,7 +255,7 @@ function ModalContato({ contato, empresasIniciais = [], onSalvar, onFechar }) {
 }
 
 // ─── Card expandível de contato ────────────────────────────
-function ContatoCard({ contato, onEditar, onAtualizar }) {
+function ContatoCard({ contato, onEditar, onAtualizar, onConversar }) {
   const [expandido, setExpandido]         = useState(false)
   const [historico, setHistorico]         = useState([])
   const [empresas, setEmpresas]           = useState([])
@@ -336,6 +338,15 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
         </div>
 
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+          {onConversar && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onConversar(contato) }}
+              title="Iniciar conversa no WhatsApp"
+              style={{ background: '#7a1e1e', border: 'none', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#fff', fontWeight: 600 }}
+            >
+              <MessageSquare size={12} /> Conversar
+            </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onEditar(contato) }}
             title="Editar contato"
@@ -433,7 +444,7 @@ function ContatoCard({ contato, onEditar, onAtualizar }) {
 }
 
 // ─── Página principal ──────────────────────────────────────
-export default function ContatosPage() {
+export default function ContatosPage({ perfil }) {
   const [contatos, setContatos]   = useState([])
   const [loading, setLoading]     = useState(true)
   const [busca, setBusca]         = useState('')
@@ -442,6 +453,9 @@ export default function ContatosPage() {
   const [pagina, setPagina]       = useState(0)
   const [dropdownAberto, setDropdownAberto] = useState(false)
   const [modalImportar, setModalImportar]   = useState(false)
+  const [conversaContato, setConversaContato] = useState(null)
+  const navigate = useNavigate()
+  const isAdmin = perfil?.role === 'ADMIN'
   const POR_PAGINA = 20
   const editandoRef = useRef(false)
 
@@ -615,7 +629,13 @@ export default function ContatosPage() {
         ) : (
           <>
             {paginados.map(c => (
-              <ContatoCard key={c.id} contato={c} onEditar={handleEditar} onAtualizar={carregar} />
+              <ContatoCard
+                key={c.id}
+                contato={c}
+                onEditar={handleEditar}
+                onAtualizar={carregar}
+                onConversar={isAdmin ? setConversaContato : undefined}
+              />
             ))}
 
             {/* Paginação */}
@@ -637,6 +657,19 @@ export default function ContatosPage() {
           </>
         )}
       </div>
+
+      {/* Modal Nova Conversa */}
+      {conversaContato && (
+        <ModalNovaConversa
+          contatoFixo={conversaContato}
+          departamentosDoAgente={perfil?.departamentos ?? []}
+          onFechar={() => setConversaContato(null)}
+          onCriada={(conversa) => {
+            setConversaContato(null)
+            if (conversa) navigate('/crm', { state: { conversaId: conversa.id } })
+          }}
+        />
+      )}
 
       {/* Modal Importar Planilha */}
       {modalImportar && (

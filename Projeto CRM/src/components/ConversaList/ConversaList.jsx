@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Search } from 'lucide-react'
+import { Search, MessageSquarePlus } from 'lucide-react'
 import { useConversas } from '@/hooks/useConversas'
 import { useRealtime } from '@/hooks/useRealtime'
 import { useSLA } from '@/hooks/useSLA'
 import { ConversaCard } from './ConversaCard'
+import ModalNovaConversa from '@/components/NovaConversa/ModalNovaConversa'
 
 const WIDTH_KEY  = 'crm_lista_width'
 const WIDTH_MIN  = 280
@@ -61,11 +62,13 @@ const ABAS = [
   { status: 'ENCERRADA',     label: 'Encerradas', cor: '#7a1e1e' },
 ]
 
-export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole, slaConfig = [], classificacaoSLAConfig = [] }) {
+export function ConversaList({ conversaAtiva, onSelecionarConversa, perfil, slaConfig = [], classificacaoSLAConfig = [] }) {
   const [busca, setBusca]             = useState('')
   const [filtroDepto, setFiltroDepto] = useState('')
   const [abaAtiva, setAbaAtiva]       = useState('')   // '' = todas
+  const [novaConversa, setNovaConversa] = useState(false)
   const { width, dragging, onMouseDown } = useResizable(WIDTH_DEF)
+  const isAdmin = perfil?.role === 'ADMIN'
 
   // Busca todas sem filtro de status — filtramos client-side para poder mostrar contadores
   const { conversas, loading, erro, refresh } = useConversas({
@@ -125,6 +128,19 @@ export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole, 
 
       {/* ── Cabeçalho: busca + filtro depto ── */}
       <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid #f0ede9' }}>
+        {isAdmin && (
+          <button
+            onClick={() => setNovaConversa(true)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '8px 10px', marginBottom: 8, borderRadius: 6, border: 'none',
+              background: '#7a1e1e', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'DM Sans, sans-serif',
+            }}
+          >
+            <MessageSquarePlus size={14} /> Nova conversa
+          </button>
+        )}
         <div style={{ position: 'relative', marginBottom: 8 }}>
           <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#888480' }} />
           <input
@@ -244,6 +260,17 @@ export function ConversaList({ conversaAtiva, onSelecionarConversa, perfilRole, 
         )}
       </div>
 
+      {novaConversa && (
+        <ModalNovaConversa
+          departamentosDoAgente={perfil?.departamentos ?? []}
+          onFechar={() => setNovaConversa(false)}
+          onCriada={(conversa) => {
+            setNovaConversa(false)
+            refresh()
+            if (conversa) onSelecionarConversa(conversa)
+          }}
+        />
+      )}
     </div>
   )
 }
