@@ -500,9 +500,11 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
                 if (typeof flagsFolga !== 'object' || flagsFolga === null) flagsFolga = {};
                 if (!Array.isArray(dadosJson)) dadosJson = [];
                 
+                const empBase = state.empregadosDisponiveis.find(e => e.nome_empregado === reg.nome_trabalhador);
                 return {
-                    empregadoId: state.empregadosDisponiveis.find(e => e.nome_empregado === reg.nome_trabalhador)?.codigo_empregado || '',
+                    empregadoId: empBase?.codigo_empregado || '',
                     nome: reg.nome_trabalhador,
+                    simulacao: !empBase, // nome fora da base de empregados => folha de simulação
                     dados: dadosJson,
                     dsrDias: dsrDias,
                     flagsFolga: flagsFolga
@@ -674,9 +676,11 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
                     flagsFolgaType: typeof flagsFolga
                 });
                 
+                const empBase = state.empregadosDisponiveis.find(e => e.nome_empregado === reg.nome_trabalhador);
                 return {
-                    empregadoId: state.empregadosDisponiveis.find(e => e.nome_empregado === reg.nome_trabalhador)?.codigo_empregado || '',
+                    empregadoId: empBase?.codigo_empregado || '',
                     nome: reg.nome_trabalhador,
+                    simulacao: !empBase, // nome fora da base de empregados => folha de simulação
                     dados: dadosJson,
                     dsrDias: dsrDias,
                     flagsFolga: flagsFolga
@@ -767,8 +771,11 @@ function renderizarAbas() {
             `;
         }
         
-        let nomeExibicao = folha.nome;
-        
+        let nomeExibicao = folha.simulacao ? `🧪 ${folha.nome}` : folha.nome;
+        if (folha.simulacao && index !== state.abaAtivaIndex) {
+            btn.style.cssText += 'background: #fff8e1; border-color: #f0ad4e; color: #8a6d3b;';
+        }
+
         btn.innerHTML = `
             ${nomeExibicao}
             <span class="tab-close" onclick="event.stopPropagation(); removerFolha(${index})" style="
@@ -812,10 +819,11 @@ function renderizarConteudoAba() {
     
     let optionsEmpregados = '<option value="">Selecione o Empregado...</option>';
     state.empregadosDisponiveis.forEach(emp => {
-        const selected = (folha.nome === emp.nome_empregado) ? 'selected' : '';
+        const selected = (!folha.simulacao && folha.nome === emp.nome_empregado) ? 'selected' : '';
         optionsEmpregados += `<option value="${emp.codigo_empregado}|${emp.nome_empregado}" ${selected}>${emp.codigo_empregado} - ${emp.nome_empregado}</option>`;
     });
-    
+    optionsEmpregados += `<option value="__simulacao__" ${folha.simulacao ? 'selected' : ''}>🧪 Simular Processamento (empregado fora da base)</option>`;
+
   let html = `
     <div style="margin-bottom: 25px; background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #800000; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
         <div style="display: flex; align-items: center; gap: 15px;">
@@ -856,6 +864,14 @@ function renderizarConteudoAba() {
                     ${optionsEmpregados}
 
                     </select>
+                    ${folha.simulacao ? `
+                    <div style="margin-top: 10px;">
+                        <input type="text" id="inputNomeSimulacao" value="${(folha.nome && folha.nome !== 'Simular Processamento') ? folha.nome.replace(/"/g, '&quot;') : ''}"
+                            placeholder="Nome do empregado simulado"
+                            oninput="atualizarNomeSimulacao(this.value, ${state.abaAtivaIndex})"
+                            style="width: 100%; max-width: 500px; padding: 10px 15px; border: 2px solid #f0ad4e; border-radius: 6px; font-size: 12px; font-weight: 500; color: #495057; background-color: #fffdf7; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+                        <small style="display: block; margin-top: 5px; color: #b8860b;">🧪 Simulação — não gera arquivo TXT (sem código de empregado).</small>
+                    </div>` : ''}
                 </div>
             </div>
         </div>
@@ -948,6 +964,13 @@ window.atualizarNomeEmpregado = function(valorSelect, folhaIndex) {
     if (!valorSelect) {
         state.folhas[folhaIndex].nome = 'Novo Empregado';
         state.folhas[folhaIndex].empregadoId = '';
+        state.folhas[folhaIndex].simulacao = false;
+    } else if (valorSelect === '__simulacao__') {
+        state.folhas[folhaIndex].simulacao = true;
+        state.folhas[folhaIndex].empregadoId = '';
+        if (!state.folhas[folhaIndex].nome || state.empregadosDisponiveis.some(e => e.nome_empregado === state.folhas[folhaIndex].nome) || state.folhas[folhaIndex].nome === 'Novo Empregado') {
+            state.folhas[folhaIndex].nome = 'Simular Processamento';
+        }
     } else {
         const [id, nome] = valorSelect.split('|');
         
@@ -965,8 +988,18 @@ window.atualizarNomeEmpregado = function(valorSelect, folhaIndex) {
         
         state.folhas[folhaIndex].nome = nome;
         state.folhas[folhaIndex].empregadoId = id;
+        state.folhas[folhaIndex].simulacao = false;
     }
     renderizarAbas();
+};
+
+// Atualiza o nome digitado de uma aba em modo simulação (empregado fora da base).
+// Só atualiza o estado; o rótulo da aba é redesenhado ao trocar de aba ou processar.
+window.atualizarNomeSimulacao = function(valor, folhaIndex) {
+    if (!state.folhas[folhaIndex]) return;
+    state.folhas[folhaIndex].simulacao = true;
+    state.folhas[folhaIndex].empregadoId = '';
+    state.folhas[folhaIndex].nome = (valor || '').trim() || 'Simular Processamento';
 };
 
 // ✅ Atualizar DSR (Dias de Descanso Semanal Remunerado)
@@ -1167,12 +1200,23 @@ function iniciarSalvamento() {
         return;
     }
     let temErroEmpregado = false;
+    let temErroSimulacao = false;
     state.folhas.forEach((f, i) => {
-        if (f.nome === 'Novo Empregado' || !f.empregadoId) {
+        if (f.simulacao) {
+            if (!f.nome || f.nome === 'Novo Empregado' || f.nome === 'Simular Processamento') {
+                temErroSimulacao = true;
+                state.abaAtivaIndex = i;
+            }
+        } else if (f.nome === 'Novo Empregado' || !f.empregadoId) {
             temErroEmpregado = true;
             state.abaAtivaIndex = i;
         }
     });
+    if (temErroSimulacao) {
+        renderizarAbas();
+        mostrarMensagem('Erro', 'Informe o nome do empregado em todas as folhas marcadas como simulação.');
+        return;
+    }
     if (temErroEmpregado) {
         renderizarAbas();
         mostrarMensagem('Erro', 'Selecione um empregado válido em todas as folhas antes de processar.');
@@ -1566,6 +1610,7 @@ function calcularFolha(folha) {
     return {
         nome: folha.nome,
         empregadoId: folha.empregadoId,
+        simulacao: !!folha.simulacao,
         dias: diasCalculados,
         totais: {
             trabalhado: converterMinutosParaHora(totalTrabalhado),
@@ -1649,8 +1694,8 @@ function renderizarConsolidado() {
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 24px; background: rgba(255,255,255,0.2); width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">👨‍💼</span>
                         <div>
-                            <span style="font-weight: 600; font-size: 14px; letter-spacing: 0.5px; display: block;">${res.nome}</span>
-                            <span style="font-size: 12px; opacity: 0.9;">Matrícula: ${res.empregadoId}</span>
+                            <span style="font-weight: 600; font-size: 14px; letter-spacing: 0.5px; display: block;">${res.simulacao ? '🧪 ' : ''}${res.nome}</span>
+                            <span style="font-size: 12px; opacity: 0.9;">${res.simulacao ? 'SIMULAÇÃO — sem código de empregado (não gera TXT)' : 'Matrícula: ' + res.empregadoId}</span>
                         </div>
                     </div>
                 </div>
@@ -1711,7 +1756,7 @@ function renderizarTabelasDiarias() {
         let htmlTabela = `
             <div class="card" style="margin-bottom: 30px; padding: 0; overflow: hidden; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                 <div style="background: #f3f4f6; color: #374151; padding: 12px 20px; font-weight: 600; font-size: 15px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 10px;">
-                    <span style="color: #800000;">📅</span> ${res.nome}
+                    <span style="color: #800000;">📅</span> ${res.simulacao ? '🧪 ' : ''}${res.nome}${res.simulacao ? ' <span style="font-size:11px;font-weight:700;color:#8a6d3b;background:#fff8e1;border:1px solid #f0ad4e;border-radius:4px;padding:2px 6px;margin-left:6px;">SIMULAÇÃO</span>' : ''}
                 </div>
                 <div class="table-container" style="margin: 0; border: none; border-radius: 0;">
                     <table class="data-table" style="font-size: 13px; width: 100%; border-collapse: collapse;">
@@ -1821,8 +1866,8 @@ const dadosConsolidadoGeral = [];
 state.resultados.forEach(res => {
     // Adicionar ao Consolidado Geral
     dadosConsolidadoGeral.push({
-        'Matrícula': res.empregadoId,
-        'Empregado': res.nome,
+        'Matrícula': res.simulacao ? 'SIMULAÇÃO' : res.empregadoId,
+        'Empregado': res.simulacao ? `${res.nome} (SIMULAÇÃO)` : res.nome,
         'Horas Trabalhadas': res.totais.trabalhado,
         'Horas Normais': res.totais.normais,
         'Horas Extras 50%': res.totais.extra50,
@@ -6654,28 +6699,71 @@ async function importarExcel(file) {
         let detectouTerceiroTurno = false;
         const avisos = [];
 
-        wb.SheetNames.forEach(sheetName => {
-            const codEmp   = sheetName.split(' ')[0].trim();
+        // 1ª passada: identificar quais abas pertencem à base de empregados e quais não.
+        const abasInfo = wb.SheetNames.map(sheetName => {
+            const codEmp = sheetName.split(' ')[0].trim();
             const empregado = state.empregadosDisponiveis.find(e => e.codigo_empregado === codEmp);
+            return { sheetName, codEmp, empregado };
+        });
+        const abasForaDaBase = abasInfo.filter(a => !a.empregado);
+
+        // Empregados fora da base: perguntar se devem ser importados como SIMULAÇÃO.
+        let importarForaDaBaseComoSimulacao = false;
+        if (abasForaDaBase.length > 0) {
+            fecharModalMensagem();
+            const listaNomes = abasForaDaBase.map(a => `• ${a.sheetName}`).join('\n');
+            importarForaDaBaseComoSimulacao = window.confirm(
+                `As seguintes abas não pertencem à base de empregados desta empresa para a competência em processamento:\n\n${listaNomes}\n\n` +
+                `Deseja importá-las mesmo assim? Elas serão marcadas como SIMULAÇÃO (não geram arquivo TXT).`
+            );
+            mostrarMensagem('Importando', 'Processando o arquivo Excel...');
+        }
+
+        const nomeSimulacaoDaAba = (sheetName) => {
+            const partes = sheetName.trim().split(' ');
+            const semCodigo = /^\d+$/.test(partes[0]) ? partes.slice(1).join(' ').trim() : sheetName.trim();
+            return semCodigo || sheetName.trim();
+        };
+
+        abasInfo.forEach(({ sheetName, codEmp, empregado }) => {
+            let folhaIdx;
 
             if (!empregado) {
-                avisos.push(`Aba "${sheetName}": código "${codEmp}" não encontrado na empresa.`);
-                return;
-            }
-
-            let folhaIdx = state.folhas.findIndex(f => f.empregadoId === empregado.codigo_empregado);
-            if (folhaIdx === -1) {
-                state.folhas.push({
-                    empregadoId: empregado.codigo_empregado,
-                    nome: empregado.nome_empregado,
-                    dados: gerarDiasDoMes(state.competencia, state.periodoApuracaoInicio, state.periodoApuracaoFim),
-                    dsrDias: [],
-                    flagsFolga: {}
-                });
-                folhaIdx = state.folhas.length - 1;
+                if (!importarForaDaBaseComoSimulacao) {
+                    avisos.push(`Aba "${sheetName}": não pertence à base de empregados da empresa — ignorada.`);
+                    return;
+                }
+                const nomeSim = nomeSimulacaoDaAba(sheetName);
+                folhaIdx = state.folhas.findIndex(f => f.simulacao && f.nome === nomeSim);
+                if (folhaIdx === -1) {
+                    state.folhas.push({
+                        empregadoId: '',
+                        nome: nomeSim,
+                        simulacao: true,
+                        dados: gerarDiasDoMes(state.competencia, state.periodoApuracaoInicio, state.periodoApuracaoFim),
+                        dsrDias: [],
+                        flagsFolga: {}
+                    });
+                    folhaIdx = state.folhas.length - 1;
+                }
+                avisos.push(`Aba "${sheetName}": importada como SIMULAÇÃO.`);
             } else {
-                state.folhas[folhaIdx].nome       = empregado.nome_empregado;
-                state.folhas[folhaIdx].empregadoId = empregado.codigo_empregado;
+                folhaIdx = state.folhas.findIndex(f => f.empregadoId === empregado.codigo_empregado);
+                if (folhaIdx === -1) {
+                    state.folhas.push({
+                        empregadoId: empregado.codigo_empregado,
+                        nome: empregado.nome_empregado,
+                        simulacao: false,
+                        dados: gerarDiasDoMes(state.competencia, state.periodoApuracaoInicio, state.periodoApuracaoFim),
+                        dsrDias: [],
+                        flagsFolga: {}
+                    });
+                    folhaIdx = state.folhas.length - 1;
+                } else {
+                    state.folhas[folhaIdx].nome       = empregado.nome_empregado;
+                    state.folhas[folhaIdx].empregadoId = empregado.codigo_empregado;
+                    state.folhas[folhaIdx].simulacao  = false;
+                }
             }
 
             const linhas = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
@@ -6767,7 +6855,7 @@ function _adicionarLancamentoAdicional() {
     const sel = document.createElement('select');
     sel.className = 'lanc-empregado';
     sel.style.cssText = 'padding:5px 6px;border:1px solid #ced4da;border-radius:4px;font-size:12px;width:100%;';
-    (state.resultados || []).forEach(r => {
+    (state.resultados || []).filter(r => !r.simulacao && r.empregadoId).forEach(r => {
         const opt = document.createElement('option');
         opt.value = r.empregadoId;
         opt.textContent = `${r.nome} (${r.empregadoId})`;
@@ -6884,6 +6972,7 @@ function _construirLinhasAdicionais(compFmt, codEmpresa, tipoProcesso) {
 
 function _calcularDiasDescontoVAVT(resultados, valoresVaVtMapa = {}) {
     return (resultados || [])
+        .filter(res => !res.simulacao && res.empregadoId)
         .map(res => {
             const dias = (res.dias || []).filter(d => d.flagFalta || d.flagAtestado).length;
             const valores = valoresVaVtMapa[res.empregadoId] || {};
@@ -6925,7 +7014,14 @@ async function _construirConteudoTXTResultados(salvar = false) {
     const rubricaFaltaDSR = calcularDsrAuto ? _resolverCodigoRubricaDsr(_catalogoRubricasAtual) : null;
     let avisoDsrSemRubrica = false;
 
-    state.resultados.forEach(res => {
+    // Folhas de simulação (empregado fora da base) não entram no TXT — sem código de empregado.
+    const resultadosReais = state.resultados.filter(r => !r.simulacao && r.empregadoId);
+    const qtdSimulacoes = state.resultados.length - resultadosReais.length;
+    if (resultadosReais.length === 0) {
+        throw new Error('Todas as folhas processadas são simulações (empregados fora da base). Nenhum arquivo TXT é gerado nesse caso.');
+    }
+
+    resultadosReais.forEach(res => {
         let he50 = converterHoraParaMinutos(res.totais.extra50);
         let he100 = converterHoraParaMinutos(res.totais.extra100);
         let minsAtr;
@@ -6961,7 +7057,7 @@ async function _construirConteudoTXTResultados(salvar = false) {
 
     conteudoTXT += _construirLinhasAdicionais(compFmt, codEmpresa, config.tipoProcesso);
 
-    return { conteudoTXT, compFmt, avisoDsrSemRubrica };
+    return { conteudoTXT, compFmt, avisoDsrSemRubrica, qtdSimulacoes };
 }
 
 function _mostrarPrevia(previaId, previaConteudoId, previaInfoId, modalBodySelector, conteudoTXT) {
@@ -6982,8 +7078,12 @@ function _mostrarPrevia(previaId, previaConteudoId, previaInfoId, modalBodySelec
 
 async function gerarPreviewTXTResultados() {
     try {
-        const { conteudoTXT } = await _construirConteudoTXTResultados(false);
+        const { conteudoTXT, qtdSimulacoes } = await _construirConteudoTXTResultados(false);
         _mostrarPrevia('resTxtPrevia', 'resTxtPreviaConteudo', 'resTxtPreviaInfo', '#txtRubricasModal', conteudoTXT);
+        if (qtdSimulacoes > 0) {
+            const info = document.getElementById('resTxtPreviaInfo');
+            if (info) info.textContent += ` · ${qtdSimulacoes} simulação(ões) ignorada(s)`;
+        }
     } catch (erro) {
         mostrarMensagem('Aviso', erro.message);
     }
@@ -7026,7 +7126,7 @@ function _continuarDownloadAposAviso() {
 
 async function _efetivarDownloadTXTResultados() {
     try {
-        const { conteudoTXT, avisoDsrSemRubrica } = await _construirConteudoTXTResultados(true);
+        const { conteudoTXT, avisoDsrSemRubrica, qtdSimulacoes } = await _construirConteudoTXTResultados(true);
         if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor positivo encontrado para as rubricas configuradas.'); return; }
         const [mm, aaaa] = state.competencia.split('/');
         const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
@@ -7040,6 +7140,9 @@ async function _efetivarDownloadTXTResultados() {
         let msg = 'Arquivo TXT gerado com sucesso!';
         if (avisoDsrSemRubrica) {
             msg += '\nAviso: DSR automático não gerado — a empresa não tem "DIAS FALTAS DSR" cadastrada no catálogo.';
+        }
+        if (qtdSimulacoes > 0) {
+            msg += `\nAviso: ${qtdSimulacoes} folha(s) de simulação não entraram no TXT (empregado fora da base, sem código).`;
         }
         mostrarMensagem('Sucesso', msg);
     } catch (erro) {
