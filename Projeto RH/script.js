@@ -224,6 +224,14 @@ function _excluirContribuinte(lista) {
     );
 }
 
+// Só empregados do tipo "Empregado" geram lançamentos no arquivo TXT.
+// Estagiários entram na Folha de Ponto (documento/PDF) mas são identificados
+// como "ESTAGIÁRIO" e nunca entram no TXT — mesma regra das simulações.
+// Obs.: o valor gravado em rh_empregados.tipo_empregado é "Estágiario" (grafia legada).
+function _ehEstagiario(emp) {
+    return (emp?.tipo_empregado || '').trim() === 'Estágiario';
+}
+
 async function carregarEmpregados(codigoEmpresa) {
     try {
         const { data, error } = await supabaseClient
@@ -771,8 +779,9 @@ function renderizarAbas() {
             `;
         }
         
-        let nomeExibicao = folha.simulacao ? `🧪 ${folha.nome}` : folha.nome;
-        if (folha.simulacao && index !== state.abaAtivaIndex) {
+        const folhaEhEstagiario = !folha.simulacao && _ehEstagiario(state.empregadosDisponiveis.find(e => e.codigo_empregado === folha.empregadoId));
+        let nomeExibicao = folha.simulacao ? `🧪 ${folha.nome}` : (folhaEhEstagiario ? `🎓 ${folha.nome}` : folha.nome);
+        if ((folha.simulacao || folhaEhEstagiario) && index !== state.abaAtivaIndex) {
             btn.style.cssText += 'background: #fff8e1; border-color: #f0ad4e; color: #8a6d3b;';
         }
 
@@ -1611,6 +1620,7 @@ function calcularFolha(folha) {
         nome: folha.nome,
         empregadoId: folha.empregadoId,
         simulacao: !!folha.simulacao,
+        estagiario: !folha.simulacao && _ehEstagiario(state.empregadosDisponiveis.find(e => e.codigo_empregado === folha.empregadoId)),
         dias: diasCalculados,
         totais: {
             trabalhado: converterMinutosParaHora(totalTrabalhado),
@@ -1694,8 +1704,8 @@ function renderizarConsolidado() {
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 24px; background: rgba(255,255,255,0.2); width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">👨‍💼</span>
                         <div>
-                            <span style="font-weight: 600; font-size: 14px; letter-spacing: 0.5px; display: block;">${res.simulacao ? '🧪 ' : ''}${res.nome}</span>
-                            <span style="font-size: 12px; opacity: 0.9;">${res.simulacao ? 'SIMULAÇÃO — sem código de empregado (não gera TXT)' : 'Matrícula: ' + res.empregadoId}</span>
+                            <span style="font-weight: 600; font-size: 14px; letter-spacing: 0.5px; display: block;">${res.simulacao ? '🧪 ' : (res.estagiario ? '🎓 ' : '')}${res.nome}</span>
+                            <span style="font-size: 12px; opacity: 0.9;">${res.simulacao ? 'SIMULAÇÃO — sem código de empregado (não gera TXT)' : (res.estagiario ? 'ESTAGIÁRIO — não gera TXT (Matrícula: ' + res.empregadoId + ')' : 'Matrícula: ' + res.empregadoId)}</span>
                         </div>
                     </div>
                 </div>
@@ -1756,7 +1766,7 @@ function renderizarTabelasDiarias() {
         let htmlTabela = `
             <div class="card" style="margin-bottom: 30px; padding: 0; overflow: hidden; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
                 <div style="background: #f3f4f6; color: #374151; padding: 12px 20px; font-weight: 600; font-size: 15px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: 10px;">
-                    <span style="color: #800000;">📅</span> ${res.simulacao ? '🧪 ' : ''}${res.nome}${res.simulacao ? ' <span style="font-size:11px;font-weight:700;color:#8a6d3b;background:#fff8e1;border:1px solid #f0ad4e;border-radius:4px;padding:2px 6px;margin-left:6px;">SIMULAÇÃO</span>' : ''}
+                    <span style="color: #800000;">📅</span> ${res.simulacao ? '🧪 ' : (res.estagiario ? '🎓 ' : '')}${res.nome}${res.simulacao ? ' <span style="font-size:11px;font-weight:700;color:#8a6d3b;background:#fff8e1;border:1px solid #f0ad4e;border-radius:4px;padding:2px 6px;margin-left:6px;">SIMULAÇÃO</span>' : (res.estagiario ? ' <span style="font-size:11px;font-weight:700;color:#8a6d3b;background:#fff8e1;border:1px solid #f0ad4e;border-radius:4px;padding:2px 6px;margin-left:6px;">ESTAGIÁRIO</span>' : '')}
                 </div>
                 <div class="table-container" style="margin: 0; border: none; border-radius: 0;">
                     <table class="data-table" style="font-size: 13px; width: 100%; border-collapse: collapse;">
@@ -1866,8 +1876,8 @@ const dadosConsolidadoGeral = [];
 state.resultados.forEach(res => {
     // Adicionar ao Consolidado Geral
     dadosConsolidadoGeral.push({
-        'Matrícula': res.simulacao ? 'SIMULAÇÃO' : res.empregadoId,
-        'Empregado': res.simulacao ? `${res.nome} (SIMULAÇÃO)` : res.nome,
+        'Matrícula': res.simulacao ? 'SIMULAÇÃO' : (res.estagiario ? 'ESTAGIÁRIO' : res.empregadoId),
+        'Empregado': res.simulacao ? `${res.nome} (SIMULAÇÃO)` : (res.estagiario ? `${res.nome} (ESTAGIÁRIO)` : res.nome),
         'Horas Trabalhadas': res.totais.trabalhado,
         'Horas Normais': res.totais.normais,
         'Horas Extras 50%': res.totais.extra50,
@@ -3667,12 +3677,15 @@ async function _construirConteudoTXTExportacao() {
         }));
     }
     const empresasSemRubricaDsr = new Set();
+    let qtdEstagiarios = 0;
 
     Object.values(ultimasVersoes).forEach(save => {
         const empCodigo = save.empresa_codigo;
         const nomeTrab  = save.nome_trabalhador;
         const empInfo   = empregadosData.find(e => e.codigo_empresa === empCodigo && e.nome_empregado === nomeTrab);
         if (!empInfo) return;
+        // Só empregados do tipo "Empregado" geram lançamentos no TXT; estagiários ficam de fora.
+        if (_ehEstagiario(empInfo)) { qtdEstagiarios++; return; }
 
         const feriados   = JSON.parse(save.feriados_json || '[]');
         const dsrDias    = JSON.parse(save.dsr_dias    || '[]');
@@ -3792,15 +3805,19 @@ async function _construirConteudoTXTExportacao() {
     });
 
     localStorage.setItem(TXT_RUBRICAS_KEY, JSON.stringify(_lerCamposConfig('exp', 'exportTipoProcesso')));
-    return { conteudoTXT, compFmt, comp, empresasSemRubricaDsr };
+    return { conteudoTXT, compFmt, comp, empresasSemRubricaDsr, qtdEstagiarios };
 }
 
 async function gerarPreviewTXTExportacao() {
     mostrarMensagem('Aguarde', 'Gerando prévia...');
     try {
-        const { conteudoTXT } = await _construirConteudoTXTExportacao();
+        const { conteudoTXT, qtdEstagiarios } = await _construirConteudoTXTExportacao();
         fecharModalMensagem();
         _mostrarPrevia('expTxtPrevia', 'expTxtPreviaConteudo', 'expTxtPreviaInfo', '#exportTxtModal', conteudoTXT);
+        if (qtdEstagiarios > 0) {
+            const info = document.getElementById('expTxtPreviaInfo');
+            if (info) info.textContent += ` · ${qtdEstagiarios} estagiário(s) ignorado(s)`;
+        }
     } catch (erro) {
         fecharModalMensagem();
         mostrarMensagem('Erro', erro.message || 'Falha ao gerar prévia.');
@@ -3810,7 +3827,7 @@ async function gerarPreviewTXTExportacao() {
 async function gerarArquivoTXT() {
     mostrarMensagem('Aguarde', 'Gerando arquivo TXT...');
     try {
-        const { conteudoTXT, compFmt, empresasSemRubricaDsr } = await _construirConteudoTXTExportacao();
+        const { conteudoTXT, compFmt, empresasSemRubricaDsr, qtdEstagiarios } = await _construirConteudoTXTExportacao();
         fecharModalMensagem();
         if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor positivo encontrado para as rubricas configuradas.'); return; }
         const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
@@ -3825,6 +3842,9 @@ async function gerarArquivoTXT() {
         if (empresasSemRubricaDsr && empresasSemRubricaDsr.size > 0) {
             const nomes = [...empresasSemRubricaDsr].map(cod => state.empresas.find(e => e.codigo_empresa === cod)?.nome_empresa || cod).join(', ');
             msg += `\nAviso: DSR automático não gerado para empresa(s) sem "DIAS FALTAS DSR" cadastrada no catálogo: ${nomes}`;
+        }
+        if (qtdEstagiarios > 0) {
+            msg += `\nAviso: ${qtdEstagiarios} folha(s) de estagiário não entraram no TXT (somente empregados geram lançamentos).`;
         }
         mostrarMensagem('Sucesso', msg);
     } catch (erro) {
@@ -6855,7 +6875,7 @@ function _adicionarLancamentoAdicional() {
     const sel = document.createElement('select');
     sel.className = 'lanc-empregado';
     sel.style.cssText = 'padding:5px 6px;border:1px solid #ced4da;border-radius:4px;font-size:12px;width:100%;';
-    (state.resultados || []).filter(r => !r.simulacao && r.empregadoId).forEach(r => {
+    (state.resultados || []).filter(r => !r.simulacao && !r.estagiario && r.empregadoId).forEach(r => {
         const opt = document.createElement('option');
         opt.value = r.empregadoId;
         opt.textContent = `${r.nome} (${r.empregadoId})`;
@@ -6972,7 +6992,7 @@ function _construirLinhasAdicionais(compFmt, codEmpresa, tipoProcesso) {
 
 function _calcularDiasDescontoVAVT(resultados, valoresVaVtMapa = {}) {
     return (resultados || [])
-        .filter(res => !res.simulacao && res.empregadoId)
+        .filter(res => !res.simulacao && !res.estagiario && res.empregadoId)
         .map(res => {
             const dias = (res.dias || []).filter(d => d.flagFalta || d.flagAtestado).length;
             const valores = valoresVaVtMapa[res.empregadoId] || {};
@@ -7014,11 +7034,13 @@ async function _construirConteudoTXTResultados(salvar = false) {
     const rubricaFaltaDSR = calcularDsrAuto ? _resolverCodigoRubricaDsr(_catalogoRubricasAtual) : null;
     let avisoDsrSemRubrica = false;
 
-    // Folhas de simulação (empregado fora da base) não entram no TXT — sem código de empregado.
-    const resultadosReais = state.resultados.filter(r => !r.simulacao && r.empregadoId);
-    const qtdSimulacoes = state.resultados.length - resultadosReais.length;
+    // Só empregados do tipo "Empregado" entram no TXT. Simulações (nome fora da
+    // base, sem código) e estagiários ficam de fora.
+    const resultadosReais = state.resultados.filter(r => !r.simulacao && !r.estagiario && r.empregadoId);
+    const qtdSimulacoes = state.resultados.filter(r => r.simulacao).length;
+    const qtdEstagiarios = state.resultados.filter(r => !r.simulacao && r.estagiario).length;
     if (resultadosReais.length === 0) {
-        throw new Error('Todas as folhas processadas são simulações (empregados fora da base). Nenhum arquivo TXT é gerado nesse caso.');
+        throw new Error('Nenhuma folha processada é de empregado (as demais são simulações ou estagiários). Nenhum arquivo TXT é gerado nesse caso.');
     }
 
     resultadosReais.forEach(res => {
@@ -7057,7 +7079,7 @@ async function _construirConteudoTXTResultados(salvar = false) {
 
     conteudoTXT += _construirLinhasAdicionais(compFmt, codEmpresa, config.tipoProcesso);
 
-    return { conteudoTXT, compFmt, avisoDsrSemRubrica, qtdSimulacoes };
+    return { conteudoTXT, compFmt, avisoDsrSemRubrica, qtdSimulacoes, qtdEstagiarios };
 }
 
 function _mostrarPrevia(previaId, previaConteudoId, previaInfoId, modalBodySelector, conteudoTXT) {
@@ -7078,12 +7100,11 @@ function _mostrarPrevia(previaId, previaConteudoId, previaInfoId, modalBodySelec
 
 async function gerarPreviewTXTResultados() {
     try {
-        const { conteudoTXT, qtdSimulacoes } = await _construirConteudoTXTResultados(false);
+        const { conteudoTXT, qtdSimulacoes, qtdEstagiarios } = await _construirConteudoTXTResultados(false);
         _mostrarPrevia('resTxtPrevia', 'resTxtPreviaConteudo', 'resTxtPreviaInfo', '#txtRubricasModal', conteudoTXT);
-        if (qtdSimulacoes > 0) {
-            const info = document.getElementById('resTxtPreviaInfo');
-            if (info) info.textContent += ` · ${qtdSimulacoes} simulação(ões) ignorada(s)`;
-        }
+        const info = document.getElementById('resTxtPreviaInfo');
+        if (info && qtdSimulacoes > 0) info.textContent += ` · ${qtdSimulacoes} simulação(ões) ignorada(s)`;
+        if (info && qtdEstagiarios > 0) info.textContent += ` · ${qtdEstagiarios} estagiário(s) ignorado(s)`;
     } catch (erro) {
         mostrarMensagem('Aviso', erro.message);
     }
@@ -7126,7 +7147,7 @@ function _continuarDownloadAposAviso() {
 
 async function _efetivarDownloadTXTResultados() {
     try {
-        const { conteudoTXT, avisoDsrSemRubrica, qtdSimulacoes } = await _construirConteudoTXTResultados(true);
+        const { conteudoTXT, avisoDsrSemRubrica, qtdSimulacoes, qtdEstagiarios } = await _construirConteudoTXTResultados(true);
         if (!conteudoTXT.trim()) { mostrarMensagem('Aviso', 'Nenhum valor positivo encontrado para as rubricas configuradas.'); return; }
         const [mm, aaaa] = state.competencia.split('/');
         const blob = new Blob([conteudoTXT], { type: 'text/plain;charset=utf-8' });
@@ -7143,6 +7164,9 @@ async function _efetivarDownloadTXTResultados() {
         }
         if (qtdSimulacoes > 0) {
             msg += `\nAviso: ${qtdSimulacoes} folha(s) de simulação não entraram no TXT (empregado fora da base, sem código).`;
+        }
+        if (qtdEstagiarios > 0) {
+            msg += `\nAviso: ${qtdEstagiarios} folha(s) de estagiário não entraram no TXT (somente empregados geram lançamentos).`;
         }
         mostrarMensagem('Sucesso', msg);
     } catch (erro) {
