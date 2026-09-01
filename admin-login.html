@@ -40,6 +40,7 @@
         .alert.show { display:block; }
         .alert-error   { background:rgba(231,76,60,.1);  color:var(--danger);  border-left-color:var(--danger); }
         .alert-success { background:rgba(39,174,96,.1);  color:var(--success); border-left-color:var(--success); }
+        .alert-info    { background:rgba(52,152,219,.1); color:var(--info);    border-left-color:var(--info); }
         .loading { display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite; margin-right:6px; vertical-align:middle; }
         @keyframes spin { to { transform:rotate(360deg); } }
         .back-link { text-align:center; margin-top:18px; }
@@ -55,6 +56,7 @@
         <p>SCONT Soluções Contábeis</p>
     </div>
 
+    <div class="alert alert-info"    id="infoMsg"></div>
     <div class="alert alert-error"   id="errorMsg"></div>
     <div class="alert alert-success" id="successMsg"></div>
 
@@ -145,6 +147,15 @@ async function _checkAutoLogin() {
 }
 document.addEventListener('DOMContentLoaded', _checkAutoLogin);
 window.addEventListener('pageshow', (e) => { if (e.persisted) _checkAutoLogin(); });
+
+// ─── AVISO DE DESCONEXÃO POR INATIVIDADE ───────────────────
+if (new URLSearchParams(location.search).get('motivo') === 'inatividade') {
+    document.addEventListener('DOMContentLoaded', () => {
+        const el = document.getElementById('infoMsg');
+        el.textContent = '🔒 Sessão encerrada por inatividade. Faça login novamente para continuar.';
+        el.classList.add('show');
+    });
+}
 </script>
 </body>
 </html>

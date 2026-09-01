@@ -6,6 +6,7 @@
     <title>SCONT - Painel Administrativo</title>
     <script src="supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="portal-inatividade.js"></script>
     <style>
         :root {
             --primary:#4e1820; --primary-hover:#3a1018; --secondary:#2C3E50;
@@ -442,6 +443,31 @@
           <button class="btn-primary-sm" id="btnSalvarWhatsApp">💾 Salvar WhatsApp</button>
           <button class="btn-secondary-sm" id="btnTestarWhatsApp">📲 Testar link WhatsApp</button>
           <span class="cfg-status" id="cfgWaStatus"></span>
+        </div>
+      </div>
+
+      <!-- CARD SESSÃO / INATIVIDADE -->
+      <div class="card">
+        <p class="cfg-section-title">🔒 Sessão &amp; Segurança</p>
+        <p class="cfg-section-desc">
+          Desconecta automaticamente o usuário do portal e das ferramentas após um período
+          sem atividade (mouse, teclado, toque ou rolagem). Cerca de 1 minuto antes do limite
+          aparece um aviso com contagem regressiva. Vale para o portal, todas as ferramentas
+          e este painel administrativo.
+        </p>
+        <div class="cfg-grid">
+          <div class="form-group">
+            <label>Tempo de inatividade até desconectar (minutos)</label>
+            <input type="number" id="cfgTimeoutInatividade" min="0" max="480" step="1" placeholder="15" autocomplete="off">
+            <span class="cfg-hint">
+              <strong>0</strong> (ou vazio) desativa a desconexão automática. Padrão: <strong>15</strong> minutos.
+              A alteração vale para novas sessões e para sessões abertas em até ~10 minutos.
+            </span>
+          </div>
+        </div>
+        <div class="cfg-actions">
+          <button class="btn-primary-sm" id="btnSalvarInatividade">💾 Salvar</button>
+          <span class="cfg-status" id="cfgInatividadeStatus"></span>
         </div>
       </div>
 
@@ -1369,6 +1395,7 @@ const _CFG_MAP = {
     smtp_usuario:    'cfgSmtpUsuario',
     smtp_senha:      'cfgSmtpSenha',
     whatsapp_numero: 'cfgWhatsappNumero',
+    timeout_inatividade_min: 'cfgTimeoutInatividade',
 };
 
 function _aplicarProvedor(provedor) {
@@ -1449,6 +1476,16 @@ document.getElementById('btnSalvarEmail').addEventListener('click', async () => 
 document.getElementById('btnSalvarWhatsApp').addEventListener('click', () =>
     _salvarChaves(['whatsapp_numero'], 'cfgWaStatus', 'Número WhatsApp salvo!')
 );
+
+document.getElementById('btnSalvarInatividade').addEventListener('click', () => {
+    const el = document.getElementById('cfgTimeoutInatividade');
+    let n = parseInt(el.value, 10);
+    if (isNaN(n) || n < 0) n = 0;
+    if (n > 480) n = 480;
+    el.value = n ? String(n) : '0';
+    _salvarChaves(['timeout_inatividade_min'], 'cfgInatividadeStatus',
+        n ? `Desconexão por inatividade: ${n} min.` : 'Desconexão por inatividade desativada.');
+});
 
 document.getElementById('btnTestarEmail').addEventListener('click', async () => {
     const provedor = document.querySelector('input[name="emailProvedor"]:checked')?.value || 'brevo';
@@ -1722,6 +1759,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadFerramentas();   // carregar primeiro (usado nos modais)
     loadSolicitacoes();
     setInterval(loadSolicitacoes, 30000);
+
+    window.PortalInatividade?.iniciar({
+        sb,
+        depthToRoot: 0,
+        sessionKeys: ['adminAuth', 'userAuth'],
+        loginPage: 'admin-login.html',
+    });
 
     // Carrega dados CRM quando a aba é aberta pela primeira vez
     document.querySelectorAll('.menu-btn[data-tab="crm"]').forEach(btn => {

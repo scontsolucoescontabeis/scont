@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="shared.css">
     <script src="supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="portal-inatividade.js"></script>
     <style>
         /* ─── SIDEBAR ─── */
         .sidebar {
@@ -817,6 +818,7 @@
                 `Login: ${new Date(auth.loginTime).toLocaleTimeString('pt-BR')}`;
             loadFerramentas(auth);
             subscribeFerramentas();
+            window.PortalInatividade?.iniciar({ sb, depthToRoot: 0 });
         });
     </script>
 </body>

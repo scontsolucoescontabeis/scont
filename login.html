@@ -328,6 +328,14 @@ async function _checkAutoLogin() {
 }
 document.addEventListener('DOMContentLoaded', _checkAutoLogin);
 window.addEventListener('pageshow', (e) => { if (e.persisted) _checkAutoLogin(); });
+
+// ─── AVISO DE DESCONEXÃO POR INATIVIDADE ───────────────────
+if (new URLSearchParams(location.search).get('motivo') === 'inatividade') {
+    document.addEventListener('DOMContentLoaded', () => {
+        showAlert(document.getElementById('alertLogin'),
+            '🔒 Sua sessão foi encerrada por inatividade. Faça login novamente para continuar.', 'info');
+    });
+}
 </script>
 </body>
 </html>

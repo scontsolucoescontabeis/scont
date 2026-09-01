@@ -27,6 +27,26 @@ window.PortalAuthGuard = (function () {
         window.location.replace(url);
     }
 
+    /**
+     * Carrega portal-inatividade.js (se ainda não estiver) e inicia o
+     * logout automático por inatividade para esta ferramenta.
+     */
+    function iniciarInatividade(depth, sb) {
+        function start() {
+            if (window.PortalInatividade) {
+                window.PortalInatividade.iniciar({ sb: sb, depthToRoot: depth });
+            }
+        }
+        if (window.PortalInatividade) { start(); return; }
+        const existente = document.querySelector('script[data-portal-inatividade]');
+        if (existente) { existente.addEventListener('load', start); return; }
+        const s = document.createElement('script');
+        s.src = '../'.repeat(depth) + 'portal-inatividade.js';
+        s.setAttribute('data-portal-inatividade', '1');
+        s.onload = start;
+        document.head.appendChild(s);
+    }
+
     /** Extrai os últimos 2 segmentos do pathname atual: "PastaFerramenta/arquivo.html" */
     function paginaAtual() {
         const path = decodeURIComponent(window.location.pathname).replace(/\\/g, '/');
@@ -72,6 +92,7 @@ window.PortalAuthGuard = (function () {
                 redirecionar(depthToRoot, returnTo);
                 return null;
             }
+            iniciarInatividade(depthToRoot, sbAdm);
             return auth;
         }
 
@@ -111,6 +132,7 @@ window.PortalAuthGuard = (function () {
         );
         if (!autorizado) { redirecionar(depthToRoot, returnTo); return null; }
 
+        iniciarInatividade(depthToRoot, sb);
         return auth;
     }
 
