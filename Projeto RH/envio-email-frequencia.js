@@ -50,6 +50,13 @@ function _resolverDestinatariosEnvio({ itensPorEmpresa, gruposMarcadosIds, grupo
         });
     });
 
+    // Para e-mail de responsável compartilhado por várias empresas (origem 'empresa'),
+    // o assunto/corpo deve contemplar o nome de todas elas, não só o da primeira.
+    // Baldes de grupo mantêm o nome do grupo.
+    baldes.forEach(balde => {
+        if (balde.origem === 'empresa') balde.nomeOrigem = balde.empresas.join(', ');
+    });
+
     return { destinatarios: Array.from(baldes.values()), semEmail };
 }
 

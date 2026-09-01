@@ -84,6 +84,26 @@ teste('grupo marcado sem e-mail cadastrado cai para o e-mail individual da empre
     assert.strictEqual(destinatarios[0].origem, 'empresa');
 });
 
+teste('empresas diferentes com o mesmo e-mail de responsável viram um destinatário e o nomeOrigem contempla todas', () => {
+    const { destinatarios, semEmail } = _resolverDestinatariosEnvio({
+        itensPorEmpresa: [
+            { codigoEmpresa: '100', nomeEmpresa: 'Empresa A', arquivos: [{ nome: 'a.pdf', blob: 'BLOB_A' }] },
+            { codigoEmpresa: '200', nomeEmpresa: 'Empresa B', arquivos: [{ nome: 'b.pdf', blob: 'BLOB_B' }] },
+        ],
+        gruposMarcadosIds: [],
+        gruposInfo: [],
+        itensGruposCache: {},
+        emailPorEmpresa: { '100': 'responsavel@contabil.com', '200': 'responsavel@contabil.com' },
+    });
+    assert.strictEqual(destinatarios.length, 1);
+    assert.strictEqual(destinatarios[0].email, 'responsavel@contabil.com');
+    assert.strictEqual(destinatarios[0].origem, 'empresa');
+    assert.strictEqual(destinatarios[0].nomeOrigem, 'Empresa A, Empresa B');
+    assert.deepStrictEqual(destinatarios[0].empresas, ['Empresa A', 'Empresa B']);
+    assert.deepStrictEqual(destinatarios[0].arquivos, [{ nome: 'a.pdf', blob: 'BLOB_A' }, { nome: 'b.pdf', blob: 'BLOB_B' }]);
+    assert.deepStrictEqual(semEmail, []);
+});
+
 teste('e-mail com múltiplos endereços gera um destinatário por endereço, mesmos anexos', () => {
     const { destinatarios } = _resolverDestinatariosEnvio({
         itensPorEmpresa: [{ codigoEmpresa: '100', nomeEmpresa: 'Empresa A', arquivos: [{ nome: 'a.pdf', blob: 'BLOB_A' }] }],
