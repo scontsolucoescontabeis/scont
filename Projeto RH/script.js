@@ -6784,6 +6784,9 @@ async function importarExcel(file) {
                     state.folhas[folhaIdx].empregadoId = empregado.codigo_empregado;
                     state.folhas[folhaIdx].simulacao  = false;
                 }
+                if (_ehEstagiario(empregado)) {
+                    avisos.push(`Aba "${sheetName}": ${empregado.nome_empregado} é ESTAGIÁRIO — não gera arquivo TXT.`);
+                }
             }
 
             const linhas = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '' });
