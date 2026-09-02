@@ -236,8 +236,8 @@
 </div>
                     <div class="setting-card">
                         <h4>Feriados</h4>
-                        <button type="button" class="btn btn-secondary btn-small" id="openFeriadosBtn" style="margin-top: 5px; width: 100%;">📅 Gerenciar Feriados</button>
-                        <small style="display: block; margin-top: 5px;">Adicione feriados específicos</small>
+                        <button type="button" class="btn btn-secondary btn-small" id="openFeriadosBtn" style="margin-top: 5px; width: 100%;">📅 Ver Feriados</button>
+                        <small style="display: block; margin-top: 5px;">Cadastro em Administração &rsaquo; Feriados</small>
                     </div>
                 </div>
             </div>
@@ -621,44 +621,35 @@
 
     <!-- MODAL DE FERIADOS -->
     <div id="feriadosModal" class="modal">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content" style="max-width: 560px;">
             <div class="modal-header">
-                <h3 style="margin: 0;">📅 Gerenciar Feriados</h3>
+                <h3 style="margin: 0;">📅 Feriados</h3>
                 <button type="button" class="modal-close" id="closeFeriadosBtnTop">×</button>
             </div>
             <div class="modal-body" style="padding: 20px;">
-                <div style="background: var(--background-color); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                    <h4 style="margin-top: 0; margin-bottom: 15px; font-size: 14px;">Adicionar Novo Feriado</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label for="novaDataFeriado">Data (DD/MM/AAAA) *</label>
-                            <input type="text" id="novaDataFeriado" placeholder="DD/MM/AAAA" maxlength="10">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label for="novaDescricaoFeriado">Descrição *</label>
-                            <input type="text" id="novaDescricaoFeriado" placeholder="Ex: Feriado Municipal">
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-primary btn-small" id="addFeriadoBtn" style="margin-top: 10px; width: 100%;">➕ Adicionar Feriado</button>
-                </div>
-
-                <h4 style="font-size: 14px; margin-bottom: 10px;">Feriados Cadastrados</h4>
-                <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                <p style="font-size: 12px; color: var(--text-secondary); margin-top: 0;">
+                    Feriados aplicáveis à empresa selecionada, já com os feriados móveis calculados
+                    para o ano da competência. O cadastro é feito em
+                    <a href="admin.html#feriados" target="_blank" rel="noopener">Administração &rsaquo; Feriados</a>.
+                </p>
+                <div style="max-height: 260px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px;">
                     <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                         <thead style="background: var(--background-color); color: var(--text-primary); position: sticky; top: 0;">
                             <tr>
                                 <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">Data</th>
                                 <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">Descrição</th>
-                                <th style="padding: 8px; text-align: center; border-bottom: 1px solid var(--border-color);">Ação</th>
+                                <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">Tipo</th>
+                                <th style="padding: 8px; text-align: left; border-bottom: 1px solid var(--border-color);">Abrangência</th>
                             </tr>
                         </thead>
                         <tbody id="feriadosTbody">
-                            <tr><td colspan="3" style="text-align: center; padding: 10px; color: var(--text-secondary);">Carregando...</td></tr>
+                            <tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-secondary);">Carregando...</td></tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-            <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #eee; text-align: right;">
+            <div class="modal-footer" style="padding: 15px 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between;">
+                <a href="admin.html#feriados" target="_blank" rel="noopener" class="btn btn-primary btn-small">➕ Gerenciar feriados</a>
                 <button type="button" class="btn btn-secondary" id="closeFeriadosBtn">Fechar</button>
             </div>
         </div>
@@ -1524,6 +1515,7 @@
         box-shadow: 0 6px 20px rgba(0,0,0,0.15);
     "></div>
 
+    <script src="feriados-calculo.js"></script>
     <script src="escala-calculo.js"></script>
     <script src="folha-ponto-calculo.js"></script>
     <script src="beneficios-va-calculo.js"></script>

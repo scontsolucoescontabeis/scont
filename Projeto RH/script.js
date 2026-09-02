@@ -18,7 +18,8 @@ const state = {
     periodoApuracaoFim: null,    // dia do mês da competência (período customizado da empresa)
     folhas: [], // Array de objetos: { empregadoId, nome, dados: [], dsrDias: [], flagsFolga: {} }
     abaAtivaIndex: 0,
-    feriados: [],
+    feriados: [],       // feriados resolvidos p/ a empresa + ano da competência atuais
+    feriadosRaw: [],    // linhas cruas de rh_feriados (fonte p/ recalcularFeriadosContexto)
     jornada: '08:00',
     jornadaSexta: '04:00',
     jornadaSextaAtiva: false,
@@ -52,9 +53,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
     document.getElementById('jornadaSabado').addEventListener('input', (e) => {
         e.target.value = formatarHora(e.target.value);
-    });
-    document.getElementById('novaDataFeriado').addEventListener('input', (e) => {
-        e.target.value = formatarData(e.target.value);
     });
     if (typeof pdfjsLib !== 'undefined') {
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -90,7 +88,7 @@ async function carregarEmpresas() {
     try {
         const { data, error } = await supabaseClient
             .from('rh_empresas')
-            .select('codigo_empresa, nome_empresa, status_situacao, email_responsavel')
+            .select('codigo_empresa, nome_empresa, status_situacao, email_responsavel, uf, municipio, cidade')
             .order('nome_empresa', { ascending: true });
         if (error) throw error;
         // Só empresas ativas (mesmo critério da Administração: sem status = ativa por padrão)
@@ -316,6 +314,7 @@ function inicializarEventos() {
         }
         state.competencia = comp;
         state.empresaSelecionada = state.empresas.find(emp => emp.codigo_empresa === codEmp);
+        recalcularFeriadosContexto();
         const cfgPeriodo = await _buscarConfigRubricas(codEmp);
         const { diaInicio, diaFim } = _resolverPeriodoApuracao(cfgPeriodo);
         state.periodoApuracaoInicio = diaInicio;
@@ -334,10 +333,9 @@ function inicializarEventos() {
     });
     document.getElementById('backToEditBtn').addEventListener('click', voltarParaEdicao);
     document.getElementById('exportXlsxBtn').addEventListener('click', exportarParaExcel);
-    document.getElementById('openFeriadosBtn').addEventListener('click', () => document.getElementById('feriadosModal').classList.add('active'));
+    document.getElementById('openFeriadosBtn').addEventListener('click', () => { if (!state._feriadosDeSnapshot) recalcularFeriadosContexto(); document.getElementById('feriadosModal').classList.add('active'); });
     document.getElementById('closeFeriadosBtn').addEventListener('click', () => document.getElementById('feriadosModal').classList.remove('active'));
     document.getElementById('closeFeriadosBtnTop').addEventListener('click', () => document.getElementById('feriadosModal').classList.remove('active'));
-    document.getElementById('addFeriadoBtn').addEventListener('click', adicionarFeriado);
     document.getElementById('addTabBtn').addEventListener('click', adicionarNovaFolha);
 
     document.getElementById('importarExcelInput').addEventListener('change', (e) => {
@@ -468,6 +466,7 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
                     console.warn('Erro ao fazer parse de feriados_json:', e);
                     state.feriados = [];
                 }
+                state._feriadosDeSnapshot = true; // folha já salva: usa o retrato da época, não o calendário atual
                 renderizarTabelaFeriados();
             }
 
@@ -624,6 +623,7 @@ async function carregarSaveEspecifico(codigoEmpresa, competencia, timestamp) {
                     console.warn('Erro ao fazer parse de feriados_json:', e);
                     state.feriados = [];
                 }
+                state._feriadosDeSnapshot = true; // folha já salva: usa o retrato da época, não o calendário atual
                 renderizarTabelaFeriados();
             }
 
@@ -1070,121 +1070,91 @@ window.limparLinha = function(folhaIndex, diaIndex) {
     renderizarConteudoAba();
 };
 
-// --- GERENCIAMENTO DE FERIADOS ---
+// --- FERIADOS ---
+// O cadastro/edição de feriados vive agora em Administração > Feriados
+// (admin.html). Aqui a tabela é só carregada (state.feriadosRaw) e resolvida
+// para a empresa + ano da competência atuais (state.feriados) via
+// recalcularFeriadosContexto(). O modal "Feriados" exibe essa lista resolvida
+// somente para leitura.
+
+const _FERIADOS_FIXOS_FALLBACK = [
+    { data: '01/01', descricao: 'Confraternização Universal' },
+    { data: '21/04', descricao: 'Tiradentes' },
+    { data: '01/05', descricao: 'Dia do Trabalho' },
+    { data: '07/09', descricao: 'Independência do Brasil' },
+    { data: '12/10', descricao: 'Nossa Senhora Aparecida' },
+    { data: '02/11', descricao: 'Finados' },
+    { data: '20/11', descricao: 'Consciência Negra' },
+    { data: '25/12', descricao: 'Natal' }
+];
+
 async function carregarFeriadosGlobais() {
     try {
         const { data, error } = await supabaseClient
             .from('rh_feriados')
-            .select('id, data, descricao')
-            .order('data', { ascending: true });
+            .select('id, data, regra_movel, descricao, abrangencia, uf, municipio, tipo, ativo');
         if (error) throw error;
-        state.feriados = (data || []).map(f => ({ id: f.id, data: f.data, descricao: f.descricao }));
+        state.feriadosRaw = data || [];
     } catch (e) {
-        console.warn('Erro ao carregar rh_feriados (a tabela existe? rode a migração schema_rh_feriados_globais.sql):', e);
-        // Fallback: mesma lista fixa de antes, sem id (não editável até a migração rodar)
-        const feriadosFixos = [
-            { dia: '01/01', desc: 'Confraternização Universal' },
-            { dia: '21/04', desc: 'Tiradentes' },
-            { dia: '01/05', desc: 'Dia do Trabalho' },
-            { dia: '07/09', desc: 'Independência do Brasil' },
-            { dia: '12/10', desc: 'Nossa Senhora Aparecida' },
-            { dia: '02/11', desc: 'Finados' },
-            { dia: '20/11', desc: 'Consciência Negra' },
-            { dia: '25/12', desc: 'Natal' }
-        ];
-        state.feriados = feriadosFixos.map(f => ({ data: f.dia, descricao: f.desc }));
+        console.warn('Erro ao carregar rh_feriados (rode as migrações schema_rh_feriados_globais.sql + schema_rh_feriados_v2.sql):', e);
+        state.feriadosRaw = _FERIADOS_FIXOS_FALLBACK.map(f => ({
+            data: f.data, descricao: f.descricao, abrangencia: 'nacional', tipo: 'feriado', ativo: true
+        }));
     }
+    recalcularFeriadosContexto();
+}
+
+// Ano vigente da competência (MM/AAAA); cai para o ano corrente se ainda não definida.
+function _anoFeriados() {
+    const partes = (state.competencia || '').split('/');
+    const ano = parseInt(partes[1], 10);
+    return Number.isInteger(ano) ? ano : new Date().getFullYear();
+}
+
+// Resolve state.feriados = feriados aplicáveis à empresa selecionada, com os
+// móveis já calculados para o ano da competência. Chamado ao trocar de empresa,
+// definir a competência ou avançar a fila do lote.
+function recalcularFeriadosContexto() {
+    const expandidos = expandirFeriados(state.feriadosRaw, _anoFeriados());
+    state.feriados = feriadosDaEmpresa(expandidos, state.empresaSelecionada || {});
+    state._feriadosDeSnapshot = false;
     renderizarTabelaFeriados();
 }
 
-async function adicionarFeriado() {
-    const data = document.getElementById('novaDataFeriado').value;
-    const desc = document.getElementById('novaDescricaoFeriado').value;
-    if (!validarData(data)) {
-        mostrarMensagem('Erro', 'Data inválida. Use DD/MM/AAAA.');
-        return;
-    }
-    if (!desc) {
-        mostrarMensagem('Erro', 'Informe uma descrição para o feriado.');
-        return;
-    }
-    if (state.feriados.some(f => f.data === data)) {
-        document.getElementById('novaDataFeriado').value = '';
-        document.getElementById('novaDescricaoFeriado').value = '';
-        return;
-    }
-    try {
-        const { data: inserido, error } = await supabaseClient
-            .from('rh_feriados')
-            .insert({ data, descricao: desc })
-            .select('id, data, descricao')
-            .single();
-        if (error) throw error;
-        state.feriados.push({ id: inserido.id, data: inserido.data, descricao: inserido.descricao });
-        state.feriados.sort((a, b) => {
-            const [d1, m1, a1] = a.data.split('/');
-            const [d2, m2, a2] = b.data.split('/');
-            return new Date(a1, m1-1, d1) - new Date(a2, m2-1, d2);
-        });
-        renderizarTabelaFeriados();
-        renderizarConteudoAba();
-        document.getElementById('novaDataFeriado').value = '';
-        document.getElementById('novaDescricaoFeriado').value = '';
-    } catch (e) {
-        console.error('Erro ao adicionar feriado:', e);
-        mostrarMensagem('Erro', 'Não foi possível salvar o feriado. Verifique se a migração schema_rh_feriados_globais.sql já foi executada no Supabase.');
-    }
+// Feriados aplicáveis a uma empresa, resolvidos para os 3 anos que qualquer
+// período de apuração pode tocar (mês anterior / competência / mês seguinte).
+// Usado por Gerar Escala, Gerar Folha de Ponto e Gerar Benefícios.
+function _feriadosDaEmpresaParaComp(comp, empresa) {
+    const ano = parseInt((comp || '').split('/')[1], 10) || new Date().getFullYear();
+    const expandidos = [ano - 1, ano, ano + 1].flatMap(a => expandirFeriados(state.feriadosRaw, a));
+    return feriadosDaEmpresa(expandidos, empresa || {});
 }
 
-window.removerFeriado = function(id, data) {
-    // Feriados carregados de um snapshot antigo (feriados_json de uma folha já salva
-    // antes desta funcionalidade existir) podem não ter id — nesse caso, remove só
-    // localmente, sem tentar apagar nada do calendário global.
-    if (!id) {
-        state.feriados = state.feriados.filter(f => f.data !== data);
-        renderizarTabelaFeriados();
-        renderizarConteudoAba();
-        return;
-    }
-    mostrarConfirmacao(
-        'Remover Feriado',
-        'Tem certeza que deseja remover este feriado? Ele será removido do calendário global, afetando todas as empresas.',
-        async () => {
-            try {
-                const { error } = await supabaseClient
-                    .from('rh_feriados')
-                    .delete()
-                    .eq('id', id);
-                if (error) throw error;
-                state.feriados = state.feriados.filter(f => f.id !== id);
-                renderizarTabelaFeriados();
-                renderizarConteudoAba();
-            } catch (e) {
-                console.error('Erro ao remover feriado:', e);
-                mostrarMensagem('Erro', 'Não foi possível remover o feriado.');
-            }
-        }
-    );
-};
+const _FERIADO_ABRANGENCIA_ROTULO = { nacional: 'Nacional', estadual: 'Estadual', municipal: 'Municipal' };
+
+function _feriadoAbrangenciaTexto(f) {
+    if (f.abrangencia === 'estadual') return `Estadual · ${f.uf || ''}`;
+    if (f.abrangencia === 'municipal') return `Municipal · ${f.municipio || ''}/${f.uf || ''}`;
+    return _FERIADO_ABRANGENCIA_ROTULO[f.abrangencia] || 'Nacional';
+}
 
 function renderizarTabelaFeriados() {
     const tbody = document.getElementById('feriadosTbody');
-    tbody.innerHTML = '';
-    if (state.feriados.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 10px; color: var(--text-secondary);">Nenhum feriado cadastrado.</td></tr>';
+    if (!tbody) return;
+    const chaveMesDia = d => { const [dd, mm] = d.split('/'); return `${mm}-${dd}`; };
+    const lista = [...(state.feriados || [])].sort((a, b) => chaveMesDia(a.data).localeCompare(chaveMesDia(b.data)));
+    if (lista.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 10px; color: var(--text-secondary);">Nenhum feriado aplicável a esta empresa.</td></tr>';
         return;
     }
-    state.feriados.forEach(f => {
-        tbody.innerHTML += `
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${f.data}</td>
-                <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${f.descricao}</td>
-                <td style="padding: 8px; border-bottom: 1px solid var(--border-color); text-align: center;">
-                    <button type="button" class="btn-icon" onclick="removerFeriado('${f.id || ''}', '${f.data}')" style="color: var(--danger-color);">🗑️</button>
-                </td>
-            </tr>
-        `;
-    });
+    tbody.innerHTML = lista.map(f => `
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${f.data}${f.movel ? ' <span style="font-size:10px;color:var(--text-secondary);">(móvel)</span>' : ''}</td>
+            <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${f.descricao}</td>
+            <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${f.tipo === 'facultativo' ? 'Ponto facultativo' : 'Feriado'}</td>
+            <td style="padding: 8px; border-bottom: 1px solid var(--border-color);">${_feriadoAbrangenciaTexto(f)}</td>
+        </tr>
+    `).join('');
 }
 
 // --- ✅ LÓGICA DE ASSINATURA E SALVAMENTO ---
@@ -3050,8 +3020,10 @@ async function _carregarProximaEmpresaFila() {
     if (!fila) return;
     const item = fila.itens[fila.indice];
 
-    state.empresaSelecionada = { codigo_empresa: item.codigo_empresa, nome_empresa: item.nome_empresa };
+    const empresaCompleta = state.empresas.find(e => e.codigo_empresa === item.codigo_empresa);
+    state.empresaSelecionada = empresaCompleta || { codigo_empresa: item.codigo_empresa, nome_empresa: item.nome_empresa };
     state.competencia = fila.competencia;
+    recalcularFeriadosContexto();
     state.folhas = item.folhas;
     state.abaAtivaIndex = 0;
     state.resultados = [];
@@ -4076,7 +4048,7 @@ async function gerarPreviaBeneficios() {
             { data: excecoesData, error: errExc },
             { data: jornadasData, error: errJorn },
         ] = await Promise.all([
-            supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, cnpj').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, cnpj, uf, municipio, cidade').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, situacao, tipo_empregado, jornada_id').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_valores_va_vt').select('codigo_empresa, codigo_empregado, valor_vt, valor_va').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_ferias_calculadas').select('codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim').in('codigo_empresa', codigosEmpresas),
@@ -4127,9 +4099,10 @@ async function gerarPreviaBeneficios() {
         const jornadasMapa = {};
         (jornadasData || []).forEach(j => { jornadasMapa[j.id] = _jornadaDeRow(j); });
 
-        // Config por empresa: se deve excluir feriados nacionais do cálculo de "Dias a Trabalhar"
-        // (a escala em si não considera feriados — ver [[project_rh_escala_trabalho]]), e se a
-        // empresa apura "Dias a Trabalhar" sobre um período customizado (fora do mês calendário).
+        // Config por empresa: se deve excluir feriados do cálculo de "Dias a Trabalhar"
+        // (feriados nacionais + estaduais/municipais da empresa + móveis, resolvidos em
+        // feriados-calculo.js e passados a calcularResumoMes), e se a empresa apura
+        // "Dias a Trabalhar" sobre um período customizado (fora do mês calendário).
         // Quando ativo, o intervalo vai do dia de início NO MÊS DA COMPETÊNCIA ao dia de fim no
         // mês SEGUINTE — por isso passamos compMesSeguinte para gerarDiasDoMes/calcularResumoMes
         // (ver comentário em _competenciaMesSeguinte).
@@ -4176,17 +4149,18 @@ async function gerarPreviaBeneficios() {
             const { diaInicio, diaFim } = periodoBeneficiosPorEmpresa[emp.codigo_empresa] || { diaInicio: null, diaFim: null };
             const periodoAtivo = diaInicio !== null && diaFim !== null;
             const compParaDias = periodoAtivo ? compMesSeguinte : comp;
-            const resumoEscala = calcularResumoMes(escala, compParaDias, periodos, diaInicio, diaFim, excecoesFolga);
-            const diasTrabalhoConsiderados = resumoEscala.dias.filter(d =>
-                d.tipo === 'trabalho' && !(excluirFeriados && _isFeriadoNoDia(d.data))
-            );
+            const empresa = empresasMapa[emp.codigo_empresa] || { nome_empresa: emp.codigo_empresa, cnpj: '' };
+            // Config beneficios_excluir_feriados: quando desligada, passa [] e os
+            // "Dias a Trabalhar" ignoram feriados (comportamento antigo da empresa).
+            const feriadosEmp = excluirFeriados ? _feriadosDaEmpresaParaComp(comp, empresa) : [];
+            const resumoEscala = calcularResumoMes(escala, compParaDias, periodos, diaInicio, diaFim, excecoesFolga, feriadosEmp);
+            const diasTrabalhoConsiderados = resumoEscala.dias.filter(d => d.tipo === 'trabalho');
             const diasTrabalhar = diasTrabalhoConsiderados.length;
             const datasDescontar = save ? _datasDescontarFolhaSalva(save) : [];
             const diasDescontar = datasDescontar.length;
             const jornadaEmpregado = jornadasMapa[emp.jornada_id] || jornadaPadraoPorEmpresa[emp.codigo_empresa];
             const reducaoVA = calcularDiasReduzidosVA(diasTrabalhoConsiderados, jornadaEmpregado, datasDescontar);
             const valores = valoresMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || { vt: 0, va: 0 };
-            const empresa = empresasMapa[emp.codigo_empresa] || { nome_empresa: emp.codigo_empresa, cnpj: '' };
             return {
                 codigo_empresa: emp.codigo_empresa,
                 nome_empresa: empresa.nome_empresa,
@@ -5583,13 +5557,14 @@ async function gerarPreviaFolhaPonto() {
             const cfg = await _buscarConfigRubricas(codigoEmpresa);
             const { diaInicio, diaFim } = _resolverPeriodoApuracao(cfg);
             const periodoTexto = _labelPeriodoFolhaPonto(comp, diaInicio, diaFim);
+            const feriadosEmpresa = _feriadosDaEmpresaParaComp(comp, empresaInfo || state.empresas.find(e => e.codigo_empresa === codigoEmpresa));
 
             const empregados = empregadosEmpresa.map(emp => {
                 const chave = `${emp.codigo_empresa}_${emp.codigo_empregado}`;
                 const escala = escalasMapa[chave] || null;
                 const periodosFerias = feriasMapa[chave];
                 const excecoesFolga = excecoesMapa[chave] || [];
-                const resumo = calcularResumoMes(escala, comp, periodosFerias, diaInicio, diaFim, excecoesFolga);
+                const resumo = calcularResumoMes(escala, comp, periodosFerias, diaInicio, diaFim, excecoesFolga, feriadosEmpresa);
                 const jornadaPorDiaSemana = agruparJornadaPorDiaSemana(jornadaMapa[chave] || []);
                 return {
                     codigo_empregado: emp.codigo_empregado,
@@ -5632,18 +5607,29 @@ async function gerarPreviaFolhaPonto() {
     }
 }
 
+// Rótulo da coluna "Observações" na folha em branco: FÉRIAS, FERIADO ou
+// PONTO FACULTATIVO (feriado tem prioridade só depois de férias).
+function _folhaPontoObsDia(l) {
+    if (l.ferias) return 'FÉRIAS';
+    if (l.feriado) return l.feriadoTipo === 'facultativo' ? 'PONTO FACULTATIVO' : 'FERIADO';
+    return '';
+}
+
 // Uma linha da prévia (mesmo formato de dado exibido no PDF): dia em branco para
-// preenchimento, ou "FÉRIAS" nas colunas preenchíveis quando o dia é de férias.
+// preenchimento, ou um rótulo (FÉRIAS / FERIADO / PONTO FACULTATIVO) na coluna
+// Observações quando o dia não é de trabalho por um desses motivos.
 function _linhaFolhaPontoPreviaHtml(l) {
     const estiloFolga = (l.tipo === 'folga' && !l.ferias) ? 'background:#EDEDED;' : '';
-    if (l.ferias) {
+    const obs = _folhaPontoObsDia(l);
+    if (obs) {
+        const cor = l.ferias ? '#2C7BE5' : (l.feriadoTipo === 'facultativo' ? '#B45309' : '#8B3A3A');
         return `<tr style="${estiloFolga}">
             <td style="padding:4px 6px; text-align:left; border:1px solid var(--border-color);">${l.data.slice(0, 2)} ${l.diaSemana}</td>
             <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
             <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
             <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
             <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
-            <td style="padding:4px 6px; text-align:center; border:1px solid var(--border-color); color:#2C7BE5; font-weight:600;">FÉRIAS</td>
+            <td style="padding:4px 6px; text-align:center; border:1px solid var(--border-color); color:${cor}; font-weight:600;">${obs}</td>
             <td style="padding:4px 6px; border:1px solid var(--border-color);"></td>
         </tr>`;
     }
@@ -5827,12 +5813,9 @@ function _desenharPaginaFolhaPontoEmpregado(doc, empresaDados, emp, MARGEM, page
         doc.setFont('helvetica', 'normal');
         y += 4;
 
-        const body = emp.linhas.map(l => {
-            if (l.ferias) {
-                return [`${l.data.slice(0, 2)} ${l.diaSemana}`, '', '', '', '', 'FÉRIAS', ''];
-            }
-            return [`${l.data.slice(0, 2)} ${l.diaSemana}`, '', '', '', '', '', ''];
-        });
+        const body = emp.linhas.map(l => (
+            [`${l.data.slice(0, 2)} ${l.diaSemana}`, '', '', '', '', _folhaPontoObsDia(l), '']
+        ));
 
         doc.autoTable({
             head: [['Dia', 'Entrada 1', 'Saída 1', 'Entrada 2', 'Saída 2', 'Observações', 'Assinatura']],
@@ -5852,6 +5835,10 @@ function _desenharPaginaFolhaPontoEmpregado(doc, empresaDados, emp, MARGEM, page
                 const linha = emp.linhas[data.row.index];
                 if (linha && linha.tipo === 'folga' && !linha.ferias) {
                     data.cell.styles.fillColor = [230, 230, 230];
+                }
+                if (linha && linha.feriado && data.column.index === 5) {
+                    data.cell.styles.fontStyle = 'bold';
+                    data.cell.styles.textColor = linha.feriadoTipo === 'facultativo' ? [180, 83, 9] : [139, 58, 58];
                 }
             },
         });
@@ -6021,11 +6008,14 @@ async function gerarEscala() {
             return;
         }
 
+        const feriadosPorEmpresa = {};
         const linhas = empregadosFiltrados.map(emp => {
             const escala = escalasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || null;
             const empresa = state.empresas.find(e => e.codigo_empresa === emp.codigo_empresa);
             const periodosFerias = feriasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`];
             const excecoesFolga = excecoesMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || [];
+            const feriados = feriadosPorEmpresa[emp.codigo_empresa]
+                ?? (feriadosPorEmpresa[emp.codigo_empresa] = _feriadosDaEmpresaParaComp(comp, empresa));
             return {
                 codigo_empresa: emp.codigo_empresa,
                 nome_empresa: empresa?.nome_empresa || emp.codigo_empresa,
@@ -6034,8 +6024,9 @@ async function gerarEscala() {
                 escala,
                 periodosFerias,
                 excecoesFolga,
+                feriados,
                 feriasTexto: _periodosFeriasNoMesTexto(periodosFerias, comp),
-                resumo: calcularResumoMes(escala, comp, periodosFerias, null, null, excecoesFolga),
+                resumo: calcularResumoMes(escala, comp, periodosFerias, null, null, excecoesFolga, feriados),
                 expandido: false
             };
         });
@@ -6093,6 +6084,7 @@ function _renderizarListaEscala() {
                     <span>${_badgeTipoEscala(l.escala)}</span>
                     <span>✅ ${l.resumo.totalTrabalho} trabalho</span>
                     <span>🌴 ${l.resumo.totalFolga} folga${l.resumo.totalFerias ? ` (${l.resumo.totalFerias} de férias)` : ''}</span>
+                    ${l.resumo.totalFeriados ? `<span style="color:#C0392B;">📅 ${l.resumo.totalFeriados} feriado(s)</span>` : ''}
                     <span style="font-size:16px;">${l.expandido ? '▲' : '▼'}</span>
                 </div>
             </div>
@@ -6158,15 +6150,17 @@ function _renderizarMiniCalendarioEscala(linha, idx) {
     const primeiroDiaSemana = { Dom: 0, Seg: 1, Ter: 2, Qua: 3, Qui: 4, Sex: 5, Sab: 6 }[linha.resumo.dias[0].diaSemana];
     const celulasVazias = Array.from({ length: primeiroDiaSemana }, () => '<div></div>').join('');
     const celulasDias = linha.resumo.dias.map(d => {
-        const cor = d.ferias ? '#2C7BE5' : d.excecao ? '#8B5CF6' : (d.tipo === 'trabalho' ? '#27AE60' : '#B8860B');
-        const clicavel = !d.ferias && (d.excecao || d.tipo === 'trabalho');
+        const cor = d.ferias ? '#2C7BE5' : d.feriado ? (d.feriadoTipo === 'facultativo' ? '#B45309' : '#C0392B') : d.excecao ? '#8B5CF6' : (d.tipo === 'trabalho' ? '#27AE60' : '#B8860B');
+        const clicavel = !d.ferias && !d.feriado && (d.excecao || d.tipo === 'trabalho');
         const rotulo = d.ferias
             ? 'férias'
-            : d.excecao
-                ? 'folga marcada manualmente (clique para desfazer)'
-                : d.tipo === 'trabalho'
-                    ? 'trabalho (clique para marcar folga pontual)'
-                    : d.tipo;
+            : d.feriado
+                ? `${d.feriadoTipo === 'facultativo' ? 'ponto facultativo' : 'feriado'}: ${d.feriadoDescricao || ''}`
+                : d.excecao
+                    ? 'folga marcada manualmente (clique para desfazer)'
+                    : d.tipo === 'trabalho'
+                        ? 'trabalho (clique para marcar folga pontual)'
+                        : d.tipo;
         const dia = d.data.split('/')[0];
         const onclick = clicavel ? ` onclick="_toggleExcecaoFolgaEscala(${idx}, '${d.data}')"` : '';
         const cursor = clicavel ? 'cursor:pointer;' : '';
@@ -6211,7 +6205,7 @@ async function _toggleExcecaoFolgaEscala(idx, dataBR) {
             if (error) throw error;
             linha.excecoesFolga = [...(linha.excecoesFolga || []), iso];
         }
-        linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia, linha.periodosFerias, null, null, linha.excecoesFolga);
+        linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia, linha.periodosFerias, null, null, linha.excecoesFolga, linha.feriados);
         _renderizarListaEscala();
     } catch (erro) {
         console.error('Erro ao marcar/desmarcar folga pontual:', erro);
@@ -6391,7 +6385,7 @@ async function _salvarEscalaEmpregado(idx) {
         if (error) throw error;
 
         linha.escala = _parsearCamposEscala(data);
-        linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia, linha.periodosFerias, null, null, linha.excecoesFolga);
+        linha.resumo = calcularResumoMes(linha.escala, state._escalaCompetencia, linha.periodosFerias, null, null, linha.excecoesFolga, linha.feriados);
         // A linha pode continuar expandida após salvar — o form precisa refletir
         // o que acabou de ir para o banco, por isso forcar=true aqui.
         _inicializarFormEscala(linha, true);

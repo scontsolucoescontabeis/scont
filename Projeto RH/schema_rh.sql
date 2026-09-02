@@ -334,13 +334,22 @@ CREATE POLICY "rh_grupos_empresas_itens: escrita autenticado"
 
 -- ============================================================
 -- 9. TABELA: rh_feriados
---    Calendário de feriados global, compartilhado por todas as empresas.
---    Ver migração: schema_rh_feriados_globais.sql
+--    Calendário de feriados nacionais e locais. Cadastro/edição em
+--    Administração > Feriados (admin.html). Consumido por Controle de
+--    Frequência, Gerar Escala, Gerar Folha de Ponto, Gerar Benefícios e
+--    Calendário da Folha.
+--    Ver migrações: schema_rh_feriados_globais.sql (v1) + schema_rh_feriados_v2.sql
 -- ============================================================
 -- CREATE TABLE public.rh_feriados (
 --     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
---     data        TEXT NOT NULL,       -- "DD/MM" ou "DD/MM/AAAA"
+--     data        TEXT,               -- "DD/MM" (recorrente) ou "DD/MM/AAAA"; NULL se móvel
+--     regra_movel TEXT,               -- sexta_santa | carnaval_segunda | carnaval_terca | quarta_cinzas | corpus_christi
 --     descricao   TEXT NOT NULL,
+--     abrangencia TEXT NOT NULL DEFAULT 'nacional',  -- nacional | estadual | municipal
+--     uf          TEXT,               -- obrigatória se abrangencia <> 'nacional'
+--     municipio   TEXT,               -- obrigatória se abrangencia = 'municipal'
+--     tipo        TEXT NOT NULL DEFAULT 'feriado',   -- feriado | facultativo
+--     ativo       BOOLEAN NOT NULL DEFAULT TRUE,
 --     criado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 -- );
 
