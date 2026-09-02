@@ -3963,9 +3963,6 @@ function _atualizarResumoEmpresasSelecionadasBeneficios() {
     info.textContent = `${nomes.length} empresa(s) selecionada(s): ${nomes.join(', ')}`;
 }
 
-function _isFeriadoNoDia(dataBR) {
-    return state.feriados.some(f => f.data === dataBR || f.data === dataBR.substring(0, 5));
-}
 
 function _isoParaBR(iso) {
     const [a, m, d] = iso.split('-');
