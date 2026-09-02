@@ -14,7 +14,8 @@ let viewAtual = 'mes';
 
 // dados
 let empresas = [];          // [{codigo_empresa, nome_empresa}]
-let feriados = [];          // [{data:'DD/MM' | 'DD/MM/AAAA', descricao}]
+let feriadosRaw = [];       // linhas cruas de rh_feriados
+const _feriadosPorAno = {}; // cache: ano -> feriados nacionais expandidos (móveis já resolvidos)
 let templates = [];         // cronograma recorrente
 let eventos = [];           // eventos carregados da janela do mês
 let atrasados = [];         // pendências vencidas (qualquer data)
@@ -89,9 +90,23 @@ function popularSelectEmpresas() {
 }
 
 async function carregarFeriados() {
-  const { data, error } = await sb.from('rh_feriados').select('data, descricao');
+  const { data, error } = await sb.from('rh_feriados')
+    .select('data, regra_movel, descricao, abrangencia, uf, municipio, tipo, ativo');
   if (error) { toast('Erro ao carregar feriados: ' + error.message, 'error'); return; }
-  feriados = data || [];
+  feriadosRaw = data || [];
+  Object.keys(_feriadosPorAno).forEach(k => delete _feriadosPorAno[k]);
+}
+
+// O calendário da folha é único (não por empresa), então só os feriados
+// nacionais entram no cálculo de dia útil. Feriados móveis são resolvidos
+// automaticamente para o ano pedido.
+function feriadosNacionaisDoAno(ano) {
+  if (!_feriadosPorAno[ano]) {
+    _feriadosPorAno[ano] = (typeof expandirFeriados === 'function')
+      ? expandirFeriados(feriadosRaw, ano).filter(f => (f.abrangencia || 'nacional') === 'nacional')
+      : feriadosRaw.filter(f => f.data && (f.abrangencia || 'nacional') === 'nacional' && f.ativo !== false);
+  }
+  return _feriadosPorAno[ano];
 }
 
 async function carregarTemplates() {
@@ -177,7 +192,7 @@ function fmtBr(s) {
 function nomeFeriado(d) {
   const dm  = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
   const dma = dm + '/' + d.getFullYear();
-  const f = feriados.find(f => f.data === dm || f.data === dma);
+  const f = feriadosNacionaisDoAno(d.getFullYear()).find(f => f.data === dm || f.data === dma);
   return f ? f.descricao : null;
 }
 

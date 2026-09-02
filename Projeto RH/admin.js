@@ -56,10 +56,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     carregarJornadaInfo();
     carregarSocios();
     carregarRubricas();
+    carregarFeriados();
     carregarRegras();
     carregarMapeamentos();
     configurarUpload();
     _carregarTimestampsImportacao();
+
+    // Abre a aba indicada no hash (ex.: admin.html#feriados, vindo do Controle de Frequência)
+    const abaHash = (location.hash || '').replace('#', '');
+    const btnHash = abaHash && document.getElementById('nav-' + abaHash);
+    if (btnHash) abrirAba(abaHash, btnHash);
 });
 
 // --- NAVEGAÇÃO DE ABAS ---
@@ -4026,6 +4032,327 @@ function mostrarMensagem(titulo, mensagem) {
     document.getElementById('messageModal').classList.add('active'); 
 }
 
-function fecharModalMensagem() { 
-    document.getElementById('messageModal').classList.remove('active'); 
+function fecharModalMensagem() {
+    document.getElementById('messageModal').classList.remove('active');
+}
+
+// ============================================================
+// FERIADOS (aba 🗓️ Feriados)
+// ============================================================
+
+const _UFS_BR = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+const _FERIADO_REGRA_LABEL = {
+    sexta_santa: 'Sexta-feira Santa',
+    carnaval_segunda: 'Carnaval (segunda-feira)',
+    carnaval_terca: 'Carnaval (terça-feira)',
+    quarta_cinzas: 'Quarta-feira de Cinzas',
+    corpus_christi: 'Corpus Christi',
+};
+let _feriadosAdmin = [];
+let _feriadosEmpresasPrevia = [];
+
+const _escFer = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+async function carregarFeriados() {
+    // UF selects
+    const selFiltroUf = document.getElementById('filtroFeriadosUf');
+    const selFormUf = document.getElementById('feriadoUf');
+    if (selFiltroUf && selFiltroUf.options.length <= 1) {
+        _UFS_BR.forEach(uf => selFiltroUf.appendChild(new Option(uf, uf)));
+    }
+    if (selFormUf && selFormUf.options.length === 0) {
+        _UFS_BR.forEach(uf => selFormUf.appendChild(new Option(uf, uf)));
+    }
+    const anoInput = document.getElementById('previaFeriadosAno');
+    if (anoInput && !anoInput.value) anoInput.value = new Date().getFullYear();
+
+    // Empresas (datalist de municípios + select da prévia)
+    try {
+        const { data } = await supabaseClient
+            .from('rh_empresas')
+            .select('codigo_empresa, nome_empresa, uf, municipio, cidade')
+            .order('nome_empresa', { ascending: true });
+        _feriadosEmpresasPrevia = _filtrarPorEscopo(data);
+        const datalist = document.getElementById('feriadoMunicipiosDatalist');
+        if (datalist) {
+            const municipios = [...new Set(_feriadosEmpresasPrevia
+                .flatMap(e => [e.municipio, e.cidade])
+                .map(m => (m || '').trim())
+                .filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+            datalist.innerHTML = municipios.map(m => `<option value="${_escFer(m)}">`).join('');
+        }
+        const selEmp = document.getElementById('previaFeriadosEmpresa');
+        if (selEmp && selEmp.options.length <= 1) {
+            _feriadosEmpresasPrevia.forEach(e => selEmp.appendChild(new Option(`${e.codigo_empresa} – ${e.nome_empresa || e.codigo_empresa}`, e.codigo_empresa)));
+        }
+    } catch (_) {}
+
+    _onAbrangenciaFeriadoChange();
+    _onDataTipoFeriadoChange();
+    await buscarFeriados();
+}
+
+async function buscarFeriados() {
+    const tbody = document.getElementById('feriadosAdminTableBody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;">Carregando...</td></tr>';
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_feriados')
+            .select('id, data, regra_movel, descricao, abrangencia, uf, municipio, tipo, ativo');
+        if (error) throw error;
+        _feriadosAdmin = data || [];
+        renderizarTabelaFeriadosAdmin();
+    } catch (erro) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#E74C3C;">Erro ao carregar feriados: ${_escFer(erro.message)}<br><small>Rode a migração schema_rh_feriados_v2.sql no Supabase.</small></td></tr>`;
+    }
+}
+
+function _feriadoChaveOrdenacao(f) {
+    const anoRef = new Date().getFullYear();
+    const dataRef = f.regra_movel ? resolverDataMovel(f.regra_movel, anoRef) : f.data;
+    if (!dataRef) return '99-99';
+    const [dd, mm] = dataRef.split('/');
+    return `${mm}-${dd}`;
+}
+
+function _feriadoDataTexto(f) {
+    if (f.regra_movel) return `<span title="calculado pela Páscoa">Móvel · ${_escFer(_FERIADO_REGRA_LABEL[f.regra_movel] || f.regra_movel)}</span>`;
+    return _escFer(f.data || '—');
+}
+
+function _feriadoAbrangenciaTextoAdmin(f) {
+    if (f.abrangencia === 'estadual') return `Estadual · ${_escFer(f.uf || '')}`;
+    if (f.abrangencia === 'municipal') return `Municipal · ${_escFer(f.municipio || '')}/${_escFer(f.uf || '')}`;
+    return 'Nacional';
+}
+
+function _feriadosFiltrados() {
+    const texto = (document.getElementById('filtroFeriadosTexto')?.value || '').toLowerCase().trim();
+    const abr = document.getElementById('filtroFeriadosAbrangencia')?.value || '';
+    const uf = document.getElementById('filtroFeriadosUf')?.value || '';
+    const tipo = document.getElementById('filtroFeriadosTipo')?.value || '';
+    const mostrarInativos = document.getElementById('filtroFeriadosInativos')?.checked;
+    return _feriadosAdmin.filter(f => {
+        if (!mostrarInativos && f.ativo === false) return false;
+        if (texto && !(f.descricao || '').toLowerCase().includes(texto)) return false;
+        if (abr && (f.abrangencia || 'nacional') !== abr) return false;
+        if (uf && (f.uf || '') !== uf) return false;
+        if (tipo && (f.tipo || 'feriado') !== tipo) return false;
+        return true;
+    });
+}
+
+function renderizarTabelaFeriadosAdmin() {
+    const tbody = document.getElementById('feriadosAdminTableBody');
+    if (!tbody) return;
+    const lista = _feriadosFiltrados().sort((a, b) => _feriadoChaveOrdenacao(a).localeCompare(_feriadoChaveOrdenacao(b)));
+    const info = document.getElementById('infoFeriados');
+    if (info) info.textContent = `${lista.length} feriado(s)`;
+    if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#95A5A6;">Nenhum feriado encontrado.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = lista.map(f => `
+        <tr${f.ativo === false ? ' style="opacity:.5;"' : ''}>
+            <td>${_feriadoDataTexto(f)}</td>
+            <td>${_escFer(f.descricao || '—')}</td>
+            <td>${(f.tipo || 'feriado') === 'facultativo' ? 'Ponto facultativo' : 'Feriado'}</td>
+            <td>${_feriadoAbrangenciaTextoAdmin(f)}</td>
+            <td><button type="button" onclick="toggleAtivoFeriado('${f.id}')" style="cursor:pointer;border:none;background:none;font-size:13px;font-weight:600;color:${f.ativo === false ? '#95A5A6' : '#1E7E34'};">${f.ativo === false ? '✕ Inativo' : '✔ Ativo'}</button></td>
+            <td>
+                <button type="button" class="btn-delete" style="background:#5B6B7B;" onclick="editarFeriado('${f.id}')">Editar</button>
+                <button type="button" class="btn-delete" onclick="excluirFeriado('${f.id}')">Excluir</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filtrarFeriadosAdmin() {
+    renderizarTabelaFeriadosAdmin();
+}
+
+function limparFiltrosFeriados() {
+    ['filtroFeriadosTexto', 'filtroFeriadosAbrangencia', 'filtroFeriadosUf', 'filtroFeriadosTipo'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const chk = document.getElementById('filtroFeriadosInativos');
+    if (chk) chk.checked = false;
+    renderizarTabelaFeriadosAdmin();
+}
+
+function _onAbrangenciaFeriadoChange() {
+    const abr = document.getElementById('feriadoAbrangencia')?.value || 'nacional';
+    const localRow = document.getElementById('feriadoLocalRow');
+    const munGroup = document.getElementById('feriadoMunicipioGroup');
+    if (localRow) localRow.style.display = abr === 'nacional' ? 'none' : '';
+    if (munGroup) munGroup.style.display = abr === 'municipal' ? '' : 'none';
+}
+
+function _onDataTipoFeriadoChange() {
+    const tipo = document.querySelector('input[name="feriadoDataTipo"]:checked')?.value || 'recorrente';
+    const fixaGroup = document.getElementById('feriadoDataFixaGroup');
+    const movelGroup = document.getElementById('feriadoRegraMovelGroup');
+    const formato = document.getElementById('feriadoDataFormato');
+    const input = document.getElementById('feriadoData');
+    if (fixaGroup) fixaGroup.style.display = tipo === 'movel' ? 'none' : '';
+    if (movelGroup) movelGroup.style.display = tipo === 'movel' ? '' : 'none';
+    if (formato) formato.textContent = tipo === 'especifica' ? '(DD/MM/AAAA)' : '(DD/MM)';
+    if (input) input.placeholder = tipo === 'especifica' ? 'DD/MM/AAAA' : 'DD/MM';
+}
+
+function limparFormFeriado() {
+    document.getElementById('feriadoId').value = '';
+    document.getElementById('feriadoDescricao').value = '';
+    document.getElementById('feriadoTipo').value = 'feriado';
+    document.getElementById('feriadoAbrangencia').value = 'nacional';
+    document.getElementById('feriadoUf').value = _UFS_BR[0];
+    document.getElementById('feriadoMunicipio').value = '';
+    document.getElementById('feriadoData').value = '';
+    document.getElementById('feriadoRegraMovel').value = 'sexta_santa';
+    document.getElementById('feriadoAtivo').checked = true;
+    const radio = document.querySelector('input[name="feriadoDataTipo"][value="recorrente"]');
+    if (radio) radio.checked = true;
+    _onAbrangenciaFeriadoChange();
+    _onDataTipoFeriadoChange();
+}
+
+function editarFeriado(id) {
+    const f = _feriadosAdmin.find(x => String(x.id) === String(id));
+    if (!f) return;
+    document.getElementById('feriadoId').value = f.id;
+    document.getElementById('feriadoDescricao').value = f.descricao || '';
+    document.getElementById('feriadoTipo').value = f.tipo === 'facultativo' ? 'facultativo' : 'feriado';
+    document.getElementById('feriadoAbrangencia').value = f.abrangencia || 'nacional';
+    document.getElementById('feriadoUf').value = f.uf || _UFS_BR[0];
+    document.getElementById('feriadoMunicipio').value = f.municipio || '';
+    document.getElementById('feriadoAtivo').checked = f.ativo !== false;
+
+    let dataTipo = 'recorrente';
+    if (f.regra_movel) dataTipo = 'movel';
+    else if ((f.data || '').length > 5) dataTipo = 'especifica';
+    const radio = document.querySelector(`input[name="feriadoDataTipo"][value="${dataTipo}"]`);
+    if (radio) radio.checked = true;
+    document.getElementById('feriadoData').value = f.regra_movel ? '' : (f.data || '');
+    document.getElementById('feriadoRegraMovel').value = f.regra_movel || 'sexta_santa';
+
+    _onAbrangenciaFeriadoChange();
+    _onDataTipoFeriadoChange();
+    const det = document.getElementById('feriadoFormDetails');
+    if (det) { det.open = true; det.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+}
+
+function _validarDataFeriado(valor, comAno) {
+    if (comAno) return /^\d{2}\/\d{2}\/\d{4}$/.test(valor);
+    return /^\d{2}\/\d{2}$/.test(valor);
+}
+
+async function salvarFeriado() {
+    const id = document.getElementById('feriadoId').value;
+    const descricao = document.getElementById('feriadoDescricao').value.trim();
+    const tipo = document.getElementById('feriadoTipo').value;
+    const abrangencia = document.getElementById('feriadoAbrangencia').value;
+    const uf = document.getElementById('feriadoUf').value;
+    const municipio = document.getElementById('feriadoMunicipio').value.trim();
+    const dataTipo = document.querySelector('input[name="feriadoDataTipo"]:checked')?.value || 'recorrente';
+
+    if (!descricao) { mostrarStatus('statusFeriados', 'Informe a descrição do feriado.', 'error'); return; }
+    if (abrangencia !== 'nacional' && !uf) { mostrarStatus('statusFeriados', 'Selecione a UF.', 'error'); return; }
+    if (abrangencia === 'municipal' && !municipio) { mostrarStatus('statusFeriados', 'Informe o município.', 'error'); return; }
+
+    const row = {
+        descricao,
+        tipo,
+        abrangencia,
+        uf: abrangencia === 'nacional' ? null : uf,
+        municipio: abrangencia === 'municipal' ? municipio : null,
+        ativo: document.getElementById('feriadoAtivo').checked,
+        data: null,
+        regra_movel: null,
+    };
+
+    if (dataTipo === 'movel') {
+        row.regra_movel = document.getElementById('feriadoRegraMovel').value;
+    } else {
+        const data = document.getElementById('feriadoData').value.trim();
+        if (!_validarDataFeriado(data, dataTipo === 'especifica')) {
+            mostrarStatus('statusFeriados', dataTipo === 'especifica' ? 'Data inválida. Use DD/MM/AAAA.' : 'Data inválida. Use DD/MM.', 'error');
+            return;
+        }
+        row.data = data;
+    }
+
+    try {
+        let error;
+        if (id) {
+            ({ error } = await supabaseClient.from('rh_feriados').update(row).eq('id', id));
+        } else {
+            ({ error } = await supabaseClient.from('rh_feriados').insert(row));
+        }
+        if (error) throw error;
+        mostrarStatus('statusFeriados', id ? '✅ Feriado atualizado.' : '✅ Feriado cadastrado.', 'success');
+        limparFormFeriado();
+        await buscarFeriados();
+    } catch (erro) {
+        mostrarStatus('statusFeriados', 'Erro ao salvar: ' + erro.message, 'error');
+    }
+}
+
+async function excluirFeriado(id) {
+    if (!confirm('Excluir este feriado? A ação afeta todas as ferramentas que usam o calendário de feriados.')) return;
+    try {
+        const { error } = await supabaseClient.from('rh_feriados').delete().eq('id', id);
+        if (error) throw error;
+        mostrarStatus('statusFeriados', '✅ Feriado excluído.', 'success');
+        await buscarFeriados();
+    } catch (erro) {
+        mostrarStatus('statusFeriados', 'Erro ao excluir: ' + erro.message, 'error');
+    }
+}
+
+async function toggleAtivoFeriado(id) {
+    const f = _feriadosAdmin.find(x => String(x.id) === String(id));
+    if (!f) return;
+    try {
+        const { error } = await supabaseClient.from('rh_feriados').update({ ativo: f.ativo === false }).eq('id', id);
+        if (error) throw error;
+        f.ativo = f.ativo === false;
+        renderizarTabelaFeriadosAdmin();
+    } catch (erro) {
+        mostrarStatus('statusFeriados', 'Erro ao alterar: ' + erro.message, 'error');
+    }
+}
+
+function previewFeriados() {
+    const ano = parseInt(document.getElementById('previaFeriadosAno').value, 10);
+    const tbody = document.getElementById('previaFeriadosTableBody');
+    if (!Number.isInteger(ano)) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#E74C3C;">Informe um ano válido.</td></tr>'; return; }
+
+    const codEmp = document.getElementById('previaFeriadosEmpresa').value;
+    const empresa = _feriadosEmpresasPrevia.find(e => String(e.codigo_empresa) === String(codEmp));
+
+    let lista = expandirFeriados(_feriadosAdmin, ano);
+    lista = empresa ? feriadosDaEmpresa(lista, empresa) : lista.filter(f => f.abrangencia === 'nacional');
+    lista.sort((a, b) => {
+        const ka = a.data.split('/').reverse().join('');
+        const kb = b.data.split('/').reverse().join('');
+        return ka.localeCompare(kb);
+    });
+
+    if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#95A5A6;">Nenhum feriado para este ano/empresa.</td></tr>';
+        return;
+    }
+    const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    tbody.innerHTML = lista.map(f => {
+        const [dd, mm, aa] = f.data.split('/');
+        const dow = aa ? diasSemana[new Date(`${aa}-${mm}-${dd}T00:00:00`).getDay()] : '—';
+        return `<tr>
+            <td>${_escFer(f.data)}${f.movel ? ' <small style="color:#95A5A6;">(móvel)</small>' : ''}</td>
+            <td>${dow}</td>
+            <td>${_escFer(f.descricao)}</td>
+            <td>${f.tipo === 'facultativo' ? 'Ponto facultativo' : 'Feriado'}</td>
+            <td>${_feriadoAbrangenciaTextoAdmin(f)}</td>
+        </tr>`;
+    }).join('');
 }

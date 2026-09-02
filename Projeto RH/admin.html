@@ -131,6 +131,9 @@
         <button class="sidebar-item" id="nav-rubricas" onclick="abrirAba('rubricas', this)">
             <span class="sidebar-item-icon">🏷️</span> Rubricas
         </button>
+        <button class="sidebar-item" id="nav-feriados" onclick="abrirAba('feriados', this)">
+            <span class="sidebar-item-icon">🗓️</span> Feriados
+        </button>
         <button class="sidebar-item" id="nav-regrasRenomeacao" onclick="abrirAba('regrasRenomeacao', this)">
             <span class="sidebar-item-icon">🔄</span> Renomear Arquivos
         </button>
@@ -532,6 +535,160 @@
                             <input type="text" id="tipoRubrica" placeholder="Ex: Vencimento">
                         </div>
                         <button type="button" class="btn-save" onclick="adicionarRubrica()">➕ Salvar Rubrica</button>
+                    </div>
+                </details>
+            </div>
+        </div>
+
+        <!-- ABA FERIADOS -->
+        <div id="feriados" class="admin-tab-content">
+            <div class="admin-section">
+                <h2>Feriados</h2>
+                <p style="color:#7F8C8D;font-size:13px;margin-bottom:16px;">
+                    Feriados usados pelo Controle de Frequência, Gerar Escala, Gerar Folha de Ponto,
+                    Gerar Benefícios e Calendário da Folha. <strong>Nacional</strong> vale para todas as
+                    empresas; <strong>estadual</strong> e <strong>municipal</strong> valem só para as
+                    empresas cuja UF / município (cadastro em <em>Empresas</em>) corresponde. Feriados
+                    <strong>móveis</strong> (Carnaval, Sexta-feira Santa, Quarta-feira de Cinzas e Corpus
+                    Christi) são calculados automaticamente pela Páscoa de cada ano.
+                </p>
+                <div id="statusFeriados" class="status-message"></div>
+
+                <div style="background:#F8F9FA;border:1px solid #DEE2E6;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+                    <div class="form-group" style="margin-bottom:0;flex:2;min-width:180px;">
+                        <label>Buscar por descrição</label>
+                        <input type="text" id="filtroFeriadosTexto" placeholder="Digite para filtrar..." oninput="filtrarFeriadosAdmin()">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px;">
+                        <label>Abrangência</label>
+                        <select id="filtroFeriadosAbrangencia" onchange="filtrarFeriadosAdmin()">
+                            <option value="">Todas</option>
+                            <option value="nacional">Nacional</option>
+                            <option value="estadual">Estadual</option>
+                            <option value="municipal">Municipal</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;flex:0 0 90px;">
+                        <label>UF</label>
+                        <select id="filtroFeriadosUf" onchange="filtrarFeriadosAdmin()"><option value="">Todas</option></select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;flex:0 0 130px;">
+                        <label>Tipo</label>
+                        <select id="filtroFeriadosTipo" onchange="filtrarFeriadosAdmin()">
+                            <option value="">Todos</option>
+                            <option value="feriado">Feriado</option>
+                            <option value="facultativo">Ponto facultativo</option>
+                        </select>
+                    </div>
+                    <div style="flex:0 0 auto;padding-bottom:1px;">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;"><input type="checkbox" id="filtroFeriadosInativos" onchange="filtrarFeriadosAdmin()"> Mostrar inativos</label>
+                    </div>
+                    <div style="flex:0 0 auto;">
+                        <button type="button" onclick="limparFiltrosFeriados()" style="padding:9px 16px;border:1px solid #C0C0C0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-weight:600;">✕ Limpar</button>
+                    </div>
+                    <span id="infoFeriados" style="font-size:12px;color:#7F8C8D;align-self:center;white-space:nowrap;"></span>
+                </div>
+
+                <div class="table-container" style="overflow-x:auto;">
+                    <table class="admin-table">
+                        <thead><tr>
+                            <th>Data</th>
+                            <th>Descrição</th>
+                            <th>Tipo</th>
+                            <th>Abrangência</th>
+                            <th>Ativo</th>
+                            <th>Ações</th>
+                        </tr></thead>
+                        <tbody id="feriadosAdminTableBody"><tr><td colspan="6" style="text-align:center;color:#95A5A6;">Carregando...</td></tr></tbody>
+                    </table>
+                </div>
+
+                <details id="feriadoFormDetails" style="margin-top:22px;border:1px solid #DEE2E6;border-radius:8px;padding:12px 16px;">
+                    <summary style="cursor:pointer;font-weight:600;color:#2C3E50;font-size:14px;user-select:none;">➕ Adicionar / Editar Feriado</summary>
+                    <div style="margin-top:14px;">
+                        <input type="hidden" id="feriadoId">
+                        <div class="form-group">
+                            <label for="feriadoDescricao">Descrição *</label>
+                            <input type="text" id="feriadoDescricao" placeholder="Ex: Aniversário da cidade">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="feriadoTipo">Tipo</label>
+                                <select id="feriadoTipo">
+                                    <option value="feriado">Feriado</option>
+                                    <option value="facultativo">Ponto facultativo</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="feriadoAbrangencia">Abrangência *</label>
+                                <select id="feriadoAbrangencia" onchange="_onAbrangenciaFeriadoChange()">
+                                    <option value="nacional">Nacional</option>
+                                    <option value="estadual">Estadual</option>
+                                    <option value="municipal">Municipal</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row" id="feriadoLocalRow" style="display:none;">
+                            <div class="form-group">
+                                <label for="feriadoUf">UF *</label>
+                                <select id="feriadoUf"></select>
+                            </div>
+                            <div class="form-group" id="feriadoMunicipioGroup" style="display:none;">
+                                <label for="feriadoMunicipio">Município *</label>
+                                <input type="text" id="feriadoMunicipio" list="feriadoMunicipiosDatalist" placeholder="Ex: Santos">
+                                <datalist id="feriadoMunicipiosDatalist"></datalist>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Data</label>
+                            <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+                                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="feriadoDataTipo" value="recorrente" checked onchange="_onDataTipoFeriadoChange()"> Recorrente todo ano (DD/MM)</label>
+                                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="feriadoDataTipo" value="especifica" onchange="_onDataTipoFeriadoChange()"> Data específica (DD/MM/AAAA)</label>
+                                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" name="feriadoDataTipo" value="movel" onchange="_onDataTipoFeriadoChange()"> Móvel (calculado pela Páscoa)</label>
+                            </div>
+                        </div>
+                        <div class="form-group" id="feriadoDataFixaGroup">
+                            <label for="feriadoData">Data <span id="feriadoDataFormato">(DD/MM)</span> *</label>
+                            <input type="text" id="feriadoData" placeholder="DD/MM" maxlength="10">
+                        </div>
+                        <div class="form-group" id="feriadoRegraMovelGroup" style="display:none;">
+                            <label for="feriadoRegraMovel">Regra móvel *</label>
+                            <select id="feriadoRegraMovel">
+                                <option value="sexta_santa">Sexta-feira Santa</option>
+                                <option value="carnaval_segunda">Carnaval (segunda-feira)</option>
+                                <option value="carnaval_terca">Carnaval (terça-feira)</option>
+                                <option value="quarta_cinzas">Quarta-feira de Cinzas</option>
+                                <option value="corpus_christi">Corpus Christi</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" id="feriadoAtivo" checked> Ativo</label>
+                        </div>
+                        <button type="button" class="btn-save" onclick="salvarFeriado()">💾 Salvar Feriado</button>
+                        <button type="button" onclick="limparFormFeriado()" style="margin-left:8px;padding:9px 18px;border:1px solid #C0C0C0;border-radius:6px;background:white;cursor:pointer;font-size:13px;font-weight:600;">Cancelar</button>
+                    </div>
+                </details>
+
+                <details style="margin-top:16px;border:1px solid #DEE2E6;border-radius:8px;padding:12px 16px;">
+                    <summary style="cursor:pointer;font-weight:600;color:#2C3E50;font-size:14px;user-select:none;">🔎 Prévia — feriados aplicáveis num ano / empresa</summary>
+                    <div style="margin-top:14px;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="previaFeriadosAno">Ano</label>
+                                <input type="number" id="previaFeriadosAno" min="2000" max="2100" step="1">
+                            </div>
+                            <div class="form-group">
+                                <label for="previaFeriadosEmpresa">Empresa (opcional)</label>
+                                <select id="previaFeriadosEmpresa"><option value="">— só os nacionais —</option></select>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-save" onclick="previewFeriados()">Ver feriados</button>
+                        <div class="table-container" style="overflow-x:auto;margin-top:12px;">
+                            <table class="admin-table">
+                                <thead><tr><th>Data</th><th>Dia</th><th>Descrição</th><th>Tipo</th><th>Abrangência</th></tr></thead>
+                                <tbody id="previaFeriadosTableBody"><tr><td colspan="5" style="text-align:center;color:#95A5A6;">Escolha o ano e clique em “Ver feriados”.</td></tr></tbody>
+                            </table>
+                        </div>
                     </div>
                 </details>
             </div>
@@ -1044,6 +1201,7 @@
 <script src="jornada-parser.js"></script>
 <script src="socios-parser.js"></script>
 <script src="qsa-analise.js"></script>
+<script src="feriados-calculo.js"></script>
 <script src="../portal-auth-guard.js"></script>
 <script src="admin.js"></script>
 
