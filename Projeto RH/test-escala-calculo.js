@@ -262,6 +262,58 @@ teste('calcularResumoMes: sem datasExcecaoFolga, nenhum dia fica marcado como ex
     assert.strictEqual(resumo.dias.every(d => d.excecao === false), true);
 });
 
+// ===== calcularResumoMes + feriados =====
+
+teste('calcularResumoMes: feriado recorrente (DD/MM) vira folga e não conta como trabalho', () => {
+    const escalaFixa = { tipo_escala: 'fixa', dias_semana: ['segunda', 'terca', 'quarta', 'quinta', 'sexta'] };
+    const feriados = [{ data: '09/07', tipo: 'feriado', descricao: 'Revolução Constitucionalista' }];
+    const resumo = calcularResumoMes(escalaFixa, '07/2026', null, null, null, null, feriados);
+    const dia = resumo.dias.find(d => d.data === '09/07/2026'); // quinta-feira
+    assert.strictEqual(dia.tipo, 'folga');
+    assert.strictEqual(dia.feriado, true);
+    assert.strictEqual(dia.feriadoTipo, 'feriado');
+    assert.strictEqual(dia.feriadoDescricao, 'Revolução Constitucionalista');
+
+    const semFeriado = calcularResumoMes(escalaFixa, '07/2026');
+    assert.strictEqual(resumo.totalTrabalho, semFeriado.totalTrabalho - 1);
+    assert.strictEqual(resumo.totalFeriados, 1);
+});
+
+teste('calcularResumoMes: feriado com data específica (DD/MM/AAAA) só casa no ano certo', () => {
+    const feriados = [{ data: '03/04/2026', tipo: 'feriado', descricao: 'Sexta-feira Santa' }];
+    const resumo = calcularResumoMes(null, '04/2026', null, null, null, null, feriados);
+    assert.strictEqual(resumo.dias.find(d => d.data === '03/04/2026').feriado, true);
+
+    const outroAno = calcularResumoMes(null, '04/2025', null, null, null, null, feriados);
+    assert.strictEqual(outroAno.dias.every(d => d.feriado === false), true);
+});
+
+teste('calcularResumoMes: facultativo também vira folga, mas feriadoTipo distingue', () => {
+    const escalaFixa = { tipo_escala: 'fixa', dias_semana: ['segunda', 'terca', 'quarta', 'quinta', 'sexta'] };
+    const feriados = [{ data: '17/02/2026', tipo: 'facultativo', descricao: 'Carnaval (terça-feira)' }];
+    const resumo = calcularResumoMes(escalaFixa, '02/2026', null, null, null, null, feriados);
+    const dia = resumo.dias.find(d => d.data === '17/02/2026');
+    assert.strictEqual(dia.tipo, 'folga');
+    assert.strictEqual(dia.feriado, true);
+    assert.strictEqual(dia.feriadoTipo, 'facultativo');
+});
+
+teste('calcularResumoMes: férias tem prioridade sobre feriado (feriado não marcado)', () => {
+    const escalaFixa = { tipo_escala: 'fixa', dias_semana: ['segunda', 'terca', 'quarta', 'quinta', 'sexta'] };
+    const periodos = [{ inicio: '2026-07-09', fim: '2026-07-09' }];
+    const feriados = [{ data: '09/07', tipo: 'feriado', descricao: 'X' }];
+    const resumo = calcularResumoMes(escalaFixa, '07/2026', periodos, null, null, null, feriados);
+    const dia = resumo.dias.find(d => d.data === '09/07/2026');
+    assert.strictEqual(dia.ferias, true);
+    assert.strictEqual(dia.feriado, false);
+});
+
+teste('calcularResumoMes: sem feriados, todos os dias têm feriado=false e totalFeriados=0', () => {
+    const resumo = calcularResumoMes(null, '07/2026');
+    assert.strictEqual(resumo.dias.every(d => d.feriado === false), true);
+    assert.strictEqual(resumo.totalFeriados, 0);
+});
+
 // ===== validarConfigEscala =====
 
 teste('validarConfigEscala: fixa sem dias selecionados é inválida', () => {

@@ -139,6 +139,14 @@ function _dataEmPeriodo(dataIso, periodos) {
     return (periodos || []).some(p => dataIso >= p.inicio && dataIso <= p.fim);
 }
 
+// feriados: [{ data: 'DD/MM' (recorrente) | 'DD/MM/AAAA' (específico), tipo, descricao }].
+// dataBR: 'DD/MM/AAAA'. Retorna o feriado casado ou null.
+function _feriadoDoDia(feriados, dataBR) {
+    if (!feriados || !feriados.length) return null;
+    const curto = dataBR.slice(0, 5);
+    return feriados.find(f => f.data === dataBR || f.data === curto) || null;
+}
+
 // Retorna { dias: [{data, diaSemana, tipo, ferias, excecao}], totalTrabalho, totalFolga, totalFerias, totalDias }
 // periodosFerias (opcional): [{inicio: 'AAAA-MM-DD', fim: 'AAAA-MM-DD'}, ...]. Dia que cai em
 // algum período de férias sempre vira folga, independente do que a escala diga para aquele dia
@@ -146,25 +154,34 @@ function _dataEmPeriodo(dataIso, periodos) {
 // diaInicio/diaFim (opcionais): ver _gerarDiasDoMes — apura um intervalo customizado em vez do
 // mês calendário completo.
 // datasExcecaoFolga (opcional): array de datas 'AAAA-MM-DD' marcadas manualmente como folga
-// pontual (tela "Gerar Escala", sem alterar a escala configurada). Prioridade: férias > exceção
-// > escala — um dia em férias nunca vira "exceção" mesmo que também esteja na lista.
-function calcularResumoMes(escala, competencia, periodosFerias, diaInicio = null, diaFim = null, datasExcecaoFolga = null) {
+// pontual (tela "Gerar Escala", sem alterar a escala configurada).
+// feriados (opcional): [{ data: 'DD/MM' | 'DD/MM/AAAA', tipo: 'feriado'|'facultativo', descricao }],
+// já resolvido para a empresa e o ano da competência (ver feriados-calculo.js). Um dia que casa
+// com um feriado (e não está em férias) vira folga e ganha { feriado, feriadoTipo, feriadoDescricao }.
+// Prioridade: férias > feriado > exceção > escala — um dia em férias nunca vira "feriado" nem
+// "exceção" mesmo que também case.
+function calcularResumoMes(escala, competencia, periodosFerias, diaInicio = null, diaFim = null, datasExcecaoFolga = null, feriados = null) {
     const diasDoMes = _gerarDiasDoMes(competencia, diaInicio, diaFim);
     const dias = diasDoMes.map(d => {
         const iso = _brParaIso(d.data);
         const emFerias = _dataEmPeriodo(iso, periodosFerias);
-        const emExcecao = !emFerias && (datasExcecaoFolga || []).includes(iso);
+        const fer = !emFerias ? _feriadoDoDia(feriados, d.data) : null;
+        const emExcecao = !emFerias && !fer && (datasExcecaoFolga || []).includes(iso);
         return {
             data: d.data,
             diaSemana: d.diaSemana,
-            tipo: (emFerias || emExcecao) ? 'folga' : calcularTipoDia(escala, d.data, d.diaSemana),
+            tipo: (emFerias || fer || emExcecao) ? 'folga' : calcularTipoDia(escala, d.data, d.diaSemana),
             ferias: emFerias,
-            excecao: emExcecao
+            excecao: emExcecao,
+            feriado: !!fer,
+            feriadoTipo: fer ? (fer.tipo === 'facultativo' ? 'facultativo' : 'feriado') : null,
+            feriadoDescricao: fer ? (fer.descricao || '') : null
         };
     });
     const totalTrabalho = dias.filter(d => d.tipo === 'trabalho').length;
     const totalFerias = dias.filter(d => d.ferias).length;
-    return { dias, totalTrabalho, totalFolga: dias.length - totalTrabalho, totalFerias, totalDias: dias.length };
+    const totalFeriados = dias.filter(d => d.feriado).length;
+    return { dias, totalTrabalho, totalFolga: dias.length - totalTrabalho, totalFerias, totalFeriados, totalDias: dias.length };
 }
 
 // Validação de uma configuração de escala montada na tela, antes de salvar.
@@ -204,6 +221,7 @@ if (typeof module !== 'undefined' && module.exports) {
         _gerarDiasDoMes,
         _diasEntreIso,
         _dataEmPeriodo,
+        _feriadoDoDia,
         calcularTipoDiaFixa,
         calcularTipoDiaVariavelDatas,
         calcularTipoDiaVariavelPadrao,

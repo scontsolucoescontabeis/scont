@@ -78,6 +78,16 @@ teste('montarLinhasFolhaPonto: preserva ferias e excecao no retorno', () => {
     assert.strictEqual(linhas[0].ferias, true);
 });
 
+teste('montarLinhasFolhaPonto: feriado (folga) mostra travessão e propaga feriadoTipo/descrição', () => {
+    const jornada = { segunda: { entrada: '08:00', saida: '17:00' } };
+    const dias = [{ data: '09/07/2026', diaSemana: 'Seg', tipo: 'folga', ferias: false, excecao: false, feriado: true, feriadoTipo: 'feriado', feriadoDescricao: 'Revolução Constitucionalista' }];
+    const linhas = montarLinhasFolhaPonto(dias, jornada);
+    assert.strictEqual(linhas[0].horarioPrevisto, '—');
+    assert.strictEqual(linhas[0].feriado, true);
+    assert.strictEqual(linhas[0].feriadoTipo, 'feriado');
+    assert.strictEqual(linhas[0].feriadoDescricao, 'Revolução Constitucionalista');
+});
+
 const _jorSegSex = { entrada: '08:00', intervalo_inicio: '12:00', intervalo_fim: '13:00', saida: '17:48' };
 
 teste('resumirJornadaSemana: Seg a Sex idêntico, sem sábado', () => {
