@@ -4109,6 +4109,7 @@ async function gerarPreviaBeneficios() {
         const jornadaPadraoPorEmpresa = {};
         const observacoesPorEmpresa = [];
         const periodosCustomPorEmpresa = [];
+        const feriadosCompetenciaPorEmpresa = {}; // { cod: { excluido, feriados:[{data,descricao,tipo,abrangencia,uf,municipio}] } }
         await Promise.all(codigosEmpresas.map(async cod => {
             const cfg = await _buscarConfigRubricas(cod);
             excluirFeriadosPorEmpresa[cod] = cfg?.['beneficios_excluir_feriados']?.cod !== '0'; // default: excluir (true)
@@ -4117,9 +4118,19 @@ async function gerarPreviaBeneficios() {
             jornadaPadraoPorEmpresa[cod] = _jornadaPadraoDeConfig(cfg);
             const observacao = (cfg?.['observacoes']?.cod || '').trim();
             if (observacao) observacoesPorEmpresa.push({ codigo_empresa: cod, observacao });
-            if (periodo.diaInicio !== null && periodo.diaFim !== null) {
-                const dias = gerarDiasDoMes(compMesSeguinte, periodo.diaInicio, periodo.diaFim);
-                if (dias.length > 0) periodosCustomPorEmpresa.push({ codigo_empresa: cod, texto: `${dias[0].data} a ${dias.at(-1).data}` });
+            const periodoAtivo = periodo.diaInicio !== null && periodo.diaFim !== null;
+            const compDias = periodoAtivo ? compMesSeguinte : comp;
+            const diasPeriodo = gerarDiasDoMes(compDias, periodo.diaInicio, periodo.diaFim);
+            if (periodoAtivo && diasPeriodo.length > 0) {
+                periodosCustomPorEmpresa.push({ codigo_empresa: cod, texto: `${diasPeriodo[0].data} a ${diasPeriodo.at(-1).data}` });
+            }
+            // Feriados que caem dentro do período de apuração desta empresa
+            const datasPeriodo = new Set(diasPeriodo.map(d => d.data));
+            const feriadosNoPeriodo = _feriadosDaEmpresaParaComp(comp, empresasMapa[cod] || {})
+                .filter(f => datasPeriodo.has(f.data))
+                .sort((a, b) => a.data.split('/').reverse().join('').localeCompare(b.data.split('/').reverse().join('')));
+            if (feriadosNoPeriodo.length > 0) {
+                feriadosCompetenciaPorEmpresa[cod] = { excluido: excluirFeriadosPorEmpresa[cod], feriados: feriadosNoPeriodo };
             }
         }));
 
@@ -4131,6 +4142,7 @@ async function gerarPreviaBeneficios() {
             fecharModalMensagem();
             mostrarMensagem('Aviso', 'Nenhum empregado ativo encontrado para as empresas selecionadas.');
             document.getElementById('beneficiosPreviaContainer').style.display = 'none';
+            _renderizarFeriadosBeneficios({}, {});
             _renderizarObservacoesBeneficios([]);
             _renderizarPeriodosBeneficios([]);
             _renderizarAlertaJornadaReduzidaBeneficios([]);
@@ -4196,6 +4208,7 @@ async function gerarPreviaBeneficios() {
         fecharModalMensagem();
         state._beneficiosLinhas = linhas;
         _renderizarPreviaBeneficios(linhas);
+        _renderizarFeriadosBeneficios(feriadosCompetenciaPorEmpresa, empresasMapa);
         _renderizarObservacoesBeneficios(observacoesPorEmpresa);
         _renderizarPeriodosBeneficios(periodosCustomPorEmpresa);
         _renderizarAlertaJornadaReduzidaBeneficios(alertaJornadaReduzida);
@@ -4236,6 +4249,49 @@ function _renderizarPreviaBeneficios(linhas) {
     }).join('');
     container.style.display = 'block';
     _atualizarInfoBeneficios();
+}
+
+// Aviso de feriados na competência e se estão (ou não) sendo descontados dos
+// "Dias a Trabalhar", conforme a config beneficios_excluir_feriados da empresa.
+// feriadosPorEmpresa: { cod: { excluido:bool, feriados:[{data,descricao,tipo,abrangencia,uf,municipio}] } }.
+function _renderizarFeriadosBeneficios(feriadosPorEmpresa, empresasMapa) {
+    const div = document.getElementById('beneficiosFeriadosContainer');
+    if (!div) return;
+    const codigos = Object.keys(feriadosPorEmpresa || {});
+    if (codigos.length === 0) {
+        div.style.display = 'none';
+        div.innerHTML = '';
+        return;
+    }
+    const multiplas = codigos.length > 1;
+    div.innerHTML = codigos
+        .sort((a, b) => ((empresasMapa[a] || {}).nome_empresa || a).localeCompare((empresasMapa[b] || {}).nome_empresa || b))
+        .map(cod => {
+            const info = feriadosPorEmpresa[cod];
+            const nomeEmpresa = (empresasMapa[cod] || {}).nome_empresa || cod;
+            const excluido = info.excluido;
+            const cor = excluido
+                ? { bg: '#eff6ff', bd: '#bfdbfe', tx: '#1e40af' }
+                : { bg: '#fef3c7', bd: '#fde68a', tx: '#92400e' };
+            const situacao = excluido
+                ? '<strong>excluído(s)</strong> do cálculo de “Dias a Trabalhar”'
+                : '<strong>sendo contabilizado(s)</strong> nos “Dias a Trabalhar”';
+            const lista = info.feriados.map(f => {
+                const tipoTxt = f.tipo === 'facultativo' ? 'ponto facultativo' : 'feriado';
+                return `<li>${f.data} — ${f.descricao} <span style="opacity:.75;">(${_feriadoAbrangenciaTexto(f).toLowerCase()}, ${tipoTxt})</span></li>`;
+            }).join('');
+            return `
+        <div style="display:flex; gap:10px; align-items:flex-start; background:${cor.bg}; border:1px solid ${cor.bd}; color:${cor.tx}; border-radius:8px; padding:12px 16px; margin-bottom:8px;">
+            <span style="font-size:16px; line-height:1;">📅</span>
+            <div>
+                ${multiplas ? `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px;">${cod} - ${nomeEmpresa}</div>` : ''}
+                <div style="font-size:13px; font-weight:700; margin-bottom:4px;">${info.feriados.length} feriado(s) nesta competência — ${situacao} (config da empresa).</div>
+                <ul style="margin:0; padding-left:18px; font-size:12px; line-height:1.6;">${lista}</ul>
+                ${excluido ? '' : '<div style="font-size:11px; margin-top:4px;">Para excluir, ligue “Excluir feriados nacionais do cálculo…” nas Configurações da empresa.</div>'}
+            </div>
+        </div>`;
+        }).join('');
+    div.style.display = 'block';
 }
 
 function _renderizarObservacoesBeneficios(observacoesPorEmpresa) {
@@ -5555,6 +5611,10 @@ async function gerarPreviaFolhaPonto() {
             const { diaInicio, diaFim } = _resolverPeriodoApuracao(cfg);
             const periodoTexto = _labelPeriodoFolhaPonto(comp, diaInicio, diaFim);
             const feriadosEmpresa = _feriadosDaEmpresaParaComp(comp, empresaInfo || state.empresas.find(e => e.codigo_empresa === codigoEmpresa));
+            const _datasPeriodoFolha = new Set(gerarDiasDoMes(comp, diaInicio, diaFim).map(d => d.data));
+            const feriadosNoPeriodo = feriadosEmpresa
+                .filter(f => _datasPeriodoFolha.has(f.data))
+                .sort((a, b) => a.data.split('/').reverse().join('').localeCompare(b.data.split('/').reverse().join('')));
 
             const empregados = empregadosEmpresa.map(emp => {
                 const chave = `${emp.codigo_empresa}_${emp.codigo_empregado}`;
@@ -5583,6 +5643,7 @@ async function gerarPreviaFolhaPonto() {
                 uf: empresaInfo?.uf || '',
                 cep: empresaInfo?.cep || '',
                 periodoTexto,
+                feriadosNoPeriodo,
                 empregados,
             });
         }
@@ -5694,6 +5755,24 @@ function _toggleFolhaPontoEmpregado(headerEl) {
     if (icon) icon.textContent = aberto ? '▼' : '▲';
 }
 
+// Aviso, na prévia da Folha de Ponto, dos feriados que caem no período — todos
+// marcados como descanso (FERIADO / PONTO FACULTATIVO) na folha em branco.
+function _avisoFeriadosFolhaPontoHtml(feriados) {
+    if (!feriados || feriados.length === 0) return '';
+    const itens = feriados.map(f => {
+        const tipoTxt = f.tipo === 'facultativo' ? 'ponto facultativo' : 'feriado';
+        return `<li>${f.data} — ${f.descricao} <span style="opacity:.75;">(${_feriadoAbrangenciaTexto(f).toLowerCase()}, ${tipoTxt})</span></li>`;
+    }).join('');
+    return `
+        <div style="display:flex; gap:10px; align-items:flex-start; background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; border-radius:8px; padding:10px 14px; margin-bottom:10px;">
+            <span style="font-size:15px; line-height:1;">📅</span>
+            <div>
+                <div style="font-size:12px; font-weight:700; margin-bottom:3px;">${feriados.length} feriado(s) no período — marcado(s) como descanso na folha (sem horário previsto).</div>
+                <ul style="margin:0; padding-left:18px; font-size:12px; line-height:1.6;">${itens}</ul>
+            </div>
+        </div>`;
+}
+
 function _renderizarListaFolhaPonto(avisos) {
     const dados = state._folhaPontoDados;
     const totalEmpregados = dados.empresas.reduce((soma, e) => soma + e.empregados.length, 0);
@@ -5711,6 +5790,7 @@ function _renderizarListaFolhaPonto(avisos) {
             <div style="font-size:12px; color:var(--text-secondary); margin-top:2px; margin-bottom:10px;">
                 ${emp.empregados.length} empregado(s) · Período: ${emp.periodoTexto}
             </div>
+            ${_avisoFeriadosFolhaPontoHtml(emp.feriadosNoPeriodo)}
             ${emp.empregados.map(e => _cardEmpregadoFolhaPontoHtml(e, emp.codigo_empresa)).join('')}
         </div>
     `).join('') + (avisos && avisos.length ? `
