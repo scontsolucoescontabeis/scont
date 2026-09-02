@@ -61,8 +61,18 @@ function resolverDataMovel(regra, ano) {
     return _formatarBR(alvo);
 }
 
-// rows: linhas cruas de rh_feriados. ano: usado para resolver as regras móveis.
-// Retorna [{ id, descricao, tipo, abrangencia, uf, municipio, movel, data }].
+// Recorrente 'DD/MM' -> 'DD/MM/AAAA' do ano pedido. Data já específica ('DD/MM/AAAA')
+// passa direto. Qualquer outro formato retorna null.
+function _resolverDataFixa(data, ano) {
+    if (!data) return null;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(data)) return data;
+    if (/^\d{2}\/\d{2}$/.test(data)) return `${data}/${ano}`;
+    return null;
+}
+
+// rows: linhas cruas de rh_feriados. ano: usado para resolver regras móveis E
+// feriados recorrentes ('DD/MM'). Retorna
+// [{ id, descricao, tipo, abrangencia, uf, municipio, movel, data:'DD/MM/AAAA' }].
 // Descarta ativo === false e itens sem data resolvida.
 function expandirFeriados(rows, ano) {
     return (rows || [])
@@ -77,7 +87,7 @@ function expandirFeriados(rows, ano) {
                 municipio: r.municipio || null,
                 movel: !!r.regra_movel,
             };
-            item.data = r.regra_movel ? resolverDataMovel(r.regra_movel, ano) : (r.data || null);
+            item.data = r.regra_movel ? resolverDataMovel(r.regra_movel, ano) : _resolverDataFixa(r.data, ano);
             if (r.regra_movel) item.regra_movel = r.regra_movel;
             return item;
         })
@@ -112,6 +122,7 @@ if (typeof module !== 'undefined' && module.exports) {
         REGRAS_MOVEIS,
         calcularDomingoPascoa,
         resolverDataMovel,
+        _resolverDataFixa,
         expandirFeriados,
         feriadosDaEmpresa,
         _norm,

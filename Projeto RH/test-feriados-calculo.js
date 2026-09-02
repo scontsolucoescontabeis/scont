@@ -57,14 +57,16 @@ teste('REGRAS_MOVEIS tem as 5 chaves esperadas', () => {
 
 // ===== expandirFeriados =====
 
-teste('expandirFeriados: resolve móvel para o ano e mantém fixos', () => {
+teste('expandirFeriados: resolve móvel e recorrente para o ano pedido', () => {
     const rows = [
         { id: '1', descricao: 'Natal', data: '25/12', abrangencia: 'nacional', tipo: 'feriado', ativo: true },
         { id: '2', descricao: 'Sexta-feira Santa', regra_movel: 'sexta_santa', abrangencia: 'nacional', tipo: 'feriado', ativo: true },
+        { id: '3', descricao: 'Data única', data: '10/06/2027', abrangencia: 'nacional', tipo: 'feriado', ativo: true },
     ];
     const exp = expandirFeriados(rows, 2026);
-    assert.strictEqual(exp.length, 2);
-    assert.strictEqual(exp.find(f => f.id === '1').data, '25/12');
+    assert.strictEqual(exp.length, 3);
+    assert.strictEqual(exp.find(f => f.id === '1').data, '25/12/2026');
+    assert.strictEqual(exp.find(f => f.id === '3').data, '10/06/2027');
     const santa = exp.find(f => f.id === '2');
     assert.strictEqual(santa.data, '03/04/2026');
     assert.strictEqual(santa.movel, true);
