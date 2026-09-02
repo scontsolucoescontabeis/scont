@@ -1292,9 +1292,12 @@
                         <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Benefícios (VT/VA)</span>
                     </div>
                     <div style="padding: 14px 14px;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <input type="checkbox" id="cfgBeneficiosExcluirFeriados" checked style="width: 16px; height: 16px; cursor: pointer;">
-                            <label for="cfgBeneficiosExcluirFeriados" style="font-size: 13px; cursor: pointer; margin: 0;">Excluir feriados nacionais do cálculo de "Dias a Trabalhar" em Gerar Benefícios</label>
+                        <div style="display: flex; align-items: flex-start; gap: 8px;">
+                            <input type="checkbox" id="cfgBeneficiosExcluirFeriados" checked style="width: 16px; height: 16px; cursor: pointer; margin-top: 2px;">
+                            <label for="cfgBeneficiosExcluirFeriados" style="font-size: 13px; cursor: pointer; margin: 0;">
+                                Não contabilizar feriados como "Dias a Trabalhar" (Gerar Benefícios)
+                                <span style="display: block; font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Marcado: feriados do período abatem os "Dias a Trabalhar" (e, com isso, VT/VA). Desmarcado: feriados contam como dia normal de trabalho.</span>
+                            </label>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px; margin-top: 14px;">
                             <input type="checkbox" id="cfgBeneficiosPeriodoAtivo" style="width: 16px; height: 16px; cursor: pointer;"

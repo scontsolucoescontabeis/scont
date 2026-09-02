@@ -4287,7 +4287,7 @@ function _renderizarFeriadosBeneficios(feriadosPorEmpresa, empresasMapa) {
                 ${multiplas ? `<div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; margin-bottom:3px;">${cod} - ${nomeEmpresa}</div>` : ''}
                 <div style="font-size:13px; font-weight:700; margin-bottom:4px;">${info.feriados.length} feriado(s) nesta competência — ${situacao} (config da empresa).</div>
                 <ul style="margin:0; padding-left:18px; font-size:12px; line-height:1.6;">${lista}</ul>
-                ${excluido ? '' : '<div style="font-size:11px; margin-top:4px;">Para excluir, ligue “Excluir feriados nacionais do cálculo…” nas Configurações da empresa.</div>'}
+                ${excluido ? '' : '<div style="font-size:11px; margin-top:4px;">Para abater esses dias, marque “Não contabilizar feriados como \'Dias a Trabalhar\'” nas Configurações da empresa.</div>'}
             </div>
         </div>`;
         }).join('');
