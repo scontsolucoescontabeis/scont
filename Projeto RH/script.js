@@ -3565,27 +3565,22 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, m
 // Linhas de benefício VT/VA "compostas" automaticamente no TXT (Folha de Ponto ou
 // Exportação em Lote) para empresas com Acréscimo de VT/VA configurado: mesmo
 // cálculo da tela Gerar Benefícios (linhas, já com diasTrabalharVT/VA ajustados
-// pelo chamador para incluir o bônus de sábado "sempre extra"), lançado na
-// rubrica configurada, na competência SEGUINTE (mês em que o benefício é pago).
-function _linhasBeneficiosComposto(linhas, compFmtSeguinte, tipoProcesso, config) {
+// pelo chamador para incluir o bônus de sábado "sempre extra" e calculados para a
+// competência seguinte — ver _prepararComposicaoBeneficioRes). compFmtLancamento
+// é a competência AAAAMM da linha no TXT: mesma da Folha de Ponto sendo
+// processada agora (não a "seguinte" usada para calcular os dias — mesma
+// convenção do botão manual "Gerar Lançamentos na Folha", ver _mesAnterior).
+function _linhasBeneficiosComposto(linhas, compFmtLancamento, tipoProcesso, config) {
     const encDiasOuHoras = (tipo, dias) => tipo === 'dias' ? _encDias(dias) : _encMinutosParaTipo(dias * 480, tipo);
     const encValor = (tipo, dias, valorDiario) => tipo === 'monetario' ? Math.round(dias * (valorDiario || 0) * 100) : encDiasOuHoras(tipo, dias);
     let conteudo = '';
     linhas.forEach(l => {
         const diasPagarVt = _diasPagarBeneficio(l, 'vt');
         const diasPagarVa = _diasPagarBeneficio(l, 'va');
-        if (config.rubAcrescimoVT) conteudo += _montarLinhaTxt(l.codigo_empregado, compFmtSeguinte, l.codigo_empresa, config.rubAcrescimoVT, tipoProcesso, encValor(config.tipoAcrescimoVT, diasPagarVt, l.vtDiario));
-        if (config.rubAcrescimoVA) conteudo += _montarLinhaTxt(l.codigo_empregado, compFmtSeguinte, l.codigo_empresa, config.rubAcrescimoVA, tipoProcesso, encValor(config.tipoAcrescimoVA, diasPagarVa, l.vaDiario));
+        if (config.rubAcrescimoVT) conteudo += _montarLinhaTxt(l.codigo_empregado, compFmtLancamento, l.codigo_empresa, config.rubAcrescimoVT, tipoProcesso, encValor(config.tipoAcrescimoVT, diasPagarVt, l.vtDiario));
+        if (config.rubAcrescimoVA) conteudo += _montarLinhaTxt(l.codigo_empregado, compFmtLancamento, l.codigo_empresa, config.rubAcrescimoVA, tipoProcesso, encValor(config.tipoAcrescimoVA, diasPagarVa, l.vaDiario));
     });
     return conteudo;
-}
-
-// 'MM/AAAA' -> 'AAAAMM' do mês seguinte (mesma convenção de competência de
-// pagamento usada em Gerar Benefícios: mês trabalhado paga no mês seguinte).
-function _compFmtSeguinte(comp) {
-    const seguinte = _competenciaMesSeguinte(comp); // 'MM/AAAA'
-    const [mes, ano] = seguinte.split('/');
-    return ano + mes;
 }
 
 // Aplica o bônus de sábado "sempre extra" trabalhado (mapa de chave -> {extraVT,
@@ -3846,9 +3841,12 @@ async function _construirConteudoTXTExportacao() {
     // Empresas com Acréscimo de VT/VA configurado em Configurações (persistido —
     // não o formulário deste modal, que é compartilhado por todo o lote e lançaria
     // o benefício em empresas que não pediram isso): compõe no mesmo TXT o
-    // benefício completo de VT/VA (mesma lógica de Gerar Benefícios) da
-    // competência SEGUINTE (mês em que o benefício trabalhado nesta competência é
-    // pago), já somando o bônus de sábado "sempre extra" trabalhado apurado acima.
+    // benefício completo de VT/VA (mesma lógica de Gerar Benefícios, "Dias a
+    // Trabalhar"/férias calculados para a competência SEGUINTE — mês que o
+    // empregado vai efetivamente trabalhar, não a competência sendo processada
+    // agora), já somando o bônus de sábado "sempre extra" trabalhado apurado
+    // acima. A linha em si é lançada na competência desta Exportação (compFmt),
+    // mesma convenção do botão manual "Gerar Lançamentos na Folha" (_mesAnterior).
     const configAcrescimoPorEmpresa = {};
     await Promise.all(empresasSelecionadas.map(async cod => {
         const cfgEmp = await _buscarConfigRubricas(cod);
@@ -3863,13 +3861,12 @@ async function _construirConteudoTXTExportacao() {
     }));
     const empresasComAcrescimo = Object.keys(configAcrescimoPorEmpresa);
     if (empresasComAcrescimo.length > 0) {
-        const { linhas: linhasBeneficios } = await _calcularLinhasBeneficios(comp, empresasComAcrescimo);
+        const { linhas: linhasBeneficios } = await _calcularLinhasBeneficios(_competenciaMesSeguinte(comp), empresasComAcrescimo);
         const linhasAjustadas = _aplicarBonusSabadoExtra(linhasBeneficios, bonusSabadoExtraMapa, l => `${l.codigo_empresa}_${l.codigo_empregado}`);
-        const compFmtSeguinte = _compFmtSeguinte(comp);
         const linhasPorEmpresa = {};
         linhasAjustadas.forEach(l => { (linhasPorEmpresa[l.codigo_empresa] ??= []).push(l); });
         Object.entries(linhasPorEmpresa).forEach(([cod, linhasEmp]) => {
-            conteudoTXT += _linhasBeneficiosComposto(linhasEmp, compFmtSeguinte, config.tipoProcesso, configAcrescimoPorEmpresa[cod]);
+            conteudoTXT += _linhasBeneficiosComposto(linhasEmp, compFmt, config.tipoProcesso, configAcrescimoPorEmpresa[cod]);
         });
     }
 
@@ -7240,6 +7237,13 @@ function _calcularDiasAcrescimoVAVT(resultados, valoresVaVtMapa = {}) {
 // quando a empresa não tem Acréscimo de VT/VA configurado (nada a compor).
 // Usado tanto para gerar o TXT quanto para a prévia do aviso antes de baixar —
 // mesmo cálculo nos dois lugares, para não divergir.
+//
+// "Dias a Trabalhar"/férias são calculados para a competência SEGUINTE (mês que o
+// empregado vai efetivamente trabalhar — ex.: processando 08, usa a escala/férias
+// de 09), não a competência sendo processada agora — mesmo raciocínio de "mês a
+// trabalhar" da tela Gerar Benefícios. Um empregado de férias em 08 mas não em 09
+// tem que aparecer com dias normais aqui, não zerado (bug real encontrado em
+// 2026-09-04, empresa 13, empregado de férias só em agosto).
 async function _prepararComposicaoBeneficioRes(codEmpresa) {
     const cfgEmpresa = await _buscarConfigRubricas(codEmpresa);
     const rubAcrescimoVT = cfgEmpresa?.['acrescimoVT']?.cod || '';
@@ -7255,7 +7259,8 @@ async function _prepararComposicaoBeneficioRes(codEmpresa) {
         const extraVA = res.dias.filter(d => d.flagSabadoExtraVA).length;
         if (extraVT > 0 || extraVA > 0) bonusMapa[res.empregadoId] = { extraVT, extraVA };
     });
-    const { linhas } = await _calcularLinhasBeneficios(state.competencia, [codEmpresa]);
+    const compMesTrabalhar = _competenciaMesSeguinte(state.competencia);
+    const { linhas } = await _calcularLinhasBeneficios(compMesTrabalhar, [codEmpresa]);
     return { config, linhas: _aplicarBonusSabadoExtra(linhas, bonusMapa, l => l.codigo_empregado) };
 }
 
@@ -7347,13 +7352,16 @@ async function _construirConteudoTXTResultados(salvar = false) {
 
     // Empresa com Acréscimo de VT/VA configurado em Configurações (persistido):
     // compõe no mesmo TXT o benefício completo de VT/VA (mesma lógica de Gerar
-    // Benefícios) da competência SEGUINTE (mês em que o benefício trabalhado nesta
-    // competência é pago), já somando o bônus de sábado "sempre extra" trabalhado
-    // (VT: qualquer hora; VA: só 4h+). Mesmo cálculo usado no aviso prévio (ver
-    // _prepararComposicaoBeneficioRes), para não divergir entre prévia e TXT real.
+    // Benefícios, "Dias a Trabalhar" calculados para a competência seguinte — mês
+    // que o empregado vai trabalhar), já somando o bônus de sábado "sempre extra"
+    // trabalhado (VT: qualquer hora; VA: só 4h+). A linha em si é lançada na
+    // competência desta Folha de Ponto (compFmt), mesma convenção do botão manual
+    // "Gerar Lançamentos na Folha" em Gerar Benefícios (_mesAnterior). Mesmo
+    // cálculo usado no aviso prévio (ver _prepararComposicaoBeneficioRes), para não
+    // divergir entre prévia e TXT real.
     const composicao = await _prepararComposicaoBeneficioRes(codEmpresa);
     if (composicao) {
-        conteudoTXT += _linhasBeneficiosComposto(composicao.linhas, _compFmtSeguinte(state.competencia), config.tipoProcesso, composicao.config);
+        conteudoTXT += _linhasBeneficiosComposto(composicao.linhas, compFmt, config.tipoProcesso, composicao.config);
     }
 
     return { conteudoTXT, compFmt, avisoDsrSemRubrica, qtdSimulacoes, qtdEstagiarios };
