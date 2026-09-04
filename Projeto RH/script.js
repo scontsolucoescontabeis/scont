@@ -1438,8 +1438,10 @@ function calcularFolha(folha) {
 
         // Sábado "sempre extra" trabalhado: não é dia de escala normal (jornadaEfetiva
         // = 0 acima), então "Dias a Trabalhar" (Gerar Benefícios) não conta esse dia —
-        // mas o empregado trabalhou e tem direito a VT/VA nele (ver acréscimo no TXT).
+        // mas o empregado trabalhou e tem direito a VT nele (qualquer hora trabalhada);
+        // VA só é devido se trabalhou 4h (240min) ou mais nesse sábado específico.
         const flagSabadoExtraTrabalhado = dia.diaSemana === 'Sab' && jr.sabadoSempreExtra && minTrabalhados > 0;
+        const flagSabadoExtraVA = flagSabadoExtraTrabalhado && minTrabalhados >= 240;
 
         let extra50 = 0, extra100 = 0, faltante = 0;
         let flagDSR = isDSRCustomizado;
@@ -1554,7 +1556,8 @@ function calcularFolha(folha) {
             flagSemRegistro: flagSemRegistro,
             flagCompensacao: flagCompensacao,
             flagFerias: flagFerias,
-            flagSabadoExtraTrabalhado: flagSabadoExtraTrabalhado
+            flagSabadoExtraTrabalhado: flagSabadoExtraTrabalhado,
+            flagSabadoExtraVA: flagSabadoExtraVA
         };
     });
     
@@ -3416,10 +3419,6 @@ function _carregarConfigNoCampos(prefixo, c) {
     setOpt(`${prefixo}TipoDescontoVT`, c.tipoDescontoVT, 'monetario');
     setVal(`${prefixo}RubDescontoVA`,  c.rubDescontoVA);
     setOpt(`${prefixo}TipoDescontoVA`, c.tipoDescontoVA, 'monetario');
-    setVal(`${prefixo}RubAcrescimoVT`,  c.rubAcrescimoVT);
-    setOpt(`${prefixo}TipoAcrescimoVT`, c.tipoAcrescimoVT, 'monetario');
-    setVal(`${prefixo}RubAcrescimoVA`,  c.rubAcrescimoVA);
-    setOpt(`${prefixo}TipoAcrescimoVA`, c.tipoAcrescimoVA, 'monetario');
 }
 
 function _lerCamposConfig(prefixo, radioName) {
@@ -3442,10 +3441,6 @@ function _lerCamposConfig(prefixo, radioName) {
         tipoDescontoVT: g(`${prefixo}TipoDescontoVT`) || 'monetario',
         rubDescontoVA:  g(`${prefixo}RubDescontoVA`).trim(),
         tipoDescontoVA: g(`${prefixo}TipoDescontoVA`) || 'monetario',
-        rubAcrescimoVT:  g(`${prefixo}RubAcrescimoVT`).trim(),
-        tipoAcrescimoVT: g(`${prefixo}TipoAcrescimoVT`) || 'monetario',
-        rubAcrescimoVA:  g(`${prefixo}RubAcrescimoVA`).trim(),
-        tipoAcrescimoVA: g(`${prefixo}TipoAcrescimoVA`) || 'monetario',
     };
 }
 
@@ -3544,18 +3539,12 @@ function _montarLinhaTxt(codEmp, compFmt, codEmpresa, rubrica, tipoProcesso, val
     return `10${empFmt}${compFmt}${rub}${tp}${String(valorInt).padStart(9, '0')}${empFmt2}\n`;
 }
 
-function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null, diasFaltaDetalhes = [], rubricaFaltaDSR = null, dias_acrescimo_vavt = 0) {
+function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null, diasFaltaDetalhes = [], rubricaFaltaDSR = null) {
     const linha = (rubrica, valorInt) => _montarLinhaTxt(codEmp, compFmt, codEmpresa, rubrica, config.tipoProcesso, valorInt);
     const encDiasOuHoras = (tipo, dias) => tipo === 'dias' ? _encDias(dias) : _encMinutosParaTipo(dias * 480, tipo);
     const encDescontoVaVt = (tipo, valorDiario) => {
         if (tipo === 'monetario') return Math.round(dias_desconto_vavt * (valorDiario || 0) * 100);
         return encDiasOuHoras(tipo, dias_desconto_vavt);
-    };
-    // Acréscimo de VT/VA: mesma mecânica do desconto, mas somando dias em vez de
-    // subtrair — usado para sábados "sempre extra" efetivamente trabalhados.
-    const encAcrescimoVaVt = (tipo, valorDiario) => {
-        if (tipo === 'monetario') return Math.round(dias_acrescimo_vavt * (valorDiario || 0) * 100);
-        return encDiasOuHoras(tipo, dias_acrescimo_vavt);
     };
     const valoresVT = valoresVaVtEmpregado?.vt || 0;
     const valoresVA = valoresVaVtEmpregado?.va || 0;
@@ -3570,9 +3559,49 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, m
         _linhaRubricaFaltaDSR(rubricaFaltaDSR, config.tipoProcesso, codEmp, compFmt, codEmpresa, _calcularDomingosDSR(diasFaltaDetalhes)),
         linha(config.rubDescontoVT, encDescontoVaVt(config.tipoDescontoVT, valoresVT)),
         linha(config.rubDescontoVA, encDescontoVaVt(config.tipoDescontoVA, valoresVA)),
-        linha(config.rubAcrescimoVT, encAcrescimoVaVt(config.tipoAcrescimoVT, valoresVT)),
-        linha(config.rubAcrescimoVA, encAcrescimoVaVt(config.tipoAcrescimoVA, valoresVA)),
     ].join('');
+}
+
+// Linhas de benefício VT/VA "compostas" automaticamente no TXT (Folha de Ponto ou
+// Exportação em Lote) para empresas com Acréscimo de VT/VA configurado: mesmo
+// cálculo da tela Gerar Benefícios (linhas, já com diasTrabalharVT/VA ajustados
+// pelo chamador para incluir o bônus de sábado "sempre extra"), lançado na
+// rubrica configurada, na competência SEGUINTE (mês em que o benefício é pago).
+function _linhasBeneficiosComposto(linhas, compFmtSeguinte, tipoProcesso, config) {
+    const encDiasOuHoras = (tipo, dias) => tipo === 'dias' ? _encDias(dias) : _encMinutosParaTipo(dias * 480, tipo);
+    const encValor = (tipo, dias, valorDiario) => tipo === 'monetario' ? Math.round(dias * (valorDiario || 0) * 100) : encDiasOuHoras(tipo, dias);
+    let conteudo = '';
+    linhas.forEach(l => {
+        const diasPagarVt = _diasPagarBeneficio(l, 'vt');
+        const diasPagarVa = _diasPagarBeneficio(l, 'va');
+        if (config.rubAcrescimoVT) conteudo += _montarLinhaTxt(l.codigo_empregado, compFmtSeguinte, l.codigo_empresa, config.rubAcrescimoVT, tipoProcesso, encValor(config.tipoAcrescimoVT, diasPagarVt, l.vtDiario));
+        if (config.rubAcrescimoVA) conteudo += _montarLinhaTxt(l.codigo_empregado, compFmtSeguinte, l.codigo_empresa, config.rubAcrescimoVA, tipoProcesso, encValor(config.tipoAcrescimoVA, diasPagarVa, l.vaDiario));
+    });
+    return conteudo;
+}
+
+// 'MM/AAAA' -> 'AAAAMM' do mês seguinte (mesma convenção de competência de
+// pagamento usada em Gerar Benefícios: mês trabalhado paga no mês seguinte).
+function _compFmtSeguinte(comp) {
+    const seguinte = _competenciaMesSeguinte(comp); // 'MM/AAAA'
+    const [mes, ano] = seguinte.split('/');
+    return ano + mes;
+}
+
+// Aplica o bônus de sábado "sempre extra" trabalhado (mapa de chave -> {extraVT,
+// extraVA}, chave definida por chaveFn) às linhas de _calcularLinhasBeneficios,
+// somando aos "Dias a Trabalhar" antes de gerar o TXT. VT soma todo sábado extra
+// trabalhado; VA só os que bateram 4h (240min) ou mais nesse sábado.
+function _aplicarBonusSabadoExtra(linhas, bonusMapa, chaveFn) {
+    return linhas.map(l => {
+        const bonus = bonusMapa[chaveFn(l)];
+        if (!bonus) return l;
+        return {
+            ...l,
+            diasTrabalharVT: l.diasTrabalharVT + bonus.extraVT,
+            diasTrabalharVA: l.diasTrabalharVA + bonus.extraVA,
+        };
+    });
 }
 
 async function abrirModalExportacaoTXT() {
@@ -3674,6 +3703,10 @@ async function _construirConteudoTXTExportacao() {
     }
     const empresasSemRubricaDsr = new Set();
     let qtdEstagiarios = 0;
+    // Bônus de sábado "sempre extra" trabalhado por empregado (chave codigo_empresa_codigo_empregado),
+    // usado depois do loop para compor o benefício de VT/VA do mês seguinte (ver
+    // config.rubAcrescimoVT/VA mais abaixo).
+    const bonusSabadoExtraMapa = {};
 
     Object.values(ultimasVersoes).forEach(save => {
         const empCodigo = save.empresa_codigo;
@@ -3697,7 +3730,7 @@ async function _construirConteudoTXTExportacao() {
         const rule100    = save.rule_extra_100_opcional || false;
         const dados      = JSON.parse(save.dados_json || '[]');
 
-        let tTrab = 0, tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0, tDiasDescontoVAVT = 0, tDiasAcrescimoVAVT = 0;
+        let tTrab = 0, tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0, tDiasDescontoVAVT = 0, tDiasAcrescimoVT = 0, tDiasAcrescimoVA = 0;
         const diasFaltaDetalhes = [];
         dados.forEach(dia => {
             const jornadaMinEfetiva = dia.diaSemana === 'Sab'
@@ -3725,8 +3758,12 @@ async function _construirConteudoTXTExportacao() {
             // ✅ Horas trabalhadas = horas fictas (noturno convertido) + horas trabalhadas fora do período noturno.
             const minTrab = minTrabReal - minNot + minNotConv;
             // Sábado "sempre extra" trabalhado (jornadaMinEfetiva = 0 acima): não conta em
-            // "Dias a Trabalhar" da escala, mas gera acréscimo de VT/VA no TXT.
-            if (dia.diaSemana === 'Sab' && sabadoSempreExtra && minTrab > 0) tDiasAcrescimoVAVT++;
+            // "Dias a Trabalhar" da escala, mas gera acréscimo de VT (qualquer hora) e de
+            // VA (só se bateu 4h/240min) no benefício composto do mês seguinte.
+            if (dia.diaSemana === 'Sab' && sabadoSempreExtra && minTrab > 0) {
+                tDiasAcrescimoVT++;
+                if (minTrab >= 240) tDiasAcrescimoVA++;
+            }
             let ex50 = 0, ex100 = 0, dev = 0;
             const flag = flagsFolga[dia.data];
             const isAtestadoMedicoExp = flag === 'atestado';
@@ -3799,10 +3836,42 @@ async function _construirConteudoTXTExportacao() {
             tDiasDescontoVAVT,
             valoresVaVtMapa[`${empCodigo}_${empInfo.codigo_empregado}`],
             diasFaltaDetalhes,
-            rubricaFaltaDSR,
-            tDiasAcrescimoVAVT
+            rubricaFaltaDSR
         );
+        if (tDiasAcrescimoVT > 0 || tDiasAcrescimoVA > 0) {
+            bonusSabadoExtraMapa[`${empCodigo}_${empInfo.codigo_empregado}`] = { extraVT: tDiasAcrescimoVT, extraVA: tDiasAcrescimoVA };
+        }
     });
+
+    // Empresas com Acréscimo de VT/VA configurado em Configurações (persistido —
+    // não o formulário deste modal, que é compartilhado por todo o lote e lançaria
+    // o benefício em empresas que não pediram isso): compõe no mesmo TXT o
+    // benefício completo de VT/VA (mesma lógica de Gerar Benefícios) da
+    // competência SEGUINTE (mês em que o benefício trabalhado nesta competência é
+    // pago), já somando o bônus de sábado "sempre extra" trabalhado apurado acima.
+    const configAcrescimoPorEmpresa = {};
+    await Promise.all(empresasSelecionadas.map(async cod => {
+        const cfgEmp = await _buscarConfigRubricas(cod);
+        const rubVT = cfgEmp?.['acrescimoVT']?.cod || '';
+        const rubVA = cfgEmp?.['acrescimoVA']?.cod || '';
+        if (rubVT || rubVA) {
+            configAcrescimoPorEmpresa[cod] = {
+                rubAcrescimoVT: rubVT, tipoAcrescimoVT: cfgEmp?.['acrescimoVT']?.tipo || 'monetario',
+                rubAcrescimoVA: rubVA, tipoAcrescimoVA: cfgEmp?.['acrescimoVA']?.tipo || 'monetario',
+            };
+        }
+    }));
+    const empresasComAcrescimo = Object.keys(configAcrescimoPorEmpresa);
+    if (empresasComAcrescimo.length > 0) {
+        const { linhas: linhasBeneficios } = await _calcularLinhasBeneficios(comp, empresasComAcrescimo);
+        const linhasAjustadas = _aplicarBonusSabadoExtra(linhasBeneficios, bonusSabadoExtraMapa, l => `${l.codigo_empresa}_${l.codigo_empregado}`);
+        const compFmtSeguinte = _compFmtSeguinte(comp);
+        const linhasPorEmpresa = {};
+        linhasAjustadas.forEach(l => { (linhasPorEmpresa[l.codigo_empresa] ??= []).push(l); });
+        Object.entries(linhasPorEmpresa).forEach(([cod, linhasEmp]) => {
+            conteudoTXT += _linhasBeneficiosComposto(linhasEmp, compFmtSeguinte, config.tipoProcesso, configAcrescimoPorEmpresa[cod]);
+        });
+    }
 
     localStorage.setItem(TXT_RUBRICAS_KEY, JSON.stringify(_lerCamposConfig('exp', 'exportTipoProcesso')));
     return { conteudoTXT, compFmt, comp, empresasSemRubricaDsr, qtdEstagiarios };
@@ -4056,15 +4125,15 @@ function _diasPagarBeneficio(linha, tipo) {
     return Math.max(0, base - linha.diasDescontar);
 }
 
-async function gerarPreviaBeneficios() {
-    const comp = document.getElementById('beneficiosCompetencia').value;
-    if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe uma competência válida (MM/AAAA).'); return; }
-    const codigosEmpresas = Array.from(_beneficiosEmpresasSelecionadas);
-    if (codigosEmpresas.length === 0) { mostrarMensagem('Aviso', 'Selecione pelo menos uma empresa.'); return; }
-
-    mostrarMensagem('Aguarde', 'Calculando prévia de benefícios...');
-    try {
-        const [
+// Motor de cálculo de "Gerar Benefícios" (VT/VA), extraído de gerarPreviaBeneficios
+// para ser reutilizado sem DOM — também usado pela composição automática de
+// benefícios no TXT da Folha de Ponto/Exportação em Lote (ver
+// _construirConteudoTXTResultados / _construirConteudoTXTExportacao) para
+// empresas com "Acréscimo de VT/VA" configurado (sábado "sempre extra").
+// comp: 'MM/AAAA' (mês trabalhado). codigosEmpresas: array de códigos.
+// Lança em caso de erro (sem tratar mensagem de UI aqui).
+async function _calcularLinhasBeneficios(comp, codigosEmpresas) {
+    const [
             { data: empresasData, error: errEmp },
             { data: empregadosData, error: errFunc },
             { data: valoresData, error: errVal },
@@ -4168,14 +4237,7 @@ async function gerarPreviaBeneficios() {
         );
 
         if (empregadosFiltrados.length === 0) {
-            fecharModalMensagem();
-            mostrarMensagem('Aviso', 'Nenhum empregado ativo encontrado para as empresas selecionadas.');
-            document.getElementById('beneficiosPreviaContainer').style.display = 'none';
-            _renderizarFeriadosBeneficios({}, {});
-            _renderizarObservacoesBeneficios([]);
-            _renderizarPeriodosBeneficios([]);
-            _renderizarAlertaJornadaReduzidaBeneficios([]);
-            return;
+            return { linhas: [], feriadosCompetenciaPorEmpresa: {}, observacoesPorEmpresa: [], periodosCustomPorEmpresa: [], alertaJornadaReduzida: [], empresasMapa };
         }
 
         const linhas = empregadosFiltrados.map(emp => {
@@ -4237,7 +4299,30 @@ async function gerarPreviaBeneficios() {
         periodosCustomPorEmpresa.forEach(p => { p.nome_empresa = (empresasMapa[p.codigo_empresa] || {}).nome_empresa || p.codigo_empresa; });
         periodosCustomPorEmpresa.sort((a, b) => a.nome_empresa.localeCompare(b.nome_empresa));
 
+    return { linhas, feriadosCompetenciaPorEmpresa, observacoesPorEmpresa, periodosCustomPorEmpresa, alertaJornadaReduzida, empresasMapa };
+}
+
+async function gerarPreviaBeneficios() {
+    const comp = document.getElementById('beneficiosCompetencia').value;
+    if (!validarCompetencia(comp)) { mostrarMensagem('Aviso', 'Informe uma competência válida (MM/AAAA).'); return; }
+    const codigosEmpresas = Array.from(_beneficiosEmpresasSelecionadas);
+    if (codigosEmpresas.length === 0) { mostrarMensagem('Aviso', 'Selecione pelo menos uma empresa.'); return; }
+
+    mostrarMensagem('Aguarde', 'Calculando prévia de benefícios...');
+    try {
+        const { linhas, feriadosCompetenciaPorEmpresa, observacoesPorEmpresa, periodosCustomPorEmpresa, alertaJornadaReduzida, empresasMapa } =
+            await _calcularLinhasBeneficios(comp, codigosEmpresas);
+
         fecharModalMensagem();
+        if (linhas.length === 0) {
+            mostrarMensagem('Aviso', 'Nenhum empregado ativo encontrado para as empresas selecionadas.');
+            document.getElementById('beneficiosPreviaContainer').style.display = 'none';
+            _renderizarFeriadosBeneficios({}, {});
+            _renderizarObservacoesBeneficios([]);
+            _renderizarPeriodosBeneficios([]);
+            _renderizarAlertaJornadaReduzidaBeneficios([]);
+            return;
+        }
         state._beneficiosLinhas = linhas;
         _renderizarPreviaBeneficios(linhas);
         _renderizarFeriadosBeneficios(feriadosCompetenciaPorEmpresa, empresasMapa);
@@ -7121,28 +7206,31 @@ function _calcularDiasDescontoVAVT(resultados, valoresVaVtMapa = {}) {
         .filter(item => item.dias > 0);
 }
 
-// Mesma mecânica de _calcularDiasDescontoVAVT, mas para sábados "sempre extra"
-// efetivamente trabalhados (ver flagSabadoExtraTrabalhado em calcularFolha) —
-// contam como acréscimo de VT/VA em vez de desconto.
+// Mesma ideia de _calcularDiasDescontoVAVT, mas para sábados "sempre extra"
+// efetivamente trabalhados (ver flagSabadoExtraTrabalhado/flagSabadoExtraVA em
+// calcularFolha) — contam como acréscimo em vez de desconto. VT soma qualquer
+// sábado extra trabalhado; VA só os que bateram 4h (240min) ou mais.
 function _calcularDiasAcrescimoVAVT(resultados, valoresVaVtMapa = {}) {
     return (resultados || [])
         .filter(res => !res.simulacao && !res.estagiario && res.empregadoId)
         .map(res => {
-            const dias = (res.dias || []).filter(d => d.flagSabadoExtraTrabalhado).length;
+            const diasVT = (res.dias || []).filter(d => d.flagSabadoExtraTrabalhado).length;
+            const diasVA = (res.dias || []).filter(d => d.flagSabadoExtraVA).length;
             const valores = valoresVaVtMapa[res.empregadoId] || {};
             const valorVT = valores.vt || 0;
             const valorVA = valores.va || 0;
             return {
                 nome: res.nome,
                 empregadoId: res.empregadoId,
-                dias,
+                diasVT,
+                diasVA,
                 valorVT,
                 valorVA,
-                totalVT: dias * valorVT,
-                totalVA: dias * valorVA,
+                totalVT: diasVT * valorVT,
+                totalVA: diasVA * valorVA,
             };
         })
-        .filter(item => item.dias > 0);
+        .filter(item => item.diasVT > 0 || item.diasVA > 0);
 }
 
 function _formatarMoeda(valor) {
@@ -7192,7 +7280,6 @@ async function _construirConteudoTXTResultados(salvar = false) {
         const minsNorm = Math.max(0, converterHoraParaMinutos(res.totais.trabalhado) - he50 - he100);
         const diasFaltaRes = res.dias.filter(d => d.flagFalta);
         const diasDescontoVAVT = res.dias.filter(d => d.flagFalta || d.flagAtestado).length;
-        const diasAcrescimoVAVT = res.dias.filter(d => d.flagSabadoExtraTrabalhado).length;
         if (calcularDsrAuto && diasFaltaRes.length > 0 && !rubricaFaltaDSR) avisoDsrSemRubrica = true;
         conteudoTXT += _linhasTxt(
             config,
@@ -7208,12 +7295,35 @@ async function _construirConteudoTXTResultados(salvar = false) {
             diasDescontoVAVT,
             valoresVaVtMapa[res.empregadoId],
             diasFaltaRes,
-            rubricaFaltaDSR,
-            diasAcrescimoVAVT
+            rubricaFaltaDSR
         );
     });
 
     conteudoTXT += _construirLinhasAdicionais(compFmt, codEmpresa, config.tipoProcesso);
+
+    // Empresa com Acréscimo de VT/VA configurado em Configurações (persistido):
+    // compõe no mesmo TXT o benefício completo de VT/VA (mesma lógica de Gerar
+    // Benefícios) da competência SEGUINTE (mês em que o benefício trabalhado nesta
+    // competência é pago), já somando o bônus de sábado "sempre extra" trabalhado
+    // (VT: qualquer hora; VA: só 4h+).
+    const cfgEmpresa = await _buscarConfigRubricas(codEmpresa);
+    const rubAcrescimoVT = cfgEmpresa?.['acrescimoVT']?.cod || '';
+    const rubAcrescimoVA = cfgEmpresa?.['acrescimoVA']?.cod || '';
+    if (rubAcrescimoVT || rubAcrescimoVA) {
+        const configAcrescimo = {
+            rubAcrescimoVT, tipoAcrescimoVT: cfgEmpresa?.['acrescimoVT']?.tipo || 'monetario',
+            rubAcrescimoVA, tipoAcrescimoVA: cfgEmpresa?.['acrescimoVA']?.tipo || 'monetario',
+        };
+        const bonusMapa = {};
+        resultadosReais.forEach(res => {
+            const extraVT = res.dias.filter(d => d.flagSabadoExtraTrabalhado).length;
+            const extraVA = res.dias.filter(d => d.flagSabadoExtraVA).length;
+            if (extraVT > 0 || extraVA > 0) bonusMapa[res.empregadoId] = { extraVT, extraVA };
+        });
+        const { linhas: linhasBeneficios } = await _calcularLinhasBeneficios(state.competencia, [codEmpresa]);
+        const linhasAjustadas = _aplicarBonusSabadoExtra(linhasBeneficios, bonusMapa, l => l.codigo_empregado);
+        conteudoTXT += _linhasBeneficiosComposto(linhasAjustadas, _compFmtSeguinte(state.competencia), config.tipoProcesso, configAcrescimo);
+    }
 
     return { conteudoTXT, compFmt, avisoDsrSemRubrica, qtdSimulacoes, qtdEstagiarios };
 }
@@ -7258,7 +7368,7 @@ async function gerarTXTResultados() {
     _efetivarDownloadTXTResultados();
 }
 
-function _linhasAvisoAjusteVAVT(lista) {
+function _linhasAvisoDesconto(lista) {
     return lista.map(item => `
         <tr>
             <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.nome}</td>
@@ -7271,14 +7381,30 @@ function _linhasAvisoAjusteVAVT(lista) {
     `).join('');
 }
 
+// VT e VA têm contagem de dias diferente aqui (VA só sábados com 4h+), por isso
+// duas colunas de "Dias" em vez de uma compartilhada como no desconto.
+function _linhasAvisoAcrescimo(lista) {
+    return lista.map(item => `
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.nome}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.diasVT}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(item.valorVT)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(item.totalVT)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.diasVA}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(item.valorVA)}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(item.totalVA)}</td>
+        </tr>
+    `).join('');
+}
+
 function _abrirModalAvisoDescontos(listaDesconto, listaAcrescimo = []) {
     const blocoDesconto = document.getElementById('avisoDescontosBloco');
     const blocoAcrescimo = document.getElementById('avisoAcrescimosBloco');
     if (blocoDesconto) blocoDesconto.style.display = listaDesconto.length > 0 ? 'block' : 'none';
     if (blocoAcrescimo) blocoAcrescimo.style.display = listaAcrescimo.length > 0 ? 'block' : 'none';
-    document.getElementById('avisoDescontosTbody').innerHTML = _linhasAvisoAjusteVAVT(listaDesconto);
+    document.getElementById('avisoDescontosTbody').innerHTML = _linhasAvisoDesconto(listaDesconto);
     const tbodyAcrescimo = document.getElementById('avisoAcrescimosTbody');
-    if (tbodyAcrescimo) tbodyAcrescimo.innerHTML = _linhasAvisoAjusteVAVT(listaAcrescimo);
+    if (tbodyAcrescimo) tbodyAcrescimo.innerHTML = _linhasAvisoAcrescimo(listaAcrescimo);
     document.getElementById('avisoDescontosModal').classList.add('active');
 }
 
