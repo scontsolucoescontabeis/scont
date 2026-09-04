@@ -7233,6 +7233,50 @@ function _calcularDiasAcrescimoVAVT(resultados, valoresVaVtMapa = {}) {
         .filter(item => item.diasVT > 0 || item.diasVA > 0);
 }
 
+// Prepara a composição do benefício de VT/VA (ver [[project_rh_sabado_sempre_extra_acrescimo]])
+// para a empresa/competência sendo processada em Folha de Ponto: busca a config
+// persistida (Acréscimo de VT/VA em Configurações), soma o bônus de sábado
+// "sempre extra" trabalhado às linhas de _calcularLinhasBeneficios. Retorna null
+// quando a empresa não tem Acréscimo de VT/VA configurado (nada a compor).
+// Usado tanto para gerar o TXT quanto para a prévia do aviso antes de baixar —
+// mesmo cálculo nos dois lugares, para não divergir.
+async function _prepararComposicaoBeneficioRes(codEmpresa) {
+    const cfgEmpresa = await _buscarConfigRubricas(codEmpresa);
+    const rubAcrescimoVT = cfgEmpresa?.['acrescimoVT']?.cod || '';
+    const rubAcrescimoVA = cfgEmpresa?.['acrescimoVA']?.cod || '';
+    if (!rubAcrescimoVT && !rubAcrescimoVA) return null;
+    const config = {
+        rubAcrescimoVT, tipoAcrescimoVT: cfgEmpresa?.['acrescimoVT']?.tipo || 'monetario',
+        rubAcrescimoVA, tipoAcrescimoVA: cfgEmpresa?.['acrescimoVA']?.tipo || 'monetario',
+    };
+    const bonusMapa = {};
+    state.resultados.filter(r => !r.simulacao && !r.estagiario && r.empregadoId).forEach(res => {
+        const extraVT = res.dias.filter(d => d.flagSabadoExtraTrabalhado).length;
+        const extraVA = res.dias.filter(d => d.flagSabadoExtraVA).length;
+        if (extraVT > 0 || extraVA > 0) bonusMapa[res.empregadoId] = { extraVT, extraVA };
+    });
+    const { linhas } = await _calcularLinhasBeneficios(state.competencia, [codEmpresa]);
+    return { config, linhas: _aplicarBonusSabadoExtra(linhas, bonusMapa, l => l.codigo_empregado) };
+}
+
+// Lista para a tabela "Benefício de VT/VA" do aviso prévio: valor TOTAL (dias já
+// pagos, base + bônus de sábado extra) que será lançado, não só o extra — ver
+// _calcularDiasAcrescimoVAVT (que mostra só o bônus, informativo).
+function _previaBeneficioComposto(composicao) {
+    if (!composicao) return [];
+    return composicao.linhas
+        .map(l => ({
+            nome: l.nome_empregado,
+            diasVT: _diasPagarBeneficio(l, 'vt'),
+            diasVA: _diasPagarBeneficio(l, 'va'),
+            valorVT: l.vtDiario,
+            valorVA: l.vaDiario,
+            totalVT: _diasPagarBeneficio(l, 'vt') * l.vtDiario,
+            totalVA: _diasPagarBeneficio(l, 'va') * l.vaDiario,
+        }))
+        .filter(item => item.totalVT > 0 || item.totalVA > 0);
+}
+
 function _formatarMoeda(valor) {
     return (Number(valor) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -7305,24 +7349,11 @@ async function _construirConteudoTXTResultados(salvar = false) {
     // compõe no mesmo TXT o benefício completo de VT/VA (mesma lógica de Gerar
     // Benefícios) da competência SEGUINTE (mês em que o benefício trabalhado nesta
     // competência é pago), já somando o bônus de sábado "sempre extra" trabalhado
-    // (VT: qualquer hora; VA: só 4h+).
-    const cfgEmpresa = await _buscarConfigRubricas(codEmpresa);
-    const rubAcrescimoVT = cfgEmpresa?.['acrescimoVT']?.cod || '';
-    const rubAcrescimoVA = cfgEmpresa?.['acrescimoVA']?.cod || '';
-    if (rubAcrescimoVT || rubAcrescimoVA) {
-        const configAcrescimo = {
-            rubAcrescimoVT, tipoAcrescimoVT: cfgEmpresa?.['acrescimoVT']?.tipo || 'monetario',
-            rubAcrescimoVA, tipoAcrescimoVA: cfgEmpresa?.['acrescimoVA']?.tipo || 'monetario',
-        };
-        const bonusMapa = {};
-        resultadosReais.forEach(res => {
-            const extraVT = res.dias.filter(d => d.flagSabadoExtraTrabalhado).length;
-            const extraVA = res.dias.filter(d => d.flagSabadoExtraVA).length;
-            if (extraVT > 0 || extraVA > 0) bonusMapa[res.empregadoId] = { extraVT, extraVA };
-        });
-        const { linhas: linhasBeneficios } = await _calcularLinhasBeneficios(state.competencia, [codEmpresa]);
-        const linhasAjustadas = _aplicarBonusSabadoExtra(linhasBeneficios, bonusMapa, l => l.codigo_empregado);
-        conteudoTXT += _linhasBeneficiosComposto(linhasAjustadas, _compFmtSeguinte(state.competencia), config.tipoProcesso, configAcrescimo);
+    // (VT: qualquer hora; VA: só 4h+). Mesmo cálculo usado no aviso prévio (ver
+    // _prepararComposicaoBeneficioRes), para não divergir entre prévia e TXT real.
+    const composicao = await _prepararComposicaoBeneficioRes(codEmpresa);
+    if (composicao) {
+        conteudoTXT += _linhasBeneficiosComposto(composicao.linhas, _compFmtSeguinte(state.competencia), config.tipoProcesso, composicao.config);
     }
 
     return { conteudoTXT, compFmt, avisoDsrSemRubrica, qtdSimulacoes, qtdEstagiarios };
@@ -7361,8 +7392,10 @@ async function gerarTXTResultados() {
     const valoresVaVtMapa = await _buscarValoresVaVtEmpresa(codEmpresa);
     const listaDesconto = _calcularDiasDescontoVAVT(state.resultados, valoresVaVtMapa);
     const listaAcrescimo = _calcularDiasAcrescimoVAVT(state.resultados, valoresVaVtMapa);
-    if (listaDesconto.length > 0 || listaAcrescimo.length > 0) {
-        _abrirModalAvisoDescontos(listaDesconto, listaAcrescimo);
+    const composicao = await _prepararComposicaoBeneficioRes(codEmpresa);
+    const listaBeneficio = _previaBeneficioComposto(composicao);
+    if (listaDesconto.length > 0 || listaAcrescimo.length > 0 || listaBeneficio.length > 0) {
+        _abrirModalAvisoDescontos(listaDesconto, listaAcrescimo, listaBeneficio);
         return;
     }
     _efetivarDownloadTXTResultados();
@@ -7397,14 +7430,18 @@ function _linhasAvisoAcrescimo(lista) {
     `).join('');
 }
 
-function _abrirModalAvisoDescontos(listaDesconto, listaAcrescimo = []) {
+function _abrirModalAvisoDescontos(listaDesconto, listaAcrescimo = [], listaBeneficio = []) {
     const blocoDesconto = document.getElementById('avisoDescontosBloco');
     const blocoAcrescimo = document.getElementById('avisoAcrescimosBloco');
+    const blocoBeneficio = document.getElementById('avisoBeneficioBloco');
     if (blocoDesconto) blocoDesconto.style.display = listaDesconto.length > 0 ? 'block' : 'none';
     if (blocoAcrescimo) blocoAcrescimo.style.display = listaAcrescimo.length > 0 ? 'block' : 'none';
+    if (blocoBeneficio) blocoBeneficio.style.display = listaBeneficio.length > 0 ? 'block' : 'none';
     document.getElementById('avisoDescontosTbody').innerHTML = _linhasAvisoDesconto(listaDesconto);
     const tbodyAcrescimo = document.getElementById('avisoAcrescimosTbody');
     if (tbodyAcrescimo) tbodyAcrescimo.innerHTML = _linhasAvisoAcrescimo(listaAcrescimo);
+    const tbodyBeneficio = document.getElementById('avisoBeneficioTbody');
+    if (tbodyBeneficio) tbodyBeneficio.innerHTML = _linhasAvisoAcrescimo(listaBeneficio);
     document.getElementById('avisoDescontosModal').classList.add('active');
 }
 

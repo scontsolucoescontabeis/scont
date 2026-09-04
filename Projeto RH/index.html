@@ -955,6 +955,25 @@
                         </table>
                     </div>
                 </div>
+                <div id="avisoBeneficioBloco" style="display:none; margin-top: 16px;">
+                    <p style="margin-bottom: 12px; font-size: 14px; color: var(--text-primary);"><strong>Benefício de VT/VA (competência seguinte)</strong> — esta empresa tem "Acréscimo de VT/VA" configurado, então o valor TOTAL abaixo (já somando os sábados extras acima, se houver) será lançado automaticamente neste TXT nas rubricas de Acréscimo configuradas:</p>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead>
+                                <tr style="background: #f8f9fa; color: var(--text-primary); text-align: left;">
+                                    <th style="padding: 8px; border-bottom: 2px solid #dee2e6; font-weight: 700;">Empregado</th>
+                                    <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center; font-weight: 700;">Dias a Pagar VT</th>
+                                    <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 700;">VT / dia</th>
+                                    <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 700;">Total VT</th>
+                                    <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center; font-weight: 700;">Dias a Pagar VA</th>
+                                    <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 700;">VA / dia</th>
+                                    <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: right; font-weight: 700;">Total VA</th>
+                                </tr>
+                            </thead>
+                            <tbody id="avisoBeneficioTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
                 <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; margin-bottom: 0;">
                     Valores diários cadastrados em "Valores VT/VA". Empregados sem valor cadastrado aparecem com R$ 0,00.
                 </p>
