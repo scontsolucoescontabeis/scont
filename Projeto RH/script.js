@@ -1436,6 +1436,11 @@ function calcularFolha(folha) {
         // ✅ Horas trabalhadas = horas fictas (noturno convertido) + horas trabalhadas fora do período noturno.
         const minTrabalhados = minTrabalhadosReais - minNoturnos + minNoturnosConvertidos;
 
+        // Sábado "sempre extra" trabalhado: não é dia de escala normal (jornadaEfetiva
+        // = 0 acima), então "Dias a Trabalhar" (Gerar Benefícios) não conta esse dia —
+        // mas o empregado trabalhou e tem direito a VT/VA nele (ver acréscimo no TXT).
+        const flagSabadoExtraTrabalhado = dia.diaSemana === 'Sab' && jr.sabadoSempreExtra && minTrabalhados > 0;
+
         let extra50 = 0, extra100 = 0, faltante = 0;
         let flagDSR = isDSRCustomizado;
         let flagFolga = false, flagFalta = false, flagAtestado = false, flagAtestadoComparecimento = false, flagLiberacaoMeioExpediente = false, flagSemRegistro = false, flagCompensacao = false;
@@ -1548,7 +1553,8 @@ function calcularFolha(folha) {
             flagLiberacaoMeioExpediente: flagLiberacaoMeioExpediente,
             flagSemRegistro: flagSemRegistro,
             flagCompensacao: flagCompensacao,
-            flagFerias: flagFerias
+            flagFerias: flagFerias,
+            flagSabadoExtraTrabalhado: flagSabadoExtraTrabalhado
         };
     });
     
@@ -1967,6 +1973,8 @@ const _CFG_EVENTOS = [
     { ev: 'falta',     sufRub: 'Falta',     defaultTipo: 'dias'  },
     { ev: 'descontoVT', sufRub: 'DescontoVT', defaultTipo: 'monetario' },
     { ev: 'descontoVA', sufRub: 'DescontoVA', defaultTipo: 'monetario' },
+    { ev: 'acrescimoVT', sufRub: 'AcrescimoVT', defaultTipo: 'monetario' },
+    { ev: 'acrescimoVA', sufRub: 'AcrescimoVA', defaultTipo: 'monetario' },
 ];
 
 let _cacheConfigRubricas = {};
@@ -3408,6 +3416,10 @@ function _carregarConfigNoCampos(prefixo, c) {
     setOpt(`${prefixo}TipoDescontoVT`, c.tipoDescontoVT, 'monetario');
     setVal(`${prefixo}RubDescontoVA`,  c.rubDescontoVA);
     setOpt(`${prefixo}TipoDescontoVA`, c.tipoDescontoVA, 'monetario');
+    setVal(`${prefixo}RubAcrescimoVT`,  c.rubAcrescimoVT);
+    setOpt(`${prefixo}TipoAcrescimoVT`, c.tipoAcrescimoVT, 'monetario');
+    setVal(`${prefixo}RubAcrescimoVA`,  c.rubAcrescimoVA);
+    setOpt(`${prefixo}TipoAcrescimoVA`, c.tipoAcrescimoVA, 'monetario');
 }
 
 function _lerCamposConfig(prefixo, radioName) {
@@ -3430,6 +3442,10 @@ function _lerCamposConfig(prefixo, radioName) {
         tipoDescontoVT: g(`${prefixo}TipoDescontoVT`) || 'monetario',
         rubDescontoVA:  g(`${prefixo}RubDescontoVA`).trim(),
         tipoDescontoVA: g(`${prefixo}TipoDescontoVA`) || 'monetario',
+        rubAcrescimoVT:  g(`${prefixo}RubAcrescimoVT`).trim(),
+        tipoAcrescimoVT: g(`${prefixo}TipoAcrescimoVT`) || 'monetario',
+        rubAcrescimoVA:  g(`${prefixo}RubAcrescimoVA`).trim(),
+        tipoAcrescimoVA: g(`${prefixo}TipoAcrescimoVA`) || 'monetario',
     };
 }
 
@@ -3528,12 +3544,18 @@ function _montarLinhaTxt(codEmp, compFmt, codEmpresa, rubrica, tipoProcesso, val
     return `10${empFmt}${compFmt}${rub}${tp}${String(valorInt).padStart(9, '0')}${empFmt2}\n`;
 }
 
-function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null, diasFaltaDetalhes = [], rubricaFaltaDSR = null) {
+function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, mins_he100, mins_not, mins_atr, dias_falta, dias_desconto_vavt = 0, valoresVaVtEmpregado = null, diasFaltaDetalhes = [], rubricaFaltaDSR = null, dias_acrescimo_vavt = 0) {
     const linha = (rubrica, valorInt) => _montarLinhaTxt(codEmp, compFmt, codEmpresa, rubrica, config.tipoProcesso, valorInt);
     const encDiasOuHoras = (tipo, dias) => tipo === 'dias' ? _encDias(dias) : _encMinutosParaTipo(dias * 480, tipo);
     const encDescontoVaVt = (tipo, valorDiario) => {
         if (tipo === 'monetario') return Math.round(dias_desconto_vavt * (valorDiario || 0) * 100);
         return encDiasOuHoras(tipo, dias_desconto_vavt);
+    };
+    // Acréscimo de VT/VA: mesma mecânica do desconto, mas somando dias em vez de
+    // subtrair — usado para sábados "sempre extra" efetivamente trabalhados.
+    const encAcrescimoVaVt = (tipo, valorDiario) => {
+        if (tipo === 'monetario') return Math.round(dias_acrescimo_vavt * (valorDiario || 0) * 100);
+        return encDiasOuHoras(tipo, dias_acrescimo_vavt);
     };
     const valoresVT = valoresVaVtEmpregado?.vt || 0;
     const valoresVA = valoresVaVtEmpregado?.va || 0;
@@ -3548,6 +3570,8 @@ function _linhasTxt(config, codEmp, compFmt, codEmpresa, mins_trab, mins_he50, m
         _linhaRubricaFaltaDSR(rubricaFaltaDSR, config.tipoProcesso, codEmp, compFmt, codEmpresa, _calcularDomingosDSR(diasFaltaDetalhes)),
         linha(config.rubDescontoVT, encDescontoVaVt(config.tipoDescontoVT, valoresVT)),
         linha(config.rubDescontoVA, encDescontoVaVt(config.tipoDescontoVA, valoresVA)),
+        linha(config.rubAcrescimoVT, encAcrescimoVaVt(config.tipoAcrescimoVT, valoresVT)),
+        linha(config.rubAcrescimoVA, encAcrescimoVaVt(config.tipoAcrescimoVA, valoresVA)),
     ].join('');
 }
 
@@ -3673,7 +3697,7 @@ async function _construirConteudoTXTExportacao() {
         const rule100    = save.rule_extra_100_opcional || false;
         const dados      = JSON.parse(save.dados_json || '[]');
 
-        let tTrab = 0, tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0, tDiasDescontoVAVT = 0;
+        let tTrab = 0, tEx50 = 0, tEx100 = 0, tNot = 0, tDev = 0, tFaltaDias = 0, tDiasDescontoVAVT = 0, tDiasAcrescimoVAVT = 0;
         const diasFaltaDetalhes = [];
         dados.forEach(dia => {
             const jornadaMinEfetiva = dia.diaSemana === 'Sab'
@@ -3700,6 +3724,9 @@ async function _construirConteudoTXTExportacao() {
             const minNotConv = Math.round(minNot / 0.875);
             // ✅ Horas trabalhadas = horas fictas (noturno convertido) + horas trabalhadas fora do período noturno.
             const minTrab = minTrabReal - minNot + minNotConv;
+            // Sábado "sempre extra" trabalhado (jornadaMinEfetiva = 0 acima): não conta em
+            // "Dias a Trabalhar" da escala, mas gera acréscimo de VT/VA no TXT.
+            if (dia.diaSemana === 'Sab' && sabadoSempreExtra && minTrab > 0) tDiasAcrescimoVAVT++;
             let ex50 = 0, ex100 = 0, dev = 0;
             const flag = flagsFolga[dia.data];
             const isAtestadoMedicoExp = flag === 'atestado';
@@ -3772,7 +3799,8 @@ async function _construirConteudoTXTExportacao() {
             tDiasDescontoVAVT,
             valoresVaVtMapa[`${empCodigo}_${empInfo.codigo_empregado}`],
             diasFaltaDetalhes,
-            rubricaFaltaDSR
+            rubricaFaltaDSR,
+            tDiasAcrescimoVAVT
         );
     });
 
@@ -7093,6 +7121,30 @@ function _calcularDiasDescontoVAVT(resultados, valoresVaVtMapa = {}) {
         .filter(item => item.dias > 0);
 }
 
+// Mesma mecânica de _calcularDiasDescontoVAVT, mas para sábados "sempre extra"
+// efetivamente trabalhados (ver flagSabadoExtraTrabalhado em calcularFolha) —
+// contam como acréscimo de VT/VA em vez de desconto.
+function _calcularDiasAcrescimoVAVT(resultados, valoresVaVtMapa = {}) {
+    return (resultados || [])
+        .filter(res => !res.simulacao && !res.estagiario && res.empregadoId)
+        .map(res => {
+            const dias = (res.dias || []).filter(d => d.flagSabadoExtraTrabalhado).length;
+            const valores = valoresVaVtMapa[res.empregadoId] || {};
+            const valorVT = valores.vt || 0;
+            const valorVA = valores.va || 0;
+            return {
+                nome: res.nome,
+                empregadoId: res.empregadoId,
+                dias,
+                valorVT,
+                valorVA,
+                totalVT: dias * valorVT,
+                totalVA: dias * valorVA,
+            };
+        })
+        .filter(item => item.dias > 0);
+}
+
 function _formatarMoeda(valor) {
     return (Number(valor) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -7140,6 +7192,7 @@ async function _construirConteudoTXTResultados(salvar = false) {
         const minsNorm = Math.max(0, converterHoraParaMinutos(res.totais.trabalhado) - he50 - he100);
         const diasFaltaRes = res.dias.filter(d => d.flagFalta);
         const diasDescontoVAVT = res.dias.filter(d => d.flagFalta || d.flagAtestado).length;
+        const diasAcrescimoVAVT = res.dias.filter(d => d.flagSabadoExtraTrabalhado).length;
         if (calcularDsrAuto && diasFaltaRes.length > 0 && !rubricaFaltaDSR) avisoDsrSemRubrica = true;
         conteudoTXT += _linhasTxt(
             config,
@@ -7155,7 +7208,8 @@ async function _construirConteudoTXTResultados(salvar = false) {
             diasDescontoVAVT,
             valoresVaVtMapa[res.empregadoId],
             diasFaltaRes,
-            rubricaFaltaDSR
+            rubricaFaltaDSR,
+            diasAcrescimoVAVT
         );
     });
 
@@ -7196,16 +7250,16 @@ async function gerarTXTResultados() {
     const codEmpresa = state.empresaSelecionada?.codigo_empresa;
     const valoresVaVtMapa = await _buscarValoresVaVtEmpresa(codEmpresa);
     const listaDesconto = _calcularDiasDescontoVAVT(state.resultados, valoresVaVtMapa);
-    if (listaDesconto.length > 0) {
-        _abrirModalAvisoDescontos(listaDesconto);
+    const listaAcrescimo = _calcularDiasAcrescimoVAVT(state.resultados, valoresVaVtMapa);
+    if (listaDesconto.length > 0 || listaAcrescimo.length > 0) {
+        _abrirModalAvisoDescontos(listaDesconto, listaAcrescimo);
         return;
     }
     _efetivarDownloadTXTResultados();
 }
 
-function _abrirModalAvisoDescontos(lista) {
-    const tbody = document.getElementById('avisoDescontosTbody');
-    tbody.innerHTML = lista.map(item => `
+function _linhasAvisoAjusteVAVT(lista) {
+    return lista.map(item => `
         <tr>
             <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.nome}</td>
             <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">${item.dias}</td>
@@ -7215,6 +7269,16 @@ function _abrirModalAvisoDescontos(lista) {
             <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: right;">${_formatarMoeda(item.totalVA)}</td>
         </tr>
     `).join('');
+}
+
+function _abrirModalAvisoDescontos(listaDesconto, listaAcrescimo = []) {
+    const blocoDesconto = document.getElementById('avisoDescontosBloco');
+    const blocoAcrescimo = document.getElementById('avisoAcrescimosBloco');
+    if (blocoDesconto) blocoDesconto.style.display = listaDesconto.length > 0 ? 'block' : 'none';
+    if (blocoAcrescimo) blocoAcrescimo.style.display = listaAcrescimo.length > 0 ? 'block' : 'none';
+    document.getElementById('avisoDescontosTbody').innerHTML = _linhasAvisoAjusteVAVT(listaDesconto);
+    const tbodyAcrescimo = document.getElementById('avisoAcrescimosTbody');
+    if (tbodyAcrescimo) tbodyAcrescimo.innerHTML = _linhasAvisoAjusteVAVT(listaAcrescimo);
     document.getElementById('avisoDescontosModal').classList.add('active');
 }
 
