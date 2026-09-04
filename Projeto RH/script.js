@@ -4020,10 +4020,11 @@ function _jornadaDeRow(row) {
     };
 }
 
-// Divide "Dias a Trabalhar" (base do VT) do "Dias a Pagar" de VT/VA: VA desconta
-// também os dias de jornada <= 4h (diasReduzidosVA), VT nunca é afetado por isso.
+// "Dias a Trabalhar" é configurável de forma independente para VT e VA
+// (diasTrabalharVT / diasTrabalharVA), para não vincular o recebimento de um
+// benefício ao outro. "Dias a Descontar" (faltas/atestados) continua único.
 function _diasPagarBeneficio(linha, tipo) {
-    const base = tipo === 'va' ? Math.max(0, linha.diasTrabalhar - (linha.diasReduzidosVA || 0)) : linha.diasTrabalhar;
+    const base = tipo === 'va' ? linha.diasTrabalharVA : linha.diasTrabalharVT;
     return Math.max(0, base - linha.diasDescontar);
 }
 
@@ -4178,7 +4179,10 @@ async function gerarPreviaBeneficios() {
                 nome_empregado: emp.nome_empregado,
                 desc_cargo: emp.desc_cargo || '',
                 feriasTexto: _periodosFeriasNoMesTexto(periodos, compParaDias, diaInicio, diaFim),
-                diasTrabalhar,
+                // VT e VA partem do mesmo cálculo de escala, mas são editáveis
+                // independentemente — VA já nasce descontado da jornada reduzida.
+                diasTrabalharVT: diasTrabalhar,
+                diasTrabalharVA: Math.max(0, diasTrabalhar - reducaoVA.total),
                 diasDescontar,
                 diasReduzidosVA: reducaoVA.total,
                 diasReduzidosVADatas: reducaoVA.dias,
@@ -4237,7 +4241,8 @@ function _renderizarPreviaBeneficios(linhas) {
             <td style="padding:6px 8px;">${l.codigo_empregado} - ${l.nome_empregado}</td>
             <td style="padding:6px 8px;">${l.desc_cargo}</td>
             <td style="padding:6px 8px; text-align:center; white-space:normal;">${l.feriasTexto ? `🏖️ ${l.feriasTexto}` : ''}</td>
-            <td style="padding:6px 8px; text-align:center;"><input type="number" min="0" class="ben-dias-trabalhar" value="${l.diasTrabalhar}" style="width:60px;" oninput="_recalcularLinhaBeneficios(${i})"></td>
+            <td style="padding:6px 8px; text-align:center;"><input type="number" min="0" class="ben-dias-trabalhar-vt" value="${l.diasTrabalharVT}" style="width:60px;" oninput="_recalcularLinhaBeneficios(${i})"></td>
+            <td style="padding:6px 8px; text-align:center;"><input type="number" min="0" class="ben-dias-trabalhar-va" value="${l.diasTrabalharVA}" style="width:60px;" oninput="_recalcularLinhaBeneficios(${i})"></td>
             <td style="padding:6px 8px; text-align:center;"><input type="number" min="0" class="ben-dias-descontar" value="${l.diasDescontar}" style="width:60px;" oninput="_recalcularLinhaBeneficios(${i})"></td>
             <td style="padding:6px 8px; text-align:center;" class="ben-dias-pagar-vt">${diasPagarVt}</td>
             <td style="padding:6px 8px; text-align:center;" class="ben-dias-pagar-va">${diasPagarVa}${temReducaoVA ? ` <span title="${tituloReducao}" style="cursor:help;">⚠️</span>` : ''}</td>
@@ -4386,9 +4391,11 @@ function _recalcularLinhaBeneficios(idx) {
     const tr = document.querySelector(`#beneficiosPreviaBody tr[data-idx="${idx}"]`);
     const linha = state._beneficiosLinhas?.[idx];
     if (!tr || !linha) return;
-    const diasTrabalhar = parseInt(tr.querySelector('.ben-dias-trabalhar').value, 10) || 0;
+    const diasTrabalharVT = parseInt(tr.querySelector('.ben-dias-trabalhar-vt').value, 10) || 0;
+    const diasTrabalharVA = parseInt(tr.querySelector('.ben-dias-trabalhar-va').value, 10) || 0;
     const diasDescontar = parseInt(tr.querySelector('.ben-dias-descontar').value, 10) || 0;
-    linha.diasTrabalhar = diasTrabalhar;
+    linha.diasTrabalharVT = diasTrabalharVT;
+    linha.diasTrabalharVA = diasTrabalharVA;
     linha.diasDescontar = diasDescontar;
     const diasPagarVt = _diasPagarBeneficio(linha, 'vt');
     const diasPagarVa = _diasPagarBeneficio(linha, 'va');
@@ -4408,9 +4415,10 @@ function exportarBeneficiosExcel() {
     const linhas = state._beneficiosLinhas.filter(l => l.selecionado !== false);
     if (linhas.length === 0) { mostrarMensagem('Aviso', 'Selecione ao menos um empregado antes de exportar.'); return; }
 
-    // "DIAS A PAGAR" virou duas colunas (VT/VA) porque dias com jornada <= 4h
+    // "DIAS" e "DIAS A PAGAR" viraram duas colunas cada (VT/VA): "Dias a Trabalhar"
+    // é configurável independentemente por benefício, e dias com jornada <= 4h
     // (ver beneficios-va-calculo.js) não geram VA, mas continuam contando para VT.
-    const cabecalho = ['Cód Emp', 'NOME', 'CNPJ', 'Cód Epr', 'Nome', 'Descrição cargo', 'DIAS', 'DESCONTAR', 'DIAS A PAGAR (VT)', 'DIAS A PAGAR (VA)', 'VT DIARIO', 'VA DIARIO', 'VT MENSAL', 'VA MENSAL'];
+    const cabecalho = ['Cód Emp', 'NOME', 'CNPJ', 'Cód Epr', 'Nome', 'Descrição cargo', 'DIAS (VT)', 'DIAS (VA)', 'DESCONTAR', 'DIAS A PAGAR (VT)', 'DIAS A PAGAR (VA)', 'VT DIARIO', 'VA DIARIO', 'VT MENSAL', 'VA MENSAL'];
     // VT/VA (diário e mensal) saem como texto com 2 casas decimais (não número),
     // conforme exigido para importação em outros sistemas.
     const linhasExcel = linhas.map(l => {
@@ -4420,7 +4428,7 @@ function exportarBeneficiosExcel() {
         const vaDiario = l.vaDiario || 0;
         return [
             l.codigo_empresa, l.nome_empresa, l.cnpj, l.codigo_empregado, l.nome_empregado, l.desc_cargo,
-            l.diasTrabalhar, l.diasDescontar, diasPagarVt, diasPagarVa,
+            l.diasTrabalharVT, l.diasTrabalharVA, l.diasDescontar, diasPagarVt, diasPagarVa,
             l.vtDiario ? vtDiario.toFixed(2).replace('.', ',') : '',
             l.vaDiario ? vaDiario.toFixed(2).replace('.', ',') : '',
             (diasPagarVt * vtDiario).toFixed(2).replace('.', ','),
@@ -4430,10 +4438,10 @@ function exportarBeneficiosExcel() {
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([cabecalho, ...linhasExcel]);
-    ws['!cols'] = [10, 28, 20, 10, 28, 22, 8, 10, 12, 12, 10, 10, 12, 12].map(w => ({ wch: w }));
-    // Garante que VT/VA (colunas 10 a 13: diário e mensal) fiquem como texto no
+    ws['!cols'] = [10, 28, 20, 10, 28, 22, 8, 8, 10, 12, 12, 10, 10, 12, 12].map(w => ({ wch: w }));
+    // Garante que VT/VA (colunas 11 a 14: diário e mensal) fiquem como texto no
     // arquivo, mesmo que o Excel tente reinterpretar o conteúdo como número.
-    const COLS_VALOR_TEXTO = [10, 11, 12, 13];
+    const COLS_VALOR_TEXTO = [11, 12, 13, 14];
     for (let r = 1; r < linhasExcel.length + 1; r++) {
         COLS_VALOR_TEXTO.forEach(c => {
             const addr = XLSX.utils.encode_cell({ r, c });
@@ -4829,21 +4837,21 @@ function _relatorioLiquidoBeneficiosPDF(grupo, comp, periodoTexto, mesFmt, ano) 
         totalVt += vtMensal; totalVa += vaMensal; totalGeral += vtMensal + vaMensal;
         return [
             l.codigo_empregado, l.nome_empregado, l.desc_cargo,
-            l.diasTrabalhar, l.diasDescontar, diasPagarVt, diasPagarVa,
+            l.diasTrabalharVT, l.diasTrabalharVA, l.diasDescontar, diasPagarVt, diasPagarVa,
             l.vtDiario ? _fmtMoedaRecibo(l.vtDiario) : '',
             l.vaDiario ? _fmtMoedaRecibo(l.vaDiario) : '',
             _fmtMoedaRecibo(vtMensal), _fmtMoedaRecibo(vaMensal), _fmtMoedaRecibo(vtMensal + vaMensal),
         ];
     });
     body.push([
-        { content: 'Total Geral:', colSpan: 9, styles: { fontStyle: 'bold', halign: 'right' } },
+        { content: 'Total Geral:', colSpan: 10, styles: { fontStyle: 'bold', halign: 'right' } },
         { content: _fmtMoedaRecibo(totalVt), styles: { fontStyle: 'bold' } },
         { content: _fmtMoedaRecibo(totalVa), styles: { fontStyle: 'bold' } },
         { content: _fmtMoedaRecibo(totalGeral), styles: { fontStyle: 'bold' } },
     ]);
 
     doc.autoTable({
-        head: [['Código', 'Empregado', 'Cargo', 'Dias Trab.', 'Descontar', 'A Pagar VT', 'A Pagar VA', 'VT Diário', 'VA Diário', 'VT Mensal', 'VA Mensal', 'Total']],
+        head: [['Código', 'Empregado', 'Cargo', 'Dias Trab. (VT)', 'Dias Trab. (VA)', 'Descontar', 'A Pagar VT', 'A Pagar VA', 'VT Diário', 'VA Diário', 'VT Mensal', 'VA Mensal', 'Total']],
         body,
         startY: MARGEM + alturaBarra + 4,
         margin: { left: MARGEM, right: MARGEM },
