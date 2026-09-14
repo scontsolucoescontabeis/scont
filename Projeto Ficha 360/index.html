@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ficha 360 do Cliente — Scont</title>
+  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png" />
+  <link rel="stylesheet" href="css/ficha360.css" />
+  <script src="../supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../portal-auth-guard.js"></script>
+</head>
+<body>
+<div id="authOverlay" style="position:fixed;inset:0;background:#F0F2F5;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="font-size:40px;">🔐</div>
+  <p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+      <h1>Ficha 360</h1>
+      <p>Visão única do cliente</p>
+    </div>
+    <nav class="menu">
+      <button class="menu-item" id="menuPainel">📊 <span>Painel da Carteira</span></button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn-voltar" onclick="window.location.href='../portal.html'">🏠 <span>Voltar ao Portal</span></button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div id="avisoFontes" class="aviso-fontes" hidden></div>
+    <div id="carregando" class="carregando" hidden>Carregando carteira…</div>
+    <section id="telaPainel" hidden></section>
+    <section id="telaFicha" hidden></section>
+  </main>
+</div>
+
+<script src="../Projeto RH/qsa-analise.js"></script>
+<script src="../Projeto Onboarding Contabil/contabil-diario-util.js"></script>
+<script src="js/vinculos.js"></script>
+<script src="js/regras.js"></script>
+<script src="js/carteira.js"></script>
+<script src="js/fontes.js"></script>
+<script src="js/app.js"></script>
+<script src="js/painel.js"></script>
+<script src="js/cadastro.js"></script>
+<script src="js/anotacoes.js"></script>
+<script src="js/ficha.js"></script>
+</body>
+</html>
