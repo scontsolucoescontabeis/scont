@@ -26,7 +26,7 @@ Local: `Projeto Ficha 360/`. Card novo no `portal.html`; acesso controlado por `
 ### 2.2 Ficha da Empresa (`index.html?empresa=<codigo_empresa>`)
 
 - **Cabeçalho fixo:** nome, código, CNPJ, regime, semáforo, responsáveis, atalhos (Diário, Licenças, Certificado, Controle de Frequência, Fechamento). Atalho abre a ferramenta com `?empresa=<codigo>`; ferramentas que ainda não leem o parâmetro simplesmente abrem normalmente.
-- **Abas** (lazy load por aba, exceto Resumo, que reaproveita o cálculo do painel):
+- **Abas** — os dados da carteira já ficam em memória após o painel; só buscam sob demanda: contagem de jornada/escala (DP), anotações e CRM:
   1. **Resumo** — um cartão com o número-chave de cada bloco + lista única de alertas ordenada por gravidade.
   2. **Cadastro** — "Dados do Domínio" (somente leitura) + "Dados Scont" (editável) + contatos.
   3. **Vencimentos** — certificados, licenças e alvarás, com dias restantes.
@@ -62,7 +62,7 @@ DP e Contábil contratados **não** são duplicados: vêm de `fechamento_empresa
 **`ficha360_contatos`**
 
 `id UUID PK · codigo_empresa TEXT NOT NULL FK · nome TEXT NOT NULL · funcao TEXT · area TEXT NOT NULL DEFAULT 'geral' CHECK in (geral, dp, contabil, fiscal, financeiro) · telefone TEXT · email TEXT · whatsapp TEXT · principal BOOLEAN NOT NULL DEFAULT false · created_at TIMESTAMPTZ DEFAULT now()`
-Índice em `codigo_empresa`. O contato do Mapeamento Contábil permanece lá (RLS `contabil_pode_ver_contato`); a ficha só o exibe se a consulta retornar.
+Índice em `codigo_empresa`. O contato do Mapeamento Contábil permanece lá (RLS `contabil_pode_ver_contato`) e **não é exibido na Ficha 360 na V1** — continua acessível só pela Central Contábil.
 
 **`ficha360_anotacoes`**
 
@@ -76,7 +76,7 @@ DP e Contábil contratados **não** são duplicados: vêm de `fechamento_empresa
 | Cadastro Domínio | `rh_empresas` | `id, codigo_empresa, nome_empresa, cnpj, regime_enquadramento, inscricao_estadual, inscricao_municipal, endereco, cidade, municipio, uf, cep, status_situacao, email` |
 | Grupo | `rh_grupos_empresas_itens` → `rh_grupos_empresas` | nome do grupo |
 | Responsáveis DP | `fechamento_empresas_responsaveis` → `usuarios` | nomes |
-| Responsáveis Contábil | `contabil_empresas_responsaveis` → `solicitacoes_acesso` | nomes (tabela de usuários diferente — resolver separado) |
+| Responsáveis Contábil | `contabil_empresas_responsaveis` + RPC `contabil_listar_usuarios_aprovados()` | nomes (usuário vem de `solicitacoes_acesso`; a RPC já existe e é `SECURITY DEFINER`) |
 | Depto contratado | `fechamento_empresas_config.possui_folha`, `contabil_empresas_config.possui_contabil` | |
 | Certificados | `certificados` (ativos) | vínculo: `cpf_cnpj` só dígitos = `rh_empresas.cnpj` só dígitos (14 díg.); e-CPF: `cpf_cnpj` (11 díg.) ∈ CPFs de `rh_socios` da empresa. Situação via mesma regra `situacaoEfetiva` + `data_vencimento` |
 | Licenças/Alvarás | `licencas`, `alvaras` | `empresa_id = rh_empresas.id`, `ativo = true`, `deletado_em is null`, `data_validade` |
@@ -102,11 +102,11 @@ Limites em constantes no topo de `js/regras.js`.
 |---|---|---|---|
 | Certificado | vencido ou ≤ 7 dias | 8–30 dias | nenhum certificado vinculado |
 | Licença/Alvará | vencido ou ≤ 15 dias | 16–60 dias | — |
-| Folha (se `possui_folha`) | ciclo da competência anterior não concluído após o dia 10 do mês corrente | fases pendentes no ciclo atual | sem responsável DP |
+| Folha (se `possui_folha`) | ciclo da competência anterior (mês passado) não concluído — ou inexistente — após o dia 10 do mês corrente | ciclo da competência anterior ainda não concluído até o dia 10 | sem responsável DP |
 | QSA | sócio com participação ativa também empregado ativo | sobreposição já encerrada | — |
 | Formulários | em aberto há > 15 dias | em aberto há ≤ 15 dias | — |
 | Diário (se `possui_contabil`) | último evento da competência = `rejeitado` | competência esperada (pela `periodicidade`) sem evento `enviado`/`aprovado` | sem responsável Contábil |
-| Mapeamento | `nivel_atencao = 'alto'` | pendência aberta com `prazo` vencido | pendências abertas |
+| Mapeamento | `nivel_atencao = 'critico'` | `nivel_atencao = 'alto'` ou pendência aberta com `prazo` vencido | pendências abertas |
 | Onboarding | — | `em_andamento` há > 60 dias | — |
 | Cadastro Scont | — | — | sem linha em `ficha360_empresa` ou sem contato `principal` |
 
@@ -130,6 +130,8 @@ Projeto Ficha 360/
   index.html          painel + ficha (alterna por ?empresa=)
   css/ficha360.css
   js/
+    app.js            namespace F360, helpers (esc, datas), bootstrap, roteamento
+    carteira.js       função pura montarCarteira(dados, hoje) → itens com alertas/semáforo
     fontes.js         uma função por módulo → { ok:true, dados } | { ok:false, motivo:'sem_permissao'|'erro'|'tabela_ausente' }
     vinculos.js       normalizarCnpj, normalizarNome, indexarPorCodigo
     regras.js         funções puras: alertas<Modulo>(dados, hoje) → [alerta]; semaforo(alertas)
