@@ -50,7 +50,10 @@ window.Ficha360Ficha = (function () {
             ['🔑 Certificado', `../Projeto Certificado Digital/index.html?empresa=${cod}`],
             ['⏱️ Controle de Frequência', `../Projeto RH/admin.html?empresa=${cod}`],
             ['✅ Fechamento', `../Projeto Fechamento Folha/controle.html?empresa=${cod}`],
-        ].map(([r, href]) => `<a class="btn btn-mini" href="${href}" target="_blank" rel="noopener">${r}</a>`).join('');
+        // Sem rel="noopener": são links internos (mesma origem do portal), e "noopener" impede
+        // a nova aba de herdar a sessão de sessionStorage, forçando login de novo (bug real
+        // reportado pelo usuário).
+        ].map(([r, href]) => `<a class="btn btn-mini" href="${href}" target="_blank">${r}</a>`).join('');
 
         tela.innerHTML = `
           <div class="ficha-cab sem-${it.semaforo}">
