@@ -45,8 +45,8 @@ window.Ficha360Painel = (function () {
         const conta = (fn) => ativos.filter(fn).length;
         const semResp = conta(i => (i.possuiFolha && !i.responsaveisDp.length) || (i.possuiContabil && !i.responsaveisContabil.length));
 
-        const contador = (valor, rotulo, chave) =>
-            `<div class="contador ${filtros.semaforo === chave ? 'ativo' : ''}" data-semaforo="${chave}"><strong>${valor}</strong><span>${rotulo}</span></div>`;
+        const contador = (valor, rotulo, chave, tom) =>
+            `<div class="contador ${tom ? 'contador-' + tom : ''} ${filtros.semaforo === chave ? 'ativo' : ''}" data-semaforo="${chave}"><strong>${valor}</strong><span>${rotulo}</span></div>`;
 
         const statusOpts = Object.entries(F360.ROTULO_STATUS).map(([k, v]) =>
             `<option value="${k}" ${filtros.status === k ? 'selected' : ''}>${v}</option>`).join('');
@@ -60,8 +60,8 @@ window.Ficha360Painel = (function () {
           </div>
           <div class="contadores">
             ${contador(ativos.length, 'Empresas ativas', '')}
-            ${contador(conta(i => i.semaforo === 'vermelho'), '🔴 Críticas', 'vermelho')}
-            ${contador(conta(i => i.semaforo === 'amarelo'), '🟡 Atenção', 'amarelo')}
+            ${contador(conta(i => i.semaforo === 'vermelho'), 'Críticas', 'vermelho', 'critico')}
+            ${contador(conta(i => i.semaforo === 'amarelo'), 'Atenção', 'amarelo', 'atencao')}
             ${contador(semResp, 'Sem responsável definido', 'sem_responsavel')}
           </div>
           <div class="filtros">
@@ -93,18 +93,18 @@ window.Ficha360Painel = (function () {
                 i.responsaveisDp.length ? `DP: ${F360.esc(i.responsaveisDp.join(', '))}` : '',
                 i.responsaveisContabil.length ? `Cont.: ${F360.esc(i.responsaveisContabil.join(', '))}` : '',
             ].filter(Boolean).join('<br>') || '<span class="bloqueado">—</span>';
-            return `<tr class="clicavel" data-codigo="${F360.esc(i.codigo)}">
-                <td>${F360.semaforoHtml(i.semaforo)}</td>
-                <td>${F360.esc(i.codigo)}</td>
+            return `<tr class="clicavel sem-${i.semaforo}" data-codigo="${F360.esc(i.codigo)}">
+                <td class="col-barra" title="${F360.esc(F360.ROTULO_SEMAFORO[i.semaforo] || '')}"></td>
+                <td class="mono">${F360.esc(i.codigo)}</td>
                 <td><strong>${F360.esc(i.nome)}</strong>${i.grupo ? `<br><span class="chip chip-neutro">${F360.esc(i.grupo)}</span>` : ''}</td>
                 <td>${F360.esc(i.regime) || '—'}</td>
                 <td>${resp}</td>
-                <td>${i.empregadosAtivos == null ? '—' : i.empregadosAtivos}</td>
+                <td class="num t-right">${i.empregadosAtivos == null ? '—' : i.empregadosAtivos}</td>
                 <td>${chips || '<span class="bloqueado">Sem alertas</span>'}</td>
             </tr>`;
         }).join('');
         wrap.innerHTML = `<table class="tabela">
-            <thead><tr><th></th><th>Código</th><th>Empresa</th><th>Regime</th><th>Responsáveis</th><th>Empreg. ativos</th><th>Alertas</th></tr></thead>
+            <thead><tr><th></th><th>Código</th><th>Empresa</th><th>Regime</th><th>Responsáveis</th><th class="t-right">Empreg. ativos</th><th>Alertas</th></tr></thead>
             <tbody>${linhas}</tbody></table>
             <div class="vazio" style="text-align:right;padding:8px 12px">${lista.length} empresa(s)</div>`;
         wrap.querySelectorAll('tr.clicavel').forEach(tr =>

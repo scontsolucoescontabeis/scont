@@ -27,8 +27,10 @@ window.F360 = {
         const [a, m, d] = String(iso).slice(0, 10).split('-');
         return d && m && a ? `${d}/${m}/${a}` : '—';
     },
+    CLASSE_CHIP_SEMAFORO: { vermelho: 'critico', amarelo: 'atencao', verde: 'ok', inativo: 'neutro' },
     semaforoHtml(s) {
-        return `<span class="sem sem-${s}" title="${F360.ROTULO_SEMAFORO[s] || ''}"></span>`;
+        const cls = F360.CLASSE_CHIP_SEMAFORO[s] || 'neutro';
+        return `<span class="chip chip-${cls}">${F360.esc(F360.ROTULO_SEMAFORO[s] || s)}</span>`;
     },
     chipAlerta(a) {
         return `<span class="chip chip-${a.gravidade}">${F360.esc(a.mensagem)}</span>`;

@@ -53,7 +53,7 @@ window.Ficha360Ficha = (function () {
         ].map(([r, href]) => `<a class="btn btn-mini" href="${href}" target="_blank" rel="noopener">${r}</a>`).join('');
 
         tela.innerHTML = `
-          <div class="ficha-cab">
+          <div class="ficha-cab sem-${it.semaforo}">
             <button class="btn btn-mini" id="btnVoltar">← Painel</button>
             <h2 style="margin-top:8px">${F360.semaforoHtml(it.semaforo)} ${esc(it.nome)}</h2>
             <div class="ficha-meta">
@@ -129,18 +129,18 @@ window.Ficha360Ficha = (function () {
 
     function renderVencimentos(el, it) {
         const certs = it.certificados.map(c => `<tr>
-            <td>${esc(c.cliente) || '—'}</td><td>${esc(c.cpf_cnpj) || '—'}</td><td>${esc(c.situacao) || '—'}</td>
-            <td>${F360.fmtData(c.data_vencimento)}</td><td>${linhaDias(c.data_vencimento)}</td></tr>`).join('');
+            <td>${esc(c.cliente) || '—'}</td><td class="mono">${esc(c.cpf_cnpj) || '—'}</td><td>${esc(c.situacao) || '—'}</td>
+            <td class="num">${F360.fmtData(c.data_vencimento)}</td><td class="t-right">${linhaDias(c.data_vencimento)}</td></tr>`).join('');
         const lics = it.licencas.slice().sort((a, b) => String(a.data_validade).localeCompare(String(b.data_validade))).map(l => `<tr>
             <td>${l.origem === 'alvara' ? 'Alvará' : 'Licença'}</td><td>${esc(l.tipo) || '—'}</td><td>${esc(l.estabelecimento) || '—'}</td>
-            <td>${F360.fmtData(l.data_validade)}</td><td>${linhaDias(l.data_validade)}</td></tr>`).join('');
+            <td class="num">${F360.fmtData(l.data_validade)}</td><td class="t-right">${linhaDias(l.data_validade)}</td></tr>`).join('');
         el.innerHTML = `${avisoFontes('vencimentos')}
           <div class="cartao"><h3>Certificados digitais</h3>
-            ${certs ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Titular</th><th>CPF/CNPJ</th><th>Situação</th><th>Vencimento</th><th>Prazo</th></tr></thead><tbody>${certs}</tbody></table></div>`
+            ${certs ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Titular</th><th>CPF/CNPJ</th><th>Situação</th><th>Vencimento</th><th class="t-right">Prazo</th></tr></thead><tbody>${certs}</tbody></table></div>`
                 : '<div class="bloqueado">Nenhum certificado vinculado (vínculo por CNPJ da empresa ou CPF dos sócios).</div>'}
           </div>
           <div class="cartao" style="margin-top:12px"><h3>Licenças e alvarás</h3>
-            ${lics ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Tipo</th><th>Descrição</th><th>Estabelecimento</th><th>Validade</th><th>Prazo</th></tr></thead><tbody>${lics}</tbody></table></div>`
+            ${lics ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Tipo</th><th>Descrição</th><th>Estabelecimento</th><th>Validade</th><th class="t-right">Prazo</th></tr></thead><tbody>${lics}</tbody></table></div>`
                 : '<div class="bloqueado">Nenhuma licença ou alvará ativo.</div>'}
           </div>`;
     }
@@ -196,13 +196,13 @@ window.Ficha360Ficha = (function () {
             const ativo = !s.data_saida;
             return `<tr>
                 <td>${esc(s.nome_socio)}</td>
-                <td>${esc(s.cpf) || '—'}</td>
+                <td class="mono">${esc(s.cpf) || '—'}</td>
                 <td>${esc(s.cargo) || '—'}</td>
-                <td>${fmtPercentual(s.participacao)}</td>
-                <td>${fmtMoeda(s.capital_social)}</td>
-                <td>${F360.fmtData(s.data_entrada)}</td>
-                <td>${s.data_saida ? F360.fmtData(s.data_saida) : '—'}</td>
-                <td><span class="chip chip-${ativo ? 'info' : 'neutro'}">${ativo ? 'Ativo' : 'Saiu'}</span></td>
+                <td class="num t-right">${fmtPercentual(s.participacao)}</td>
+                <td class="num t-right">${fmtMoeda(s.capital_social)}</td>
+                <td class="num">${F360.fmtData(s.data_entrada)}</td>
+                <td class="num">${s.data_saida ? F360.fmtData(s.data_saida) : '—'}</td>
+                <td><span class="chip chip-${ativo ? 'ok' : 'neutro'}">${ativo ? 'Ativo' : 'Saiu'}</span></td>
             </tr>`;
         }).join('');
 
@@ -210,7 +210,7 @@ window.Ficha360Ficha = (function () {
           <div class="cartao">
             <h3>Quadro societário (${lista.length})</h3>
             ${linhas ? `<div class="tabela-wrap"><table class="tabela">
-                <thead><tr><th>Nome</th><th>CPF</th><th>Cargo</th><th>Participação</th><th>Capital social</th><th>Entrada</th><th>Saída</th><th>Situação</th></tr></thead>
+                <thead><tr><th>Nome</th><th>CPF</th><th>Cargo</th><th class="t-right">Participação</th><th class="t-right">Capital social</th><th>Entrada</th><th>Saída</th><th>Situação</th></tr></thead>
                 <tbody>${linhas}</tbody></table></div>`
                 : '<div class="bloqueado">Nenhum sócio importado.</div>'}
           </div>`;
