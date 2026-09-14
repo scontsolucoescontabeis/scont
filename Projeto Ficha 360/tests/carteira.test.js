@@ -83,6 +83,7 @@ teste('empregados indisponível → empregadosAtivos null e sem QSA', () => {
     const beta = montarCarteira(d, HOJE).find(i => i.codigo === '10');
     assert.strictEqual(beta.empregadosAtivos, null);
     assert.deepStrictEqual(beta.ocorrenciasQsa, []);
+    assert.strictEqual(beta.alertas.some(a => a.modulo === 'qsa'), false);
 });
 
 teste('status inativo vira semáforo inativo', () => {

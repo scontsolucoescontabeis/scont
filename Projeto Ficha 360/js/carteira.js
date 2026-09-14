@@ -51,7 +51,7 @@
         const socios = idx('socios');
         const qsaDisponivel = ok('socios') && ok('empregados');
         const ocorrencias = V.indexarPorCodigo(
-            qsaDisponivel ? Qsa.computarOcorrencias(arr('socios'), arr('empregados'), [], hoje) : [],
+            qsaDisponivel ? Qsa.computarOcorrencias(arr('socios'), arr('empregados'), empresas, hoje) : [],
             'empresa'
         );
 
@@ -126,7 +126,7 @@
                     alertas = alertas.concat(R.alertasFolha({ possuiFolha, ciclos: item.ciclos, temResponsavel: listaRespDp.length > 0 }, hoje));
                 }
                 if (qsaDisponivel) alertas = alertas.concat(R.alertasQsa(item.ocorrenciasQsa));
-                if (ok('formularios')) alertas = alertas.concat(R.alertasFormularios(item.formularios, hoje));
+                if (ok('formularios') || ok('empregadosForm')) alertas = alertas.concat(R.alertasFormularios(item.formularios, hoje));
                 if (ok('cfgContabil') && ok('diarioEventos') && ok('respContabil')) {
                     alertas = alertas.concat(R.alertasDiario({
                         possuiContabil,
