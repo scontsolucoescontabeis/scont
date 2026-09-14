@@ -4,15 +4,18 @@ window.Ficha360Ficha = (function () {
 
     const ABAS = [
         ['resumo', 'Resumo'], ['cadastro', 'Cadastro'], ['vencimentos', 'Vencimentos'],
-        ['dp', 'DP'], ['contabil', 'Contábil'], ['anotacoes', 'Anotações'], ['crm', 'CRM'],
+        ['dp', 'DP'], ['socios', 'Sócios'], ['contabil', 'Contábil'], ['anotacoes', 'Anotações'], ['crm', 'CRM'],
     ];
     const NOME_MODULO = {
         certificado: 'Certificado', licenca: 'Licenças', folha: 'Folha', qsa: 'QSA', formularios: 'Formulários',
         diario: 'Diário', mapeamento: 'Mapeamento', onboarding: 'Onboarding', cadastro: 'Cadastro',
     };
+    // Tipos reconhecidos de empregado (mesmo catálogo de carteira.js/admin.js); usado só pra rótulo.
+    const ROTULO_TIPO_EMPREGADO = { Empregado: 'Empregados', 'Estágiario': 'Estagiários', Contribuinte: 'Contribuintes', Outros: 'Outros' };
     const FONTES_POR_ABA = {
         vencimentos: ['certificados', 'licencas', 'alvaras'],
         dp: ['empregados', 'socios', 'ciclos', 'formularios', 'empregadosForm', 'cfgFolha', 'respDp'],
+        socios: ['socios'],
         contabil: ['cfgContabil', 'onboardings', 'mapeamentos', 'pendencias', 'diarioEventos', 'respContabil'],
     };
 
@@ -84,7 +87,8 @@ window.Ficha360Ficha = (function () {
         const el = document.getElementById('conteudoAba');
         const it = item();
         const render = {
-            resumo: renderResumo, vencimentos: renderVencimentos, dp: renderDp, contabil: renderContabil, crm: renderCrm,
+            resumo: renderResumo, vencimentos: renderVencimentos, dp: renderDp, socios: renderSocios,
+            contabil: renderContabil, crm: renderCrm,
             cadastro: (c, i) => Ficha360Cadastro.render(c, i),
             anotacoes: (c, i) => Ficha360Anotacoes.render(c, i),
         }[abaAtual];
@@ -152,19 +156,23 @@ window.Ficha360Ficha = (function () {
             ${esc(o.nome_socio)} × empregado ${esc(o.codigo_empregado)} (${esc(o.tipo_match)})</li>`).join('');
         const abertos = it.formularios.filter(f => !['validado', 'rejeitado', 'excluido'].includes(f.status));
 
+        const porTipo = it.empregadosPorTipo;
+        const detalheTipos = porTipo
+            ? Object.entries(porTipo).filter(([, n]) => n > 0).map(([t, n]) => `${ROTULO_TIPO_EMPREGADO[t] || t} ${n}`).join(' · ') || 'nenhum ativo'
+            : '';
+
         el.innerHTML = `${avisoFontes('dp')}
           <div class="grade">
             <div class="cartao"><h3>Folha contratada</h3><div class="numero">${it.possuiFolha ? 'Sim' : 'Não'}</div></div>
-            <div class="cartao"><h3>Empregados ativos</h3><div class="numero">${it.empregadosAtivos == null ? '—' : it.empregadosAtivos}</div></div>
+            <div class="cartao"><h3>Empregados ativos</h3><div class="numero">${it.empregadosAtivos == null ? '—' : it.empregadosAtivos}</div><div class="bloqueado">${esc(detalheTipos)}</div></div>
             <div class="cartao"><h3>Formulários em aberto</h3><div class="numero">${abertos.length}</div></div>
             <div class="cartao"><h3>Jornada / Escala</h3><div class="numero" id="jornadaEscala">…</div></div>
           </div>
           <div class="cartao" style="margin-top:12px"><h3>Fechamento da folha (mês passado e atual)</h3>
             ${ciclosHtml ? `<ul class="lista-alertas">${ciclosHtml}</ul>` : '<div class="bloqueado">Nenhum ciclo nas competências recentes.</div>'}
           </div>
-          <div class="cartao" style="margin-top:12px"><h3>Sócios (${it.socios.length})</h3>
-            ${it.socios.length ? `<ul class="lista-alertas">${it.socios.map(s => `<li>${esc(s.nome_socio)} — entrada ${F360.fmtData(s.data_entrada)}${s.data_saida ? ` · saída ${F360.fmtData(s.data_saida)}` : ''}</li>`).join('')}</ul>` : '<div class="bloqueado">Nenhum sócio importado.</div>'}
-            ${qsa ? `<h3 style="margin-top:12px">Análise do QSA</h3><ul class="lista-alertas">${qsa}</ul>` : ''}
+          <div class="cartao" style="margin-top:12px"><h3>Análise do QSA</h3>
+            ${qsa ? `<ul class="lista-alertas">${qsa}</ul>` : '<div class="bloqueado">Nenhuma sobreposição entre sócio e empregado.</div>'}
           </div>`;
 
         const { jornada, escala } = await Ficha360Fontes.contarJornadaEscala(F360.sb, it.codigo);
@@ -172,6 +180,40 @@ window.Ficha360Ficha = (function () {
         if (!alvo) return; // usuário trocou de aba
         const fmt = (n) => n == null ? '🔒' : (n > 0 ? '✅' : '—');
         alvo.innerHTML = `<span title="Jornada">${fmt(jornada)}</span> / <span title="Escala">${fmt(escala)}</span>`;
+    }
+
+    function fmtMoeda(v) {
+        return v == null ? '—' : Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function fmtPercentual(v) {
+        return v == null ? '—' : `${Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
+    }
+
+    function renderSocios(el, it) {
+        const lista = it.socios.slice().sort((a, b) => (a.nome_socio || '').localeCompare(b.nome_socio || '', 'pt-BR'));
+        const linhas = lista.map(s => {
+            const ativo = !s.data_saida;
+            return `<tr>
+                <td>${esc(s.nome_socio)}</td>
+                <td>${esc(s.cpf) || '—'}</td>
+                <td>${esc(s.cargo) || '—'}</td>
+                <td>${fmtPercentual(s.participacao)}</td>
+                <td>${fmtMoeda(s.capital_social)}</td>
+                <td>${F360.fmtData(s.data_entrada)}</td>
+                <td>${s.data_saida ? F360.fmtData(s.data_saida) : '—'}</td>
+                <td><span class="chip chip-${ativo ? 'info' : 'neutro'}">${ativo ? 'Ativo' : 'Saiu'}</span></td>
+            </tr>`;
+        }).join('');
+
+        el.innerHTML = `${avisoFontes('socios')}
+          <div class="cartao">
+            <h3>Quadro societário (${lista.length})</h3>
+            ${linhas ? `<div class="tabela-wrap"><table class="tabela">
+                <thead><tr><th>Nome</th><th>CPF</th><th>Cargo</th><th>Participação</th><th>Capital social</th><th>Entrada</th><th>Saída</th><th>Situação</th></tr></thead>
+                <tbody>${linhas}</tbody></table></div>`
+                : '<div class="bloqueado">Nenhum sócio importado.</div>'}
+          </div>`;
     }
 
     function renderContabil(el, it) {

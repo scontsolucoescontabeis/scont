@@ -30,10 +30,13 @@ teste('periodoEsperado respeita periodicidade', () => {
     assert.deepStrictEqual(R.periodoEsperado(null, '2026-09-14'), { ano: 2026, mes: 8 });
 });
 
-teste('empregadoAtivo', () => {
-    assert.strictEqual(R.empregadoAtivo('Ativo'), true);
-    assert.strictEqual(R.empregadoAtivo('Inativo'), false);
-    assert.strictEqual(R.empregadoAtivo(null), false);
+teste('empregadoAtivo segue o padrão do RH: só "Demitido" é inativo', () => {
+    // rh_empregados.situacao na produção usa 'Trabalhando'/'Demitido' (importado do Domínio),
+    // não 'Ativo'/'Inativo' — mesma regra usada em Projeto RH/script.js (~8 pontos de uso).
+    assert.strictEqual(R.empregadoAtivo('Trabalhando'), true);
+    assert.strictEqual(R.empregadoAtivo('Demitido'), false);
+    assert.strictEqual(R.empregadoAtivo('Afastado'), true);
+    assert.strictEqual(R.empregadoAtivo(null), true);
 });
 
 // ===== certificado =====

@@ -29,7 +29,7 @@
         licencas:       { tabela: 'licencas', ordem: 'id', colunas: 'id, empresa_id, tipo, estabelecimento, numero, data_validade', filtro: soAtivosLic },
         alvaras:        { tabela: 'alvaras', ordem: 'id', colunas: 'id, empresa_id, tipo, estabelecimento, numero, data_validade', filtro: soAtivosLic },
         empregados:     { tabela: 'rh_empregados', ordem: 'id', colunas: 'codigo_empresa, codigo_empregado, nome_empregado, cpf, situacao, tipo_empregado, data_admissao, data_demissao' },
-        socios:         { tabela: 'rh_socios', ordem: 'id', colunas: 'codigo_empresa, nome_socio, cpf, data_entrada, data_saida' },
+        socios:         { tabela: 'rh_socios', ordem: 'id', colunas: 'id, codigo_empresa, nome_socio, cpf, cargo, participacao, capital_social, email_socio, data_entrada, data_saida' },
         ciclos:         { tabela: 'fechamento_ciclo', ordem: 'id', colunas: 'id, codigo_empresa, competencia, concluido_em, fechamento_ciclo_fase(nome_fase, status)',
                           filtro: (q, hoje) => q.in('competencia', _competenciasRecentes(hoje)) },
         formularios:    { tabela: 'formularios', ordem: 'id', colunas: 'id, rh_empresa_id, status, created_at', filtro: comEmpresaRh },

@@ -65,9 +65,10 @@
         return { ano: a, mes: m };
     }
 
+    // rh_empregados.situacao vem do Domínio como 'Trabalhando'/'Demitido' (não 'Ativo'/'Inativo').
+    // Mesma regra usada em Projeto RH/script.js: só 'Demitido' é considerado inativo.
     function empregadoAtivo(situacao) {
-        const s = String(situacao == null ? '' : situacao).toLowerCase();
-        return s.includes('ativ') && !s.includes('inativ');
+        return String(situacao == null ? '' : situacao).trim() !== 'Demitido';
     }
 
     function _porDias(modulo, rotulo, dias, limCritico, limAtencao) {

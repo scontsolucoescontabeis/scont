@@ -16,6 +16,20 @@
 })(typeof self !== 'undefined' ? self : this, function (V, R, Qsa) {
     'use strict';
 
+    // Tipos reconhecidos de rh_empregados.tipo_empregado (mesmo catálogo de Projeto RH/admin.js
+    // `_VG_TIPOS`); qualquer outro valor cai em 'Outros'.
+    const TIPOS_EMPREGADO = ['Empregado', 'Estágiario', 'Contribuinte'];
+
+    function contarEmpregadosPorTipo(lista) {
+        const out = { Empregado: 0, 'Estágiario': 0, Contribuinte: 0, Outros: 0 };
+        for (const x of lista) {
+            if (!R.empregadoAtivo(x.situacao)) continue;
+            const t = (x.tipo_empregado || '').trim();
+            out[TIPOS_EMPREGADO.includes(t) ? t : 'Outros'] += 1;
+        }
+        return out;
+    }
+
     function montarCarteira(dados, hoje) {
         const ok = (k) => Array.isArray(dados[k]);
         const arr = (k) => (ok(k) ? dados[k] : []);
@@ -105,6 +119,7 @@
                 empregadosAtivos: ok('empregados')
                     ? (empregados.get(cod) || []).filter(x => (x.tipo_empregado || '').trim() === 'Empregado' && R.empregadoAtivo(x.situacao)).length
                     : null,
+                empregadosPorTipo: ok('empregados') ? contarEmpregadosPorTipo(empregados.get(cod) || []) : null,
                 certificados: certs.get(cod) || [],
                 licencas: licencas.get(cod) || [],
                 socios: socios.get(cod) || [],

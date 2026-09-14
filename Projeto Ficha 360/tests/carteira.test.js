@@ -24,9 +24,12 @@ function base() {
         licencas: [{ id: 'l1', empresa_id: 'u1', tipo: 'Bombeiros', data_validade: '2026-09-20' }],
         alvaras: [],
         empregados: [
-            { codigo_empresa: '10', codigo_empregado: '1', nome_empregado: 'X', situacao: 'Ativo', tipo_empregado: 'Empregado' },
-            { codigo_empresa: '10', codigo_empregado: '2', nome_empregado: 'Y', situacao: 'Inativo', tipo_empregado: 'Empregado' },
-            { codigo_empresa: '10', codigo_empregado: '3', nome_empregado: 'Z', situacao: 'Ativo', tipo_empregado: 'Estagiário' },
+            // situacao usa os valores reais do Domínio ('Trabalhando'/'Demitido'), não 'Ativo'/'Inativo'.
+            { codigo_empresa: '10', codigo_empregado: '1', nome_empregado: 'X', situacao: 'Trabalhando', tipo_empregado: 'Empregado' },
+            { codigo_empresa: '10', codigo_empregado: '2', nome_empregado: 'Y', situacao: 'Demitido', tipo_empregado: 'Empregado' },
+            { codigo_empresa: '10', codigo_empregado: '3', nome_empregado: 'Z', situacao: 'Trabalhando', tipo_empregado: 'Estágiario' },
+            { codigo_empresa: '10', codigo_empregado: '4', nome_empregado: 'W', situacao: 'Trabalhando', tipo_empregado: 'Contribuinte' },
+            { codigo_empresa: '10', codigo_empregado: '5', nome_empregado: 'V', situacao: 'Trabalhando', tipo_empregado: 'Diretor' },
         ],
         socios: [],
         ciclos: [{ codigo_empresa: '10', competencia: '08/2026', concluido_em: '2026-09-05T00:00:00Z', fechamento_ciclo_fase: [] }],
@@ -49,6 +52,7 @@ teste('monta item com responsáveis, grupo, contagem de ativos e ordena por nome
     assert.deepStrictEqual(beta.responsaveisContabil, ['Caio Contábil']);
     assert.strictEqual(beta.grupo, 'Grupo Beta');
     assert.strictEqual(beta.empregadosAtivos, 1);
+    assert.deepStrictEqual(beta.empregadosPorTipo, { Empregado: 1, 'Estágiario': 1, Contribuinte: 1, Outros: 1 });
     assert.strictEqual(beta.certificados.length, 1);
     assert.strictEqual(beta.licencas[0].origem, 'licenca');
 });
@@ -82,6 +86,7 @@ teste('empregados indisponível → empregadosAtivos null e sem QSA', () => {
     d.empregados = null;
     const beta = montarCarteira(d, HOJE).find(i => i.codigo === '10');
     assert.strictEqual(beta.empregadosAtivos, null);
+    assert.strictEqual(beta.empregadosPorTipo, null);
     assert.deepStrictEqual(beta.ocorrenciasQsa, []);
     assert.strictEqual(beta.alertas.some(a => a.modulo === 'qsa'), false);
 });
@@ -97,7 +102,7 @@ teste('formulários por rh_empresa_id e QSA ocorrendo agora', () => {
     const d = base();
     d.formularios = [{ id: 'f1', rh_empresa_id: 'u2', status: 'recebido', created_at: '2026-08-01T00:00:00Z' }];
     d.socios = [{ codigo_empresa: '20', nome_socio: 'João', cpf: '11122233344', data_entrada: '2020-01-01', data_saida: null }];
-    d.empregados.push({ codigo_empresa: '20', codigo_empregado: '9', nome_empregado: 'João', cpf: '111.222.333-44', situacao: 'Ativo', tipo_empregado: 'Empregado', data_admissao: '2021-01-01', data_demissao: null });
+    d.empregados.push({ codigo_empresa: '20', codigo_empregado: '9', nome_empregado: 'João', cpf: '111.222.333-44', situacao: 'Trabalhando', tipo_empregado: 'Empregado', data_admissao: '2021-01-01', data_demissao: null });
     const alfa = montarCarteira(d, HOJE).find(i => i.codigo === '20');
     assert.strictEqual(alfa.formularios.length, 1);
     assert.strictEqual(alfa.ocorrenciasQsa.length, 1);
