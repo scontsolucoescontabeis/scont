@@ -61,15 +61,44 @@
         return out;
     }
 
-    // Lançamento de benefícios (VA/VT) mais recente da empresa, por competência de pagamento
-    // 'MM/AAAA' — comparação numérica, não lexicográfica (senão '01/2027' < '12/2026' como texto).
-    function lancamentoMaisRecente(lancamentos) {
-        if (!lancamentos.length) return null;
-        const chave = (l) => {
-            const [m, a] = String(l.competencia_pagamento || '').split('/').map(Number);
-            return (a || 0) * 12 + (m || 0);
-        };
-        return lancamentos.slice().sort((a, b) => chave(b) - chave(a))[0];
+    // Valores de VT/VA por empregado (rh_valores_va_vt, config de Controle de Frequência >
+    // Gerar Benefícios) — mesmo filtro de elegibilidade da própria tela de origem
+    // (Projeto RH/script.js _excluirContribuinte): fora Contribuinte e fora Demitido.
+    function montarValoresVaVt(empregados, valores) {
+        const porCodigo = new Map(valores.map(v => [v.codigo_empregado, v]));
+        return empregados
+            .filter(e => (e.tipo_empregado || '').trim() !== 'Contribuinte' && R.empregadoAtivo(e.situacao))
+            .map(e => {
+                const v = porCodigo.get(e.codigo_empregado);
+                return { codigo_empregado: e.codigo_empregado, nome: e.nome_empregado, vt: v ? Number(v.valor_vt) || 0 : 0, va: v ? Number(v.valor_va) || 0 : 0 };
+            })
+            .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+    }
+
+    // Dias corridos do mês (sem new Date() — mesmo estilo do resto do módulo).
+    function _diasNoMes(ano, mes) {
+        const dias = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const bissexto = mes === 2 && (ano % 4 === 0 && (ano % 100 !== 0 || ano % 400 === 0));
+        return bissexto ? 29 : dias[mes - 1];
+    }
+
+    function _pad2(n) { return String(n).padStart(2, '0'); }
+
+    // Primeiro e último dia do mês (ano, mes 1-12), como strings ISO 'YYYY-MM-DD'.
+    function _limitesMes(ano, mes) {
+        return { inicio: `${ano}-${_pad2(mes)}-01`, fim: `${ano}-${_pad2(mes)}-${_pad2(_diasNoMes(ano, mes))}` };
+    }
+
+    function _proximoMes(ano, mes) {
+        return mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
+    }
+
+    // Períodos de férias (rh_ferias_calculadas) que tocam o mês informado — comparação de string
+    // ISO 'YYYY-MM-DD' funciona como comparação de data, sem precisar de new Date().
+    function feriasNoMes(lista, limites) {
+        return lista
+            .filter(f => f.ferias_inicio <= limites.fim && limites.inicio <= f.ferias_fim)
+            .slice().sort((a, b) => String(a.ferias_inicio).localeCompare(String(b.ferias_inicio)));
     }
 
     function montarCarteira(dados, hoje) {
@@ -128,7 +157,12 @@
         const nomeGrupo = mapaPor('grupos', 'id', 'nome_grupo');
         const jornadaPadraoLinhas = idx('jornadaPadrao');
         const jornadasExtras = idx('jornadasExtras');
-        const lancamentosBeneficios = idx('beneficiosLancamentos');
+        const valoresVaVt = idx('valoresVaVt');
+        const ferias = idx('feriasCalculadas');
+        const anoAtual = Number(hoje.slice(0, 4)), mesAtual = Number(hoje.slice(5, 7));
+        const limitesMesAtual = _limitesMes(anoAtual, mesAtual);
+        const proximo = _proximoMes(anoAtual, mesAtual);
+        const limitesProximoMes = _limitesMes(proximo.ano, proximo.mes);
 
         const nomes = (lista, mapaNomes) => lista.map(r => mapaNomes.get(r.usuario_id) || '(sem nome)');
 
@@ -170,7 +204,11 @@
                 jornadaContagem: (ok('empregados') && ok('jornadasExtras'))
                     ? contarPorJornada(empregados.get(cod) || [], jornadasExtras.get(cod) || [])
                     : null,
-                beneficio: ok('beneficiosLancamentos') ? lancamentoMaisRecente(lancamentosBeneficios.get(cod) || []) : null,
+                valoresVaVt: (ok('empregados') && ok('valoresVaVt'))
+                    ? montarValoresVaVt(empregados.get(cod) || [], valoresVaVt.get(cod) || [])
+                    : null,
+                feriasAtual: ok('feriasCalculadas') ? feriasNoMes(ferias.get(cod) || [], limitesMesAtual) : null,
+                feriasProxima: ok('feriasCalculadas') ? feriasNoMes(ferias.get(cod) || [], limitesProximoMes) : null,
                 certificados: certs.get(cod) || [],
                 licencas: licencas.get(cod) || [],
                 socios: socios.get(cod) || [],

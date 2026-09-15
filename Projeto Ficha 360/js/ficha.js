@@ -14,7 +14,7 @@ window.Ficha360Ficha = (function () {
     const ROTULO_TIPO_EMPREGADO = { Empregado: 'Empregados', 'Estágiario': 'Estagiários', Contribuinte: 'Contribuintes', Outros: 'Outros' };
     const FONTES_POR_ABA = {
         vencimentos: ['certificados', 'licencas', 'alvaras'],
-        dp: ['empregados', 'socios', 'ciclos', 'formularios', 'empregadosForm', 'cfgFolha', 'respDp', 'jornadaPadrao', 'jornadasExtras', 'beneficiosLancamentos'],
+        dp: ['empregados', 'socios', 'ciclos', 'formularios', 'empregadosForm', 'cfgFolha', 'respDp', 'jornadaPadrao', 'jornadasExtras', 'valoresVaVt', 'feriasCalculadas'],
         socios: ['socios'],
         contabil: ['cfgContabil', 'onboardings', 'mapeamentos', 'pendencias', 'diarioEventos', 'respContabil'],
     };
@@ -131,6 +131,13 @@ window.Ficha360Ficha = (function () {
           </div>`;
     }
 
+    // Rótulo "SET/2026" pro mês atual (offsetMeses=0) ou seguinte (offsetMeses=1), a partir de F360.hoje.
+    function labelCompetencia(offsetMeses) {
+        let ano = Number(F360.hoje.slice(0, 4)), mes = Number(F360.hoje.slice(5, 7)) + offsetMeses;
+        while (mes > 12) { mes -= 12; ano += 1; }
+        return `${ContabilDiarioUtil.MESES_LABELS[mes - 1]}/${ano}`;
+    }
+
     function linhaDias(dataISO) {
         const d = Ficha360Regras.diasAte(dataISO, F360.hoje);
         if (d === null) return '—';
@@ -192,16 +199,18 @@ window.Ficha360Ficha = (function () {
                 <div class="bloqueado" style="margin-top:2px">${partes.join(' · ')}</div></div></li>`;
         }).join('');
 
-        // Benefícios VA/VT do lançamento mais recente (Projeto Benefícios).
-        const ben = it.beneficio;
-        const linhasBen = ben ? (ben.linhas_json || []).slice().sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR')) : [];
-        const benHtml = linhasBen.map(l => `<tr>
-            <td>${esc(l.nome)}</td>
-            <td class="num t-right">${fmtMoeda(l.vt_dia)}</td>
-            <td class="num t-right">${fmtMoeda(l.va_dia)}</td>
-            <td class="num t-right">${l.dias ?? '—'}</td>
-            <td class="num t-right col-hide-movel">${fmtMoeda(l.total_vt)}</td>
-            <td class="num t-right col-hide-movel">${fmtMoeda(l.total_va)}</td>
+        // Férias que tocam a competência atual e a seguinte (rh_ferias_calculadas).
+        const feriasLinha = (f) => `<li>${esc(f.nome_empregado)} — ${F360.fmtData(f.ferias_inicio)} a ${F360.fmtData(f.ferias_fim)}</li>`;
+        const feriasAtualHtml = (it.feriasAtual || []).map(feriasLinha).join('');
+        const feriasProximaHtml = (it.feriasProxima || []).map(feriasLinha).join('');
+        const subLabel = (t) => `<div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;margin:0 0 6px">${esc(t)}</div>`;
+
+        // Valores de VT/VA por empregado (Controle de Frequência > Gerar Benefícios).
+        const valoresVaVt = it.valoresVaVt || [];
+        const vaVtHtml = valoresVaVt.map(v => `<tr>
+            <td>${esc(v.nome)}</td>
+            <td class="num t-right">${fmtMoeda(v.vt)}</td>
+            <td class="num t-right">${fmtMoeda(v.va)}</td>
         </tr>`).join('');
 
         el.innerHTML = `${avisoFontes('dp')}
@@ -217,11 +226,18 @@ window.Ficha360Ficha = (function () {
           <div class="cartao" style="margin-top:12px"><h3>Jornada de trabalho</h3>
             ${jornadasHtml ? `<ul class="lista-alertas">${jornadasHtml}</ul>` : '<div class="bloqueado">Nenhuma jornada configurada em Controle de Frequência.</div>'}
           </div>
-          <div class="cartao" style="margin-top:12px"><h3>Benefícios (VA/VT)${ben ? ` — competência ${esc(ben.competencia_pagamento)}` : ''}</h3>
-            ${linhasBen.length ? `<div class="tabela-wrap"><table class="tabela">
-                <thead><tr><th>Nome</th><th class="t-right">VT/dia</th><th class="t-right">VA/dia</th><th class="t-right">Dias</th><th class="t-right col-hide-movel">Total VT</th><th class="t-right col-hide-movel">Total VA</th></tr></thead>
-                <tbody>${benHtml}</tbody></table></div>`
-                : '<div class="bloqueado">Nenhum lançamento de VA/VT encontrado para esta empresa.</div>'}
+          <div class="cartao" style="margin-top:12px"><h3>Valores de VA/VT por empregado</h3>
+            <div class="bloqueado" style="margin-bottom:8px">Configurados em Controle de Frequência &gt; Gerar Benefícios.</div>
+            ${vaVtHtml ? `<div class="tabela-wrap"><table class="tabela">
+                <thead><tr><th>Nome</th><th class="t-right">VT</th><th class="t-right">VA</th></tr></thead>
+                <tbody>${vaVtHtml}</tbody></table></div>`
+                : '<div class="bloqueado">Nenhum empregado elegível para VA/VT nesta empresa.</div>'}
+          </div>
+          <div class="cartao" style="margin-top:12px"><h3>Férias</h3>
+            ${subLabel(labelCompetencia(0))}
+            ${feriasAtualHtml ? `<ul class="lista-alertas">${feriasAtualHtml}</ul>` : '<div class="bloqueado">Ninguém de férias nesta competência.</div>'}
+            <div style="margin-top:12px">${subLabel(labelCompetencia(1))}</div>
+            ${feriasProximaHtml ? `<ul class="lista-alertas">${feriasProximaHtml}</ul>` : '<div class="bloqueado">Ninguém de férias na próxima competência.</div>'}
           </div>
           <div class="cartao" style="margin-top:12px"><h3>Análise do QSA</h3>
             ${qsa ? `<ul class="lista-alertas">${qsa}</ul>` : '<div class="bloqueado">Nenhuma sobreposição entre sócio e empregado.</div>'}

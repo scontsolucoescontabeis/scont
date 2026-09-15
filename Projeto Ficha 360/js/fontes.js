@@ -47,7 +47,13 @@
         jornadaPadrao:  { tabela: 'rh_config_rubricas_txt', ordem: 'id', colunas: 'codigo_empresa, evento, codigo_rubrica',
                           filtro: (q) => q.in('evento', ['jornada_diaria', 'jornada_sexta_ativa', 'jornada_sexta', 'jornada_sabado_ativa', 'jornada_sabado', 'sabado_sempre_extra']) },
         jornadasExtras: { tabela: 'rh_jornadas', ordem: 'nome', colunas: 'id, codigo_empresa, nome, jornada_diaria, jornada_sexta_ativa, jornada_sexta, jornada_sabado_ativa, jornada_sabado, sabado_sempre_extra' },
-        beneficiosLancamentos: { tabela: 'rh_beneficios_lancamentos', ordem: 'id', colunas: 'codigo_empresa, competencia_pagamento, mes_referencia, linhas_json' },
+        // Valores de VT/VA por empregado configurados em Controle de Frequência > Gerar Benefícios
+        // (NÃO é o Projeto Benefícios — são ferramentas e tabelas diferentes).
+        valoresVaVt:    { tabela: 'rh_valores_va_vt', ordem: 'id', colunas: 'codigo_empresa, codigo_empregado, valor_vt, valor_va' },
+        // Só férias que ainda não terminaram antes do mês atual — descarta histórico antigo sem
+        // precisar saber, aqui, qual é exatamente "a competência atual" (isso é feito em carteira.js).
+        feriasCalculadas: { tabela: 'rh_ferias_calculadas', ordem: 'id', colunas: 'codigo_empresa, codigo_empregado, nome_empregado, ferias_inicio, ferias_fim',
+                            filtro: (q, hoje) => q.gte('ferias_fim', hoje.slice(0, 8) + '01') },
     };
 
     // Mês passado e mês corrente, formato 'MM/AAAA' (padrão de fechamento_ciclo.competencia)

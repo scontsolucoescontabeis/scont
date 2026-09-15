@@ -43,7 +43,8 @@ function base() {
         grupos: [{ id: 'g1', nome_grupo: 'Grupo Beta' }],
         jornadaPadrao: [],
         jornadasExtras: [],
-        beneficiosLancamentos: [],
+        valoresVaVt: [],
+        feriasCalculadas: [],
     };
 }
 
@@ -158,20 +159,56 @@ teste('jornadaContagem null quando fonte de jornadas extras indisponível', () =
     assert.strictEqual(beta.jornadaContagem, null);
 });
 
-teste('benefício mais recente escolhido por competência (comparação numérica, não texto)', () => {
+teste('valores de VT/VA por empregado: exclui Contribuinte e Demitido; 0 quando não configurado', () => {
     const d = base();
-    d.beneficiosLancamentos = [
-        { codigo_empresa: '10', competencia_pagamento: '12/2026', linhas_json: [{ cod_emp: '1', nome: 'X', vt_dia: 10, va_dia: 20, dias: 22, total_vt: 220, total_va: 440 }] },
-        { codigo_empresa: '10', competencia_pagamento: '01/2027', linhas_json: [{ cod_emp: '1', nome: 'X', vt_dia: 11, va_dia: 21, dias: 22, total_vt: 242, total_va: 462 }] },
-    ];
+    // base(): 1=X(Empregado,Trabalhando) 2=Y(Empregado,Demitido) 3=Z(Estágiario,Trabalhando)
+    //         4=W(Contribuinte,Trabalhando) 5=V(Diretor/Outros,Trabalhando) — todos da empresa '10'.
+    d.valoresVaVt = [{ codigo_empresa: '10', codigo_empregado: '1', valor_vt: 8.5, valor_va: 22 }];
     const beta = montarCarteira(d, HOJE).find(i => i.codigo === '10');
-    assert.strictEqual(beta.beneficio.competencia_pagamento, '01/2027');
-    assert.strictEqual(beta.beneficio.linhas_json[0].total_vt, 242);
+    assert.deepStrictEqual(beta.valoresVaVt.map(v => v.codigo_empregado).sort(), ['1', '3', '5']);
+    const x = beta.valoresVaVt.find(v => v.codigo_empregado === '1');
+    assert.deepStrictEqual({ vt: x.vt, va: x.va }, { vt: 8.5, va: 22 });
+    const z = beta.valoresVaVt.find(v => v.codigo_empregado === '3');
+    assert.deepStrictEqual({ vt: z.vt, va: z.va }, { vt: 0, va: 0 });
 });
 
-teste('sem lançamentos de benefícios, beneficio fica null (não undefined/erro)', () => {
-    const alfa = montarCarteira(base(), HOJE).find(i => i.codigo === '20');
-    assert.strictEqual(alfa.beneficio, null);
+teste('valoresVaVt null quando fonte de empregados ou de valores indisponível', () => {
+    const d1 = base();
+    d1.empregados = null;
+    assert.strictEqual(montarCarteira(d1, HOJE).find(i => i.codigo === '10').valoresVaVt, null);
+
+    const d2 = base();
+    d2.valoresVaVt = null;
+    assert.strictEqual(montarCarteira(d2, HOJE).find(i => i.codigo === '10').valoresVaVt, null);
+});
+
+teste('férias: separa competência atual (09/2026) e próxima (10/2026) por sobreposição de datas', () => {
+    const d = base();
+    d.feriasCalculadas = [
+        { codigo_empresa: '10', codigo_empregado: '1', nome_empregado: 'Só setembro', ferias_inicio: '2026-09-05', ferias_fim: '2026-09-20' },
+        { codigo_empresa: '10', codigo_empregado: '2', nome_empregado: 'Vira o mês', ferias_inicio: '2026-09-25', ferias_fim: '2026-10-10' },
+        { codigo_empresa: '10', codigo_empregado: '3', nome_empregado: 'Só outubro', ferias_inicio: '2026-10-15', ferias_fim: '2026-10-30' },
+        { codigo_empresa: '10', codigo_empregado: '4', nome_empregado: 'Já terminou', ferias_inicio: '2026-08-01', ferias_fim: '2026-08-15' },
+        { codigo_empresa: '20', codigo_empregado: '9', nome_empregado: 'Outra empresa', ferias_inicio: '2026-09-01', ferias_fim: '2026-09-10' },
+    ];
+    const beta = montarCarteira(d, HOJE).find(i => i.codigo === '10');
+    assert.deepStrictEqual(beta.feriasAtual.map(f => f.nome_empregado), ['Só setembro', 'Vira o mês']);
+    assert.deepStrictEqual(beta.feriasProxima.map(f => f.nome_empregado), ['Vira o mês', 'Só outubro']);
+});
+
+teste('férias ordenadas por início; null quando fonte indisponível', () => {
+    const d = base();
+    d.feriasCalculadas = [
+        { codigo_empresa: '10', codigo_empregado: '1', nome_empregado: 'B', ferias_inicio: '2026-09-20', ferias_fim: '2026-09-25' },
+        { codigo_empresa: '10', codigo_empregado: '2', nome_empregado: 'A', ferias_inicio: '2026-09-01', ferias_fim: '2026-09-05' },
+    ];
+    const beta = montarCarteira(d, HOJE).find(i => i.codigo === '10');
+    assert.deepStrictEqual(beta.feriasAtual.map(f => f.nome_empregado), ['A', 'B']);
+
+    d.feriasCalculadas = null;
+    const beta2 = montarCarteira(d, HOJE).find(i => i.codigo === '10');
+    assert.strictEqual(beta2.feriasAtual, null);
+    assert.strictEqual(beta2.feriasProxima, null);
 });
 
 console.log(`\n${n} testes OK`);
