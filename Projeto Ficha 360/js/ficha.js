@@ -74,8 +74,8 @@ window.Ficha360Ficha = (function () {
               ${meta('CNPJ', it.cnpj ? `<span class="mono">${esc(it.cnpj)}</span>` : '', true)}
               ${meta('Carteira', esc(F360.ROTULO_STATUS[it.statusCarteira] || it.statusCarteira))}
               ${it.grupo ? meta('Grupo', esc(it.grupo)) : ''}
-              ${meta('Resp. DP', esc(it.responsaveisDp.join(', ')), true)}
-              ${meta('Resp. Contábil', esc(it.responsaveisContabil.join(', ')), true)}
+              ${meta('Resp. DP', it.possuiFolha ? esc(it.responsaveisDp.join(', ')) : 'N/A', true)}
+              ${meta('Resp. Contábil', it.possuiContabil ? esc(it.responsaveisContabil.join(', ')) : 'N/A', true)}
             </dl>
           </div>
           <div class="abas-wrap">
