@@ -147,6 +147,9 @@
         <button class="sidebar-item" id="nav-vavt" onclick="abrirAba('vavt', this)">
             <span class="sidebar-item-icon">💰</span> VA/VT
         </button>
+        <button class="sidebar-item" id="nav-grupos" onclick="abrirAba('grupos', this)">
+            <span class="sidebar-item-icon">👥</span> Grupos de Empresas
+        </button>
     </nav>
     <div class="sidebar-footer">
         <a href="index.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
@@ -998,10 +1001,40 @@
             </div>
         </div>
 
+        <!-- ABA GRUPOS DE EMPRESAS -->
+        <div id="grupos" class="admin-tab-content">
+            <div class="admin-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
+                    <h2 style="margin:0;">👥 Grupos de Empresas</h2>
+                    <button type="button" class="btn-save" onclick="novoGrupoCfg()">➕ Novo Grupo</button>
+                </div>
+                <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start;">
+                    <div style="flex: 0 0 260px; border:1px solid #E0E0E0; border-radius:8px; overflow:hidden;">
+                        <div id="listaGruposCfg"></div>
+                    </div>
+                    <div style="flex: 1 1 420px; border:1px solid #E0E0E0; border-radius:8px; padding:16px;" id="grupoDetalheCfg">
+                        <p style="color: #7F8C8D; font-size:13px;">Selecione um grupo à esquerda ou clique em "Novo Grupo".</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /container -->
 </div><!-- /main-content -->
 
 <div id="vvBuscaEmpresaResultados" style="
+    display: none;
+    position: fixed;
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 9000;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+"></div>
+
+<div id="grpBuscaEmpresaResultadosCfg" style="
     display: none;
     position: fixed;
     background: #fff;

@@ -59,6 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     carregarFeriados();
     carregarRegras();
     carregarMapeamentos();
+    carregarGruposCfg();
     configurarUpload();
     _carregarTimestampsImportacao();
 
@@ -4517,4 +4518,236 @@ async function salvarValoresVaVt() {
     } catch (e) {
         mostrarMensagem('Erro', 'Erro ao salvar valores de VT/VA: ' + e.message);
     }
+}
+
+// --- GRUPOS DE EMPRESAS ---
+// CRUD completo migrado do Controle de Frequência (Projeto RH/script.js). A
+// tela antiga (Projeto RH/index.html #gruposScreen) continua existindo só
+// para consulta e para a ferramenta de exportação em lote, que depende do
+// mesmo estado carregado por lá (_grupos/_grupoAtual) e não foi tocada.
+
+let _gruposCfg = [];
+let _grupoAtualCfg = null;
+
+async function carregarGruposCfg() {
+    try {
+        const { data: grupos, error: errG } = await supabaseClient
+            .from('rh_grupos_empresas')
+            .select('id, nome_grupo')
+            .order('nome_grupo', { ascending: true });
+        if (errG) throw errG;
+        const { data: itens, error: errI } = await supabaseClient
+            .from('rh_grupos_empresas_itens')
+            .select('grupo_id, codigo_empresa');
+        if (errI) throw errI;
+        const contagem = {};
+        (itens || []).forEach(it => { contagem[it.grupo_id] = (contagem[it.grupo_id] || 0) + 1; });
+        _gruposCfg = (grupos || []).map(g => ({ ...g, qtdEmpresas: contagem[g.id] || 0 }));
+        renderizarListaGruposCfg();
+    } catch (erro) {
+        console.error('Erro ao carregar grupos:', erro);
+        mostrarMensagem('Erro', 'Falha ao carregar grupos de empresas.');
+    }
+}
+
+function renderizarListaGruposCfg() {
+    const container = document.getElementById('listaGruposCfg');
+    if (!container) return;
+    if (_gruposCfg.length === 0) {
+        container.innerHTML = '<div style="padding:14px; color: #7F8C8D; font-size:13px;">Nenhum grupo cadastrado.</div>';
+        return;
+    }
+    container.innerHTML = _gruposCfg.map(g => `
+        <div onclick="selecionarGrupoCfg('${g.id}')"
+            style="padding:10px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #f0f0f0; ${_grupoAtualCfg?.id === g.id ? 'background:#f5f5f5; font-weight:600;' : ''}">
+            ${g.nome_grupo} <span style="color: #7F8C8D;">(${g.qtdEmpresas})</span>
+        </div>
+    `).join('');
+}
+
+function novoGrupoCfg() {
+    _grupoAtualCfg = { id: null, nome_grupo: '', observacoes: '', email_responsavel: '', empresas: [] };
+    renderizarListaGruposCfg();
+    _renderGrupoDetalheCfg();
+}
+
+async function selecionarGrupoCfg(id) {
+    const grupo = _gruposCfg.find(g => g.id === id);
+    if (!grupo) return;
+    try {
+        const { data: grupoCompleto, error: errG } = await supabaseClient
+            .from('rh_grupos_empresas')
+            .select('id, nome_grupo, observacoes, email_responsavel')
+            .eq('id', id)
+            .single();
+        if (errG) throw errG;
+        const { data: itens, error } = await supabaseClient
+            .from('rh_grupos_empresas_itens')
+            .select('codigo_empresa')
+            .eq('grupo_id', id);
+        if (error) throw error;
+        const empresas = (itens || []).map(it => {
+            const emp = _todasEmpresas.find(e => e.codigo_empresa === it.codigo_empresa);
+            return { codigo_empresa: it.codigo_empresa, nome_empresa: emp?.nome_empresa || it.codigo_empresa };
+        });
+        _grupoAtualCfg = {
+            id: grupoCompleto.id,
+            nome_grupo: grupoCompleto.nome_grupo,
+            observacoes: grupoCompleto.observacoes || '',
+            email_responsavel: grupoCompleto.email_responsavel || '',
+            empresas,
+        };
+        renderizarListaGruposCfg();
+        _renderGrupoDetalheCfg();
+    } catch (erro) {
+        console.error('Erro ao carregar empresas do grupo:', erro);
+        mostrarMensagem('Erro', 'Falha ao carregar as empresas do grupo.');
+    }
+}
+
+function _renderGrpEmpresasListCfg() {
+    const container = document.getElementById('grpEmpresasListCfg');
+    if (!container) return;
+    if (_grupoAtualCfg.empresas.length === 0) {
+        container.innerHTML = '<div style="padding:10px; color: #7F8C8D; font-size:13px;">Nenhuma empresa adicionada.</div>';
+        return;
+    }
+    container.innerHTML = _grupoAtualCfg.empresas.map(e => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid #f0f0f0; font-size:13px;">
+            <span><strong>${e.codigo_empresa}</strong> - ${e.nome_empresa}</span>
+            <button type="button" class="btn btn-danger btn-small" style="padding:2px 8px; font-size:11px;" onclick="removerEmpresaGrupoCfg('${e.codigo_empresa}')">remover</button>
+        </div>
+    `).join('');
+}
+
+function removerEmpresaGrupoCfg(codigo) {
+    _grupoAtualCfg.empresas = _grupoAtualCfg.empresas.filter(e => e.codigo_empresa !== codigo);
+    _renderGrpEmpresasListCfg();
+}
+
+function filtrarEmpresasGrupoCfg(termo) {
+    const box   = document.getElementById('grpBuscaEmpresaResultadosCfg');
+    const input = document.getElementById('grpBuscaEmpresaCfg');
+    if (!box || !input) return;
+    const rect = input.getBoundingClientRect();
+    box.style.top   = (rect.bottom + 2) + 'px';
+    box.style.left  = rect.left + 'px';
+    box.style.width = rect.width + 'px';
+    const norm = termo.trim().toLowerCase();
+    const lista = norm
+        ? _todasEmpresas.filter(e => e.nome_empresa.toLowerCase().includes(norm) || e.codigo_empresa.toLowerCase().includes(norm))
+        : _todasEmpresas;
+    if (!lista.length) {
+        box.innerHTML = '<div style="padding:10px 14px;color:#999;font-size:13px;">Nenhuma empresa encontrada</div>';
+        box.style.display = 'block';
+        return;
+    }
+    box.innerHTML = lista.map(e => `
+        <div onclick="adicionarEmpresaGrupoCfg('${e.codigo_empresa}', '${e.nome_empresa.replace(/'/g, "\\'")}')"
+            style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;"
+            onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+            <span style="font-family:monospace;font-weight:600;color:#8B3A3A;margin-right:8px;">${e.codigo_empresa}</span>${e.nome_empresa}
+        </div>`).join('');
+    box.style.display = 'block';
+}
+
+function adicionarEmpresaGrupoCfg(codigo, nome) {
+    if (!_grupoAtualCfg.empresas.some(e => e.codigo_empresa === codigo)) {
+        _grupoAtualCfg.empresas.push({ codigo_empresa: codigo, nome_empresa: nome });
+    }
+    document.getElementById('grpBuscaEmpresaCfg').value = '';
+    document.getElementById('grpBuscaEmpresaResultadosCfg').style.display = 'none';
+    _renderGrpEmpresasListCfg();
+}
+
+async function salvarGrupoCfg() {
+    const nome = (document.getElementById('grpNomeCfg')?.value || '').trim();
+    if (!nome) { mostrarMensagem('Aviso', 'Informe o nome do grupo.'); return; }
+    const observacoes = (document.getElementById('grpObservacoesCfg')?.value || '').trim();
+    const emailResponsavel = (document.getElementById('grpEmailResponsavelCfg')?.value || '').trim() || null;
+    try {
+        let grupoId = _grupoAtualCfg.id;
+        if (grupoId) {
+            const { error } = await supabaseClient.from('rh_grupos_empresas').update({ nome_grupo: nome, observacoes, email_responsavel: emailResponsavel }).eq('id', grupoId);
+            if (error) throw error;
+        } else {
+            const { data, error } = await supabaseClient.from('rh_grupos_empresas').insert({ nome_grupo: nome, observacoes, email_responsavel: emailResponsavel }).select('id').single();
+            if (error) throw error;
+            grupoId = data.id;
+        }
+        const { error: errDel } = await supabaseClient.from('rh_grupos_empresas_itens').delete().eq('grupo_id', grupoId);
+        if (errDel) throw errDel;
+        if (_grupoAtualCfg.empresas.length > 0) {
+            const { error: errIns } = await supabaseClient.from('rh_grupos_empresas_itens')
+                .insert(_grupoAtualCfg.empresas.map(e => ({ grupo_id: grupoId, codigo_empresa: e.codigo_empresa })));
+            if (errIns) throw errIns;
+        }
+        mostrarMensagem('Sucesso', '✅ Grupo salvo com sucesso!');
+        await carregarGruposCfg();
+        await selecionarGrupoCfg(grupoId);
+    } catch (erro) {
+        console.error('Erro ao salvar grupo:', erro);
+        mostrarMensagem('Erro', 'Falha ao salvar o grupo: ' + erro.message);
+    }
+}
+
+async function excluirGrupoCfg() {
+    if (!_grupoAtualCfg?.id) return;
+    if (!confirm(`Excluir o grupo "${_grupoAtualCfg.nome_grupo}"?`)) return;
+    try {
+        const { error } = await supabaseClient.from('rh_grupos_empresas').delete().eq('id', _grupoAtualCfg.id);
+        if (error) throw error;
+        _grupoAtualCfg = null;
+        await carregarGruposCfg();
+        _renderGrupoDetalheCfg();
+        mostrarMensagem('Sucesso', '✅ Grupo excluído com sucesso!');
+    } catch (erro) {
+        console.error('Erro ao excluir grupo:', erro);
+        mostrarMensagem('Erro', 'Falha ao excluir o grupo: ' + erro.message);
+    }
+}
+
+function _renderGrupoDetalheCfg() {
+    const container = document.getElementById('grupoDetalheCfg');
+    if (!container) return;
+    if (!_grupoAtualCfg) {
+        container.innerHTML = '<p style="color: #7F8C8D; font-size:13px;">Selecione um grupo à esquerda ou clique em "Novo Grupo".</p>';
+        return;
+    }
+    container.innerHTML = `
+        <div class="form-group" style="margin-bottom:14px;">
+            <label>Nome do Grupo</label>
+            <input type="text" id="grpNomeCfg" value="${_grupoAtualCfg.nome_grupo.replace(/"/g, '&quot;')}" placeholder="Ex: Grupo Shopping X" style="width:100%; box-sizing:border-box;">
+        </div>
+        <div class="form-group" style="margin-bottom:14px;">
+            <label>E-mail(is) do Responsável pelo Grupo</label>
+            <input type="text" id="grpEmailResponsavelCfg" value="${(_grupoAtualCfg.email_responsavel || '').replace(/"/g, '&quot;')}"
+                placeholder="ex: financeiro@empresa.com, rh@empresa.com" style="width:100%; box-sizing:border-box;">
+            <small style="color: #7F8C8D; font-size:11px;">
+                Quando preenchido, os PDFs de Benefícios/Folha de Ponto gerados com este grupo marcado no seletor
+                são enviados juntos para este(s) e-mail(is), em vez do e-mail individual de cada empresa.
+            </small>
+        </div>
+        <div class="form-group" style="margin-bottom:8px;">
+            <label>Empresas do Grupo</label>
+            <input type="text" id="grpBuscaEmpresaCfg" placeholder="Digite o nome ou código da empresa..." autocomplete="off"
+                oninput="filtrarEmpresasGrupoCfg(this.value)" onfocus="filtrarEmpresasGrupoCfg(this.value)"
+                style="width:100%; box-sizing:border-box; margin-top:4px;">
+        </div>
+        <div id="grpEmpresasListCfg" style="border:1px solid #E0E0E0; border-radius:8px; overflow:hidden; margin-bottom:14px;"></div>
+        <div style="margin-bottom:18px; border:1px solid #E0E0E0; border-radius:8px; overflow:hidden;">
+            <div style="background: #F5F5F5; padding: 8px 14px;">
+                <span style="font-size: 11px; font-weight: 700; color: #7F8C8D; text-transform: uppercase; letter-spacing: 0.4px;">📝 Observações do Grupo</span>
+            </div>
+            <div style="padding: 14px;">
+                <textarea id="grpObservacoesCfg" rows="10" placeholder="Descreva aqui tudo o que for relevante sobre este grupo: particularidades das empresas, combinados com o cliente, exceções de processamento, prazos, etc. Não deixe nenhum detalhe de fora."
+                    style="width:100%; box-sizing:border-box; padding:12px; border:1px solid #ced4da; border-radius:6px; font-size:15px; line-height:1.5; font-family:inherit; resize:vertical; min-height:180px;">${(_grupoAtualCfg.observacoes || '').replace(/</g, '&lt;')}</textarea>
+            </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; gap:10px;">
+            ${_grupoAtualCfg.id ? '<button type="button" class="btn btn-danger btn-small" onclick="excluirGrupoCfg()">🗑 Excluir Grupo</button>' : '<span></span>'}
+            <button type="button" class="btn btn-primary btn-small" onclick="salvarGrupoCfg()">💾 Salvar Grupo</button>
+        </div>
+    `;
+    _renderGrpEmpresasListCfg();
 }

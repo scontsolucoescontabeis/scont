@@ -2567,12 +2567,6 @@ function renderizarListaGrupos() {
     `).join('');
 }
 
-function novoGrupo() {
-    _grupoAtual = { id: null, nome_grupo: '', observacoes: '', email_responsavel: '', empresas: [] };
-    renderizarListaGrupos();
-    _renderGrupoDetalhe();
-}
-
 async function selecionarGrupo(id) {
     const grupo = _grupos.find(g => g.id === id);
     if (!grupo) return;
@@ -2607,148 +2601,29 @@ async function selecionarGrupo(id) {
     }
 }
 
-function _renderGrpEmpresasList() {
-    const container = document.getElementById('grpEmpresasList');
-    if (!container) return;
-    if (_grupoAtual.empresas.length === 0) {
-        container.innerHTML = '<div style="padding:10px; color: var(--text-secondary); font-size:13px;">Nenhuma empresa adicionada.</div>';
-        return;
-    }
-    container.innerHTML = _grupoAtual.empresas.map(e => `
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid #f0f0f0; font-size:13px;">
-            <span><strong>${e.codigo_empresa}</strong> - ${e.nome_empresa}</span>
-            <button type="button" class="btn btn-danger btn-small" style="padding:2px 8px; font-size:11px;" onclick="removerEmpresaGrupo('${e.codigo_empresa}')">remover</button>
-        </div>
-    `).join('');
-}
-
-function removerEmpresaGrupo(codigo) {
-    _grupoAtual.empresas = _grupoAtual.empresas.filter(e => e.codigo_empresa !== codigo);
-    _renderGrpEmpresasList();
-}
-
-function filtrarEmpresasGrupo(termo) {
-    const box   = document.getElementById('grpBuscaEmpresaResultados');
-    const input = document.getElementById('grpBuscaEmpresa');
-    if (!box || !input) return;
-    const rect = input.getBoundingClientRect();
-    box.style.top   = (rect.bottom + 2) + 'px';
-    box.style.left  = rect.left + 'px';
-    box.style.width = rect.width + 'px';
-    const norm = termo.trim().toLowerCase();
-    const lista = norm
-        ? state.empresas.filter(e => e.nome_empresa.toLowerCase().includes(norm) || e.codigo_empresa.toLowerCase().includes(norm))
-        : state.empresas;
-    if (!lista.length) {
-        box.innerHTML = '<div style="padding:10px 14px;color:#999;font-size:13px;">Nenhuma empresa encontrada</div>';
-        box.style.display = 'block';
-        return;
-    }
-    box.innerHTML = lista.map(e => `
-        <div onclick="adicionarEmpresaGrupo('${e.codigo_empresa}', '${e.nome_empresa.replace(/'/g, "\\'")}')"
-            style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;"
-            onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
-            <span style="font-family:monospace;font-weight:600;color:var(--primary-color);margin-right:8px;">${e.codigo_empresa}</span>${e.nome_empresa}
-        </div>`).join('');
-    box.style.display = 'block';
-}
-
-function adicionarEmpresaGrupo(codigo, nome) {
-    if (!_grupoAtual.empresas.some(e => e.codigo_empresa === codigo)) {
-        _grupoAtual.empresas.push({ codigo_empresa: codigo, nome_empresa: nome });
-    }
-    document.getElementById('grpBuscaEmpresa').value = '';
-    document.getElementById('grpBuscaEmpresaResultados').style.display = 'none';
-    _renderGrpEmpresasList();
-}
-
-async function salvarGrupo() {
-    const nome = (document.getElementById('grpNome')?.value || '').trim();
-    if (!nome) { mostrarMensagem('Aviso', 'Informe o nome do grupo.'); return; }
-    const observacoes = (document.getElementById('grpObservacoes')?.value || '').trim();
-    const emailResponsavel = (document.getElementById('grpEmailResponsavel')?.value || '').trim() || null;
-    try {
-        let grupoId = _grupoAtual.id;
-        if (grupoId) {
-            const { error } = await supabaseClient.from('rh_grupos_empresas').update({ nome_grupo: nome, observacoes, email_responsavel: emailResponsavel }).eq('id', grupoId);
-            if (error) throw error;
-        } else {
-            const { data, error } = await supabaseClient.from('rh_grupos_empresas').insert({ nome_grupo: nome, observacoes, email_responsavel: emailResponsavel }).select('id').single();
-            if (error) throw error;
-            grupoId = data.id;
-        }
-        const { error: errDel } = await supabaseClient.from('rh_grupos_empresas_itens').delete().eq('grupo_id', grupoId);
-        if (errDel) throw errDel;
-        if (_grupoAtual.empresas.length > 0) {
-            const { error: errIns } = await supabaseClient.from('rh_grupos_empresas_itens')
-                .insert(_grupoAtual.empresas.map(e => ({ grupo_id: grupoId, codigo_empresa: e.codigo_empresa })));
-            if (errIns) throw errIns;
-        }
-        mostrarMensagem('Sucesso', '✅ Grupo salvo com sucesso!');
-        await carregarGrupos();
-        await selecionarGrupo(grupoId);
-    } catch (erro) {
-        console.error('Erro ao salvar grupo:', erro);
-        mostrarMensagem('Erro', 'Falha ao salvar o grupo: ' + erro.message);
-    }
-}
-
-async function excluirGrupo() {
-    if (!_grupoAtual?.id) return;
-    if (!confirm(`Excluir o grupo "${_grupoAtual.nome_grupo}"?`)) return;
-    try {
-        const { error } = await supabaseClient.from('rh_grupos_empresas').delete().eq('id', _grupoAtual.id);
-        if (error) throw error;
-        _grupoAtual = null;
-        await carregarGrupos();
-        _renderGrupoDetalhe();
-        mostrarMensagem('Sucesso', '✅ Grupo excluído com sucesso!');
-    } catch (erro) {
-        console.error('Erro ao excluir grupo:', erro);
-        mostrarMensagem('Erro', 'Falha ao excluir o grupo: ' + erro.message);
-    }
-}
-
 function _renderGrupoDetalhe() {
     const container = document.getElementById('grupoDetalhe');
     if (!container) return;
     if (!_grupoAtual) {
-        container.innerHTML = '<p style="color: var(--text-secondary); font-size:13px;">Selecione um grupo à esquerda ou clique em "Novo Grupo".</p>';
+        container.innerHTML = '<p style="color: var(--text-secondary); font-size:13px;">Selecione um grupo à esquerda para ver os detalhes e as ações em lote.</p>';
         return;
     }
     container.innerHTML = `
-        <div class="form-group" style="margin-bottom:14px;">
-            <label>Nome do Grupo</label>
-            <input type="text" id="grpNome" value="${_grupoAtual.nome_grupo.replace(/"/g, '&quot;')}" placeholder="Ex: Grupo Shopping X" style="width:100%; box-sizing:border-box;">
-        </div>
-        <div class="form-group" style="margin-bottom:14px;">
-            <label>E-mail(is) do Responsável pelo Grupo</label>
-            <input type="text" id="grpEmailResponsavel" value="${(_grupoAtual.email_responsavel || '').replace(/"/g, '&quot;')}"
-                placeholder="ex: financeiro@empresa.com, rh@empresa.com" style="width:100%; box-sizing:border-box;">
-            <small style="color: var(--text-secondary); font-size:11px;">
-                Quando preenchido, os PDFs de Benefícios/Folha de Ponto gerados com este grupo marcado no seletor
-                são enviados juntos para este(s) e-mail(is), em vez do e-mail individual de cada empresa.
-            </small>
-        </div>
-        <div class="form-group" style="margin-bottom:8px;">
-            <label>Empresas do Grupo</label>
-            <input type="text" id="grpBuscaEmpresa" placeholder="Digite o nome ou código da empresa..." autocomplete="off"
-                oninput="filtrarEmpresasGrupo(this.value)" onfocus="filtrarEmpresasGrupo(this.value)"
-                style="width:100%; box-sizing:border-box; margin-top:4px;">
-        </div>
-        <div id="grpEmpresasList" style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden; margin-bottom:14px;"></div>
-        <div style="margin-bottom:18px; border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
-            <div style="background: var(--background-color); padding: 8px 14px;">
-                <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">📝 Observações do Grupo</span>
+        <p style="font-size:12px; color:#7F8C8D; margin-bottom:12px;">Para criar, editar ou excluir grupos, use <a href="../Projeto Departamento Pessoal/configuracoes.html?tab=grupos">Departamento Pessoal › Configurações</a>.</p>
+        <div style="margin-bottom:14px;">
+            <h3 style="margin:0 0 6px;">${_grupoAtual.nome_grupo}</h3>
+            ${_grupoAtual.email_responsavel ? `<div style="font-size:13px; color: var(--text-secondary); margin-bottom:6px;">📧 ${_grupoAtual.email_responsavel}</div>` : ''}
+            ${_grupoAtual.observacoes ? `<div style="font-size:13px; white-space:pre-wrap; margin-bottom:10px;">${_grupoAtual.observacoes.replace(/</g, '&lt;')}</div>` : ''}
+            <div style="font-size:13px; font-weight:600; margin-bottom:6px;">Empresas do Grupo (${_grupoAtual.empresas.length})</div>
+            <div style="border:1px solid var(--border-color); border-radius:8px; overflow:hidden;">
+                ${_grupoAtual.empresas.length === 0
+                    ? '<div style="padding:10px; color: var(--text-secondary); font-size:13px;">Nenhuma empresa neste grupo.</div>'
+                    : _grupoAtual.empresas.map(e => `
+                        <div style="padding:8px 10px; border-bottom:1px solid #f0f0f0; font-size:13px;">
+                            <strong>${e.codigo_empresa}</strong> - ${e.nome_empresa}
+                        </div>
+                    `).join('')}
             </div>
-            <div style="padding: 14px;">
-                <textarea id="grpObservacoes" rows="10" placeholder="Descreva aqui tudo o que for relevante sobre este grupo: particularidades das empresas, combinados com o cliente, exceções de processamento, prazos, etc. Não deixe nenhum detalhe de fora."
-                    style="width:100%; box-sizing:border-box; padding:12px; border:1px solid #ced4da; border-radius:6px; font-size:15px; line-height:1.5; font-family:inherit; resize:vertical; min-height:180px;">${(_grupoAtual.observacoes || '').replace(/</g, '&lt;')}</textarea>
-            </div>
-        </div>
-        <div style="display:flex; justify-content:space-between; gap:10px;">
-            ${_grupoAtual.id ? '<button type="button" class="btn btn-danger btn-small" onclick="excluirGrupo()">🗑 Excluir Grupo</button>' : '<span></span>'}
-            <button type="button" class="btn btn-primary btn-small" onclick="salvarGrupo()">💾 Salvar Grupo</button>
         </div>
         ${_grupoAtual.id ? `
         <div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:16px;">
@@ -2765,7 +2640,6 @@ function _renderGrupoDetalhe() {
             </div>
         </div>` : ''}
     `;
-    _renderGrpEmpresasList();
     const compEl = document.getElementById('grpCompetencia');
     if (compEl) compEl.addEventListener('input', e => { e.target.value = formatarCompetencia(e.target.value); });
 }
