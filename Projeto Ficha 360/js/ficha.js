@@ -14,7 +14,7 @@ window.Ficha360Ficha = (function () {
     const ROTULO_TIPO_EMPREGADO = { Empregado: 'Empregados', 'Estágiario': 'Estagiários', Contribuinte: 'Contribuintes', Outros: 'Outros' };
     const FONTES_POR_ABA = {
         vencimentos: ['certificados', 'licencas', 'alvaras'],
-        dp: ['empregados', 'socios', 'ciclos', 'formularios', 'empregadosForm', 'cfgFolha', 'respDp'],
+        dp: ['empregados', 'socios', 'ciclos', 'formularios', 'empregadosForm', 'cfgFolha', 'respDp', 'jornadaPadrao', 'jornadasExtras', 'beneficiosLancamentos'],
         socios: ['socios'],
         contabil: ['cfgContabil', 'onboardings', 'mapeamentos', 'pendencias', 'diarioEventos', 'respContabil'],
     };
@@ -172,6 +172,38 @@ window.Ficha360Ficha = (function () {
             ? Object.entries(porTipo).filter(([, n]) => n > 0).map(([t, n]) => `${ROTULO_TIPO_EMPREGADO[t] || t} ${n}`).join(' · ') || 'nenhum ativo'
             : '';
 
+        // Jornada Padrão + jornadas extras, com quantos empregados ativos usam cada uma
+        // (cadastradas em Controle de Frequência > Configurações).
+        const jornadas = [];
+        if (it.jornadaPadrao) jornadas.push({ nome: 'Jornada Padrão', ...it.jornadaPadrao });
+        it.jornadasExtras.forEach(j => jornadas.push({
+            nome: j.nome, diaria: j.jornada_diaria,
+            sextaAtiva: j.jornada_sexta_ativa, sexta: j.jornada_sexta,
+            sabadoSempreExtra: j.sabado_sempre_extra,
+            sabadoAtiva: !j.sabado_sempre_extra && j.jornada_sabado_ativa, sabado: j.jornada_sabado,
+        }));
+        const jornadasHtml = jornadas.map(j => {
+            const n = it.jornadaContagem ? (it.jornadaContagem[j.nome] || 0) : null;
+            const partes = [`Diária ${esc(j.diaria)}`];
+            if (j.sextaAtiva) partes.push(`Sexta ${esc(j.sexta)}`);
+            if (j.sabadoSempreExtra) partes.push('Sábado sempre extra');
+            else if (j.sabadoAtiva) partes.push(`Sábado ${esc(j.sabado)}`);
+            return `<li><div><strong>${esc(j.nome)}</strong>${n != null ? ` <span class="chip chip-neutro">${n} empregado(s)</span>` : ''}
+                <div class="bloqueado" style="margin-top:2px">${partes.join(' · ')}</div></div></li>`;
+        }).join('');
+
+        // Benefícios VA/VT do lançamento mais recente (Projeto Benefícios).
+        const ben = it.beneficio;
+        const linhasBen = ben ? (ben.linhas_json || []).slice().sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR')) : [];
+        const benHtml = linhasBen.map(l => `<tr>
+            <td>${esc(l.nome)}</td>
+            <td class="num t-right">${fmtMoeda(l.vt_dia)}</td>
+            <td class="num t-right">${fmtMoeda(l.va_dia)}</td>
+            <td class="num t-right">${l.dias ?? '—'}</td>
+            <td class="num t-right col-hide-movel">${fmtMoeda(l.total_vt)}</td>
+            <td class="num t-right col-hide-movel">${fmtMoeda(l.total_va)}</td>
+        </tr>`).join('');
+
         el.innerHTML = `${avisoFontes('dp')}
           <div class="grade">
             <div class="cartao"><h3>Folha contratada</h3><div class="numero">${it.possuiFolha ? 'Sim' : 'Não'}</div></div>
@@ -181,6 +213,15 @@ window.Ficha360Ficha = (function () {
           </div>
           <div class="cartao" style="margin-top:12px"><h3>Fechamento da folha (mês passado e atual)</h3>
             ${ciclosHtml ? `<ul class="lista-alertas">${ciclosHtml}</ul>` : '<div class="bloqueado">Nenhum ciclo nas competências recentes.</div>'}
+          </div>
+          <div class="cartao" style="margin-top:12px"><h3>Jornada de trabalho</h3>
+            ${jornadasHtml ? `<ul class="lista-alertas">${jornadasHtml}</ul>` : '<div class="bloqueado">Nenhuma jornada configurada em Controle de Frequência.</div>'}
+          </div>
+          <div class="cartao" style="margin-top:12px"><h3>Benefícios (VA/VT)${ben ? ` — competência ${esc(ben.competencia_pagamento)}` : ''}</h3>
+            ${linhasBen.length ? `<div class="tabela-wrap"><table class="tabela">
+                <thead><tr><th>Nome</th><th class="t-right">VT/dia</th><th class="t-right">VA/dia</th><th class="t-right">Dias</th><th class="t-right col-hide-movel">Total VT</th><th class="t-right col-hide-movel">Total VA</th></tr></thead>
+                <tbody>${benHtml}</tbody></table></div>`
+                : '<div class="bloqueado">Nenhum lançamento de VA/VT encontrado para esta empresa.</div>'}
           </div>
           <div class="cartao" style="margin-top:12px"><h3>Análise do QSA</h3>
             ${qsa ? `<ul class="lista-alertas">${qsa}</ul>` : '<div class="bloqueado">Nenhuma sobreposição entre sócio e empregado.</div>'}

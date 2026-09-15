@@ -30,6 +30,48 @@
         return out;
     }
 
+    // Monta a Jornada Padrão da empresa a partir das linhas de rh_config_rubricas_txt
+    // (evento -> codigo_rubrica). Sem linha 'jornada_diaria' = nada configurado ainda.
+    function montarJornadaPadrao(linhas) {
+        const m = {};
+        for (const l of linhas) m[l.evento] = l.codigo_rubrica;
+        if (!m.jornada_diaria) return null;
+        const sempreExtra = m.sabado_sempre_extra === '1';
+        return {
+            diaria: m.jornada_diaria,
+            sextaAtiva: m.jornada_sexta_ativa === '1',
+            sexta: m.jornada_sexta || null,
+            sabadoSempreExtra: sempreExtra,
+            sabadoAtiva: !sempreExtra && m.jornada_sabado_ativa === '1',
+            sabado: m.jornada_sabado || null,
+        };
+    }
+
+    // Quantos empregados ativos usam cada jornada (extras pelo nome; sem jornada_id ou
+    // apontando pra uma jornada que não existe mais = 'Jornada Padrão').
+    function contarPorJornada(empregados, jornadasExtras) {
+        const nomePorId = new Map(jornadasExtras.map(j => [j.id, j.nome]));
+        const out = { 'Jornada Padrão': 0 };
+        for (const j of jornadasExtras) out[j.nome] = 0;
+        for (const e of empregados) {
+            if (!R.empregadoAtivo(e.situacao)) continue;
+            const nome = e.jornada_id && nomePorId.has(e.jornada_id) ? nomePorId.get(e.jornada_id) : 'Jornada Padrão';
+            out[nome] = (out[nome] || 0) + 1;
+        }
+        return out;
+    }
+
+    // Lançamento de benefícios (VA/VT) mais recente da empresa, por competência de pagamento
+    // 'MM/AAAA' — comparação numérica, não lexicográfica (senão '01/2027' < '12/2026' como texto).
+    function lancamentoMaisRecente(lancamentos) {
+        if (!lancamentos.length) return null;
+        const chave = (l) => {
+            const [m, a] = String(l.competencia_pagamento || '').split('/').map(Number);
+            return (a || 0) * 12 + (m || 0);
+        };
+        return lancamentos.slice().sort((a, b) => chave(b) - chave(a))[0];
+    }
+
     function montarCarteira(dados, hoje) {
         const ok = (k) => Array.isArray(dados[k]);
         const arr = (k) => (ok(k) ? dados[k] : []);
@@ -84,6 +126,9 @@
         const diario = idx('diarioEventos');
         const grupoPorCodigo = mapaPor('gruposItens', 'codigo_empresa', 'grupo_id');
         const nomeGrupo = mapaPor('grupos', 'id', 'nome_grupo');
+        const jornadaPadraoLinhas = idx('jornadaPadrao');
+        const jornadasExtras = idx('jornadasExtras');
+        const lancamentosBeneficios = idx('beneficiosLancamentos');
 
         const nomes = (lista, mapaNomes) => lista.map(r => mapaNomes.get(r.usuario_id) || '(sem nome)');
 
@@ -120,6 +165,12 @@
                     ? (empregados.get(cod) || []).filter(x => (x.tipo_empregado || '').trim() === 'Empregado' && R.empregadoAtivo(x.situacao)).length
                     : null,
                 empregadosPorTipo: ok('empregados') ? contarEmpregadosPorTipo(empregados.get(cod) || []) : null,
+                jornadaPadrao: ok('jornadaPadrao') ? montarJornadaPadrao(jornadaPadraoLinhas.get(cod) || []) : null,
+                jornadasExtras: jornadasExtras.get(cod) || [],
+                jornadaContagem: (ok('empregados') && ok('jornadasExtras'))
+                    ? contarPorJornada(empregados.get(cod) || [], jornadasExtras.get(cod) || [])
+                    : null,
+                beneficio: ok('beneficiosLancamentos') ? lancamentoMaisRecente(lancamentosBeneficios.get(cod) || []) : null,
                 certificados: certs.get(cod) || [],
                 licencas: licencas.get(cod) || [],
                 socios: socios.get(cod) || [],

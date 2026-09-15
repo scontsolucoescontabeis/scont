@@ -28,7 +28,7 @@
         certificados:   { tabela: 'certificados', ordem: 'id', colunas: 'id, cliente, cpf_cnpj, situacao, data_vencimento, ativo' },
         licencas:       { tabela: 'licencas', ordem: 'id', colunas: 'id, empresa_id, tipo, estabelecimento, numero, data_validade', filtro: soAtivosLic },
         alvaras:        { tabela: 'alvaras', ordem: 'id', colunas: 'id, empresa_id, tipo, estabelecimento, numero, data_validade', filtro: soAtivosLic },
-        empregados:     { tabela: 'rh_empregados', ordem: 'id', colunas: 'codigo_empresa, codigo_empregado, nome_empregado, cpf, situacao, tipo_empregado, data_admissao, data_demissao' },
+        empregados:     { tabela: 'rh_empregados', ordem: 'id', colunas: 'codigo_empresa, codigo_empregado, nome_empregado, cpf, situacao, tipo_empregado, data_admissao, data_demissao, jornada_id' },
         socios:         { tabela: 'rh_socios', ordem: 'id', colunas: 'id, codigo_empresa, nome_socio, cpf, cargo, participacao, capital_social, email_socio, data_entrada, data_saida' },
         ciclos:         { tabela: 'fechamento_ciclo', ordem: 'id', colunas: 'id, codigo_empresa, competencia, concluido_em, fechamento_ciclo_fase(nome_fase, status)',
                           filtro: (q, hoje) => q.in('competencia', _competenciasRecentes(hoje)) },
@@ -41,6 +41,13 @@
                           filtro: (q, hoje) => q.gte('ano', Number(hoje.slice(0, 4)) - 1) },
         gruposItens:    { tabela: 'rh_grupos_empresas_itens', ordem: 'id', colunas: 'grupo_id, codigo_empresa' },
         grupos:         { tabela: 'rh_grupos_empresas', ordem: 'id', colunas: 'id, nome_grupo' },
+        // Jornada Padrão fica em rh_config_rubricas_txt como linhas por "evento" (mesmo padrão de
+        // configuração usado no Controle de Frequência — codigo_rubrica guarda o valor, não um
+        // código de rubrica de verdade, nesses eventos específicos).
+        jornadaPadrao:  { tabela: 'rh_config_rubricas_txt', ordem: 'id', colunas: 'codigo_empresa, evento, codigo_rubrica',
+                          filtro: (q) => q.in('evento', ['jornada_diaria', 'jornada_sexta_ativa', 'jornada_sexta', 'jornada_sabado_ativa', 'jornada_sabado', 'sabado_sempre_extra']) },
+        jornadasExtras: { tabela: 'rh_jornadas', ordem: 'nome', colunas: 'id, codigo_empresa, nome, jornada_diaria, jornada_sexta_ativa, jornada_sexta, jornada_sabado_ativa, jornada_sabado, sabado_sempre_extra' },
+        beneficiosLancamentos: { tabela: 'rh_beneficios_lancamentos', ordem: 'id', colunas: 'codigo_empresa, competencia_pagamento, mes_referencia, linhas_json' },
     };
 
     // Mês passado e mês corrente, formato 'MM/AAAA' (padrão de fechamento_ciclo.competencia)

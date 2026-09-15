@@ -126,8 +126,22 @@ table.tabela{width:100%;border-collapse:collapse;font-size:13px}
 
 @media (max-width: 900px){
   .app{flex-direction:column}
-  .sidebar{width:100%;height:auto;position:static}
-  .main{padding:16px}
+  /* Sidebar vira uma barra de topo compacta — a coluna cheia não faz sentido no celular
+     (empurrava todo o conteúdo pra baixo da dobra). */
+  .sidebar{
+    width:100%;height:auto;position:sticky;top:0;z-index:20;
+    flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:space-between;
+    padding:8px 14px;gap:8px 14px;
+  }
+  .brand{display:flex;align-items:center;gap:8px}
+  .brand img{width:26px;height:26px;padding:3px;border-radius:4px}
+  .brand h1{font-size:14px;margin:0}
+  .brand p{display:none}
+  .menu{margin-top:0;flex-direction:row}
+  .menu-item{padding:7px 10px;font-size:12.5px}
+  .sidebar-footer{margin-top:0}
+  .btn-voltar{width:auto;padding:7px 10px;font-size:12.5px}
+  .main{padding:14px}
 }
 
 /* Celular: some colunas secundárias em vez de forçar rolagem lateral na tabela. */

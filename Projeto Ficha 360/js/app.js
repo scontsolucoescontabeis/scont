@@ -11,6 +11,7 @@ window.F360 = {
         ciclos: 'Fechamento da Folha', formularios: 'Formulários', empregadosForm: 'Formulários de empregado',
         onboardings: 'Onboarding', mapeamentos: 'Mapeamento', pendencias: 'Pendências do Mapeamento',
         diarioEventos: 'Diário Contábil', gruposItens: 'Grupos', grupos: 'Grupos',
+        jornadaPadrao: 'Jornada Padrão', jornadasExtras: 'Jornadas', beneficiosLancamentos: 'Benefícios VA/VT',
     },
     ROTULO_SEMAFORO: { vermelho: 'Crítico', amarelo: 'Atenção', verde: 'OK', inativo: 'Inativa' },
     ROTULO_STATUS: { ativo: 'Ativo', em_implantacao: 'Em implantação', em_saida: 'Em saída', inativo: 'Inativo' },

@@ -41,6 +41,9 @@ function base() {
         diarioEventos: [{ codigo_empresa: '10', ano: 2026, mes: 8, tipo_evento: 'aprovado', created_at: '2026-09-03T00:00:00Z' }],
         gruposItens: [{ grupo_id: 'g1', codigo_empresa: '10' }],
         grupos: [{ id: 'g1', nome_grupo: 'Grupo Beta' }],
+        jornadaPadrao: [],
+        jornadasExtras: [],
+        beneficiosLancamentos: [],
     };
 }
 
@@ -114,6 +117,61 @@ teste('responsável sem nome resolvido aparece como "(sem nome)"', () => {
     d.usuariosDp = null;
     const beta = montarCarteira(d, HOJE).find(i => i.codigo === '10');
     assert.deepStrictEqual(beta.responsaveisDp, ['(sem nome)']);
+});
+
+teste('jornada padrão montada a partir das linhas de evento; sem jornada_diaria vira null', () => {
+    const d = base();
+    d.jornadaPadrao = [
+        { codigo_empresa: '10', evento: 'jornada_diaria', codigo_rubrica: '08:00' },
+        { codigo_empresa: '10', evento: 'jornada_sexta_ativa', codigo_rubrica: '1' },
+        { codigo_empresa: '10', evento: 'jornada_sexta', codigo_rubrica: '04:00' },
+        { codigo_empresa: '10', evento: 'sabado_sempre_extra', codigo_rubrica: '1' },
+        { codigo_empresa: '10', evento: 'jornada_sabado_ativa', codigo_rubrica: '1' },
+        { codigo_empresa: '10', evento: 'jornada_sabado', codigo_rubrica: '04:00' },
+    ];
+    const c = montarCarteira(d, HOJE);
+    const beta = c.find(i => i.codigo === '10');
+    assert.deepStrictEqual(beta.jornadaPadrao, {
+        diaria: '08:00', sextaAtiva: true, sexta: '04:00',
+        sabadoSempreExtra: true, sabadoAtiva: false, sabado: '04:00',
+    });
+    const alfa = c.find(i => i.codigo === '20');
+    assert.strictEqual(alfa.jornadaPadrao, null);
+});
+
+teste('jornadas extras contam empregados ativos por jornada; sem associação cai em Jornada Padrão', () => {
+    const d = base();
+    d.jornadasExtras = [{ id: 'j1', codigo_empresa: '10', nome: 'Turno Noite', jornada_diaria: '06:00', jornada_sexta_ativa: false, jornada_sabado_ativa: false }];
+    // X (Trabalhando) sem jornada_id -> Jornada Padrão; Z (Trabalhando) -> Turno Noite; Y é Demitido, não conta.
+    d.empregados[0].jornada_id = null;
+    d.empregados[2].jornada_id = 'j1';
+    const beta = montarCarteira(d, HOJE).find(i => i.codigo === '10');
+    assert.deepStrictEqual(beta.jornadasExtras.map(j => j.nome), ['Turno Noite']);
+    assert.strictEqual(beta.jornadaContagem['Turno Noite'], 1);
+    assert.ok(beta.jornadaContagem['Jornada Padrão'] >= 1);
+});
+
+teste('jornadaContagem null quando fonte de jornadas extras indisponível', () => {
+    const d = base();
+    d.jornadasExtras = null;
+    const beta = montarCarteira(d, HOJE).find(i => i.codigo === '10');
+    assert.strictEqual(beta.jornadaContagem, null);
+});
+
+teste('benefício mais recente escolhido por competência (comparação numérica, não texto)', () => {
+    const d = base();
+    d.beneficiosLancamentos = [
+        { codigo_empresa: '10', competencia_pagamento: '12/2026', linhas_json: [{ cod_emp: '1', nome: 'X', vt_dia: 10, va_dia: 20, dias: 22, total_vt: 220, total_va: 440 }] },
+        { codigo_empresa: '10', competencia_pagamento: '01/2027', linhas_json: [{ cod_emp: '1', nome: 'X', vt_dia: 11, va_dia: 21, dias: 22, total_vt: 242, total_va: 462 }] },
+    ];
+    const beta = montarCarteira(d, HOJE).find(i => i.codigo === '10');
+    assert.strictEqual(beta.beneficio.competencia_pagamento, '01/2027');
+    assert.strictEqual(beta.beneficio.linhas_json[0].total_vt, 242);
+});
+
+teste('sem lançamentos de benefícios, beneficio fica null (não undefined/erro)', () => {
+    const alfa = montarCarteira(base(), HOJE).find(i => i.codigo === '20');
+    assert.strictEqual(alfa.beneficio, null);
 });
 
 console.log(`\n${n} testes OK`);
