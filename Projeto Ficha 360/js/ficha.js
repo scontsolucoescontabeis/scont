@@ -43,20 +43,6 @@ window.Ficha360Ficha = (function () {
             document.getElementById('btnVoltarErro').addEventListener('click', () => F360.irParaPainel());
             return;
         }
-        const cod = encodeURIComponent(it.codigo);
-        const atalhos = [
-            ['📔 Diário', `../Projeto Onboarding Contabil/diario.html?empresa=${cod}`],
-            ['📜 Licenças', `../Projeto Licenças/index.html?empresa=${cod}`],
-            ['🔑 Certificado', `../Projeto Certificado Digital/index.html?empresa=${cod}`],
-            ['⏱️ Controle de Frequência', `../Projeto RH/admin.html?empresa=${cod}`],
-            ['✅ Fechamento', `../Projeto Fechamento Folha/controle.html?empresa=${cod}`],
-        // href/target ficam só para clique-direito/"abrir em nova aba"; o clique normal é
-        // interceptado (abaixo) e chama window.open() em vez de deixar o navegador seguir o
-        // link — um <a target="_blank"> comum NÃO herda a sessão de sessionStorage na nova
-        // aba (confirmado testando no Chrome), então a ferramenta de destino pedia login de
-        // novo; window.open() herda normalmente.
-        ].map(([r, href]) => `<a class="btn btn-mini atalho-ferramenta" href="${href}" target="_blank">${r}</a>`).join('');
-
         tela.innerHTML = `
           <div class="ficha-cab sem-${it.semaforo}">
             <button class="btn btn-mini" id="btnVoltar">← Painel</button>
@@ -70,18 +56,11 @@ window.Ficha360Ficha = (function () {
               <span>Contábil <strong>${esc(it.responsaveisContabil.join(', ')) || '—'}</strong></span>
               ${it.grupo ? `<span>Grupo <strong>${esc(it.grupo)}</strong></span>` : ''}
             </div>
-            <div class="atalhos">${atalhos}</div>
           </div>
           <div class="abas">${ABAS.map(([k, r]) => `<button class="aba ${k === abaAtual ? 'ativa' : ''}" data-aba="${k}">${r}</button>`).join('')}</div>
           <div id="conteudoAba"></div>`;
 
         document.getElementById('btnVoltar').addEventListener('click', () => F360.irParaPainel());
-        tela.querySelectorAll('.atalho-ferramenta').forEach(a => a.addEventListener('click', (e) => {
-            // Clique com botão do meio/Ctrl/Cmd continua abrindo pelo link normal (não intercepta).
-            if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
-            e.preventDefault();
-            window.open(a.getAttribute('href'), '_blank');
-        }));
         tela.querySelectorAll('.aba').forEach(b => b.addEventListener('click', () => {
             abaAtual = b.dataset.aba;
             tela.querySelectorAll('.aba').forEach(x => x.classList.toggle('ativa', x === b));
