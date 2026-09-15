@@ -50,7 +50,7 @@ function _aplicarEscopoQuery(query) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     await _resolverEscopoUsuario();
-    carregarEmpresas();
+    const _empresasPromise = carregarEmpresas();
     carregarEmpregados();
     carregarFeriasInfo();
     carregarJornadaInfo();
@@ -61,6 +61,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     carregarMapeamentos();
     configurarUpload();
     _carregarTimestampsImportacao();
+
+    // Garante que _todasEmpresas já está populada antes de abrir o deep-link de
+    // querystring abaixo (filtrarEmpresasValoresVaVt depende dela).
+    await _empresasPromise;
 
     // Abre a aba indicada por querystring (ex.: configuracoes.html?tab=vavt&empresa=123, vindo do Controle de Frequência)
     const params = new URLSearchParams(location.search);
