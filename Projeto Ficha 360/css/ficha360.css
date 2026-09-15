@@ -129,3 +129,12 @@ table.tabela{width:100%;border-collapse:collapse;font-size:13px}
   .sidebar{width:100%;height:auto;position:static}
   .main{padding:16px}
 }
+
+/* Celular: some colunas secundárias em vez de forçar rolagem lateral na tabela. */
+@media (max-width: 640px){
+  .col-hide-movel{display:none}
+  .tabela td,.tabela th{padding:8px 6px;font-size:12.5px}
+  .tabela .chip{white-space:normal;max-width:100%}
+  .ficha-meta{gap:10px 16px}
+  .atalhos .btn-mini{flex:1 1 auto;text-align:center}
+}

@@ -22,6 +22,7 @@ window.Ficha360Cadastro = (function () {
               ${ro('Inscrição estadual', d.inscricao_estadual)}${ro('Inscrição municipal', d.inscricao_municipal)}
               ${ro('Situação no Domínio', d.status_situacao)}${ro('Endereço', d.endereco)}
               ${ro('Cidade / UF', [d.cidade || d.municipio, d.uf].filter(Boolean).join(' / '))}${ro('CEP', d.cep)}${ro('E-mail', d.email)}
+              ${ro('Cliente desde', F360.fmtData(d.data_cadastro))}
             </div>
             <div class="checks" style="margin-top:10px">
               <span>DP/Folha: <strong>${it.possuiFolha ? 'Sim' : 'Não'}</strong></span>
@@ -47,7 +48,6 @@ window.Ficha360Cadastro = (function () {
           <div class="form-grade">
             <label class="campo">Status na carteira
               <select id="cStatus">${Object.entries(F360.ROTULO_STATUS).map(([k, r]) => opt(k, r, f.status_carteira || 'ativo')).join('')}</select></label>
-            <label class="campo">Cliente desde <input type="date" id="cInicio" value="${esc(f.data_inicio_cliente || '')}"></label>
             <label class="campo">Saída do cliente <input type="date" id="cSaida" value="${esc(f.data_saida_cliente || '')}"></label>
             <label class="campo">Porte <input type="text" id="cPorte" value="${esc(f.porte || '')}"></label>
             <label class="campo">Atividade principal <input type="text" id="cAtividade" value="${esc(f.atividade_principal || '')}"></label>
@@ -66,7 +66,6 @@ window.Ficha360Cadastro = (function () {
             const registro = {
                 codigo_empresa: it.codigo,
                 status_carteira: document.getElementById('cStatus').value,
-                data_inicio_cliente: document.getElementById('cInicio').value || null,
                 data_saida_cliente: document.getElementById('cSaida').value || null,
                 porte: document.getElementById('cPorte').value.trim() || null,
                 atividade_principal: document.getElementById('cAtividade').value.trim() || null,

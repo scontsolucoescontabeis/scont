@@ -17,7 +17,7 @@
     const comEmpresaRh = (q) => q.not('rh_empresa_id', 'is', null);
 
     const FONTES = {
-        empresas:       { tabela: 'rh_empresas', ordem: 'codigo_empresa', colunas: 'id, codigo_empresa, nome_empresa, cnpj, regime_enquadramento, inscricao_estadual, inscricao_municipal, endereco, cidade, municipio, uf, cep, status_situacao, email' },
+        empresas:       { tabela: 'rh_empresas', ordem: 'codigo_empresa', colunas: 'id, codigo_empresa, nome_empresa, cnpj, regime_enquadramento, inscricao_estadual, inscricao_municipal, endereco, cidade, municipio, uf, cep, status_situacao, email, data_cadastro' },
         fichas:         { tabela: 'ficha360_empresa', ordem: 'codigo_empresa', colunas: '*' },
         contatos:       { tabela: 'ficha360_contatos', ordem: 'id', colunas: '*' },
         respDp:         { tabela: 'fechamento_empresas_responsaveis', ordem: 'id', colunas: 'codigo_empresa, usuario_id' },

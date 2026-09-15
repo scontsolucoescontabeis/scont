@@ -97,14 +97,14 @@ window.Ficha360Painel = (function () {
                 <td class="col-barra" title="${F360.esc(F360.ROTULO_SEMAFORO[i.semaforo] || '')}"></td>
                 <td class="mono">${F360.esc(i.codigo)}</td>
                 <td><strong>${F360.esc(i.nome)}</strong>${i.grupo ? `<br><span class="chip chip-neutro">${F360.esc(i.grupo)}</span>` : ''}</td>
-                <td>${F360.esc(i.regime) || '—'}</td>
-                <td>${resp}</td>
-                <td class="num t-right">${i.empregadosAtivos == null ? '—' : i.empregadosAtivos}</td>
+                <td class="col-hide-movel">${F360.esc(i.regime) || '—'}</td>
+                <td class="col-hide-movel">${resp}</td>
+                <td class="num t-right col-hide-movel">${i.empregadosAtivos == null ? '—' : i.empregadosAtivos}</td>
                 <td>${chips || '<span class="bloqueado">Sem alertas</span>'}</td>
             </tr>`;
         }).join('');
         wrap.innerHTML = `<table class="tabela">
-            <thead><tr><th></th><th>Código</th><th>Empresa</th><th>Regime</th><th>Responsáveis</th><th class="t-right">Empreg. ativos</th><th>Alertas</th></tr></thead>
+            <thead><tr><th></th><th>Código</th><th>Empresa</th><th class="col-hide-movel">Regime</th><th class="col-hide-movel">Responsáveis</th><th class="t-right col-hide-movel">Empreg. ativos</th><th>Alertas</th></tr></thead>
             <tbody>${linhas}</tbody></table>
             <div class="vazio" style="text-align:right;padding:8px 12px">${lista.length} empresa(s)</div>`;
         wrap.querySelectorAll('tr.clicavel').forEach(tr =>

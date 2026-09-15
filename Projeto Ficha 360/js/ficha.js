@@ -50,10 +50,12 @@ window.Ficha360Ficha = (function () {
             ['🔑 Certificado', `../Projeto Certificado Digital/index.html?empresa=${cod}`],
             ['⏱️ Controle de Frequência', `../Projeto RH/admin.html?empresa=${cod}`],
             ['✅ Fechamento', `../Projeto Fechamento Folha/controle.html?empresa=${cod}`],
-        // Sem rel="noopener": são links internos (mesma origem do portal), e "noopener" impede
-        // a nova aba de herdar a sessão de sessionStorage, forçando login de novo (bug real
-        // reportado pelo usuário).
-        ].map(([r, href]) => `<a class="btn btn-mini" href="${href}" target="_blank">${r}</a>`).join('');
+        // href/target ficam só para clique-direito/"abrir em nova aba"; o clique normal é
+        // interceptado (abaixo) e chama window.open() em vez de deixar o navegador seguir o
+        // link — um <a target="_blank"> comum NÃO herda a sessão de sessionStorage na nova
+        // aba (confirmado testando no Chrome), então a ferramenta de destino pedia login de
+        // novo; window.open() herda normalmente.
+        ].map(([r, href]) => `<a class="btn btn-mini atalho-ferramenta" href="${href}" target="_blank">${r}</a>`).join('');
 
         tela.innerHTML = `
           <div class="ficha-cab sem-${it.semaforo}">
@@ -74,6 +76,12 @@ window.Ficha360Ficha = (function () {
           <div id="conteudoAba"></div>`;
 
         document.getElementById('btnVoltar').addEventListener('click', () => F360.irParaPainel());
+        tela.querySelectorAll('.atalho-ferramenta').forEach(a => a.addEventListener('click', (e) => {
+            // Clique com botão do meio/Ctrl/Cmd continua abrindo pelo link normal (não intercepta).
+            if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            e.preventDefault();
+            window.open(a.getAttribute('href'), '_blank');
+        }));
         tela.querySelectorAll('.aba').forEach(b => b.addEventListener('click', () => {
             abaAtual = b.dataset.aba;
             tela.querySelectorAll('.aba').forEach(x => x.classList.toggle('ativa', x === b));
@@ -199,12 +207,12 @@ window.Ficha360Ficha = (function () {
             const ativo = !s.data_saida;
             return `<tr>
                 <td>${esc(s.nome_socio)}</td>
-                <td class="mono">${esc(s.cpf) || '—'}</td>
-                <td>${esc(s.cargo) || '—'}</td>
+                <td class="mono col-hide-movel">${esc(s.cpf) || '—'}</td>
+                <td class="col-hide-movel">${esc(s.cargo) || '—'}</td>
                 <td class="num t-right">${fmtPercentual(s.participacao)}</td>
-                <td class="num t-right">${fmtMoeda(s.capital_social)}</td>
-                <td class="num">${F360.fmtData(s.data_entrada)}</td>
-                <td class="num">${s.data_saida ? F360.fmtData(s.data_saida) : '—'}</td>
+                <td class="num t-right col-hide-movel">${fmtMoeda(s.capital_social)}</td>
+                <td class="num col-hide-movel">${F360.fmtData(s.data_entrada)}</td>
+                <td class="num col-hide-movel">${s.data_saida ? F360.fmtData(s.data_saida) : '—'}</td>
                 <td><span class="chip chip-${ativo ? 'ok' : 'neutro'}">${ativo ? 'Ativo' : 'Saiu'}</span></td>
             </tr>`;
         }).join('');
@@ -213,7 +221,7 @@ window.Ficha360Ficha = (function () {
           <div class="cartao">
             <h3>Quadro societário (${lista.length})</h3>
             ${linhas ? `<div class="tabela-wrap"><table class="tabela">
-                <thead><tr><th>Nome</th><th>CPF</th><th>Cargo</th><th class="t-right">Participação</th><th class="t-right">Capital social</th><th>Entrada</th><th>Saída</th><th>Situação</th></tr></thead>
+                <thead><tr><th>Nome</th><th class="col-hide-movel">CPF</th><th class="col-hide-movel">Cargo</th><th class="t-right">Participação</th><th class="t-right col-hide-movel">Capital social</th><th class="col-hide-movel">Entrada</th><th class="col-hide-movel">Saída</th><th>Situação</th></tr></thead>
                 <tbody>${linhas}</tbody></table></div>`
                 : '<div class="bloqueado">Nenhum sócio importado.</div>'}
           </div>`;
