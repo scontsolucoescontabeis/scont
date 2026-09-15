@@ -16,8 +16,8 @@
 })(typeof self !== 'undefined' ? self : this, function (V, R, Qsa) {
     'use strict';
 
-    // Tipos reconhecidos de rh_empregados.tipo_empregado (mesmo catálogo de Projeto RH/admin.js
-    // `_VG_TIPOS`); qualquer outro valor cai em 'Outros'.
+    // Tipos reconhecidos de rh_empregados.tipo_empregado (mesmo catálogo de
+    // Projeto Departamento Pessoal/configuracoes.js `_VG_TIPOS`); qualquer outro valor cai em 'Outros'.
     const TIPOS_EMPREGADO = ['Empregado', 'Estágiario', 'Contribuinte'];
 
     function contarEmpregadosPorTipo(lista) {

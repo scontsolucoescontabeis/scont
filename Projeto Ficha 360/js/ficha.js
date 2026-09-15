@@ -230,7 +230,7 @@ window.Ficha360Ficha = (function () {
             : '';
 
         // Jornada Padrão + jornadas extras, com quantos empregados ativos usam cada uma
-        // (cadastradas em Controle de Frequência > Configurações).
+        // (cadastradas em Departamento Pessoal > Configurações > Configuração por Empresa).
         const jornadas = [];
         if (it.jornadaPadrao) jornadas.push({ nome: 'Jornada Padrão', ...it.jornadaPadrao });
         it.jornadasExtras.forEach(j => jornadas.push({
@@ -255,7 +255,7 @@ window.Ficha360Ficha = (function () {
         const feriasProximaHtml = (it.feriasProxima || []).map(feriasLinha).join('');
         const subLabel = (t) => `<div class="sublabel">${esc(t)}</div>`;
 
-        // Valores de VT/VA por empregado (Controle de Frequência > Gerar Benefícios).
+        // Valores de VT/VA por empregado (Departamento Pessoal > Configurações > VA/VT).
         const valoresVaVt = it.valoresVaVt || [];
         const vaVtHtml = valoresVaVt.map(v => `<tr>
             <td>${esc(v.nome)}</td>
@@ -273,10 +273,10 @@ window.Ficha360Ficha = (function () {
             ${ciclosHtml ? `<ul class="lista-alertas">${ciclosHtml}</ul>` : '<div class="bloqueado">Nenhum ciclo nas competências recentes.</div>'}
           </div>
           <div class="cartao" style="margin-top:12px"><h3>Jornada de trabalho</h3>
-            ${jornadasHtml ? `<ul class="lista-alertas">${jornadasHtml}</ul>` : '<div class="bloqueado">Nenhuma jornada configurada em Controle de Frequência.</div>'}
+            ${jornadasHtml ? `<ul class="lista-alertas">${jornadasHtml}</ul>` : '<div class="bloqueado">Nenhuma jornada configurada em Departamento Pessoal > Configurações.</div>'}
           </div>
           <div class="cartao" style="margin-top:12px"><h3>Valores de VA/VT por empregado</h3>
-            <div class="bloqueado" style="margin-bottom:8px">Configurados em Controle de Frequência &gt; Gerar Benefícios.</div>
+            <div class="bloqueado" style="margin-bottom:8px">Configurados em Departamento Pessoal &gt; Configurações &gt; VA/VT.</div>
             ${vaVtHtml ? `<div class="tabela-wrap"><table class="tabela">
                 <thead><tr><th>Nome</th><th class="t-right">VT</th><th class="t-right">VA</th></tr></thead>
                 <tbody>${vaVtHtml}</tbody></table></div>`
