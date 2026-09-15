@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Administração - Módulo RH · SCONT</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Configurações — Departamento Pessoal · SCONT</title>
+    <link rel="stylesheet" href="../Projeto RH/styles.css">
     <style>
         .admin-tab-content { display: none; background: white; border-radius: 12px; padding: 24px 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .admin-tab-content.active { display: block; }
@@ -113,8 +113,8 @@
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
         <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
-        <h2>Admin · Módulo RH</h2>
-        <p>Gestão de dados</p>
+        <h2>Configurações</h2>
+        <p>Departamento Pessoal</p>
     </div>
     <nav class="sidebar-nav">
         <button class="sidebar-item active" id="nav-empresas" onclick="abrirAba('empresas', this)">
@@ -147,6 +147,9 @@
     </nav>
     <div class="sidebar-footer">
         <a href="index.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
+            <span class="sidebar-item-icon">⬅️</span> Voltar ao Hub DP
+        </a>
+        <a href="../Projeto RH/index.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
             <span class="sidebar-item-icon">📋</span> Controle de Frequência
         </a>
         <a href="../portal.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
@@ -159,7 +162,7 @@
 <!-- MAIN CONTENT -->
 <div class="main-content">
     <div class="page-header">
-        <h1>⚙️ Administração — Módulo RH</h1>
+        <h1>⚙️ Configurações — Departamento Pessoal</h1>
         <div class="page-header-sub">Gestão de Empresas, Empregados, Sócios, Rubricas e Regras</div>
     </div>
 
@@ -1201,13 +1204,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="ferias-parser.js"></script>
-<script src="jornada-parser.js"></script>
-<script src="socios-parser.js"></script>
-<script src="qsa-analise.js"></script>
-<script src="feriados-calculo.js"></script>
+<script src="../Projeto RH/ferias-parser.js"></script>
+<script src="../Projeto RH/jornada-parser.js"></script>
+<script src="../Projeto RH/socios-parser.js"></script>
+<script src="../Projeto RH/qsa-analise.js"></script>
+<script src="../Projeto RH/feriados-calculo.js"></script>
 <script src="../portal-auth-guard.js"></script>
-<script src="admin.js"></script>
+<script src="configuracoes.js"></script>
 
 <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
 <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>

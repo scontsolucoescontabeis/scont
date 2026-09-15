@@ -1,9 +1,9 @@
 /**
  * SCONT - Painel de Administração
- * Arquivo: admin.js
+ * Arquivo: configuracoes.js
  */
 
-// SUPABASE_URL e SUPABASE_KEY carregados de ../supabase-config.js via admin.html
+// SUPABASE_URL e SUPABASE_KEY carregados de ../supabase-config.js via configuracoes.html
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // --- ESCOPO POR RESPONSÁVEL ---
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     configurarUpload();
     _carregarTimestampsImportacao();
 
-    // Abre a aba indicada no hash (ex.: admin.html#feriados, vindo do Controle de Frequência)
+    // Abre a aba indicada no hash (ex.: configuracoes.html#feriados, vindo do Controle de Frequência)
     const abaHash = (location.hash || '').replace('#', '');
     const btnHash = abaHash && document.getElementById('nav-' + abaHash);
     if (btnHash) abrirAba(abaHash, btnHash);
