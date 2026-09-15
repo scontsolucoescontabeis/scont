@@ -5411,7 +5411,6 @@ async function salvarConfigRubricas() {
         if (empresaAtualizada) empresaAtualizada.email_responsavel = emailResponsavel;
 
         delete _cacheConfigRubricas[codigoEmpresa];
-        fecharModalConfigRubricas();
         mostrarMensagem('Sucesso', '✅ Configuração de rubricas salva com sucesso!');
     } catch (e) {
         mostrarMensagem('Erro', 'Erro ao salvar configuração: ' + e.message);
@@ -5430,7 +5429,6 @@ async function limparConfigRubricas() {
             .eq('codigo_empresa', codigoEmpresa);
         if (error) throw error;
         delete _cacheConfigRubricas[codigoEmpresa];
-        fecharModalConfigRubricas();
         mostrarMensagem('Sucesso', '✅ Configuração removida com sucesso!');
     } catch (e) {
         mostrarMensagem('Erro', 'Erro ao limpar configuração: ' + e.message);
