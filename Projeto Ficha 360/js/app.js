@@ -81,12 +81,34 @@ window.F360 = {
         F360.rotear();
     },
     rotear() {
-        const codigo = new URLSearchParams(window.location.search).get('empresa');
+        const params = new URLSearchParams(window.location.search);
+        const codigo = params.get('empresa');
         document.getElementById('telaPainel').hidden = !!codigo;
         document.getElementById('telaFicha').hidden = !codigo;
+        document.getElementById('menuPainel').classList.toggle('ativo', !codigo);
         window.scrollTo(0, 0);
-        if (codigo) Ficha360Ficha.abrir(codigo);
-        else Ficha360Painel.render();
+        if (codigo) {
+            Ficha360Ficha.abrir(codigo, params.get('aba'));
+            const it = F360.carteira.find(i => i.codigo === codigo);
+            document.title = `${it ? it.nome : codigo} — Ficha 360`;
+        } else {
+            Ficha360Painel.render();
+            document.title = 'Ficha 360 do Cliente — Scont';
+        }
+    },
+
+    // No celular as tabelas viram cartões; cada célula precisa do nome da coluna (data-label)
+    // pra mostrar "Vencimento: 10/10/2026" em vez de um valor solto. Feito aqui, uma vez,
+    // pra qualquer tabela renderizada em qualquer aba — sem mexer em cada template.
+    rotularTabelas(raiz) {
+        raiz.querySelectorAll('table.tabela').forEach(tabela => {
+            const titulos = [...tabela.querySelectorAll('thead th')].map(th => th.textContent.trim());
+            tabela.querySelectorAll('tbody tr').forEach(tr => {
+                [...tr.children].forEach((td, idx) => {
+                    if (!td.hasAttribute('data-label')) td.setAttribute('data-label', titulos[idx] || '');
+                });
+            });
+        });
     },
 };
 
@@ -109,6 +131,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('authOverlay')?.remove();
     document.getElementById('menuPainel').addEventListener('click', () => F360.irParaPainel());
     window.addEventListener('popstate', () => F360.rotear());
+    const main = document.querySelector('.main');
+    new MutationObserver(() => F360.rotularTabelas(main)).observe(main, { childList: true, subtree: true });
 
     if (await F360.carregar()) F360.rotear();
 });

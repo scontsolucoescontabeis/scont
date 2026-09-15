@@ -32,7 +32,7 @@ window.Ficha360Anotacoes = (function () {
             <div class="anotacao-meta">
               ${a.fixada ? '📌' : ''}<span class="chip chip-neutro">${esc(CATEGORIAS[a.categoria] || a.categoria)}</span>
               <strong>${esc(a.autor_nome) || '—'}</strong> · ${F360.fmtData(a.created_at)}${a.editado_em ? ' · editada' : ''}
-              ${podeEditar(a) ? `<span style="margin-left:auto;display:flex;gap:4px">
+              ${podeEditar(a) ? `<span class="anotacao-acoes">
                 <button class="btn btn-mini" data-acao="fixar">${a.fixada ? 'Desafixar' : 'Fixar'}</button>
                 <button class="btn btn-mini" data-acao="editar">Editar</button>
                 <button class="btn btn-mini btn-perigo" data-acao="excluir">Excluir</button></span>` : ''}
@@ -43,16 +43,16 @@ window.Ficha360Anotacoes = (function () {
         el.innerHTML = `
           <div class="cartao">
             <h3>Nova anotação</h3>
-            <label class="campo"><textarea id="anTexto" placeholder="Ex.: Cliente pediu envio da folha até dia 5; combinado com o sócio João."></textarea></label>
+            <label class="campo"><span class="sr-only">Texto da anotação</span><textarea id="anTexto" placeholder="Ex.: Cliente pediu envio da folha até dia 5; combinado com o sócio João."></textarea></label>
             <div class="acoes">
-              <select id="anCategoria" style="margin-right:auto">${Object.entries(CATEGORIAS).map(([k, r]) => `<option value="${k}">${r}</option>`).join('')}</select>
+              <select id="anCategoria" aria-label="Categoria" style="margin-right:auto">${Object.entries(CATEGORIAS).map(([k, r]) => `<option value="${k}">${r}</option>`).join('')}</select>
               <button class="btn btn-primario" id="anSalvar">Registrar</button>
             </div>
           </div>
           <div class="cartao" style="margin-top:12px">
             <div class="cabecalho-tela" style="margin-bottom:8px">
               <h3 style="margin:0">Histórico (${lista.length})</h3>
-              <select id="anFiltro"><option value="">Todas as categorias</option>${Object.entries(CATEGORIAS).map(([k, r]) =>
+              <select id="anFiltro" aria-label="Filtrar por categoria"><option value="">Todas as categorias</option>${Object.entries(CATEGORIAS).map(([k, r]) =>
                   `<option value="${k}" ${filtroCategoria === k ? 'selected' : ''}>${r}</option>`).join('')}</select>
             </div>
             ${cards || '<div class="bloqueado">Nenhuma anotação.</div>'}
@@ -81,9 +81,8 @@ window.Ficha360Anotacoes = (function () {
             if (b.dataset.acao === 'fixar') {
                 resp = await F360.sb.from('ficha360_anotacoes').update({ fixada: !a.fixada }).eq('id', id);
             } else if (b.dataset.acao === 'editar') {
-                const novo = prompt('Editar anotação:', a.texto);
-                if (novo == null || !novo.trim() || novo.trim() === a.texto) return;
-                resp = await F360.sb.from('ficha360_anotacoes').update({ texto: novo.trim(), editado_em: new Date().toISOString() }).eq('id', id);
+                editarInline(b.closest('.anotacao'), a, el, it);
+                return;
             } else {
                 if (!confirm('Excluir esta anotação?')) return;
                 resp = await F360.sb.from('ficha360_anotacoes').delete().eq('id', id);
@@ -91,6 +90,32 @@ window.Ficha360Anotacoes = (function () {
             if (resp.error) { alert(`Não foi possível concluir: ${resp.error.message}`); return; }
             render(el, it);
         }));
+    }
+
+    // Troca o texto do card por um textarea com Salvar/Cancelar (prompt() é ruim no celular).
+    function editarInline(card, a, el, it) {
+        const textoEl = card.querySelector('.anotacao-texto');
+        const acoesEl = card.querySelector('.anotacao-acoes');
+        if (acoesEl) acoesEl.hidden = true;
+        textoEl.outerHTML = `<div class="anotacao-edicao">
+            <label class="campo" style="margin-top:6px"><span class="sr-only">Editar anotação</span><textarea>${esc(a.texto)}</textarea></label>
+            <div class="acoes" style="margin-top:8px">
+              <button class="btn btn-mini" data-ed="cancelar">Cancelar</button>
+              <button class="btn btn-mini btn-primario" data-ed="salvar">Salvar</button>
+            </div></div>`;
+        const edicao = card.querySelector('.anotacao-edicao');
+        const ta = edicao.querySelector('textarea');
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+        edicao.querySelector('[data-ed="cancelar"]').addEventListener('click', () => render(el, it));
+        edicao.querySelector('[data-ed="salvar"]').addEventListener('click', async (e) => {
+            const novo = ta.value.trim();
+            if (!novo || novo === a.texto) { render(el, it); return; }
+            e.currentTarget.disabled = true;
+            const { error } = await F360.sb.from('ficha360_anotacoes').update({ texto: novo, editado_em: new Date().toISOString() }).eq('id', a.id);
+            if (error) { e.currentTarget.disabled = false; alert(`Não foi possível salvar: ${error.message}`); return; }
+            render(el, it);
+        });
     }
 
     return { render };

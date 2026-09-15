@@ -19,11 +19,27 @@ window.Ficha360Ficha = (function () {
         contabil: ['cfgContabil', 'onboardings', 'mapeamentos', 'pendencias', 'diarioEventos', 'respContabil'],
     };
 
+    // Em qual aba cada alerta é detalhado (usado no contador das abas e no link do Resumo).
+    const ABA_DO_MODULO = {
+        certificado: 'vencimentos', licenca: 'vencimentos',
+        folha: 'dp', qsa: 'dp', formularios: 'dp',
+        diario: 'contabil', mapeamento: 'contabil', onboarding: 'contabil',
+        cadastro: 'cadastro',
+    };
+
     let codigoAtual = null;
     let abaAtual = 'resumo';
 
     const esc = (v) => F360.esc(v);
     const item = () => F360.carteira.find(i => i.codigo === codigoAtual);
+
+    // Contador de alertas (crítico/atenção) por aba, com a cor do mais grave.
+    function badgeAba(it, aba) {
+        const lista = it.alertas.filter(a => a.gravidade !== 'info' && (aba === 'resumo' || ABA_DO_MODULO[a.modulo] === aba));
+        if (!lista.length) return '';
+        const tom = lista.some(a => a.gravidade === 'critico') ? 'b-critico' : 'b-atencao';
+        return ` <span class="badge ${tom}" aria-label="${lista.length} alerta(s)">${lista.length}</span>`;
+    }
 
     function avisoFontes(aba) {
         const falhas = (FONTES_POR_ABA[aba] || []).filter(k => F360.falhas[k]);
@@ -32,8 +48,9 @@ window.Ficha360Ficha = (function () {
             `${F360.falhas[k] === 'sem_permissao' ? '🔒 Sem permissão' : '⚠️ Indisponível'}: ${esc(F360.NOMES_FONTE[k] || k)}`).join(' · ')}</div>`;
     }
 
-    function abrir(codigo) {
+    function abrir(codigo, aba) {
         if (codigo !== codigoAtual) abaAtual = 'resumo';
+        if (aba && ABAS.some(([k]) => k === aba)) abaAtual = aba;
         codigoAtual = codigo;
         const tela = document.getElementById('telaFicha');
         const it = item();
@@ -43,29 +60,77 @@ window.Ficha360Ficha = (function () {
             document.getElementById('btnVoltarErro').addEventListener('click', () => F360.irParaPainel());
             return;
         }
+        const meta = (rotulo, valor, larga) =>
+            `<div${larga ? ' class="meta-larga"' : ''}><dt>${rotulo}</dt><dd>${valor || '—'}</dd></div>`;
         tela.innerHTML = `
           <div class="ficha-cab sem-${it.semaforo}">
-            <button class="btn btn-mini" id="btnVoltar">← Painel</button>
-            <h2 style="margin-top:8px">${F360.semaforoHtml(it.semaforo)} ${esc(it.nome)}</h2>
-            <div class="ficha-meta">
-              <span>Código <strong>${esc(it.codigo)}</strong></span>
-              <span>CNPJ <strong>${esc(it.cnpj) || '—'}</strong></span>
-              <span>Regime <strong>${esc(it.regime) || '—'}</strong></span>
-              <span>Carteira <strong>${esc(F360.ROTULO_STATUS[it.statusCarteira] || it.statusCarteira)}</strong></span>
-              <span>DP <strong>${esc(it.responsaveisDp.join(', ')) || '—'}</strong></span>
-              <span>Contábil <strong>${esc(it.responsaveisContabil.join(', ')) || '—'}</strong></span>
-              ${it.grupo ? `<span>Grupo <strong>${esc(it.grupo)}</strong></span>` : ''}
+            <div class="ficha-topo">
+              <button class="btn btn-mini" id="btnVoltar">← Painel</button>
             </div>
+            <h2>${esc(it.nome)} ${F360.semaforoHtml(it.semaforo)}</h2>
+            <dl class="ficha-meta">
+              ${meta('Código', `<span class="mono">${esc(it.codigo)}</span>`)}
+              ${meta('Regime', esc(it.regime))}
+              ${meta('CNPJ', it.cnpj ? `<span class="mono">${esc(it.cnpj)}</span>` : '', true)}
+              ${meta('Carteira', esc(F360.ROTULO_STATUS[it.statusCarteira] || it.statusCarteira))}
+              ${it.grupo ? meta('Grupo', esc(it.grupo)) : ''}
+              ${meta('Resp. DP', esc(it.responsaveisDp.join(', ')), true)}
+              ${meta('Resp. Contábil', esc(it.responsaveisContabil.join(', ')), true)}
+            </dl>
           </div>
-          <div class="abas">${ABAS.map(([k, r]) => `<button class="aba ${k === abaAtual ? 'ativa' : ''}" data-aba="${k}">${r}</button>`).join('')}</div>
-          <div id="conteudoAba"></div>`;
+          <div class="abas-wrap">
+            <div class="abas" role="tablist" aria-label="Seções da ficha">${ABAS.map(([k, r]) =>
+                `<button class="aba ${k === abaAtual ? 'ativa' : ''}" role="tab" aria-selected="${k === abaAtual}" data-aba="${k}">${r}${badgeAba(it, k)}</button>`).join('')}</div>
+          </div>
+          <div id="conteudoAba" role="tabpanel"></div>`;
 
         document.getElementById('btnVoltar').addEventListener('click', () => F360.irParaPainel());
-        tela.querySelectorAll('.aba').forEach(b => b.addEventListener('click', () => {
-            abaAtual = b.dataset.aba;
-            tela.querySelectorAll('.aba').forEach(x => x.classList.toggle('ativa', x === b));
-            renderAba();
-        }));
+        tela.querySelectorAll('.aba').forEach(b => b.addEventListener('click', () => trocarAba(b.dataset.aba)));
+
+        // Setas ←/→ navegam entre as abas quando o foco está numa delas.
+        tela.querySelector('.abas').addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+            const idx = ABAS.findIndex(([k]) => k === abaAtual);
+            const prox = ABAS[(idx + (e.key === 'ArrowRight' ? 1 : ABAS.length - 1)) % ABAS.length][0];
+            trocarAba(prox);
+            tela.querySelector(`.aba[data-aba="${prox}"]`).focus();
+        });
+
+        // Some o degradê "tem mais abas →" quando já rolou até o fim.
+        const abasEl = tela.querySelector('.abas');
+        const wrapAbas = tela.querySelector('.abas-wrap');
+        const checarFim = () => wrapAbas.classList.toggle('fim', abasEl.scrollLeft + abasEl.clientWidth >= abasEl.scrollWidth - 4);
+        abasEl.addEventListener('scroll', checarFim, { passive: true });
+        requestAnimationFrame(() => { centralizarAbaAtiva(false); checarFim(); });
+
+        renderAba();
+    }
+
+    function centralizarAbaAtiva(suave) {
+        const abasEl = document.querySelector('#telaFicha .abas');
+        const ativa = abasEl && abasEl.querySelector('.aba.ativa');
+        if (!ativa || abasEl.scrollWidth <= abasEl.clientWidth) return;
+        const alvo = ativa.offsetLeft - (abasEl.clientWidth - ativa.offsetWidth) / 2;
+        abasEl.scrollTo({ left: Math.max(0, alvo), behavior: suave ? 'smooth' : 'auto' });
+    }
+
+    function trocarAba(aba) {
+        if (!ABAS.some(([k]) => k === aba)) return;
+        abaAtual = aba;
+        const tela = document.getElementById('telaFicha');
+        tela.querySelectorAll('.aba').forEach(x => {
+            const ativa = x.dataset.aba === aba;
+            x.classList.toggle('ativa', ativa);
+            x.setAttribute('aria-selected', String(ativa));
+        });
+        // Guarda a aba na URL (sem criar entrada no histórico) — recarregar a página mantém a aba.
+        const params = new URLSearchParams(window.location.search);
+        if (aba === 'resumo') params.delete('aba'); else params.set('aba', aba);
+        history.replaceState({}, '', `?${params.toString()}`);
+        centralizarAbaAtiva(true);
+        // Se a pessoa rolou pra baixo e trocou de aba, traz o topo das abas de volta pra tela.
+        const wrap = tela.querySelector('.abas-wrap');
+        if (wrap && wrap.getBoundingClientRect().top < 0) wrap.scrollIntoView({ block: 'start' });
         renderAba();
     }
 
@@ -104,10 +169,16 @@ window.Ficha360Ficha = (function () {
           </div>
           <div class="cartao" style="margin-top:12px">
             <h3>Alertas (${it.alertas.length})</h3>
-            ${it.alertas.length ? `<ul class="lista-alertas">${it.alertas.map(a =>
-                `<li><span class="chip chip-${a.gravidade}">${esc(NOME_MODULO[a.modulo] || a.modulo)}</span>${esc(a.mensagem)}</li>`).join('')}</ul>`
-                : '<div class="bloqueado">Nenhum alerta.</div>'}
+            ${it.alertas.length ? `<ul class="lista-alertas">${it.alertas.map(a => {
+                const destino = ABA_DO_MODULO[a.modulo];
+                const conteudo = `<span class="chip chip-${a.gravidade}">${esc(NOME_MODULO[a.modulo] || a.modulo)}</span><span class="alerta-msg">${esc(a.mensagem)}</span>`;
+                return destino
+                    ? `<li><button type="button" class="alerta-link" data-ir-aba="${destino}">${conteudo}<span class="alerta-ir">Ver ${esc((ABAS.find(([k]) => k === destino) || [])[1] || '')} ›</span></button></li>`
+                    : `<li>${conteudo}</li>`;
+            }).join('')}</ul>`
+                : '<div class="bloqueado">✅ Nenhum alerta para esta empresa.</div>'}
           </div>`;
+        el.querySelectorAll('[data-ir-aba]').forEach(b => b.addEventListener('click', () => trocarAba(b.dataset.irAba)));
     }
 
     // Rótulo "SET/2026" pro mês atual (offsetMeses=0) ou seguinte (offsetMeses=1), a partir de F360.hoje.
@@ -182,7 +253,7 @@ window.Ficha360Ficha = (function () {
         const feriasLinha = (f) => `<li>${esc(f.nome_empregado)} — ${F360.fmtData(f.ferias_inicio)} a ${F360.fmtData(f.ferias_fim)}</li>`;
         const feriasAtualHtml = (it.feriasAtual || []).map(feriasLinha).join('');
         const feriasProximaHtml = (it.feriasProxima || []).map(feriasLinha).join('');
-        const subLabel = (t) => `<div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;margin:0 0 6px">${esc(t)}</div>`;
+        const subLabel = (t) => `<div class="sublabel">${esc(t)}</div>`;
 
         // Valores de VT/VA por empregado (Controle de Frequência > Gerar Benefícios).
         const valoresVaVt = it.valoresVaVt || [];

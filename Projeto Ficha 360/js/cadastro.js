@@ -17,7 +17,7 @@ window.Ficha360Cadastro = (function () {
 
         el.innerHTML = `
           <div class="cartao"><h3>Dados do Domínio (somente leitura)</h3>
-            <div class="form-grade">
+            <div class="form-grade ro-grade">
               ${ro('Razão social', d.nome_empresa)}${ro('CNPJ', d.cnpj)}${ro('Regime', d.regime_enquadramento)}
               ${ro('Inscrição estadual', d.inscricao_estadual)}${ro('Inscrição municipal', d.inscricao_municipal)}
               ${ro('Situação no Domínio', d.status_situacao)}${ro('Endereço', d.endereco)}
