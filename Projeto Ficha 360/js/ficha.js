@@ -307,12 +307,12 @@ window.Ficha360Ficha = (function () {
             const ativo = !s.data_saida;
             return `<tr>
                 <td>${esc(s.nome_socio)}</td>
-                <td class="mono col-hide-movel">${esc(s.cpf) || '—'}</td>
-                <td class="col-hide-movel">${esc(s.cargo) || '—'}</td>
+                <td class="mono">${esc(s.cpf) || '—'}</td>
+                <td>${esc(s.cargo) || '—'}</td>
                 <td class="num t-right">${fmtPercentual(s.participacao)}</td>
-                <td class="num t-right col-hide-movel">${fmtMoeda(s.capital_social)}</td>
-                <td class="num col-hide-movel">${F360.fmtData(s.data_entrada)}</td>
-                <td class="num col-hide-movel">${s.data_saida ? F360.fmtData(s.data_saida) : '—'}</td>
+                <td class="num t-right">${fmtMoeda(s.capital_social)}</td>
+                <td class="num">${F360.fmtData(s.data_entrada)}</td>
+                <td class="num">${s.data_saida ? F360.fmtData(s.data_saida) : '—'}</td>
                 <td><span class="chip chip-${ativo ? 'ok' : 'neutro'}">${ativo ? 'Ativo' : 'Saiu'}</span></td>
             </tr>`;
         }).join('');
@@ -321,7 +321,7 @@ window.Ficha360Ficha = (function () {
           <div class="cartao">
             <h3>Quadro societário (${lista.length})</h3>
             ${linhas ? `<div class="tabela-wrap"><table class="tabela">
-                <thead><tr><th>Nome</th><th class="col-hide-movel">CPF</th><th class="col-hide-movel">Cargo</th><th class="t-right">Participação</th><th class="t-right col-hide-movel">Capital social</th><th class="col-hide-movel">Entrada</th><th class="col-hide-movel">Saída</th><th>Situação</th></tr></thead>
+                <thead><tr><th>Nome</th><th>CPF</th><th>Cargo</th><th class="t-right">Participação</th><th class="t-right">Capital social</th><th>Entrada</th><th>Saída</th><th>Situação</th></tr></thead>
                 <tbody>${linhas}</tbody></table></div>`
                 : '<div class="bloqueado">Nenhum sócio importado.</div>'}
           </div>`;
