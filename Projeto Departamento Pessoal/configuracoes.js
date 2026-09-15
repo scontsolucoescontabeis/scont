@@ -48,6 +48,19 @@ function _aplicarEscopoQuery(query) {
     return query.in('codigo_empresa', [..._empresasPermitidas]);
 }
 
+// Gate de administrador da aba "Folha Contratada" — as tabelas
+// fechamento_empresas_config/fechamento_empresas_responsaveis têm RLS
+// totalmente permissiva (sem checagem server-side); o controle de acesso é
+// só este check client-side, equivalente ao antigo `if (!isAdminAtual)` de
+// controle.js:iniciarConfigEmpresas() + item de sidebar escondido. Não é o
+// mesmo controle de _empresasPermitidas/_filtrarPorEscopo (isso é o escopo de
+// "Prestador de Serviço" das outras abas) — aqui é só admin sim/não.
+function _isAdminFolhaContratada() {
+    let auth = null;
+    try { auth = JSON.parse(sessionStorage.getItem('userAuth') || 'null'); } catch (_) { auth = null; }
+    return auth?.isAdmin === true;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     await _resolverEscopoUsuario();
     const _empresasPromise = carregarEmpresas();
@@ -62,7 +75,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     carregarGruposCfg();
     configurarUpload();
     _carregarTimestampsImportacao();
-    carregarBaseFolhaContratada().then(() => iniciarConfigEmpresas());
+
+    const _souAdminFolhaContratada = _isAdminFolhaContratada();
+    const _navFolhaContratada = document.getElementById('nav-folhaContratada');
+    if (_navFolhaContratada) _navFolhaContratada.style.display = _souAdminFolhaContratada ? '' : 'none';
+    if (_souAdminFolhaContratada) {
+        carregarBaseFolhaContratada().then(() => iniciarConfigEmpresas());
+    }
 
     // Garante que _todasEmpresas já está populada antes de abrir o deep-link de
     // querystring abaixo (filtrarEmpresasValoresVaVt depende dela).
@@ -72,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const params = new URLSearchParams(location.search);
     const tabQuery = params.get('tab');
     const empresaQuery = params.get('empresa');
-    if (tabQuery) {
+    if (tabQuery && !(tabQuery === 'folhaContratada' && !_souAdminFolhaContratada)) {
         const btnQuery = document.getElementById('nav-' + tabQuery);
         if (btnQuery) abrirAba(tabQuery, btnQuery);
         if (tabQuery === 'vavt' && empresaQuery) {
@@ -83,8 +102,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Abre a aba indicada no hash (ex.: configuracoes.html#feriados, vindo do Controle de Frequência)
     const abaHash = (location.hash || '').replace('#', '');
-    const btnHash = abaHash && document.getElementById('nav-' + abaHash);
-    if (btnHash) abrirAba(abaHash, btnHash);
+    if (abaHash && !(abaHash === 'folhaContratada' && !_souAdminFolhaContratada)) {
+        const btnHash = document.getElementById('nav-' + abaHash);
+        if (btnHash) abrirAba(abaHash, btnHash);
+    }
 });
 
 // --- NAVEGAÇÃO DE ABAS ---
@@ -5515,10 +5536,14 @@ function mostrarToastCF(msg, tipo) {
 }
 
 // ─── A PARTIR DAQUI: verbatim de controle.js:829-1235 ───────────
-// Única adaptação: iniciarConfigEmpresas() perdeu o guard de isAdminAtual e a
-// chamada a navegarPara('dashboard') — ambos exclusivos do roteador de telas
-// de controle.html (isAdminAtual/navegarPara não existem em configuracoes.js).
-// Chamada a partir do DOMContentLoaded do topo do arquivo, sem gate por aba.
+// Única adaptação: iniciarConfigEmpresas() perdeu a chamada a
+// navegarPara('dashboard') e o `if (!isAdminAtual)` interno — exclusivos do
+// roteador de telas de controle.html (isAdminAtual/navegarPara não existem em
+// configuracoes.js). O gate de admin equivalente (única autorização real
+// desta tela — ver _isAdminFolhaContratada() acima) foi movido para fora,
+// para o DOMContentLoaded do topo do arquivo: só chama
+// carregarBaseFolhaContratada()/iniciarConfigEmpresas() se o usuário for
+// admin, e esconde #nav-folhaContratada caso contrário.
 function iniciarConfigEmpresas() {
     document.getElementById('buscaEmpresaFolhaCF').value = '';
     renderTabelaEmpresasFolha();
