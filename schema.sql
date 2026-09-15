@@ -249,7 +249,9 @@ INSERT INTO public.ferramentas (nome, descricao, icone, url_base, ativa, ordem) 
 
     ('Admin – Módulo RH',
      'Gerenciamento de empresas, empregados, rubricas e regras do módulo RH',
-     '⚙️', './Projeto RH/admin.html', TRUE, 40),
+     -- Tela migrada para o hub "Departamento Pessoal" (Configurações);
+     -- fica inativa para não aparecer como card separado no portal.
+     '⚙️', './Projeto Departamento Pessoal/configuracoes.html', FALSE, 40),
 
     ('Gerenciador de Formulários',
      'Visualização e gestão de formulários de registro e alteração de empresa',

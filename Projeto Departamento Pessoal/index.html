@@ -12,7 +12,6 @@
   <script src="../supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../portal-auth-guard.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
 </head>
 <body>
 <!-- AUTH OVERLAY -->
@@ -24,14 +23,10 @@
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
-      <div class="brand-mark">DP</div>
-      <div>
-        <h1>SCONT</h1>
-        <p>Departamento Pessoal</p>
-      </div>
+      <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+      <h1>Departamento Pessoal</h1>
+      <p>Central de Ferramentas</p>
     </div>
-
-    <nav class="nav-tree" id="navTree"></nav>
 
     <div class="sidebar-footer">
       <button class="btn-voltar" onclick="window.location.href='../portal.html'">
@@ -40,16 +35,65 @@
     </div>
   </aside>
 
-  <main class="main" id="main">
-    <div class="empty-state">
-      <div class="emoji">📤</div>
-      <h2>Fluxos do Departamento Pessoal</h2>
-      <p>Selecione um fluxo no menu ao lado para ver o passo a passo e o fluxograma do processo.</p>
+  <main class="main">
+    <div class="tool-picker">
+      <div class="tool-picker-header">
+        <h2>Departamento Pessoal</h2>
+        <p>Escolha uma ferramenta para continuar.</p>
+      </div>
+
+      <div class="tool-cards">
+        <a class="tool-card" href="../Projeto RH/index.html">
+          <div class="tool-card-icon">📋</div>
+          <h3>Controle de Frequência - Ponto</h3>
+          <p>Processamento de folha de ponto, benefícios e escala por competência.</p>
+        </a>
+        <a class="tool-card" href="../Projeto RH/lancamentos.html">
+          <div class="tool-card-icon">💸</div>
+          <h3>Lançamentos de Folha</h3>
+          <p>Lançamentos adicionais por empregado a partir do catálogo de rubricas.</p>
+        </a>
+        <a class="tool-card" href="../Projeto Simulador Folha/index.html">
+          <div class="tool-card-icon">🧮</div>
+          <h3>Simulador de Folha de Pagamento</h3>
+          <p>Simulação de cálculos de folha de pagamento.</p>
+        </a>
+        <a class="tool-card" href="../Projeto Fechamento Folha/index.html">
+          <div class="tool-card-icon">💼</div>
+          <h3>Fechamento Folha de Pagamento</h3>
+          <p>Fechamento mensal por empresa, controle de ciclo e programação de férias.</p>
+        </a>
+        <a class="tool-card" href="../Projeto Validação Fechamento Folha/index.html">
+          <div class="tool-card-icon">🔍</div>
+          <h3>Validação de Fechamento de Folha</h3>
+          <p>Conferência de extratos e competências do fechamento.</p>
+        </a>
+        <a class="tool-card" href="../Projeto Calendario Folha/index.html">
+          <div class="tool-card-icon">🗓️</div>
+          <h3>Calendário da Folha</h3>
+          <p>Eventos e prazos do calendário único da folha de pagamento.</p>
+        </a>
+        <a class="tool-card" href="fluxos-operacionais.html">
+          <div class="tool-card-icon">📤</div>
+          <h3>Fluxos Operacionais</h3>
+          <p>Passo a passo e fluxograma dos processos de rescisão, admissão e férias.</p>
+        </a>
+        <a class="tool-card" href="configuracoes.html" id="cardConfiguracoes">
+          <div class="tool-card-icon">⚙️</div>
+          <h3>Configurações</h3>
+          <p>VA/VT, Grupos de Empresas, Empresas, Empregados, Rubricas, Feriados e Folha Contratada — tudo num só lugar.</p>
+        </a>
+      </div>
     </div>
   </main>
 </div>
 
-<script src="data/rescisao.js"></script>
-<script src="app.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    const auth = await window.PortalAuthGuard.init(1);
+    if (!auth) return;
+    document.getElementById('authOverlay')?.remove();
+  });
+</script>
 </body>
 </html>

@@ -3,11 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Administração - Módulo RH · SCONT</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Configurações — Departamento Pessoal · SCONT</title>
+    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png" />
+    <link rel="stylesheet" href="../Projeto RH/styles.css">
     <style>
         .admin-tab-content { display: none; background: white; border-radius: 12px; padding: 24px 28px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .admin-tab-content.active { display: block; }
+
+        /* Aba Folha Contratada (movida de Projeto Fechamento Folha/controle.html) */
+        .empresas-filtros { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 16px 0 10px; }
+        .empresas-filtros input[type="text"] { flex: 1; min-width: 220px; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 6px; }
+        .empresas-contador { font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; }
+
+        .folha-toggle { border: none; border-radius: 999px; padding: 4px 14px; font-size: 12px; font-weight: 700; cursor: pointer; min-width: 52px; }
+        .folha-toggle.folha-sim { background: #e8f5e9; color: var(--success-color); }
+        .folha-toggle.folha-nao { background: #fdecea; color: var(--danger-color); }
+        .folha-toggle:disabled { opacity: .6; cursor: default; }
+
+        .responsavel-cel { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .responsavel-nomes { font-size: 12px; }
+        .btn-editar-responsavel { border: none; background: none; cursor: pointer; font-size: 14px; color: var(--text-secondary); }
+        .btn-editar-responsavel:hover { color: var(--primary-color); }
+
+        .responsavel-check-item { display: flex; align-items: center; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border-color); font-size: 13px; cursor: pointer; }
+        .responsavel-check-item:last-child { border-bottom: none; }
+        .responsavel-check-item small { color: var(--text-secondary); }
+
+        .modal-content.large { max-width: 640px; }
+        #modalResponsavelUsuarioCFBody { max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 10px; }
+
+        .toast-cf {
+            position: fixed; bottom: 24px; right: 24px;
+            background: var(--text-primary); color: #fff;
+            padding: 12px 18px; border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            font-size: 13px; z-index: 2000; display: none;
+        }
+        .toast-cf.show { display: block; }
+        .toast-cf.erro { background: var(--danger-color); }
+        .toast-cf.sucesso { background: var(--success-color); }
         .admin-section { margin-bottom: 24px; }
         .admin-section h2 { color: #8B3A3A; margin-bottom: 16px; font-size: 20px; border-bottom: 2px solid #F5F5F5; padding-bottom: 8px; }
         .upload-area { border: 2px dashed #8B3A3A; border-radius: 8px; padding: 30px; text-align: center; background: #F5F5F5; cursor: pointer; transition: all 0.3s ease; }
@@ -113,8 +150,8 @@
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
         <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
-        <h2>Admin · Módulo RH</h2>
-        <p>Gestão de dados</p>
+        <h2>Configurações</h2>
+        <p>Departamento Pessoal</p>
     </div>
     <nav class="sidebar-nav">
         <button class="sidebar-item active" id="nav-empresas" onclick="abrirAba('empresas', this)">
@@ -144,9 +181,24 @@
         <button class="sidebar-item" id="nav-importar" onclick="abrirAba('importar', this)">
             <span class="sidebar-item-icon">📥</span> Importar Dados
         </button>
+        <button class="sidebar-item" id="nav-vavt" onclick="abrirAba('vavt', this)">
+            <span class="sidebar-item-icon">💰</span> VA/VT
+        </button>
+        <button class="sidebar-item" id="nav-grupos" onclick="abrirAba('grupos', this)">
+            <span class="sidebar-item-icon">👥</span> Grupos de Empresas
+        </button>
+        <button class="sidebar-item" id="nav-configEmpresa" onclick="abrirAba('configEmpresa', this)">
+            <span class="sidebar-item-icon">🏷️</span> Configuração por Empresa
+        </button>
+        <button class="sidebar-item" id="nav-folhaContratada" onclick="abrirAba('folhaContratada', this)">
+            <span class="sidebar-item-icon">🏢</span> Folha Contratada
+        </button>
     </nav>
     <div class="sidebar-footer">
         <a href="index.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
+            <span class="sidebar-item-icon">⬅️</span> Voltar ao Hub DP
+        </a>
+        <a href="../Projeto RH/index.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
             <span class="sidebar-item-icon">📋</span> Controle de Frequência
         </a>
         <a href="../portal.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
@@ -159,7 +211,7 @@
 <!-- MAIN CONTENT -->
 <div class="main-content">
     <div class="page-header">
-        <h1>⚙️ Administração — Módulo RH</h1>
+        <h1>⚙️ Configurações — Departamento Pessoal</h1>
         <div class="page-header-sub">Gestão de Empresas, Empregados, Sócios, Rubricas e Regras</div>
     </div>
 
@@ -959,8 +1011,494 @@
             </div>
         </div>
 
+        <!-- ABA VA/VT -->
+        <div id="vavt" class="admin-tab-content">
+            <div class="admin-section">
+                <h2>💰 Valores de VT/VA por Empregado</h2>
+                <div class="form-group" style="max-width:420px;">
+                    <label>Empresa</label>
+                    <input type="text" id="vvBuscaEmpresa"
+                        placeholder="Digite o nome ou código da empresa..."
+                        autocomplete="off"
+                        oninput="filtrarEmpresasValoresVaVt(this.value)"
+                        onfocus="filtrarEmpresasValoresVaVt(this.value)">
+                    <input type="hidden" id="vvCodigoEmpresa">
+                </div>
+                <div id="vvSemEmpresa" style="text-align: center; padding: 30px 0; color: #7F8C8D; font-size: 13px;">
+                    Selecione uma empresa para configurar os valores diários de VT e VA de cada empregado.
+                </div>
+                <div id="vvConteudo" style="display: none;">
+                    <div style="border: 1px solid #E0E0E0; border-radius: 8px; overflow: hidden;">
+                        <div style="background: #F5F5F5; padding: 8px 14px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+                            <span style="font-size: 11px; font-weight: 700; color: #7F8C8D; text-transform: uppercase; letter-spacing: 0.4px;">Empregado</span>
+                            <span style="font-size: 11px; font-weight: 700; color: #7F8C8D; text-transform: uppercase; letter-spacing: 0.4px;">VT / dia (R$)</span>
+                            <span style="font-size: 11px; font-weight: 700; color: #7F8C8D; text-transform: uppercase; letter-spacing: 0.4px;">VA / dia (R$)</span>
+                        </div>
+                        <div id="vvTabelaEmpregados" style="max-height: 420px; overflow-y: auto;"></div>
+                    </div>
+                    <p style="font-size: 11px; color: #7F8C8D; margin-top: 6px;">
+                        Valor diário de VT/VA a ser descontado do empregado em caso de falta ou atestado. Campos vazios equivalem a R$ 0,00.
+                    </p>
+                    <button type="button" class="btn-save" id="vvBtnSalvar" style="display: none; margin-top: 10px;" onclick="salvarValoresVaVt()">💾 Salvar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA GRUPOS DE EMPRESAS -->
+        <div id="grupos" class="admin-tab-content">
+            <div class="admin-section">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:15px;">
+                    <h2 style="margin:0;">👥 Grupos de Empresas</h2>
+                    <button type="button" class="btn-save" onclick="novoGrupoCfg()">➕ Novo Grupo</button>
+                </div>
+                <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start;">
+                    <div style="flex: 0 0 260px; border:1px solid #E0E0E0; border-radius:8px; overflow:hidden;">
+                        <div id="listaGruposCfg"></div>
+                    </div>
+                    <div style="flex: 1 1 420px; border:1px solid #E0E0E0; border-radius:8px; padding:16px;" id="grupoDetalheCfg">
+                        <p style="color: #7F8C8D; font-size:13px;">Selecione um grupo à esquerda ou clique em "Novo Grupo".</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA CONFIGURAÇÃO POR EMPRESA (rubricas / jornadas / e-mail do responsável) -->
+        <div id="configEmpresa" class="admin-tab-content">
+            <div class="admin-section" style="padding: 20px;">
+                <h2 style="margin-top:0;">⚙️ Configuração por Empresa</h2>
+
+                <!-- Busca de empresa -->
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label style="font-weight: 600; font-size: 13px; color: var(--text-primary);">Empresa</label>
+                    <input type="text" id="cfgBuscaEmpresa"
+                        placeholder="Digite o nome ou código da empresa..."
+                        autocomplete="off"
+                        oninput="filtrarEmpresasConfig(this.value)"
+                        onfocus="filtrarEmpresasConfig(this.value)"
+                        style="width: 100%; box-sizing: border-box; margin-top: 4px;">
+                    <input type="hidden" id="cfgCodigoEmpresa">
+                </div>
+
+                <!-- Tabela de rubricas -->
+                <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Evento</span>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Código da Rubrica</span>
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Tipo de Valor</span>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Horas Trabalhadas</span>
+                        <input type="text" id="cfgRub_horasTrab" maxlength="9" placeholder="Ex: 000001" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_horasTrab" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Horas Extras 50%</span>
+                        <input type="text" id="cfgRub_he50" maxlength="9" placeholder="Ex: 000050" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_he50" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Horas Extras 100%</span>
+                        <input type="text" id="cfgRub_he100" maxlength="9" placeholder="Ex: 000100" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_he100" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Adicional Noturno</span>
+                        <input type="text" id="cfgRub_noturno" maxlength="9" placeholder="Ex: 000310" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_noturno" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Atraso</span>
+                        <input type="text" id="cfgRub_atraso" maxlength="9" placeholder="Ex: 000410" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_atraso" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Falta (em dias)</span>
+                        <input type="text" id="cfgRub_falta" maxlength="9" placeholder="Ex: 000510" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_falta" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="dias">Dias</option>
+                            <option value="horas">Horas (HHMM)</option>
+                            <option value="monetario">Monetário (R$)</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Desconto de VT (em dias)</span>
+                        <input type="text" id="cfgRub_descontoVT" maxlength="9" placeholder="Ex: 000520" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_descontoVT" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                            <option value="horas">Horas (HHMM)</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Desconto de VA (em dias)</span>
+                        <input type="text" id="cfgRub_descontoVA" maxlength="9" placeholder="Ex: 000530" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_descontoVA" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                            <option value="horas">Horas (HHMM)</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Acréscimo de VT (em dias)</span>
+                        <input type="text" id="cfgRub_acrescimoVT" maxlength="9" placeholder="Ex: 000540" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_acrescimoVT" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                            <option value="horas">Horas (HHMM)</option>
+                        </select>
+                    </div>
+                    <div style="padding: 9px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 1.6fr 1fr 1.3fr; gap: 10px; align-items: center;">
+                        <span style="font-size: 13px; font-weight: 500;">Acréscimo de VA (em dias)</span>
+                        <input type="text" id="cfgRub_acrescimoVA" maxlength="9" placeholder="Ex: 000550" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace;">
+                        <select id="cfgTipo_acrescimoVA" style="padding: 5px; border: 1px solid #ced4da; border-radius: 4px; font-size: 12px;">
+                            <option value="monetario">Monetário (R$)</option>
+                            <option value="dias">Dias</option>
+                            <option value="horas">Horas (HHMM)</option>
+                        </select>
+                    </div>
+                </div>
+                <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">
+                    Campos vazios = sem pré-preenchimento ao gerar TXT. Desconto de VT/VA é lançado automaticamente quando o empregado tiver falta ou atestado no período.
+                    Acréscimo de VT/VA: quando preenchido, ao gerar o TXT da Folha de Ponto/Exportação em Lote desta empresa o benefício completo de VT/VA (mesmo cálculo de "Gerar Benefícios") é composto automaticamente no mesmo arquivo, para a competência seguinte, já somando os sábados "sempre extra" trabalhados (Jornada de Trabalho acima) — VT soma qualquer sábado extra trabalhado, VA só os com 4h ou mais.
+                </p>
+
+                <!-- Jornada Padrão -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Jornada Padrão</span>
+                    </div>
+                    <div style="padding: 14px 14px;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                            <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas diárias</label>
+                            <input type="text" id="cfgJornada" value="08:00" maxlength="5" placeholder="HH:MM"
+                                style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <input type="checkbox" id="cfgJornadaSextaAtiva" style="width: 16px; height: 16px; cursor: pointer;"
+                                onchange="document.getElementById('cfgJornadaSextaContainer').style.display = this.checked ? 'flex' : 'none';">
+                            <label for="cfgJornadaSextaAtiva" style="font-size: 13px; cursor: pointer; margin: 0;">Jornada diferenciada para a Sexta</label>
+                        </div>
+                        <div id="cfgJornadaSextaContainer" style="display: none; align-items: center; gap: 12px; padding-left: 24px;">
+                            <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas na Sexta</label>
+                            <input type="text" id="cfgJornadaSexta" value="04:00" maxlength="5" placeholder="HH:MM"
+                                style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; margin-top: 8px;">
+                            <input type="checkbox" id="cfgJornadaSabadoAtiva" style="width: 16px; height: 16px; cursor: pointer;"
+                                onchange="document.getElementById('cfgJornadaSabadoContainer').style.display = this.checked ? 'flex' : 'none'; if (this.checked) { document.getElementById('cfgSabadoSempreExtra').checked = false; }">
+                            <label for="cfgJornadaSabadoAtiva" style="font-size: 13px; cursor: pointer; margin: 0;">Jornada diferenciada para o Sábado</label>
+                        </div>
+                        <div id="cfgJornadaSabadoContainer" style="display: none; align-items: center; gap: 12px; padding-left: 24px;">
+                            <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas no Sábado</label>
+                            <input type="text" id="cfgJornadaSabado" value="04:00" maxlength="5" placeholder="HH:MM"
+                                style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <input type="checkbox" id="cfgSabadoSempreExtra" style="width: 16px; height: 16px; cursor: pointer;"
+                                onchange="if (this.checked) { document.getElementById('cfgJornadaSabadoAtiva').checked = false; document.getElementById('cfgJornadaSabadoContainer').style.display = 'none'; }">
+                            <label for="cfgSabadoSempreExtra" style="font-size: 13px; cursor: pointer; margin: 0;">Sábado sempre extra</label>
+                        </div>
+                        <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; margin-bottom: 0;">
+                            Usada para todo empregado sem uma jornada própria associada abaixo.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Outras Jornadas -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Outras Jornadas</span>
+                        <button type="button" class="btn btn-secondary btn-small" style="font-size: 11px;" onclick="abrirFormNovaJornada()">+ Nova Jornada</button>
+                    </div>
+                    <div style="padding: 10px 14px;">
+                        <div id="cfgJornadasLista" style="font-size: 13px; color: var(--text-secondary);">Selecione uma empresa para ver as jornadas cadastradas.</div>
+
+                        <div id="cfgJornadaFormContainer" style="display: none; margin-top: 12px; padding: 12px; border: 1px dashed var(--border-color); border-radius: 8px;">
+                            <input type="hidden" id="cfgJornadaFormId">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Nome da jornada</label>
+                                <input type="text" id="cfgJornadaFormNome" placeholder="Ex: Turno Reduzido" maxlength="60"
+                                    style="flex: 1; padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas diárias</label>
+                                <input type="text" id="cfgJornadaFormDiaria" value="08:00" maxlength="5" placeholder="HH:MM"
+                                    oninput="this.value = formatarHora(this.value);"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <input type="checkbox" id="cfgJornadaFormSextaAtiva" style="width: 16px; height: 16px; cursor: pointer;"
+                                    onchange="document.getElementById('cfgJornadaFormSextaContainer').style.display = this.checked ? 'flex' : 'none';">
+                                <label for="cfgJornadaFormSextaAtiva" style="font-size: 13px; cursor: pointer; margin: 0;">Jornada diferenciada para a Sexta</label>
+                            </div>
+                            <div id="cfgJornadaFormSextaContainer" style="display: none; align-items: center; gap: 12px; padding-left: 24px; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas na Sexta</label>
+                                <input type="text" id="cfgJornadaFormSexta" value="04:00" maxlength="5" placeholder="HH:MM"
+                                    oninput="this.value = formatarHora(this.value);"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                                <input type="checkbox" id="cfgJornadaFormSabadoAtiva" style="width: 16px; height: 16px; cursor: pointer;"
+                                    onchange="document.getElementById('cfgJornadaFormSabadoContainer').style.display = this.checked ? 'flex' : 'none'; if (this.checked) { document.getElementById('cfgJornadaFormSabadoSempreExtra').checked = false; }">
+                                <label for="cfgJornadaFormSabadoAtiva" style="font-size: 13px; cursor: pointer; margin: 0;">Jornada diferenciada para o Sábado</label>
+                            </div>
+                            <div id="cfgJornadaFormSabadoContainer" style="display: none; align-items: center; gap: 12px; padding-left: 24px; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 120px;">Horas no Sábado</label>
+                                <input type="text" id="cfgJornadaFormSabado" value="04:00" maxlength="5" placeholder="HH:MM"
+                                    oninput="this.value = formatarHora(this.value);"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 80px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                                <input type="checkbox" id="cfgJornadaFormSabadoSempreExtra" style="width: 16px; height: 16px; cursor: pointer;"
+                                    onchange="if (this.checked) { document.getElementById('cfgJornadaFormSabadoAtiva').checked = false; document.getElementById('cfgJornadaFormSabadoContainer').style.display = 'none'; }">
+                                <label for="cfgJornadaFormSabadoSempreExtra" style="font-size: 13px; cursor: pointer; margin: 0;">Sábado sempre extra</label>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button type="button" class="btn btn-primary btn-small" onclick="salvarJornadaConfig()">Salvar Jornada</button>
+                                <button type="button" class="btn btn-secondary btn-small" onclick="cancelarFormJornada()">Cancelar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Associar Empregados -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Associar Empregados</span>
+                    </div>
+                    <div style="padding: 10px 14px;">
+                        <div id="cfgAssociacaoEmpregados" style="font-size: 13px; color: var(--text-secondary);">Selecione uma empresa para associar empregados a uma jornada.</div>
+                        <button type="button" class="btn btn-primary btn-small" id="cfgBtnSalvarAssociacoes" style="display: none; margin-top: 10px;" onclick="salvarAssociacoesJornadaEmpregados()">💾 Salvar Associações</button>
+                    </div>
+                </div>
+
+                <!-- Período de Apuração -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Período de Apuração</span>
+                    </div>
+                    <div style="padding: 14px 14px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <input type="checkbox" id="cfgPeriodoApuracaoAtivo" style="width: 16px; height: 16px; cursor: pointer;"
+                                onchange="document.getElementById('cfgPeriodoApuracaoContainer').style.display = this.checked ? 'block' : 'none'; atualizarExemploPeriodoApuracao();">
+                            <label for="cfgPeriodoApuracaoAtivo" style="font-size: 13px; cursor: pointer; margin: 0;">Usar período customizado (fora do mês calendário)</label>
+                        </div>
+                        <div id="cfgPeriodoApuracaoContainer" style="display: none; padding-left: 24px;">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 190px;">Dia de início (mês anterior)</label>
+                                <input type="number" id="cfgPeriodoApuracaoDiaInicio" min="1" max="31" placeholder="28" oninput="atualizarExemploPeriodoApuracao()"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 70px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 190px;">Dia de fim (mês da competência)</label>
+                                <input type="number" id="cfgPeriodoApuracaoDiaFim" min="1" max="31" placeholder="28" oninput="atualizarExemploPeriodoApuracao()"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 70px;">
+                            </div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">
+                                <span id="cfgPeriodoApuracaoExemplo">Ex.: para competência 07/2026 → 28/06/2026 a 28/07/2026</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Benefícios (VT/VA) -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Benefícios (VT/VA)</span>
+                    </div>
+                    <div style="padding: 14px 14px;">
+                        <div style="display: flex; align-items: flex-start; gap: 8px;">
+                            <input type="checkbox" id="cfgBeneficiosExcluirFeriados" checked style="width: 16px; height: 16px; cursor: pointer; margin-top: 2px;">
+                            <label for="cfgBeneficiosExcluirFeriados" style="font-size: 13px; cursor: pointer; margin: 0;">
+                                Não contabilizar feriados como "Dias a Trabalhar" (Gerar Benefícios)
+                                <span style="display: block; font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Marcado: feriados do período abatem os "Dias a Trabalhar" (e, com isso, VT/VA). Desmarcado: feriados contam como dia normal de trabalho.</span>
+                            </label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-top: 14px;">
+                            <input type="checkbox" id="cfgBeneficiosPeriodoAtivo" style="width: 16px; height: 16px; cursor: pointer;"
+                                onchange="document.getElementById('cfgBeneficiosPeriodoContainer').style.display = this.checked ? 'block' : 'none'; atualizarExemploBeneficiosPeriodo();">
+                            <label for="cfgBeneficiosPeriodoAtivo" style="font-size: 13px; cursor: pointer; margin: 0;">Usar período customizado para "Dias a Trabalhar" (fora do mês calendário)</label>
+                        </div>
+                        <div id="cfgBeneficiosPeriodoContainer" style="display: none; padding-left: 24px; margin-top: 8px;">
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 190px;">Dia de início (mês da competência)</label>
+                                <input type="number" id="cfgBeneficiosPeriodoDiaInicio" min="1" max="31" placeholder="5" oninput="atualizarExemploBeneficiosPeriodo()"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 70px;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                                <label style="font-size: 13px; font-weight: 500; min-width: 190px;">Dia de fim (mês seguinte)</label>
+                                <input type="number" id="cfgBeneficiosPeriodoDiaFim" min="1" max="31" placeholder="5" oninput="atualizarExemploBeneficiosPeriodo()"
+                                    style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: monospace; width: 70px;">
+                            </div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">
+                                <span id="cfgBeneficiosPeriodoExemplo">Informe o dia de início e o dia de fim para ver um exemplo.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Documentos (PDFs) -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Documentos (PDFs)</span>
+                    </div>
+                    <div style="padding: 14px 14px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="cfgPdfIndividualPorEmpregado" style="width: 16px; height: 16px; cursor: pointer;">
+                            <label for="cfgPdfIndividualPorEmpregado" style="font-size: 13px; cursor: pointer; margin: 0;">Gerar recibos de benefícios e folhas de ponto individualmente por empregado (um PDF por empregado, empacotados em .zip)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Envio de Documentos -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">📧 Envio de Documentos</span>
+                    </div>
+                    <div style="padding: 14px 14px;">
+                        <label style="font-size: 13px; font-weight: 500;">E-mail(is) do Responsável</label>
+                        <input type="text" id="cfgEmailResponsavel" placeholder="ex: financeiro@empresa.com, rh@empresa.com"
+                            style="width: 100%; box-sizing: border-box; margin-top: 6px; padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;">
+                        <p style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; margin-bottom: 0;">
+                            Usado pelo botão "Enviar por E-mail" em Gerar Benefícios e Gerar Folhas de Ponto (aceita mais de um e-mail, separados por vírgula).
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Regras de Horas Extras e Turnos -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Regras de Horas Extras e Turnos</span>
+                    </div>
+                    <div style="padding: 14px 14px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                            <input type="checkbox" id="cfgRuleExtra100" style="width: 16px; height: 16px; cursor: pointer;">
+                            <label for="cfgRuleExtra100" style="font-size: 13px; cursor: pointer; margin: 0;">Aplicar Hora Extra 100% a partir da 3ª hora</label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                            <input type="checkbox" id="cfgTerceiroTurno" style="width: 16px; height: 16px; cursor: pointer;">
+                            <label for="cfgTerceiroTurno" style="font-size: 13px; cursor: pointer; margin: 0;">Empresa com 3 turnos (Entrada 3 / Saída 3)</label>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="cfgNaoCompensarDefault" style="width: 16px; height: 16px; cursor: pointer;">
+                            <label for="cfgNaoCompensarDefault" style="font-size: 13px; cursor: pointer; margin: 0;">Não compensar horas extras com horas faltantes (padrão ao gerar TXT)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Observações -->
+                <div style="margin-top: 18px; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                    <div style="background: var(--background-color); padding: 8px 14px;">
+                        <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px;">Observações</span>
+                    </div>
+                    <div style="padding: 14px 14px;">
+                        <textarea id="cfgObservacoes" rows="4" placeholder="Observações sobre esta empresa, exibidas ao iniciar o preenchimento da folha..."
+                            style="width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; font-family: inherit; resize: vertical;"></textarea>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 15px; margin-top: 18px; border-top: 1px solid #eee;">
+                    <button type="button" class="btn btn-danger btn-small" onclick="limparConfigRubricas()" style="font-size: 12px;">🗑 Limpar Empresa</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarConfigRubricas()">💾 Salvar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA FOLHA CONTRATADA (Empresas com Folha de Pagamento + Responsáveis) -->
+        <div id="folhaContratada" class="admin-tab-content">
+            <div class="container">
+                <div class="section-header">
+                    <h2>Empresas com Folha de Pagamento</h2>
+                    <p>Marque as empresas ativas que têm folha de pagamento fechada pela Scont — somente as marcadas com "Sim" aparecem em "Fluxo por Empresa". As alterações são salvas automaticamente.</p>
+                </div>
+
+                <div class="empresas-filtros">
+                    <input type="text" id="buscaEmpresaFolhaCF" placeholder="Buscar empresa...">
+                    <button class="btn btn-secondary btn-small" onclick="alternarVisiveisFolha(true)">Marcar visíveis</button>
+                    <button class="btn btn-secondary btn-small" onclick="alternarVisiveisFolha(false)">Desmarcar visíveis</button>
+                    <button class="btn btn-secondary btn-small" onclick="document.getElementById('fileImportarFolhaCF').click()">📊 Importar planilha</button>
+                    <button class="btn btn-secondary btn-small" onclick="baixarModeloEmpresasFolhaCF()">⬇️ Modelo</button>
+                    <button class="btn btn-secondary btn-small" onclick="abrirModalResponsavelPorUsuarioCF()">👤 Atribuir por usuário</button>
+                    <input type="file" id="fileImportarFolhaCF" accept=".xlsx,.xls,.csv" style="display:none">
+                </div>
+                <p class="empresas-contador" id="contadorEmpresasFolhaCF"></p>
+
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Código Empresa</th>
+                                <th>Nome Empresa</th>
+                                <th>Folha de Pagamento</th>
+                                <th>Responsável(is)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpoTabelaEmpresasFolhaCF">
+                            <tr><td colspan="4">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /container -->
 </div><!-- /main-content -->
+
+<div id="vvBuscaEmpresaResultados" style="
+    display: none;
+    position: fixed;
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 9000;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+"></div>
+
+<div id="grpBuscaEmpresaResultadosCfg" style="
+    display: none;
+    position: fixed;
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 9000;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+"></div>
+
+<div id="cfgBuscaEmpresaResultados" style="
+    display: none;
+    position: fixed;
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 9000;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+"></div>
 
 
 <!-- MODAL: EDITAR JORNADA DE TRABALHO -->
@@ -1195,19 +1733,60 @@
     </div>
 </div>
 
+<!-- MODAL RESPONSÁVEIS (por empresa) — aba Folha Contratada -->
+<div class="modal" id="modalResponsaveisCF">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalResponsaveisCFTitulo">Responsável(is)</h3>
+            <button class="modal-close" onclick="fecharModalResponsaveisCF()">×</button>
+        </div>
+        <div class="modal-body" id="modalResponsaveisCFBody"></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary btn-small" onclick="fecharModalResponsaveisCF()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL ATRIBUIR RESPONSÁVEL POR USUÁRIO (várias empresas) — aba Folha Contratada -->
+<div class="modal" id="modalResponsavelUsuarioCF">
+    <div class="modal-content large">
+        <div class="modal-header">
+            <h3>Atribuir responsável a várias empresas</h3>
+            <button class="modal-close" onclick="fecharModalResponsavelUsuarioCF()">×</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:12px; color:var(--text-secondary); margin-bottom:10px;">Escolha um usuário e marque todas as empresas pelas quais ele é responsável pelo fechamento. As alterações são salvas automaticamente.</p>
+            <div class="form-group">
+                <select id="selectUsuarioResponsavelCF" onchange="renderCorpoModalResponsavelUsuarioCF()"></select>
+            </div>
+            <div class="empresas-filtros" style="margin-bottom:8px;">
+                <input type="text" id="buscaEmpresaModalUsuarioCF" placeholder="Buscar empresa..." oninput="renderCorpoModalResponsavelUsuarioCF()">
+                <button class="btn btn-secondary btn-small" onclick="alternarTodasModalUsuarioCF(true)">Marcar visíveis</button>
+                <button class="btn btn-secondary btn-small" onclick="alternarTodasModalUsuarioCF(false)">Desmarcar visíveis</button>
+            </div>
+            <div id="modalResponsavelUsuarioCFBody"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary btn-small" onclick="fecharModalResponsavelUsuarioCF()">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-cf" id="toastCF"></div>
+
 <!-- SCRIPTS -->
 <script src="../supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="ferias-parser.js"></script>
-<script src="jornada-parser.js"></script>
-<script src="socios-parser.js"></script>
-<script src="qsa-analise.js"></script>
-<script src="feriados-calculo.js"></script>
+<script src="../Projeto RH/ferias-parser.js"></script>
+<script src="../Projeto RH/jornada-parser.js"></script>
+<script src="../Projeto RH/socios-parser.js"></script>
+<script src="../Projeto RH/qsa-analise.js"></script>
+<script src="../Projeto RH/feriados-calculo.js"></script>
 <script src="../portal-auth-guard.js"></script>
-<script src="admin.js"></script>
+<script src="configuracoes.js"></script>
 
 <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
 <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
