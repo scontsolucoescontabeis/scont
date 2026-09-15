@@ -142,7 +142,7 @@ window.Ficha360Ficha = (function () {
           </div>`;
     }
 
-    async function renderDp(el, it) {
+    function renderDp(el, it) {
         const ciclos = it.ciclos.slice().sort((a, b) => String(b.competencia).localeCompare(String(a.competencia)));
         const ciclosHtml = ciclos.map(c => {
             const fases = c.fechamento_ciclo_fase || [];
@@ -197,7 +197,6 @@ window.Ficha360Ficha = (function () {
             <div class="cartao"><h3>Folha contratada</h3><div class="numero">${it.possuiFolha ? 'Sim' : 'Não'}</div></div>
             <div class="cartao"><h3>Empregados ativos</h3><div class="numero">${it.empregadosAtivos == null ? '—' : it.empregadosAtivos}</div><div class="bloqueado">${esc(detalheTipos)}</div></div>
             <div class="cartao"><h3>Formulários em aberto</h3><div class="numero">${abertos.length}</div></div>
-            <div class="cartao"><h3>Jornada / Escala</h3><div class="numero" id="jornadaEscala">…</div></div>
           </div>
           <div class="cartao" style="margin-top:12px"><h3>Fechamento da folha (mês passado e atual)</h3>
             ${ciclosHtml ? `<ul class="lista-alertas">${ciclosHtml}</ul>` : '<div class="bloqueado">Nenhum ciclo nas competências recentes.</div>'}
@@ -221,12 +220,6 @@ window.Ficha360Ficha = (function () {
           <div class="cartao" style="margin-top:12px"><h3>Análise do QSA</h3>
             ${qsa ? `<ul class="lista-alertas">${qsa}</ul>` : '<div class="bloqueado">Nenhuma sobreposição entre sócio e empregado.</div>'}
           </div>`;
-
-        const { jornada, escala } = await Ficha360Fontes.contarJornadaEscala(F360.sb, it.codigo);
-        const alvo = document.getElementById('jornadaEscala');
-        if (!alvo) return; // usuário trocou de aba
-        const fmt = (n) => n == null ? '🔒' : (n > 0 ? '✅' : '—');
-        alvo.innerHTML = `<span title="Jornada">${fmt(jornada)}</span> / <span title="Escala">${fmt(escala)}</span>`;
     }
 
     function fmtMoeda(v) {

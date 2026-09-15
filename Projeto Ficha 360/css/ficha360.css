@@ -1,10 +1,14 @@
 :root{
   --primary:#8B3A3A; --primary-dark:#6B2A2A; --primary-light:#A85252; --primary-soft:#F4E9E7;
   --secondary:#2C3E50; --bg:#FAF8F3; --surface:#fff; --surface-2:#F4F1E9;
-  --border:#E7E0D2; --border-strong:#D6CCB6; --muted:#7C7364; --faint:#A29A8A;
+  /* --muted e --faint escurecidos, --border-strong reforçada e --warning escurecida em
+     14/09/2026 — a paleta original não passava no contraste mínimo de leitura (WCAG AA):
+     --faint chegava a 2.6:1 contra o fundo (mínimo é 4.5:1 pra texto normal), e isso pegava
+     TUDO que usa a classe .bloqueado (textos auxiliares em quase toda tela). */
+  --border:#E7E0D2; --border-strong:#A0916E; --muted:#665D50; --faint:#726955;
   --success:#29684A; --success-soft:#E6F0E9;
   --danger:#B23A2E; --danger-soft:#F8E7E3;
-  --warning:#B8801F; --warning-soft:#F9EFDC;
+  --warning:#8A5D12; --warning-soft:#F9EFDC;
   --info:#3498DB; --info-soft:#eaf1ff; --inativo:#9B9488; --inativo-soft:#F1EEE7;
   --radius:3px; --shadow:none; --sidebar:260px;
 }

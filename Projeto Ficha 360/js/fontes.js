@@ -113,15 +113,6 @@
         return { dados, falhas };
     }
 
-    async function contarJornadaEscala(sb, codigo) {
-        const contar = async (tabela) => {
-            const { count, error } = await sb.from(tabela).select('id', { count: 'exact', head: true }).eq('codigo_empresa', codigo);
-            return error ? null : (count || 0);
-        };
-        const [jornada, escala] = await Promise.all([contar('rh_jornada_trabalho'), contar('rh_escala_trabalho')]);
-        return { jornada, escala };
-    }
-
     let _cacheContatosEmpresas = null;
 
     async function carregarCrm(sb, item) {
@@ -144,5 +135,5 @@
         }
     }
 
-    return { FONTES, classificarErro, buscarTodos, carregarCarteira, contarJornadaEscala, carregarCrm };
+    return { FONTES, classificarErro, buscarTodos, carregarCarteira, carregarCrm };
 });
