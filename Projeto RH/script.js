@@ -2037,22 +2037,6 @@ function _resolverPeriodoApuracao(cfg) {
     };
 }
 
-function atualizarExemploPeriodoApuracao() {
-    const el = document.getElementById('cfgPeriodoApuracaoExemplo');
-    if (!el) return;
-    const diaInicio = parseInt(document.getElementById('cfgPeriodoApuracaoDiaInicio')?.value, 10);
-    const diaFim = parseInt(document.getElementById('cfgPeriodoApuracaoDiaFim')?.value, 10);
-    if (!Number.isInteger(diaInicio) || !Number.isInteger(diaFim) || diaInicio < 1 || diaInicio > 31 || diaFim < 1 || diaFim > 31) {
-        el.textContent = 'Informe o dia de início e o dia de fim para ver um exemplo.';
-        return;
-    }
-    const comp = document.getElementById('competencia')?.value;
-    const [mesStr, anoStr] = validarCompetencia(comp) ? comp.split('/') : ['07', String(new Date().getFullYear())];
-    const dias = gerarDiasDoMes(`${mesStr}/${anoStr}`, diaInicio, diaFim);
-    if (dias.length === 0) { el.textContent = ''; return; }
-    el.textContent = `Ex.: para competência ${mesStr}/${anoStr} → ${dias[0].data} a ${dias.at(-1).data}`;
-}
-
 // diaInicio: dia do mês anterior à competência; diaFim: dia do mês da competência.
 // Independente do período de apuração da Frequência ([[_resolverPeriodoApuracao]]) — ver
 // docs/superpowers/specs/2026-07-30-beneficios-periodo-apuracao-design.md.
@@ -2083,22 +2067,6 @@ function _competenciaMesSeguinte(comp) {
 
 function _pdfIndividualAtivo(cfg) {
     return !!cfg && cfg['pdf_individual_por_empregado']?.cod === '1';
-}
-
-function atualizarExemploBeneficiosPeriodo() {
-    const el = document.getElementById('cfgBeneficiosPeriodoExemplo');
-    if (!el) return;
-    const diaInicio = parseInt(document.getElementById('cfgBeneficiosPeriodoDiaInicio')?.value, 10);
-    const diaFim = parseInt(document.getElementById('cfgBeneficiosPeriodoDiaFim')?.value, 10);
-    if (!Number.isInteger(diaInicio) || !Number.isInteger(diaFim) || diaInicio < 1 || diaInicio > 31 || diaFim < 1 || diaFim > 31) {
-        el.textContent = 'Informe o dia de início e o dia de fim para ver um exemplo.';
-        return;
-    }
-    const hoje = new Date();
-    const comp = `${String(hoje.getMonth() + 1).padStart(2, '0')}/${hoje.getFullYear()}`;
-    const dias = gerarDiasDoMes(_competenciaMesSeguinte(comp), diaInicio, diaFim);
-    if (dias.length === 0) { el.textContent = ''; return; }
-    el.textContent = `Ex.: para competência ${comp} → ${dias[0].data} a ${dias.at(-1).data}`;
 }
 
 function _textoPeriodoApuracao(competencia, diaInicio, diaFim) {
@@ -4772,6 +4740,13 @@ function _irConfigurarValoresVaVtPendentes() {
     if (_pendentesConfigNovos.length === 0) return;
     const empresas = [...new Set(_pendentesConfigNovos.map(p => p.codigo_empresa))];
     const codigoEmpresaPendente = empresas[0];
+    // A tela de Configurações trata uma empresa por vez; avisa antes de sair
+    // daqui se houver pendências em mais de uma. Usa alert() (e não
+    // mostrarMensagem) porque a navegação acontece logo em seguida e o modal
+    // do portal não bloqueia — a mensagem sumiria antes de ser lida.
+    if (empresas.length > 1) {
+        alert(`Há empregados novos em ${empresas.length} empresas. Configure uma de cada vez — abrindo a primeira.`);
+    }
     window.location.href = '../Projeto Departamento Pessoal/configuracoes.html?tab=vavt&empresa=' + encodeURIComponent(codigoEmpresaPendente);
 }
 

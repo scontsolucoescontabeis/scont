@@ -26,6 +26,32 @@ SET url_base = './Projeto Departamento Pessoal/index.html',
     descricao = 'Hub com todas as ferramentas de Departamento Pessoal: Controle de Frequência, Lançamentos, Simulador, Fechamento, Validação, Calendário, Fluxos Operacionais e Configurações.'
 WHERE nome = 'Departamento Pessoal';
 
+-- 1b. Concede acesso ao hub para todo usuário que já tinha acesso a
+--     qualquer uma das 7 ferramentas que estão sendo desativadas (evita
+--     que quem usava Folha de Ponto/Simulador/etc. no dia a dia perca o
+--     acesso quando o card correspondente sumir da tela principal — o
+--     guard do portal autoriza por pasta, e a pasta mudou para
+--     "Projeto Departamento Pessoal").
+--     Idempotente via ON CONFLICT na constraint usuario_ferramenta_unique
+--     (usuario_id, ferramenta_id).
+INSERT INTO public.usuario_ferramentas (usuario_id, ferramenta_id)
+SELECT DISTINCT uf.usuario_id, hub.id
+FROM public.usuario_ferramentas uf
+JOIN public.ferramentas f ON f.id = uf.ferramenta_id
+CROSS JOIN LATERAL (
+    SELECT id FROM public.ferramentas WHERE nome = 'Departamento Pessoal'
+) hub
+WHERE f.nome IN (
+    'Folha de Ponto',                        -- Controle de Frequência - Ponto
+    'Lançamentos de Folha',
+    'Simulador de Folha de Pagamento',
+    'Fechamento Folha de Pagamento',
+    'Validação de Fechamento de Folha',
+    'Calendário da Folha',
+    'Admin – Módulo RH'
+)
+ON CONFLICT ON CONSTRAINT usuario_ferramenta_unique DO NOTHING;
+
 -- 2. As ferramentas que entraram como cards dentro do hub saem da tela
 --    principal do portal (soft-deactivate, não delete — preserva
 --    usuario_ferramentas e permite reverter facilmente).

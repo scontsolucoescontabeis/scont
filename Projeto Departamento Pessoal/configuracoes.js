@@ -97,6 +97,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (tabQuery === 'vavt' && empresaQuery) {
             document.getElementById('vvBuscaEmpresa').value = empresaQuery;
             filtrarEmpresasValoresVaVt(empresaQuery);
+            // Se o termo da querystring identifica uma única empresa, seleciona
+            // direto (carrega a tabela de empregados) — sem ambiguidade, não faz
+            // sentido obrigar o usuário a clicar no único resultado do dropdown.
+            const _norm = empresaQuery.trim().toLowerCase();
+            const _correspondentes = _todasEmpresas.filter(e =>
+                (e.nome_empresa || '').toLowerCase().includes(_norm) ||
+                (e.codigo_empresa || '').toLowerCase().includes(_norm));
+            if (_correspondentes.length === 1) {
+                selecionarEmpresaValoresVaVt(_correspondentes[0].codigo_empresa, _correspondentes[0].nome_empresa);
+            }
         }
     }
 
@@ -4402,14 +4412,13 @@ function previewFeriados() {
 // Empregados do tipo "Contribuinte" (sócios/pró-labore) não entram em parametrização
 // nem geração de Controle de Frequência, Escala, Benefícios ou Fechamento da Folha.
 // Empregados com situação "Demitido" também nunca entram nessas ferramentas.
+// Cópia idêntica de Projeto RH/script.js — NÃO editar aqui sem replicar lá também (o motor de cálculo depende da versão original).
 function _excluirContribuinte(lista) {
     return (lista || []).filter(e =>
         (e.tipo_empregado || '').trim() !== 'Contribuinte' &&
         (e.situacao || '').trim() !== 'Demitido'
     );
 }
-
-let _cacheValoresVaVt = {};
 
 function abrirModalValoresVaVt() {
     document.getElementById('vvCodigoEmpresa').value = '';
@@ -4494,9 +4503,16 @@ async function _carregarTabelaValoresVaVt(codigoEmpresa) {
         const mapaValores = {};
         (valores || []).forEach(v => { mapaValores[v.codigo_empregado] = v; });
 
+        // Realce "🆕 novo" dos empregados que a importação de Empregados marcou
+        // como pendentes de configuração (mesma lista de localStorage escrita
+        // por _salvarPendentesConfigNovos). Puramente cosmético.
+        let _pendentesConfigNovos = [];
+        try { _pendentesConfigNovos = JSON.parse(localStorage.getItem(_PENDENTES_CONFIG_NOVOS_KEY) || '[]'); } catch (_) { _pendentesConfigNovos = []; }
+        if (!Array.isArray(_pendentesConfigNovos)) _pendentesConfigNovos = [];
+
         tabela.innerHTML = empregados.map(emp => {
             const v = mapaValores[emp.codigo_empregado] || {};
-            const destaque = false;
+            const destaque = _pendentesConfigNovos.some(p => p.codigo_empresa === codigoEmpresa && p.codigo_empregado === emp.codigo_empregado);
             return `
                 <div style="padding: 8px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; align-items: center; ${destaque ? 'background:#EAF7EE;' : ''}">
                     <span style="font-size: 13px;">${emp.codigo_empregado} - ${emp.nome_empregado}${destaque ? ' <span style="font-size:11px; font-weight:700; color:#1E8449; background:white; padding:2px 8px; border-radius:10px;">🆕 novo</span>' : ''}</span>
@@ -4535,7 +4551,9 @@ async function salvarValoresVaVt() {
             .from('rh_valores_va_vt')
             .upsert(rows, { onConflict: 'codigo_empresa,codigo_empregado' });
         if (error) throw error;
-        delete _cacheValoresVaVt[codigoEmpresa];
+        // Não há cache de valores VA/VT nesta página (o cache _cacheValoresVaVt é
+        // do motor de cálculo, que vive em Projeto RH/script.js e recarrega a
+        // cada sessão de processamento) — nada a invalidar aqui.
         mostrarMensagem('Sucesso', '✅ Valores de VT/VA salvos com sucesso!');
     } catch (e) {
         mostrarMensagem('Erro', 'Erro ao salvar valores de VT/VA: ' + e.message);
@@ -4798,6 +4816,7 @@ const _CFG_EVENTOS = [
 
 let _cacheConfigRubricas = {};
 
+// Cópia idêntica de Projeto RH/script.js — NÃO editar aqui sem replicar lá também (o motor de cálculo depende da versão original).
 async function _buscarConfigRubricas(codigoEmpresa) {
     if (!codigoEmpresa) return null;
     if (_cacheConfigRubricas[codigoEmpresa] !== undefined) return _cacheConfigRubricas[codigoEmpresa];
@@ -4824,22 +4843,26 @@ async function _buscarConfigRubricas(codigoEmpresa) {
 // --- Utilitários de formatação/validação/geração de dias, também copiados de
 // Projeto RH/script.js (permanecem lá, usados amplamente pelo motor de cálculo). ---
 
+// Cópia idêntica de Projeto RH/script.js — NÃO editar aqui sem replicar lá também (o motor de cálculo depende da versão original).
 function formatarHora(valor) {
     let v = valor.replace(/\D/g, '');
     if (v.length >= 2) v = v.substring(0, 2) + ':' + v.substring(2, 4);
     return v;
 }
 
+// Cópia idêntica de Projeto RH/script.js — NÃO editar aqui sem replicar lá também (o motor de cálculo depende da versão original).
 function validarHora(hora) {
     if (!hora) return true;
     const regex = /^([01]\d|2[0-3]):([0-5]\d)$/;
     return regex.test(hora);
 }
 
+// Cópia idêntica de Projeto RH/script.js — NÃO editar aqui sem replicar lá também (o motor de cálculo depende da versão original).
 function validarCompetencia(competencia) {
     return /^(0[1-9]|1[0-2])\/\d{4}$/.test(competencia);
 }
 
+// Cópia idêntica de Projeto RH/script.js — NÃO editar aqui sem replicar lá também (o motor de cálculo depende da versão original).
 function _competenciaMesSeguinte(comp) {
     const [mes, ano] = comp.split('/').map(Number);
     const mesSeg = mes === 12 ? 1 : mes + 1;
@@ -4847,6 +4870,7 @@ function _competenciaMesSeguinte(comp) {
     return `${String(mesSeg).padStart(2, '0')}/${anoSeg}`;
 }
 
+// Cópia idêntica de Projeto RH/script.js — NÃO editar aqui sem replicar lá também (o motor de cálculo depende da versão original).
 function _diaObjeto(dataObj) {
     const diasSemana = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
     const d = String(dataObj.getDate()).padStart(2, '0');
@@ -4868,6 +4892,7 @@ function _diaObjeto(dataObj) {
 // dia do mês ANTERIOR à competência e diaFim é o dia do mês DA competência (ex: 28/06 a
 // 28/07 para competência 07/2026). Quando ausentes ou inválidos, mantém o comportamento
 // padrão (mês calendário completo da competência).
+// Cópia idêntica de Projeto RH/script.js — NÃO editar aqui sem replicar lá também (o motor de cálculo depende da versão original).
 function gerarDiasDoMes(competencia, diaInicio = null, diaFim = null) {
     if (!competencia) return [];
     const [mes, ano] = competencia.split('/');
@@ -4913,6 +4938,7 @@ function gerarDiasDoMes(competencia, diaInicio = null, diaFim = null) {
     return dias;
 }
 
+// Originalmente em Projeto RH/script.js; lá ficou sem chamador depois desta migração e foi removida — esta é agora a única versão viva.
 function atualizarExemploPeriodoApuracao() {
     const el = document.getElementById('cfgPeriodoApuracaoExemplo');
     if (!el) return;
@@ -4929,6 +4955,7 @@ function atualizarExemploPeriodoApuracao() {
     el.textContent = `Ex.: para competência ${mesStr}/${anoStr} → ${dias[0].data} a ${dias.at(-1).data}`;
 }
 
+// Originalmente em Projeto RH/script.js; lá ficou sem chamador depois desta migração e foi removida — esta é agora a única versão viva.
 function atualizarExemploBeneficiosPeriodo() {
     const el = document.getElementById('cfgBeneficiosPeriodoExemplo');
     if (!el) return;
@@ -5086,6 +5113,7 @@ let _cacheJornadas = {};
 let _jornadasConfigAtual = [];
 let _empregadosConfigAtual = [];
 
+// Cópia idêntica de Projeto RH/script.js — NÃO editar aqui sem replicar lá também (o motor de cálculo depende da versão original).
 async function _buscarJornadas(codigoEmpresa) {
     if (!codigoEmpresa) return [];
     if (_cacheJornadas[codigoEmpresa] !== undefined) return _cacheJornadas[codigoEmpresa];
@@ -5105,6 +5133,7 @@ async function _buscarJornadas(codigoEmpresa) {
     }
 }
 
+// Cópia idêntica de Projeto RH/script.js — NÃO editar aqui sem replicar lá também (o motor de cálculo depende da versão original).
 function _invalidarCacheJornadas(codigoEmpresa) {
     delete _cacheJornadas[codigoEmpresa];
 }
@@ -5327,19 +5356,6 @@ async function salvarAssociacoesJornadaEmpregados() {
     }
 }
 
-function abrirModalConfigRubricas() {
-    document.getElementById('cfgCodigoEmpresa').value = '';
-    document.getElementById('cfgBuscaEmpresa').value = '';
-    document.getElementById('cfgBuscaEmpresaResultados').style.display = 'none';
-    _limparCamposConfigRubricas();
-    document.getElementById('configRubricasModal').classList.add('active');
-}
-
-function fecharModalConfigRubricas() {
-    document.getElementById('configRubricasModal').classList.remove('active');
-    document.getElementById('cfgBuscaEmpresaResultados').style.display = 'none';
-}
-
 function filtrarEmpresasConfig(termo) {
     const box   = document.getElementById('cfgBuscaEmpresaResultados');
     const input = document.getElementById('cfgBuscaEmpresa');
@@ -5479,6 +5495,7 @@ let usuariosCache = [];
 // mesmas queries/tabelas/campos, restritas ao que esta aba usa — não inclui
 // fechamento_config_geral (email_alerta_fechamento), que só o dashboard de
 // fases do Fechamento Folha consome.
+// Não aplica _filtrarPorEscopo porque a aba inteira já é restrita a admin (_isAdminFolhaContratada()), então não há escopo por responsável a aplicar aqui — rever se esse gate for flexibilizado no futuro.
 async function carregarBaseFolhaContratada() {
     const [
         { data: empresas, error: errEmp },
@@ -5870,6 +5887,7 @@ function lerPlanilhaFolhaCF(file) {
     });
 }
 
+// Estes listeners não passam pelo gate de admin da Folha Contratada, mas é inofensivo: os controles vivem numa aba que não-admin não consegue abrir.
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('fileImportarFolhaCF');
     if (fileInput) fileInput.addEventListener('change', handleImportarPlanilhaFolhaCF);
