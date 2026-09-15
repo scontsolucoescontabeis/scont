@@ -3262,139 +3262,6 @@ async function limparConfigRubricas() {
     }
 }
 
-// --- VALORES DE VT/VA POR EMPREGADO ---
-
-function abrirModalValoresVaVt() {
-    document.getElementById('vvCodigoEmpresa').value = '';
-    document.getElementById('vvBuscaEmpresa').value = '';
-    document.getElementById('vvBuscaEmpresaResultados').style.display = 'none';
-    document.getElementById('vvConteudo').style.display = 'none';
-    document.getElementById('vvSemEmpresa').style.display = 'block';
-    document.getElementById('vvBtnSalvar').style.display = 'none';
-    document.getElementById('valoresVaVtModal').classList.add('active');
-}
-
-function fecharModalValoresVaVt() {
-    document.getElementById('valoresVaVtModal').classList.remove('active');
-    document.getElementById('vvBuscaEmpresaResultados').style.display = 'none';
-}
-
-function filtrarEmpresasValoresVaVt(termo) {
-    const box   = document.getElementById('vvBuscaEmpresaResultados');
-    const input = document.getElementById('vvBuscaEmpresa');
-    if (!box || !input) return;
-
-    const rect = input.getBoundingClientRect();
-    box.style.top   = (rect.bottom + 2) + 'px';
-    box.style.left  = rect.left + 'px';
-    box.style.width = rect.width + 'px';
-
-    const norm = termo.trim().toLowerCase();
-    const lista = norm
-        ? state.empresas.filter(e =>
-            e.nome_empresa.toLowerCase().includes(norm) ||
-            e.codigo_empresa.toLowerCase().includes(norm))
-        : state.empresas;
-
-    if (!lista.length) {
-        box.innerHTML = '<div style="padding:10px 14px;color:#999;font-size:13px;">Nenhuma empresa encontrada</div>';
-        box.style.display = 'block';
-        return;
-    }
-
-    box.innerHTML = lista.map(e => `
-        <div onclick="selecionarEmpresaValoresVaVt('${e.codigo_empresa}', '${e.nome_empresa.replace(/'/g, "\\'")}')"
-            style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;"
-            onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
-            <span style="font-family:monospace;font-weight:600;color:var(--primary-color);margin-right:8px;">${e.codigo_empresa}</span>${e.nome_empresa}
-        </div>`).join('');
-    box.style.display = 'block';
-}
-
-async function selecionarEmpresaValoresVaVt(codigo, nome) {
-    document.getElementById('vvCodigoEmpresa').value = codigo;
-    document.getElementById('vvBuscaEmpresa').value = `${codigo} - ${nome}`;
-    document.getElementById('vvBuscaEmpresaResultados').style.display = 'none';
-    await _carregarTabelaValoresVaVt(codigo);
-}
-
-async function _carregarTabelaValoresVaVt(codigoEmpresa) {
-    document.getElementById('vvSemEmpresa').style.display = 'none';
-    document.getElementById('vvConteudo').style.display = 'block';
-    document.getElementById('vvBtnSalvar').style.display = 'none';
-    const tabela = document.getElementById('vvTabelaEmpregados');
-    tabela.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-secondary);font-size:13px;">Carregando...</div>';
-
-    try {
-        const [{ data: empregadosData, error: errEmp }, { data: valores, error: errVal }] = await Promise.all([
-            supabaseClient.from('rh_empregados')
-                .select('codigo_empregado, nome_empregado, tipo_empregado, situacao')
-                .eq('codigo_empresa', codigoEmpresa)
-                .order('nome_empregado', { ascending: true }),
-            supabaseClient.from('rh_valores_va_vt')
-                .select('codigo_empregado, valor_vt, valor_va')
-                .eq('codigo_empresa', codigoEmpresa),
-        ]);
-        if (errEmp) throw errEmp;
-        if (errVal) throw errVal;
-        const empregados = _excluirContribuinte(empregadosData);
-
-        if (!empregados || empregados.length === 0) {
-            tabela.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text-secondary);font-size:13px;">Esta empresa não possui empregados cadastrados.</div>';
-            return;
-        }
-
-        const mapaValores = {};
-        (valores || []).forEach(v => { mapaValores[v.codigo_empregado] = v; });
-
-        tabela.innerHTML = empregados.map(emp => {
-            const v = mapaValores[emp.codigo_empregado] || {};
-            const destaque = _pendentesConfigNovos.some(p => p.codigo_empresa === codigoEmpresa && p.codigo_empregado === emp.codigo_empregado);
-            return `
-                <div style="padding: 8px 14px; border-top: 1px solid #eee; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; align-items: center; ${destaque ? 'background:#EAF7EE;' : ''}">
-                    <span style="font-size: 13px;">${emp.codigo_empregado} - ${emp.nome_empregado}${destaque ? ' <span style="font-size:11px; font-weight:700; color:#1E8449; background:white; padding:2px 8px; border-radius:10px;">🆕 novo</span>' : ''}</span>
-                    <input type="number" step="0.01" min="0" data-codigo-empregado="${emp.codigo_empregado}" class="vv-input-vt" value="${v.valor_vt ?? ''}" placeholder="0,00" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;">
-                    <input type="number" step="0.01" min="0" data-codigo-empregado="${emp.codigo_empregado}" class="vv-input-va" value="${v.valor_va ?? ''}" placeholder="0,00" style="padding: 5px 9px; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px;">
-                </div>
-            `;
-        }).join('');
-        document.getElementById('vvBtnSalvar').style.display = 'inline-flex';
-    } catch (e) {
-        console.error('Erro ao carregar valores de VT/VA:', e);
-        tabela.innerHTML = '<div style="padding:14px;text-align:center;color:var(--danger-color);font-size:13px;">Erro ao carregar dados.</div>';
-    }
-}
-
-async function salvarValoresVaVt() {
-    const codigoEmpresa = (document.getElementById('vvCodigoEmpresa')?.value || '').trim();
-    if (!codigoEmpresa) { mostrarMensagem('Aviso', 'Selecione uma empresa antes de salvar.'); return; }
-
-    const rows = Array.from(document.querySelectorAll('.vv-input-vt')).map(inputVT => {
-        const codigoEmpregado = inputVT.dataset.codigoEmpregado;
-        const inputVA = document.querySelector(`.vv-input-va[data-codigo-empregado="${codigoEmpregado}"]`);
-        return {
-            codigo_empresa: codigoEmpresa,
-            codigo_empregado: codigoEmpregado,
-            valor_vt: parseFloat(inputVT.value) || 0,
-            valor_va: parseFloat(inputVA?.value) || 0,
-            data_atualizacao: new Date().toISOString(),
-        };
-    });
-
-    if (rows.length === 0) { mostrarMensagem('Aviso', 'Não há empregados para salvar.'); return; }
-
-    try {
-        const { error } = await supabaseClient
-            .from('rh_valores_va_vt')
-            .upsert(rows, { onConflict: 'codigo_empresa,codigo_empregado' });
-        if (error) throw error;
-        delete _cacheValoresVaVt[codigoEmpresa];
-        mostrarMensagem('Sucesso', '✅ Valores de VT/VA salvos com sucesso!');
-    } catch (e) {
-        mostrarMensagem('Erro', 'Erro ao salvar valores de VT/VA: ' + e.message);
-    }
-}
-
 // --- EXPORTAÇÃO TXT ---
 
 const TXT_RUBRICAS_KEY = 'rh_txt_rubricas';
@@ -5513,13 +5380,8 @@ function _irConfigurarEscalaPendentes() {
 function _irConfigurarValoresVaVtPendentes() {
     if (_pendentesConfigNovos.length === 0) return;
     const empresas = [...new Set(_pendentesConfigNovos.map(p => p.codigo_empresa))];
-    abrirModalValoresVaVt();
-    const primeira = state.empresas.find(e => e.codigo_empresa === empresas[0]);
-    if (primeira) selecionarEmpresaValoresVaVt(primeira.codigo_empresa, primeira.nome_empresa);
-    if (empresas.length > 1) {
-        setTimeout(() => mostrarMensagem('Várias empresas pendentes',
-            `Há empregados novos em ${empresas.length} empresas. Configure uma de cada vez — depois de salvar esta, use "Configurar Valores VT/VA" de novo pra ir pra próxima.`), 300);
-    }
+    const codigoEmpresaPendente = empresas[0];
+    window.location.href = '../Projeto Departamento Pessoal/configuracoes.html?tab=vavt&empresa=' + encodeURIComponent(codigoEmpresaPendente);
 }
 
 // ===== GERAR FOLHAS DE PONTO =====

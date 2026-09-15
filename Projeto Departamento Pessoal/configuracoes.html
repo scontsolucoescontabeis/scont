@@ -144,6 +144,9 @@
         <button class="sidebar-item" id="nav-importar" onclick="abrirAba('importar', this)">
             <span class="sidebar-item-icon">📥</span> Importar Dados
         </button>
+        <button class="sidebar-item" id="nav-vavt" onclick="abrirAba('vavt', this)">
+            <span class="sidebar-item-icon">💰</span> VA/VT
+        </button>
     </nav>
     <div class="sidebar-footer">
         <a href="index.html" class="sidebar-item" style="border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; text-decoration: none;">
@@ -962,8 +965,53 @@
             </div>
         </div>
 
+        <!-- ABA VA/VT -->
+        <div id="vavt" class="admin-tab-content">
+            <div class="admin-section">
+                <h2>💰 Valores de VT/VA por Empregado</h2>
+                <div class="form-group" style="max-width:420px;">
+                    <label>Empresa</label>
+                    <input type="text" id="vvBuscaEmpresa"
+                        placeholder="Digite o nome ou código da empresa..."
+                        autocomplete="off"
+                        oninput="filtrarEmpresasValoresVaVt(this.value)"
+                        onfocus="filtrarEmpresasValoresVaVt(this.value)">
+                    <input type="hidden" id="vvCodigoEmpresa">
+                </div>
+                <div id="vvSemEmpresa" style="text-align: center; padding: 30px 0; color: #7F8C8D; font-size: 13px;">
+                    Selecione uma empresa para configurar os valores diários de VT e VA de cada empregado.
+                </div>
+                <div id="vvConteudo" style="display: none;">
+                    <div style="border: 1px solid #E0E0E0; border-radius: 8px; overflow: hidden;">
+                        <div style="background: #F5F5F5; padding: 8px 14px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+                            <span style="font-size: 11px; font-weight: 700; color: #7F8C8D; text-transform: uppercase; letter-spacing: 0.4px;">Empregado</span>
+                            <span style="font-size: 11px; font-weight: 700; color: #7F8C8D; text-transform: uppercase; letter-spacing: 0.4px;">VT / dia (R$)</span>
+                            <span style="font-size: 11px; font-weight: 700; color: #7F8C8D; text-transform: uppercase; letter-spacing: 0.4px;">VA / dia (R$)</span>
+                        </div>
+                        <div id="vvTabelaEmpregados" style="max-height: 420px; overflow-y: auto;"></div>
+                    </div>
+                    <p style="font-size: 11px; color: #7F8C8D; margin-top: 6px;">
+                        Valor diário de VT/VA a ser descontado do empregado em caso de falta ou atestado. Campos vazios equivalem a R$ 0,00.
+                    </p>
+                    <button type="button" class="btn-save" id="vvBtnSalvar" style="display: none; margin-top: 10px;" onclick="salvarValoresVaVt()">💾 Salvar</button>
+                </div>
+            </div>
+        </div>
+
     </div><!-- /container -->
 </div><!-- /main-content -->
+
+<div id="vvBuscaEmpresaResultados" style="
+    display: none;
+    position: fixed;
+    background: #fff;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 9000;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+"></div>
 
 
 <!-- MODAL: EDITAR JORNADA DE TRABALHO -->
