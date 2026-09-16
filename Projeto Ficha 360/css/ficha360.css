@@ -117,7 +117,7 @@ table.tabela{width:100%;border-collapse:collapse;font-size:13px}
 .ficha-meta div{display:flex;flex-direction:column;gap:2px;min-width:0}
 .ficha-meta dt{color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.03em}
 .ficha-meta dd{margin:0;color:var(--secondary);font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
-.ficha-meta dd .mono{font-size:15px;letter-spacing:.02em}
+.ficha-meta dd .mono{font-family:'IBM Plex Sans',"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;letter-spacing:.02em}
 
 .abas-wrap{position:relative;background:var(--surface);border:1px solid var(--border);border-top:0}
 .abas{display:flex;gap:22px;flex-wrap:nowrap;padding:0 18px;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth}
