@@ -12,53 +12,81 @@
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  body{background:var(--bg); color:var(--text);}
+  html, body{height:100%;}
+  body{background:var(--bg); color:var(--text); overflow:hidden;}
   .mono, .num, .kpi-value, td.num, th.num{
     font-family:ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     font-variant-numeric: tabular-nums;
   }
 
-  .page{max-width:1180px; margin:0 auto; padding:24px 20px 56px; display:flex; flex-direction:column; gap:22px;}
+  /* ---------- app shell ---------- */
+  #app{display:flex; height:100vh;}
 
-  /* ---------- topbar ---------- */
-  .topbar{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;}
-  .brand{display:flex; align-items:center; gap:10px; font-weight:700; color:var(--secondary); font-size:.95rem;}
-  .brand-mark{
-    width:30px; height:30px; border-radius:8px; flex:none;
+  /* ---------- sidebar (padrão do portal) ---------- */
+  .sidebar{
+    width:240px; min-width:240px;
     background:linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-    display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px;
+    color:#fff; display:flex; flex-direction:column;
+    transition:width .3s ease, min-width .3s ease; overflow:hidden;
+    box-shadow:4px 0 20px rgba(15,23,42,.15);
   }
-  .back-link{
-    display:inline-flex; align-items:center; gap:6px;
-    background:var(--card); border:1px solid var(--border); color:var(--secondary);
-    padding:8px 14px; border-radius:999px; font-size:.82rem; font-weight:600;
-    text-decoration:none; box-shadow:var(--shadow-sm); transition:var(--transition);
+  .sidebar.collapsed{width:64px; min-width:64px;}
+  .brand{
+    display:flex; align-items:center; gap:10px; padding:22px 20px; font-size:16px; font-weight:800;
+    letter-spacing:.3px; border-bottom:1px solid rgba(255,255,255,.12); white-space:nowrap; overflow:hidden;
   }
-  .back-link:hover{border-color:var(--primary); color:var(--primary);}
+  .nav{flex:1; display:flex; flex-direction:column; padding:12px 10px; gap:4px; overflow-y:auto;}
+  .nav button{
+    display:flex; align-items:center; gap:12px; padding:11px 12px; border:none; background:transparent;
+    color:rgba(255,255,255,.72); border-radius:var(--radius-sm); cursor:pointer; font-size:14px;
+    font-family:inherit; text-align:left; white-space:nowrap; overflow:hidden; transition:var(--transition);
+  }
+  .nav button span:first-child{font-size:17px; flex-shrink:0; width:20px; text-align:center;}
+  .nav button:hover{background:rgba(255,255,255,.12); color:#fff;}
+  .nav button.active{background:rgba(255,255,255,.18); color:#fff; font-weight:700; box-shadow:inset 3px 0 0 rgba(255,255,255,.8);}
+  .sidebar.collapsed .nav button span:last-child, .sidebar.collapsed .sidebar-footer, .sidebar.collapsed .brand span:last-child{display:none;}
+  .sidebar-portal{padding:10px 10px 0; border-top:1px solid rgba(255,255,255,.12);}
+  .btn-portal{
+    display:flex; align-items:center; gap:12px; padding:11px 12px; width:100%; border:none;
+    background:rgba(255,255,255,.1); color:#fff; border-radius:var(--radius-sm); cursor:pointer;
+    font-size:13px; font-weight:600; font-family:inherit; white-space:nowrap; overflow:hidden;
+  }
+  .btn-portal:hover{background:rgba(255,255,255,.2);}
+  .sidebar-footer{padding:14px 14px 16px; font-size:11px; color:rgba(255,255,255,.45); line-height:1.5;}
 
-  /* ---------- masthead ---------- */
-  .masthead{
-    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
-    box-shadow:var(--shadow-sm); padding:22px 26px; position:relative; overflow:hidden;
+  /* ---------- main / topbar ---------- */
+  .main{flex:1; display:flex; flex-direction:column; overflow:hidden; background:var(--bg);}
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:0 24px; height:64px; min-height:64px;
+    background:var(--card); border-bottom:1px solid var(--border); box-shadow:var(--shadow-sm);
   }
-  .masthead::before{
-    content:""; position:absolute; inset:0 0 auto 0; height:4px;
-    background:linear-gradient(90deg, var(--primary), var(--secondary));
+  .top-left{display:flex; align-items:center; gap:14px; min-width:0;}
+  .collapse-btn{
+    background:none; border:1px solid var(--border); border-radius:var(--radius-sm);
+    width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; color:var(--text-light); flex:none;
   }
-  .eyebrow{
-    display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
-    color:var(--primary); background:#F3E4E4;
-    padding:3px 10px; border-radius:999px; margin-bottom:10px;
+  .collapse-btn:hover{background:var(--bg-light); color:var(--primary); border-color:var(--primary);}
+  .page-info h1{font-size:17px; font-weight:700; color:var(--secondary); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .page-info .meta{font-size:.76rem; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .top-actions{display:flex; align-items:center; gap:14px; flex:none;}
+  .scope-toggle{
+    display:flex; align-items:center; gap:6px; font-size:.78rem; color:var(--text-light);
+    cursor:pointer; user-select:none; white-space:nowrap;
   }
-  .masthead h1{font-size:clamp(1.4rem, 1.15rem + 1.1vw, 1.9rem); margin:0 0 8px; color:var(--secondary); line-height:1.15;}
-  .lede{max-width:66ch; margin:0; color:var(--text-light); font-size:.94rem; line-height:1.55;}
-  .lede strong{color:var(--secondary); font-weight:700;}
-  .meta{font-size:.78rem; color:var(--muted); margin-top:10px;}
+  .scope-toggle input{accent-color:var(--primary); width:14px; height:14px; cursor:pointer;}
+
+  .content{flex:1; overflow-y:auto; padding:22px 24px 48px;}
+  .content-inner{max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:20px;}
+
+  .screen{display:none;}
+  .screen.active{display:flex; flex-direction:column; gap:20px;}
 
   /* ---------- KPI row ---------- */
   .kpis{display:grid; gap:14px; grid-template-columns:repeat(4, 1fr);}
-  @media (max-width:820px){ .kpis{grid-template-columns:repeat(2,1fr);} }
-  @media (max-width:460px){ .kpis{grid-template-columns:1fr;} }
+  @media (max-width:900px){ .kpis{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:520px){ .kpis{grid-template-columns:1fr;} }
   .kpi{
     background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
     padding:16px 18px; display:flex; flex-direction:column; gap:5px; box-shadow:var(--shadow-sm);
@@ -100,7 +128,7 @@
     padding:16px 18px; box-shadow:var(--shadow-sm);
   }
   .toolbar-row{display:flex; flex-wrap:wrap; gap:10px; align-items:center;}
-  #search{
+  #search, #sem-reajuste-search{
     flex:1 1 220px; min-width:0;
     background:var(--bg-light); border:1px solid var(--border); border-radius:var(--radius-sm);
     padding:9px 12px; font-size:.9rem; color:var(--text); font-family:inherit;
@@ -122,29 +150,12 @@
   .chip.is-active{background:var(--primary); border-color:var(--primary); color:#fff;}
   .chip.is-active .bar-dot{background:#fff !important;}
   .toolbar-foot{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
-  #result-count{font-size:.8rem; color:var(--muted);}
+  #result-count, #sem-reajuste-count{font-size:.8rem; color:var(--muted);}
   #reset-btn{
     background:none; border:1px solid var(--border); color:var(--text-light);
     border-radius:var(--radius-sm); padding:7px 12px; font-size:.79rem; cursor:pointer; font-family:inherit; transition:var(--transition);
   }
   #reset-btn:hover{border-color:var(--primary); color:var(--primary);}
-  #sem-reajuste-btn{
-    background:var(--bg-light); border:1px solid var(--border); color:var(--secondary);
-    border-radius:var(--radius-sm); padding:7px 12px; font-size:.79rem; font-weight:600;
-    cursor:pointer; font-family:inherit; transition:var(--transition);
-  }
-  #sem-reajuste-btn:hover{border-color:var(--primary); color:var(--primary);}
-  .panel-head{
-    display:flex; justify-content:space-between; align-items:center; gap:10px;
-    padding:14px 18px; border-bottom:1px solid var(--border);
-  }
-  .panel-head strong{color:var(--secondary); font-size:.9rem;}
-  .panel-head p{margin:2px 0 0; font-size:.78rem; color:var(--muted);}
-  #sem-reajuste-close{
-    background:none; border:1px solid var(--border); color:var(--text-light);
-    border-radius:var(--radius-sm); padding:6px 11px; font-size:.78rem; cursor:pointer; font-family:inherit;
-  }
-  #sem-reajuste-close:hover{border-color:var(--primary); color:var(--primary);}
 
   /* ---------- table ---------- */
   .table-wrap{
@@ -152,12 +163,14 @@
     box-shadow:var(--shadow-sm); overflow:hidden;
   }
   .table-scroll{overflow-x:auto;}
-  table{width:100%; border-collapse:collapse; font-size:.85rem; min-width:920px;}
+  table{width:100%; border-collapse:collapse; font-size:.85rem; min-width:760px;}
+  #data-table{min-width:920px;}
   thead th{
     position:sticky; top:0; z-index:1;
     background:var(--bg-light); text-align:left;
     border-bottom:2px solid var(--border); padding:0;
   }
+  thead th.plain{padding:10px 12px; font-weight:700; font-size:.72rem; letter-spacing:.04em; text-transform:uppercase; color:var(--text-light);}
   th button{
     width:100%; text-align:inherit; background:none; border:none; cursor:pointer;
     font:inherit; color:var(--text-light); font-weight:700; font-size:.72rem;
@@ -181,6 +194,8 @@
     display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:999px;
     font-size:.72rem; font-weight:700; white-space:nowrap;
   }
+  .badge.ok{background:#DFF3E7; color:#1E7B45;}
+  .badge.off{background:#F3E4E4; color:#8B3A3A;}
   .badge .bar-dot{width:7px; height:7px;}
   td.empty-state{padding:40px 12px; text-align:center; color:var(--muted); font-size:.9rem;}
 
@@ -190,6 +205,8 @@
     box-shadow:var(--shadow-sm); padding:32px; text-align:center; color:var(--text-light); font-size:.92rem;
   }
   .data-status.is-error{border-color:var(--danger); color:var(--danger);}
+  .lede{max-width:70ch; margin:0; color:var(--text-light); font-size:.9rem; line-height:1.5;}
+  .lede strong{color:var(--secondary); font-weight:700;}
 
   @media (prefers-reduced-motion: no-preference){
     .bar-fill, .kpi-meter-fill{transition:width .5s ease;}
@@ -203,118 +220,158 @@
   <p style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso ao Portal SCONT…</p>
 </div>
 
-<div class="page" id="page-content" hidden>
+<div id="app" hidden>
 
-  <div id="data-status" class="data-status" hidden></div>
-
-
-  <div class="topbar">
-    <div class="brand"><span class="brand-mark">🧾</span> Portal SCONT · Departamento Pessoal</div>
-    <a class="back-link" href="portal.html">🏠 Voltar ao Portal</a>
-  </div>
-
-  <header class="masthead">
-    <span class="eyebrow">Auditoria de Folha</span>
-    <h1>Reajustes Salariais — Convenções Coletivas</h1>
-    <p class="lede">Todo reajuste salarial concedido a <strong>empregados</strong> (contribuintes excluídos), extraído do relatório consolidado das empresas SCONT, com destaque para os que vieram de <strong>Convenção Coletiva de Trabalho (CCT)</strong> — use o card em destaque, a barra ou os filtros abaixo para isolá-los.</p>
-    <p class="meta mono">Competência 01/2025 – 08/2026 · relatório emitido 16/09/2026</p>
-  </header>
-
-  <section class="kpis" aria-label="Resumo geral">
-    <div class="kpi kpi-feature">
-      <span class="kpi-label">Reajustes por CCT</span>
-      <span class="kpi-value" id="kpi-cct-value">—</span>
-      <div class="kpi-meter"><div class="kpi-meter-fill" id="kpi-cct-meter" style="width:0%"></div></div>
-      <span class="kpi-sub" id="kpi-cct-sub">carregando…</span>
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><span>🧾</span><span>Reajustes CCT</span></div>
+    <nav class="nav">
+      <button class="active" data-page="dashboard"><span>📊</span><span>Dashboard</span></button>
+      <button data-page="reajustes"><span>💰</span><span>Reajustes</span></button>
+      <button data-page="sem-reajuste"><span>🚫</span><span>Sem reajuste</span></button>
+    </nav>
+    <div class="sidebar-portal">
+      <button class="btn-portal" type="button" onclick="window.location.href='portal.html'"><span>🏠</span><span>Voltar ao Portal</span></button>
     </div>
-    <div class="kpi">
-      <span class="kpi-label">Empresas com reajuste</span>
-      <span class="kpi-value" id="kpi-empresas">—</span>
-      <span class="kpi-sub" id="kpi-empresas-sub">&nbsp;</span>
-    </div>
-    <div class="kpi">
-      <span class="kpi-label">Empregados atingidos</span>
-      <span class="kpi-value" id="kpi-empregados">—</span>
-      <span class="kpi-sub">receberam ao menos 1 reajuste</span>
-    </div>
-    <div class="kpi">
-      <span class="kpi-label">Aumento médio</span>
-      <span class="kpi-value" id="kpi-avg-pct">—</span>
-      <span class="kpi-sub">variação salarial média por evento</span>
-    </div>
-  </section>
+    <div class="sidebar-footer">Reajustes salariais de empregados (contribuintes excluídos), com destaque para Convenção Coletiva (CCT).</div>
+  </aside>
 
-  <section class="breakdown" aria-label="Distribuição por motivo do reajuste">
-    <h2>Reajustes por motivo</h2>
-    <div class="bars" id="category-bars"></div>
-  </section>
+  <main class="main">
+    <header class="topbar">
+      <div class="top-left">
+        <button class="collapse-btn" id="sidebarCollapseBtn" type="button" aria-label="Recolher menu">☰</button>
+        <div class="page-info">
+          <h1 id="pageTitle">Dashboard</h1>
+          <div class="meta" id="pageSubtitle">Visão geral dos reajustes salariais</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <label class="scope-toggle"><input type="checkbox" id="toggle-empresas-inativas"> Empresas inativas</label>
+        <label class="scope-toggle"><input type="checkbox" id="toggle-empregados-inativos"> Empregados inativos</label>
+      </div>
+    </header>
 
-  <section class="toolbar" aria-label="Filtros">
-    <div class="toolbar-row">
-      <input id="search" type="search" placeholder="Buscar empresa, empregado ou motivo…" aria-label="Buscar">
-      <select id="empresa-select" aria-label="Filtrar por empresa">
-        <option value="">Todas as empresas</option>
-      </select>
-      <select id="ano-select" aria-label="Filtrar por ano">
-        <option value="">Todos os anos</option>
-        <option value="2025">2025</option>
-        <option value="2026">2026</option>
-      </select>
-    </div>
-    <div class="toolbar-row chips" id="category-chips"></div>
-    <div class="toolbar-foot">
-      <span id="result-count"></span>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button id="sem-reajuste-btn" type="button" hidden>Empresas sem reajuste</button>
-        <button id="reset-btn" type="button">Limpar filtros</button>
+    <div class="content">
+      <div class="content-inner">
+
+        <div id="data-status" class="data-status" hidden></div>
+
+        <!-- ===================== DASHBOARD ===================== -->
+        <section class="screen active" id="page-dashboard">
+          <p class="lede">Todo reajuste salarial concedido a <strong>empregados ativos</strong> (contribuintes excluídos), com destaque para os que vieram de <strong>Convenção Coletiva de Trabalho (CCT)</strong>. Use os toggles no topo para incluir empresas/empregados inativos.</p>
+
+          <section class="kpis" aria-label="Resumo geral">
+            <div class="kpi kpi-feature">
+              <span class="kpi-label">Reajustes por CCT</span>
+              <span class="kpi-value" id="kpi-cct-value">—</span>
+              <div class="kpi-meter"><div class="kpi-meter-fill" id="kpi-cct-meter" style="width:0%"></div></div>
+              <span class="kpi-sub" id="kpi-cct-sub">carregando…</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-label">Empresas com reajuste</span>
+              <span class="kpi-value" id="kpi-empresas">—</span>
+              <span class="kpi-sub" id="kpi-empresas-sub">&nbsp;</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-label">Empregados atingidos</span>
+              <span class="kpi-value" id="kpi-empregados">—</span>
+              <span class="kpi-sub">receberam ao menos 1 reajuste</span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-label">Aumento médio</span>
+              <span class="kpi-value" id="kpi-avg-pct">—</span>
+              <span class="kpi-sub">variação salarial média por evento</span>
+            </div>
+          </section>
+
+          <section class="breakdown" aria-label="Distribuição por motivo do reajuste">
+            <h2>Reajustes por motivo</h2>
+            <div class="bars" id="category-bars"></div>
+          </section>
+        </section>
+
+        <!-- ===================== REAJUSTES ===================== -->
+        <section class="screen" id="page-reajustes">
+          <section class="toolbar" aria-label="Filtros">
+            <div class="toolbar-row">
+              <input id="search" type="search" placeholder="Buscar empresa, empregado ou motivo…" aria-label="Buscar">
+              <select id="empresa-select" aria-label="Filtrar por empresa">
+                <option value="">Todas as empresas</option>
+              </select>
+              <select id="ano-select" aria-label="Filtrar por ano">
+                <option value="">Todos os anos</option>
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+              </select>
+            </div>
+            <div class="toolbar-row chips" id="category-chips"></div>
+            <div class="toolbar-foot">
+              <span id="result-count"></span>
+              <button id="reset-btn" type="button">Limpar filtros</button>
+            </div>
+          </section>
+
+          <section class="table-wrap">
+            <div class="table-scroll">
+              <table id="data-table">
+                <thead>
+                  <tr>
+                    <th data-key="en"><button type="button">Empresa <span class="arrow"></span></button></th>
+                    <th data-key="fn"><button type="button">Empregado <span class="arrow"></span></button></th>
+                    <th data-key="dt"><button type="button">Data <span class="arrow"></span></button></th>
+                    <th data-key="cat"><button type="button">Categoria <span class="arrow"></span></button></th>
+                    <th data-key="mo"><button type="button">Motivo <span class="arrow"></span></button></th>
+                    <th data-key="sa" class="num"><button type="button">Sal. anterior <span class="arrow"></span></button></th>
+                    <th data-key="ns" class="num"><button type="button">Novo salário <span class="arrow"></span></button></th>
+                    <th data-key="pc" class="num"><button type="button">Δ% <span class="arrow"></span></button></th>
+                  </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <p class="foot">Fonte: relatório "Alterações Salariais — todas as empresas" · extração automática, seção Empregados apenas (contribuintes excluídos).</p>
+        </section>
+
+        <!-- ===================== SEM REAJUSTE ===================== -->
+        <section class="screen" id="page-sem-reajuste">
+          <p class="lede">Empresas cadastradas (rh_empresas) que <strong>não tiveram nenhum reajuste</strong> de empregado no período, dentro do escopo atual (toggles no topo). Por padrão considera só empresas ativas.</p>
+
+          <section class="toolbar" aria-label="Buscar empresa sem reajuste">
+            <div class="toolbar-row">
+              <input id="sem-reajuste-search" type="search" placeholder="Buscar empresa…" aria-label="Buscar empresa sem reajuste">
+            </div>
+            <div class="toolbar-foot">
+              <span id="sem-reajuste-count"></span>
+            </div>
+          </section>
+
+          <section class="table-wrap">
+            <div class="table-scroll">
+              <table>
+                <thead><tr>
+                  <th class="plain">Empresa</th>
+                  <th class="plain">CNPJ</th>
+                  <th class="plain">Código</th>
+                  <th class="plain">Situação</th>
+                </tr></thead>
+                <tbody id="sem-reajuste-body"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
       </div>
     </div>
-  </section>
-
-  <section class="table-wrap" id="sem-reajuste-wrap" hidden>
-    <div class="panel-head">
-      <div>
-        <strong>Empresas ativas sem reajuste de empregados no período</strong>
-        <p>Comparado com o cadastro completo de empresas (rh_empresas) — inclui só empresas com situação ativa.</p>
-      </div>
-      <button id="sem-reajuste-close" type="button">Fechar ✕</button>
-    </div>
-    <div class="table-scroll">
-      <table>
-        <thead><tr><th style="padding:10px 12px;">Empresa</th><th style="padding:10px 12px;">CNPJ</th><th style="padding:10px 12px;">Código</th></tr></thead>
-        <tbody id="sem-reajuste-body"></tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="table-wrap">
-    <div class="table-scroll">
-      <table id="data-table">
-        <thead>
-          <tr>
-            <th data-key="en"><button type="button">Empresa <span class="arrow"></span></button></th>
-            <th data-key="fn"><button type="button">Empregado <span class="arrow"></span></button></th>
-            <th data-key="dt"><button type="button">Data <span class="arrow"></span></button></th>
-            <th data-key="cat"><button type="button">Categoria <span class="arrow"></span></button></th>
-            <th data-key="mo"><button type="button">Motivo <span class="arrow"></span></button></th>
-            <th data-key="sa" class="num"><button type="button">Sal. anterior <span class="arrow"></span></button></th>
-            <th data-key="ns" class="num"><button type="button">Novo salário <span class="arrow"></span></button></th>
-            <th data-key="pc" class="num"><button type="button">Δ% <span class="arrow"></span></button></th>
-          </tr>
-        </thead>
-        <tbody id="table-body"></tbody>
-      </table>
-    </div>
-  </section>
-
-  <p class="foot">Fonte: relatório "Alterações Salariais — todas as empresas" · extração automática, seção Empregados apenas (contribuintes excluídos) · 1.196 eventos em 114 empresas. Acesso restrito a usuários autenticados no Portal SCONT.</p>
-
+  </main>
 </div>
 
 <script>
 (function(){
   "use strict";
-  var DATA = [];
+
+  var RAW_DATA = [];      // todos os reajustes, com .ea (empresa ativa) e .pa (empregado ativo)
+  var EMPRESAS_ALL = [];  // rh_empresas completo
 
   var CATS = [
     {key:"CCT", label:"Convenção Coletiva (CCT)", color:"#8B3A3A", soft:"#F3E4E4"},
@@ -325,6 +382,12 @@
   ];
   var catInfo = {};
   CATS.forEach(function(c){ catInfo[c.key] = c; });
+
+  var PAGE_MAP = {
+    "dashboard": ["Dashboard", "Visão geral dos reajustes salariais"],
+    "reajustes": ["Reajustes", "Todos os eventos de reajuste, com filtros e ordenação"],
+    "sem-reajuste": ["Sem reajuste", "Empresas sem nenhum reajuste de empregado no período"]
+  };
 
   function fmtMoney(v){
     if(v === null || v === undefined) return "—";
@@ -345,39 +408,67 @@
     if(p.length !== 3) return d;
     return p[2] + p[1] + p[0];
   }
-
-  var state = { q:"", empresa:"", categoria:"", ano:"", sortKey:"dt", sortDir:"desc" };
-
-  function ativa(s){
+  function empresaAtiva(s){
     return !s || String(s).trim().toLowerCase().indexOf("ativ") === 0;
   }
+  function empregadoAtivo(s){
+    return (s || "").trim() !== "Demitido";
+  }
 
-  function initSummary(empresasAtivasCount){
+  var state = {
+    q:"", empresa:"", categoria:"", ano:"", sortKey:"dt", sortDir:"desc",
+    incluirEmpresasInativas:false, incluirEmpregadosInativos:false
+  };
+
+  // ---------- escopo (respeita os dois toggles globais) ----------
+  function scopedData(){
+    return RAW_DATA.filter(function(d){
+      return (state.incluirEmpresasInativas || d.ea) && (state.incluirEmpregadosInativos || d.pa);
+    });
+  }
+
+  // ---------- navegação (sidebar) ----------
+  function setPage(pageName){
+    document.querySelectorAll(".screen").forEach(function(p){ p.classList.remove("active"); });
+    var target = document.getElementById("page-" + pageName);
+    if(target) target.classList.add("active");
+
+    var info = PAGE_MAP[pageName] || ["", ""];
+    document.getElementById("pageTitle").textContent = info[0];
+    document.getElementById("pageSubtitle").textContent = info[1];
+
+    document.querySelectorAll(".nav button").forEach(function(btn){
+      btn.classList.toggle("active", btn.getAttribute("data-page") === pageName);
+    });
+  }
+
+  // ---------- dashboard ----------
+  function initSummary(){
+    var data = scopedData();
     var totalCct = 0;
     var empresas = {};
     var empregados = {};
     var pctSum = 0, pctN = 0;
     var catCounts = {};
-    DATA.forEach(function(d){
+    data.forEach(function(d){
       if(d.cat === "CCT") totalCct++;
       empresas[d.ec] = true;
       empregados[d.ec + "#" + d.fc] = true;
       if(d.pc !== null && d.pc !== undefined){ pctSum += d.pc; pctN++; }
       catCounts[d.cat] = (catCounts[d.cat] || 0) + 1;
     });
-    var total = DATA.length;
+    var total = data.length;
     var empresaCount = Object.keys(empresas).length;
     var empregadoCount = Object.keys(empregados).length;
     var pctAvg = pctN ? (pctSum / pctN) : 0;
+    var empresasAtivasCount = EMPRESAS_ALL.filter(function(e){ return empresaAtiva(e.status_situacao); }).length;
 
     document.getElementById("kpi-cct-value").textContent = totalCct.toLocaleString("pt-BR") + " ";
     document.getElementById("kpi-cct-value").insertAdjacentHTML("beforeend", '<span class="kpi-unit">/ ' + total.toLocaleString("pt-BR") + '</span>');
-    document.getElementById("kpi-cct-meter").style.width = Math.round(totalCct/total*100) + "%";
-    document.getElementById("kpi-cct-sub").textContent = Math.round(totalCct/total*100) + "% dos reajustes vieram de convenção coletiva";
+    document.getElementById("kpi-cct-meter").style.width = (total ? Math.round(totalCct/total*100) : 0) + "%";
+    document.getElementById("kpi-cct-sub").textContent = (total ? Math.round(totalCct/total*100) : 0) + "% dos reajustes vieram de convenção coletiva";
     document.getElementById("kpi-empresas").textContent = empresaCount.toLocaleString("pt-BR");
-    document.getElementById("kpi-empresas-sub").textContent = empresasAtivasCount
-      ? "de " + empresasAtivasCount.toLocaleString("pt-BR") + " empresas ativas"
-      : "no período analisado";
+    document.getElementById("kpi-empresas-sub").textContent = "de " + empresasAtivasCount.toLocaleString("pt-BR") + " empresas ativas";
     document.getElementById("kpi-empregados").textContent = empregadoCount.toLocaleString("pt-BR");
     document.getElementById("kpi-avg-pct").textContent = fmtPct(Math.round(pctAvg*10)/10);
 
@@ -395,12 +486,16 @@
     barsEl.querySelectorAll(".bar-row").forEach(function(btn){
       btn.addEventListener("click", function(){ toggleCategoria(btn.getAttribute("data-cat")); });
     });
+    barsEl.querySelectorAll(".bar-row").forEach(function(el){
+      el.classList.toggle("is-active", state.categoria !== "" && el.getAttribute("data-cat") === state.categoria);
+    });
 
     var chipsEl = document.getElementById("category-chips");
-    var allChip = '<button type="button" class="chip is-active" data-cat="">Todos <span class="mono">(' + total.toLocaleString("pt-BR") + ')</span></button>';
+    var allChip = '<button type="button" class="chip' + (state.categoria === "" ? " is-active" : "") + '" data-cat="">Todos <span class="mono">(' + total.toLocaleString("pt-BR") + ')</span></button>';
     var catChips = CATS.map(function(c){
       var n = catCounts[c.key] || 0;
-      return '<button type="button" class="chip" data-cat="' + esc(c.key) + '"><span class="bar-dot" style="background:' + c.color + '"></span>' + esc(c.label) + ' <span class="mono">(' + n.toLocaleString("pt-BR") + ')</span></button>';
+      var activeCls = state.categoria === c.key ? " is-active" : "";
+      return '<button type="button" class="chip' + activeCls + '" data-cat="' + esc(c.key) + '"><span class="bar-dot" style="background:' + c.color + '"></span>' + esc(c.label) + ' <span class="mono">(' + n.toLocaleString("pt-BR") + ')</span></button>';
     }).join("");
     chipsEl.innerHTML = allChip + catChips;
     chipsEl.querySelectorAll(".chip").forEach(function(btn){
@@ -408,34 +503,33 @@
     });
 
     var empresaNames = {};
-    DATA.forEach(function(d){ empresaNames[d.en] = (empresaNames[d.en]||0) + 1; });
+    data.forEach(function(d){ empresaNames[d.en] = (empresaNames[d.en]||0) + 1; });
     var names = Object.keys(empresaNames).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); });
     var sel = document.getElementById("empresa-select");
+    var prevSelected = state.empresa;
+    sel.innerHTML = '<option value="">Todas as empresas</option>';
     names.forEach(function(n){
       var opt = document.createElement("option");
       opt.value = n;
       opt.textContent = n + " (" + empresaNames[n] + ")";
       sel.appendChild(opt);
     });
+    if(prevSelected && names.indexOf(prevSelected) !== -1) sel.value = prevSelected;
+    else if(prevSelected){ state.empresa = ""; }
   }
 
   function setCategoria(cat){
     state.categoria = cat;
-    document.querySelectorAll(".chip").forEach(function(el){
-      el.classList.toggle("is-active", el.getAttribute("data-cat") === cat);
-    });
-    document.querySelectorAll(".bar-row").forEach(function(el){
-      el.classList.toggle("is-active", cat !== "" && el.getAttribute("data-cat") === cat);
-    });
-    render();
+    refreshAll();
   }
   function toggleCategoria(cat){
     setCategoria(state.categoria === cat ? "" : cat);
   }
 
+  // ---------- tabela de reajustes ----------
   function getFiltered(){
     var q = state.q.trim().toLowerCase();
-    return DATA.filter(function(d){
+    return scopedData().filter(function(d){
       if(state.empresa && d.en !== state.empresa) return false;
       if(state.categoria && d.cat !== state.categoria) return false;
       if(state.ano && d.an !== state.ano) return false;
@@ -478,7 +572,7 @@
       '</tr>';
   }
 
-  function render(){
+  function renderTable(){
     var rows = sortRows(getFiltered());
     var tbody = document.getElementById("table-body");
     if(rows.length === 0){
@@ -487,9 +581,9 @@
       tbody.innerHTML = rows.map(rowHtml).join("");
     }
     var count = document.getElementById("result-count");
-    count.textContent = "Mostrando " + rows.length.toLocaleString("pt-BR") + " de " + DATA.length.toLocaleString("pt-BR") + " registros";
+    count.textContent = "Mostrando " + rows.length.toLocaleString("pt-BR") + " de " + scopedData().length.toLocaleString("pt-BR") + " registros";
 
-    document.querySelectorAll("thead th").forEach(function(th){
+    document.querySelectorAll("#data-table thead th").forEach(function(th){
       if(th.getAttribute("data-key") === state.sortKey){
         th.setAttribute("aria-sort", state.sortDir === "asc" ? "ascending" : "descending");
       } else {
@@ -498,49 +592,48 @@
     });
   }
 
-  function bindEvents(){
-    var searchTimer;
-    document.getElementById("search").addEventListener("input", function(e){
-      clearTimeout(searchTimer);
-      var val = e.target.value;
-      searchTimer = setTimeout(function(){ state.q = val; render(); }, 140);
+  // ---------- empresas sem reajuste ----------
+  function renderSemReajuste(){
+    var comReajuste = {};
+    scopedData().forEach(function(d){ comReajuste[String(d.ec)] = true; });
+    var universo = EMPRESAS_ALL.filter(function(e){
+      return state.incluirEmpresasInativas || empresaAtiva(e.status_situacao);
     });
-    document.getElementById("empresa-select").addEventListener("change", function(e){
-      state.empresa = e.target.value; render();
-    });
-    document.getElementById("ano-select").addEventListener("change", function(e){
-      state.ano = e.target.value; render();
-    });
-    document.getElementById("reset-btn").addEventListener("click", function(){
-      state = { q:"", empresa:"", categoria:"", ano:"", sortKey:"dt", sortDir:"desc" };
-      document.getElementById("search").value = "";
-      document.getElementById("empresa-select").value = "";
-      document.getElementById("ano-select").value = "";
-      setCategoria("");
-    });
-    document.getElementById("sem-reajuste-btn").addEventListener("click", function(){
-      var wrap = document.getElementById("sem-reajuste-wrap");
-      wrap.hidden = !wrap.hidden;
-      if(!wrap.hidden) wrap.scrollIntoView({behavior:"smooth", block:"start"});
-    });
-    document.getElementById("sem-reajuste-close").addEventListener("click", function(){
-      document.getElementById("sem-reajuste-wrap").hidden = true;
-    });
-    document.querySelectorAll("thead th").forEach(function(th){
-      th.querySelector("button").addEventListener("click", function(){
-        var key = th.getAttribute("data-key");
-        if(state.sortKey === key){
-          state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
-        } else {
-          state.sortKey = key;
-          state.sortDir = (key === "sa" || key === "ns" || key === "pc") ? "desc" : "asc";
-          if(key === "dt") state.sortDir = "desc";
-        }
-        render();
-      });
-    });
+    var semReajuste = universo.filter(function(e){ return !comReajuste[String(e.codigo_empresa)]; });
+
+    var q = (document.getElementById("sem-reajuste-search").value || "").trim().toLowerCase();
+    var visiveis = q
+      ? semReajuste.filter(function(e){ return (e.nome_empresa || "").toLowerCase().indexOf(q) !== -1; })
+      : semReajuste;
+    visiveis = visiveis.slice().sort(function(a,b){ return (a.nome_empresa||"").localeCompare(b.nome_empresa||"", "pt-BR"); });
+
+    document.getElementById("sem-reajuste-count").textContent =
+      "Mostrando " + visiveis.length.toLocaleString("pt-BR") + " de " + semReajuste.length.toLocaleString("pt-BR") + " empresas sem reajuste";
+
+    var tbody = document.getElementById("sem-reajuste-body");
+    if(visiveis.length === 0){
+      tbody.innerHTML = '<tr><td class="empty-state" colspan="4">' +
+        (semReajuste.length === 0
+          ? ('Nenhuma empresa' + (state.incluirEmpresasInativas ? "" : " ativa") + ' ficou sem reajuste no escopo atual.')
+          : 'Nenhuma empresa encontrada com esse termo de busca.') +
+        '</td></tr>';
+    } else {
+      tbody.innerHTML = visiveis.map(function(e){
+        var ativa = empresaAtiva(e.status_situacao);
+        var badge = ativa ? '<span class="badge ok">Ativa</span>' : '<span class="badge off">Inativa</span>';
+        return '<tr><td class="cell-emp">' + esc(e.nome_empresa) + '</td><td class="mono">' + esc(e.cnpj || "—") + '</td><td class="mono">' + esc(e.codigo_empresa) + '</td><td>' + badge + '</td></tr>';
+      }).join("");
+    }
   }
 
+  // ---------- recalcula tudo (mudou escopo, categoria, etc.) ----------
+  function refreshAll(){
+    initSummary();
+    renderTable();
+    renderSemReajuste();
+  }
+
+  // ---------- carregamento ----------
   function dbDateToDisplay(iso){
     if(!iso) return "";
     var p = iso.split("-"); // YYYY-MM-DD
@@ -556,14 +649,17 @@
       sa: r.salario_anterior != null ? Number(r.salario_anterior) : null,
       ns: r.novo_salario != null ? Number(r.novo_salario) : null,
       pc: r.percentual != null ? Number(r.percentual) : null,
-      mo: r.motivo || "", fr: r.forma_reajuste || "", cat: r.categoria
+      mo: r.motivo || "", fr: r.forma_reajuste || "", cat: r.categoria,
+      ea: true, pa: true // ajustado depois de cruzar com rh_empresas / rh_empregados
     };
   }
 
-  async function fetchAllRows(sb){
+  async function fetchAllPaginated(sb, table, selectCols, extra){
     var pageSize = 1000, all = [], from = 0;
     while(true){
-      var res = await sb.from("rh_reajustes_convencoes").select("*").range(from, from + pageSize - 1);
+      var q = sb.from(table).select(selectCols);
+      if(extra) q = extra(q);
+      var res = await q.range(from, from + pageSize - 1);
       if(res.error) throw res.error;
       var chunk = res.data || [];
       all = all.concat(chunk);
@@ -571,34 +667,6 @@
       from += pageSize;
     }
     return all;
-  }
-
-  async function fetchEmpresas(sb){
-    var res = await sb.from("rh_empresas").select("codigo_empresa, nome_empresa, cnpj, status_situacao").order("nome_empresa");
-    if(res.error) throw res.error;
-    return res.data || [];
-  }
-
-  function renderSemReajuste(empresasAll){
-    var comReajuste = {};
-    DATA.forEach(function(d){ comReajuste[String(d.ec)] = true; });
-    var ativas = empresasAll.filter(function(e){ return ativa(e.status_situacao); });
-    var semReajuste = ativas.filter(function(e){ return !comReajuste[String(e.codigo_empresa)]; });
-    semReajuste.sort(function(a,b){ return (a.nome_empresa||"").localeCompare(b.nome_empresa||"", "pt-BR"); });
-
-    var btn = document.getElementById("sem-reajuste-btn");
-    btn.textContent = "Empresas sem reajuste (" + semReajuste.length.toLocaleString("pt-BR") + ")";
-    btn.hidden = false;
-
-    var tbody = document.getElementById("sem-reajuste-body");
-    if(semReajuste.length === 0){
-      tbody.innerHTML = '<tr><td class="empty-state" colspan="3">Todas as empresas ativas tiveram ao menos um reajuste de empregado no período.</td></tr>';
-    } else {
-      tbody.innerHTML = semReajuste.map(function(e){
-        return '<tr><td class="cell-emp">' + esc(e.nome_empresa) + '</td><td class="mono">' + esc(e.cnpj || "—") + '</td><td class="mono">' + esc(e.codigo_empresa) + '</td></tr>';
-      }).join("");
-    }
-    return ativas.length;
   }
 
   function showStatus(msg, isError){
@@ -611,33 +679,104 @@
     document.getElementById("data-status").hidden = true;
   }
 
+  function bindEvents(){
+    var searchTimer;
+    document.getElementById("search").addEventListener("input", function(e){
+      clearTimeout(searchTimer);
+      var val = e.target.value;
+      searchTimer = setTimeout(function(){ state.q = val; renderTable(); }, 140);
+    });
+    document.getElementById("empresa-select").addEventListener("change", function(e){
+      state.empresa = e.target.value; renderTable();
+    });
+    document.getElementById("ano-select").addEventListener("change", function(e){
+      state.ano = e.target.value; renderTable();
+    });
+    document.getElementById("reset-btn").addEventListener("click", function(){
+      state.q = ""; state.empresa = ""; state.categoria = ""; state.ano = "";
+      state.sortKey = "dt"; state.sortDir = "desc";
+      document.getElementById("search").value = "";
+      document.getElementById("ano-select").value = "";
+      refreshAll();
+    });
+    document.querySelectorAll("#data-table thead th").forEach(function(th){
+      th.querySelector("button").addEventListener("click", function(){
+        var key = th.getAttribute("data-key");
+        if(state.sortKey === key){
+          state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+        } else {
+          state.sortKey = key;
+          state.sortDir = (key === "sa" || key === "ns" || key === "pc") ? "desc" : "asc";
+          if(key === "dt") state.sortDir = "desc";
+        }
+        renderTable();
+      });
+    });
+
+    var semSearchTimer;
+    document.getElementById("sem-reajuste-search").addEventListener("input", function(){
+      clearTimeout(semSearchTimer);
+      semSearchTimer = setTimeout(renderSemReajuste, 140);
+    });
+
+    document.getElementById("toggle-empresas-inativas").addEventListener("change", function(){
+      state.incluirEmpresasInativas = this.checked;
+      refreshAll();
+    });
+    document.getElementById("toggle-empregados-inativos").addEventListener("change", function(){
+      state.incluirEmpregadosInativos = this.checked;
+      refreshAll();
+    });
+
+    document.querySelectorAll(".nav button[data-page]").forEach(function(btn){
+      btn.addEventListener("click", function(){ setPage(btn.getAttribute("data-page")); });
+    });
+    document.getElementById("sidebarCollapseBtn").addEventListener("click", function(){
+      document.getElementById("sidebar").classList.toggle("collapsed");
+    });
+  }
+
   async function initPage(sb){
-    document.getElementById("page-content").hidden = false;
+    document.getElementById("app").hidden = false;
     showStatus("Carregando reajustes…", false);
+
+    var reajustesRows, empresasRows, empregadosRows;
     try {
-      var rows = await fetchAllRows(sb);
-      DATA = rows.map(mapRow);
+      var results = await Promise.all([
+        fetchAllPaginated(sb, "rh_reajustes_convencoes", "*"),
+        fetchAllPaginated(sb, "rh_empresas", "codigo_empresa, nome_empresa, cnpj, status_situacao"),
+        fetchAllPaginated(sb, "rh_empregados", "codigo_empresa, codigo_empregado, situacao, tipo_empregado", function(q){
+          return q.eq("tipo_empregado", "Empregado");
+        })
+      ]);
+      reajustesRows = results[0]; empresasRows = results[1]; empregadosRows = results[2];
     } catch(err){
       showStatus("Não foi possível carregar os dados (" + (err && err.message ? err.message : "erro desconhecido") + "). Verifique se a tabela rh_reajustes_convencoes já foi criada e populada no Supabase.", true);
       return;
     }
-    if(DATA.length === 0){
+
+    RAW_DATA = reajustesRows.map(mapRow);
+    if(RAW_DATA.length === 0){
       showStatus("A tabela rh_reajustes_convencoes existe mas está vazia. Rode o script de carga de dados no Supabase.", true);
       return;
     }
+    EMPRESAS_ALL = empresasRows;
+
+    var empresaAtivaMap = {};
+    empresasRows.forEach(function(e){ empresaAtivaMap[String(e.codigo_empresa)] = empresaAtiva(e.status_situacao); });
+    var empregadoAtivoMap = {};
+    empregadosRows.forEach(function(e){ empregadoAtivoMap[String(e.codigo_empresa) + "#" + String(e.codigo_empregado)] = empregadoAtivo(e.situacao); });
+
+    RAW_DATA.forEach(function(d){
+      var eKey = String(d.ec);
+      var pKey = String(d.ec) + "#" + String(d.fc);
+      d.ea = empresaAtivaMap.hasOwnProperty(eKey) ? empresaAtivaMap[eKey] : true;
+      d.pa = empregadoAtivoMap.hasOwnProperty(pKey) ? empregadoAtivoMap[pKey] : true;
+    });
+
     hideStatus();
-
-    var empresasAtivasCount = null;
-    try {
-      var empresasAll = await fetchEmpresas(sb);
-      empresasAtivasCount = renderSemReajuste(empresasAll);
-    } catch(err){
-      console.error("Falha ao carregar rh_empresas para o filtro 'sem reajuste':", err);
-    }
-
-    initSummary(empresasAtivasCount);
     bindEvents();
-    render();
+    refreshAll();
   }
   window.__initReajustesPage = initPage;
 })();
