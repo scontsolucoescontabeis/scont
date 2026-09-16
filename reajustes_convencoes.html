@@ -128,6 +128,23 @@
     border-radius:var(--radius-sm); padding:7px 12px; font-size:.79rem; cursor:pointer; font-family:inherit; transition:var(--transition);
   }
   #reset-btn:hover{border-color:var(--primary); color:var(--primary);}
+  #sem-reajuste-btn{
+    background:var(--bg-light); border:1px solid var(--border); color:var(--secondary);
+    border-radius:var(--radius-sm); padding:7px 12px; font-size:.79rem; font-weight:600;
+    cursor:pointer; font-family:inherit; transition:var(--transition);
+  }
+  #sem-reajuste-btn:hover{border-color:var(--primary); color:var(--primary);}
+  .panel-head{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:14px 18px; border-bottom:1px solid var(--border);
+  }
+  .panel-head strong{color:var(--secondary); font-size:.9rem;}
+  .panel-head p{margin:2px 0 0; font-size:.78rem; color:var(--muted);}
+  #sem-reajuste-close{
+    background:none; border:1px solid var(--border); color:var(--text-light);
+    border-radius:var(--radius-sm); padding:6px 11px; font-size:.78rem; cursor:pointer; font-family:inherit;
+  }
+  #sem-reajuste-close:hover{border-color:var(--primary); color:var(--primary);}
 
   /* ---------- table ---------- */
   .table-wrap{
@@ -247,7 +264,26 @@
     <div class="toolbar-row chips" id="category-chips"></div>
     <div class="toolbar-foot">
       <span id="result-count"></span>
-      <button id="reset-btn" type="button">Limpar filtros</button>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button id="sem-reajuste-btn" type="button" hidden>Empresas sem reajuste</button>
+        <button id="reset-btn" type="button">Limpar filtros</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="table-wrap" id="sem-reajuste-wrap" hidden>
+    <div class="panel-head">
+      <div>
+        <strong>Empresas ativas sem reajuste de empregados no período</strong>
+        <p>Comparado com o cadastro completo de empresas (rh_empresas) — inclui só empresas com situação ativa.</p>
+      </div>
+      <button id="sem-reajuste-close" type="button">Fechar ✕</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th style="padding:10px 12px;">Empresa</th><th style="padding:10px 12px;">CNPJ</th><th style="padding:10px 12px;">Código</th></tr></thead>
+        <tbody id="sem-reajuste-body"></tbody>
+      </table>
     </div>
   </section>
 
@@ -312,7 +348,11 @@
 
   var state = { q:"", empresa:"", categoria:"", ano:"", sortKey:"dt", sortDir:"desc" };
 
-  function initSummary(){
+  function ativa(s){
+    return !s || String(s).trim().toLowerCase().indexOf("ativ") === 0;
+  }
+
+  function initSummary(empresasAtivasCount){
     var totalCct = 0;
     var empresas = {};
     var empregados = {};
@@ -335,7 +375,9 @@
     document.getElementById("kpi-cct-meter").style.width = Math.round(totalCct/total*100) + "%";
     document.getElementById("kpi-cct-sub").textContent = Math.round(totalCct/total*100) + "% dos reajustes vieram de convenção coletiva";
     document.getElementById("kpi-empresas").textContent = empresaCount.toLocaleString("pt-BR");
-    document.getElementById("kpi-empresas-sub").textContent = "de 167 empresas no relatório";
+    document.getElementById("kpi-empresas-sub").textContent = empresasAtivasCount
+      ? "de " + empresasAtivasCount.toLocaleString("pt-BR") + " empresas ativas"
+      : "no período analisado";
     document.getElementById("kpi-empregados").textContent = empregadoCount.toLocaleString("pt-BR");
     document.getElementById("kpi-avg-pct").textContent = fmtPct(Math.round(pctAvg*10)/10);
 
@@ -476,6 +518,14 @@
       document.getElementById("ano-select").value = "";
       setCategoria("");
     });
+    document.getElementById("sem-reajuste-btn").addEventListener("click", function(){
+      var wrap = document.getElementById("sem-reajuste-wrap");
+      wrap.hidden = !wrap.hidden;
+      if(!wrap.hidden) wrap.scrollIntoView({behavior:"smooth", block:"start"});
+    });
+    document.getElementById("sem-reajuste-close").addEventListener("click", function(){
+      document.getElementById("sem-reajuste-wrap").hidden = true;
+    });
     document.querySelectorAll("thead th").forEach(function(th){
       th.querySelector("button").addEventListener("click", function(){
         var key = th.getAttribute("data-key");
@@ -523,6 +573,34 @@
     return all;
   }
 
+  async function fetchEmpresas(sb){
+    var res = await sb.from("rh_empresas").select("codigo_empresa, nome_empresa, cnpj, status_situacao").order("nome_empresa");
+    if(res.error) throw res.error;
+    return res.data || [];
+  }
+
+  function renderSemReajuste(empresasAll){
+    var comReajuste = {};
+    DATA.forEach(function(d){ comReajuste[String(d.ec)] = true; });
+    var ativas = empresasAll.filter(function(e){ return ativa(e.status_situacao); });
+    var semReajuste = ativas.filter(function(e){ return !comReajuste[String(e.codigo_empresa)]; });
+    semReajuste.sort(function(a,b){ return (a.nome_empresa||"").localeCompare(b.nome_empresa||"", "pt-BR"); });
+
+    var btn = document.getElementById("sem-reajuste-btn");
+    btn.textContent = "Empresas sem reajuste (" + semReajuste.length.toLocaleString("pt-BR") + ")";
+    btn.hidden = false;
+
+    var tbody = document.getElementById("sem-reajuste-body");
+    if(semReajuste.length === 0){
+      tbody.innerHTML = '<tr><td class="empty-state" colspan="3">Todas as empresas ativas tiveram ao menos um reajuste de empregado no período.</td></tr>';
+    } else {
+      tbody.innerHTML = semReajuste.map(function(e){
+        return '<tr><td class="cell-emp">' + esc(e.nome_empresa) + '</td><td class="mono">' + esc(e.cnpj || "—") + '</td><td class="mono">' + esc(e.codigo_empresa) + '</td></tr>';
+      }).join("");
+    }
+    return ativas.length;
+  }
+
   function showStatus(msg, isError){
     var el = document.getElementById("data-status");
     el.textContent = msg;
@@ -548,7 +626,16 @@
       return;
     }
     hideStatus();
-    initSummary();
+
+    var empresasAtivasCount = null;
+    try {
+      var empresasAll = await fetchEmpresas(sb);
+      empresasAtivasCount = renderSemReajuste(empresasAll);
+    } catch(err){
+      console.error("Falha ao carregar rh_empresas para o filtro 'sem reajuste':", err);
+    }
+
+    initSummary(empresasAtivasCount);
     bindEvents();
     render();
   }
