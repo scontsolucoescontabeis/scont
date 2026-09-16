@@ -11,6 +11,9 @@
 <link rel="stylesheet" href="shared.css">
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
   html, body{height:100%;}
   body{background:var(--bg); color:var(--text); overflow:hidden;}
@@ -78,7 +81,7 @@
   .scope-toggle input{accent-color:var(--primary); width:14px; height:14px; cursor:pointer;}
 
   .content{flex:1; overflow-y:auto; padding:22px 24px 48px;}
-  .content-inner{max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:20px;}
+  .content-inner{width:100%; display:flex; flex-direction:column; gap:20px;}
 
   .screen{display:none;}
   .screen.active{display:flex; flex-direction:column; gap:20px;}
@@ -156,6 +159,13 @@
     border-radius:var(--radius-sm); padding:7px 12px; font-size:.79rem; cursor:pointer; font-family:inherit; transition:var(--transition);
   }
   #reset-btn:hover{border-color:var(--primary); color:var(--primary);}
+  .export-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  .btn-export{
+    display:inline-flex; align-items:center; gap:6px;
+    background:none; border:1px solid var(--border); color:var(--text-light);
+    border-radius:var(--radius-sm); padding:7px 12px; font-size:.79rem; cursor:pointer; font-family:inherit; transition:var(--transition);
+  }
+  .btn-export:hover{border-color:var(--primary); color:var(--primary); background:var(--bg-light);}
 
   /* ---------- table ---------- */
   .table-wrap{
@@ -298,7 +308,13 @@
                 <option value="2026">2026</option>
               </select>
             </div>
-            <div id="resumo-count" style="font-size:.8rem; color:var(--muted); margin-bottom:8px;"></div>
+            <div class="toolbar-foot" style="margin-bottom:8px;">
+              <span id="resumo-count" style="font-size:.8rem; color:var(--muted);"></span>
+              <div class="export-actions">
+                <button id="export-resumo-pdf" class="btn-export" type="button">📄 PDF</button>
+                <button id="export-resumo-xlsx" class="btn-export" type="button">📊 Excel</button>
+              </div>
+            </div>
             <div class="table-scroll">
               <table>
                 <thead>
@@ -334,7 +350,11 @@
             <div class="toolbar-row chips" id="category-chips"></div>
             <div class="toolbar-foot">
               <span id="result-count"></span>
-              <button id="reset-btn" type="button">Limpar filtros</button>
+              <div class="export-actions">
+                <button id="export-reajustes-pdf" class="btn-export" type="button">📄 PDF</button>
+                <button id="export-reajustes-xlsx" class="btn-export" type="button">📊 Excel</button>
+                <button id="reset-btn" type="button">Limpar filtros</button>
+              </div>
             </div>
           </section>
 
@@ -376,6 +396,10 @@
             </div>
             <div class="toolbar-foot">
               <span id="sem-reajuste-count"></span>
+              <div class="export-actions">
+                <button id="export-sem-reajuste-pdf" class="btn-export" type="button">📄 PDF</button>
+                <button id="export-sem-reajuste-xlsx" class="btn-export" type="button">📊 Excel</button>
+              </div>
             </div>
           </section>
 
@@ -628,7 +652,7 @@
   }
 
   // ---------- empresas sem reajuste ----------
-  function renderSemReajuste(){
+  function computeSemReajusteList(){
     var comReajuste = {};
     scopedData()
       .filter(function(d){ return !state.semReajusteAno || d.an === state.semReajusteAno; })
@@ -643,6 +667,13 @@
       ? semReajuste.filter(function(e){ return (e.nome_empresa || "").toLowerCase().indexOf(q) !== -1; })
       : semReajuste;
     visiveis = visiveis.slice().sort(function(a,b){ return (a.nome_empresa||"").localeCompare(b.nome_empresa||"", "pt-BR"); });
+
+    return { all: semReajuste, visiveis: visiveis };
+  }
+
+  function renderSemReajuste(){
+    var listas = computeSemReajusteList();
+    var semReajuste = listas.all, visiveis = listas.visiveis;
 
     var periodoLabel = state.semReajusteAno ? ("em " + state.semReajusteAno) : "no período 2025–2026";
     document.getElementById("sem-reajuste-count").textContent =
@@ -694,7 +725,7 @@
     });
   }
 
-  function renderResumo(){
+  function getResumoRowsFiltered(){
     var q = (state.resumoQ || "").trim().toLowerCase();
     var rows = computeResumoPorEmpresa();
     if(q){
@@ -709,6 +740,11 @@
       if(va > vb) return 1 * dir;
       return 0;
     });
+    return rows;
+  }
+
+  function renderResumo(){
+    var rows = getResumoRowsFiltered();
 
     document.getElementById("resumo-count").textContent =
       "Mostrando " + rows.length.toLocaleString("pt-BR") + " empresa(s) com reajuste" + (state.resumoAno ? (" em " + state.resumoAno) : " no período");
@@ -744,6 +780,101 @@
     renderTable();
     renderSemReajuste();
     renderResumo();
+  }
+
+  // ---------- exportação (PDF / Excel) ----------
+  function todayStamp(){
+    var d = new Date();
+    function pad(n){ return n < 10 ? "0" + n : "" + n; }
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+
+  function exportRowsToPdf(title, head, bodyRows, filename, orientation){
+    var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+    if(!jsPDFCtor){ alert("Biblioteca de PDF não carregou. Recarregue a página e tente novamente."); return; }
+    var doc = new jsPDFCtor({ unit:"mm", format:"a4", orientation: orientation || "landscape" });
+    var pageW = doc.internal.pageSize.getWidth();
+    var MARGEM = 10;
+    doc.setFillColor(139, 58, 58);
+    doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, 14, 2, 2, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(12);
+    doc.text(title, MARGEM + 4, MARGEM + 9);
+    doc.setTextColor(44, 62, 80);
+    doc.setFontSize(8);
+    doc.text("Gerado em " + new Date().toLocaleString("pt-BR"), MARGEM + 4, MARGEM + 14 + 5);
+    doc.autoTable({
+      head: [head],
+      body: bodyRows,
+      startY: MARGEM + 14 + 8,
+      margin: { left: MARGEM, right: MARGEM },
+      styles: { fontSize: 7.5, cellPadding: 1.6, textColor: [44, 62, 80] },
+      headStyles: { fillColor: [139, 58, 58], textColor: 255 },
+      alternateRowStyles: { fillColor: [240, 242, 245] }
+    });
+    doc.save(filename);
+  }
+
+  function exportRowsToExcel(sheetName, head, bodyRows, filename){
+    if(typeof XLSX === "undefined"){ alert("Biblioteca de Excel não carregou. Recarregue a página e tente novamente."); return; }
+    var ws = XLSX.utils.aoa_to_sheet([head].concat(bodyRows));
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, filename);
+  }
+
+  function bindExportEvents(){
+    document.getElementById("export-reajustes-pdf").addEventListener("click", function(){
+      var rows = sortRows(getFiltered());
+      var head = ["Empresa","Empregado","Código","Data","Categoria","Motivo","Sal. anterior","Novo salário","Δ%"];
+      var body = rows.map(function(d){
+        return [d.en, d.fn, d.fc, d.dt, d.cat, d.mo, fmtMoney(d.sa), fmtMoney(d.ns), fmtPct(d.pc)];
+      });
+      exportRowsToPdf("Reajustes salariais — " + rows.length.toLocaleString("pt-BR") + " registro(s)", head, body, "reajustes_" + todayStamp() + ".pdf", "landscape");
+    });
+    document.getElementById("export-reajustes-xlsx").addEventListener("click", function(){
+      var rows = sortRows(getFiltered());
+      var head = ["Empresa","Empregado","Código","Data","Categoria","Motivo","Salário anterior","Novo salário","Variação %"];
+      var body = rows.map(function(d){
+        return [d.en, d.fn, d.fc, d.dt, d.cat, d.mo, d.sa != null ? d.sa : "", d.ns != null ? d.ns : "", d.pc != null ? d.pc : ""];
+      });
+      exportRowsToExcel("Reajustes", head, body, "reajustes_" + todayStamp() + ".xlsx");
+    });
+
+    document.getElementById("export-sem-reajuste-pdf").addEventListener("click", function(){
+      var visiveis = computeSemReajusteList().visiveis;
+      var periodo = state.semReajusteAno ? ("em " + state.semReajusteAno) : "no período 2025–2026";
+      var head = ["Empresa","CNPJ","Código","Situação"];
+      var body = visiveis.map(function(e){
+        return [e.nome_empresa || "", e.cnpj || "—", e.codigo_empresa, empresaAtiva(e.status_situacao) ? "Ativa" : "Inativa"];
+      });
+      exportRowsToPdf("Empresas sem reajuste " + periodo + " — " + visiveis.length.toLocaleString("pt-BR") + " empresa(s)", head, body, "empresas_sem_reajuste_" + todayStamp() + ".pdf", "portrait");
+    });
+    document.getElementById("export-sem-reajuste-xlsx").addEventListener("click", function(){
+      var visiveis = computeSemReajusteList().visiveis;
+      var head = ["Empresa","CNPJ","Código","Situação"];
+      var body = visiveis.map(function(e){
+        return [e.nome_empresa || "", e.cnpj || "", e.codigo_empresa, empresaAtiva(e.status_situacao) ? "Ativa" : "Inativa"];
+      });
+      exportRowsToExcel("Sem reajuste", head, body, "empresas_sem_reajuste_" + todayStamp() + ".xlsx");
+    });
+
+    document.getElementById("export-resumo-pdf").addEventListener("click", function(){
+      var rows = getResumoRowsFiltered();
+      var head = ["Empresa","Empregados","Reajustes","% CCT","Aumento médio","Impacto (R$)"];
+      var body = rows.map(function(r){
+        return [r.en, r.empregados, r.reajustes, Math.round(r.cctPct) + "%", fmtPct(r.avgPct === null ? null : Math.round(r.avgPct * 10) / 10), fmtMoney(r.impacto)];
+      });
+      exportRowsToPdf("Resumo gerencial por empresa — " + rows.length.toLocaleString("pt-BR") + " empresa(s)", head, body, "resumo_por_empresa_" + todayStamp() + ".pdf", "landscape");
+    });
+    document.getElementById("export-resumo-xlsx").addEventListener("click", function(){
+      var rows = getResumoRowsFiltered();
+      var head = ["Empresa","Empregados","Reajustes","% CCT","Aumento médio (%)","Impacto (R$)"];
+      var body = rows.map(function(r){
+        return [r.en, r.empregados, r.reajustes, Math.round(r.cctPct * 10) / 10, r.avgPct === null ? "" : Math.round(r.avgPct * 10) / 10, Math.round(r.impacto * 100) / 100];
+      });
+      exportRowsToExcel("Resumo por empresa", head, body, "resumo_por_empresa_" + todayStamp() + ".xlsx");
+    });
   }
 
   // ---------- carregamento ----------
@@ -873,6 +1004,8 @@
         renderResumo();
       });
     });
+
+    bindExportEvents();
   }
 
   async function initPage(sb){
