@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reajustes Salariais — Convenções Coletivas | Portal SCONT</title>
+<link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="shared.css">
+<script src="supabase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  body{background:var(--bg); color:var(--text);}
+  .mono, .num, .kpi-value, td.num, th.num{
+    font-family:ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .page{max-width:1180px; margin:0 auto; padding:24px 20px 56px; display:flex; flex-direction:column; gap:22px;}
+
+  /* ---------- topbar ---------- */
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; color:var(--secondary); font-size:.95rem;}
+  .brand-mark{
+    width:30px; height:30px; border-radius:8px; flex:none;
+    background:linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    display:flex; align-items:center; justify-content:center; color:#fff; font-size:15px;
+  }
+  .back-link{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--card); border:1px solid var(--border); color:var(--secondary);
+    padding:8px 14px; border-radius:999px; font-size:.82rem; font-weight:600;
+    text-decoration:none; box-shadow:var(--shadow-sm); transition:var(--transition);
+  }
+  .back-link:hover{border-color:var(--primary); color:var(--primary);}
+
+  /* ---------- masthead ---------- */
+  .masthead{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow-sm); padding:22px 26px; position:relative; overflow:hidden;
+  }
+  .masthead::before{
+    content:""; position:absolute; inset:0 0 auto 0; height:4px;
+    background:linear-gradient(90deg, var(--primary), var(--secondary));
+  }
+  .eyebrow{
+    display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--primary); background:#F3E4E4;
+    padding:3px 10px; border-radius:999px; margin-bottom:10px;
+  }
+  .masthead h1{font-size:clamp(1.4rem, 1.15rem + 1.1vw, 1.9rem); margin:0 0 8px; color:var(--secondary); line-height:1.15;}
+  .lede{max-width:66ch; margin:0; color:var(--text-light); font-size:.94rem; line-height:1.55;}
+  .lede strong{color:var(--secondary); font-weight:700;}
+  .meta{font-size:.78rem; color:var(--muted); margin-top:10px;}
+
+  /* ---------- KPI row ---------- */
+  .kpis{display:grid; gap:14px; grid-template-columns:repeat(4, 1fr);}
+  @media (max-width:820px){ .kpis{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:460px){ .kpis{grid-template-columns:1fr;} }
+  .kpi{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px 18px; display:flex; flex-direction:column; gap:5px; box-shadow:var(--shadow-sm);
+  }
+  .kpi-feature{border:1px solid var(--primary); background:linear-gradient(180deg,#F8ECEC,var(--card) 65%);}
+  .kpi-label{font-size:.74rem; font-weight:700; letter-spacing:.03em; color:var(--text-light); text-transform:uppercase;}
+  .kpi-value{font-size:1.85rem; font-weight:700; line-height:1; color:var(--secondary);}
+  .kpi-feature .kpi-value{color:var(--primary);}
+  .kpi-unit{font-size:1rem; color:var(--muted); font-weight:500;}
+  .kpi-sub{font-size:.76rem; color:var(--muted);}
+  .kpi-meter{height:6px; border-radius:4px; background:var(--border); overflow:hidden; margin-top:2px;}
+  .kpi-meter-fill{height:100%; background:var(--primary); border-radius:4px;}
+
+  /* ---------- breakdown bars ---------- */
+  .breakdown{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:18px 20px 20px; box-shadow:var(--shadow-sm);
+  }
+  .breakdown h2{font-size:1rem; margin:0 0 14px; color:var(--secondary); font-weight:700;}
+  .bars{display:flex; flex-direction:column; gap:9px;}
+  .bar-row{
+    display:grid; grid-template-columns:190px 1fr 60px; align-items:center; gap:12px;
+    cursor:pointer; border:none; background:none; padding:5px; border-radius:6px;
+    font-family:inherit; text-align:left; width:100%; color:var(--text);
+  }
+  .bar-row:hover{background:var(--bg-light);}
+  .bar-row.is-active{background:#F3E4E4; outline:1.5px solid var(--primary);}
+  .bar-name{display:flex; align-items:center; gap:8px; font-size:.85rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .bar-dot{width:9px; height:9px; border-radius:50%; flex:none;}
+  .bar-track{height:14px; border-radius:4px; background:var(--bg); overflow:hidden;}
+  .bar-fill{height:100%; border-radius:4px;}
+  .bar-count{font-size:.8rem; text-align:right; color:var(--text-light);}
+  @media (max-width:560px){ .bar-row{grid-template-columns:118px 1fr 42px; gap:8px;} .bar-name{font-size:.76rem;} }
+
+  /* ---------- toolbar ---------- */
+  .toolbar{
+    display:flex; flex-direction:column; gap:12px;
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px 18px; box-shadow:var(--shadow-sm);
+  }
+  .toolbar-row{display:flex; flex-wrap:wrap; gap:10px; align-items:center;}
+  #search{
+    flex:1 1 220px; min-width:0;
+    background:var(--bg-light); border:1px solid var(--border); border-radius:var(--radius-sm);
+    padding:9px 12px; font-size:.9rem; color:var(--text); font-family:inherit;
+  }
+  #search:focus-visible, select:focus-visible, .chip:focus-visible, th button:focus-visible{
+    outline:2px solid var(--primary); outline-offset:1px;
+  }
+  select{
+    background:var(--bg-light); border:1px solid var(--border); border-radius:var(--radius-sm);
+    padding:8px 10px; font-size:.85rem; color:var(--text); font-family:inherit; max-width:280px;
+  }
+  .chips{display:flex; flex-wrap:wrap; gap:7px;}
+  .chip{
+    border:1px solid var(--border); background:var(--bg-light); color:var(--text-light);
+    border-radius:999px; padding:6px 12px; font-size:.79rem; font-weight:600;
+    cursor:pointer; display:flex; align-items:center; gap:6px; font-family:inherit; transition:var(--transition);
+  }
+  .chip .bar-dot{width:7px; height:7px;}
+  .chip.is-active{background:var(--primary); border-color:var(--primary); color:#fff;}
+  .chip.is-active .bar-dot{background:#fff !important;}
+  .toolbar-foot{display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;}
+  #result-count{font-size:.8rem; color:var(--muted);}
+  #reset-btn{
+    background:none; border:1px solid var(--border); color:var(--text-light);
+    border-radius:var(--radius-sm); padding:7px 12px; font-size:.79rem; cursor:pointer; font-family:inherit; transition:var(--transition);
+  }
+  #reset-btn:hover{border-color:var(--primary); color:var(--primary);}
+
+  /* ---------- table ---------- */
+  .table-wrap{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow-sm); overflow:hidden;
+  }
+  .table-scroll{overflow-x:auto;}
+  table{width:100%; border-collapse:collapse; font-size:.85rem; min-width:920px;}
+  thead th{
+    position:sticky; top:0; z-index:1;
+    background:var(--bg-light); text-align:left;
+    border-bottom:2px solid var(--border); padding:0;
+  }
+  th button{
+    width:100%; text-align:inherit; background:none; border:none; cursor:pointer;
+    font:inherit; color:var(--text-light); font-weight:700; font-size:.72rem;
+    letter-spacing:.04em; text-transform:uppercase;
+    padding:10px 12px; display:flex; align-items:center; gap:5px;
+  }
+  th.num button{justify-content:flex-end;}
+  th button:hover{color:var(--primary);}
+  th .arrow{font-size:.68rem; opacity:0; color:var(--primary);}
+  th[aria-sort="ascending"] .arrow, th[aria-sort="descending"] .arrow{opacity:1;}
+  th[aria-sort="ascending"] .arrow::before{content:"▲";}
+  th[aria-sort="descending"] .arrow::before{content:"▼";}
+  tbody td{padding:9px 12px; border-bottom:1px solid var(--border-light); vertical-align:top;}
+  tbody tr:nth-child(even){background:var(--bg-light);}
+  tbody tr:hover{background:#F3E4E4;}
+  td.num{text-align:right; white-space:nowrap;}
+  .cell-emp{font-weight:600; color:var(--secondary);}
+  .cell-fn{color:var(--muted); font-size:.8rem;}
+  .cell-motivo{color:var(--text-light); font-size:.79rem; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; padding:3px 9px; border-radius:999px;
+    font-size:.72rem; font-weight:700; white-space:nowrap;
+  }
+  .badge .bar-dot{width:7px; height:7px;}
+  td.empty-state{padding:40px 12px; text-align:center; color:var(--muted); font-size:.9rem;}
+
+  .foot{font-size:.78rem; color:var(--muted); text-align:center; padding-top:4px;}
+  .data-status{
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    box-shadow:var(--shadow-sm); padding:32px; text-align:center; color:var(--text-light); font-size:.92rem;
+  }
+  .data-status.is-error{border-color:var(--danger); color:var(--danger);}
+
+  @media (prefers-reduced-motion: no-preference){
+    .bar-fill, .kpi-meter-fill{transition:width .5s ease;}
+  }
+</style>
+</head>
+<body>
+
+<div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F0F2F5;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="font-size:40px;">🔐</div>
+  <p style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso ao Portal SCONT…</p>
+</div>
+
+<div class="page" id="page-content" hidden>
+
+  <div id="data-status" class="data-status" hidden></div>
+
+
+  <div class="topbar">
+    <div class="brand"><span class="brand-mark">🧾</span> Portal SCONT · Departamento Pessoal</div>
+    <a class="back-link" href="portal.html">🏠 Voltar ao Portal</a>
+  </div>
+
+  <header class="masthead">
+    <span class="eyebrow">Auditoria de Folha</span>
+    <h1>Reajustes Salariais — Convenções Coletivas</h1>
+    <p class="lede">Todo reajuste salarial concedido a <strong>empregados</strong> (contribuintes excluídos), extraído do relatório consolidado das empresas SCONT, com destaque para os que vieram de <strong>Convenção Coletiva de Trabalho (CCT)</strong> — use o card em destaque, a barra ou os filtros abaixo para isolá-los.</p>
+    <p class="meta mono">Competência 01/2025 – 08/2026 · relatório emitido 16/09/2026</p>
+  </header>
+
+  <section class="kpis" aria-label="Resumo geral">
+    <div class="kpi kpi-feature">
+      <span class="kpi-label">Reajustes por CCT</span>
+      <span class="kpi-value" id="kpi-cct-value">—</span>
+      <div class="kpi-meter"><div class="kpi-meter-fill" id="kpi-cct-meter" style="width:0%"></div></div>
+      <span class="kpi-sub" id="kpi-cct-sub">carregando…</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Empresas com reajuste</span>
+      <span class="kpi-value" id="kpi-empresas">—</span>
+      <span class="kpi-sub" id="kpi-empresas-sub">&nbsp;</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Empregados atingidos</span>
+      <span class="kpi-value" id="kpi-empregados">—</span>
+      <span class="kpi-sub">receberam ao menos 1 reajuste</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-label">Aumento médio</span>
+      <span class="kpi-value" id="kpi-avg-pct">—</span>
+      <span class="kpi-sub">variação salarial média por evento</span>
+    </div>
+  </section>
+
+  <section class="breakdown" aria-label="Distribuição por motivo do reajuste">
+    <h2>Reajustes por motivo</h2>
+    <div class="bars" id="category-bars"></div>
+  </section>
+
+  <section class="toolbar" aria-label="Filtros">
+    <div class="toolbar-row">
+      <input id="search" type="search" placeholder="Buscar empresa, empregado ou motivo…" aria-label="Buscar">
+      <select id="empresa-select" aria-label="Filtrar por empresa">
+        <option value="">Todas as empresas</option>
+      </select>
+      <select id="ano-select" aria-label="Filtrar por ano">
+        <option value="">Todos os anos</option>
+        <option value="2025">2025</option>
+        <option value="2026">2026</option>
+      </select>
+    </div>
+    <div class="toolbar-row chips" id="category-chips"></div>
+    <div class="toolbar-foot">
+      <span id="result-count"></span>
+      <button id="reset-btn" type="button">Limpar filtros</button>
+    </div>
+  </section>
+
+  <section class="table-wrap">
+    <div class="table-scroll">
+      <table id="data-table">
+        <thead>
+          <tr>
+            <th data-key="en"><button type="button">Empresa <span class="arrow"></span></button></th>
+            <th data-key="fn"><button type="button">Empregado <span class="arrow"></span></button></th>
+            <th data-key="dt"><button type="button">Data <span class="arrow"></span></button></th>
+            <th data-key="cat"><button type="button">Categoria <span class="arrow"></span></button></th>
+            <th data-key="mo"><button type="button">Motivo <span class="arrow"></span></button></th>
+            <th data-key="sa" class="num"><button type="button">Sal. anterior <span class="arrow"></span></button></th>
+            <th data-key="ns" class="num"><button type="button">Novo salário <span class="arrow"></span></button></th>
+            <th data-key="pc" class="num"><button type="button">Δ% <span class="arrow"></span></button></th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <p class="foot">Fonte: relatório "Alterações Salariais — todas as empresas" · extração automática, seção Empregados apenas (contribuintes excluídos) · 1.196 eventos em 114 empresas. Acesso restrito a usuários autenticados no Portal SCONT.</p>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var DATA = [];
+
+  var CATS = [
+    {key:"CCT", label:"Convenção Coletiva (CCT)", color:"#8B3A3A", soft:"#F3E4E4"},
+    {key:"Piso/Salário Mínimo", label:"Piso / Salário mínimo", color:"#3498DB", soft:"#DDEEFB"},
+    {key:"A pedido do cliente", label:"A pedido do cliente", color:"#27AE60", soft:"#DFF3E7"},
+    {key:"Importação eSocial", label:"Importação eSocial", color:"#E67E22", soft:"#FBEADB"},
+    {key:"Outros", label:"Outros", color:"#5A6C7D", soft:"#E7EAED"}
+  ];
+  var catInfo = {};
+  CATS.forEach(function(c){ catInfo[c.key] = c; });
+
+  function fmtMoney(v){
+    if(v === null || v === undefined) return "—";
+    return "R$ " + v.toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  function fmtPct(v){
+    if(v === null || v === undefined) return "—";
+    return (v > 0 ? "+" : "") + v.toLocaleString("pt-BR", {minimumFractionDigits:1, maximumFractionDigits:1}) + "%";
+  }
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function dateSortVal(d){
+    if(!d) return "";
+    var p = d.split("/");
+    if(p.length !== 3) return d;
+    return p[2] + p[1] + p[0];
+  }
+
+  var state = { q:"", empresa:"", categoria:"", ano:"", sortKey:"dt", sortDir:"desc" };
+
+  function initSummary(){
+    var totalCct = 0;
+    var empresas = {};
+    var empregados = {};
+    var pctSum = 0, pctN = 0;
+    var catCounts = {};
+    DATA.forEach(function(d){
+      if(d.cat === "CCT") totalCct++;
+      empresas[d.ec] = true;
+      empregados[d.ec + "#" + d.fc] = true;
+      if(d.pc !== null && d.pc !== undefined){ pctSum += d.pc; pctN++; }
+      catCounts[d.cat] = (catCounts[d.cat] || 0) + 1;
+    });
+    var total = DATA.length;
+    var empresaCount = Object.keys(empresas).length;
+    var empregadoCount = Object.keys(empregados).length;
+    var pctAvg = pctN ? (pctSum / pctN) : 0;
+
+    document.getElementById("kpi-cct-value").textContent = totalCct.toLocaleString("pt-BR") + " ";
+    document.getElementById("kpi-cct-value").insertAdjacentHTML("beforeend", '<span class="kpi-unit">/ ' + total.toLocaleString("pt-BR") + '</span>');
+    document.getElementById("kpi-cct-meter").style.width = Math.round(totalCct/total*100) + "%";
+    document.getElementById("kpi-cct-sub").textContent = Math.round(totalCct/total*100) + "% dos reajustes vieram de convenção coletiva";
+    document.getElementById("kpi-empresas").textContent = empresaCount.toLocaleString("pt-BR");
+    document.getElementById("kpi-empresas-sub").textContent = "de 167 empresas no relatório";
+    document.getElementById("kpi-empregados").textContent = empregadoCount.toLocaleString("pt-BR");
+    document.getElementById("kpi-avg-pct").textContent = fmtPct(Math.round(pctAvg*10)/10);
+
+    var barsEl = document.getElementById("category-bars");
+    var maxCount = Math.max.apply(null, CATS.map(function(c){ return catCounts[c.key] || 0; }));
+    barsEl.innerHTML = CATS.map(function(c){
+      var n = catCounts[c.key] || 0;
+      var pct = maxCount ? Math.round(n / maxCount * 100) : 0;
+      return '<button type="button" class="bar-row" data-cat="' + esc(c.key) + '">' +
+        '<span class="bar-name"><span class="bar-dot" style="background:' + c.color + '"></span>' + esc(c.label) + '</span>' +
+        '<span class="bar-track"><span class="bar-fill" style="width:' + pct + '%; background:' + c.color + '"></span></span>' +
+        '<span class="bar-count mono">' + n.toLocaleString("pt-BR") + '</span>' +
+        '</button>';
+    }).join("");
+    barsEl.querySelectorAll(".bar-row").forEach(function(btn){
+      btn.addEventListener("click", function(){ toggleCategoria(btn.getAttribute("data-cat")); });
+    });
+
+    var chipsEl = document.getElementById("category-chips");
+    var allChip = '<button type="button" class="chip is-active" data-cat="">Todos <span class="mono">(' + total.toLocaleString("pt-BR") + ')</span></button>';
+    var catChips = CATS.map(function(c){
+      var n = catCounts[c.key] || 0;
+      return '<button type="button" class="chip" data-cat="' + esc(c.key) + '"><span class="bar-dot" style="background:' + c.color + '"></span>' + esc(c.label) + ' <span class="mono">(' + n.toLocaleString("pt-BR") + ')</span></button>';
+    }).join("");
+    chipsEl.innerHTML = allChip + catChips;
+    chipsEl.querySelectorAll(".chip").forEach(function(btn){
+      btn.addEventListener("click", function(){ setCategoria(btn.getAttribute("data-cat")); });
+    });
+
+    var empresaNames = {};
+    DATA.forEach(function(d){ empresaNames[d.en] = (empresaNames[d.en]||0) + 1; });
+    var names = Object.keys(empresaNames).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); });
+    var sel = document.getElementById("empresa-select");
+    names.forEach(function(n){
+      var opt = document.createElement("option");
+      opt.value = n;
+      opt.textContent = n + " (" + empresaNames[n] + ")";
+      sel.appendChild(opt);
+    });
+  }
+
+  function setCategoria(cat){
+    state.categoria = cat;
+    document.querySelectorAll(".chip").forEach(function(el){
+      el.classList.toggle("is-active", el.getAttribute("data-cat") === cat);
+    });
+    document.querySelectorAll(".bar-row").forEach(function(el){
+      el.classList.toggle("is-active", cat !== "" && el.getAttribute("data-cat") === cat);
+    });
+    render();
+  }
+  function toggleCategoria(cat){
+    setCategoria(state.categoria === cat ? "" : cat);
+  }
+
+  function getFiltered(){
+    var q = state.q.trim().toLowerCase();
+    return DATA.filter(function(d){
+      if(state.empresa && d.en !== state.empresa) return false;
+      if(state.categoria && d.cat !== state.categoria) return false;
+      if(state.ano && d.an !== state.ano) return false;
+      if(q){
+        var hay = (d.en + " " + d.fn + " " + d.mo).toLowerCase();
+        if(hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+  }
+
+  function sortRows(rows){
+    var key = state.sortKey, dir = state.sortDir === "asc" ? 1 : -1;
+    var numeric = (key === "sa" || key === "ns" || key === "pc");
+    rows.sort(function(a,b){
+      var va, vb;
+      if(key === "dt"){ va = dateSortVal(a.dt); vb = dateSortVal(b.dt); }
+      else if(numeric){ va = a[key]; vb = b[key]; }
+      else { va = (a[key]||"").toLowerCase(); vb = (b[key]||"").toLowerCase(); }
+      if(va === null || va === undefined) va = numeric ? -Infinity : "";
+      if(vb === null || vb === undefined) vb = numeric ? -Infinity : "";
+      if(va < vb) return -1 * dir;
+      if(va > vb) return 1 * dir;
+      return 0;
+    });
+    return rows;
+  }
+
+  function rowHtml(d){
+    var c = catInfo[d.cat] || catInfo["Outros"];
+    return '<tr>' +
+      '<td class="cell-emp">' + esc(d.en) + '</td>' +
+      '<td><span class="cell-emp">' + esc(d.fn) + '</span><br><span class="cell-fn mono">#' + esc(d.fc) + '</span></td>' +
+      '<td class="mono">' + esc(d.dt) + '</td>' +
+      '<td><span class="badge" style="background:' + c.soft + ';color:' + c.color + '"><span class="bar-dot" style="background:' + c.color + '"></span>' + esc(c.label) + '</span></td>' +
+      '<td class="cell-motivo" title="' + esc(d.mo + (d.fr ? " — " + d.fr : "")) + '">' + esc(d.mo) + '</td>' +
+      '<td class="num">' + fmtMoney(d.sa) + '</td>' +
+      '<td class="num">' + fmtMoney(d.ns) + '</td>' +
+      '<td class="num">' + fmtPct(d.pc) + '</td>' +
+      '</tr>';
+  }
+
+  function render(){
+    var rows = sortRows(getFiltered());
+    var tbody = document.getElementById("table-body");
+    if(rows.length === 0){
+      tbody.innerHTML = '<tr><td class="empty-state" colspan="8">Nenhum reajuste encontrado com esses filtros.</td></tr>';
+    } else {
+      tbody.innerHTML = rows.map(rowHtml).join("");
+    }
+    var count = document.getElementById("result-count");
+    count.textContent = "Mostrando " + rows.length.toLocaleString("pt-BR") + " de " + DATA.length.toLocaleString("pt-BR") + " registros";
+
+    document.querySelectorAll("thead th").forEach(function(th){
+      if(th.getAttribute("data-key") === state.sortKey){
+        th.setAttribute("aria-sort", state.sortDir === "asc" ? "ascending" : "descending");
+      } else {
+        th.removeAttribute("aria-sort");
+      }
+    });
+  }
+
+  function bindEvents(){
+    var searchTimer;
+    document.getElementById("search").addEventListener("input", function(e){
+      clearTimeout(searchTimer);
+      var val = e.target.value;
+      searchTimer = setTimeout(function(){ state.q = val; render(); }, 140);
+    });
+    document.getElementById("empresa-select").addEventListener("change", function(e){
+      state.empresa = e.target.value; render();
+    });
+    document.getElementById("ano-select").addEventListener("change", function(e){
+      state.ano = e.target.value; render();
+    });
+    document.getElementById("reset-btn").addEventListener("click", function(){
+      state = { q:"", empresa:"", categoria:"", ano:"", sortKey:"dt", sortDir:"desc" };
+      document.getElementById("search").value = "";
+      document.getElementById("empresa-select").value = "";
+      document.getElementById("ano-select").value = "";
+      setCategoria("");
+    });
+    document.querySelectorAll("thead th").forEach(function(th){
+      th.querySelector("button").addEventListener("click", function(){
+        var key = th.getAttribute("data-key");
+        if(state.sortKey === key){
+          state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+        } else {
+          state.sortKey = key;
+          state.sortDir = (key === "sa" || key === "ns" || key === "pc") ? "desc" : "asc";
+          if(key === "dt") state.sortDir = "desc";
+        }
+        render();
+      });
+    });
+  }
+
+  function dbDateToDisplay(iso){
+    if(!iso) return "";
+    var p = iso.split("-"); // YYYY-MM-DD
+    if(p.length !== 3) return iso;
+    return p[2] + "/" + p[1] + "/" + p[0];
+  }
+  function mapRow(r){
+    return {
+      ec: r.empresa_codigo, en: r.empresa_nome, cn: r.cnpj,
+      fc: r.funcionario_codigo, fn: r.funcionario_nome,
+      dt: dbDateToDisplay(r.data_reajuste),
+      an: r.data_reajuste ? r.data_reajuste.slice(0,4) : "",
+      sa: r.salario_anterior != null ? Number(r.salario_anterior) : null,
+      ns: r.novo_salario != null ? Number(r.novo_salario) : null,
+      pc: r.percentual != null ? Number(r.percentual) : null,
+      mo: r.motivo || "", fr: r.forma_reajuste || "", cat: r.categoria
+    };
+  }
+
+  async function fetchAllRows(sb){
+    var pageSize = 1000, all = [], from = 0;
+    while(true){
+      var res = await sb.from("rh_reajustes_convencoes").select("*").range(from, from + pageSize - 1);
+      if(res.error) throw res.error;
+      var chunk = res.data || [];
+      all = all.concat(chunk);
+      if(chunk.length < pageSize) break;
+      from += pageSize;
+    }
+    return all;
+  }
+
+  function showStatus(msg, isError){
+    var el = document.getElementById("data-status");
+    el.textContent = msg;
+    el.classList.toggle("is-error", !!isError);
+    el.hidden = false;
+  }
+  function hideStatus(){
+    document.getElementById("data-status").hidden = true;
+  }
+
+  async function initPage(sb){
+    document.getElementById("page-content").hidden = false;
+    showStatus("Carregando reajustes…", false);
+    try {
+      var rows = await fetchAllRows(sb);
+      DATA = rows.map(mapRow);
+    } catch(err){
+      showStatus("Não foi possível carregar os dados (" + (err && err.message ? err.message : "erro desconhecido") + "). Verifique se a tabela rh_reajustes_convencoes já foi criada e populada no Supabase.", true);
+      return;
+    }
+    if(DATA.length === 0){
+      showStatus("A tabela rh_reajustes_convencoes existe mas está vazia. Rode o script de carga de dados no Supabase.", true);
+      return;
+    }
+    hideStatus();
+    initSummary();
+    bindEvents();
+    render();
+  }
+  window.__initReajustesPage = initPage;
+})();
+</script>
+
+<script src="portal-auth-guard.js"></script>
+<script>
+(async () => {
+  const auth = await window.PortalAuthGuard.init(0, { returnAfterLogin: true, skipToolCheck: true });
+  if (!auth) return;
+  document.getElementById('portalAuthOverlay').remove();
+  const sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+  window.__initReajustesPage(sb);
+})();
+</script>
+
+</body>
+</html>
