@@ -128,7 +128,7 @@
     padding:16px 18px; box-shadow:var(--shadow-sm);
   }
   .toolbar-row{display:flex; flex-wrap:wrap; gap:10px; align-items:center;}
-  #search, #sem-reajuste-search{
+  #search, #sem-reajuste-search, #resumo-search{
     flex:1 1 220px; min-width:0;
     background:var(--bg-light); border:1px solid var(--border); border-radius:var(--radius-sm);
     padding:9px 12px; font-size:.9rem; color:var(--text); font-family:inherit;
@@ -287,6 +287,34 @@
             <h2>Reajustes por motivo</h2>
             <div class="bars" id="category-bars"></div>
           </section>
+
+          <section class="breakdown" aria-label="Resumo gerencial por empresa" style="padding:18px 20px 4px;">
+            <h2>Resumo por empresa</h2>
+            <div class="toolbar-row" style="margin-bottom:12px;">
+              <input id="resumo-search" type="search" placeholder="Buscar empresa…" aria-label="Buscar empresa no resumo">
+              <select id="resumo-ano-select" aria-label="Filtrar resumo por ano">
+                <option value="">Todos os anos</option>
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+              </select>
+            </div>
+            <div id="resumo-count" style="font-size:.8rem; color:var(--muted); margin-bottom:8px;"></div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th data-rkey="en"><button type="button">Empresa <span class="arrow"></span></button></th>
+                    <th data-rkey="empregados" class="num"><button type="button">Empregados <span class="arrow"></span></button></th>
+                    <th data-rkey="reajustes" class="num"><button type="button">Reajustes <span class="arrow"></span></button></th>
+                    <th data-rkey="cctPct" class="num"><button type="button">% CCT <span class="arrow"></span></button></th>
+                    <th data-rkey="avgPct" class="num"><button type="button">Aumento médio <span class="arrow"></span></button></th>
+                    <th data-rkey="impacto" class="num"><button type="button">Impacto (R$) <span class="arrow"></span></button></th>
+                  </tr>
+                </thead>
+                <tbody id="resumo-body"></tbody>
+              </table>
+            </div>
+          </section>
         </section>
 
         <!-- ===================== REAJUSTES ===================== -->
@@ -423,7 +451,8 @@
   var state = {
     q:"", empresa:"", categoria:"", ano:"", sortKey:"dt", sortDir:"desc",
     incluirEmpresasInativas:false, incluirEmpregadosInativos:false,
-    semReajusteAno:""
+    semReajusteAno:"",
+    resumoQ:"", resumoAno:"", resumoSortKey:"reajustes", resumoSortDir:"desc"
   };
 
   // ---------- escopo (respeita os dois toggles globais) ----------
@@ -635,11 +664,86 @@
     }
   }
 
+  // ---------- resumo gerencial por empresa (dashboard) ----------
+  function computeResumoPorEmpresa(){
+    var base = scopedData().filter(function(d){
+      return !state.resumoAno || d.an === state.resumoAno;
+    });
+    var porEmpresa = {};
+    base.forEach(function(d){
+      var g = porEmpresa[d.ec];
+      if(!g){
+        g = porEmpresa[d.ec] = { ec:d.ec, en:d.en, reajustes:0, empregadosSet:{}, cct:0, pctSum:0, pctN:0, impacto:0 };
+      }
+      g.reajustes++;
+      g.empregadosSet[d.fc] = true;
+      if(d.cat === "CCT") g.cct++;
+      if(d.pc !== null && d.pc !== undefined){ g.pctSum += d.pc; g.pctN++; }
+      if(d.sa !== null && d.ns !== null && d.sa !== undefined && d.ns !== undefined){ g.impacto += (d.ns - d.sa); }
+    });
+    return Object.keys(porEmpresa).map(function(ec){
+      var g = porEmpresa[ec];
+      return {
+        ec: g.ec, en: g.en,
+        empregados: Object.keys(g.empregadosSet).length,
+        reajustes: g.reajustes,
+        cctPct: g.reajustes ? (g.cct / g.reajustes * 100) : 0,
+        avgPct: g.pctN ? (g.pctSum / g.pctN) : null,
+        impacto: g.impacto
+      };
+    });
+  }
+
+  function renderResumo(){
+    var q = (state.resumoQ || "").trim().toLowerCase();
+    var rows = computeResumoPorEmpresa();
+    if(q){
+      rows = rows.filter(function(r){ return r.en.toLowerCase().indexOf(q) !== -1; });
+    }
+    var key = state.resumoSortKey, dir = state.resumoSortDir === "asc" ? 1 : -1;
+    rows.sort(function(a,b){
+      var va = a[key], vb = b[key];
+      if(key === "en"){ va = (va||"").toLowerCase(); vb = (vb||"").toLowerCase(); }
+      else { va = va === null || va === undefined ? -Infinity : va; vb = vb === null || vb === undefined ? -Infinity : vb; }
+      if(va < vb) return -1 * dir;
+      if(va > vb) return 1 * dir;
+      return 0;
+    });
+
+    document.getElementById("resumo-count").textContent =
+      "Mostrando " + rows.length.toLocaleString("pt-BR") + " empresa(s) com reajuste" + (state.resumoAno ? (" em " + state.resumoAno) : " no período");
+
+    var tbody = document.getElementById("resumo-body");
+    if(rows.length === 0){
+      tbody.innerHTML = '<tr><td class="empty-state" colspan="6">Nenhuma empresa encontrada com esses filtros.</td></tr>';
+    } else {
+      tbody.innerHTML = rows.map(function(r){
+        return '<tr>' +
+          '<td class="cell-emp">' + esc(r.en) + '</td>' +
+          '<td class="num">' + r.empregados.toLocaleString("pt-BR") + '</td>' +
+          '<td class="num">' + r.reajustes.toLocaleString("pt-BR") + '</td>' +
+          '<td class="num">' + Math.round(r.cctPct) + '%</td>' +
+          '<td class="num">' + fmtPct(r.avgPct === null ? null : Math.round(r.avgPct*10)/10) + '</td>' +
+          '<td class="num">' + fmtMoney(r.impacto) + '</td>' +
+          '</tr>';
+      }).join("");
+    }
+
+    document.querySelectorAll("#page-dashboard thead th[data-rkey]").forEach(function(th){
+      if(th.getAttribute("data-rkey") === state.resumoSortKey){
+        th.setAttribute("aria-sort", state.resumoSortDir === "asc" ? "ascending" : "descending");
+      } else {
+        th.removeAttribute("aria-sort");
+      }
+    });
+  }
+
   // ---------- recalcula tudo (mudou escopo, categoria, etc.) ----------
   function refreshAll(){
     initSummary();
     renderTable();
     renderSemReajuste();
+    renderResumo();
   }
 
   // ---------- carregamento ----------
@@ -746,6 +850,28 @@
     });
     document.getElementById("sidebarCollapseBtn").addEventListener("click", function(){
       document.getElementById("sidebar").classList.toggle("collapsed");
+    });
+
+    var resumoSearchTimer;
+    document.getElementById("resumo-search").addEventListener("input", function(e){
+      clearTimeout(resumoSearchTimer);
+      var val = e.target.value;
+      resumoSearchTimer = setTimeout(function(){ state.resumoQ = val; renderResumo(); }, 140);
+    });
+    document.getElementById("resumo-ano-select").addEventListener("change", function(e){
+      state.resumoAno = e.target.value; renderResumo();
+    });
+    document.querySelectorAll("#page-dashboard thead th[data-rkey]").forEach(function(th){
+      th.querySelector("button").addEventListener("click", function(){
+        var key = th.getAttribute("data-rkey");
+        if(state.resumoSortKey === key){
+          state.resumoSortDir = state.resumoSortDir === "asc" ? "desc" : "asc";
+        } else {
+          state.resumoSortKey = key;
+          state.resumoSortDir = (key === "en") ? "asc" : "desc";
+        }
+        renderResumo();
+      });
     });
   }
 
