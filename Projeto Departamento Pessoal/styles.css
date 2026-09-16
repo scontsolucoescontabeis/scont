@@ -399,3 +399,11 @@ button{font:inherit}
 }
 .tool-card h3{ font-size:1.05rem; margin:0 0 8px; color:var(--brand-strong); }
 .tool-card p{ font-size:.88rem; color:var(--muted); margin:0; line-height:1.5; }
+.tool-card-bloqueado{
+  opacity:.5; cursor:not-allowed; pointer-events:none;
+  filter:grayscale(60%);
+}
+.tool-card-bloqueado::after{
+  content:"🔒 Sem acesso"; display:inline-block; margin-top:10px;
+  font-size:.78rem; font-weight:600; color:var(--muted);
+}

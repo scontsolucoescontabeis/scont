@@ -86,8 +86,10 @@ function configurarEventos() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true, skipToolCheck: true });
     if (!auth) return;
+    const okDp = await window.DPPermissoes.exigir(auth, 'validacao', 1);
+    if (!okDp) return;
     configurarEventos();
 });
 

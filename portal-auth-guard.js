@@ -69,7 +69,11 @@ window.PortalAuthGuard = (function () {
      */
     /**
      * @param {number} depthToRoot
-     * @param {{ returnAfterLogin?: boolean }} [opts]
+     * @param {{ returnAfterLogin?: boolean, skipToolCheck?: boolean }} [opts]
+     *   skipToolCheck: pula a autorização por pasta (passos 3+) para
+     *   usuário comum, mantendo só a checagem de sessão. Usado por páginas
+     *   cuja autorização real é feita por outro mecanismo (ex.: sub-permissões
+     *   do hub Departamento Pessoal, ver Projeto Departamento Pessoal/dp-permissoes.js).
      */
     async function init(depthToRoot, opts) {
         depthToRoot = depthToRoot ?? 1;
@@ -103,6 +107,11 @@ window.PortalAuthGuard = (function () {
             sessionStorage.removeItem('userAuth');
             redirecionar(depthToRoot, returnTo);
             return null;
+        }
+
+        if (opts?.skipToolCheck) {
+            iniciarInatividade(depthToRoot, sb);
+            return auth;
         }
 
         const { data, error } = await sb

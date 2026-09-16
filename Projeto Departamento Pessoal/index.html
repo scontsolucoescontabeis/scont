@@ -12,6 +12,7 @@
   <script src="../supabase-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../portal-auth-guard.js"></script>
+  <script src="dp-permissoes.js"></script>
 </head>
 <body>
 <!-- AUTH OVERLAY -->
@@ -43,42 +44,42 @@
       </div>
 
       <div class="tool-cards">
-        <a class="tool-card" href="../Projeto RH/index.html">
+        <a class="tool-card" href="../Projeto RH/index.html" data-chave="frequencia">
           <div class="tool-card-icon">📋</div>
           <h3>Controle de Frequência - Ponto</h3>
           <p>Processamento de folha de ponto, benefícios e escala por competência.</p>
         </a>
-        <a class="tool-card" href="../Projeto RH/lancamentos.html">
+        <a class="tool-card" href="../Projeto RH/lancamentos.html" data-chave="lancamentos">
           <div class="tool-card-icon">💸</div>
           <h3>Lançamentos de Folha</h3>
           <p>Lançamentos adicionais por empregado a partir do catálogo de rubricas.</p>
         </a>
-        <a class="tool-card" href="../Projeto Simulador Folha/index.html">
+        <a class="tool-card" href="../Projeto Simulador Folha/index.html" data-chave="simulador">
           <div class="tool-card-icon">🧮</div>
           <h3>Simulador de Folha de Pagamento</h3>
           <p>Simulação de cálculos de folha de pagamento.</p>
         </a>
-        <a class="tool-card" href="../Projeto Fechamento Folha/index.html">
+        <a class="tool-card" href="../Projeto Fechamento Folha/index.html" data-chave="fechamento">
           <div class="tool-card-icon">💼</div>
           <h3>Fechamento Folha de Pagamento</h3>
           <p>Fechamento mensal por empresa, controle de ciclo e programação de férias.</p>
         </a>
-        <a class="tool-card" href="../Projeto Validação Fechamento Folha/index.html">
+        <a class="tool-card" href="../Projeto Validação Fechamento Folha/index.html" data-chave="validacao">
           <div class="tool-card-icon">🔍</div>
           <h3>Validação de Fechamento de Folha</h3>
           <p>Conferência de extratos e competências do fechamento.</p>
         </a>
-        <a class="tool-card" href="../Projeto Calendario Folha/index.html">
+        <a class="tool-card" href="../Projeto Calendario Folha/index.html" data-chave="calendario">
           <div class="tool-card-icon">🗓️</div>
           <h3>Calendário da Folha</h3>
           <p>Eventos e prazos do calendário único da folha de pagamento.</p>
         </a>
-        <a class="tool-card" href="fluxos-operacionais.html">
+        <a class="tool-card" href="fluxos-operacionais.html" data-chave="fluxos">
           <div class="tool-card-icon">📤</div>
           <h3>Fluxos Operacionais</h3>
           <p>Passo a passo e fluxograma dos processos de rescisão, admissão e férias.</p>
         </a>
-        <a class="tool-card" href="configuracoes.html" id="cardConfiguracoes">
+        <a class="tool-card" href="configuracoes.html" id="cardConfiguracoes" data-chave="configuracoes">
           <div class="tool-card-icon">⚙️</div>
           <h3>Configurações</h3>
           <p>VA/VT, Grupos de Empresas, Empresas, Empregados, Rubricas, Feriados e Folha Contratada — tudo num só lugar.</p>
@@ -93,6 +94,17 @@
     const auth = await window.PortalAuthGuard.init(1);
     if (!auth) return;
     document.getElementById('authOverlay')?.remove();
+
+    const acesso = await window.DPPermissoes.carregar(auth);
+    if (acesso !== true) {
+      const chaves = Array.isArray(acesso) ? acesso : [];
+      document.querySelectorAll('.tool-card[data-chave]').forEach(card => {
+        if (!chaves.includes(card.dataset.chave)) {
+          card.classList.add('tool-card-bloqueado');
+          card.removeAttribute('href');
+        }
+      });
+    }
   });
 </script>
 </body>

@@ -83,8 +83,10 @@ function navegarPara(modo) {
 // INICIALIZAÇÃO
 // ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true, skipToolCheck: true });
     if (!auth) return;
+    const okDp = await window.DPPermissoes.exigir(auth, 'fechamento', 1);
+    if (!okDp) return;
 
     isAdminAtual = auth.isAdmin === true;
     document.getElementById('sectionConfigCF').style.display = isAdminAtual ? '' : 'none';

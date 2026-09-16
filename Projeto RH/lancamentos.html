@@ -304,7 +304,8 @@
     </div>
 
     <script src="lancamentos.js"></script>
+    <script src="../Projeto Departamento Pessoal/dp-permissoes.js"></script>
     <div id="portalAuthOverlay" style="position:fixed;inset:0;background:#F4F7F6;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;"><div style="font-size:40px;">🔐</div><p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p></div>
-    <script>(async()=>{const a=await window.PortalAuthGuard.init(1);if(!a)return;document.getElementById('portalAuthOverlay').remove();})();</script>
+    <script>(async()=>{const a=await window.PortalAuthGuard.init(1,{skipToolCheck:true});if(!a)return;const ok=await window.DPPermissoes.exigir(a,'lancamentos',1);if(!ok)return;document.getElementById('portalAuthOverlay').remove();})();</script>
 </body>
 </html>

@@ -184,6 +184,8 @@
   async function iniciar() {
     const auth = await window.PortalAuthGuard.init(1);
     if (!auth) return;
+    const okDp = await window.DPPermissoes.exigir(auth, 'fluxos', 1);
+    if (!okDp) return;
     document.getElementById('authOverlay')?.remove();
 
     renderNavTree();
