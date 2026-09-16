@@ -1068,7 +1068,7 @@ document.getElementById('formAprovar').addEventListener('submit', async (e) => {
                                 descricao: f.descricao || '',
                                 url:       f.url_base  || '',
                             })),
-                            portal_url: window.location.origin + '/portal.html',
+                            portal_url: window.location.href.replace(/admin-dashboard\.html.*$/, 'portal.html'),
                         },
                     }),
                 });
@@ -1282,7 +1282,7 @@ document.getElementById('formEditar').addEventListener('submit', async (e) => {
                                 descricao: f.descricao || '',
                                 url:       f.url_base  || '',
                             })),
-                            portal_url: window.location.origin + '/portal.html',
+                            portal_url: window.location.href.replace(/admin-dashboard\.html.*$/, 'portal.html'),
                         },
                     }),
                 });
