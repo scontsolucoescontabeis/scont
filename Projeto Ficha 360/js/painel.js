@@ -19,7 +19,7 @@ window.Ficha360Painel = (function () {
     function aplicarFiltros(itens) {
         const busca = filtros.busca.trim().toLowerCase();
         return itens.filter(i => {
-            if (!filtros.inativas && i.statusCarteira === 'inativo' && filtros.status !== 'inativo') return false;
+            if (!filtros.status && !filtros.inativas && i.statusCarteira !== 'ativo') return false;
             if (busca && !(`${i.codigo} ${i.nome} ${i.cnpj}`.toLowerCase().includes(busca))) return false;
             if (filtros.responsavel && !i.responsaveisDp.concat(i.responsaveisContabil).includes(filtros.responsavel)) return false;
             if (filtros.regime && i.regime !== filtros.regime) return false;
@@ -54,7 +54,7 @@ window.Ficha360Painel = (function () {
     function render() {
         const tela = document.getElementById('telaPainel');
         const todos = F360.carteira;
-        const ativos = todos.filter(i => i.statusCarteira !== 'inativo');
+        const ativos = todos.filter(i => i.statusCarteira === 'ativo');
         const conta = (fn) => ativos.filter(fn).length;
         const semResp = conta(i => (i.possuiFolha && !i.responsaveisDp.length) || (i.possuiContabil && !i.responsaveisContabil.length));
 
@@ -90,7 +90,7 @@ window.Ficha360Painel = (function () {
               <select id="fRegime" aria-label="Regime">${opcoes(todos.map(i => i.regime), filtros.regime, 'Regime')}</select>
               <select id="fStatus" aria-label="Status na carteira"><option value="">Status na carteira</option>${statusOpts}</select>
               <select id="fDepto" aria-label="Departamento"><option value="">Departamento</option>${deptoOpts}</select>
-              <label><input type="checkbox" id="fInativas" ${filtros.inativas ? 'checked' : ''}> Mostrar inativas</label>
+              <label><input type="checkbox" id="fInativas" ${filtros.inativas ? 'checked' : ''}> Mostrar todos os status</label>
             </div>
           </div>
           <div class="resumo-filtros" id="resumoFiltros" aria-live="polite"></div>
