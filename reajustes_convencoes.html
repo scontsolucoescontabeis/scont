@@ -335,11 +335,16 @@
 
         <!-- ===================== SEM REAJUSTE ===================== -->
         <section class="screen" id="page-sem-reajuste">
-          <p class="lede">Empresas cadastradas (rh_empresas) que <strong>não tiveram nenhum reajuste</strong> de empregado no período, dentro do escopo atual (toggles no topo). Por padrão considera só empresas ativas.</p>
+          <p class="lede">Empresas cadastradas (rh_empresas) que <strong>não tiveram nenhum reajuste</strong> de empregado no ano selecionado, dentro do escopo atual (toggles no topo). Por padrão considera só empresas ativas.</p>
 
           <section class="toolbar" aria-label="Buscar empresa sem reajuste">
             <div class="toolbar-row">
               <input id="sem-reajuste-search" type="search" placeholder="Buscar empresa…" aria-label="Buscar empresa sem reajuste">
+              <select id="sem-reajuste-ano-select" aria-label="Filtrar por ano">
+                <option value="">Todo o período (2025–2026)</option>
+                <option value="2025">Sem reajuste em 2025</option>
+                <option value="2026">Sem reajuste em 2026</option>
+              </select>
             </div>
             <div class="toolbar-foot">
               <span id="sem-reajuste-count"></span>
@@ -417,7 +422,8 @@
 
   var state = {
     q:"", empresa:"", categoria:"", ano:"", sortKey:"dt", sortDir:"desc",
-    incluirEmpresasInativas:false, incluirEmpregadosInativos:false
+    incluirEmpresasInativas:false, incluirEmpregadosInativos:false,
+    semReajusteAno:""
   };
 
   // ---------- escopo (respeita os dois toggles globais) ----------
@@ -595,7 +601,9 @@
   // ---------- empresas sem reajuste ----------
   function renderSemReajuste(){
     var comReajuste = {};
-    scopedData().forEach(function(d){ comReajuste[String(d.ec)] = true; });
+    scopedData()
+      .filter(function(d){ return !state.semReajusteAno || d.an === state.semReajusteAno; })
+      .forEach(function(d){ comReajuste[String(d.ec)] = true; });
     var universo = EMPRESAS_ALL.filter(function(e){
       return state.incluirEmpresasInativas || empresaAtiva(e.status_situacao);
     });
@@ -607,14 +615,15 @@
       : semReajuste;
     visiveis = visiveis.slice().sort(function(a,b){ return (a.nome_empresa||"").localeCompare(b.nome_empresa||"", "pt-BR"); });
 
+    var periodoLabel = state.semReajusteAno ? ("em " + state.semReajusteAno) : "no período 2025–2026";
     document.getElementById("sem-reajuste-count").textContent =
-      "Mostrando " + visiveis.length.toLocaleString("pt-BR") + " de " + semReajuste.length.toLocaleString("pt-BR") + " empresas sem reajuste";
+      "Mostrando " + visiveis.length.toLocaleString("pt-BR") + " de " + semReajuste.length.toLocaleString("pt-BR") + " empresas sem reajuste " + periodoLabel;
 
     var tbody = document.getElementById("sem-reajuste-body");
     if(visiveis.length === 0){
       tbody.innerHTML = '<tr><td class="empty-state" colspan="4">' +
         (semReajuste.length === 0
-          ? ('Nenhuma empresa' + (state.incluirEmpresasInativas ? "" : " ativa") + ' ficou sem reajuste no escopo atual.')
+          ? ('Nenhuma empresa' + (state.incluirEmpresasInativas ? "" : " ativa") + ' ficou sem reajuste ' + periodoLabel + ' no escopo atual.')
           : 'Nenhuma empresa encontrada com esse termo de busca.') +
         '</td></tr>';
     } else {
@@ -717,6 +726,10 @@
     document.getElementById("sem-reajuste-search").addEventListener("input", function(){
       clearTimeout(semSearchTimer);
       semSearchTimer = setTimeout(renderSemReajuste, 140);
+    });
+    document.getElementById("sem-reajuste-ano-select").addEventListener("change", function(e){
+      state.semReajusteAno = e.target.value;
+      renderSemReajuste();
     });
 
     document.getElementById("toggle-empresas-inativas").addEventListener("change", function(){
