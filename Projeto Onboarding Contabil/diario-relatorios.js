@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const STATUS_GRADE_LABELS = { nao_iniciado: 'Não Iniciado', em_andamento: 'Em Andamento', pendencia: 'Pendência', concluido: 'Concluído' };
+  const STATUS_GRADE_LABELS = { nao_iniciado: 'Não Iniciado', em_andamento: 'Em Andamento', pendencia: 'Pendência', pendencia_sanada: 'Pendência Sanada', concluido: 'Concluído' };
 
   const COLUNAS = [
     { key: 'empresa', grupo: 'fixa', label: 'Empresa', padrao: true, fixa: true },

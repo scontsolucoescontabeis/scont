@@ -846,7 +846,7 @@
 
   // ─── AUDITORIA ──────────────────────────────────────────────
 
-  const STATUS_GRADE_LABELS = { nao_iniciado: 'Não Iniciado', em_andamento: 'Em Andamento', pendencia: 'Pendência', concluido: 'Concluído' };
+  const STATUS_GRADE_LABELS = { nao_iniciado: 'Não Iniciado', em_andamento: 'Em Andamento', pendencia: 'Pendência', pendencia_sanada: 'Pendência Sanada', concluido: 'Concluído' };
 
   async function registrarAuditoria(codigoEmpresa, campo, valorAnterior, valorNovo, observacao) {
     const auth = window.__contabilAuth || {};
@@ -1055,9 +1055,22 @@
 
   async function resolverPendencia(codigoEmpresa, ano, mes) {
     if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
-    await transicionarStatusMes(codigoEmpresa, ano, mes, 'pendencia', 'em_andamento', null);
+    await transicionarStatusMes(codigoEmpresa, ano, mes, 'pendencia', 'pendencia_sanada', null);
     const auth = window.__contabilAuth || {};
     enviarAlertaPendenciaResolvida(codigoEmpresa, ano, mes, auth).catch((e) => console.error('Erro ao enviar alerta de pendência sanada:', e));
+  }
+
+  // A partir de "pendencia_sanada" só é permitido seguir para "em_andamento"
+  // ou "concluido" — nunca de volta para "pendencia" (a pendência já foi
+  // resolvida) nem pular pra outro estado; ver abrirPopoverPendenciaSanada.
+  async function voltarParaEmAndamentoDePendenciaSanada(codigoEmpresa, ano, mes) {
+    if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
+    await transicionarStatusMes(codigoEmpresa, ano, mes, 'pendencia_sanada', 'em_andamento', null);
+  }
+
+  async function concluirDePendenciaSanada(codigoEmpresa, ano, mes) {
+    if (statusFechamentoDoMes(codigoEmpresa, ano, mes) === 'aprovado') return;
+    await transicionarStatusMes(codigoEmpresa, ano, mes, 'pendencia_sanada', 'concluido', null);
   }
 
   // Mesmo padrão de enviarAlertaPendencia, para o evento inverso: notifica
@@ -1173,6 +1186,39 @@
     }, 0);
   }
 
+  // ─── POPOVER: escolha Em Andamento/Concluído a partir do azul (pendência já sanada) ──
+
+  function abrirPopoverPendenciaSanada(cel, codigoEmpresa, ano, mes) {
+    fecharPopoverGrade();
+    const pop = document.createElement('div');
+    pop.id = 'popoverGrade';
+    pop.className = 'popover-grade';
+    pop.innerHTML = `
+      <button type="button" class="btn btn-secondary" id="popBtnEmAndamento">🟡 Em Andamento</button>
+      <button type="button" class="btn btn-primary" id="popBtnConcluido">🟢 Marcar Concluído</button>
+    `;
+    pop.addEventListener('click', (ev) => ev.stopPropagation());
+    document.body.appendChild(pop);
+
+    const rect = cel.getBoundingClientRect();
+    pop.style.top = `${rect.bottom + 6}px`;
+    pop.style.left = `${Math.min(Math.max(rect.left + rect.width / 2 - 100, 8), window.innerWidth - 208)}px`;
+
+    pop.querySelector('#popBtnConcluido').addEventListener('click', () => {
+      fecharPopoverGrade();
+      concluirDePendenciaSanada(codigoEmpresa, ano, mes);
+    });
+    pop.querySelector('#popBtnEmAndamento').addEventListener('click', () => {
+      fecharPopoverGrade();
+      voltarParaEmAndamentoDePendenciaSanada(codigoEmpresa, ano, mes);
+    });
+
+    setTimeout(() => {
+      document.addEventListener('click', fecharPopoverGradeAoClicarFora);
+      window.addEventListener('scroll', fecharPopoverGrade, true);
+    }, 0);
+  }
+
   // ─── POPOVER: admin do portal muda o status livremente ──────
   // Só _isAdmin (super-admin do Portal Scont) — não _isScontTeam. Pula
   // pra qualquer status, sem seguir o pipeline normal
@@ -1183,6 +1229,7 @@
     { valor: 'nao_iniciado', label: '⚪ Não Iniciado' },
     { valor: 'em_andamento', label: '🟡 Em Andamento' },
     { valor: 'pendencia', label: '🔴 Pendência' },
+    { valor: 'pendencia_sanada', label: '🔵 Pendência Sanada' },
     { valor: 'concluido', label: '🟢 Concluído' },
   ];
 
@@ -1339,6 +1386,7 @@
         if (status === 'nao_iniciado') { iniciarMes(empresaAtualCodigo, anoGradeAtual, mes); return; }
         if (status === 'em_andamento') { abrirPopoverGrade(cel, empresaAtualCodigo, anoGradeAtual, mes); return; }
         if (status === 'pendencia') { resolverPendencia(empresaAtualCodigo, anoGradeAtual, mes); return; }
+        if (status === 'pendencia_sanada') { abrirPopoverPendenciaSanada(cel, empresaAtualCodigo, anoGradeAtual, mes); return; }
         if (status === 'concluido') { reabrirMes(empresaAtualCodigo, anoGradeAtual, mes); return; }
       });
     });
