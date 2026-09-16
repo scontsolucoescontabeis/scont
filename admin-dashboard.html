@@ -1083,7 +1083,7 @@ document.getElementById('formAprovar').addEventListener('submit', async (e) => {
 
         if (document.getElementById('apNotifWhatsApp').checked && currentSolTelefone) {
             const listaFerrs = ferrsAprovadas.map(f => `• ${f.icone || '🔧'} ${f.nome}`).join('\n');
-            const msgWa = `Olá, ${nome}! 🎉\n\nSeu acesso ao *Portal SCONT* foi *aprovado*!\n\n*Ferramentas liberadas:*\n${listaFerrs}\n\nAcesse o portal em:\n${window.location.origin}/portal.html`;
+            const msgWa = `Olá, ${nome}! 🎉\n\nSeu acesso ao *Portal SCONT* foi *aprovado*!\n\n*Ferramentas liberadas:*\n${listaFerrs}\n\nAcesse o portal em:\n${window.location.href.replace(/admin-dashboard\.html.*$/, 'portal.html')}`;
             const n = currentSolTelefone.replace(/\D/g, '');
             const comDDI = n.startsWith('55') ? n : '55' + n;
             waUrl = `https://wa.me/${comDDI}?text=${encodeURIComponent(msgWa)}`;
@@ -1299,7 +1299,7 @@ document.getElementById('formEditar').addEventListener('submit', async (e) => {
             const listaFerrs = ferrsAtuais.length
                 ? ferrsAtuais.map(f => `• ${f.icone || '🔧'} ${f.nome}`).join('\n')
                 : '(nenhuma ferramenta ativa no momento)';
-            const msgWa = `Olá, ${nome}!\n\nSeus acessos no *Portal SCONT* foram atualizados.\n\n*Ferramentas autorizadas:*\n${listaFerrs}\n\nAcesse o portal em:\n${window.location.origin}/portal.html`;
+            const msgWa = `Olá, ${nome}!\n\nSeus acessos no *Portal SCONT* foram atualizados.\n\n*Ferramentas autorizadas:*\n${listaFerrs}\n\nAcesse o portal em:\n${window.location.href.replace(/admin-dashboard\.html.*$/, 'portal.html')}`;
             const n = currentSolTelefone.replace(/\D/g, '');
             const comDDI = n.startsWith('55') ? n : '55' + n;
             waUrl = `https://wa.me/${comDDI}?text=${encodeURIComponent(msgWa)}`;
