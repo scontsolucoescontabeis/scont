@@ -181,10 +181,26 @@ CREATE POLICY "solicitacoes: admin deleta"
 -- 5.3 ferramentas
 ALTER TABLE public.ferramentas ENABLE ROW LEVEL SECURITY;
 
+-- Autenticado lê ferramentas ativas, OU ferramentas inativas às quais já tem
+-- acesso concedido (necessário para o guard de autenticação resolver o
+-- url_base de ferramentas "soft-deactivated" que viraram cards dentro de um
+-- hub — ex.: Folha de Ponto, Lançamentos etc. dentro do hub Departamento
+-- Pessoal. A tela principal do portal já filtra `ativa` no próprio código
+-- JS, então isso não faz ferramentas inativas reaparecerem na grade.
 DROP POLICY IF EXISTS "ferramentas: autenticado lê ativas" ON public.ferramentas;
 CREATE POLICY "ferramentas: autenticado lê ativas"
     ON public.ferramentas FOR SELECT
-    USING (auth.role() = 'authenticated' AND ativa = TRUE);
+    USING (
+        auth.role() = 'authenticated' AND (
+            ativa = TRUE
+            OR id IN (
+                SELECT ferramenta_id FROM public.usuario_ferramentas
+                WHERE usuario_id IN (
+                    SELECT id FROM public.solicitacoes_acesso WHERE email = auth.email()
+                )
+            )
+        )
+    );
 
 DROP POLICY IF EXISTS "ferramentas: admin gerencia" ON public.ferramentas;
 CREATE POLICY "ferramentas: admin gerencia"
