@@ -143,6 +143,8 @@
     background:var(--bg-light); border:1px solid var(--border); border-radius:var(--radius-sm);
     padding:8px 10px; font-size:.85rem; color:var(--text); font-family:inherit; max-width:280px;
   }
+  .toolbar-label{font-size:.79rem; color:var(--text-light); font-weight:600; white-space:nowrap;}
+  .columns-row{padding-top:10px; border-top:1px dashed var(--border);}
   .chips{display:flex; flex-wrap:wrap; gap:7px;}
   .chip{
     border:1px solid var(--border); background:var(--bg-light); color:var(--text-light);
@@ -208,6 +210,12 @@
   .badge.off{background:#F3E4E4; color:#8B3A3A;}
   .badge .bar-dot{width:7px; height:7px;}
   td.empty-state{padding:40px 12px; text-align:center; color:var(--muted); font-size:.9rem;}
+
+  .comparativo-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media (max-width:760px){ .comparativo-grid{grid-template-columns:1fr;} }
+  .comparativo-title{font-size:.83rem; font-weight:700; color:var(--secondary); margin:0 0 8px;}
+  .comparativo-grid .table-scroll{border:1px solid var(--border); border-radius:var(--radius-sm); overflow:hidden; max-height:340px; overflow-y:auto;}
+  .comparativo-grid thead th{position:sticky; top:0;}
 
   .foot{font-size:.78rem; color:var(--muted); text-align:center; padding-top:4px;}
   .data-status{
@@ -356,6 +364,10 @@
               </select>
             </div>
             <div class="toolbar-row chips" id="category-chips"></div>
+            <div class="toolbar-row columns-row">
+              <span class="toolbar-label">Colunas do relatório (PDF/Excel):</span>
+              <div class="chips" id="report-columns-chips"></div>
+            </div>
             <div class="toolbar-foot">
               <span id="result-count"></span>
               <div class="export-actions">
@@ -424,6 +436,48 @@
               </table>
             </div>
           </section>
+
+          <section class="breakdown" aria-label="Comparativo entre 2025 e 2026" style="padding:18px 20px 20px;">
+            <h2>Comparativo 2025 × 2026</h2>
+            <p class="lede" style="margin-bottom:14px;">Empresas que tiveram reajuste em apenas um dos dois anos — quem <strong>teve em 2025 e parou em 2026</strong>, e quem <strong>começou a reajustar em 2026</strong> sem ter tido em 2025. Ignora o filtro de ano acima (compara sempre os dois anos entre si).</p>
+            <div class="toolbar-foot" style="margin-bottom:12px;">
+              <span id="comparativo-count"></span>
+              <div class="export-actions">
+                <button id="export-comparativo-pdf" class="btn-export" type="button">📄 PDF</button>
+                <button id="export-comparativo-xlsx" class="btn-export" type="button">📊 Excel</button>
+              </div>
+            </div>
+            <div class="comparativo-grid">
+              <div>
+                <h3 class="comparativo-title">Teve reajuste em 2025, não em 2026 (<span id="comp-2025-count">0</span>)</h3>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr>
+                      <th class="plain">Empresa</th>
+                      <th class="plain">CNPJ</th>
+                      <th class="plain">Código</th>
+                      <th class="plain">Situação</th>
+                    </tr></thead>
+                    <tbody id="comp-2025-body"></tbody>
+                  </table>
+                </div>
+              </div>
+              <div>
+                <h3 class="comparativo-title">Teve reajuste em 2026, não em 2025 (<span id="comp-2026-count">0</span>)</h3>
+                <div class="table-scroll">
+                  <table>
+                    <thead><tr>
+                      <th class="plain">Empresa</th>
+                      <th class="plain">CNPJ</th>
+                      <th class="plain">Código</th>
+                      <th class="plain">Situação</th>
+                    </tr></thead>
+                    <tbody id="comp-2026-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
         </section>
 
       </div>
@@ -447,6 +501,21 @@
   ];
   var catInfo = {};
   CATS.forEach(function(c){ catInfo[c.key] = c; });
+
+  // Colunas disponíveis no relatório de Reajustes (PDF/Excel) — o usuário escolhe quais entram.
+  var REAJUSTES_COLUMNS = [
+    {key:"en", label:"Empresa"},
+    {key:"fn", label:"Empregado"},
+    {key:"fc", label:"Código"},
+    {key:"dt", label:"Data"},
+    {key:"cat", label:"Categoria"},
+    {key:"mo", label:"Motivo"},
+    {key:"sa", label:"Sal. anterior"},
+    {key:"ns", label:"Novo salário"},
+    {key:"pc", label:"Δ%"}
+  ];
+  var REAJUSTES_COLUMNS_DEFAULT = {};
+  REAJUSTES_COLUMNS.forEach(function(c){ REAJUSTES_COLUMNS_DEFAULT[c.key] = true; });
 
   var PAGE_MAP = {
     "dashboard": ["Dashboard", "Visão geral dos reajustes salariais"],
@@ -484,7 +553,8 @@
     q:"", empresa:"", categoria:"", ano:"", sortKey:"dt", sortDir:"desc",
     incluirEmpresasInativas:false, incluirEmpregadosInativos:false,
     semReajusteAno:"",
-    resumoQ:"", resumoAno:"", resumoCategoria:"", resumoSortKey:"reajustes", resumoSortDir:"desc"
+    resumoQ:"", resumoAno:"", resumoCategoria:"", resumoSortKey:"reajustes", resumoSortDir:"desc",
+    reajustesCols: Object.assign({}, REAJUSTES_COLUMNS_DEFAULT)
   };
 
   // ---------- escopo (respeita os dois toggles globais) ----------
@@ -591,6 +661,35 @@
   }
   function toggleCategoria(cat){
     setCategoria(state.categoria === cat ? "" : cat);
+  }
+
+  // ---------- colunas do relatório (PDF/Excel) ----------
+  function renderReportColumnsChips(){
+    var el = document.getElementById("report-columns-chips");
+    el.innerHTML = REAJUSTES_COLUMNS.map(function(c){
+      var active = state.reajustesCols[c.key] ? " is-active" : "";
+      return '<button type="button" class="chip' + active + '" data-col="' + esc(c.key) + '">' + esc(c.label) + '</button>';
+    }).join("");
+    el.querySelectorAll(".chip").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var key = btn.getAttribute("data-col");
+        state.reajustesCols[key] = !state.reajustesCols[key];
+        btn.classList.toggle("is-active", state.reajustesCols[key]);
+      });
+    });
+  }
+  function selectedReajustesColumns(){
+    return REAJUSTES_COLUMNS.filter(function(c){ return state.reajustesCols[c.key]; });
+  }
+  function reajustesColValuePdf(d, key){
+    if(key === "sa") return fmtMoney(d.sa);
+    if(key === "ns") return fmtMoney(d.ns);
+    if(key === "pc") return fmtPct(d.pc);
+    return d[key];
+  }
+  function reajustesColValueXlsx(d, key){
+    if(key === "sa" || key === "ns" || key === "pc") return d[key] != null ? d[key] : "";
+    return d[key];
   }
 
   // ---------- tabela de reajustes ----------
@@ -703,6 +802,50 @@
     }
   }
 
+  // ---------- comparativo 2025 x 2026 (empresas que reajustaram em só um dos anos) ----------
+  function computeComparativoAnos(){
+    var universo = EMPRESAS_ALL.filter(function(e){
+      return state.incluirEmpresasInativas || empresaAtiva(e.status_situacao);
+    });
+    var com2025 = {}, com2026 = {};
+    scopedData().forEach(function(d){
+      if(d.an === "2025") com2025[String(d.ec)] = true;
+      if(d.an === "2026") com2026[String(d.ec)] = true;
+    });
+    function porNome(a, b){ return (a.nome_empresa || "").localeCompare(b.nome_empresa || "", "pt-BR"); }
+    var so2025 = universo.filter(function(e){
+      return com2025[String(e.codigo_empresa)] && !com2026[String(e.codigo_empresa)];
+    }).sort(porNome);
+    var so2026 = universo.filter(function(e){
+      return com2026[String(e.codigo_empresa)] && !com2025[String(e.codigo_empresa)];
+    }).sort(porNome);
+    return { so2025: so2025, so2026: so2026 };
+  }
+
+  function renderComparativo(){
+    var comp = computeComparativoAnos();
+
+    document.getElementById("comp-2025-count").textContent = comp.so2025.length.toLocaleString("pt-BR");
+    document.getElementById("comp-2026-count").textContent = comp.so2026.length.toLocaleString("pt-BR");
+    document.getElementById("comparativo-count").textContent =
+      comp.so2025.length.toLocaleString("pt-BR") + " empresa(s) só em 2025  ·  " + comp.so2026.length.toLocaleString("pt-BR") + " empresa(s) só em 2026";
+
+    function renderBody(elId, list, msgVazio){
+      var tbody = document.getElementById(elId);
+      if(list.length === 0){
+        tbody.innerHTML = '<tr><td class="empty-state" colspan="4">' + msgVazio + '</td></tr>';
+        return;
+      }
+      tbody.innerHTML = list.map(function(e){
+        var ativa = empresaAtiva(e.status_situacao);
+        var badge = ativa ? '<span class="badge ok">Ativa</span>' : '<span class="badge off">Inativa</span>';
+        return '<tr><td class="cell-emp">' + esc(e.nome_empresa) + '</td><td class="mono">' + esc(e.cnpj || "—") + '</td><td class="mono">' + esc(e.codigo_empresa) + '</td><td>' + badge + '</td></tr>';
+      }).join("");
+    }
+    renderBody("comp-2025-body", comp.so2025, "Nenhuma empresa reajustou só em 2025.");
+    renderBody("comp-2026-body", comp.so2026, "Nenhuma empresa reajustou só em 2026.");
+  }
+
   // ---------- resumo gerencial por empresa (dashboard) ----------
   function computeResumoPorEmpresa(){
     var base = scopedData().filter(function(d){
@@ -791,6 +934,7 @@
     initSummary();
     renderTable();
     renderSemReajuste();
+    renderComparativo();
     renderResumo();
   }
 
@@ -882,11 +1026,11 @@
 
   function bindExportEvents(){
     document.getElementById("export-reajustes-pdf").addEventListener("click", function(){
+      var cols = selectedReajustesColumns();
+      if(cols.length === 0){ alert("Selecione pelo menos uma coluna em \"Colunas do relatório\" antes de exportar."); return; }
       var rows = sortForReport(getFiltered());
-      var head = ["Empresa","Empregado","Código","Data","Categoria","Motivo","Sal. anterior","Novo salário","Δ%"];
-      var body = rows.map(function(d){
-        return [d.en, d.fn, d.fc, d.dt, d.cat, d.mo, fmtMoney(d.sa), fmtMoney(d.ns), fmtPct(d.pc)];
-      });
+      var head = cols.map(function(c){ return c.label; });
+      var body = rows.map(function(d){ return cols.map(function(c){ return reajustesColValuePdf(d, c.key); }); });
       var headerRight = "Motivo: " + motivoLabel(state.categoria) + "   ·   Ano: " + (state.ano || "Todos");
       var filtros = [
         "Filtros — Empresa: " + (state.empresa || "Todas") + (state.q ? ("  ·  Busca: \"" + state.q + "\"") : ""),
@@ -895,11 +1039,11 @@
       exportRowsToPdf("Reajustes salariais — " + rows.length.toLocaleString("pt-BR") + " registro(s)", headerRight, filtros, head, body, "reajustes_" + todayStamp() + ".pdf", "landscape");
     });
     document.getElementById("export-reajustes-xlsx").addEventListener("click", function(){
+      var cols = selectedReajustesColumns();
+      if(cols.length === 0){ alert("Selecione pelo menos uma coluna em \"Colunas do relatório\" antes de exportar."); return; }
       var rows = sortForReport(getFiltered());
-      var head = ["Empresa","Empregado","Código","Data","Categoria","Motivo","Salário anterior","Novo salário","Variação %"];
-      var body = rows.map(function(d){
-        return [d.en, d.fn, d.fc, d.dt, d.cat, d.mo, d.sa != null ? d.sa : "", d.ns != null ? d.ns : "", d.pc != null ? d.pc : ""];
-      });
+      var head = cols.map(function(c){ return c.label; });
+      var body = rows.map(function(d){ return cols.map(function(c){ return reajustesColValueXlsx(d, c.key); }); });
       exportRowsToExcel("Reajustes", head, body, "reajustes_" + todayStamp() + ".xlsx");
     });
 
@@ -946,6 +1090,31 @@
         return [r.en, r.empregados, r.reajustes, Math.round(r.cctPct * 10) / 10, r.avgPct === null ? "" : Math.round(r.avgPct * 10) / 10, Math.round(r.impacto * 100) / 100];
       });
       exportRowsToExcel("Resumo por empresa", head, body, "resumo_por_empresa_" + todayStamp() + ".xlsx");
+    });
+
+    function comparativoRows(comp){
+      return comp.so2025.map(function(e){
+        return ["Só em 2025 (parou em 2026)", e.nome_empresa || "", e.cnpj || "", e.codigo_empresa, empresaAtiva(e.status_situacao) ? "Ativa" : "Inativa"];
+      }).concat(comp.so2026.map(function(e){
+        return ["Só em 2026 (não tinha em 2025)", e.nome_empresa || "", e.cnpj || "", e.codigo_empresa, empresaAtiva(e.status_situacao) ? "Ativa" : "Inativa"];
+      }));
+    }
+    document.getElementById("export-comparativo-pdf").addEventListener("click", function(){
+      var comp = computeComparativoAnos();
+      var head = ["Situação","Empresa","CNPJ","Código","Ativa?"];
+      var body = comparativoRows(comp);
+      var headerRight = "Comparativo 2025 × 2026";
+      var filtros = [
+        "Filtros — Só em 2025: " + comp.so2025.length.toLocaleString("pt-BR") + " empresa(s)  ·  Só em 2026: " + comp.so2026.length.toLocaleString("pt-BR") + " empresa(s)",
+        "Escopo — " + (state.incluirEmpresasInativas ? "inclui empresas inativas" : "só empresas ativas") + "  ·  Classificado por Empresa"
+      ];
+      exportRowsToPdf("Comparativo de reajustes — 2025 × 2026", headerRight, filtros, head, body, "comparativo_2025_2026_" + todayStamp() + ".pdf", "portrait");
+    });
+    document.getElementById("export-comparativo-xlsx").addEventListener("click", function(){
+      var comp = computeComparativoAnos();
+      var head = ["Situação","Empresa","CNPJ","Código","Ativa?"];
+      var body = comparativoRows(comp);
+      exportRowsToExcel("Comparativo 2025x2026", head, body, "comparativo_2025_2026_" + todayStamp() + ".xlsx");
     });
   }
 
@@ -996,6 +1165,8 @@
   }
 
   function bindEvents(){
+    renderReportColumnsChips();
+
     var searchTimer;
     document.getElementById("search").addEventListener("input", function(e){
       clearTimeout(searchTimer);
