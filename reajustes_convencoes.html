@@ -302,6 +302,14 @@
             <h2>Resumo por empresa</h2>
             <div class="toolbar-row" style="margin-bottom:12px;">
               <input id="resumo-search" type="search" placeholder="Buscar empresa…" aria-label="Buscar empresa no resumo">
+              <select id="resumo-categoria-select" aria-label="Filtrar resumo por motivo">
+                <option value="">Todos os motivos</option>
+                <option value="CCT">Convenção Coletiva (CCT)</option>
+                <option value="Piso/Salário Mínimo">Piso / Salário mínimo</option>
+                <option value="A pedido do cliente">A pedido do cliente</option>
+                <option value="Importação eSocial">Importação eSocial</option>
+                <option value="Outros">Outros</option>
+              </select>
               <select id="resumo-ano-select" aria-label="Filtrar resumo por ano">
                 <option value="">Todos os anos</option>
                 <option value="2025">2025</option>
@@ -476,7 +484,7 @@
     q:"", empresa:"", categoria:"", ano:"", sortKey:"dt", sortDir:"desc",
     incluirEmpresasInativas:false, incluirEmpregadosInativos:false,
     semReajusteAno:"",
-    resumoQ:"", resumoAno:"", resumoSortKey:"reajustes", resumoSortDir:"desc"
+    resumoQ:"", resumoAno:"", resumoCategoria:"", resumoSortKey:"reajustes", resumoSortDir:"desc"
   };
 
   // ---------- escopo (respeita os dois toggles globais) ----------
@@ -698,7 +706,9 @@
   // ---------- resumo gerencial por empresa (dashboard) ----------
   function computeResumoPorEmpresa(){
     var base = scopedData().filter(function(d){
-      return !state.resumoAno || d.an === state.resumoAno;
+      if(state.resumoAno && d.an !== state.resumoAno) return false;
+      if(state.resumoCategoria && d.cat !== state.resumoCategoria) return false;
+      return true;
     });
     var porEmpresa = {};
     base.forEach(function(d){
@@ -746,8 +756,10 @@
   function renderResumo(){
     var rows = getResumoRowsFiltered();
 
+    var periodoTxt = state.resumoAno ? (" em " + state.resumoAno) : " no período";
+    var motivoTxt = state.resumoCategoria ? (", motivo: " + (catInfo[state.resumoCategoria] ? catInfo[state.resumoCategoria].label : state.resumoCategoria)) : "";
     document.getElementById("resumo-count").textContent =
-      "Mostrando " + rows.length.toLocaleString("pt-BR") + " empresa(s) com reajuste" + (state.resumoAno ? (" em " + state.resumoAno) : " no período");
+      "Mostrando " + rows.length.toLocaleString("pt-BR") + " empresa(s) com reajuste" + periodoTxt + motivoTxt;
 
     var tbody = document.getElementById("resumo-body");
     if(rows.length === 0){
@@ -789,24 +801,37 @@
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   }
 
-  function exportRowsToPdf(title, head, bodyRows, filename, orientation){
+  function exportRowsToPdf(title, filtroLines, head, bodyRows, filename, orientation){
     var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
     if(!jsPDFCtor){ alert("Biblioteca de PDF não carregou. Recarregue a página e tente novamente."); return; }
     var doc = new jsPDFCtor({ unit:"mm", format:"a4", orientation: orientation || "landscape" });
     var pageW = doc.internal.pageSize.getWidth();
     var MARGEM = 10;
+    var usableW = pageW - MARGEM * 2 - 8;
     doc.setFillColor(139, 58, 58);
     doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, 14, 2, 2, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(12);
     doc.text(title, MARGEM + 4, MARGEM + 9);
-    doc.setTextColor(44, 62, 80);
-    doc.setFontSize(8);
-    doc.text("Gerado em " + new Date().toLocaleString("pt-BR"), MARGEM + 4, MARGEM + 14 + 5);
+
+    var y = MARGEM + 14 + 5;
+    doc.setFontSize(7.6);
+    (filtroLines || []).forEach(function(line){
+      doc.setTextColor(90, 108, 125);
+      var wrapped = doc.splitTextToSize(line, usableW);
+      wrapped.forEach(function(wline){
+        doc.text(wline, MARGEM + 4, y);
+        y += 3.6;
+      });
+    });
+    doc.setTextColor(139, 58, 58);
+    doc.text("Gerado em " + new Date().toLocaleString("pt-BR"), MARGEM + 4, y);
+    y += 4.5;
+
     doc.autoTable({
       head: [head],
       body: bodyRows,
-      startY: MARGEM + 14 + 8,
+      startY: y,
       margin: { left: MARGEM, right: MARGEM },
       styles: { fontSize: 7.5, cellPadding: 1.6, textColor: [44, 62, 80] },
       headStyles: { fillColor: [139, 58, 58], textColor: 255 },
@@ -823,17 +848,46 @@
     XLSX.writeFile(wb, filename);
   }
 
+  function escopoLabel(){
+    return (state.incluirEmpresasInativas ? "empresas ativas e inativas" : "só empresas ativas") +
+      "  ·  " + (state.incluirEmpregadosInativos ? "empregados ativos e inativos" : "só empregados ativos");
+  }
+  function motivoLabel(cat){
+    if(!cat) return "Todos";
+    return catInfo[cat] ? catInfo[cat].label : cat;
+  }
+  // Todo relatório (tela ou exportado) sai classificado por Empresa > Empregado > Ano,
+  // independente da ordenação de coluna que o usuário tenha clicado na tabela.
+  function sortForReport(rows){
+    return rows.slice().sort(function(a,b){
+      var byEmpresa = (a.en || "").localeCompare(b.en || "", "pt-BR");
+      if(byEmpresa !== 0) return byEmpresa;
+      var byEmpregado = (a.fn || "").localeCompare(b.fn || "", "pt-BR");
+      if(byEmpregado !== 0) return byEmpregado;
+      return (a.an || "").localeCompare(b.an || "");
+    });
+  }
+  function sortByEmpresa(rows, key){
+    key = key || "en";
+    return rows.slice().sort(function(a,b){ return (a[key] || "").localeCompare(b[key] || "", "pt-BR"); });
+  }
+
   function bindExportEvents(){
     document.getElementById("export-reajustes-pdf").addEventListener("click", function(){
-      var rows = sortRows(getFiltered());
+      var rows = sortForReport(getFiltered());
       var head = ["Empresa","Empregado","Código","Data","Categoria","Motivo","Sal. anterior","Novo salário","Δ%"];
       var body = rows.map(function(d){
         return [d.en, d.fn, d.fc, d.dt, d.cat, d.mo, fmtMoney(d.sa), fmtMoney(d.ns), fmtPct(d.pc)];
       });
-      exportRowsToPdf("Reajustes salariais — " + rows.length.toLocaleString("pt-BR") + " registro(s)", head, body, "reajustes_" + todayStamp() + ".pdf", "landscape");
+      var filtros = [
+        "Filtros — Motivo: " + motivoLabel(state.categoria) + "  ·  Ano: " + (state.ano || "Todos") +
+          "  ·  Empresa: " + (state.empresa || "Todas") + (state.q ? ("  ·  Busca: \"" + state.q + "\"") : ""),
+        "Escopo — " + escopoLabel() + "  ·  Classificado por Empresa / Empregado / Ano"
+      ];
+      exportRowsToPdf("Reajustes salariais — " + rows.length.toLocaleString("pt-BR") + " registro(s)", filtros, head, body, "reajustes_" + todayStamp() + ".pdf", "landscape");
     });
     document.getElementById("export-reajustes-xlsx").addEventListener("click", function(){
-      var rows = sortRows(getFiltered());
+      var rows = sortForReport(getFiltered());
       var head = ["Empresa","Empregado","Código","Data","Categoria","Motivo","Salário anterior","Novo salário","Variação %"];
       var body = rows.map(function(d){
         return [d.en, d.fn, d.fc, d.dt, d.cat, d.mo, d.sa != null ? d.sa : "", d.ns != null ? d.ns : "", d.pc != null ? d.pc : ""];
@@ -842,16 +896,21 @@
     });
 
     document.getElementById("export-sem-reajuste-pdf").addEventListener("click", function(){
-      var visiveis = computeSemReajusteList().visiveis;
+      var visiveis = sortByEmpresa(computeSemReajusteList().visiveis, "nome_empresa");
       var periodo = state.semReajusteAno ? ("em " + state.semReajusteAno) : "no período 2025–2026";
       var head = ["Empresa","CNPJ","Código","Situação"];
       var body = visiveis.map(function(e){
         return [e.nome_empresa || "", e.cnpj || "—", e.codigo_empresa, empresaAtiva(e.status_situacao) ? "Ativa" : "Inativa"];
       });
-      exportRowsToPdf("Empresas sem reajuste " + periodo + " — " + visiveis.length.toLocaleString("pt-BR") + " empresa(s)", head, body, "empresas_sem_reajuste_" + todayStamp() + ".pdf", "portrait");
+      var filtros = [
+        "Filtros — Ano: " + (state.semReajusteAno || "Todo o período (2025–2026)") +
+          (document.getElementById("sem-reajuste-search").value ? ("  ·  Busca: \"" + document.getElementById("sem-reajuste-search").value + "\"") : ""),
+        "Escopo — " + (state.incluirEmpresasInativas ? "inclui empresas inativas" : "só empresas ativas") + "  ·  Classificado por Empresa"
+      ];
+      exportRowsToPdf("Empresas sem reajuste " + periodo + " — " + visiveis.length.toLocaleString("pt-BR") + " empresa(s)", filtros, head, body, "empresas_sem_reajuste_" + todayStamp() + ".pdf", "portrait");
     });
     document.getElementById("export-sem-reajuste-xlsx").addEventListener("click", function(){
-      var visiveis = computeSemReajusteList().visiveis;
+      var visiveis = sortByEmpresa(computeSemReajusteList().visiveis, "nome_empresa");
       var head = ["Empresa","CNPJ","Código","Situação"];
       var body = visiveis.map(function(e){
         return [e.nome_empresa || "", e.cnpj || "", e.codigo_empresa, empresaAtiva(e.status_situacao) ? "Ativa" : "Inativa"];
@@ -860,15 +919,20 @@
     });
 
     document.getElementById("export-resumo-pdf").addEventListener("click", function(){
-      var rows = getResumoRowsFiltered();
+      var rows = sortByEmpresa(getResumoRowsFiltered(), "en");
       var head = ["Empresa","Empregados","Reajustes","% CCT","Aumento médio","Impacto (R$)"];
       var body = rows.map(function(r){
         return [r.en, r.empregados, r.reajustes, Math.round(r.cctPct) + "%", fmtPct(r.avgPct === null ? null : Math.round(r.avgPct * 10) / 10), fmtMoney(r.impacto)];
       });
-      exportRowsToPdf("Resumo gerencial por empresa — " + rows.length.toLocaleString("pt-BR") + " empresa(s)", head, body, "resumo_por_empresa_" + todayStamp() + ".pdf", "landscape");
+      var filtros = [
+        "Filtros — Motivo: " + motivoLabel(state.resumoCategoria) + "  ·  Ano: " + (state.resumoAno || "Todos") +
+          (state.resumoQ ? ("  ·  Busca: \"" + state.resumoQ + "\"") : ""),
+        "Escopo — " + escopoLabel() + "  ·  Classificado por Empresa"
+      ];
+      exportRowsToPdf("Resumo gerencial por empresa — " + rows.length.toLocaleString("pt-BR") + " empresa(s)", filtros, head, body, "resumo_por_empresa_" + todayStamp() + ".pdf", "landscape");
     });
     document.getElementById("export-resumo-xlsx").addEventListener("click", function(){
-      var rows = getResumoRowsFiltered();
+      var rows = sortByEmpresa(getResumoRowsFiltered(), "en");
       var head = ["Empresa","Empregados","Reajustes","% CCT","Aumento médio (%)","Impacto (R$)"];
       var body = rows.map(function(r){
         return [r.en, r.empregados, r.reajustes, Math.round(r.cctPct * 10) / 10, r.avgPct === null ? "" : Math.round(r.avgPct * 10) / 10, Math.round(r.impacto * 100) / 100];
@@ -991,6 +1055,9 @@
     });
     document.getElementById("resumo-ano-select").addEventListener("change", function(e){
       state.resumoAno = e.target.value; renderResumo();
+    });
+    document.getElementById("resumo-categoria-select").addEventListener("change", function(e){
+      state.resumoCategoria = e.target.value; renderResumo();
     });
     document.querySelectorAll("#page-dashboard thead th[data-rkey]").forEach(function(th){
       th.querySelector("button").addEventListener("click", function(){
