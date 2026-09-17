@@ -47,6 +47,9 @@
   .nav button span:first-child{font-size:17px; flex-shrink:0; width:20px; text-align:center;}
   .nav button:hover{background:rgba(255,255,255,.12); color:#fff;}
   .nav button.active{background:rgba(255,255,255,.18); color:#fff; font-weight:700; box-shadow:inset 3px 0 0 rgba(255,255,255,.8);}
+  .nav button.nav-sub{padding-left:30px; font-size:12.5px;}
+  .nav button.nav-sub span:first-child{font-size:14px; width:16px;}
+  .sidebar.collapsed .nav button.nav-sub{padding-left:12px;}
   .sidebar.collapsed .nav button span:last-child, .sidebar.collapsed .sidebar-footer, .sidebar.collapsed .brand span:last-child{display:none;}
   .sidebar-portal{padding:10px 10px 0; border-top:1px solid rgba(255,255,255,.12);}
   .btn-portal{
@@ -246,6 +249,7 @@
       <button class="active" data-page="dashboard"><span>📊</span><span>Dashboard</span></button>
       <button data-page="reajustes"><span>💰</span><span>Reajustes</span></button>
       <button data-page="sem-reajuste"><span>🚫</span><span>Sem reajuste</span></button>
+      <button data-page="comparativo" class="nav-sub"><span>📈</span><span>Comparativo 2025×2026</span></button>
     </nav>
     <div class="sidebar-portal">
       <button class="btn-portal" type="button" onclick="window.location.href='portal.html'"><span>🏠</span><span>Voltar ao Portal</span></button>
@@ -403,7 +407,7 @@
 
         <!-- ===================== SEM REAJUSTE ===================== -->
         <section class="screen" id="page-sem-reajuste">
-          <p class="lede">Empresas cadastradas (rh_empresas) que <strong>não tiveram nenhum reajuste</strong> de empregado no ano selecionado, dentro do escopo atual (toggles no topo). Por padrão considera só empresas ativas.</p>
+          <p class="lede">Empresas cadastradas (rh_empresas) que <strong>não tiveram nenhum reajuste</strong> de empregado no ano selecionado, dentro do escopo atual (toggles no topo). Por padrão considera só empresas ativas. Veja também a subtela <strong>Comparativo 2025×2026</strong> no menu ao lado.</p>
 
           <section class="toolbar" aria-label="Buscar empresa sem reajuste">
             <div class="toolbar-row">
@@ -437,9 +441,13 @@
             </div>
           </section>
 
+        </section>
+
+        <!-- ===================== COMPARATIVO 2025x2026 (subtela de Sem reajuste) ===================== -->
+        <section class="screen" id="page-comparativo">
+          <p class="lede">Empresas que tiveram reajuste em <strong>apenas um dos dois anos</strong> — quem <strong>teve em 2025 e parou em 2026</strong>, e quem <strong>começou a reajustar em 2026</strong> sem ter tido em 2025. Compara sempre os dois anos entre si, independente de outros filtros.</p>
+
           <section class="breakdown" aria-label="Comparativo entre 2025 e 2026" style="padding:18px 20px 20px;">
-            <h2>Comparativo 2025 × 2026</h2>
-            <p class="lede" style="margin-bottom:14px;">Empresas que tiveram reajuste em apenas um dos dois anos — quem <strong>teve em 2025 e parou em 2026</strong>, e quem <strong>começou a reajustar em 2026</strong> sem ter tido em 2025. Ignora o filtro de ano acima (compara sempre os dois anos entre si).</p>
             <div class="toolbar-foot" style="margin-bottom:12px;">
               <span id="comparativo-count"></span>
               <div class="export-actions">
@@ -520,7 +528,8 @@
   var PAGE_MAP = {
     "dashboard": ["Dashboard", "Visão geral dos reajustes salariais"],
     "reajustes": ["Reajustes", "Todos os eventos de reajuste, com filtros e ordenação"],
-    "sem-reajuste": ["Sem reajuste", "Empresas sem nenhum reajuste de empregado no período"]
+    "sem-reajuste": ["Sem reajuste", "Empresas sem nenhum reajuste de empregado no período"],
+    "comparativo": ["Comparativo 2025×2026", "Empresas que reajustaram em só um dos dois anos"]
   };
 
   function fmtMoney(v){
