@@ -801,20 +801,28 @@
     return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
   }
 
-  function exportRowsToPdf(title, filtroLines, head, bodyRows, filename, orientation){
+  function exportRowsToPdf(title, headerRight, filtroLines, head, bodyRows, filename, orientation){
     var jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
     if(!jsPDFCtor){ alert("Biblioteca de PDF não carregou. Recarregue a página e tente novamente."); return; }
     var doc = new jsPDFCtor({ unit:"mm", format:"a4", orientation: orientation || "landscape" });
     var pageW = doc.internal.pageSize.getWidth();
     var MARGEM = 10;
+    var bannerH = 14;
     var usableW = pageW - MARGEM * 2 - 8;
     doc.setFillColor(139, 58, 58);
-    doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, 14, 2, 2, "F");
+    doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, bannerH, 2, 2, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(12);
-    doc.text(title, MARGEM + 4, MARGEM + 9);
+    doc.setFont(undefined, "bold");
+    doc.text(title, MARGEM + 4, MARGEM + 7);
+    // motivo/ano em destaque no canto inferior direito do título, para leitura rápida no papel
+    if(headerRight){
+      doc.setFontSize(9.5);
+      doc.text(headerRight, pageW - MARGEM - 4, MARGEM + bannerH - 3, { align: "right" });
+    }
+    doc.setFont(undefined, "normal");
 
-    var y = MARGEM + 14 + 5;
+    var y = MARGEM + bannerH + 5;
     doc.setFontSize(7.6);
     (filtroLines || []).forEach(function(line){
       doc.setTextColor(90, 108, 125);
@@ -879,12 +887,12 @@
       var body = rows.map(function(d){
         return [d.en, d.fn, d.fc, d.dt, d.cat, d.mo, fmtMoney(d.sa), fmtMoney(d.ns), fmtPct(d.pc)];
       });
+      var headerRight = "Motivo: " + motivoLabel(state.categoria) + "   ·   Ano: " + (state.ano || "Todos");
       var filtros = [
-        "Filtros — Motivo: " + motivoLabel(state.categoria) + "  ·  Ano: " + (state.ano || "Todos") +
-          "  ·  Empresa: " + (state.empresa || "Todas") + (state.q ? ("  ·  Busca: \"" + state.q + "\"") : ""),
+        "Filtros — Empresa: " + (state.empresa || "Todas") + (state.q ? ("  ·  Busca: \"" + state.q + "\"") : ""),
         "Escopo — " + escopoLabel() + "  ·  Classificado por Empresa / Empregado / Ano"
       ];
-      exportRowsToPdf("Reajustes salariais — " + rows.length.toLocaleString("pt-BR") + " registro(s)", filtros, head, body, "reajustes_" + todayStamp() + ".pdf", "landscape");
+      exportRowsToPdf("Reajustes salariais — " + rows.length.toLocaleString("pt-BR") + " registro(s)", headerRight, filtros, head, body, "reajustes_" + todayStamp() + ".pdf", "landscape");
     });
     document.getElementById("export-reajustes-xlsx").addEventListener("click", function(){
       var rows = sortForReport(getFiltered());
@@ -902,12 +910,12 @@
       var body = visiveis.map(function(e){
         return [e.nome_empresa || "", e.cnpj || "—", e.codigo_empresa, empresaAtiva(e.status_situacao) ? "Ativa" : "Inativa"];
       });
+      var headerRight = "Ano: " + (state.semReajusteAno || "Todo o período");
       var filtros = [
-        "Filtros — Ano: " + (state.semReajusteAno || "Todo o período (2025–2026)") +
-          (document.getElementById("sem-reajuste-search").value ? ("  ·  Busca: \"" + document.getElementById("sem-reajuste-search").value + "\"") : ""),
+        "Filtros —" + (document.getElementById("sem-reajuste-search").value ? (" Busca: \"" + document.getElementById("sem-reajuste-search").value + "\"") : " nenhum adicional"),
         "Escopo — " + (state.incluirEmpresasInativas ? "inclui empresas inativas" : "só empresas ativas") + "  ·  Classificado por Empresa"
       ];
-      exportRowsToPdf("Empresas sem reajuste " + periodo + " — " + visiveis.length.toLocaleString("pt-BR") + " empresa(s)", filtros, head, body, "empresas_sem_reajuste_" + todayStamp() + ".pdf", "portrait");
+      exportRowsToPdf("Empresas sem reajuste " + periodo + " — " + visiveis.length.toLocaleString("pt-BR") + " empresa(s)", headerRight, filtros, head, body, "empresas_sem_reajuste_" + todayStamp() + ".pdf", "portrait");
     });
     document.getElementById("export-sem-reajuste-xlsx").addEventListener("click", function(){
       var visiveis = sortByEmpresa(computeSemReajusteList().visiveis, "nome_empresa");
@@ -924,12 +932,12 @@
       var body = rows.map(function(r){
         return [r.en, r.empregados, r.reajustes, Math.round(r.cctPct) + "%", fmtPct(r.avgPct === null ? null : Math.round(r.avgPct * 10) / 10), fmtMoney(r.impacto)];
       });
+      var headerRight = "Motivo: " + motivoLabel(state.resumoCategoria) + "   ·   Ano: " + (state.resumoAno || "Todos");
       var filtros = [
-        "Filtros — Motivo: " + motivoLabel(state.resumoCategoria) + "  ·  Ano: " + (state.resumoAno || "Todos") +
-          (state.resumoQ ? ("  ·  Busca: \"" + state.resumoQ + "\"") : ""),
+        "Filtros —" + (state.resumoQ ? (" Busca: \"" + state.resumoQ + "\"") : " nenhum adicional"),
         "Escopo — " + escopoLabel() + "  ·  Classificado por Empresa"
       ];
-      exportRowsToPdf("Resumo gerencial por empresa — " + rows.length.toLocaleString("pt-BR") + " empresa(s)", filtros, head, body, "resumo_por_empresa_" + todayStamp() + ".pdf", "landscape");
+      exportRowsToPdf("Resumo gerencial por empresa — " + rows.length.toLocaleString("pt-BR") + " empresa(s)", headerRight, filtros, head, body, "resumo_por_empresa_" + todayStamp() + ".pdf", "landscape");
     });
     document.getElementById("export-resumo-xlsx").addEventListener("click", function(){
       var rows = sortByEmpresa(getResumoRowsFiltered(), "en");
