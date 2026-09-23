@@ -5215,19 +5215,25 @@ function _desenharPaginaFolhaPontoEmpregado(doc, empresaDados, emp, MARGEM, page
         doc.setFontSize(9); doc.setFont('helvetica', 'normal');
         doc.text(`Período: ${empresaDados.periodoTexto}`, pageW - MARGEM, MARGEM + 4, { align: 'right' });
 
+        // Retorna quantas linhas o texto da esquerda ocupou, pra quem chamar
+        // empurrar o y seguinte e não deixar o texto da direita (CNPJ, etc.)
+        // ser sobrescrito quando o texto da esquerda (ex: nome da empresa) é longo.
         const linhaCabecalho = (y, esquerda, direita) => {
             doc.setFontSize(8.5); doc.setFont('helvetica', 'normal');
-            doc.text(esquerda, MARGEM, y);
+            const maxLargura = pageW / 2 - MARGEM - 4;
+            const linhas = doc.splitTextToSize(esquerda, maxLargura);
+            doc.text(linhas, MARGEM, y);
             if (direita) doc.text(direita, pageW / 2 + 4, y);
+            return linhas.length;
         };
         let y = MARGEM + 10;
-        linhaCabecalho(y, `Empresa: ${empresaDados.codigo_empresa} - ${empresaDados.nome_empresa}`, `CNPJ: ${empresaDados.cnpj || ''}`);
+        y += 4 * (linhaCabecalho(y, `Empresa: ${empresaDados.codigo_empresa} - ${empresaDados.nome_empresa}`, `CNPJ: ${empresaDados.cnpj || ''}`) - 1);
         y += 5;
-        linhaCabecalho(y, `Endereço: ${empresaDados.endereco || ''}`, `Bairro: ${empresaDados.municipio || ''}`);
+        y += 4 * (linhaCabecalho(y, `Endereço: ${empresaDados.endereco || ''}`, `Bairro: ${empresaDados.municipio || ''}`) - 1);
         y += 5;
         linhaCabecalho(y, `Cidade: ${empresaDados.cidade || ''}`, `UF: ${empresaDados.uf || ''}   CEP: ${empresaDados.cep || ''}`);
         y += 5;
-        linhaCabecalho(y, `Nome: ${emp.codigo_empregado} - ${emp.nome_empregado}`, `Departamento: ${emp.desc_dpto || ''}`);
+        y += 4 * (linhaCabecalho(y, `Nome: ${emp.codigo_empregado} - ${emp.nome_empregado}`, `Departamento: ${emp.desc_dpto || ''}`) - 1);
         y += 5;
         linhaCabecalho(y, `Função: ${emp.desc_cargo || ''}`, '');
         y += 5;
