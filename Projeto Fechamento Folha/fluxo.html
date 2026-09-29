@@ -9,6 +9,7 @@
 <script src="../supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="../portal-auth-guard.js"></script>
+<script src="../Projeto Departamento Pessoal/dp-permissoes.js"></script>
 <style>
 /* ── Variáveis do Fluxo (mapeadas para paleta SCONT/Fechamento) ─────────── */
 :root {
@@ -511,8 +512,10 @@ const toast = m => { const t=$('toast'); t.textContent=m; t.classList.add('show'
 
 /* ── SIDEBAR / HAMBURGER ────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
-    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true, skipToolCheck: true });
     if (!auth) return;
+    const okDp = await window.DPPermissoes.exigir(auth, 'fechamento', 1);
+    if (!okDp) return;
     loadState();
     renderFlow();
     renderCal();

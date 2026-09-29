@@ -230,8 +230,10 @@ function resolverColuna(header) {
 // ──────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true });
+    const auth = await window.PortalAuthGuard.init(1, { returnAfterLogin: true, skipToolCheck: true });
     if (!auth) return;
+    const okDp = await window.DPPermissoes.exigir(auth, 'fechamento', 1);
+    if (!okDp) return;
 
     // Máscara competência
     document.getElementById('competencia').addEventListener('input', e => {
