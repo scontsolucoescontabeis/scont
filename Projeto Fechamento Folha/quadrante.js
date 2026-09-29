@@ -183,6 +183,13 @@ function atualizarFaltaAuto(faltaKey) {
         const qtd = valorAjustadoFalta(linha);
         const el = document.querySelector(`[data-falta-auto-qtd="${faltaKey}"]`);
         if (el) el.textContent = qtd > 0 ? qtd + ' dias' : '–';
+
+        // Aviso "informe as datas" some assim que houver ao menos uma data válida
+        const aviso = document.querySelector(`[data-falta-aviso="${faltaKey}"]`);
+        if (aviso) {
+            const temData = (faltaDatasMap[faltaKey] || '').split(/[,;\n]/).some(s => parseDataBR(s.trim()));
+            aviso.style.display = (linha.valorInt > 0 && !temData) ? '' : 'none';
+        }
     }
     atualizarDsrAuto(codEmpregado);
     construirTotais(linhasRelatorio);
@@ -890,7 +897,7 @@ function renderizarRelatorio(linhas) {
                                 value="${_valAtual}"
                                 style="flex:1;min-width:240px;padding:4px 8px;border:1px solid #93C5FD;border-radius:4px;font-size:12px;font-family:monospace;">
                             <span style="font-size:11px;color:#6B7280;">separadas por vírgula · o domingo de DSR é calculado automaticamente</span>
-                            ${_semData ? '<span style="font-size:11px;color:#E67E22;">⚠️ informe a(s) data(s) para calcular o DSR</span>' : ''}
+                            <span data-falta-aviso="${_faltaKey.replace(/"/g, '&quot;')}" style="font-size:11px;color:#E67E22;${_semData ? '' : 'display:none;'}">⚠️ informe a(s) data(s) para calcular o DSR</span>
                         </div>
                     </td>
                 `;
