@@ -12,6 +12,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="ferias-parser.js"></script>
 <style>
 :root {
     --primary-color: #2C6E49;
@@ -333,7 +335,7 @@
             <label class="upload-area" id="uploadArea" for="inputFerias">
                 <div class="upload-icon">📄</div>
                 <div class="upload-label">Arraste o arquivo aqui ou clique para selecionar<br>
-                    <small>Formato aceito: .pdf (Programação de Férias exportada do sistema)</small></div>
+                    <small>Formato aceito: .pdf (Programação de Férias exportada do sistema) — pode conter uma ou várias empresas</small></div>
                 <input type="file" id="inputFerias" accept=".pdf">
             </label>
             <div class="upload-filename" id="filenameFerias" style="display:none;"></div>
@@ -350,6 +352,7 @@
             </div>
 
             <!-- Título -->
+            <div id="avisoMulti" style="display:none;margin-bottom:16px;padding:10px 14px;background:#EAF4FB;border:1px solid #CCE5F5;border-radius:7px;font-size:12.5px;color:#135382;"></div>
             <div style="margin-bottom:22px;">
                 <label style="font-weight:600;font-size:12px;color:#2C3E50;display:block;margin-bottom:5px;">Título do Relatório</label>
                 <input type="text" id="inputTitulo" placeholder="Ex: Programação de Férias – Quadrante – 2026"
@@ -412,6 +415,7 @@
                 <div style="margin-left:auto;display:flex;gap:8px;">
                     <button onclick="voltarConfig()" class="btn btn-secondary btn-small">← Configurar</button>
                     <button onclick="gerarPDF()" class="btn btn-secondary btn-small" id="btnPdf">📄 PDF</button>
+                    <button onclick="gerarZip()" class="btn btn-primary btn-small" id="btnZip" style="display:none;">📦 ZIP</button>
                     <button onclick="imprimirRelatorio()" class="btn btn-primary btn-small">🖨️ Imprimir</button>
                 </div>
             </div>
@@ -420,6 +424,12 @@
             <div id="pdfContent">
 
                 <div id="reportHeader"></div>
+
+                <!-- Seletor de empresa (PDF com várias empresas) -->
+                <div class="sort-bar no-print" id="empresaBar" style="display:none;">
+                    <span class="sort-bar-label">Empresa</span>
+                    <select id="selEmpresa" onchange="trocarEmpresa(this.value)" style="flex:1;min-width:0;"></select>
+                </div>
 
                 <!-- Sort bar -->
                 <div class="sort-bar no-print">
@@ -475,7 +485,6 @@ const THEMES = {
 // ──────────────────────────────────────────────
 // ESTADO
 // ──────────────────────────────────────────────
-let rawRows         = [];
 let allHeaders      = [];
 let colConfig       = [];
 let employeeGroups  = [];   // [{main, continuations:[]}] — fonte de verdade após geração
@@ -485,6 +494,9 @@ let currentTheme    = 'verde';
 let headerStyle     = 'completo';
 let metaEmpresa     = '';
 let metaCNPJ        = '';
+let metaRotulo      = 'CNPJ';
+let empresasData    = [];   // [{nome, cnpj, rotulo, rows, groups}] — uma por empresa do PDF
+let empAtiva        = 0;
 
 // ──────────────────────────────────────────────
 // AUTH + INIT
@@ -558,14 +570,25 @@ async function carregarArquivo(file) {
             mostrarMensagem('Atenção', 'Não foi possível detectar os dados no PDF. Verifique o arquivo.');
             el.style.display = 'none'; return;
         }
-        allHeaders  = resultado.headers;
-        metaEmpresa = resultado.empresa || '';
-        metaCNPJ    = resultado.cnpj    || '';
-        rawRows     = resultado.rows;
+        allHeaders   = resultado.headers;
+        empresasData = resultado.empresas.map(e => ({ ...e, groups: null }));
+        empAtiva     = 0;
+        selecionarEmpresaMeta(0);
+        const multi  = empresasData.length > 1;
+        const totLin = empresasData.reduce((s, e) => s + e.rows.length, 0);
 
-        el.textContent = '✔ ' + file.name + ' · ' + rawRows.length + ' linhas';
+        el.textContent = '✔ ' + file.name + ' · ' + (multi ? empresasData.length + ' empresas · ' : '') + totLin + ' linhas';
         document.getElementById('inputTitulo').value = file.name.replace(/\.pdf$/i, '').replace(/_/g, ' ');
-        if (metaEmpresa) document.getElementById('inputEmpresa').value = metaEmpresa;
+        if (!multi && metaEmpresa) document.getElementById('inputEmpresa').value = metaEmpresa;
+
+        const aviso = document.getElementById('avisoMulti');
+        aviso.style.display = multi ? '' : 'none';
+        if (multi) {
+            aviso.innerHTML = `📚 <strong>${empresasData.length} empresas</strong> detectadas no PDF. A configuração abaixo vale para todas; ` +
+                `o nome e o documento de cada empresa vêm do próprio relatório e o resultado final é um <strong>ZIP com um PDF por empresa</strong>.` +
+                (resultado.ignoradas.length ? ` (${resultado.ignoradas.length} sem empregados foram ignoradas.)` : '');
+        }
+        atualizarModoMulti();
 
         construirColConfig();
         document.getElementById('painelConfig').style.display    = '';
@@ -589,176 +612,19 @@ async function parsearPDF(file) {
     const buffer = await file.arrayBuffer();
     const pdf    = await pdfjsLib.getDocument({ data: buffer }).promise;
 
-    // ── 1. Coleta todos os itens de texto de todas as páginas ────────────────
-    const allItems = [];
-    let yOffset = 0;
+    const pages = [];
     for (let p = 1; p <= pdf.numPages; p++) {
-        const page     = await pdf.getPage(p);
-        const vp       = page.getViewport({ scale: 1 });
-        const content  = await page.getTextContent();
-        content.items.forEach(item => {
-            const s = (item.str || '').replace(/\s+/g, ' ').trim();
-            if (!s) return;
-            allItems.push({
-                str:  s,
-                x:    item.transform[4],
-                y:    (vp.height - item.transform[5]) + yOffset,
-                w:    item.width || 0,
-                page: p,
-            });
+        const page    = await pdf.getPage(p);
+        const vp      = page.getViewport({ scale: 1 });
+        const content = await page.getTextContent();
+        pages.push({
+            height: vp.height,
+            items: content.items.map(it => ({ str: it.str, x: it.transform[4], y: it.transform[5], width: it.width || 0 })),
         });
-        yOffset += vp.height + 60;
     }
-
-    // ── 2. Agrupa itens em linhas por proximidade vertical (tolerância 6 pt) ─
-    allItems.sort((a, b) => a.y - b.y || a.x - b.x);
-    const Y_TOL = 6;
-    const linhas = [];
-    let cur = null;
-    allItems.forEach(item => {
-        if (cur && Math.abs(item.y - cur.baseY) <= Y_TOL) {
-            cur.items.push(item);
-        } else {
-            cur = { baseY: item.y, items: [item] };
-            linhas.push(cur);
-        }
-    });
-    linhas.forEach(l => l.items.sort((a, b) => a.x - b.x));
-
-    // ── 3. Localiza a primeira linha de cabeçalho (Código + Empregado) ───────
-    let hdrIdx = -1;
-    for (let i = 0; i < linhas.length; i++) {
-        const txt = linhas[i].items.map(it => it.str).join(' ');
-        if (/c[oó]digo/i.test(txt) && /empregado/i.test(txt)) { hdrIdx = i; break; }
-    }
-    if (hdrIdx === -1) return null;
-
-    // ── 4. Metadados (empresa, CNPJ) das linhas acima do cabeçalho ───────────
-    let empresa = '', cnpj = '';
-    for (let i = 0; i < hdrIdx; i++) {
-        // Pega apenas o item mais à esquerda da linha (nome da empresa costuma ser o primeiro)
-        const leftmost = linhas[i].items[0];
-        if (!leftmost) continue;
-        const s = leftmost.str.trim();
-        const mC = linhas[i].items.map(it => it.str).join(' ').match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/);
-        if (mC && !cnpj) cnpj = mC[0];
-        if (!empresa && s.length > 8
-            && /^[A-ZÀ-Ú]/.test(s)                             // começa com maiúscula
-            && !/^(CNPJ|Data\s*base|P[aá]g|Emiss[aã]o|Horas|PROGRAMA[ÇC]|Sistema)/i.test(s)
-            && !/^\d/.test(s))                                   // não começa com número
-            empresa = s.replace(/\s+/g, ' ').substring(0, 100);
-    }
-
-    // ── 5. Constrói definições de colunas ────────────────────────────────────
-    const subItems = linhas[hdrIdx].items;
-
-    // Linha acima: verifica se é o cabeçalho de grupo (Data, Vencto., Início…)
-    const prevItems = hdrIdx > 0 ? linhas[hdrIdx - 1].items : [];
-    const prevTxt   = prevItems.map(it => it.str).join(' ');
-    const isGrpRow  = /data|vencto\.?|in[ií]cio|fim\b/i.test(prevTxt) && !/\d{4}/.test(prevTxt);
-
-    const colDefs = subItems.map(si => {
-        const sub = si.str.trim();
-        let grp   = '';
-        if (isGrpRow) {
-            // Encontra o item de grupo mais próximo (dentro de 60 pt)
-            const closest = prevItems.reduce((best, gi) => {
-                const d = Math.abs(gi.x - si.x);
-                return (!best || d < Math.abs(best.x - si.x)) ? gi : best;
-            }, null);
-            if (closest && Math.abs(closest.x - si.x) < 60) grp = closest.str.trim();
-        }
-        let label;
-        if (!grp || grp.toLowerCase() === sub.toLowerCase()) label = sub;
-        else if (sub.toLowerCase().startsWith(grp.toLowerCase().slice(0, 4))) label = sub;
-        else label = `${grp} ${sub}`;
-        return { x: si.x, label };
-    });
-
-    // Fronteiras de coluna
-    // Regra geral: ponto médio entre colunas adjacentes.
-    // Exceção para a 1ª coluna (Código): códigos de empregado são alinhados à direita
-    // no PDF, então números curtos ("86") ficam mais à direita que "242". Para não
-    // mapeá-los para a coluna Empregado, a fronteira direita da 1ª coluna vai até
-    // 90 % do espaço até a próxima coluna (em vez de 50 %).
-    for (let i = 0; i < colDefs.length; i++) {
-        colDefs[i].xStart = i === 0
-            ? -Infinity
-            : colDefs[i - 1].xEnd;
-
-        if (i === colDefs.length - 1) {
-            colDefs[i].xEnd = Infinity;
-        } else if (i === 0) {
-            // Primeira coluna: fronteira alargada para acomodar alinhamento à direita
-            colDefs[i].xEnd = colDefs[i].x + (colDefs[i + 1].x - colDefs[i].x) * 0.90;
-        } else {
-            colDefs[i].xEnd = (colDefs[i].x + colDefs[i + 1].x) / 2;
-        }
-    }
-
-    // ── 6. Fingerprint do cabeçalho para detectar repetições (pág. 2+) ───────
-    // Uma linha é "cabeçalho repetido" se tiver os mesmos itens em x próximos
-    const hdrXs  = subItems.map(it => Math.round(it.x));
-    const isHdrRepeat = (items) => {
-        if (!items.length) return false;
-        const txt = items.map(it => it.str).join(' ');
-        if (/c[oó]digo/i.test(txt) && /empregado/i.test(txt)) return true;
-        // Sub-cabeçalho de grupo repetido (ex.: "admissão férias venc. pro. aquisitivo…")
-        if (/admiss[aã]o|venc\.|aquisitivo/i.test(txt) && !/\d{2}\/\d{2}\/\d{4}/.test(txt)) return true;
-        // Linha de grupo (Data Vencto. Início Fim Dias…) sem datas reais
-        if (/^(Data\b|Vencto\.?|In[ií]cio\b)/i.test(txt.trim()) && !/\d{2}\/\d{2}\/\d{4}/.test(txt)) return true;
-        return false;
-    };
-    const isFooter = (items) => {
-        const txt = items.map(it => it.str).join(' ').trim();
-        if (/sistema licenciado|observa[çc][oõ]es|total de empregados/i.test(txt)) return true;
-        if (/\bp[aá]g(ina)?[\s.:]/i.test(txt)) return true;
-        if (/^(emiss[aã]o|horas|data\s*base|cnpj)\b/i.test(txt)) return true;
-        // Título do arquivo repetido no cabeçalho de cada página
-        if (/programa[çc][aã]o\s+de\s+f[eé]rias/i.test(txt)) return true;
-        // Número de página isolado (ex.: "2", "2 de 5", "Pág. 2 de 5")
-        if (/^\d+(\s+de\s+\d+)?$/.test(txt)) return true;
-        return false;
-    };
-
-    // Valor placeholder do PDF (ex.: ..../..../......  ou  ....)
-    const isPlaceholder = (s) => /^[.\-/\s]+$/.test(s.trim());
-
-    // ── 7. Processa linhas de dados ──────────────────────────────────────────
-    const dataRows = [];
-    for (let i = hdrIdx + 1; i < linhas.length; i++) {
-        const items = linhas[i].items;
-        if (!items.length) continue;
-        if (isHdrRepeat(items) || isFooter(items)) continue;
-
-        // Atribui cada item de texto à coluna pela fronteira de x
-        const rowArr = new Array(colDefs.length).fill('');
-        items.forEach(item => {
-            let ci = colDefs.findIndex(c => item.x >= c.xStart && item.x < c.xEnd);
-            if (ci === -1) {
-                // Fallback: centro mais próximo
-                let bestD = Infinity;
-                colDefs.forEach((c, idx) => {
-                    const d = Math.abs(item.x - c.x);
-                    if (d < bestD) { bestD = d; ci = idx; }
-                });
-            }
-            rowArr[ci] = rowArr[ci] ? rowArr[ci] + ' ' + item.str : item.str;
-        });
-
-        // Normaliza placeholders → string vazia (mantém '-' que é dado real)
-        const clean = rowArr.map(c => {
-            const v = c.trim();
-            return isPlaceholder(v) ? '' : v;
-        });
-
-        // Descarta linhas completamente vazias após normalização
-        if (clean.every(c => !c)) continue;
-
-        dataRows.push(clean);
-    }
-
-    return { headers: colDefs.map(c => c.label), rows: dataRows, empresa, cnpj };
+    // Detecção de empresas/colunas/linhas em ferias-parser.js (aceita 1 ou N empresas)
+    const r = parsearFerias(pages);
+    return (r && r.empresas.length) ? r : null;
 }
 
 // ──────────────────────────────────────────────
@@ -830,7 +696,7 @@ function selecionarHS(style) {
     headerStyle = style;
     document.getElementById('hs-completo').classList.toggle('selected', style === 'completo');
     document.getElementById('hs-simples').classList.toggle('selected',  style === 'simples');
-    document.getElementById('wrapEmpresa').style.display = style === 'completo' ? '' : 'none';
+    atualizarModoMulti();
 }
 
 // ──────────────────────────────────────────────
@@ -841,9 +707,13 @@ function gerarRelatorio() {
     if (!visCols.length) { mostrarMensagem('Atenção', 'Selecione ao menos uma coluna para o relatório.'); return; }
 
     const pkIdx = visCols[0].origIdx;
-    employeeGroups = agruparLinhas(rawRows, pkIdx);
+    empresasData.forEach(e => { e.groups = agruparLinhas(e.rows, pkIdx); });
+    empAtiva       = 0;
+    selecionarEmpresaMeta(0);
+    employeeGroups = empresasData[0].groups;
     activeSort     = { colIdx: null, dir: 'asc' };
     filteredGroups = employeeGroups;
+    preencherSeletorEmpresa();
 
     preencherSortBar(visCols);
     renderizarHeader();
@@ -885,8 +755,7 @@ function agruparLinhas(rows, pkIdx) {
 // ──────────────────────────────────────────────
 function renderizarHeader() {
     const titulo  = document.getElementById('inputTitulo').value.trim() || 'Programação de Férias';
-    const empresa = headerStyle === 'completo'
-        ? (document.getElementById('inputEmpresa').value.trim() || metaEmpresa || '') : '';
+    const empresa = nomeEmpresaCabecalho();
     const dataGer = new Date().toLocaleDateString('pt-BR');
     const t       = THEMES[currentTheme];
     let html = '';
@@ -895,7 +764,7 @@ function renderizarHeader() {
         html = `<div class="rpt-header-completo" style="background-color:${t.primary};">
             <div>
                 ${empresa ? `<div class="rpt-header-empresa">${escHtml(empresa)}</div>` : ''}
-                ${metaCNPJ ? `<div class="rpt-header-cnpj">CNPJ: ${escHtml(metaCNPJ)}</div>` : ''}
+                ${metaCNPJ ? `<div class="rpt-header-cnpj">${escHtml(metaRotulo)}: ${escHtml(metaCNPJ)}</div>` : ''}
             </div>
             <div class="rpt-header-titulo-bloco">
                 <div class="rpt-header-titulo">${escHtml(titulo)}</div>
@@ -1092,109 +961,196 @@ function deletarContinuacao(gi, ci) {
 // ──────────────────────────────────────────────
 // GERAR PDF — jsPDF + AutoTable, paisagem, largura dinâmica
 // ──────────────────────────────────────────────
+function nomeEmpresaCabecalho() {
+    if (headerStyle !== 'completo') return '';
+    if (empresasData.length > 1) return metaEmpresa || '';
+    return document.getElementById('inputEmpresa').value.trim() || metaEmpresa || '';
+}
+
+function tituloRelatorio() {
+    return document.getElementById('inputTitulo').value.trim() || 'Programação de Férias';
+}
+
+function nomeArquivoSeguro(s) {
+    return s.replace(/[\/\\:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+}
+
+// Monta o jsPDF de uma empresa. `groups` = empregados a imprimir.
+function construirPDF(empresa, groups) {
+    const titulo  = tituloRelatorio();
+    const t       = THEMES[currentTheme];
+    const rgb     = hexToRgb(t.primary);
+    const visCols = colConfig.filter(c => c.visible);
+
+    // 1. Montar dados da tabela
+    const head = [visCols.map(c => c.label || '')];
+    const body = [];
+    groups.forEach(g => {
+        body.push(visCols.map(c => celulaPDF(g.main[c.origIdx], c.label)));
+        g.continuations.forEach(cont => {
+            body.push(visCols.map((c, ci) => ci === 0 ? '↳' : celulaPDF(cont[c.origIdx], c.label)));
+        });
+    });
+
+    // 2. Largura de página dinâmica (~14 mm por coluna; mínimo A4 paisagem)
+    const MM_PER_COL = 14;
+    const MARGEM     = 10;
+    const pageW      = Math.max(297, visCols.length * MM_PER_COL + MARGEM * 2);
+    const pageH      = 210;
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: 'landscape' });
+
+    // 3. Cabeçalho do relatório
+    const nome    = headerStyle === 'completo' ? empresa.nome : '';
+    const dataGer = new Date().toLocaleDateString('pt-BR');
+    let startY    = MARGEM;
+
+    if (headerStyle === 'completo') {
+        const barH = empresa.cnpj ? 18 : 13;
+        doc.setFillColor(rgb.r, rgb.g, rgb.b);
+        doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, barH, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        if (nome) {
+            doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+            doc.text(nome, MARGEM + 4, MARGEM + 6);
+        }
+        if (empresa.cnpj) {
+            doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+            doc.text((empresa.rotulo || 'CNPJ') + ': ' + empresa.cnpj, MARGEM + 4, MARGEM + 12);
+        }
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+        doc.text(titulo, pageW - MARGEM - 4, MARGEM + 6, { align: 'right' });
+        doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+        doc.text('Gerado em ' + dataGer + ' · ' + groups.length + ' empregado(s)',
+            pageW - MARGEM - 4, MARGEM + 12, { align: 'right' });
+        startY = MARGEM + barH + 4;
+    } else {
+        doc.setTextColor(rgb.r, rgb.g, rgb.b);
+        doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+        doc.text(titulo, MARGEM, MARGEM + 6);
+        doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+        doc.setTextColor(127, 140, 141);
+        doc.text('Gerado em ' + dataGer + ' · ' + groups.length + ' empregado(s)', MARGEM, MARGEM + 12);
+        startY = MARGEM + 18;
+    }
+
+    // 4. Tabela
+    doc.autoTable({
+        head,
+        body,
+        startY,
+        margin: { left: MARGEM, right: MARGEM },
+        tableWidth: pageW - MARGEM * 2,
+        styles:          { fontSize: 6.5, cellPadding: 1.8, valign: 'middle', overflow: 'linebreak' },
+        headStyles:      { fillColor: [rgb.r, rgb.g, rgb.b], textColor: 255, fontStyle: 'bold', fontSize: 6.5 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        didParseCell: data => {
+            if (data.section === 'body' && data.row.raw[0] === '↳') {
+                data.cell.styles.fontSize  = 6;
+                data.cell.styles.textColor = [85, 85, 85];
+                data.cell.styles.fillColor = [246, 250, 247];
+                data.cell.styles.fontStyle = 'italic';
+            }
+        },
+    });
+    return doc;
+}
+
+// PDF da empresa exibida (respeita busca/ordenação/exclusões da prévia)
 async function gerarPDF() {
-    const titulo = document.getElementById('inputTitulo').value.trim() || 'Programação de Férias';
-    const btn    = document.getElementById('btnPdf');
+    const btn = document.getElementById('btnPdf');
     btn.disabled    = true;
     btn.textContent = '⏳ Gerando...';
-
     try {
-        const t       = THEMES[currentTheme];
-        const rgb     = hexToRgb(t.primary);
-        const rgbDark = hexToRgb(t.dark);
-        const visCols = colConfig.filter(c => c.visible);
-
-        // 1. Montar dados da tabela
-        const head = [visCols.map(c => c.label || '')];
-        const body = [];
-        filteredGroups.forEach(g => {
-            body.push(visCols.map(c => {
-                const v = g.main[c.origIdx];
-                return celulaPDF(v, c.label);
-            }));
-            g.continuations.forEach(cont => {
-                body.push(visCols.map((c, ci) => {
-                    if (ci === 0) return '↳';
-                    return celulaPDF(cont[c.origIdx], c.label);
-                }));
-            });
-        });
-
-        // 2. Calcular largura de página dinâmica
-        //    Cada coluna precisa de ~14 mm mínimo; mínimo absoluto A4 paisagem (297 mm)
-        const MM_PER_COL = 14;
-        const MARGEM     = 10;
-        const pageW      = Math.max(297, visCols.length * MM_PER_COL + MARGEM * 2);
-        const pageH      = 210;
-
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ unit: 'mm', format: [pageW, pageH], orientation: 'landscape' });
-
-        // 3. Cabeçalho do relatório
-        const empresa  = headerStyle === 'completo'
-            ? (document.getElementById('inputEmpresa').value.trim() || metaEmpresa || '') : '';
-        const dataGer  = new Date().toLocaleDateString('pt-BR');
-        let startY     = MARGEM;
-
-        if (headerStyle === 'completo') {
-            const barH = metaCNPJ ? 18 : 13;
-            doc.setFillColor(rgb.r, rgb.g, rgb.b);
-            doc.roundedRect(MARGEM, MARGEM, pageW - MARGEM * 2, barH, 2, 2, 'F');
-            doc.setTextColor(255, 255, 255);
-            if (empresa) {
-                doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-                doc.text(empresa, MARGEM + 4, MARGEM + 6);
-            }
-            if (metaCNPJ) {
-                doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-                doc.text('CNPJ: ' + metaCNPJ, MARGEM + 4, MARGEM + 12);
-            }
-            doc.setFontSize(9); doc.setFont('helvetica', 'bold');
-            doc.text(titulo, pageW - MARGEM - 4, MARGEM + 6, { align: 'right' });
-            doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-            doc.text('Gerado em ' + dataGer + ' · ' + filteredGroups.length + ' empregado(s)',
-                pageW - MARGEM - 4, MARGEM + 12, { align: 'right' });
-            startY = MARGEM + barH + 4;
-        } else {
-            doc.setTextColor(rgb.r, rgb.g, rgb.b);
-            doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-            doc.text(titulo, MARGEM, MARGEM + 6);
-            doc.setFontSize(8); doc.setFont('helvetica', 'normal');
-            doc.setTextColor(127, 140, 141);
-            doc.text('Gerado em ' + dataGer + ' · ' + filteredGroups.length + ' empregado(s)',
-                MARGEM, MARGEM + 12);
-            startY = MARGEM + 18;
-        }
-
-        // 4. Tabela
-        doc.autoTable({
-            head,
-            body,
-            startY,
-            margin: { left: MARGEM, right: MARGEM },
-            tableWidth: pageW - MARGEM * 2,
-            styles:          { fontSize: 6.5, cellPadding: 1.8, valign: 'middle', overflow: 'linebreak' },
-            headStyles:      { fillColor: [rgb.r, rgb.g, rgb.b], textColor: 255, fontStyle: 'bold', fontSize: 6.5 },
-            alternateRowStyles: { fillColor: [249, 250, 251] },
-            didParseCell: data => {
-                if (data.section === 'body' && data.row.raw[0] === '↳') {
-                    data.cell.styles.fontSize     = 6;
-                    data.cell.styles.textColor    = [85, 85, 85];
-                    data.cell.styles.fillColor    = [246, 250, 247];
-                    data.cell.styles.fontStyle    = 'italic';
-                }
-            },
-        });
-
-        doc.save(titulo.replace(/[/\\:*?"<>|]/g, '_') + '.pdf');
-
+        const emp = { nome: nomeEmpresaCabecalho(), cnpj: metaCNPJ, rotulo: metaRotulo };
+        const doc = construirPDF(emp, filteredGroups);
+        const sufixo = empresasData.length > 1 && metaEmpresa ? ' - ' + metaEmpresa : '';
+        doc.save(nomeArquivoSeguro(tituloRelatorio() + sufixo) + '.pdf');
     } catch (e) {
         console.error('PDF error:', e);
         mostrarMensagem('Erro', 'Falha ao gerar PDF: ' + e.message);
     } finally {
-        btn.disabled    = false;
-        btn.textContent = '📄 PDF';
+        btn.disabled = false;
+        atualizarModoMulti();
     }
+}
+
+// ZIP com um PDF por empresa (mesma configuração; ordenação atual aplicada a todas)
+async function gerarZip() {
+    const btn = document.getElementById('btnZip');
+    btn.disabled = true;
+    try {
+        const zip    = new JSZip();
+        const titulo = tituloRelatorio();
+        const usados = new Set();
+        let gerados  = 0;
+        for (let i = 0; i < empresasData.length; i++) {
+            const e = empresasData[i];
+            btn.textContent = `⏳ ${i + 1}/${empresasData.length}`;
+            await new Promise(r => setTimeout(r, 0));   // deixa a UI atualizar
+            let groups = e.groups || [];
+            if (activeSort.colIdx !== null)
+                groups = [...groups].sort((a, b) => compararCelulas(a.main[activeSort.colIdx], b.main[activeSort.colIdx], activeSort.dir));
+            if (!groups.length) continue;                // empresa esvaziada na prévia
+
+            const doc  = construirPDF({ nome: e.nome, cnpj: e.cnpj, rotulo: e.rotulo }, groups);
+            let base   = nomeArquivoSeguro(`${titulo} - ${e.nome || 'Empresa ' + (i + 1)}`);
+            if (usados.has(base.toLowerCase())) base = nomeArquivoSeguro(`${base} - ${e.cnpj || i + 1}`);
+            usados.add(base.toLowerCase());
+            zip.file(base + '.pdf', doc.output('arraybuffer'));
+            gerados++;
+        }
+        if (!gerados) { mostrarMensagem('Atenção', 'Nenhuma empresa com empregados para gerar.'); return; }
+        btn.textContent = '⏳ Compactando...';
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = nomeArquivoSeguro(titulo) + '.zip';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch (e) {
+        console.error('ZIP error:', e);
+        mostrarMensagem('Erro', 'Falha ao gerar ZIP: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        atualizarModoMulti();
+    }
+}
+
+// ──────────────────────────────────────────────
+// MÚLTIPLAS EMPRESAS
+// ──────────────────────────────────────────────
+function selecionarEmpresaMeta(i) {
+    const e = empresasData[i] || {};
+    metaEmpresa = e.nome   || '';
+    metaCNPJ    = e.cnpj   || '';
+    metaRotulo  = e.rotulo || 'CNPJ';
+}
+
+function atualizarModoMulti() {
+    const multi = empresasData.length > 1;
+    document.getElementById('btnZip').style.display = multi ? '' : 'none';
+    document.getElementById('btnZip').textContent   = `📦 ZIP (${empresasData.length} PDFs)`;
+    document.getElementById('btnPdf').textContent   = multi ? '📄 PDF (empresa atual)' : '📄 PDF';
+    document.getElementById('empresaBar').style.display = multi ? '' : 'none';
+    document.getElementById('wrapEmpresa').style.display = (!multi && headerStyle === 'completo') ? '' : 'none';
+}
+
+function preencherSeletorEmpresa() {
+    const sel = document.getElementById('selEmpresa');
+    sel.innerHTML = empresasData.map((e, i) =>
+        `<option value="${i}">${escHtml(e.nome || 'Empresa ' + (i + 1))} — ${escHtml(e.cnpj || '')} (${e.groups.length})</option>`).join('');
+    sel.value = String(empAtiva);
+    atualizarModoMulti();
+}
+
+function trocarEmpresa(v) {
+    empAtiva = parseInt(v, 10) || 0;
+    selecionarEmpresaMeta(empAtiva);
+    employeeGroups = empresasData[empAtiva].groups;
+    document.getElementById('buscaFerias').value = '';
+    filtrarTabela();   // reaplica ordenação atual e re-renderiza tabela + cabeçalho
 }
 
 function hexToRgb(hex) {
