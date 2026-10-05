@@ -780,7 +780,114 @@ function filtrarGrade() {
     });
 }
 
-function gerarParametrizacoes() {
+// --- Rubricas não cadastradas na empresa: oferece cadastro antes de gerar ---
+
+let rubricasFaltantesAtuais = []; // [{ colunaId, rubrica, codEmpresa, empresa, qtd }]
+
+function coletarRubricasFaltantes() {
+    const mapa = new Map();
+    for (const r of rubricasGrid) {
+        if (r.codigo) continue;
+        const valoresColuna = valoresGrid[r.id] || {};
+        for (const empKey of Object.keys(valoresColuna)) {
+            const valor = valoresColuna[empKey];
+            if (!valor || !valor.trim()) continue;
+            const [codEmpresa] = empKey.split('|');
+            if (resolverCodigoRubrica(r, codEmpresa)) continue;
+            const chave = `${r.id}|${codEmpresa}`;
+            if (!mapa.has(chave)) {
+                mapa.set(chave, { colunaId: r.id, rubrica: r.label, codEmpresa, empresa: nomeEmpresaPorCodigo(codEmpresa), qtd: 0 });
+            }
+            mapa.get(chave).qtd++;
+        }
+    }
+    return [...mapa.values()];
+}
+
+function abrirModalRubricasFaltantes(faltantes) {
+    rubricasFaltantesAtuais = faltantes;
+    const lista = document.getElementById('rubricasFaltantesLista');
+    lista.innerHTML = '';
+    faltantes.forEach((f, i) => {
+        const linha = document.createElement('div');
+        linha.style.cssText = 'display:flex; gap:10px; align-items:center; margin-bottom:8px;';
+        const info = document.createElement('div');
+        info.style.flex = '1';
+        info.textContent = `${f.rubrica} — ${f.empresa} (${f.qtd} lançamento${f.qtd > 1 ? 's' : ''})`;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.id = `rubricaFaltanteCodigo_${i}`;
+        input.placeholder = 'Código';
+        input.inputMode = 'numeric';
+        input.style.width = '120px';
+        linha.append(info, input);
+        lista.appendChild(linha);
+    });
+    document.getElementById('rubricasFaltantesModal').classList.add('active');
+}
+
+function fecharModalRubricasFaltantes() {
+    document.getElementById('rubricasFaltantesModal').classList.remove('active');
+}
+
+function continuarSemCadastrarRubricas() {
+    fecharModalRubricasFaltantes();
+    gerarParametrizacoes(true);
+}
+
+async function cadastrarRubricasFaltantes() {
+    const novas = [];
+    for (let i = 0; i < rubricasFaltantesAtuais.length; i++) {
+        const f = rubricasFaltantesAtuais[i];
+        const codigo = document.getElementById(`rubricaFaltanteCodigo_${i}`).value.trim();
+        if (!codigo) continue;
+        if (!/^\d+$/.test(codigo)) {
+            mostrarMensagem('Atenção', `Código inválido para "${f.rubrica}" (${f.empresa}): use apenas números.`);
+            return;
+        }
+        const existente = catalogoRubricasLote.find(r => r.codigo_empresa === f.codEmpresa && r.codigo_rubrica === codigo);
+        if (existente) {
+            mostrarMensagem('Atenção', `O código ${codigo} já está cadastrado na empresa ${f.empresa} como "${existente.descricao_rubrica || 'sem descrição'}".`);
+            return;
+        }
+        novas.push({ f, codigo });
+    }
+
+    if (novas.length === 0) {
+        mostrarMensagem('Atenção', 'Informe ao menos um código ou use "Continuar sem cadastrar".');
+        return;
+    }
+
+    const btn = document.getElementById('btnCadastrarRubricasFaltantes');
+    btn.disabled = true;
+    const { error } = await supabaseClient
+        .from('rh_rubricas')
+        .upsert(novas.map(({ f, codigo }) => ({
+            codigo_empresa: f.codEmpresa,
+            empresa: nomeEmpresaPorCodigo(f.codEmpresa),
+            codigo_rubrica: codigo,
+            descricao_rubrica: f.rubrica,
+            tipo: null
+        })), { onConflict: 'codigo_empresa,codigo_rubrica' });
+    btn.disabled = false;
+
+    if (error) {
+        console.error('Erro ao cadastrar rubricas:', error);
+        mostrarMensagem('Erro', 'Falha ao cadastrar rubrica: ' + error.message);
+        return;
+    }
+
+    novas.forEach(({ f, codigo }) => {
+        catalogoRubricasLote.push({ codigo_empresa: f.codEmpresa, codigo_rubrica: codigo, descricao_rubrica: f.rubrica, tipo: null });
+        const coluna = rubricasGrid.find(c => c.id === f.colunaId);
+        if (coluna) coluna.codigosPorEmpresa = { ...(coluna.codigosPorEmpresa || {}), [f.codEmpresa]: codigo };
+    });
+
+    fecharModalRubricasFaltantes();
+    gerarParametrizacoes(true);
+}
+
+function gerarParametrizacoes(ignorarRubricasFaltantes = false) {
     const comp = document.getElementById('lanCompetencia').value;
     const tipoProcesso = document.getElementById('lanTipoProcesso').value;
 
@@ -797,6 +904,14 @@ function gerarParametrizacoes() {
     if (empregadosSelecionadosAtual.length === 0) {
         mostrarMensagem('Atenção', 'Nenhum empregado selecionado. Volte ao passo 2.');
         return;
+    }
+
+    if (!ignorarRubricasFaltantes) {
+        const faltantes = coletarRubricasFaltantes();
+        if (faltantes.length > 0) {
+            abrirModalRubricasFaltantes(faltantes);
+            return;
+        }
     }
 
     const calcularDsrAuto = document.getElementById('calcularDsrAutomatico')?.checked ?? false;

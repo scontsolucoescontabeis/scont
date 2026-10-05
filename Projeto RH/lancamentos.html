@@ -271,6 +271,21 @@
         </div>
     </div>
 
+    <!-- MODAL: RUBRICAS NÃO CADASTRADAS NA EMPRESA -->
+    <div id="rubricasFaltantesModal" class="modal">
+        <div class="modal-content" style="max-width: 640px;">
+            <div class="modal-header"><h3>⚠️ Rubrica não cadastrada</h3><button type="button" class="modal-close" onclick="fecharModalRubricasFaltantes()">×</button></div>
+            <div class="modal-body">
+                <p style="margin-bottom: 12px;">As rubricas abaixo não estão cadastradas para a empresa indicada. Informe o código para cadastrá-las (ficam salvas em Rubricas para uso futuro) ou continue sem cadastrar — nesse caso, os lançamentos associados <strong>não constarão no TXT</strong>.</p>
+                <div id="rubricasFaltantesLista"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="continuarSemCadastrarRubricas()">Continuar sem cadastrar</button>
+                <button type="button" class="btn btn-primary" id="btnCadastrarRubricasFaltantes" onclick="cadastrarRubricasFaltantes()">Cadastrar e continuar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL DE CONFIGURAÇÕES DO LANÇAMENTO -->
     <div id="configLancamentosModal" class="modal">
         <div class="modal-content" style="max-width: 720px;">
