@@ -803,6 +803,7 @@ function gerarParametrizacoes() {
     const novasParametrizacoes = [];
     const rubricasIgnoradas = [];
     const empresasSemRubricaDsrTotal = new Set();
+    const rubricasSemCadastro = new Map();
 
     for (const r of rubricasGrid) {
         const valoresColuna = valoresGrid[r.id] || {};
@@ -830,9 +831,13 @@ function gerarParametrizacoes() {
 
             const [codEmpresaItem] = empKey.split('|');
             if (!resolverCodigoRubrica(r, codEmpresaItem)) {
-                const nomeEmp = empregadosInfoAtual[empKey] || empKey;
-                mostrarMensagem('Atenção', `Empregado "${nomeEmp}" (empresa ${nomeEmpresaPorCodigo(codEmpresaItem)}): a rubrica "${r.label}" não está cadastrada no catálogo dessa empresa.`);
-                return;
+                // Não bloqueia: o lançamento fica fora do TXT e o usuário é avisado ao final
+                const chave = `${r.label}|${codEmpresaItem}`;
+                if (!rubricasSemCadastro.has(chave)) {
+                    rubricasSemCadastro.set(chave, { rubrica: r.label, empresa: nomeEmpresaPorCodigo(codEmpresaItem), qtd: 0 });
+                }
+                rubricasSemCadastro.get(chave).qtd++;
+                continue;
             }
 
             itens.push({
@@ -879,8 +884,18 @@ function gerarParametrizacoes() {
         }
     }
 
+    let avisoSemCadastro = '';
+    if (rubricasSemCadastro.size > 0) {
+        const linhas = [...rubricasSemCadastro.values()]
+            .map(x => `• ${x.rubrica} — ${x.empresa} (${x.qtd} lançamento${x.qtd > 1 ? 's' : ''})`)
+            .join('\n');
+        avisoSemCadastro = `A rubrica não está cadastrada para a(s) empresa(s) abaixo. Os lançamentos associados a essas rubricas NÃO constarão no TXT:\n${linhas}`;
+    }
+
     if (novasParametrizacoes.length === 0) {
-        mostrarMensagem('Atenção', 'Nenhuma rubrica da grade tem valores preenchidos.');
+        mostrarMensagem('Atenção', avisoSemCadastro
+            ? `Nenhuma parametrização gerada.\n${avisoSemCadastro}`
+            : 'Nenhuma rubrica da grade tem valores preenchidos.');
         return;
     }
 
@@ -903,7 +918,10 @@ function gerarParametrizacoes() {
         const nomes = [...empresasSemRubricaDsrTotal].map(cod => nomeEmpresaPorCodigo(cod)).join(', ');
         msg += `\nAviso: DSR automático não gerado para empregado(s) de empresa(s) sem "DIAS FALTAS DSR" cadastrada no catálogo: ${nomes}`;
     }
-    mostrarMensagem('Sucesso', msg);
+    if (avisoSemCadastro) {
+        msg += `\n\n⚠️ ${avisoSemCadastro}`;
+    }
+    mostrarMensagem(avisoSemCadastro ? 'Atenção' : 'Sucesso', msg);
 }
 
 function atualizarListaParametrizacoes() {
