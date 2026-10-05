@@ -205,6 +205,10 @@
             <div style="margin-top: 20px;">
                 <label style="font-weight: 600; font-size: 13px; display: block; margin-bottom: 5px;">Grade de Valores por Empregado</label>
                 <input type="text" id="buscaEmpregadoGrade" class="search-input" placeholder="🔍 Buscar por código ou nome do empregado..." onkeyup="filtrarGrade()">
+                <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 8px 0; cursor: pointer;">
+                    <input type="checkbox" id="ordenarGradeAlfabetica" onchange="renderGrade(); filtrarGrade();">
+                    Ordenar empregados por ordem alfabética (independente da empresa)
+                </label>
                 <div id="gradeContainer" class="grade-table-container">
                     <div class="grade-empty-msg">Adicione ao menos uma rubrica acima para montar a grade.</div>
                 </div>

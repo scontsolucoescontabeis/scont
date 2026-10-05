@@ -756,7 +756,13 @@ function renderGrade() {
     });
     html += '</tr></thead><tbody>';
 
-    empregadosSelecionadosAtual.forEach(empKey => {
+    let empregadosOrdenados = empregadosSelecionadosAtual;
+    if (document.getElementById('ordenarGradeAlfabetica')?.checked) {
+        empregadosOrdenados = [...empregadosSelecionadosAtual].sort((a, b) =>
+            (empregadosInfoAtual[a] || a).localeCompare(empregadosInfoAtual[b] || b, 'pt-BR', { sensitivity: 'base' }));
+    }
+
+    empregadosOrdenados.forEach(empKey => {
         const nome = empregadosInfoAtual[empKey] || empKey;
         const buscaAttr = nome.toLowerCase().replace(/"/g, '');
         html += `<tr data-emp-busca="${buscaAttr}"><td class="grade-emp-col">${nome}</td>`;
