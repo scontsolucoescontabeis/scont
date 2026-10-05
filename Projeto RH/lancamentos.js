@@ -758,8 +758,12 @@ function renderGrade() {
 
     let empregadosOrdenados = empregadosSelecionadosAtual;
     if (document.getElementById('ordenarGradeAlfabetica')?.checked) {
+        // O rótulo é "[Emp: X] código - NOME": ordena só pelo nome, depois código da empresa
+        const soNome = empKey => (empregadosInfoAtual[empKey] || empKey).replace(/^\[Emp:[^\]]*\]\s*\S+\s*-\s*/, '');
         empregadosOrdenados = [...empregadosSelecionadosAtual].sort((a, b) =>
-            (empregadosInfoAtual[a] || a).localeCompare(empregadosInfoAtual[b] || b, 'pt-BR', { sensitivity: 'base' }));
+            soNome(a).localeCompare(soNome(b), 'pt-BR', { sensitivity: 'base' })
+            || a.split('|')[0].localeCompare(b.split('|')[0], 'pt-BR', { numeric: true })
+            || a.split('|')[1].localeCompare(b.split('|')[1], 'pt-BR', { numeric: true }));
     }
 
     empregadosOrdenados.forEach(empKey => {
