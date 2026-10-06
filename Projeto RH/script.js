@@ -134,6 +134,11 @@ function filtrarEmpresas(termo) {
 }
 
 function _aplicarConfigEmpresaNaTelaEdicao(cfg) {
+    const ignorarFeriados = cfg?.['frequencia_ignorar_feriados']?.cod === '1';
+    if (state.frequenciaIgnorarFeriados !== ignorarFeriados) {
+        state.frequenciaIgnorarFeriados = ignorarFeriados;
+        recalcularFeriadosContexto();
+    }
     const ruleExtra100El = document.getElementById('ruleExtra100Optional');
     const terceiroTurnoEl = document.getElementById('terceiroTurno');
     if (ruleExtra100El) ruleExtra100El.checked = cfg?.['rule_extra_100_opcional']?.cod === '1';
@@ -314,8 +319,9 @@ function inicializarEventos() {
         }
         state.competencia = comp;
         state.empresaSelecionada = state.empresas.find(emp => emp.codigo_empresa === codEmp);
-        recalcularFeriadosContexto();
         const cfgPeriodo = await _buscarConfigRubricas(codEmp);
+        state.frequenciaIgnorarFeriados = cfgPeriodo?.['frequencia_ignorar_feriados']?.cod === '1';
+        recalcularFeriadosContexto();
         const { diaInicio, diaFim } = _resolverPeriodoApuracao(cfgPeriodo);
         state.periodoApuracaoInicio = diaInicio;
         state.periodoApuracaoFim = diaFim;
@@ -1115,8 +1121,14 @@ function _anoFeriados() {
 // móveis já calculados para o ano da competência. Chamado ao trocar de empresa,
 // definir a competência ou avançar a fila do lote.
 function recalcularFeriadosContexto() {
-    const expandidos = expandirFeriados(state.feriadosRaw, _anoFeriados());
-    state.feriados = feriadosDaEmpresa(expandidos, state.empresaSelecionada || {});
+    // Empresa configurada para não considerar feriados no Controle de Frequência
+    // (config frequencia_ignorar_feriados): nenhum dia vira feriado/DSR automático.
+    if (state.frequenciaIgnorarFeriados) {
+        state.feriados = [];
+    } else {
+        const expandidos = expandirFeriados(state.feriadosRaw, _anoFeriados());
+        state.feriados = feriadosDaEmpresa(expandidos, state.empresaSelecionada || {});
+    }
     state._feriadosDeSnapshot = false;
     renderizarTabelaFeriados();
 }
@@ -4956,7 +4968,9 @@ async function gerarPreviaFolhaPonto() {
             const cfg = await _buscarConfigRubricas(codigoEmpresa);
             const { diaInicio, diaFim } = _resolverPeriodoApuracao(cfg);
             const periodoTexto = _labelPeriodoFolhaPonto(comp, diaInicio, diaFim);
-            const feriadosEmpresa = _feriadosDaEmpresaParaComp(comp, empresaInfo || state.empresas.find(e => e.codigo_empresa === codigoEmpresa));
+            const feriadosEmpresa = cfg?.['frequencia_ignorar_feriados']?.cod === '1'
+                ? []
+                : _feriadosDaEmpresaParaComp(comp, empresaInfo || state.empresas.find(e => e.codigo_empresa === codigoEmpresa));
             const _datasPeriodoFolha = new Set(gerarDiasDoMes(comp, diaInicio, diaFim).map(d => d.data));
             const feriadosNoPeriodo = feriadosEmpresa
                 .filter(f => _datasPeriodoFolha.has(f.data))
@@ -5438,6 +5452,12 @@ async function gerarEscala() {
         }
 
         const feriadosPorEmpresa = {};
+        // Empresas configuradas para não considerar feriados no Controle de Frequência
+        const codigosEscala = [...new Set(empregadosFiltrados.map(e => e.codigo_empresa))];
+        await Promise.all(codigosEscala.map(async cod => {
+            const cfgEmp = await _buscarConfigRubricas(cod);
+            if (cfgEmp?.['frequencia_ignorar_feriados']?.cod === '1') feriadosPorEmpresa[cod] = [];
+        }));
         const linhas = empregadosFiltrados.map(emp => {
             const escala = escalasMapa[`${emp.codigo_empresa}_${emp.codigo_empregado}`] || null;
             const empresa = state.empresas.find(e => e.codigo_empresa === emp.codigo_empresa);
