@@ -1522,8 +1522,6 @@ button:focus-visible, a:focus-visible {
 }
 
 /* ===== EMPRESAS CADASTRADAS (rh_empresas) ===== */
-.campo-empresa-rh { position: relative; }
-
 .btn-empresa-cadastrada {
     background: var(--bronze-tint);
     color: var(--wine-800);
@@ -1532,22 +1530,47 @@ button:focus-visible, a:focus-visible {
 
 .btn-empresa-cadastrada:hover { background: var(--bronze-300); }
 
-.empresas-rh-lista {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    z-index: 50;
-    max-height: 320px;
-    overflow-y: auto;
-    background: var(--card);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    box-shadow: var(--shadow-lg);
-    padding: 0.35rem;
+.modal-empresas-rh { max-width: 640px; }
+
+.empresas-rh-busca-wrap {
+    position: relative;
+    margin-bottom: 0.5rem;
 }
 
-.empresas-rh-lista[hidden] { display: none; }
+.empresas-rh-busca-wrap i {
+    position: absolute;
+    left: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--bronze-600);
+    pointer-events: none;
+}
+
+.empresas-rh-busca-wrap input {
+    width: 100%;
+    padding: 0.8rem 0.9rem 0.8rem 2.5rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.95rem;
+}
+
+.empresas-rh-busca-wrap input:focus {
+    outline: none;
+    border-color: var(--wine-800);
+    box-shadow: 0 0 0 3px rgba(78, 24, 32, 0.12);
+}
+
+.empresas-rh-lista {
+    flex: 1;
+    min-height: 200px;
+    max-height: 50vh;
+    overflow-y: auto;
+    margin-top: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 0.35rem;
+}
 
 .empresa-rh-item {
     display: flex;
@@ -1555,7 +1578,7 @@ button:focus-visible, a:focus-visible {
     gap: 0.1rem;
     width: 100%;
     text-align: left;
-    padding: 0.6rem 0.75rem;
+    padding: 0.65rem 0.8rem;
     background: none;
     border: none;
     border-radius: 8px;
@@ -1563,10 +1586,26 @@ button:focus-visible, a:focus-visible {
     cursor: pointer;
 }
 
-.empresa-rh-item:hover,
+.empresa-rh-item.ativo,
 .empresa-rh-item:focus-visible { background: var(--wine-tint); }
 
-.empresa-rh-item strong { font-size: 0.9rem; color: var(--wine-800); }
-.empresa-rh-item span { font-size: 0.78rem; color: var(--ink-500); font-variant-numeric: tabular-nums; }
+.empresa-rh-item strong { font-size: 0.92rem; color: var(--wine-800); }
+.empresa-rh-item span { font-size: 0.8rem; color: var(--ink-500); font-variant-numeric: tabular-nums; }
 
-.empresas-rh-vazio { padding: 0.9rem; font-size: 0.85rem; color: var(--ink-500); text-align: center; }
+.empresas-rh-vazio { padding: 1.25rem; font-size: 0.88rem; color: var(--ink-500); text-align: center; }
+
+/* ===== CAMPO CNPJ: máscara completa sempre visível ===== */
+.campo-com-botao { flex-wrap: wrap; }
+
+.campo-com-botao input#cnpj {
+    flex: 1 1 20ch;
+    min-width: 20ch;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+}
+
+.campo-com-botao .btn-buscar-cnpj { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+
+@media (min-width: 900px) {
+    .form-group:has(.campo-empresa-rh) { grid-column: span 2; }
+}
