@@ -1491,7 +1491,7 @@
     return `
       <div class="mapa-secao-body" style="padding:0 0 16px;">
         <div class="full"><label>Balancete do ${unidadeCap} (PDF) — obrigatório</label><input type="file" id="fechBalanceteArquivo" accept="application/pdf,.pdf"></div>
-        <div class="full"><label>Observação (opcional)</label><textarea id="fechObservacaoEnvio" rows="2" placeholder="Alguma observação para a equipe Scont...">${escapeHtml(_observacaoEncerramentoPendente)}</textarea></div>
+        <div class="full"><label>Observação (opcional)</label><textarea id="fechObservacaoEnvio" rows="6" placeholder="Alguma observação para a equipe Scont...">${escapeHtml(_observacaoEncerramentoPendente)}</textarea></div>
         <div class="full"><button type="button" class="btn btn-primary" id="btnEncerrarMes">${autoAprovar ? 'Revisar e Encerrar' : `Encerrar ${unidade} contábil`}</button></div>
       </div>
     `;
@@ -1538,7 +1538,7 @@
           <div class="mapa-secao-body" style="padding:0 0 16px;">
             ${ultimo && ultimo.balancete_url ? `<div class="full"><label>Balancete do ${unidadeCap}</label><a href="#" class="arquivo-link" data-ver-balancete="${escapeHtml(ultimo.balancete_url)}">📄 ${escapeHtml(ultimo.balancete_nome || 'ver balancete')}</a></div>` : ''}
             <div class="full"><button type="button" class="btn btn-primary" id="btnAprovarFechamento">Aprovar</button></div>
-            <div class="full"><label>Motivo da rejeição (obrigatório para rejeitar)</label><textarea id="fechMotivoRejeicao" rows="2" placeholder="Explique o que precisa ser corrigido..."></textarea></div>
+            <div class="full"><label>Motivo da rejeição (obrigatório para rejeitar)</label><textarea id="fechMotivoRejeicao" rows="6" placeholder="Explique o que precisa ser corrigido..."></textarea></div>
             <div class="full"><button type="button" class="btn btn-secondary" id="btnRejeitarFechamento">Rejeitar</button></div>
           </div>
         `;
