@@ -1141,13 +1141,21 @@
     if (pop && !pop.contains(ev.target)) fecharPopoverGrade();
   }
 
+  function alargarPopoverParaForm(pop) {
+    pop.classList.add('popover-grade-form');
+    const r = pop.getBoundingClientRect();
+    if (r.right > window.innerWidth - 8) pop.style.left = `${Math.max(window.innerWidth - r.width - 8, 8)}px`;
+    if (r.bottom > window.innerHeight - 8) pop.style.top = `${Math.max(window.innerHeight - r.height - 8, 8)}px`;
+  }
+
   function abrirFormPendenciaNoPopover(pop, codigoEmpresa, ano, mes) {
     pop.innerHTML = `
       <label>Motivo da pendência (obrigatório)</label>
-      <textarea id="popMotivoPendencia" rows="2" placeholder="Ex: falta disponibilização de documentação..."></textarea>
+      <textarea id="popMotivoPendencia" rows="6" placeholder="Ex: falta disponibilização de documentação..."></textarea>
       <button type="button" class="btn btn-primary" id="popBtnConfirmarPendencia">Confirmar</button>
     `;
     pop.addEventListener('click', (ev) => ev.stopPropagation());
+    alargarPopoverParaForm(pop);
     pop.querySelector('#popBtnConfirmarPendencia').addEventListener('click', () => {
       const motivo = pop.querySelector('#popMotivoPendencia').value.trim();
       if (!motivo) { mostrarToast('Informe o motivo da pendência.', 'erro'); return; }
@@ -1243,10 +1251,11 @@
   function abrirFormPendenciaAdminNoPopover(pop, codigoEmpresa, ano, mes, statusAtual) {
     pop.innerHTML = `
       <label>Motivo da pendência (obrigatório)</label>
-      <textarea id="popMotivoPendenciaAdmin" rows="2" placeholder="Ex: falta disponibilização de documentação..."></textarea>
+      <textarea id="popMotivoPendenciaAdmin" rows="6" placeholder="Ex: falta disponibilização de documentação..."></textarea>
       <button type="button" class="btn btn-primary" id="popBtnConfirmarPendenciaAdmin">Confirmar</button>
     `;
     pop.addEventListener('click', (ev) => ev.stopPropagation());
+    alargarPopoverParaForm(pop);
     pop.querySelector('#popBtnConfirmarPendenciaAdmin').addEventListener('click', () => {
       const motivo = pop.querySelector('#popMotivoPendenciaAdmin').value.trim();
       if (!motivo) { mostrarToast('Informe o motivo da pendência.', 'erro'); return; }

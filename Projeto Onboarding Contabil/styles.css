@@ -657,6 +657,7 @@ input,select,textarea{font:inherit}
   box-shadow:var(--shadow); padding:10px; width:200px;
   display:flex; flex-direction:column; gap:6px; cursor:default; user-select:text;
 }
+.popover-grade.popover-grade-form{ width:min(420px, calc(100vw - 16px)); }
 .popover-grade button{ font-size:12px; padding:6px 8px; white-space:nowrap; }
 .popover-grade label{ display:block; font-size:11px; color:var(--muted); text-align:left; margin-bottom:4px; }
 .popover-grade textarea{ width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:12px; font-family:inherit; resize:vertical; }
