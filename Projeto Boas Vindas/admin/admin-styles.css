@@ -1520,3 +1520,53 @@ button:focus-visible, a:focus-visible {
     outline: 2px solid var(--bronze-500);
     outline-offset: 2px;
 }
+
+/* ===== EMPRESAS CADASTRADAS (rh_empresas) ===== */
+.campo-empresa-rh { position: relative; }
+
+.btn-empresa-cadastrada {
+    background: var(--bronze-tint);
+    color: var(--wine-800);
+    border: 1px solid var(--bronze-300);
+}
+
+.btn-empresa-cadastrada:hover { background: var(--bronze-300); }
+
+.empresas-rh-lista {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 50;
+    max-height: 320px;
+    overflow-y: auto;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    padding: 0.35rem;
+}
+
+.empresas-rh-lista[hidden] { display: none; }
+
+.empresa-rh-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    width: 100%;
+    text-align: left;
+    padding: 0.6rem 0.75rem;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.empresa-rh-item:hover,
+.empresa-rh-item:focus-visible { background: var(--wine-tint); }
+
+.empresa-rh-item strong { font-size: 0.9rem; color: var(--wine-800); }
+.empresa-rh-item span { font-size: 0.78rem; color: var(--ink-500); font-variant-numeric: tabular-nums; }
+
+.empresas-rh-vazio { padding: 0.9rem; font-size: 0.85rem; color: var(--ink-500); text-align: center; }

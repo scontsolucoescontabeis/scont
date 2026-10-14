@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cnpjInput = document.getElementById('cnpj');
     cnpjInput?.addEventListener('input', () => {
         cnpjInput.value = formatarCNPJ(cnpjInput.value);
+        if (_empresasRhAberta) renderizarListaEmpresasCadastradas();
     });
     cnpjInput?.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); buscarDadosCNPJ(); }
@@ -156,6 +157,116 @@ async function buscarDadosCNPJ() {
         }
     }
 }
+
+// ===== EMPRESAS CADASTRADAS (rh_empresas) =====
+let _empresasRh = null;        // cache; null = ainda não carregado
+let _empresasRhAberta = false;
+
+async function carregarEmpresasCadastradas() {
+    if (_empresasRh) return _empresasRh;
+    const { data, error } = await db
+        .from('rh_empresas')
+        .select('id, codigo_empresa, nome_empresa, cnpj, regime_enquadramento, inscricao_estadual')
+        .order('nome_empresa', { ascending: true });
+    if (error) throw error;
+    _empresasRh = data || [];
+    return _empresasRh;
+}
+
+async function alternarListaEmpresasCadastradas() {
+    const lista = document.getElementById('empresasRhLista');
+    const btn = document.getElementById('btnEmpresaCadastrada');
+    if (!lista) return;
+    if (_empresasRhAberta) { fecharListaEmpresasCadastradas(); return; }
+
+    _empresasRhAberta = true;
+    lista.hidden = false;
+    btn?.setAttribute('aria-expanded', 'true');
+    lista.innerHTML = '<div class="empresas-rh-vazio"><i class="fas fa-spinner fa-spin"></i> Carregando empresas...</div>';
+    try {
+        await carregarEmpresasCadastradas();
+        renderizarListaEmpresasCadastradas();
+    } catch (err) {
+        console.error(err);
+        lista.innerHTML = '<div class="empresas-rh-vazio">Não foi possível carregar as empresas cadastradas.</div>';
+    }
+}
+
+function fecharListaEmpresasCadastradas() {
+    _empresasRhAberta = false;
+    const lista = document.getElementById('empresasRhLista');
+    if (lista) lista.hidden = true;
+    document.getElementById('btnEmpresaCadastrada')?.setAttribute('aria-expanded', 'false');
+}
+
+function renderizarListaEmpresasCadastradas() {
+    const lista = document.getElementById('empresasRhLista');
+    if (!lista || !_empresasRh) return;
+    const termo = (document.getElementById('cnpj')?.value || '').trim().toLowerCase();
+    const digitos = termo.replace(/\D/g, '');
+
+    const filtradas = _empresasRh.filter(e => {
+        if (!termo) return true;
+        const cnpjE = (e.cnpj || '').replace(/\D/g, '');
+        return (digitos && cnpjE.includes(digitos))
+            || (e.nome_empresa || '').toLowerCase().includes(termo)
+            || (e.codigo_empresa || '').toLowerCase().includes(termo);
+    }).slice(0, 50);
+
+    if (!filtradas.length) {
+        lista.innerHTML = '<div class="empresas-rh-vazio">Nenhuma empresa cadastrada encontrada.</div>';
+        return;
+    }
+
+    lista.innerHTML = '';
+    filtradas.forEach(e => {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'empresa-rh-item';
+        item.setAttribute('role', 'option');
+        const nome = document.createElement('strong');
+        nome.textContent = e.nome_empresa || '(sem nome)';
+        const meta = document.createElement('span');
+        meta.textContent = `${e.cnpj ? formatarCNPJ(e.cnpj) : 'CNPJ não informado'} · Cód. ${e.codigo_empresa || '—'}`;
+        item.append(nome, meta);
+        item.addEventListener('click', () => selecionarEmpresaCadastrada(e));
+        lista.appendChild(item);
+    });
+}
+
+function selecionarEmpresaCadastrada(e) {
+    const setar = (id, valor) => {
+        const el = document.getElementById(id);
+        if (el && valor) el.value = valor;
+    };
+    setar('cnpj', e.cnpj ? formatarCNPJ(e.cnpj) : '');
+    setar('razaoSocial', e.nome_empresa);
+    setar('inscricao', e.inscricao_estadual);
+
+    const regime = (e.regime_enquadramento || '').toLowerCase();
+    const regimeEl = document.getElementById('regime');
+    if (regimeEl) {
+        if (regime.includes('simples')) regimeEl.value = 'Simples Nacional';
+        else if (regime.includes('presumido')) regimeEl.value = 'Lucro Presumido';
+        else if (regime.includes('real')) regimeEl.value = 'Lucro Real';
+    }
+
+    fecharListaEmpresasCadastradas();
+    if (e.cnpj) {
+        showToast(`Empresa "${e.nome_empresa}" selecionada. Use "Buscar" para completar porte e CNAEs`, 'success');
+    } else {
+        showToast(`Empresa "${e.nome_empresa}" selecionada, mas sem CNPJ cadastrado no RH`, 'error');
+    }
+}
+
+document.addEventListener('click', ev => {
+    if (!_empresasRhAberta) return;
+    if (!ev.target.closest('.campo-empresa-rh')) fecharListaEmpresasCadastradas();
+});
+
+document.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape' && _empresasRhAberta) fecharListaEmpresasCadastradas();
+});
 
 // ===== NAVEGAÇÃO =====
 function mudarSecao(secao) {
