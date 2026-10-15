@@ -17,6 +17,9 @@ window.PdiTela = (function () {
     ];
 
     let host = null, d = null, ctx = null, aba = 'resumo';
+    let ocupado = false, sujo = false;
+
+    window.addEventListener('beforeunload', (ev) => { if (sujo) { ev.preventDefault(); ev.returnValue = ''; } });
 
     function render(h, dados, contexto, abaInicial) {
         host = h; d = dados; ctx = contexto;
@@ -25,20 +28,39 @@ window.PdiTela = (function () {
     }
 
     async function salvar(fn, ok) {
+        if (ocupado) return;           // evita duplo clique duplicar o registro
+        ocupado = true;
+        const y = window.scrollY;      // mantém a posição de leitura após recarregar
+        host.setAttribute('aria-busy', 'true');
         try {
             await fn();
+            sujo = false;
             if (ok) U.toast(ok, 'ok');
             await ctx.recarregar(aba);
+            window.scrollTo(0, y);
         } catch (err) {
-            U.toast(err.message || 'Não foi possível salvar.', 'erro');
+            U.toast(U.erroAmigavel(err), 'erro');
+        } finally {
+            ocupado = false;
+            host.removeAttribute('aria-busy');
         }
+    }
+
+    async function trocarAba(nova) {
+        if (sujo && !(await U.confirmar('Alterações não salvas', 'Você alterou a ficha e ainda não salvou. Sair descarta essas alterações.', 'Descartar e sair'))) return;
+        sujo = false;
+        aba = nova;
+        desenhar();
+        window.scrollTo(0, 0);
     }
 
     // ---------- util ----------
     const pode = () => ctx.pode.avaliar;
+    // data-label em cada célula: no celular a tabela empilha em cartões (CSS .empilhar)
+    const rotular = (tr, cab) => { let i = 0; return tr.replace(/<td(?=[ >])/g, () => `<td data-label="${e(cab[i++] || '')}"`); };
     const tabela = (cab, linhas, vazio) => linhas.length
-        ? `<div class="tabela-wrap"><table class="doc-tab"><thead><tr>${cab.map(c => `<th>${e(c)}</th>`).join('')}</tr></thead><tbody>${linhas.join('')}</tbody></table></div>`
-        : `<p class="muted">${e(vazio || 'Nada registrado ainda.')}</p>`;
+        ? `<div class="tabela-wrap"><table class="doc-tab empilhar"><thead><tr>${cab.map(c => `<th>${e(c)}</th>`).join('')}</tr></thead><tbody>${linhas.map(l => rotular(l, cab)).join('')}</tbody></table></div>`
+        : `<p class="vazio">${e(vazio || 'Nada registrado ainda.')}</p>`;
     const btn = (a, rot, id, cls) => `<button class="btn peq ${cls || 'sec'}" data-a="${a}"${id ? ` data-id="${e(id)}"` : ''}>${e(rot)}</button>`;
     const fim = () => C.fimPdi(d.pdi.data_inicio, d.pdi.meses_acompanhamento);
     const cicloAtual = () => {
@@ -60,7 +82,7 @@ window.PdiTela = (function () {
         const acoes = d.acoes.filter(a => !a.recorrencia);
         const conc = acoes.filter(a => a.status === 'concluido').length;
         const ultimas = d.avaliacoes.filter(a => a.status === 'concluida').slice(-1)[0];
-        const kpi = (rot, val, sub) => `<div class="kpi"><span class="kpi-v">${e(val)}</span><span class="kpi-r">${e(rot)}</span>${sub ? `<small>${e(sub)}</small>` : ''}</div>`;
+        const kpi = (rot, val, sub) => `<div class="kpi"><span class="kpi-v${String(val).length > 7 ? ' txt' : ''}">${e(val)}</span><span class="kpi-r">${e(rot)}</span>${sub ? `<small>${e(sub)}</small>` : ''}</div>`;
         const prox = acoes.filter(a => a.status !== 'concluido').map(a => ({ a, data: C.somarDias(d.pdi.data_inicio, a.prazo_dias) }))
             .sort((x, y) => x.data.localeCompare(y.data)).slice(0, 4);
         return `<div class="kpis">
@@ -295,8 +317,8 @@ window.PdiTela = (function () {
         <form id="formFicha" class="ficha">
           <div class="grid2"><label>Data da reunião<input type="date" name="data_reuniao" value="${e(f.data_reuniao || '')}" ${edita ? '' : 'disabled'}></label>
             <label>Gestor<input name="gestor_nome" value="${e(f.gestor_nome || d.pdi.gestor_nome || '')}" ${edita ? '' : 'disabled'}></label></div>
-          <div class="tabela-wrap"><table class="doc-tab"><thead><tr><th>Pilar</th><th>Nota inicial</th><th>Nota do ciclo</th><th>Evidências da avaliação</th></tr></thead>
-            <tbody>${C.PILARES.map(linhaPilar).join('')}</tbody></table></div>
+          <div class="tabela-wrap"><table class="doc-tab empilhar"><thead><tr><th>Pilar</th><th>Nota inicial</th><th>Nota do ciclo</th><th>Evidências da avaliação</th></tr></thead>
+            <tbody>${C.PILARES.map(p => rotular(linhaPilar(p), ['Pilar', 'Nota inicial', 'Nota do ciclo', 'Evidências da avaliação'])).join('')}</tbody></table></div>
           <p class="doc-nota">${e(T.TEXTOS.fichaNaRegra)}</p>
           <div class="apoio"><strong>Apoio à decisão (não substitui a nota):</strong> média técnica ${mediaTec == null ? '—' : String(mediaTec).replace('.', ',')}
              · média comportamental ${mediaComp == null ? '—' : String(mediaComp).replace('.', ',')} · melhorias validadas no período: ${valid} · ${e(resumoInd)}</div>
@@ -388,19 +410,26 @@ window.PdiTela = (function () {
               ${p.colaborador_user_id ? '' : ' <span class="aviso">sem usuário vinculado</span>'}</p></div>
             <div><button class="btn" data-a="apresentar">Apresentar</button></div>
           </header>
-          <nav class="abas" role="tablist">${ABAS.map(a => `<button role="tab" class="aba${a[0] === aba ? ' ativa' : ''}" data-aba="${a[0]}" aria-selected="${a[0] === aba}">${e(a[1])}</button>`).join('')}</nav>
-          <section class="aba-corpo">${CONTEUDO[aba]()}</section>`;
+          <nav class="abas" aria-label="Seções do PDI">${ABAS.map(a => `<button class="aba${a[0] === aba ? ' ativa' : ''}" data-aba="${a[0]}"${a[0] === aba ? ' aria-current="page"' : ''}>${e(a[1])}</button>`).join('')}</nav>
+          <section class="aba-corpo" aria-live="polite">${CONTEUDO[aba]()}</section>`;
+        document.title = `${p.colaborador_nome} — PDI — SCONT`;
+        if (ctx.gravarHash) ctx.gravarHash({ pdi: p.id, aba }, false);
+        sujo = false;
         ligar();
+        const ativa = host.querySelector('.aba.ativa');
+        if (ativa && ativa.scrollIntoView) ativa.scrollIntoView({ block: 'nearest', inline: 'center' });
     }
 
     function ligar() {
-        host.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => { aba = b.dataset.aba; desenhar(); });
+        host.querySelectorAll('[data-aba]').forEach(b => b.onclick = () => trocarAba(b.dataset.aba));
         host.querySelectorAll('button[data-a]').forEach(b => b.onclick = () => executar(b.dataset.a, b.dataset.id));
         host.querySelectorAll('select[data-a]').forEach(s => s.onchange = () => executar(s.dataset.a, s.dataset.id, s.value));
         host.querySelectorAll('input[type=checkbox][data-a]').forEach(c => c.onchange = () => executar(c.dataset.a, c.dataset.id, c.checked));
         const ff = host.querySelector('#formFicha');
         if (ff) {
             ff.onsubmit = (ev) => { ev.preventDefault(); salvarFicha(ff); };
+            ff.addEventListener('input', () => { sujo = true; });
+            ff.addEventListener('change', () => { sujo = true; });
             ff.querySelectorAll('input[name^="na_"]').forEach(c => c.onchange = () => {
                 const p = c.name.slice(3);
                 ff.elements['nc_' + p].disabled = c.checked;
@@ -444,7 +473,11 @@ window.PdiTela = (function () {
     const nomeUsuario = () => ctx.user.nome || ctx.user.email;
 
     const HANDLERS = {
-        voltar: () => ctx.voltar(),
+        voltar: async () => {
+            if (sujo && !(await U.confirmar('Alterações não salvas', 'Você alterou a ficha e ainda não salvou. Sair descarta essas alterações.', 'Descartar e sair'))) return;
+            sujo = false;
+            ctx.voltar();
+        },
         apresentar: () => window.PdiApresentar.abrir(dadosComSemanas()),
         imprimir: () => window.PdiExportar.imprimir(dadosComSemanas()),
         docx: () => window.PdiExportar.docx(dadosComSemanas()).catch(err => U.toast(err.message, 'erro')),
