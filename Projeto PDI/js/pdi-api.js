@@ -126,6 +126,16 @@ window.PdiApi = (function () {
         p_gestor_nome: p.gestor_nome || null, p_data_inicio: p.data_inicio,
     }));
 
+    // Exclui o PDI (só admin): remove os relatórios do Storage e depois chama a função do banco,
+    // que apaga o PDI e tudo que depende dele. A auditoria preserva o registro.
+    async function excluirPdi(id) {
+        try {
+            const { data: arqs } = await sb.storage.from('pdi-relatorios').list(id, { limit: 100 });
+            if (arqs && arqs.length) await sb.storage.from('pdi-relatorios').remove(arqs.map(a => `${id}/${a.name}`));
+        } catch (_) { /* sem relatório anexado ou sem acesso: segue a exclusão */ }
+        return q(sb.rpc('pdi_excluir', { p_pdi: id }));
+    }
+
     async function urlRelatorio(path) {
         const { data, error } = await sb.storage.from('pdi-relatorios').createSignedUrl(path, 300);
         if (error) throw new Error(error.message);
@@ -141,7 +151,7 @@ window.PdiApi = (function () {
     return {
         init, tabelaAusente, papeis, sessao, listarPdis, carregarTodos, carregar, ins, upd, del, atualizarSemEco,
         upsertApuracao, upsertAlinhamento, upsertAvaliacao, upsertPilar, modelos, usuarios, socios, rhSocios,
-        criarPdi, urlRelatorio, enviarRelatorio, CODIGO_EMPRESA_SCONT,
+        criarPdi, excluirPdi, urlRelatorio, enviarRelatorio, CODIGO_EMPRESA_SCONT,
         client: () => sb,
     };
 })();

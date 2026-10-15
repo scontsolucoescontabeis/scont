@@ -21,4 +21,5 @@ psql -f tests/rls_pdi.sql          # Postgres descartável com stubs de auth/sto
 DOCX_LIB=<node_modules/docx/build/index.cjs> node tests/docx.test.js
 ```
 `tests/harness-visual.html` renderiza as telas com dados simulados (sem Supabase).
+`_sql/pdi_excluir_pdi.sql` (incremental): exclusão de PDI pelo admin; roda depois de `schema_pdi.sql` se o banco já existia.
 `tools/gerar-seed.js` regenera `_sql/seed_pdi.sql` a partir de `js/textos.js`.

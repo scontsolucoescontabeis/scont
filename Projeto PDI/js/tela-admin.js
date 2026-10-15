@@ -22,6 +22,7 @@ window.PdiAdmin = (function () {
                 <td>${fd(p.data_inicio)}</td><td>${e(p.status)}</td>
                 <td><button class="btn peq sec" data-a="vincular" data-id="${p.id}">Vincular usuários</button>
                     <button class="btn peq sec" data-a="status" data-id="${p.id}">Status</button>
+                    <button class="btn peq danger" data-a="excluir" data-id="${p.id}">Excluir</button>
                     <button class="btn peq" data-a="abrir" data-id="${p.id}">Abrir</button></td></tr>`).join('')
                 || '<tr><td colspan="7" class="muted">Nenhum PDI cadastrado.</td></tr>'}
             </tbody></table></div></section>
@@ -75,6 +76,21 @@ window.PdiAdmin = (function () {
                 const r = await U.formulario('Status do PDI', [
                     { nome: 'status', rotulo: 'Status', tipo: 'select', vazio: false, valor: p.status, opcoes: [['rascunho', 'Rascunho'], ['ativo', 'Ativo'], ['encerrado', 'Encerrado']] }]);
                 if (r) await executar(() => Api.atualizarSemEco('pdis', id, r), 'Status atualizado.');
+            },
+            excluir: async (id) => {
+                const p = pdis.find(x => x.id === id);
+                const r = await U.formulario(`Excluir PDI — ${p.colaborador_nome}`, [
+                    { nome: 'confirmacao', rotulo: `Para confirmar, digite o nome do colaborador: ${p.colaborador_nome}`, obrigatorio: true },
+                ], {
+                    texto: 'Esta ação apaga o PDI e tudo que depende dele: níveis, avaliações, fichas trimestrais, feedbacks, ciências e relatórios anexados. Não pode ser desfeita. O registro da exclusão fica na auditoria.',
+                    confirmar: 'Excluir definitivamente',
+                });
+                if (!r) return;
+                if ((r.confirmacao || '').trim().toLowerCase() !== (p.colaborador_nome || '').trim().toLowerCase()) {
+                    U.toast('O nome digitado não confere. Nada foi excluído.', 'erro');
+                    return;
+                }
+                await executar(() => Api.excluirPdi(id), 'PDI excluído.');
             },
             'novo-socio': async () => {
                 const campos = [{ nome: 'usuario_id', rotulo: 'Usuário do portal', tipo: 'select', obrigatorio: true, opcoes: opUsr }];

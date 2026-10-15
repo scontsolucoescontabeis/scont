@@ -448,7 +448,8 @@ DECLARE
     v_ciencias INTEGER;
 BEGIN
     IF TG_OP = 'DELETE' THEN
-        IF OLD.status = 'concluida' THEN
+        -- exclusão do PDI inteiro (pdi_excluir, só admin) pode levar as fichas concluídas junto
+        IF OLD.status = 'concluida' AND COALESCE(current_setting('pdi.excluindo', TRUE), '') <> 'on' THEN
             RAISE EXCEPTION 'Avaliação concluída não pode ser excluída.';
         END IF;
         RETURN OLD;
@@ -510,6 +511,9 @@ CREATE OR REPLACE FUNCTION public.pdi_pilares_guarda()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_status TEXT; v_av UUID;
 BEGIN
+    IF TG_OP = 'DELETE' AND COALESCE(current_setting('pdi.excluindo', TRUE), '') = 'on' THEN
+        RETURN OLD;
+    END IF;
     v_av := COALESCE(NEW.avaliacao_id, OLD.avaliacao_id);
     SELECT status INTO v_status FROM public.pdi_avaliacoes_trimestrais WHERE id = v_av;
     IF v_status = 'concluida' THEN
@@ -778,6 +782,26 @@ $$;
 
 REVOKE ALL ON FUNCTION public.pdi_criar_a_partir_do_modelo FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.pdi_criar_a_partir_do_modelo TO authenticated;
+
+-- ------------------------------------------------------------
+-- 5b. Exclusão de um PDI inteiro (somente administrador).
+--     As tabelas filhas caem em cascata; a auditoria (sem FK) preserva o histórico.
+-- ------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.pdi_excluir(p_pdi UUID)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+    IF NOT public.is_admin() THEN
+        RAISE EXCEPTION 'Somente o administrador exclui PDIs.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.pdis WHERE id = p_pdi) THEN
+        RAISE EXCEPTION 'PDI não encontrado.';
+    END IF;
+    PERFORM set_config('pdi.excluindo', 'on', TRUE);   -- vale só nesta transação
+    DELETE FROM public.pdis WHERE id = p_pdi;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.pdi_excluir(UUID) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.pdi_excluir(UUID) TO authenticated;
 
 -- ------------------------------------------------------------
 -- 6. Storage: relatórios comportamentais (privado, pasta = pdi_id)
