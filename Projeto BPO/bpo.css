@@ -1,0 +1,127 @@
+/* BPO Financeiro — complementos ao styles.css do Departamento Contábil (mesma paleta). */
+
+.bpo-select, .bpo-input{
+  padding:9px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface);
+  color:var(--text); font-size:.88rem; min-width:0;
+}
+.bpo-select:focus, .bpo-input:focus{outline:2px solid var(--brand-soft); border-color:var(--brand)}
+
+.bpo-cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin:16px 0}
+.bpo-card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm);
+  padding:14px 16px; cursor:pointer; transition:.15s ease; border-left:4px solid var(--line);
+}
+.bpo-card:hover{transform:translateY(-1px); box-shadow:var(--shadow-soft)}
+.bpo-card.active{outline:2px solid var(--brand)}
+.bpo-card .num{font-size:1.7rem; font-weight:800; line-height:1.1}
+.bpo-card .label{font-size:.8rem; color:var(--muted); font-weight:600; margin-top:2px}
+.bpo-card-ok{border-left-color:var(--success)} .bpo-card-ok .num{color:var(--success)}
+.bpo-card-pendente{border-left-color:var(--danger)} .bpo-card-pendente .num{color:var(--danger)}
+.bpo-card-dispensado{border-left-color:var(--muted)}
+.bpo-card-total{border-left-color:var(--brand)}
+
+.bpo-aviso{
+  border:1px solid var(--line); border-radius:var(--radius-sm); padding:10px 14px; margin:12px 0;
+  background:var(--surface); font-size:.88rem; line-height:1.5;
+}
+.bpo-aviso-alerta{background:var(--warning-soft); border-color:#f3cfa6}
+.bpo-aviso-ok{background:var(--success-soft); border-color:#bfe6cf}
+.bpo-aviso-erro{background:var(--danger-soft); border-color:#f2b8b5}
+
+.bpo-pill{display:inline-block; padding:2px 9px; border-radius:999px; font-size:.74rem; font-weight:700}
+.bpo-pill-teste{background:var(--warning-soft); color:var(--warning)}
+.bpo-sit-ok{background:var(--success-soft); color:#1e8449}
+.bpo-sit-pend{background:var(--danger-soft); color:#b3261e}
+.bpo-sit-neutro{background:var(--line-soft); color:var(--muted)}
+
+.bpo-etapas{display:flex; gap:10px; flex-wrap:wrap; margin:12px 0}
+.bpo-etapa{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm);
+  padding:8px 12px; min-width:120px; font-size:.8rem;
+}
+.bpo-etapa.atual{border-color:var(--brand); background:var(--brand-soft)}
+.bpo-etapa.passada{opacity:.65}
+.bpo-etapa strong{display:block; font-size:.9rem}
+
+.bpo-tabela-wrap{overflow-x:auto}
+.bpo-tabela td.acoes{text-align:right; white-space:nowrap}
+.bpo-tabela tbody tr{cursor:default}
+.bpo-arquivos{max-width:360px; font-size:.78rem; color:var(--muted)}
+.bpo-link{background:none; border:none; color:var(--brand); cursor:pointer; font-weight:700; padding:2px 6px; font-size:.8rem}
+.bpo-link:hover{text-decoration:underline}
+
+.bpo-dropzone{
+  display:block; margin-top:14px;
+  border:2px dashed var(--line); border-radius:var(--radius); padding:36px 20px; text-align:center;
+  background:var(--surface); color:var(--muted); cursor:pointer; transition:.15s ease;
+}
+.bpo-dropzone:hover, .bpo-dropzone.over{border-color:var(--brand); background:var(--brand-soft)}
+.bpo-dropzone .emoji{font-size:2.4rem}
+
+.bpo-form-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; margin-bottom:18px}
+.bpo-form-grid .full{grid-column:1/-1}
+.bpo-form-grid label{display:block; font-size:.8rem; font-weight:700; margin-bottom:5px; color:var(--text)}
+.bpo-form-grid input[type=text], .bpo-form-grid input[type=email], .bpo-form-grid input[type=number], .bpo-form-grid textarea{
+  width:100%; padding:9px 12px; border:1px solid var(--line); border-radius:10px; font-size:.88rem;
+}
+.bpo-form-grid textarea{min-height:140px; resize:vertical; line-height:1.5}
+.bpo-form-grid small{display:block; color:var(--muted); font-size:.76rem; margin-top:4px}
+
+.bpo-secao{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px; margin-bottom:16px}
+.bpo-secao h3{margin:0 0 12px; font-size:1rem; color:var(--brand-strong)}
+
+.bpo-preview{border:1px solid var(--line); border-radius:var(--radius-sm); padding:14px 18px; background:#fff; font-size:.9rem; line-height:1.55}
+.bpo-preview p{margin:0 0 10px}
+
+.bpo-toast{
+  position:fixed; right:20px; bottom:20px; background:var(--secondary); color:#fff; padding:12px 18px;
+  border-radius:12px; font-size:.88rem; z-index:2000; opacity:0; pointer-events:none; transition:.25s ease;
+  max-width:420px;
+}
+.bpo-toast.show{opacity:1}
+.bpo-toast.erro{background:#b3261e}
+.bpo-toast.sucesso{background:#1e8449}
+
+.bpo-progresso{height:8px; background:var(--line-soft); border-radius:999px; overflow:hidden; margin:10px 0}
+.bpo-progresso > div{height:100%; width:0; background:var(--brand); transition:width .2s ease}
+
+@media (max-width:760px){
+  .bpo-cards{grid-template-columns:repeat(2,1fr)}
+}
+
+/* Lista de nomes não reconhecidos: rolagem interna + cabeçalho fixo */
+.bpo-scroll{max-height:460px; overflow:auto; border:1px solid var(--line-soft); border-radius:var(--radius-sm)}
+.bpo-scroll .mapa-table{border-radius:0}
+.bpo-scroll thead th{position:sticky; top:0; background:var(--surface-2); z-index:1}
+.bpo-scroll .bpo-input{width:100%; min-width:200px}
+.bpo-vinc-barra{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px}
+.bpo-acoes-fixas{
+  position:sticky; bottom:0; z-index:5; display:flex; gap:10px; justify-content:flex-end; align-items:center;
+  padding:12px 16px; margin-top:8px; background:rgba(255,255,255,.96); border:1px solid var(--line);
+  border-radius:var(--radius-sm); box-shadow:var(--shadow-soft);
+}
+.bpo-acoes-fixas .resumo{margin-right:auto; color:var(--muted); font-size:.85rem}
+.bpo-monitorado{font-weight:700; color:var(--brand)}
+
+/* Painel: agrupamento por empresa */
+.bpo-pill{white-space:nowrap}
+.bpo-tabela tr.bpo-grupo-ini td{border-top:2px solid var(--line)}
+.bpo-tabela tbody tr:first-child.bpo-grupo-ini td{border-top:none}
+.bpo-arq-nome{display:inline-block; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:bottom}
+.bpo-arquivos{white-space:nowrap}
+
+/* Empresas */
+.bpo-scroll-alto{max-height:calc(100vh - 300px); min-height:320px}
+tr.bpo-sem td{background:var(--surface-2)}
+tr.bpo-sem .bpo-input{opacity:.7}
+
+/* Regras e textos */
+.bpo-check{display:flex !important; align-items:center; gap:8px; margin-top:10px; font-weight:600}
+.bpo-check input{width:auto !important}
+
+/* Empresas: ações em massa */
+.bpo-massa{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; padding:10px 14px;
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); font-size:.85rem}
+.bpo-massa > span{margin-right:auto; color:var(--muted); font-weight:600}
+.bpo-massa label{font-size:.88rem; cursor:pointer}
+#bpoModal .bpo-dropzone{padding:22px 16px}

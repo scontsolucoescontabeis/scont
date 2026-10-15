@@ -1,0 +1,295 @@
+// ============================================================
+// bpo-alertas — envio dos e-mails de alerta do BPO Financeiro
+//
+// Chamado pela tela Projeto BPO/index.html (fila de alertas).
+// Destinatários e textos NUNCA vêm do chamador: são lidos aqui, com
+// service role, das tabelas bpo_* — a função não vira um "envia
+// qualquer coisa para qualquer um".
+//
+// Ações (body.acao):
+//   cobrar     { competencia, codigo_empresa, etapa, tipo_texto, tipo_ids[], data_limite? }
+//   relatorio  { competencia, etapa?, itens[], resumo?, portal_url? }
+//
+// Deploy: supabase functions deploy bpo-alertas
+// ============================================================
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import nodemailer from 'npm:nodemailer@6';
+
+const CORS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const TIPOS_TEXTO = ['inicial', 'lembrete', 'ultimo_aviso'];
+
+const escapeHtml = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+
+function competenciaTextos(comp: string) {
+    const m = /^(\d{4})-(\d{2})$/.exec(comp || '');
+    if (!m) return { curta: comp, extenso: comp };
+    return { curta: `${m[2]}/${m[1]}`, extenso: `${MESES[parseInt(m[2], 10) - 1]}/${m[1]}` };
+}
+
+function dataBr(iso?: string | null) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
+function emailsValidos(lista: unknown, dominiosIgnorados: string[] = []): string[] {
+    const out: string[] = [];
+    const ign = dominiosIgnorados.map((d) => d.toLowerCase());
+    (Array.isArray(lista) ? lista : []).forEach((x) => {
+        const v = String(x).trim().toLowerCase();
+        if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) && !out.includes(v) && !ign.includes(v.split('@')[1])) out.push(v);
+    });
+    return out;
+}
+
+function aplicarVariaveis(texto: string, vars: Record<string, string>) {
+    return String(texto || '').replace(/\{(\w+)\}/g, (orig, k) => (k in vars ? vars[k] : orig));
+}
+
+// Linha em branco = parágrafo; "- " = item de lista; **x** = negrito.
+function textoParaHtml(texto: string, vars: Record<string, string>) {
+    const seguros: Record<string, string> = {};
+    Object.keys(vars).forEach((k) => { seguros[k] = escapeHtml(vars[k]); });
+    const html = aplicarVariaveis(escapeHtml(texto), seguros);
+    const negrito = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    return html.replace(/\r\n/g, '\n').split(/\n\s*\n/).map((bloco) => {
+        const partes: string[] = [];
+        let lista: string[] = [], par: string[] = [];
+        const fecharLista = () => { if (lista.length) partes.push(`<ul>${lista.join('')}</ul>`); lista = []; };
+        const fecharPar = () => { if (par.length) partes.push(`<p>${par.join('<br>')}</p>`); par = []; };
+        bloco.split('\n').filter((l) => l.trim()).forEach((l) => {
+            const item = /^\s*-\s+(.*)$/.exec(l);
+            if (item) { fecharPar(); lista.push(`<li>${negrito(item[1])}</li>`); } else { fecharLista(); par.push(negrito(l.trim())); }
+        });
+        fecharPar(); fecharLista();
+        return partes.join('');
+    }).join('');
+}
+
+// ── Layout Scont (mesmo visual das outras funções de e-mail) ────────
+function envelope(nomeRemetente: string, miolo: string): string {
+    return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#f0f2f5" style="background-color:#f0f2f5;padding:32px 16px;"><tr><td align="center">
+<table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;">
+<tr><td bgcolor="#f5eae9" style="background-color:#f5eae9;padding:28px;text-align:center;border-radius:12px 12px 0 0;border:1px solid #e0c8c6;border-bottom:none;">
+  <h1 style="color:#4e1820;margin:0;font-size:22px;font-weight:700;">${escapeHtml(nomeRemetente)}</h1>
+  <p style="color:#8b4a4a;margin:6px 0 0;font-size:13px;">Contabilidade com excelência</p>
+</td></tr>
+<tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:32px;border:1px solid #e0e6ed;border-top:none;color:#434343;font-size:15px;line-height:1.6;">
+${miolo}
+  <hr style="border:none;border-top:1px solid #e0e6ed;margin:24px 0;">
+  <p style="font-size:12px;color:#999;text-align:center;line-height:1.8;margin:0;">
+    <strong style="color:#4e1820;">BPO Financeiro</strong><br>
+    📚 <a href="mailto:contabil@scontdf.com.br" style="color:#b47938;">contabil@scontdf.com.br</a>
+  </p>
+</td></tr>
+<tr><td bgcolor="#f8f9fa" style="background-color:#f8f9fa;padding:16px;text-align:center;border:1px solid #e0e6ed;border-top:none;border-radius:0 0 12px 12px;">
+  <p style="margin:0;font-size:11px;color:#aaa;">Mensagem automática · ${escapeHtml(nomeRemetente)}</p>
+</td></tr></table></td></tr></table></body></html>`;
+}
+
+// ── Envio (mesmos provedores configurados em configuracoes_scont) ───
+async function enviar(cfgMail: Record<string, string>, msg: { para: string[]; cc: string[]; assunto: string; html: string }) {
+    const nomeRem = cfgMail.nome_remetente || 'Scont Soluções Contábeis';
+    const emailRem = cfgMail.email_remetente || cfgMail.smtp_usuario || 'contato@scontdf.com.br';
+    const provedor = cfgMail.email_provedor || 'brevo';
+
+    if (provedor === 'smtp') {
+        if (!cfgMail.smtp_host || !cfgMail.smtp_usuario || !cfgMail.smtp_senha) {
+            throw new Error('Configurações SMTP incompletas. Acesse Admin → Configurações → SMTP.');
+        }
+        const transporter = nodemailer.createTransport({
+            host: cfgMail.smtp_host, port: parseInt(cfgMail.smtp_porta || '587'),
+            secure: cfgMail.smtp_seguranca === 'SSL',
+            auth: { user: cfgMail.smtp_usuario, pass: cfgMail.smtp_senha },
+            tls: { rejectUnauthorized: false },
+        });
+        const info = await transporter.sendMail({
+            from: `${nomeRem} <${emailRem}>`, to: msg.para.join(', '),
+            ...(msg.cc.length ? { cc: msg.cc.join(', ') } : {}),
+            replyTo: cfgMail.email_resposta_contabil || 'contabil@scontdf.com.br',
+            subject: msg.assunto, html: msg.html,
+        });
+        return { provider: 'smtp', id: info.messageId };
+    }
+
+    if (!cfgMail.brevo_api_key) throw new Error('Brevo API Key não configurada. Acesse Admin → Configurações.');
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': cfgMail.brevo_api_key, 'Content-Type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({
+            sender: { name: nomeRem, email: emailRem },
+            to: msg.para.map((email) => ({ email })),
+            ...(msg.cc.length ? { cc: msg.cc.map((email) => ({ email })) } : {}),
+            replyTo: { email: cfgMail.email_resposta_contabil || 'contabil@scontdf.com.br' },
+            subject: msg.assunto, htmlContent: msg.html,
+        }),
+    });
+    const json = await resp.json();
+    if (!resp.ok) throw new Error('Brevo: ' + (json?.message ?? JSON.stringify(json)));
+    return { provider: 'brevo', id: json.messageId };
+}
+
+// Modo teste: tudo vai só para o e-mail de teste, com aviso no topo.
+function aplicarModoTeste(cfg: Record<string, unknown>, para: string[], cc: string[], assunto: string, html: string) {
+    if (!cfg.modo_teste) return { para, cc, assunto, html, teste: false };
+    const alvo = emailsValidos([cfg.email_teste]);
+    if (!alvo.length) throw new Error('Modo teste ligado, mas o e-mail de teste não está configurado (Regras e textos).');
+    const aviso = `<div style="background:#fdf1e6;border:1px solid #f3cfa6;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#8a5a1f;">
+      <strong>MODO TESTE</strong> — destinatários reais: ${escapeHtml(para.join(', ') || '—')}${cc.length ? ` (cc: ${escapeHtml(cc.join(', '))})` : ''}</div>`;
+    return { para: alvo, cc: [], assunto: `[TESTE] ${assunto}`, html: aviso + html, teste: true };
+}
+
+function resposta(obj: unknown, status = 200) {
+    return new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
+Deno.serve(async (req) => {
+    if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+    try {
+        const authHeader = req.headers.get('Authorization');
+        if (!authHeader) throw new Error('Não autorizado.');
+
+        // Quem chama precisa ser admin ou equipe Scont (mesma regra da RLS das tabelas).
+        const userDb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+            global: { headers: { Authorization: authHeader } },
+        });
+        const { data: pode, error: podeErr } = await userDb.rpc('bpo_pode_gerir');
+        if (podeErr || pode !== true) return resposta({ ok: false, error: 'Sem permissão para o BPO Financeiro.' }, 403);
+        const { data: u } = await userDb.auth.getUser();
+        const quem = u?.user?.email || 'desconhecido';
+
+        const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+        const body = await req.json() as Record<string, unknown>;
+        const acao = String(body.acao || '');
+        const comp = String(body.competencia || '');
+        if (!/^\d{4}-\d{2}$/.test(comp)) throw new Error('Competência inválida.');
+        const { curta, extenso } = competenciaTextos(comp);
+
+        const { data: cfgRow, error: cfgErr } = await db.from('bpo_config').select('*').eq('id', 1).maybeSingle();
+        if (cfgErr || !cfgRow) throw new Error('Configuração do BPO não encontrada (rode schema_bpo_documentos.sql).');
+        const cfg = cfgRow as Record<string, unknown> & { ignorar_emails_dominio?: string[] };
+
+        const { data: mailRows, error: mailErr } = await db.from('configuracoes_scont').select('chave, valor');
+        if (mailErr) throw new Error('Erro ao ler configurações de e-mail: ' + mailErr.message);
+        const cfgMail: Record<string, string> = {};
+        (mailRows ?? []).forEach((r: { chave: string; valor: string }) => { cfgMail[r.chave] = r.valor ?? ''; });
+        const nomeRem = cfgMail.nome_remetente || 'Scont Soluções Contábeis';
+
+        // ── COBRAR (1 e-mail por empresa, com todos os documentos pendentes) ──
+        if (acao === 'cobrar') {
+            const codigo = String(body.codigo_empresa || '');
+            const etapa = String(body.etapa || 'MANUAL').toUpperCase();
+            const tipoTexto = String(body.tipo_texto || 'lembrete');
+            if (!TIPOS_TEXTO.includes(tipoTexto)) throw new Error('tipo_texto inválido.');
+            const tipoIds = (Array.isArray(body.tipo_ids) ? body.tipo_ids : []).map(String);
+            if (!codigo || !tipoIds.length) throw new Error('Empresa e documentos são obrigatórios.');
+
+            const [{ data: emp }, { data: rh }, { data: tps }, { data: marc }, { data: jaFoi }] = await Promise.all([
+                db.from('bpo_empresas').select('*').eq('codigo_empresa', codigo).maybeSingle(),
+                db.from('rh_empresas').select('nome_empresa').eq('codigo_empresa', codigo).maybeSingle(),
+                db.from('bpo_tipos_documento').select('id, nome').in('id', tipoIds),
+                db.from('bpo_marcacoes').select('tipo_id').eq('competencia', comp).eq('codigo_empresa', codigo).in('tipo_id', tipoIds),
+                etapa === 'MANUAL' ? Promise.resolve({ data: null }) :
+                    db.from('bpo_alertas').select('id').eq('competencia', comp).eq('codigo_empresa', codigo)
+                        .eq('etapa', etapa).eq('ok', true).limit(1).maybeSingle(),
+            ]);
+            if (jaFoi) return resposta({ ok: true, duplicado: true });
+            if (!emp || !(emp as { possui_bpo?: boolean }).possui_bpo) {
+                return resposta({ ok: false, error: 'Empresa não está marcada com BPO.' }, 409);
+            }
+            const dispensados = new Set((marc ?? []).map((m: { tipo_id: string }) => m.tipo_id));
+            const docs = (tps ?? []).filter((t: { id: string }) => !dispensados.has(t.id)).map((t: { nome: string }) => t.nome);
+            if (!docs.length) return resposta({ ok: false, error: 'Documentos já recebidos ou dispensados.' }, 409);
+
+            const para = emailsValidos((emp as { emails?: string[] }).emails, cfg.ignorar_emails_dominio);
+            const cc = emailsValidos((emp as { emails_cc?: string[] }).emails_cc, cfg.ignorar_emails_dominio).filter((e) => !para.includes(e));
+            const registrar = async (ok: boolean, dest: string[], teste: boolean, erro?: string) => {
+                await db.from('bpo_alertas').insert({
+                    competencia: comp, codigo_empresa: codigo, etapa, tipo_texto: tipoTexto, documentos: docs,
+                    para: dest, ok, modo_teste: teste, erro: erro || null, enviado_por: quem,
+                });
+            };
+            if (!para.length) {
+                await registrar(false, [], !!cfg.modo_teste, 'SEM_EMAIL');
+                return resposta({ ok: false, sem_email: true, error: 'Empresa sem e-mail cadastrado.' }, 422);
+            }
+
+            const vars: Record<string, string> = {
+                cliente: (rh as { nome_empresa?: string } | null)?.nome_empresa || codigo,
+                competencia: curta, competencia_extenso: extenso,
+                data_limite: dataBr(String(body.data_limite || '')) || 'o quanto antes',
+                documentos: docs.map((d) => `- ${d}`).join('\n'),
+            };
+            const assunto = aplicarVariaveis(String(cfg[`assunto_${tipoTexto}`] || ''), vars);
+            const miolo = textoParaHtml(String(cfg[`texto_${tipoTexto}`] || ''), vars);
+            const final = aplicarModoTeste(cfg, para, cc, assunto, miolo);
+            try {
+                const r = await enviar(cfgMail, { para: final.para, cc: final.cc, assunto: final.assunto, html: envelope(nomeRem, final.html) });
+                await registrar(true, para, final.teste);
+                return resposta({ ok: true, para, modo_teste: final.teste, ...r });
+            } catch (e) {
+                await registrar(false, para, final.teste, e instanceof Error ? e.message : String(e));
+                throw e;
+            }
+        }
+
+        // ── RELATÓRIO PARA A CHEFE ─────────────────────────────────
+        if (acao === 'relatorio') {
+            const itens = (Array.isArray(body.itens) ? body.itens : []) as Array<Record<string, unknown>>;
+            const para = emailsValidos([cfg.email_chefe]);
+            const cc = emailsValidos([...((cfg.emails_copia_relatorio as string[]) || []), cfg.email_operador]).filter((e) => !para.includes(e));
+            if (!para.length && !cc.length) throw new Error('Nenhum destinatário para o relatório (preencha o e-mail da chefe em Regras e textos).');
+
+            const porEmpresa = new Map<string, { nome: string; docs: string[]; alertas: number }>();
+            itens.forEach((i) => {
+                const k = String(i.codigo);
+                const g = porEmpresa.get(k) || { nome: String(i.nome || k), docs: [], alertas: Number(i.alertas) || 0 };
+                g.docs.push(String(i.documento || ''));
+                porEmpresa.set(k, g);
+            });
+            const lista = Array.from(porEmpresa.entries()).sort((a, b) => a[1].nome.localeCompare(b[1].nome, 'pt-BR'));
+            const portal = typeof body.portal_url === 'string' && /^https:\/\//.test(body.portal_url) ? body.portal_url : '';
+            const linhas = lista.map(([cod, g]) => `<tr>
+                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;">${escapeHtml(g.nome)}<br><span style="color:#999;font-size:12px;">${escapeHtml(cod)}</span></td>
+                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;">${escapeHtml(g.docs.join(', '))}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;text-align:center;">${g.alertas}</td></tr>`).join('');
+            const miolo = `<h2 style="color:#4e1820;font-size:18px;margin:0 0 8px;">Documentos não recebidos — ${escapeHtml(curta)}</h2>
+                <p style="margin:0 0 16px;">${lista.length} empresa(s) com BPO com documentos pendentes.</p>
+                ${lista.length ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+                  <tr style="background:#f5eae9;"><th align="left" style="padding:8px 10px;">Empresa</th><th align="left" style="padding:8px 10px;">Pendente</th><th style="padding:8px 10px;">Alertas</th></tr>
+                  ${linhas}</table>` : '<p>✅ Nenhuma pendência.</p>'}
+                ${portal ? `<p style="margin-top:20px;"><a href="${escapeHtml(portal)}?competencia=${comp}" style="background:#8B3A3A;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700;">Abrir o painel</a></p>` : ''}`;
+            const assunto = aplicarVariaveis(String(cfg.assunto_relatorio || ''), { competencia: curta, competencia_extenso: extenso });
+            const destPara = para.length ? para : cc.slice(0, 1);
+            const destCc = para.length ? cc : cc.slice(1);
+            const final = aplicarModoTeste(cfg, destPara, destCc, assunto, miolo);
+            const registrar = async (ok: boolean, erro?: string) => {
+                await db.from('bpo_alertas').insert({
+                    competencia: comp, codigo_empresa: null, etapa: String(body.etapa || 'MANUAL').toUpperCase(),
+                    tipo_texto: 'relatorio', documentos: [], para: destPara, ok, modo_teste: final.teste,
+                    erro: erro || null, enviado_por: quem,
+                });
+            };
+            try {
+                const r = await enviar(cfgMail, { para: final.para, cc: final.cc, assunto: final.assunto, html: envelope(nomeRem, final.html) });
+                await registrar(true);
+                return resposta({ ok: true, para: destPara, modo_teste: final.teste, total: lista.length, ...r });
+            } catch (e) {
+                await registrar(false, e instanceof Error ? e.message : String(e));
+                throw e;
+            }
+        }
+
+        throw new Error(`Ação desconhecida: ${acao}`);
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return resposta({ ok: false, error: msg }, 400);
+    }
+});
