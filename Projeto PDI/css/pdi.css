@@ -255,3 +255,8 @@ tr.clicavel:focus-visible { outline: 3px solid var(--info); outline-offset: -3px
 }
 
 .nowrap { white-space: nowrap; }
+
+/* Rodapé da sidebar: botão "Voltar ao Portal" com folga da borda inferior da página */
+.sidebar { height: 100vh; height: 100dvh; padding-bottom: 36px; }
+.sidebar-footer { padding-bottom: 8px; }
+@media (max-width: 768px) { .sidebar { padding-bottom: calc(36px + env(safe-area-inset-bottom, 0px)); } }
