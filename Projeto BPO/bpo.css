@@ -133,3 +133,6 @@ tr.bpo-sem .bpo-input{opacity:.7}
 /* Botão de e-mail de teste por texto */
 .bpo-teste-linha{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:-4px 0 10px}
 .bpo-teste-linha small{margin:0 !important}
+
+/* Pré-visualização do e-mail (layout real) */
+.bpo-email-frame{width:100%; height:620px; border:1px solid var(--line); border-radius:var(--radius-sm); background:#f0f2f5}

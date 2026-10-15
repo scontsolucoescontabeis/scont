@@ -42,17 +42,23 @@
     return String(texto || '').replace(/\{(\w+)\}/g, (orig, k) => (k in vars ? vars[k] : orig));
   }
 
-  // Mesma regra de formatação da edge function (pré-visualização na tela).
+  // Mesma regra de formatação (e mesmos estilos inline) da edge function bpo-alertas.
   function textoParaHtml(texto, vars) {
     const seguros = {};
-    Object.keys(vars || {}).forEach((k) => { seguros[k] = k === 'documentos_html' ? vars[k] : escapeHtml(vars[k]); });
+    Object.keys(vars || {}).forEach((k) => { seguros[k] = escapeHtml(vars[k]); });
     const html = aplicarVariaveis(escapeHtml(texto), seguros);
     const negrito = (s) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     return html.replace(/\r\n/g, '\n').split(/\n\s*\n/).map((bloco) => {
       const partes = [];
       let lista = [], par = [];
-      const fecharLista = () => { if (lista.length) partes.push(`<ul>${lista.join('')}</ul>`); lista = []; };
-      const fecharPar = () => { if (par.length) partes.push(`<p>${par.join('<br>')}</p>`); par = []; };
+      const fecharLista = () => {
+        if (lista.length) partes.push(`<ul style="color:#434343;margin:0 0 16px;padding-left:22px;line-height:1.8;">${lista.join('')}</ul>`);
+        lista = [];
+      };
+      const fecharPar = () => {
+        if (par.length) partes.push(`<p style="color:#434343;margin:0 0 16px;line-height:1.7;">${par.join('<br>')}</p>`);
+        par = [];
+      };
       bloco.split('\n').filter((l) => l.trim()).forEach((l) => {
         const item = /^\s*-\s+(.*)$/.exec(l);
         if (item) { fecharPar(); lista.push(`<li>${negrito(item[1])}</li>`); } else { fecharLista(); par.push(negrito(l.trim())); }
@@ -60,6 +66,58 @@
       fecharPar(); fecharLista();
       return partes.join('');
     }).join('');
+  }
+
+  // ─── LAYOUT DO E-MAIL (idêntico ao da edge function e ao da função enviar-email do portal) ──
+
+  const TITULOS_EMAIL = {
+    inicial: { texto: '📥 Solicitação de documentos', cor: '#4e1820' },
+    lembrete: { texto: '🔔 Lembrete: documentos pendentes', cor: '#E8890C' },
+    ultimo_aviso: { texto: '⚠️ Último aviso: documentos pendentes', cor: '#E74C3C' },
+    relatorio: { texto: '📋 Documentos não recebidos', cor: '#4e1820' },
+  };
+
+  function tituloEmail(tipo, competenciaCurta) {
+    const t = TITULOS_EMAIL[tipo] || TITULOS_EMAIL.lembrete;
+    return `<h2 style="color:${t.cor};margin:0 0 8px;font-size:20px;">${t.texto} — ${escapeHtml(competenciaCurta)}</h2>\n`;
+  }
+
+  function envelopeEmail(nomeRemetente, miolo) {
+    const nome = escapeHtml(nomeRemetente);
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+</head>
+<body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#f0f2f5" style="background-color:#f0f2f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td bgcolor="#f5eae9" style="background-color:#f5eae9;padding:32px;text-align:center;border-radius:12px 12px 0 0;border:1px solid #e0c8c6;border-bottom:none;">
+          <h1 style="color:#4e1820;margin:0;font-size:22px;font-weight:700;">${nome}</h1>
+          <p style="color:#8b4a4a;margin:6px 0 0;font-size:13px;">Contabilidade com excelência</p>
+        </td></tr>
+        <tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:36px 32px;border:1px solid #e0e6ed;border-top:none;">
+${miolo}
+          <hr style="border:none;border-top:1px solid #e0e6ed;margin:24px 0;">
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-size:12px;color:#999;text-align:center;line-height:1.8;">
+            <strong style="color:#4e1820;">Nossos Departamentos</strong><br>
+            📋 Fiscal: <a href="mailto:fiscal@scontdf.com.br" style="color:#b47938;">fiscal@scontdf.com.br</a><br>
+            👥 Pessoal: <a href="mailto:pessoal@scontdf.com.br" style="color:#b47938;">pessoal@scontdf.com.br</a><br>
+            📚 Contábil: <a href="mailto:contabil@scontdf.com.br" style="color:#b47938;">contabil@scontdf.com.br</a><br>
+            🏢 Administrativo: <a href="mailto:contato@scontdf.com.br" style="color:#b47938;">contato@scontdf.com.br</a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td bgcolor="#f8f9fa" style="background-color:#f8f9fa;padding:18px;text-align:center;border:1px solid #e0e6ed;border-top:none;border-radius:0 0 12px 12px;">
+          <p style="margin:0;font-size:11px;color:#aaa;">© ${new Date().getFullYear()} ${nome} · Todos os direitos reservados</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
   }
 
   // ─── DATAS ──────────────────────────────────────────────────
@@ -490,7 +548,7 @@
   }
 
   const api = {
-    MESES, SITUACOES, TIPOS_ETAPA, escapeHtml, normalizar, parseEmails, aplicarVariaveis, textoParaHtml,
+    MESES, SITUACOES, TIPOS_ETAPA, escapeHtml, normalizar, parseEmails, aplicarVariaveis, textoParaHtml, tituloEmail, envelopeEmail,
     competenciaTextos, dataBr, dataIsoDeBr, dataHoraIsoDeBr, competenciaSugerida, competenciaDaPublicacao, listaCompetencias,
     parseRelatorio, casarClientes, arquivoCasaTipo, calcularStatus, contar,
     feriadosDoAno, ehDiaUtil, proximoDiaUtil, calendarioCompetencia, cicloTextos, mascaraData, dataBrValida, feriadosExtrasParaTexto, textoParaFeriadosExtras,

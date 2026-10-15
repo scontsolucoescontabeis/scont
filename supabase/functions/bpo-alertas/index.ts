@@ -52,6 +52,7 @@ function aplicarVariaveis(texto: string, vars: Record<string, string>) {
 }
 
 // Linha em branco = parágrafo; "- " = item de lista; **x** = negrito.
+// Estilos inline no padrão dos e-mails do Portal (enviar-email).
 function textoParaHtml(texto: string, vars: Record<string, string>) {
     const seguros: Record<string, string> = {};
     Object.keys(vars).forEach((k) => { seguros[k] = escapeHtml(vars[k]); });
@@ -60,8 +61,14 @@ function textoParaHtml(texto: string, vars: Record<string, string>) {
     return html.replace(/\r\n/g, '\n').split(/\n\s*\n/).map((bloco) => {
         const partes: string[] = [];
         let lista: string[] = [], par: string[] = [];
-        const fecharLista = () => { if (lista.length) partes.push(`<ul>${lista.join('')}</ul>`); lista = []; };
-        const fecharPar = () => { if (par.length) partes.push(`<p>${par.join('<br>')}</p>`); par = []; };
+        const fecharLista = () => {
+            if (lista.length) partes.push(`<ul style="color:#434343;margin:0 0 16px;padding-left:22px;line-height:1.8;">${lista.join('')}</ul>`);
+            lista = [];
+        };
+        const fecharPar = () => {
+            if (par.length) partes.push(`<p style="color:#434343;margin:0 0 16px;line-height:1.7;">${par.join('<br>')}</p>`);
+            par = [];
+        };
         bloco.split('\n').filter((l) => l.trim()).forEach((l) => {
             const item = /^\s*-\s+(.*)$/.exec(l);
             if (item) { fecharPar(); lista.push(`<li>${negrito(item[1])}</li>`); } else { fecharLista(); par.push(negrito(l.trim())); }
@@ -71,28 +78,65 @@ function textoParaHtml(texto: string, vars: Record<string, string>) {
     }).join('');
 }
 
-// ── Layout Scont (mesmo visual das outras funções de e-mail) ────────
+// ── Layout Scont: MESMO padrão da função enviar-email (cabeçalho, corpo, rodapé "Nossos Departamentos").
+//    Mantenha igual a enviar-email/index.ts (_cabecalho/_rodape/_fechamento) e a bpo-util.js (envelopeEmail).
 function envelope(nomeRemetente: string, miolo: string): string {
-    return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
+    const nome = escapeHtml(nomeRemetente);
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+</head>
 <body style="margin:0;padding:0;background-color:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#f0f2f5" style="background-color:#f0f2f5;padding:32px 16px;"><tr><td align="center">
-<table width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;">
-<tr><td bgcolor="#f5eae9" style="background-color:#f5eae9;padding:28px;text-align:center;border-radius:12px 12px 0 0;border:1px solid #e0c8c6;border-bottom:none;">
-  <h1 style="color:#4e1820;margin:0;font-size:22px;font-weight:700;">${escapeHtml(nomeRemetente)}</h1>
-  <p style="color:#8b4a4a;margin:6px 0 0;font-size:13px;">Contabilidade com excelência</p>
-</td></tr>
-<tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:32px;border:1px solid #e0e6ed;border-top:none;color:#434343;font-size:15px;line-height:1.6;">
+  <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#f0f2f5" style="background-color:#f0f2f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td bgcolor="#f5eae9" style="background-color:#f5eae9;padding:32px;text-align:center;border-radius:12px 12px 0 0;border:1px solid #e0c8c6;border-bottom:none;">
+          <h1 style="color:#4e1820;margin:0;font-size:22px;font-weight:700;">${nome}</h1>
+          <p style="color:#8b4a4a;margin:6px 0 0;font-size:13px;">Contabilidade com excelência</p>
+        </td></tr>
+        <tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:36px 32px;border:1px solid #e0e6ed;border-top:none;">
 ${miolo}
-  <hr style="border:none;border-top:1px solid #e0e6ed;margin:24px 0;">
-  <p style="font-size:12px;color:#999;text-align:center;line-height:1.8;margin:0;">
-    <strong style="color:#4e1820;">BPO Financeiro</strong><br>
-    📚 <a href="mailto:contabil@scontdf.com.br" style="color:#b47938;">contabil@scontdf.com.br</a>
-  </p>
-</td></tr>
-<tr><td bgcolor="#f8f9fa" style="background-color:#f8f9fa;padding:16px;text-align:center;border:1px solid #e0e6ed;border-top:none;border-radius:0 0 12px 12px;">
-  <p style="margin:0;font-size:11px;color:#aaa;">Mensagem automática · ${escapeHtml(nomeRemetente)}</p>
-</td></tr></table></td></tr></table></body></html>`;
+          <hr style="border:none;border-top:1px solid #e0e6ed;margin:24px 0;">
+          <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-size:12px;color:#999;text-align:center;line-height:1.8;">
+            <strong style="color:#4e1820;">Nossos Departamentos</strong><br>
+            📋 Fiscal: <a href="mailto:fiscal@scontdf.com.br" style="color:#b47938;">fiscal@scontdf.com.br</a><br>
+            👥 Pessoal: <a href="mailto:pessoal@scontdf.com.br" style="color:#b47938;">pessoal@scontdf.com.br</a><br>
+            📚 Contábil: <a href="mailto:contabil@scontdf.com.br" style="color:#b47938;">contabil@scontdf.com.br</a><br>
+            🏢 Administrativo: <a href="mailto:contato@scontdf.com.br" style="color:#b47938;">contato@scontdf.com.br</a>
+          </td></tr></table>
+        </td></tr>
+        <tr><td bgcolor="#f8f9fa" style="background-color:#f8f9fa;padding:18px;text-align:center;border:1px solid #e0e6ed;border-top:none;border-radius:0 0 12px 12px;">
+          <p style="margin:0;font-size:11px;color:#aaa;">© ${new Date().getFullYear()} ${nome} · Todos os direitos reservados</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+// Título (h2 com emoji e cor por nível, como os alertas do Hub) e botão no padrão do portal.
+const TITULOS_EMAIL: Record<string, { texto: string; cor: string }> = {
+    inicial: { texto: '📥 Solicitação de documentos', cor: '#4e1820' },
+    lembrete: { texto: '🔔 Lembrete: documentos pendentes', cor: '#E8890C' },
+    ultimo_aviso: { texto: '⚠️ Último aviso: documentos pendentes', cor: '#E74C3C' },
+    relatorio: { texto: '📋 Documentos não recebidos', cor: '#4e1820' },
+};
+
+function tituloHtml(tipo: string, competenciaCurta: string): string {
+    const t = TITULOS_EMAIL[tipo] || TITULOS_EMAIL.lembrete;
+    return `<h2 style="color:${t.cor};margin:0 0 8px;font-size:20px;">${t.texto} — ${escapeHtml(competenciaCurta)}</h2>\n`;
+}
+
+function botaoHtml(url: string, rotulo: string): string {
+    return `<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:8px 0 24px;">
+            <a href="${escapeHtml(url)}" style="background-color:#f5eae9;color:#4e1820;border:2px solid #4e1820;padding:13px 34px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;display:inline-block;">
+              ${rotulo}
+            </a>
+          </td></tr></table>`;
 }
 
 // ── Envio (mesmos provedores configurados em configuracoes_scont) ───
@@ -149,18 +193,26 @@ function aplicarModoTeste(cfg: Record<string, unknown>, para: string[], cc: stri
 
 type LinhaRel = [string, { nome: string; docs: string[]; alertas: number }];
 
-// Corpo do relatório da chefe (usado no envio real e no e-mail de teste).
+// Corpo do relatório da chefe (usado no envio real e no e-mail de teste), no padrão visual do Hub.
 function htmlRelatorio(curta: string, comp: string, lista: LinhaRel[], portal: string): string {
-    const linhas = lista.map(([cod, g]) => `<tr>
-                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;">${escapeHtml(g.nome)}<br><span style="color:#999;font-size:12px;">${escapeHtml(cod)}</span></td>
-                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;">${escapeHtml(g.docs.join(', '))}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;text-align:center;">${g.alertas}</td></tr>`).join('');
-    return `<h2 style="color:#4e1820;font-size:18px;margin:0 0 8px;">Documentos não recebidos — ${escapeHtml(curta)}</h2>
-                <p style="margin:0 0 16px;">${lista.length} empresa(s) com BPO com documentos pendentes.</p>
-                ${lista.length ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
-                  <tr style="background:#f5eae9;"><th align="left" style="padding:8px 10px;">Empresa</th><th align="left" style="padding:8px 10px;">Pendente</th><th style="padding:8px 10px;">Alertas</th></tr>
-                  ${linhas}</table>` : '<p>✅ Nenhuma pendência.</p>'}
-                ${portal ? `<p style="margin-top:20px;"><a href="${escapeHtml(portal)}?competencia=${comp}" style="background:#8B3A3A;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700;">Abrir o painel</a></p>` : ''}`;
+    const tdBase = 'padding:10px 12px;border-bottom:1px solid #f0f2f5;vertical-align:middle;';
+    const linhas = lista.map(([cod, g]) => `
+            <tr>
+              <td style="${tdBase}"><strong style="color:#4e1820;">${escapeHtml(g.nome)}</strong><br><span style="font-size:12px;color:#888;">${escapeHtml(cod)}</span></td>
+              <td style="${tdBase}color:#434343;font-size:13px;">${escapeHtml(g.docs.join(', '))}</td>
+              <td style="${tdBase}color:#434343;font-size:13px;text-align:center;">${g.alertas}</td>
+            </tr>`).join('');
+    const th = 'padding:10px 12px;font-size:12px;font-weight:700;color:#4e1820;text-align:left;';
+    return tituloHtml('relatorio', curta) + `
+          <p style="color:#434343;margin:0 0 16px;line-height:1.7;">
+            <strong>${lista.length}</strong> empresa(s) com BPO financeiro ainda possuem documentos pendentes da competência <strong>${escapeHtml(curta)}</strong>.
+          </p>
+          ${lista.length ? `<table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e0e6ed;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+            <tr bgcolor="#f5eae9" style="background-color:#f5eae9;">
+              <td style="${th}">Empresa</td><td style="${th}">Pendente</td><td style="${th}text-align:center;">Alertas</td>
+            </tr>${linhas}
+          </table>` : '<p style="color:#33aa23;margin:0 0 24px;font-weight:600;">✅ Nenhuma pendência.</p>'}
+          ${portal ? botaoHtml(`${portal}?competencia=${comp}`, '💼 Abrir o BPO Financeiro') : ''}`;
 }
 
 function resposta(obj: unknown, status = 200) {
@@ -245,7 +297,7 @@ Deno.serve(async (req) => {
                 documentos: docs.map((d) => `- ${d}`).join('\n'),
             };
             const assunto = aplicarVariaveis(String(cfg[`assunto_${tipoTexto}`] || ''), vars);
-            const miolo = textoParaHtml(String(cfg[`texto_${tipoTexto}`] || ''), vars);
+            const miolo = tituloHtml(tipoTexto, curta) + textoParaHtml(String(cfg[`texto_${tipoTexto}`] || ''), vars);
             const final = aplicarModoTeste(cfg, para, cc, assunto, miolo);
             try {
                 const r = await enviar(cfgMail, { para: final.para, cc: final.cc, assunto: final.assunto, html: envelope(nomeRem, final.html) });
@@ -320,7 +372,7 @@ Deno.serve(async (req) => {
                 ];
                 miolo = htmlRelatorio(curta, comp, lista, '');
             } else {
-                miolo = textoParaHtml(String(body.texto ?? cfg[`texto_${tipoTexto}`] ?? '').slice(0, 20000), vars);
+                miolo = tituloHtml(tipoTexto, curta) + textoParaHtml(String(body.texto ?? cfg[`texto_${tipoTexto}`] ?? '').slice(0, 20000), vars);
             }
             const aviso = `<div style="background:#eaf1ff;border:1px solid #bcd0f7;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#2c4a7c;">
               <strong>E-MAIL DE TESTE</strong> — exemplo com dados fictícios. Nenhum cliente recebeu esta mensagem.</div>`;

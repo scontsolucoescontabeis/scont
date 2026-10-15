@@ -575,7 +575,7 @@
       <div class="bpo-secao">
         <h3>Texto que será enviado (${esc(U.TIPOS_ETAPA[tipoTexto] || tipoTexto)})</h3>
         <p style="margin:0 0 8px"><strong>Assunto:</strong> ${esc(assunto)}</p>
-        <div class="bpo-preview">${corpo}</div>
+        <iframe class="bpo-email-frame" title="Pré-visualização do e-mail" srcdoc="${esc(U.envelopeEmail('Scont Soluções Contábeis', U.tituloEmail(tipoTexto, vars.competencia) + corpo))}"></iframe>
       </div>
       <div class="bpo-secao">
         <h3>Empresas com pendência (${fila.length}) <small style="font-weight:400;color:var(--muted)">— ${enviaveis.length} podem receber agora</small></h3>

@@ -101,6 +101,15 @@ const fx = U.textoParaFeriadosExtras('24/12, 31/12; 15/11/2026, 99/99, abc');
 assert.deepStrictEqual(fx.lista, ['12-24', '12-31', '2026-11-15']);
 assert.deepStrictEqual(fx.invalidos, ['99/99', 'abc']);
 
+// layout do e-mail (padrão do Hub: enviar-email)
+const env = U.envelopeEmail('Scont Soluções Contábeis', '<p>miolo</p>');
+assert.ok(env.includes('width="600"') && env.includes('#f5eae9') && env.includes('#4e1820'));
+assert.ok(env.includes('Contabilidade com excelência') && env.includes('Nossos Departamentos'));
+assert.ok(env.includes('Todos os direitos reservados') && env.includes('<p>miolo</p>'));
+assert.ok(U.tituloEmail('ultimo_aviso', '09/2026').includes('#E74C3C'));
+assert.ok(U.tituloEmail('lembrete', '09/2026').includes('09/2026'));
+assert.ok(U.textoParaHtml('Olá **x**\n\n- a\n- b', {}).includes('<ul style="color:#434343'));
+
 // fila
 const fila = U.montarFila(st, [{ codigo_empresa: '20', emails: ['a@cli.com', 'x@scontdf.com.br'], emails_cc: ['b@cli.com'] }],
   tipos, { '20': 'EMPRESA VINTE', '30': 'EMPRESA TRINTA' }, [{ ok: true, etapa: 'D5', codigo_empresa: '30' }], 'D5', { ignorar_emails_dominio: ['scontdf.com.br'] });
