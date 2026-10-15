@@ -5,7 +5,7 @@ window.PdiMeu = (function () {
     const fd = Doc.fmtData;
 
     async function render(host, ctx) {
-        host.innerHTML = '<p class="muted">Carregando seu PDI…</p>';
+        host.innerHTML = '<p class="carregando" role="status">Carregando seu PDI…</p>';
         const lista = (await window.PdiApi.listarPdis()).filter(p => p.colaborador_user_id === ctx.user.id);
         if (!lista.length) {
             host.innerHTML = `<h1>Meu PDI e Resultados</h1><p class="muted">Você ainda não possui um PDI cadastrado. Procure o administrador do portal.</p>`;

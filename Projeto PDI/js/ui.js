@@ -16,10 +16,13 @@ window.PdiUI = (function () {
 
     function toast(msg, tipo) {
         let box = document.getElementById('toasts');
-        if (!box) { box = document.createElement('div'); box.id = 'toasts'; document.body.appendChild(box); }
+        if (!box) {
+            box = document.createElement('div'); box.id = 'toasts';
+            box.setAttribute('aria-live', 'polite'); box.setAttribute('role', 'status');
+            document.body.appendChild(box);
+        }
         const t = document.createElement('div');
         t.className = `toast ${tipo || ''}`;
-        t.setAttribute('role', 'status');
         t.textContent = msg;
         box.appendChild(t);
         setTimeout(() => t.remove(), tipo === 'erro' ? 7000 : 3500);
@@ -30,8 +33,28 @@ window.PdiUI = (function () {
      * campos: [{ nome, rotulo, tipo: text|textarea|date|number|select|checkbox, opcoes:[[valor,rotulo]], obrigatorio, valor }]
      * Retorna Promise<objeto|null>.
      */
+    // Rótulos específicos para o botão de confirmação (evita "Salvar" genérico)
+    const ROTULOS = [
+        [/^Registrar nível/, 'Registrar nível'], [/^Avaliar —/, 'Registrar avaliação'], [/^Apurar —/, 'Salvar apuração'],
+        [/^Registrar melhoria/, 'Registrar melhoria'], [/^Validação do gestor/, 'Registrar validação'],
+        [/^Sinalizar/, 'Registrar sinalização'], [/^Escrever feedback/, 'Publicar feedback'],
+        [/resumo semanal/i, 'Salvar resumo'], [/^Nova ação/, 'Criar ação'], [/^Novo PDI/, 'Criar PDI'],
+        [/^Vincular sócio/, 'Vincular sócio'], [/^Vincular usuários/, 'Salvar vínculos'], [/^Evidência da ação/, 'Registrar evidência'],
+        [/^Meta —/, 'Definir meta'], [/^Reabrir ficha/, 'Reabrir ficha'],
+    ];
+
+    function erroAmigavel(err) {
+        const m = (err && err.message) || String(err || '');
+        if (/row-level security|permission denied|violates row/i.test(m)) return 'Você não tem permissão para esta ação. Se deveria ter, fale com o administrador do portal.';
+        if (/failed to fetch|networkerror|load failed/i.test(m)) return 'Sem conexão com o servidor. Verifique sua internet e tente de novo.';
+        if (/duplicate key|unique constraint/i.test(m)) return 'Esse registro já existe. Edite o existente em vez de criar outro.';
+        return m || 'Não foi possível concluir. Tente novamente.';
+    }
+
     function formulario(titulo, campos, opts) {
         opts = opts || {};
+        if (!opts.confirmar) { const r = ROTULOS.find(x => x[0].test(titulo)); if (r) opts = Object.assign({}, opts, { confirmar: r[1] }); }
+        const anterior = document.activeElement;
         return new Promise((resolve) => {
             const ov = document.createElement('div');
             ov.className = 'modal-ov';
@@ -52,7 +75,7 @@ window.PdiUI = (function () {
                     ? `<label class="chk" for="${id}">${ctl} ${esc(c.rotulo)}</label>${dica}`
                     : `<label for="${id}">${esc(c.rotulo)}${c.obrigatorio ? ' *' : ''}</label>${ctl}${dica}`;
             }).join('');
-            ov.innerHTML = `<form class="modal" role="dialog" aria-modal="true" aria-label="${esc(titulo)}">
+            ov.innerHTML = `<form class="modal" role="dialog" aria-modal="true" aria-label="${esc(titulo)}" autocomplete="off">
                 <h3>${esc(titulo)}</h3>${opts.texto ? `<p class="muted">${esc(opts.texto)}</p>` : ''}
                 <div class="modal-corpo">${html}</div>
                 <div class="modal-acoes">
@@ -61,7 +84,7 @@ window.PdiUI = (function () {
                 </div></form>`;
             document.body.appendChild(ov);
             const form = ov.querySelector('form');
-            const fechar = (v) => { ov.remove(); resolve(v); };
+            const fechar = (v) => { ov.remove(); if (anterior && anterior.focus) anterior.focus(); resolve(v); };
             ov.addEventListener('mousedown', (e) => { if (e.target === ov) fechar(null); });
             form.querySelector('[data-x="cancelar"]').onclick = () => fechar(null);
             form.addEventListener('keydown', (e) => { if (e.key === 'Escape') fechar(null); });
@@ -82,6 +105,7 @@ window.PdiUI = (function () {
     }
 
     function confirmar(titulo, texto, rotulo) {
+        const anterior = document.activeElement;
         return new Promise((resolve) => {
             const ov = document.createElement('div');
             ov.className = 'modal-ov';
@@ -89,11 +113,13 @@ window.PdiUI = (function () {
                 <p>${esc(texto)}</p><div class="modal-acoes">
                 <button class="btn sec" data-r="0">Cancelar</button><button class="btn" data-r="1">${esc(rotulo || 'Confirmar')}</button></div></div>`;
             document.body.appendChild(ov);
-            ov.querySelectorAll('button').forEach(b => b.onclick = () => { ov.remove(); resolve(b.dataset.r === '1'); });
+            ov.querySelectorAll('button').forEach(b => b.onclick = () => { ov.remove(); if (anterior && anterior.focus) anterior.focus(); resolve(b.dataset.r === '1'); });
+            const ok = ov.querySelector('button[data-r="1"]'); if (ok) ok.focus();
+            ov.addEventListener('keydown', (e) => { if (e.key === 'Escape') { ov.remove(); if (anterior && anterior.focus) anterior.focus(); resolve(false); } });
         });
     }
 
     function badge(texto, cor) { return `<span class="badge ${cor || ''}">${esc(texto)}</span>`; }
 
-    return { esc, br, hojeISO, toast, formulario, confirmar, badge };
+    return { esc, br, hojeISO, toast, formulario, confirmar, badge, erroAmigavel };
 })();

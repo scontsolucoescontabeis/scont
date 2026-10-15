@@ -8,6 +8,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png" />
+  <meta name="theme-color" content="#8B3A3A" />
   <link rel="stylesheet" href="../shared.css" />
   <link rel="stylesheet" href="css/pdi.css" />
   <script src="../supabase-config.js"></script>
@@ -20,7 +21,8 @@
   <p style="color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p>
 </div>
 
-<button class="hamburger" id="hamburger" aria-label="Menu">☰</button>
+<a class="skip" href="#main">Pular para o conteúdo</a>
+<button class="hamburger" id="hamburger" aria-label="Abrir menu" aria-controls="sidebar">☰</button>
 <div class="overlay" id="overlay"></div>
 
 <aside class="sidebar" id="sidebar">
@@ -39,7 +41,7 @@
   </div>
 </aside>
 
-<main class="main-content" id="main"><p class="muted">Carregando…</p></main>
+<main class="main-content" id="main" tabindex="-1"><p class="muted">Carregando…</p></main>
 
 <script src="js/textos.js"></script>
 <script src="js/pdi-calculo.js"></script>

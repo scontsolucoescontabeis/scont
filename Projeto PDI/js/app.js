@@ -24,17 +24,38 @@
         document.querySelectorAll('[data-tela]').forEach(b => b.onclick = () => ir(b.dataset.tela));
     }
 
+    // Rotas por hash: #tela=painel | #pdi=<id>&aba=ficha  (F5 e botão Voltar do navegador funcionam)
+    function lerHash() {
+        const p = new URLSearchParams(location.hash.slice(1));
+        return { tela: p.get('tela'), pdi: p.get('pdi'), aba: p.get('aba') };
+    }
+    function gravarHash(obj, push) {
+        const h = '#' + new URLSearchParams(obj).toString();
+        if (location.hash === h) return;
+        (push ? history.pushState : history.replaceState).call(history, null, '', h);
+    }
+    ctx.gravarHash = gravarHash;
+
     function marcar(tela) {
-        document.querySelectorAll('.menu-item[data-tela]').forEach(b => b.classList.toggle('ativo', b.dataset.tela === tela));
+        document.querySelectorAll('.menu-item[data-tela]').forEach(b => {
+            const on = b.dataset.tela === tela;
+            b.classList.toggle('ativo', on);
+            if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+        });
     }
 
-    async function ir(tela) {
+    async function ir(tela, opts) {
+        opts = opts || {};
         telaAtual = tela;
+        if (!opts.semHash) gravarHash({ tela }, true);
+        const rotulo = (menu.find(m => m[0] === tela) || [])[1];
+        if (rotulo) document.title = `${rotulo.replace(/^\S+\s/, '')} — PDI — SCONT`;
         const sbm = document.getElementById('sidebar'), ovm = document.getElementById('overlay');
         if (sbm) sbm.classList.remove('open');
         if (ovm) ovm.classList.remove('show');
         marcar(tela);
         const h = main();
+        h.innerHTML = '<p class="carregando" role="status">Carregando…</p>';
         try {
             if (tela === 'meu') await window.PdiMeu.render(h, ctx);
             else if (tela === 'painel') await window.PdiPainel.render(h, { ...ctx, somenteGestor: false });
@@ -50,13 +71,15 @@
             aviso('O módulo PDI ainda não foi instalado no banco de dados. Peça ao administrador para executar ' +
                 '_sql/schema_pdi.sql, _sql/seed_pdi.sql e _sql/add_ferramenta_pdi.sql no Supabase.');
         } else {
-            aviso(`Não foi possível carregar: ${err && err.message ? err.message : err}`);
+            aviso(`Não foi possível carregar: ${U.erroAmigavel(err)} Recarregue a página para tentar de novo.`);
         }
     }
 
-    async function abrirPdi(id, aba) {
+    async function abrirPdi(id, aba, opts) {
+        opts = opts || {};
+        if (!opts.semHash) gravarHash({ pdi: id, aba: aba || 'resumo' }, true);
         const h = main();
-        h.innerHTML = '<p class="muted">Carregando PDI…</p>';
+        h.innerHTML = '<p class="carregando" role="status">Carregando PDI…</p>';
         try {
             const d = await Api.carregar(id);
             const pdi = d.pdi;
@@ -104,9 +127,17 @@
         document.getElementById('hamburger').addEventListener('click', () => { sb2.classList.toggle('open'); ov2.classList.toggle('show'); });
         ov2.addEventListener('click', () => { sb2.classList.remove('open'); ov2.classList.remove('show'); });
         montarMenu();
-        const alvo = new URLSearchParams(location.search).get('pdi');
-        if (alvo) { await abrirPdi(alvo); return; }
-        ir(menu[0][0]);
+        window.addEventListener('popstate', rotear);
+        await rotear();
+    }
+
+    async function rotear() {
+        const h = lerHash();
+        const alvo = h.pdi || new URLSearchParams(location.search).get('pdi');
+        if (alvo) { await abrirPdi(alvo, h.aba, { semHash: true }); return; }
+        const tela = menu.some(m => m[0] === h.tela) ? h.tela : menu[0][0];
+        await ir(tela, { semHash: true });
+        if (!h.tela) gravarHash({ tela }, false);
     }
 
     document.addEventListener('DOMContentLoaded', iniciar);
