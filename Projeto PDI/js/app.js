@@ -8,7 +8,7 @@
     let menu = [];
 
     function aviso(msg) {
-        main().innerHTML = `<div class="cartao"><h1>PDI</h1><p class="aviso-bloco">${U.esc(msg)}</p></div>`;
+        main().innerHTML = `<h1>PDI</h1><div class="cartao"><p class="aviso-bloco">${U.esc(msg)}</p></div>`;
     }
 
     function montarMenu() {
@@ -30,6 +30,9 @@
 
     async function ir(tela) {
         telaAtual = tela;
+        const sbm = document.getElementById('sidebar'), ovm = document.getElementById('overlay');
+        if (sbm) sbm.classList.remove('open');
+        if (ovm) ovm.classList.remove('show');
         marcar(tela);
         const h = main();
         try {
@@ -95,7 +98,11 @@
             ctx.papeis = await Api.papeis();
         } catch (err) { semTabela(err); return; }
         if (auth.isAdmin) ctx.papeis.admin = true;
-        document.getElementById('usuario').textContent = ctx.user.nome || ctx.user.email;
+        document.getElementById('sidebarNome').textContent = ctx.user.nome || ctx.user.email;
+        document.getElementById('sidebarEmail').textContent = ctx.user.email || '';
+        const sb2 = document.getElementById('sidebar'), ov2 = document.getElementById('overlay');
+        document.getElementById('hamburger').addEventListener('click', () => { sb2.classList.toggle('open'); ov2.classList.toggle('show'); });
+        ov2.addEventListener('click', () => { sb2.classList.remove('open'); ov2.classList.remove('show'); });
         montarMenu();
         const alvo = new URLSearchParams(location.search).get('pdi');
         if (alvo) { await abrirPdi(alvo); return; }
