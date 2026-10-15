@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDI — Plano de Desenvolvimento Individual — Scont</title>
+  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" />
+  <link rel="stylesheet" href="css/pdi.css" />
+  <script src="../supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../portal-auth-guard.js"></script>
+</head>
+<body>
+<div id="authOverlay" style="position:fixed;inset:0;background:#FAF8F3;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="font-size:40px;">🔐</div>
+  <p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso...</p>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="assets/logo-scont.png" alt="SCONT">
+      <h1>PDI</h1>
+      <p>Plano de Desenvolvimento Individual</p>
+    </div>
+    <nav class="menu" id="menu" aria-label="Menu do PDI"></nav>
+    <div class="sidebar-footer">
+      <p class="usuario" id="usuario"></p>
+      <button class="btn-voltar" onclick="window.location.href='../portal.html'" title="Voltar ao Portal" aria-label="Voltar ao Portal">🏠 <span>Voltar ao Portal</span></button>
+    </div>
+  </aside>
+  <main class="main" id="main"><p class="muted">Carregando…</p></main>
+</div>
+
+<script src="js/textos.js"></script>
+<script src="js/pdi-calculo.js"></script>
+<script src="js/alertas.js"></script>
+<script src="js/pdi-documento.js"></script>
+<script src="js/pdi-docx.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/render-html.js"></script>
+<script src="js/pdi-api.js"></script>
+<script src="js/exportar.js"></script>
+<script src="js/apresentar.js"></script>
+<script src="js/tela-pdi.js"></script>
+<script src="js/tela-meu.js"></script>
+<script src="js/tela-painel.js"></script>
+<script src="js/tela-admin.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

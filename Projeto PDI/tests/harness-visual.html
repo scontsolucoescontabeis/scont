@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<!-- Harness de desenvolvimento: renderiza as telas do PDI com dados simulados (sem Supabase).
+     Uso: servir a raiz do portal e abrir /Projeto%20PDI/tests/harness-visual.html?papel=gestor&aba=ficha
+     papel: colab | gestor | socio | admin ; tela: pdi | meu | painel -->
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harness PDI</title>
+<link rel="stylesheet" href="../css/pdi.css"></head>
+<body>
+<div class="app"><aside class="sidebar"><div class="brand"><h1>PDI</h1></div><nav class="menu" id="menu"></nav></aside>
+<main class="main" id="main"></main></div>
+<script src="../js/textos.js"></script><script src="../js/pdi-calculo.js"></script><script src="../js/alertas.js"></script>
+<script src="../js/pdi-documento.js"></script><script src="../js/pdi-docx.js"></script><script src="../js/ui.js"></script>
+<script src="../js/render-html.js"></script><script src="../js/pdi-api.js"></script><script src="../js/exportar.js"></script>
+<script src="../js/apresentar.js"></script><script src="../js/tela-pdi.js"></script><script src="../js/tela-meu.js"></script>
+<script src="../js/tela-painel.js"></script>
+<script>
+(function () {
+    const T = PdiTextos, c = T.MODELO_DP.conteudo, S = T.SEED_JULIA;
+    const q = new URLSearchParams(location.search);
+    const papel = q.get('papel') || 'gestor';
+    const ME = 'u-' + papel;
+    const id = (p, i) => `${p}-${i}`;
+    const pdiId = 'pdi-1';
+    const pdi = { id: pdiId, colaborador_nome: S.colaborador_nome, cargo_setor: S.cargo_setor, admissao: S.admissao,
+        gestor_nome: S.gestor_nome, data_inicio: S.data_inicio, meses_acompanhamento: 12, status: 'ativo',
+        acompanhamento_texto: T.CABECALHO_PADRAO.acompanhamento, avaliacao_texto: T.CABECALHO_PADRAO.avaliacao,
+        contexto_desenvolvimento: S.contexto_desenvolvimento, perfil_comportamental: S.perfil_comportamental,
+        apoio_scont: c.apoio_scont, conteudo: c,
+        colaborador_user_id: papel === 'colab' ? ME : 'u-colab', gestor_user_id: papel === 'gestor' ? ME : 'u-gestor' };
+    const tecnicas = c.tecnicas.map((r, i) => ({ id: id('t', i), pdi_id: pdiId, competencia: r.competencia, pratica: r.pratica,
+        meta_ciclo1: r.meta, priorizada: i < 4, ordem: i + 1,
+        niveis: i < 3 ? [{ id: id('n', i), data: '2026-10-12', nivel: i + 1, evidencia: 'Avaliação inicial', validado_em: i < 2 ? '2026-10-13' : null }] : [] }));
+    const comportamentais = c.comportamentais.map((r, i) => ({ id: id('c', i), pdi_id: pdiId, competencia: r.competencia,
+        comportamento_esperado: r.comportamento, acao_evidencia: r.acao, ordem: i + 1,
+        avaliacoes: i < 2 ? [{ id: id('a', i), data: '2026-11-01', nota: 2 + i, evidencia: 'Observado na rotina' }] : [] }));
+    const acoes = c.acoes.map((r, i) => ({ id: id('ac', i), pdi_id: pdiId, ordem: i + 1, foco_acao: r.foco, responsaveis: r.responsaveis,
+        prazo_dias: r.dias, recorrencia: r.recorrencia, evidencia_esperada: r.evidencia, status: i === 0 ? 'concluido' : 'a_iniciar', origem: 'modelo' }));
+    const indicadores = c.indicadores.map((r, i) => ({ id: id('i', i), pdi_id: pdiId, ...r, ordem: i + 1,
+        apuracoes: i === 0 ? [{ id: 'ap1', competencia_mes: '2026-10-01', numerador: 18, denominador: 20, percentual: 90, linha_base: true },
+            { id: 'ap2', competencia_mes: '2026-11-01', numerador: 19, denominador: 20, percentual: 95 }] : [] }));
+    const ciclos = C = PdiCalculo.ciclos(pdi.data_inicio).map(k => ({ id: 'ci' + k.numero, pdi_id: pdiId, numero: k.numero, inicio: k.inicio, fim: k.fim,
+        periodo_relativo: T.CICLOS[k.numero - 1].periodo, foco_resultado_esperado: T.CICLOS[k.numero - 1].foco }));
+    const avaliacoes = [{ id: 'av1', pdi_id: pdiId, ciclo_numero: 1, status: 'aguardando_ciencia', resultado: 'parcial',
+        direcionamentos: ['revisao_prioridades'], avancos: 'Domínio em evolução.', data_reuniao: '2027-01-06', gestor_nome: S.gestor_nome,
+        pilares: [{ pilar: 'tecnicas', nota_inicial: 1, nota_ciclo: 2 }, { pilar: 'comportamentais', nota_inicial: 2, nota_ciclo: 3 },
+            { pilar: 'performance', na: true, justificativa_na: 'Sem medição suficiente' }, { pilar: 'melhorias', nota_ciclo: 2 }] }];
+    const D = { pdi, tecnicas, comportamentais, acoes, indicadores, ciclos, avaliacoes,
+        melhorias: [{ id: 'm1', pdi_id: pdiId, data: '2026-11-20', rotina: 'Ponto', situacao_anterior: 'Erros frequentes', melhoria_evidencia: 'Checklist aplicado', validacao_gestor: 'pendente' }],
+        alinhamentos: [{ id: 'al1', pdi_id: pdiId, semana_ref: '2026-10-12', concluidos: 'Treinamento', pendencias: '—', realizado: true }],
+        sinalizacoes: [{ id: 's1', pdi_id: pdiId, descricao: 'Risco no fechamento', data_sinalizacao: '2026-11-03', prazo_entrega: '2026-11-05', antes_do_prazo: true }],
+        feedbacks: [{ id: 'f1', autor_nome: 'Sócio', autor_papel: 'socio', texto: 'Bom avanço no Domínio.', created_at: '2026-11-10T10:00:00Z', ciclo_numero: 1 }],
+        evidencias: [], ciencias: [{ id: 'ci1', pdi_id: pdiId, referencia: 'avaliacao', referencia_id: 'av1', papel: 'gestor', nome: 'Brenna Costa', assinado_em: '2027-01-06T12:00:00Z' }] };
+
+    PdiApi.carregar = async () => JSON.parse(JSON.stringify(D));
+    PdiApi.listarPdis = async () => [pdi];
+    PdiApi.carregarTodos = async () => [{ pdi, ...D }];
+    const wrap = (fn) => async (...a) => { console.log('API', fn, JSON.stringify(a).slice(0, 120)); return {}; };
+    ['ins', 'upd', 'del', 'atualizarSemEco', 'upsertApuracao', 'upsertAlinhamento', 'upsertAvaliacao', 'upsertPilar'].forEach(k => PdiApi[k] = wrap(k));
+
+    const ctx = { user: { id: ME, nome: 'Usuário Teste', email: 't@x' }, cicloFicha: null,
+        pode: { admin: papel === 'admin', socio: papel === 'socio', gestor: papel === 'gestor', colab: papel === 'colab' },
+        voltar() { console.log('voltar'); }, abrirPdi(i, a) { render(a); }, recarregar: async (a) => render(a) };
+    ctx.pode.avaliar = ctx.pode.admin || ctx.pode.socio || ctx.pode.gestor;
+    function render(aba) {
+        const tela = q.get('tela') || 'pdi';
+        const h = document.getElementById('main');
+        if (tela === 'meu') PdiMeu.render(h, ctx);
+        else if (tela === 'painel') PdiPainel.render(h, { ...ctx, somenteGestor: false });
+        else PdiTela.render(h, JSON.parse(JSON.stringify(D)), ctx, aba || q.get('aba') || 'resumo');
+    }
+    window.__ready = true;
+    render();
+})();
+</script></body></html>
