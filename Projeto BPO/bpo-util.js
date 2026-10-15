@@ -102,6 +102,16 @@
     return `${a}-${pad(mes)}`;
   }
 
+  // Competência de uma publicação: o mês anterior ao da data de publicação (Brasília).
+  // '2026-09-02T10:00:00-03:00' -> '2026-08'. Sem data -> null.
+  function competenciaDaPublicacao(iso) {
+    const m = /^(\d{4})-(\d{2})/.exec(iso || '');
+    if (!m) return null;
+    let a = parseInt(m[1], 10), mes = parseInt(m[2], 10) - 1;
+    if (mes === 0) { mes = 12; a -= 1; }
+    return `${a}-${pad(mes)}`;
+  }
+
   function listaCompetencias(hoje, n) {
     const d = hoje || new Date();
     let a = d.getFullYear(), m = d.getMonth(); // mês anterior em base 1
@@ -411,7 +421,7 @@
 
   const api = {
     MESES, SITUACOES, TIPOS_ETAPA, escapeHtml, normalizar, parseEmails, aplicarVariaveis, textoParaHtml,
-    competenciaTextos, dataBr, dataIsoDeBr, dataHoraIsoDeBr, competenciaSugerida, listaCompetencias,
+    competenciaTextos, dataBr, dataIsoDeBr, dataHoraIsoDeBr, competenciaSugerida, competenciaDaPublicacao, listaCompetencias,
     parseRelatorio, casarClientes, arquivoCasaTipo, calcularStatus, contar,
     feriadosDoAno, ehDiaUtil, proximoDiaUtil, calendarioCompetencia, etapaAtual, dataLimite,
     emailsValidos, montarFila, lerPlanilhaEmpresas,

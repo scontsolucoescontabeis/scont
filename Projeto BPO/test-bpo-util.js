@@ -10,6 +10,9 @@ assert.strictEqual(U.dataHoraIsoDeBr('01/09/2026 07:37'), '2026-09-01T07:37:00-0
 assert.strictEqual(U.dataIsoDeBr('25/09/2026'), '2026-09-25');
 assert.strictEqual(U.competenciaSugerida('2026-09-30'), '2026-08');
 assert.strictEqual(U.competenciaSugerida('2026-01-31'), '2025-12');
+assert.strictEqual(U.competenciaDaPublicacao('2026-09-02T10:00:00-03:00'), '2026-08');
+assert.strictEqual(U.competenciaDaPublicacao('2026-01-05T10:00:00-03:00'), '2025-12');
+assert.strictEqual(U.competenciaDaPublicacao(null), null);
 
 // parser (linhas sintéticas, mesmo layout do Onvio)
 const L = (o) => { const a = []; Object.entries(o).forEach(([i, v]) => { a[i] = v; }); return a; };

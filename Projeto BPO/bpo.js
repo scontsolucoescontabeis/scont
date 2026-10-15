@@ -129,7 +129,7 @@
       lerTudo(() => supabaseClient.from('bpo_publicacoes').select('*').eq('competencia', competencia).order('id')),
       supabaseClient.from('bpo_marcacoes').select('*').eq('competencia', competencia),
       supabaseClient.from('bpo_alertas').select('*').eq('competencia', competencia).order('enviado_em', { ascending: false }),
-      supabaseClient.from('bpo_relatorios').select('*').eq('competencia', competencia).order('periodo_fim', { ascending: false }),
+      supabaseClient.from('bpo_relatorios').select('*').order('importado_em', { ascending: false }).limit(5),
     ]);
     publicacoes = pubs;
     marcacoes = marc.data || [];
@@ -173,7 +173,7 @@
 
   function avisoRelatorio() {
     if (!relatorios.length) {
-      return `<div class="bpo-aviso bpo-aviso-alerta">📥 Nenhum relatório importado para esta competência. Vá em <strong>Importar relatório</strong>.</div>`;
+      return `<div class="bpo-aviso bpo-aviso-alerta">📥 Nenhum relatório importado ainda. Vá em <strong>Importar relatório</strong>.</div>`;
     }
     const r = relatorios[0];
     const dias = r.emitido_em ? (Date.now() - new Date(r.emitido_em).getTime()) / 864e5 : Infinity;
@@ -362,8 +362,6 @@
     const marcadas = new Set(empresasCad.filter((e) => e.possui_bpo).map((e) => e.codigo_empresa));
     const recBpo = casamento.reconhecidos.filter((r) => marcadas.has(r.codigo)).length;
     const opcoesEmp = rhEmpresas.map((e) => `<option value="${esc(e.codigo_empresa)}">${esc(e.nome_empresa)} (${esc(e.codigo_empresa)})</option>`).join('');
-    const op = U.listaCompetencias(new Date(), 12);
-    if (!op.includes(importacao.competencia)) op.unshift(importacao.competencia);
 
     $('previaImportacao').innerHTML = `
       <div class="bpo-secao">
@@ -373,10 +371,9 @@
            ${rel.clientes.length} clientes · ${rel.totalArquivos} arquivos</p>
         <p>✅ ${casamento.reconhecidos.length} reconhecidos (${recBpo} com BPO) ·
            ⚠️ ${casamento.naoReconhecidos.length} não reconhecidos · 🚫 ${casamento.ignorados.length} ignorados</p>
-        <label style="font-weight:700;font-size:.85rem">Competência a que este relatório se refere:
-          <select id="selCompImport" class="bpo-select">${op.map((o) =>
-            `<option value="${o}" ${o === importacao.competencia ? 'selected' : ''}>${U.competenciaTextos(o).curta}</option>`).join('')}</select></label>
-        <small style="display:block;color:var(--muted);margin-top:4px">Sugerida: mês anterior ao do período. Relatório já importado para o mesmo período é substituído.</small>
+        <p style="margin:6px 0 0"><strong>Competências identificadas</strong> (mês anterior à data de publicação de cada arquivo):</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${resumoCompetencias(casamento.reconhecidos)}</div>
+        <small style="display:block;color:var(--muted);margin-top:8px">Importar de novo o mesmo cliente e período substitui só os arquivos dele; relatórios de outros clientes ou meses não são afetados.</small>
       </div>
       ${casamento.naoReconhecidos.length ? `
       <div class="bpo-secao">
@@ -402,12 +399,11 @@
         </tbody></table></div>
       </div>` : ''}
       <div class="bpo-acoes-fixas">
-        <span class="resumo">Competência ${esc(U.competenciaTextos(importacao.competencia).curta)} · ${rel.clientes.length} clientes · ${rel.totalArquivos} arquivos</span>
+        <span class="resumo">${rel.clientes.length} clientes · ${rel.totalArquivos} arquivos</span>
         <button class="btn btn-secondary" id="btnCancelarImport">Cancelar</button>
         <button class="btn btn-primary" id="btnConfirmarImport">Confirmar importação</button>
       </div>
       <div id="progressoImport"></div>`;
-    $('selCompImport').addEventListener('change', (e) => { importacao.competencia = e.target.value; });
     $('btnCancelarImport').addEventListener('click', renderImportar);
     $('btnConfirmarImport').addEventListener('click', confirmarImportacao);
     if ($('corpoNaoRec')) {
@@ -427,6 +423,17 @@
         });
       });
     }
+  }
+
+  function resumoCompetencias(reconhecidos) {
+    const por = {};
+    reconhecidos.forEach((r) => r.cliente.arquivos.forEach((a) => {
+      const c = U.competenciaDaPublicacao(a.publicadoEm) || importacao.competencia;
+      por[c] = (por[c] || 0) + 1;
+    }));
+    const chaves = Object.keys(por).sort();
+    if (!chaves.length) return '<span class="bpo-pill bpo-sit-neutro">nenhum arquivo de empresa reconhecida</span>';
+    return chaves.map((c) => `<span class="bpo-pill bpo-sit-neutro">${esc(U.competenciaTextos(c).curta)} · ${por[c]} arquivo(s)</span>`).join('');
   }
 
   function codigoDeEntrada(texto) {
@@ -460,11 +467,8 @@
       }
       const reconhecidos = casamento.reconhecidos.concat(extras);
 
-      // 2. substitui relatório do mesmo período
+      // 2. registra o relatório (histórico; nunca apaga relatórios anteriores)
       passo(10, 'Registrando o relatório...');
-      const del = await supabaseClient.from('bpo_relatorios').delete()
-        .eq('periodo_ini', rel.periodo.ini).eq('periodo_fim', rel.periodo.fim);
-      if (del.error) throw del.error;
       const totalArq = reconhecidos.reduce((n, r) => n + r.cliente.arquivos.length, 0);
       const ins = await supabaseClient.from('bpo_relatorios').insert({
         periodo_ini: rel.periodo.ini, periodo_fim: rel.periodo.fim, emitido_em: rel.emitidoEm,
@@ -474,10 +478,24 @@
       if (ins.error) throw ins.error;
       const relId = ins.data.id;
 
-      // 3. publicações em lotes
+      // 3. remove só as publicações ANTERIORES das mesmas empresas dentro do período deste
+      //    arquivo (reimportar o mesmo cliente/período substitui; outros clientes ficam intactos)
+      passo(14, 'Substituindo publicações anteriores das mesmas empresas...');
+      const codigos = Array.from(new Set(reconhecidos.map((r) => r.codigo)));
+      for (let i = 0; i < codigos.length; i += 100) {
+        const d = await supabaseClient.from('bpo_publicacoes').delete()
+          .in('codigo_empresa', codigos.slice(i, i + 100))
+          .gte('publicado_em', rel.periodo.ini + 'T00:00:00-03:00')
+          .lte('publicado_em', rel.periodo.fim + 'T23:59:59-03:00');
+        if (d.error) throw d.error;
+      }
+
+      // 4. publicações em lotes — competência por arquivo (mês anterior à data de publicação)
       const pubs = [];
       reconhecidos.forEach((r) => r.cliente.arquivos.forEach((a) => pubs.push({
-        relatorio_id: relId, competencia: importacao.competencia, codigo_empresa: r.codigo,
+        relatorio_id: relId,
+        competencia: U.competenciaDaPublicacao(a.publicadoEm) || importacao.competencia,
+        codigo_empresa: r.codigo,
         pasta: a.pasta, arquivo: a.arquivo, vencimento: a.vencimento, publicado_em: a.publicadoEm,
         publicado_por: a.publicadoPor, visualizado_em: a.visualizadoEm, excluido_em: a.excluidoEm,
       })));
@@ -488,7 +506,9 @@
       }
       passo(100, 'Concluído.');
       toast(`Relatório importado: ${reconhecidos.length} clientes, ${pubs.length} arquivos.`, 'sucesso');
-      competencia = importacao.competencia;
+      // abre o painel na competência mais recente encontrada no arquivo
+      const comps = pubs.map((p) => p.competencia).sort();
+      competencia = comps.length ? comps[comps.length - 1] : importacao.competencia;
       await carregarBase();
       mostrarTela('painel');
     } catch (e) {
