@@ -198,7 +198,7 @@
       `${seletorCompetencia()}<button type="button" class="btn btn-secondary" id="btnExportar">📊 Exportar Excel</button>`,
       `${avisoModoTeste()}${avisoRelatorio()}
        <div class="bpo-etapas">${cal.map((e) => `
-         <div class="bpo-etapa ${atual && atual.etapa === e.etapa ? 'atual' : (e.data < hojeIso() ? 'passada' : '')}">
+         <div class="bpo-etapa ${!e.ativa ? 'inativa' : (atual && atual.etapa === e.etapa ? 'atual' : (e.data < hojeIso() ? 'passada' : ''))}" ${!e.ativa ? 'title="Antes do início dos ciclos — ignorada"' : ''}>
            <strong>${esc(e.etapa)} · ${esc(U.TIPOS_ETAPA[e.tipo] || e.tipo)}</strong>${esc(U.dataBr(e.data))}</div>`).join('')}</div>
        <div class="bpo-cards">
          ${cartao('total', 'Documentos esperados', c.total)}
@@ -532,23 +532,25 @@
     }
     const et = cal.find((e) => e.etapa === etapaSelecionada);
     const ehRelatorio = et && et.tipo === 'relatorio';
+    const antesDoInicio = !!et && !et.ativa;
     const tipoTexto = ehRelatorio ? 'relatorio' : (et ? et.tipo : 'lembrete');
 
-    const fila = ehRelatorio ? [] : U.montarFila(linhas, empresasCad, tipos, nomes, alertas, etapaSelecionada, config);
+    const fila = (ehRelatorio || antesDoInicio) ? [] : U.montarFila(linhas, empresasCad, tipos, nomes, alertas, etapaSelecionada, config);
     const enviaveis = fila.filter((f) => !f.semEmail && !f.jaEnviado);
     const limite = U.dataLimite(cal);
 
     abrirMain(`Fila de alertas — competência ${U.competenciaTextos(competencia).curta}`,
       `${seletorCompetencia()}
        <select id="selEtapa" class="bpo-select">${cal.map((e) => `<option value="${esc(e.etapa)}" ${e.etapa === etapaSelecionada ? 'selected' : ''}>
-         ${esc(e.etapa)} · ${esc(U.TIPOS_ETAPA[e.tipo] || e.tipo)} · ${esc(U.dataBr(e.data))}${atual && atual.etapa === e.etapa ? ' (hoje)' : ''}</option>`).join('')}</select>`,
+         ${esc(e.etapa)} · ${esc(U.TIPOS_ETAPA[e.tipo] || e.tipo)} · ${esc(U.dataBr(e.data))}${atual && atual.etapa === e.etapa ? ' (atual)' : ''}${!e.ativa ? ' — antes do início' : ''}</option>`).join('')}</select>`,
       `${avisoModoTeste()}${avisoRelatorio()}
+       <div class="bpo-aviso">📌 Alertas enviados em <strong>${esc(U.cicloTextos(competencia).mesCiclo)}</strong> cobram a <strong>competência ${esc(U.cicloTextos(competencia).competencia)}</strong> (sempre o mês anterior).</div>
        ${!atual ? '<div class="bpo-aviso">📅 O ciclo desta competência ainda não começou. Você pode antecipar escolhendo uma etapa acima.</div>' : ''}
-       ${ehRelatorio ? blocoRelatorio() : blocoFila(fila, enviaveis, tipoTexto, limite)}`);
+       ${antesDoInicio ? `<div class="bpo-aviso bpo-aviso-alerta">⏳ Esta etapa é anterior ao <strong>início dos ciclos</strong> (${esc(U.dataBr(config.inicio_ciclos))}) e não gera alertas. Ajuste em Regras e textos ou escolha outra etapa.</div>` : (ehRelatorio ? blocoRelatorio() : blocoFila(fila, enviaveis, tipoTexto, limite))}`);
 
     ligarSeletorCompetencia(() => { etapaSelecionada = null; renderFila(); });
     $('selEtapa').addEventListener('change', (e) => { etapaSelecionada = e.target.value; renderFila(); });
-    if (ehRelatorio) $('btnEnviarRelatorio').addEventListener('click', enviarRelatorio);
+    if (antesDoInicio) { /* nada a ligar */ } else if (ehRelatorio) $('btnEnviarRelatorio').addEventListener('click', enviarRelatorio);
     else {
       document.querySelectorAll('.chk-fila').forEach((c) => c.addEventListener('change', atualizarContadorFila));
       $('chkTodos')?.addEventListener('change', (e) => {
@@ -933,12 +935,21 @@
       </div></div>
 
       <div class="bpo-secao"><h3>Calendário do ciclo</h3>
-        <p style="margin-top:0;color:var(--muted);font-size:.85rem">Dias do mês seguinte à competência. Fim de semana ou feriado passa para o próximo dia útil.</p>
-        <div id="cfgEtapas">${etapas.map((e, i) => linhaEtapa(e, i)).join('')}</div>
-        <button class="btn btn-secondary" id="btnAddEtapa" type="button">+ Etapa</button>
-        <div class="bpo-form-grid" style="margin-top:14px">
+        <div class="bpo-aviso" id="cicloResumo"></div>
+        <div class="bpo-form-grid">
+          <div><label>Início dos ciclos</label>
+            <input type="text" id="cfg-inicio" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" value="${esc(c.inicio_ciclos ? U.dataBr(c.inicio_ciclos) : '')}">
+            <small>Etapas com data anterior a esta são ignoradas — nenhum alerta é montado para ciclos passados. Vazio = sem limite.</small></div>
           <div><label>Dia útil</label><label class="bpo-check"><input type="checkbox" id="cfg-util" ${c.ajustar_dia_util !== false ? 'checked' : ''}> Ajustar fim de semana/feriado para o próximo dia útil</label></div>
-          <div><label>Feriados extras (MM-DD ou AAAA-MM-DD)</label><input type="text" id="cfg-feriados" value="${esc((c.feriados_extras || []).join(', '))}"></div>
+        </div>
+        <div class="bpo-tabela-wrap"><table class="mapa-table bpo-tabela">
+          <thead><tr><th>Etapa</th><th>Dia do mês</th><th>Data neste ciclo</th><th></th></tr></thead>
+          <tbody id="cfgEtapas">${etapas.map((e, i) => linhaEtapa(e, i)).join('')}</tbody></table></div>
+        <button class="btn btn-secondary" id="btnAddEtapa" type="button" style="margin-top:10px">+ Etapa</button>
+        <div class="bpo-form-grid" style="margin-top:14px">
+          <div><label>Feriados extras (DD/MM ou DD/MM/AAAA)</label>
+            <input type="text" id="cfg-feriados" placeholder="24/12, 31/12, 15/11/2026" value="${esc(U.feriadosExtrasParaTexto(c.feriados_extras))}">
+            <small>Nacionais e do DF já estão incluídos. Sem ano = vale todo ano.</small></div>
           <div><label>Relatório do Onvio é "antigo" após (dias)</label><input type="number" id="cfg-antigo" min="0" value="${c.dias_relatorio_antigo ?? 2}"></div>
         </div>
       </div>
@@ -965,23 +976,67 @@
     $('btnSalvarCfg2').addEventListener('click', salvarConfig);
     $('btnAddEtapa').addEventListener('click', () => {
       $('cfgEtapas').insertAdjacentHTML('beforeend', linhaEtapa({ tipo: 'lembrete', dia: 5 }, Date.now()));
-      ligarRemoverEtapa();
+      ligarEtapas();
+      atualizarPreviaCalendario();
     });
+    $('cfg-inicio').addEventListener('input', (e) => {
+      e.target.value = U.mascaraData(e.target.value);
+      atualizarPreviaCalendario();
+    });
+    $('cfg-util').addEventListener('change', atualizarPreviaCalendario);
+    $('cfg-feriados').addEventListener('input', atualizarPreviaCalendario);
     $('btnAddTipo').addEventListener('click', adicionarTipo);
-    ligarRemoverEtapa();
+    ligarEtapas();
     ligarTipos();
+    atualizarPreviaCalendario();
   }
 
   function linhaEtapa(e, i) {
-    return `<div class="cfg-etapa" data-i="${i}" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <select class="bpo-select et-tipo">${Object.keys(U.TIPOS_ETAPA).map((k) =>
-        `<option value="${k}" ${e.tipo === k ? 'selected' : ''}>${U.TIPOS_ETAPA[k]}</option>`).join('')}</select>
-      <span>no dia</span><input type="number" class="bpo-input et-dia" min="1" max="31" value="${esc(e.dia)}" style="width:80px">
-      <button type="button" class="bpo-link et-rem">Remover</button></div>`;
+    return `<tr class="cfg-etapa" data-i="${i}">
+      <td><select class="bpo-select et-tipo">${Object.keys(U.TIPOS_ETAPA).map((k) =>
+        `<option value="${k}" ${e.tipo === k ? 'selected' : ''}>${U.TIPOS_ETAPA[k]}</option>`).join('')}</select></td>
+      <td><input type="number" class="bpo-input et-dia" min="1" max="31" value="${esc(e.dia)}" style="width:90px"></td>
+      <td class="et-data"></td>
+      <td class="acoes"><button type="button" class="bpo-link et-rem">Remover</button></td></tr>`;
   }
 
-  function ligarRemoverEtapa() {
-    document.querySelectorAll('.et-rem').forEach((b) => { b.onclick = () => b.closest('.cfg-etapa').remove(); });
+  // Lê o formulário e devolve uma config temporária (para a prévia do calendário).
+  function configDoFormulario() {
+    return {
+      etapas: Array.from(document.querySelectorAll('.cfg-etapa')).map((el) => ({
+        tipo: el.querySelector('.et-tipo').value, dia: parseInt(el.querySelector('.et-dia').value, 10) || 1,
+      })),
+      ajustar_dia_util: $('cfg-util').checked,
+      feriados_extras: U.textoParaFeriadosExtras($('cfg-feriados').value).lista,
+      inicio_ciclos: U.dataBrValida($('cfg-inicio').value),
+    };
+  }
+
+  function atualizarPreviaCalendario() {
+    const cfgTmp = configDoFormulario();
+    const comp = U.listaCompetencias(new Date(), 1)[0];
+    const ciclo = U.cicloTextos(comp);
+    $('cicloResumo').innerHTML = `📅 Ciclo atual: alertas enviados em <strong>${esc(ciclo.mesCiclo)}</strong> cobram a
+      <strong>competência ${esc(ciclo.competencia)}</strong> (sempre o mês anterior ao do envio). ${cfgTmp.etapas.length} etapa(s) configurada(s).`;
+    document.querySelectorAll('.cfg-etapa').forEach((tr) => {
+      const e = { tipo: tr.querySelector('.et-tipo').value, dia: parseInt(tr.querySelector('.et-dia').value, 10) || 1 };
+      const r = U.calendarioCompetencia(comp, { ...cfgTmp, etapas: [e] })[0];
+      const alvo = tr.querySelector('.et-data');
+      if (!r) { alvo.textContent = '—'; return; }
+      alvo.innerHTML = `<strong>${esc(U.dataBr(r.data))}</strong> <span style="color:var(--muted)">${esc(r.diaSemana)}</span>`
+        + (r.ajustada ? ` <span class="bpo-pill bpo-sit-neutro" title="Dia original ${esc(U.dataBr(r.dataOriginal))} caiu em fim de semana ou feriado">ajustada</span>` : '')
+        + (!r.ativa ? ' <span class="bpo-pill bpo-sit-pend">antes do início</span>' : '');
+    });
+  }
+
+  function ligarEtapas() {
+    document.querySelectorAll('.et-rem').forEach((b) => {
+      b.onclick = () => { b.closest('.cfg-etapa').remove(); atualizarPreviaCalendario(); };
+    });
+    document.querySelectorAll('.cfg-etapa input, .cfg-etapa select').forEach((i) => {
+      i.oninput = atualizarPreviaCalendario;
+      i.onchange = atualizarPreviaCalendario;
+    });
   }
 
   function linhaTipo(t) {
@@ -1027,9 +1082,15 @@
 
   async function salvarConfig() {
     const etapas = Array.from(document.querySelectorAll('.cfg-etapa')).map((el) => ({
-      tipo: el.querySelector('.et-tipo').value, dia: parseInt(el.querySelector('.et-dia').value, 10) || 1,
+      tipo: el.querySelector('.et-tipo').value, dia: parseInt(el.querySelector('.et-dia').value, 10) || 0,
     }));
     if (!etapas.length) { toast('Defina ao menos uma etapa.', 'erro'); return; }
+    if (etapas.some((e) => e.dia < 1 || e.dia > 31)) { toast('O dia de cada etapa deve estar entre 1 e 31.', 'erro'); return; }
+    const inicioTxt = $('cfg-inicio').value.trim();
+    const inicio = inicioTxt ? U.dataBrValida(inicioTxt) : null;
+    if (inicioTxt && !inicio) { toast('Início dos ciclos inválido. Use DD/MM/AAAA.', 'erro'); return; }
+    const fer = U.textoParaFeriadosExtras($('cfg-feriados').value);
+    if (fer.invalidos.length) { toast('Feriados inválidos: ' + fer.invalidos.join(', ') + ' (use DD/MM ou DD/MM/AAAA).', 'erro'); return; }
     const reg = {
       email_chefe: $('cfg-chefe').value.trim() || null,
       emails_copia_relatorio: U.parseEmails($('cfg-copia').value),
@@ -1039,7 +1100,8 @@
       email_teste: $('cfg-email-teste').value.trim() || null,
       etapas,
       ajustar_dia_util: $('cfg-util').checked,
-      feriados_extras: $('cfg-feriados').value.split(/[;,\s]+/).map((s) => s.trim()).filter(Boolean),
+      feriados_extras: fer.lista,
+      inicio_ciclos: inicio,
       dias_relatorio_antigo: parseInt($('cfg-antigo').value, 10) || 0,
       updated_por: usuarioEmail,
     };
@@ -1048,9 +1110,18 @@
       if (t !== 'relatorio') reg['texto_' + t] = $('cfg-texto-' + t).value;
     });
     if (reg.modo_teste && !reg.email_teste) { toast('Informe o e-mail de teste para usar o modo teste.', 'erro'); return; }
-    const { error } = await supabaseClient.from('bpo_config').update(reg).eq('id', 1);
+    let { error } = await supabaseClient.from('bpo_config').update(reg).eq('id', 1);
+    let semColuna = false;
+    if (error && /inicio_ciclos/.test(error.message || '')) {
+      // banco ainda sem a coluna nova: salva o resto e avisa
+      const { inicio_ciclos: _ignorada, ...resto } = reg;
+      ({ error } = await supabaseClient.from('bpo_config').update(resto).eq('id', 1));
+      semColuna = !error;
+    }
     if (error) { console.error(error); toast('Erro ao salvar as regras.', 'erro'); return; }
     config = { ...config, ...reg };
-    toast('Regras salvas.', 'sucesso');
+    if (semColuna) toast('Regras salvas, mas o início dos ciclos NÃO foi gravado: rode o SQL atualizado (coluna inicio_ciclos) no Supabase.', 'erro');
+    else toast('Regras salvas.', 'sucesso');
+    atualizarPreviaCalendario();
   }
 })();

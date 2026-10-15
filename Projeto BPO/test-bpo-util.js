@@ -81,6 +81,26 @@ assert.ok(U.feriadosDoAno(2026).has('2026-04-03')); // Sexta-feira Santa 2026
 assert.ok(U.feriadosDoAno(2026).has('2026-06-04')); // Corpus Christi 2026
 assert.strictEqual(U.proximoDiaUtil('2026-11-30'), '2026-12-01'); // Dia do Evangélico (DF)
 
+// início dos ciclos, máscara e feriados em DD/MM
+const calIni = U.calendarioCompetencia('2026-09', { ...cfg, inicio_ciclos: '2026-10-10' });
+assert.deepStrictEqual(calIni.map((e) => e.ativa), [false, false, true, true, true]);
+assert.strictEqual(U.etapaAtual(calIni, '2026-10-07'), null);
+assert.strictEqual(U.etapaAtual(calIni, '2026-10-14').etapa, 'D10');
+assert.strictEqual(cal[2].ajustada, true); // 10/10 (sábado) -> 13/10
+assert.strictEqual(cal[2].diaSemana, 'ter');
+assert.deepStrictEqual(U.cicloTextos('2026-09'), { mesCiclo: 'outubro/2026', competencia: '09/2026' });
+assert.deepStrictEqual(U.cicloTextos('2026-12'), { mesCiclo: 'janeiro/2027', competencia: '12/2026' });
+assert.strictEqual(U.mascaraData('01102026'), '01/10/2026');
+assert.strictEqual(U.mascaraData('0110'), '01/10');
+assert.strictEqual(U.mascaraData('01/10/20269999'), '01/10/2026');
+assert.strictEqual(U.dataBrValida('01/10/2026'), '2026-10-01');
+assert.strictEqual(U.dataBrValida('31/02/2026'), null);
+assert.strictEqual(U.dataBrValida('1/10/2026'), null);
+assert.strictEqual(U.feriadosExtrasParaTexto(['12-24', '2026-11-30']), '24/12, 30/11/2026');
+const fx = U.textoParaFeriadosExtras('24/12, 31/12; 15/11/2026, 99/99, abc');
+assert.deepStrictEqual(fx.lista, ['12-24', '12-31', '2026-11-15']);
+assert.deepStrictEqual(fx.invalidos, ['99/99', 'abc']);
+
 // fila
 const fila = U.montarFila(st, [{ codigo_empresa: '20', emails: ['a@cli.com', 'x@scontdf.com.br'], emails_cc: ['b@cli.com'] }],
   tipos, { '20': 'EMPRESA VINTE', '30': 'EMPRESA TRINTA' }, [{ ok: true, etapa: 'D5', codigo_empresa: '30' }], 'D5', { ignorar_emails_dominio: ['scontdf.com.br'] });

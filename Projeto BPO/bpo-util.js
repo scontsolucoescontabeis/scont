@@ -300,7 +300,11 @@
     return iso;
   }
 
-  // Ciclo da competência 'AAAA-MM' roda no mês seguinte.
+  const DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+  // Ciclo da competência 'AAAA-MM' roda no mês seguinte: os alertas sempre se referem
+  // à competência ANTERIOR ao mês em que são enviados.
+  // config.inicio_ciclos ('AAAA-MM-DD'): etapas com data anterior não valem (ativa=false).
   function calendarioCompetencia(comp, config) {
     const m = /^(\d{4})-(\d{2})$/.exec(comp || '');
     if (!m) return [];
@@ -308,19 +312,85 @@
     if (mes === 13) { mes = 1; a += 1; }
     const etapas = Array.isArray(config?.etapas) ? config.etapas : [];
     const ajustar = config?.ajustar_dia_util !== false;
+    const inicio = /^\d{4}-\d{2}-\d{2}$/.test(config?.inicio_ciclos || '') ? config.inicio_ciclos : null;
     return etapas.map((e) => {
       const ultimo = new Date(Date.UTC(a, mes, 0)).getUTCDate();
       const dia = Math.min(Math.max(parseInt(e.dia, 10) || 1, 1), ultimo);
-      let data = `${a}-${pad(mes)}-${pad(dia)}`;
-      if (ajustar) data = proximoDiaUtil(data, config?.feriados_extras);
-      return { etapa: `D${e.dia}`, tipo: e.tipo, dia: e.dia, data };
+      const original = `${a}-${pad(mes)}-${pad(dia)}`;
+      const data = ajustar ? proximoDiaUtil(original, config?.feriados_extras) : original;
+      return {
+        etapa: `D${e.dia}`, tipo: e.tipo, dia: e.dia, data, dataOriginal: original,
+        ajustada: data !== original,
+        diaSemana: DIAS_SEMANA[new Date(data + 'T12:00:00Z').getUTCDay()],
+        ativa: !inicio || data >= inicio,
+      };
     }).sort((x, y) => x.data.localeCompare(y.data));
+  }
+
+  // Textos do ciclo de uma competência: { mesCiclo: 'outubro/2026', competencia: '09/2026' }
+  function cicloTextos(comp) {
+    const m = /^(\d{4})-(\d{2})$/.exec(comp || '');
+    if (!m) return { mesCiclo: '', competencia: comp || '' };
+    let a = parseInt(m[1], 10), mes = parseInt(m[2], 10) + 1;
+    if (mes === 13) { mes = 1; a += 1; }
+    return { mesCiclo: `${MESES[mes - 1]}/${a}`, competencia: competenciaTextos(comp).curta };
+  }
+
+  // ─── MÁSCARA E VALIDAÇÃO DE DATAS (DD/MM/AAAA) ──────────────
+
+  // Digitação: só números, barras automáticas, até 8 dígitos.
+  function mascaraData(s) {
+    const d = String(s || '').replace(/\D/g, '').slice(0, 8);
+    if (d.length <= 2) return d;
+    if (d.length <= 4) return d.slice(0, 2) + '/' + d.slice(2);
+    return d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4);
+  }
+
+  // 'DD/MM/AAAA' -> 'AAAA-MM-DD' somente se for uma data real; senão null.
+  function dataBrValida(s) {
+    const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(s || '').trim());
+    if (!m) return null;
+    const d = parseInt(m[1], 10), mo = parseInt(m[2], 10), a = parseInt(m[3], 10);
+    if (a < 2000 || a > 2100 || mo < 1 || mo > 12) return null;
+    const real = new Date(Date.UTC(a, mo - 1, d));
+    if (real.getUTCMonth() !== mo - 1 || real.getUTCDate() !== d) return null;
+    return `${m[3]}-${m[2]}-${m[1]}`;
+  }
+
+  // Feriados extras: armazenados como 'MM-DD' (todo ano) ou 'AAAA-MM-DD'; exibidos como 'DD/MM' e 'DD/MM/AAAA'.
+  function feriadosExtrasParaTexto(lista) {
+    return (lista || []).map((x) => {
+      let m = /^(\d{2})-(\d{2})$/.exec(x);
+      if (m) return `${m[2]}/${m[1]}`;
+      m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(x);
+      return m ? `${m[3]}/${m[2]}/${m[1]}` : x;
+    }).join(', ');
+  }
+
+  function textoParaFeriadosExtras(texto) {
+    const lista = [], invalidos = [];
+    String(texto || '').split(/[;,\s]+/).map((s) => s.trim()).filter(Boolean).forEach((tok) => {
+      const curto = /^(\d{2})\/(\d{2})$/.exec(tok);
+      if (curto) {
+        const d = parseInt(curto[1], 10), mo = parseInt(curto[2], 10);
+        if (mo >= 1 && mo <= 12 && d >= 1 && d <= new Date(Date.UTC(2024, mo, 0)).getUTCDate()) {
+          const v = `${curto[2]}-${curto[1]}`;
+          if (!lista.includes(v)) lista.push(v);
+          return;
+        }
+      } else {
+        const iso = dataBrValida(tok);
+        if (iso) { if (!lista.includes(iso)) lista.push(iso); return; }
+      }
+      invalidos.push(tok);
+    });
+    return { lista, invalidos };
   }
 
   // Última etapa de cobrança (não relatório) com data <= hoje; null se nenhuma chegou.
   function etapaAtual(calendario, hojeIso) {
     let atual = null;
-    (calendario || []).forEach((e) => { if (e.data <= hojeIso) atual = e; });
+    (calendario || []).forEach((e) => { if (e.ativa !== false && e.data <= hojeIso) atual = e; });
     return atual;
   }
 
@@ -423,7 +493,8 @@
     MESES, SITUACOES, TIPOS_ETAPA, escapeHtml, normalizar, parseEmails, aplicarVariaveis, textoParaHtml,
     competenciaTextos, dataBr, dataIsoDeBr, dataHoraIsoDeBr, competenciaSugerida, competenciaDaPublicacao, listaCompetencias,
     parseRelatorio, casarClientes, arquivoCasaTipo, calcularStatus, contar,
-    feriadosDoAno, ehDiaUtil, proximoDiaUtil, calendarioCompetencia, etapaAtual, dataLimite,
+    feriadosDoAno, ehDiaUtil, proximoDiaUtil, calendarioCompetencia, cicloTextos, mascaraData, dataBrValida, feriadosExtrasParaTexto, textoParaFeriadosExtras,
+    etapaAtual, dataLimite,
     emailsValidos, montarFila, lerPlanilhaEmpresas,
   };
 

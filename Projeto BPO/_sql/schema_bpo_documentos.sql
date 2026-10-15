@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS public.bpo_config (
     ajustar_dia_util        BOOLEAN NOT NULL DEFAULT TRUE,
     feriados_extras         TEXT[] NOT NULL DEFAULT '{12-24,12-31}',
     dias_relatorio_antigo   SMALLINT NOT NULL DEFAULT 2,
+    inicio_ciclos           DATE,   -- etapas com data anterior a esta não valem (NULL = sem limite)
 
     -- Variáveis: {cliente} {competencia} {competencia_extenso} {data_limite} {documentos}
     -- Formatação: linha em branco = parágrafo; "- " = item de lista; **texto** = negrito
@@ -52,6 +53,9 @@ CREATE TABLE IF NOT EXISTS public.bpo_config (
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_por             TEXT
 );
+-- Bancos criados antes desta coluna existir:
+ALTER TABLE public.bpo_config ADD COLUMN IF NOT EXISTS inicio_ciclos DATE;
+
 INSERT INTO public.bpo_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 
 

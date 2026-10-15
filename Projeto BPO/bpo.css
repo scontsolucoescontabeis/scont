@@ -125,3 +125,7 @@ tr.bpo-sem .bpo-input{opacity:.7}
 .bpo-massa > span{margin-right:auto; color:var(--muted); font-weight:600}
 .bpo-massa label{font-size:.88rem; cursor:pointer}
 #bpoModal .bpo-dropzone{padding:22px 16px}
+
+/* Calendário do ciclo */
+.bpo-etapa.inativa{opacity:.45; border-style:dashed}
+.cfg-etapa .et-data{white-space:nowrap}
