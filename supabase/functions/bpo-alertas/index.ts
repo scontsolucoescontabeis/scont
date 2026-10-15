@@ -9,6 +9,7 @@
 // Ações (body.acao):
 //   cobrar     { competencia, codigo_empresa, etapa, tipo_texto, tipo_ids[], data_limite? }
 //   relatorio  { competencia, etapa?, itens[], resumo?, portal_url? }
+//   teste      { competencia, tipo_texto, assunto?, texto?, data_limite? }  -> só para o e-mail de teste
 //
 // Deploy: supabase functions deploy bpo-alertas
 // ============================================================
@@ -146,6 +147,22 @@ function aplicarModoTeste(cfg: Record<string, unknown>, para: string[], cc: stri
     return { para: alvo, cc: [], assunto: `[TESTE] ${assunto}`, html: aviso + html, teste: true };
 }
 
+type LinhaRel = [string, { nome: string; docs: string[]; alertas: number }];
+
+// Corpo do relatório da chefe (usado no envio real e no e-mail de teste).
+function htmlRelatorio(curta: string, comp: string, lista: LinhaRel[], portal: string): string {
+    const linhas = lista.map(([cod, g]) => `<tr>
+                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;">${escapeHtml(g.nome)}<br><span style="color:#999;font-size:12px;">${escapeHtml(cod)}</span></td>
+                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;">${escapeHtml(g.docs.join(', '))}</td>
+                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;text-align:center;">${g.alertas}</td></tr>`).join('');
+    return `<h2 style="color:#4e1820;font-size:18px;margin:0 0 8px;">Documentos não recebidos — ${escapeHtml(curta)}</h2>
+                <p style="margin:0 0 16px;">${lista.length} empresa(s) com BPO com documentos pendentes.</p>
+                ${lista.length ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+                  <tr style="background:#f5eae9;"><th align="left" style="padding:8px 10px;">Empresa</th><th align="left" style="padding:8px 10px;">Pendente</th><th style="padding:8px 10px;">Alertas</th></tr>
+                  ${linhas}</table>` : '<p>✅ Nenhuma pendência.</p>'}
+                ${portal ? `<p style="margin-top:20px;"><a href="${escapeHtml(portal)}?competencia=${comp}" style="background:#8B3A3A;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700;">Abrir o painel</a></p>` : ''}`;
+}
+
 function resposta(obj: unknown, status = 200) {
     return new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 }
@@ -256,16 +273,7 @@ Deno.serve(async (req) => {
             });
             const lista = Array.from(porEmpresa.entries()).sort((a, b) => a[1].nome.localeCompare(b[1].nome, 'pt-BR'));
             const portal = typeof body.portal_url === 'string' && /^https:\/\//.test(body.portal_url) ? body.portal_url : '';
-            const linhas = lista.map(([cod, g]) => `<tr>
-                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;">${escapeHtml(g.nome)}<br><span style="color:#999;font-size:12px;">${escapeHtml(cod)}</span></td>
-                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;">${escapeHtml(g.docs.join(', '))}</td>
-                <td style="padding:8px 10px;border-bottom:1px solid #edf0f5;text-align:center;">${g.alertas}</td></tr>`).join('');
-            const miolo = `<h2 style="color:#4e1820;font-size:18px;margin:0 0 8px;">Documentos não recebidos — ${escapeHtml(curta)}</h2>
-                <p style="margin:0 0 16px;">${lista.length} empresa(s) com BPO com documentos pendentes.</p>
-                ${lista.length ? `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
-                  <tr style="background:#f5eae9;"><th align="left" style="padding:8px 10px;">Empresa</th><th align="left" style="padding:8px 10px;">Pendente</th><th style="padding:8px 10px;">Alertas</th></tr>
-                  ${linhas}</table>` : '<p>✅ Nenhuma pendência.</p>'}
-                ${portal ? `<p style="margin-top:20px;"><a href="${escapeHtml(portal)}?competencia=${comp}" style="background:#8B3A3A;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700;">Abrir o painel</a></p>` : ''}`;
+            const miolo = htmlRelatorio(curta, comp, lista, portal);
             const assunto = aplicarVariaveis(String(cfg.assunto_relatorio || ''), { competencia: curta, competencia_extenso: extenso });
             const destPara = para.length ? para : cc.slice(0, 1);
             const destCc = para.length ? cc : cc.slice(1);
@@ -285,6 +293,40 @@ Deno.serve(async (req) => {
                 await registrar(false, e instanceof Error ? e.message : String(e));
                 throw e;
             }
+        }
+
+        // ── E-MAIL DE TESTE (um texto, com dados fictícios, só para a equipe) ──
+        // O destinatário NUNCA vem do chamador: e-mail de teste, senão operador, senão o próprio usuário.
+        if (acao === 'teste') {
+            const tipoTexto = String(body.tipo_texto || '');
+            if (![...TIPOS_TEXTO, 'relatorio'].includes(tipoTexto)) throw new Error('tipo_texto inválido.');
+            const para = emailsValidos([cfg.email_teste, cfg.email_operador, quem]).slice(0, 1);
+            if (!para.length) throw new Error('Nenhum e-mail de teste disponível (configure o e-mail de teste).');
+
+            const { data: tps } = await db.from('bpo_tipos_documento').select('nome').eq('ativo', true).order('ordem');
+            const nomesDocs = (tps ?? []).map((t: { nome: string }) => t.nome);
+            const exemplo = nomesDocs.length ? nomesDocs : ['Extrato bancário'];
+            const vars: Record<string, string> = {
+                cliente: 'EMPRESA EXEMPLO LTDA', competencia: curta, competencia_extenso: extenso,
+                data_limite: dataBr(String(body.data_limite || '')) || 'o quanto antes',
+                documentos: exemplo.map((d) => `- ${d}`).join('\n'),
+            };
+            const assuntoBase = String(body.assunto ?? cfg[`assunto_${tipoTexto}`] ?? '').slice(0, 300);
+            let miolo: string;
+            if (tipoTexto === 'relatorio') {
+                const lista: LinhaRel[] = [
+                    ['101', { nome: 'EMPRESA EXEMPLO LTDA', docs: exemplo, alertas: 2 }],
+                    ['102', { nome: 'OUTRA EMPRESA EXEMPLO SA', docs: [exemplo[0]], alertas: 1 }],
+                ];
+                miolo = htmlRelatorio(curta, comp, lista, '');
+            } else {
+                miolo = textoParaHtml(String(body.texto ?? cfg[`texto_${tipoTexto}`] ?? '').slice(0, 20000), vars);
+            }
+            const aviso = `<div style="background:#eaf1ff;border:1px solid #bcd0f7;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#2c4a7c;">
+              <strong>E-MAIL DE TESTE</strong> — exemplo com dados fictícios. Nenhum cliente recebeu esta mensagem.</div>`;
+            const assunto = `[TESTE] ${aplicarVariaveis(assuntoBase, vars)}`;
+            const r = await enviar(cfgMail, { para, cc: [], assunto, html: envelope(nomeRem, aviso + miolo) });
+            return resposta({ ok: true, para, teste: true, ...r });
         }
 
         throw new Error(`Ação desconhecida: ${acao}`);

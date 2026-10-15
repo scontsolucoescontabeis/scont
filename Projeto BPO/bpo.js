@@ -920,7 +920,9 @@
     const etapas = Array.isArray(c.etapas) ? c.etapas : [];
     const campoTexto = (tipo, rotulo) => `
       <div class="full"><label>${rotulo} — assunto</label><input type="text" id="cfg-assunto-${tipo}" value="${esc(c['assunto_' + tipo] || '')}"></div>
-      ${tipo === 'relatorio' ? '' : `<div class="full"><label>${rotulo} — texto</label><textarea id="cfg-texto-${tipo}">${esc(c['texto_' + tipo] || '')}</textarea></div>`}`;
+      ${tipo === 'relatorio' ? '' : `<div class="full"><label>${rotulo} — texto</label><textarea id="cfg-texto-${tipo}">${esc(c['texto_' + tipo] || '')}</textarea></div>`}
+      <div class="full bpo-teste-linha"><button type="button" class="btn btn-secondary btn-teste-email" data-tipo="${tipo}">✉️ Enviar e-mail de teste</button>
+        <small>Usa o texto acima (mesmo sem salvar), com dados fictícios, e envia só para o e-mail de teste.</small></div>`;
 
     abrirMain('Regras e textos', '<button class="btn btn-primary" id="btnSalvarCfg">💾 Salvar</button>', `
       <div class="bpo-secao"><h3>Destinatários e modo teste</h3><div class="bpo-form-grid">
@@ -974,6 +976,7 @@
 
     $('btnSalvarCfg').addEventListener('click', salvarConfig);
     $('btnSalvarCfg2').addEventListener('click', salvarConfig);
+    document.querySelectorAll('.btn-teste-email').forEach((b) => b.addEventListener('click', () => enviarEmailTeste(b)));
     $('btnAddEtapa').addEventListener('click', () => {
       $('cfgEtapas').insertAdjacentHTML('beforeend', linhaEtapa({ tipo: 'lembrete', dia: 5 }, Date.now()));
       ligarEtapas();
@@ -1078,6 +1081,30 @@
     tipos.push(data);
     $('corpoTipos').insertAdjacentHTML('beforeend', linhaTipo(data));
     ligarTipos();
+  }
+
+  // E-mail de teste de um dos textos (usa o conteúdo do formulário, mesmo sem salvar).
+  async function enviarEmailTeste(btn) {
+    const tipo = btn.getAttribute('data-tipo');
+    const comp = U.listaCompetencias(new Date(), 1)[0];
+    const limite = U.dataLimite(U.calendarioCompetencia(comp, configDoFormulario()));
+    const corpo = { acao: 'teste', competencia: comp, tipo_texto: tipo, assunto: $('cfg-assunto-' + tipo).value, data_limite: limite };
+    if (tipo !== 'relatorio') corpo.texto = $('cfg-texto-' + tipo).value;
+    const rotulo = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+    try {
+      const r = await chamarFuncao(corpo);
+      toast(`E-mail de teste enviado para ${(r.para || []).join(', ')}.`, 'sucesso');
+    } catch (e) {
+      const msg = /Ação desconhecida/.test(e.message)
+        ? 'A função bpo-alertas no Supabase está desatualizada — publique a nova versão para usar o teste.'
+        : e.message;
+      toast('Falha no e-mail de teste: ' + msg, 'erro');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = rotulo;
+    }
   }
 
   async function salvarConfig() {

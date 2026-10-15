@@ -129,3 +129,7 @@ tr.bpo-sem .bpo-input{opacity:.7}
 /* Calendário do ciclo */
 .bpo-etapa.inativa{opacity:.45; border-style:dashed}
 .cfg-etapa .et-data{white-space:nowrap}
+
+/* Botão de e-mail de teste por texto */
+.bpo-teste-linha{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:-4px 0 10px}
+.bpo-teste-linha small{margin:0 !important}
