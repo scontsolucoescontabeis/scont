@@ -1520,22 +1520,22 @@
 
             <div class="info-card" data-regime="simples" hidden>
                 <strong><i class="fas fa-file-invoice-dollar"></i> DAS — Simples Nacional</strong>
-                <p>Guia única que reúne IRPJ, CSLL, PIS, COFINS, ISS/ICMS e a contribuição patronal previdenciária (CPP). Vencimento: todo dia 20 de cada mês. A alíquota depende do anexo e da faixa de receita bruta acumulada dos últimos 12 meses.</p>
+                <p data-cfg="simples.das">Guia única que reúne IRPJ, CSLL, PIS, COFINS, ISS/ICMS e a contribuição patronal previdenciária (CPP). Vencimento: todo dia 20 de cada mês. A alíquota depende do anexo e da faixa de receita bruta acumulada dos últimos 12 meses.</p>
             </div>
 
             <div class="info-card" data-regime="presumido">
                 <strong><i class="fas fa-money-bill-wave"></i> ISS</strong>
-                <p>Vencimento: todo dia 20 de cada mês</p>
+                <p data-cfg="presumido.iss">Vencimento: todo dia 20 de cada mês</p>
             </div>
 
             <div class="info-card" data-regime="presumido">
                 <strong><i class="fas fa-percent"></i> PIS e COFINS</strong>
-                <p>Vencimento: todo dia 20 de cada mês</p>
+                <p data-cfg="presumido.pis_cofins">Vencimento: todo dia 20 de cada mês</p>
             </div>
 
             <div class="info-card" data-regime="presumido">
                 <strong><i class="fas fa-file-invoice-dollar"></i> IRPJ e CSLL</strong>
-                <p>Vencimento: último dia útil de abril, julho, outubro e janeiro</p>
+                <p data-cfg="presumido.irpj_csll">Vencimento: último dia útil de abril, julho, outubro e janeiro</p>
             </div>
 
             <div class="alert danger">
@@ -1550,7 +1550,7 @@
 
             <div class="info-card">
                 <strong><i class="fas fa-file-invoice"></i> 1. Nota Fiscal Eletrônica (NFS-e)</strong>
-                <p>Emissão limitada a 5 NFS-es/mês. <span data-regime="presumido">Como optante pelo Lucro Presumido, retenha IRPJ e CSLL de prestadores como advocacia, arquitetura, contabilidade e segurança. </span><span data-regime="simples" hidden>Como optante pelo Simples Nacional, observe o limite de receita bruta e o sublimite estadual, e confira a retenção de ISS e INSS em serviços prestados a pessoas jurídicas. </span>Na aquisição de bens de fora do DF, recolha o diferencial de alíquota interestadual (DIFAL).</p>
+                <p>Emissão limitada a 5 NFS-es/mês. <span data-regime="presumido" data-cfg="presumido.nfse">Como optante pelo Lucro Presumido, retenha IRPJ e CSLL de prestadores como advocacia, arquitetura, contabilidade e segurança.</span> <span data-regime="simples" data-cfg="simples.nfse" hidden>Como optante pelo Simples Nacional, observe o limite de receita bruta e o sublimite estadual, e confira a retenção de ISS e INSS em serviços prestados a pessoas jurídicas.</span> Na aquisição de bens de fora do DF, recolha o diferencial de alíquota interestadual (DIFAL).</p>
             </div>
 
             <div class="info-card">
@@ -1605,8 +1605,8 @@
                         <tr>
                             <td><strong>INSS</strong></td>
                             <td>
-                                <span data-regime="presumido">28,8% sobre o salário</span>
-                                <span data-regime="simples" hidden>Contribuição patronal incluída no DAS (Anexos I, II, III e V); apenas a retenção do empregado (8% a 14%) é recolhida na folha. Anexo IV: 20% + RAT + terceiros</span>
+                                <span data-regime="presumido" data-cfg="presumido.inss">28,8% sobre o salário</span>
+                                <span data-regime="simples" data-cfg="simples.inss" hidden>Contribuição patronal incluída no DAS (Anexos I, II, III e V); apenas a retenção do empregado (8% a 14%) é recolhida na folha. Anexo IV: 20% + RAT + terceiros</span>
                             </td>
                             <td>Dia 20</td>
                         </tr>
@@ -1662,12 +1662,12 @@
 
             <div class="info-card" id="cardBalancoNova" hidden>
                 <strong><i class="fas fa-balance-scale"></i> Balanço de Abertura</strong>
-                <p>Por se tratar de empresa nova, a Scont realizará o balanço de abertura — registro inicial do capital social e dos bens, direitos e obrigações com que a empresa inicia suas atividades.</p>
+                <p data-cfg="nova.balanco">Por se tratar de empresa nova, a Scont realizará o balanço de abertura — registro inicial do capital social e dos bens, direitos e obrigações com que a empresa inicia suas atividades.</p>
             </div>
 
             <div class="info-card" id="cardBalancoMigracao">
                 <strong><i class="fas fa-balance-scale"></i> Balanço de Abertura</strong>
-                <p>Estamos aguardando os saldos finais da contabilidade anterior para proceder com a auditoria e o balanço de abertura — inventário físico e documental dos bens, direitos e obrigações da empresa.</p>
+                <p data-cfg="outra.balanco">Estamos aguardando os saldos finais da contabilidade anterior para proceder com a auditoria e o balanço de abertura — inventário físico e documental dos bens, direitos e obrigações da empresa.</p>
             </div>
 
             <div class="alert info">
@@ -1882,6 +1882,7 @@
     </button>
 
     <!-- JAVASCRIPT -->
+    <script src="config-padrao.js"></script>
     <script>
     // ===== SUPABASE =====
     const { createClient } = supabase;
@@ -1914,8 +1915,14 @@
                 return;
             }
 
+            let cfg = {};
+            try {
+                const r = await db.rpc('fn_buscar_config_apresentacoes');
+                if (r.data && typeof r.data === 'object') cfg = r.data;
+            } catch (_) { /* usa os textos padrão do HTML */ }
+
             preencherDadosCadastrais(data);
-            aplicarParticularidades(data);
+            aplicarParticularidades(data, cfg);
             personalizarHero(data);
             document.getElementById('badgePersonalizada').style.display = 'flex';
             document.title = `${data.razao_social} - Scont Soluções Contábeis`;
@@ -1933,7 +1940,13 @@
     }
 
     // Particularidades: regime tributário, origem contábil e início da cobrança
-    function aplicarParticularidades(dados) {
+    function aplicarParticularidades(dados, cfg = {}) {
+        // Textos personalizados em Configurações (textContent: sem HTML)
+        document.querySelectorAll('[data-cfg]').forEach(el => {
+            const v = cfg[el.dataset.cfg];
+            if (typeof v === 'string' && v.trim()) el.textContent = v.trim();
+        });
+
         const regime = (dados.regime || '').toLowerCase().includes('simples') ? 'simples' : 'presumido';
         document.querySelectorAll('[data-regime]').forEach(el => {
             el.hidden = el.dataset.regime !== regime;
@@ -1944,7 +1957,7 @@
         document.getElementById('cardBalancoMigracao').hidden = nova;
 
         const el = document.getElementById('honorarioInicio');
-        const iso = dados.inicio_cobranca_honorarios;
+        const iso = dados.inicio_cobranca_honorarios || cfg.inicio_cobranca_padrao;
         if (iso) {
             const [a, m, d] = iso.split('-').map(Number);
             el.textContent = 'Cobranças iniciam em ' + new Date(a, m - 1, d).toLocaleDateString('pt-BR') + '.';

@@ -52,6 +52,10 @@
                     <i class="fas fa-history"></i>
                     <span>Histórico</span>
                 </div>
+                <div class="nav-item" data-section="configuracoes">
+                    <i class="fas fa-sliders"></i>
+                    <span>Configurações</span>
+                </div>
             </nav>
         </aside>
 
@@ -426,6 +430,31 @@
                 </div>
             </section>
 
+            <!-- SEÇÃO 3: CONFIGURAÇÕES -->
+            <section id="configuracoes" class="admin-section">
+                <div class="section-header">
+                    <h1>Configurações</h1>
+                    <p>Personalize os textos e alíquotas exibidos nas apresentações. Campo em branco volta ao texto padrão. Vale para todas as apresentações, inclusive as já enviadas.</p>
+                </div>
+                <form id="formConfiguracoes" class="admin-form">
+                    <div id="configCampos"></div>
+                    <div class="form-etapa">
+                        <div class="etapa-cabecalho">
+                            <span class="etapa-numero"><i class="fas fa-money-bill"></i></span>
+                            <div>
+                                <h2>Honorários contábeis</h2>
+                                <p>Data padrão de início da cobrança, usada quando a apresentação não tiver data própria.</p>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgInicioCobranca">Início da cobrança (padrão)</label>
+                            <input type="date" id="cfgInicioCobranca">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Salvar configurações</button>
+                </form>
+            </section>
+
         </main>
     </div>
 
@@ -512,6 +541,7 @@
     <!-- Dados CNAE (define window.CNAE_DATA) -->
     <script src="../../Projeto Gerenciador Formularios/cnaes.js"></script>
     <script src="cnae.js"></script>
+    <script src="../config-padrao.js"></script>
     <script src="admin-script.js"></script>
 </body>
 </html>
