@@ -42,7 +42,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (contador) contador.textContent = msgInput.value.length;
     });
 
+    document.getElementById('formConfiguracoes')
+        ?.addEventListener('submit', e => { e.preventDefault(); salvarConfiguracoes(); });
+
     carregarHistorico();
+    aplicarDataPadraoCobranca();
 });
 
 // ===== MÁSCARAS =====
@@ -308,6 +312,7 @@ function mudarSecao(secao) {
     document.getElementById(secao)?.classList.add('active');
     document.querySelector(`[data-section="${secao}"]`)?.classList.add('active');
     if (secao === 'historico') carregarHistorico();
+    if (secao === 'configuracoes') carregarConfiguracoes();
 }
 
 // ===== CRIAR APRESENTAÇÃO =====
@@ -331,6 +336,8 @@ async function criarApresentacao() {
         regime:            fd.get('regime')    || null,
         porte:             fd.get('porte')     || null,
         ramo:              fd.get('ramo')      || null,
+        origem_contabilidade:       fd.get('origemContabilidade') || null,
+        inicio_cobranca_honorarios: fd.get('inicioCobranca') || null,
         cnae_principal:    `${cnaePrincipalSelecionado.codigo} — ${cnaePrincipalSelecionado.atividade}`,
         cnaes_secundarios: cnaesSecundariosSelecionados.length
             ? cnaesSecundariosSelecionados.map(c => `${c.codigo} — ${c.atividade}`).join('\n')
@@ -486,6 +493,7 @@ function copiarLinkHistorico(link) {
 // ===== NOVA APRESENTAÇÃO =====
 function novaApresentacao() {
     document.getElementById('formCriarApresentacao').reset();
+    aplicarDataPadraoCobranca();
     document.getElementById('resultado').style.display = 'none';
     removerCnaePrincipal();
     cnaesSecundariosSelecionados = [];
@@ -850,3 +858,77 @@ document.addEventListener('click', e => {
     const modal = document.getElementById('modalCNAE');
     if (modal && e.target === modal) fecharModalCNAE();
 });
+
+
+// ===== CONFIGURAÇÕES (textos por regime/situação e data padrão de cobrança) =====
+async function buscarConfig() {
+    const { data, error } = await db.from('apresentacoes_config').select('config').eq('id', 1).maybeSingle();
+    if (error) throw error;
+    return (data && data.config) || {};
+}
+
+async function carregarConfiguracoes() {
+    const box = document.getElementById('configCampos');
+    let cfg = {};
+    try { cfg = await buscarConfig(); }
+    catch (err) { showToast('Erro ao carregar configurações: ' + (err.message || err), 'error'); }
+
+    const grupos = {};
+    window.BV_CONFIG_CAMPOS.forEach(c => (grupos[c.grupo] = grupos[c.grupo] || []).push(c));
+
+    box.innerHTML = '';
+    Object.entries(grupos).forEach(([nome, campos]) => {
+        const etapa = document.createElement('div');
+        etapa.className = 'form-etapa';
+        const cab = document.createElement('div');
+        cab.className = 'etapa-cabecalho';
+        const h = document.createElement('h2');
+        h.textContent = nome;
+        cab.appendChild(h);
+        etapa.appendChild(cab);
+        campos.forEach(c => {
+            const g = document.createElement('div');
+            g.className = 'form-group';
+            const l = document.createElement('label');
+            l.textContent = c.rotulo;
+            const t = document.createElement('textarea');
+            t.rows = c.linhas;
+            t.dataset.chave = c.chave;
+            t.placeholder = c.padrao;
+            t.value = cfg[c.chave] || '';
+            g.append(l, t);
+            etapa.appendChild(g);
+        });
+        box.appendChild(etapa);
+    });
+    document.getElementById('cfgInicioCobranca').value = cfg.inicio_cobranca_padrao || '';
+}
+
+async function salvarConfiguracoes() {
+    const cfg = {};
+    document.querySelectorAll('#configCampos textarea[data-chave]').forEach(t => {
+        const v = t.value.trim();
+        if (v) cfg[t.dataset.chave] = v;
+    });
+    const data = document.getElementById('cfgInicioCobranca').value;
+    if (data) cfg.inicio_cobranca_padrao = data;
+
+    try {
+        const { error } = await db.from('apresentacoes_config')
+            .upsert({ id: 1, config: cfg, atualizado_em: new Date().toISOString() });
+        if (error) throw error;
+        showToast('Configurações salvas', 'success');
+        aplicarDataPadraoCobranca();
+    } catch (err) {
+        showToast('Erro ao salvar: ' + (err.message || JSON.stringify(err)), 'error');
+    }
+}
+
+// Pré-preenche o início da cobrança no formulário com o padrão das Configurações
+async function aplicarDataPadraoCobranca() {
+    try {
+        const cfg = await buscarConfig();
+        const el = document.getElementById('inicioCobranca');
+        if (el && !el.value && cfg.inicio_cobranca_padrao) el.value = cfg.inicio_cobranca_padrao;
+    } catch (_) { /* tabela ainda não criada: ignora */ }
+}

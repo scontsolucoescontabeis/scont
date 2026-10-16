@@ -52,6 +52,10 @@
                     <i class="fas fa-history"></i>
                     <span>Histórico</span>
                 </div>
+                <div class="nav-item" data-section="configuracoes">
+                    <i class="fas fa-sliders"></i>
+                    <span>Configurações</span>
+                </div>
             </nav>
         </aside>
 
@@ -131,6 +135,21 @@
                             <div class="form-group">
                                 <label for="ramo">Ramo de Atividade</label>
                                 <input type="text" id="ramo" name="ramo">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="origemContabilidade">Origem contábil <span class="obrigatorio">*</span></label>
+                                <select id="origemContabilidade" name="origemContabilidade" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="nova">Empresa nova (balanço de abertura pela Scont)</option>
+                                    <option value="outra_contabilidade">Vem de outra contabilidade</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="inicioCobranca">Início da cobrança dos honorários</label>
+                                <input type="date" id="inicioCobranca" name="inicioCobranca">
+                                <small class="campo-dica">Aparece em "Cobranças iniciam em…". Em branco, a frase é omitida.</small>
                             </div>
                         </div>
                     </div>
@@ -411,6 +430,31 @@
                 </div>
             </section>
 
+            <!-- SEÇÃO 3: CONFIGURAÇÕES -->
+            <section id="configuracoes" class="admin-section">
+                <div class="section-header">
+                    <h1>Configurações</h1>
+                    <p>Personalize os textos e alíquotas exibidos nas apresentações. Campo em branco volta ao texto padrão. Vale para todas as apresentações, inclusive as já enviadas.</p>
+                </div>
+                <form id="formConfiguracoes" class="admin-form">
+                    <div id="configCampos"></div>
+                    <div class="form-etapa">
+                        <div class="etapa-cabecalho">
+                            <span class="etapa-numero"><i class="fas fa-money-bill"></i></span>
+                            <div>
+                                <h2>Honorários contábeis</h2>
+                                <p>Data padrão de início da cobrança, usada quando a apresentação não tiver data própria.</p>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgInicioCobranca">Início da cobrança (padrão)</label>
+                            <input type="date" id="cfgInicioCobranca">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Salvar configurações</button>
+                </form>
+            </section>
+
         </main>
     </div>
 
@@ -497,6 +541,7 @@
     <!-- Dados CNAE (define window.CNAE_DATA) -->
     <script src="../../Projeto Gerenciador Formularios/cnaes.js"></script>
     <script src="cnae.js"></script>
+    <script src="../config-padrao.js"></script>
     <script src="admin-script.js"></script>
 </body>
 </html>
