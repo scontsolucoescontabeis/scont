@@ -26,6 +26,7 @@ window.Ficha360Ficha = (function () {
         diario: 'contabil', mapeamento: 'contabil', onboarding: 'contabil',
         cadastro: 'cadastro',
     };
+    const ORDEM_GRAVIDADE = { critico: 0, atencao: 1, info: 2 };
 
     let codigoAtual = null;
     let abaAtual = 'resumo';
@@ -45,7 +46,30 @@ window.Ficha360Ficha = (function () {
         const falhas = (FONTES_POR_ABA[aba] || []).filter(k => F360.falhas[k]);
         if (!falhas.length) return '';
         return `<div class="aviso-fontes">${falhas.map(k =>
-            `${F360.falhas[k] === 'sem_permissao' ? '🔒 Sem permissão' : '⚠️ Indisponível'}: ${esc(F360.NOMES_FONTE[k] || k)}`).join(' · ')}</div>`;
+            `<span>${F360.ico(F360.falhas[k] === 'sem_permissao' ? 'cadeado' : 'aviso')}${F360.falhas[k] === 'sem_permissao' ? 'Sem permissão' : 'Indisponível'}: ${esc(F360.NOMES_FONTE[k] || k)}</span>`).join(' · ')}</div>`;
+    }
+
+    function htmlCabecalho(it) {
+        return `
+          <div class="ficha-topo">
+            <button type="button" class="btn btn-mini" id="btnVoltar">${F360.ico('voltar')}Painel</button>
+            <h2>${esc(it.nome)} ${F360.semaforoHtml(it.semaforo)}</h2>
+          </div>
+          <div class="abas" role="tablist" aria-label="Seções da ficha">${ABAS.map(([k, r]) =>
+              `<button type="button" class="aba ${k === abaAtual ? 'ativa' : ''}" role="tab" id="tab-${k}" aria-controls="conteudoAba" aria-selected="${k === abaAtual}" tabindex="${k === abaAtual ? 0 : -1}" data-aba="${k}">${r}${badgeAba(it, k)}</button>`).join('')}</div>`;
+    }
+
+    function htmlMeta(it) {
+        const meta = (rotulo, valor, larga) =>
+            `<div${larga ? ' class="meta-larga"' : ''}><dt>${rotulo}</dt><dd>${valor || '—'}</dd></div>`;
+        return `
+              ${meta('Código', `<span class="mono">${esc(it.codigo)}</span>`)}
+              ${meta('Regime', esc(it.regime))}
+              ${meta('CNPJ', it.cnpj ? `<span class="mono">${esc(it.cnpj)}</span>` : '', true)}
+              ${meta('Carteira', esc(F360.ROTULO_STATUS[it.statusCarteira] || it.statusCarteira))}
+              ${it.grupo ? meta('Grupo', esc(it.grupo)) : ''}
+              ${meta('Responsável DP', it.possuiFolha ? esc(it.responsaveisDp.join(', ')) : 'N/A', true)}
+              ${meta('Responsável Contábil', it.possuiContabil ? esc(it.responsaveisContabil.join(', ')) : 'N/A', true)}`;
     }
 
     function abrir(codigo, aba) {
@@ -55,82 +79,88 @@ window.Ficha360Ficha = (function () {
         const tela = document.getElementById('telaFicha');
         const it = item();
         if (!it) {
-            tela.innerHTML = `<div class="cartao vazio">Empresa <strong>${esc(codigo)}</strong> não encontrada.<br><br>
-                <button class="btn btn-primario" id="btnVoltarErro">Voltar ao painel</button></div>`;
+            tela.innerHTML = `<div class="cartao vazio">Empresa <strong>${esc(codigo)}</strong> não encontrada. Confira o código ou volte ao painel e procure pelo nome.<br><br>
+                <button type="button" class="btn btn-primario" id="btnVoltarErro">Voltar ao painel</button></div>`;
             document.getElementById('btnVoltarErro').addEventListener('click', () => F360.irParaPainel());
             return;
         }
-        const meta = (rotulo, valor, larga) =>
-            `<div${larga ? ' class="meta-larga"' : ''}><dt>${rotulo}</dt><dd>${valor || '—'}</dd></div>`;
+        // Cabeçalho (nome + abas) fica grudado no topo; os metadados rolam junto com a página.
         tela.innerHTML = `
-          <div class="ficha-cab sem-${it.semaforo}">
-            <div class="ficha-topo">
-              <button class="btn btn-mini" id="btnVoltar">← Painel</button>
-            </div>
-            <h2>${esc(it.nome)} ${F360.semaforoHtml(it.semaforo)}</h2>
-            <dl class="ficha-meta">
-              ${meta('Código', `<span class="mono">${esc(it.codigo)}</span>`)}
-              ${meta('Regime', esc(it.regime))}
-              ${meta('CNPJ', it.cnpj ? `<span class="mono">${esc(it.cnpj)}</span>` : '', true)}
-              ${meta('Carteira', esc(F360.ROTULO_STATUS[it.statusCarteira] || it.statusCarteira))}
-              ${it.grupo ? meta('Grupo', esc(it.grupo)) : ''}
-              ${meta('Resp. DP', it.possuiFolha ? esc(it.responsaveisDp.join(', ')) : 'N/A', true)}
-              ${meta('Resp. Contábil', it.possuiContabil ? esc(it.responsaveisContabil.join(', ')) : 'N/A', true)}
-            </dl>
-          </div>
-          <div class="abas-wrap">
-            <div class="abas" role="tablist" aria-label="Seções da ficha">${ABAS.map(([k, r]) =>
-                `<button class="aba ${k === abaAtual ? 'ativa' : ''}" role="tab" aria-selected="${k === abaAtual}" data-aba="${k}">${r}${badgeAba(it, k)}</button>`).join('')}</div>
-          </div>
-          <div id="conteudoAba" role="tabpanel"></div>`;
+          <div class="ficha-cab sem-${it.semaforo}" id="fichaCab">${htmlCabecalho(it)}</div>
+          <dl class="ficha-meta" id="fichaMeta">${htmlMeta(it)}</dl>
+          <div id="conteudoAba" role="tabpanel" tabindex="-1" aria-labelledby="tab-${abaAtual}"></div>`;
+        ligarCabecalho();
+        renderAba();
+    }
 
+    // Religa os eventos do cabeçalho e das abas (chamado ao abrir e ao atualizar o cabeçalho).
+    function ligarCabecalho() {
+        const tela = document.getElementById('telaFicha');
+        const cab = document.getElementById('fichaCab');
         document.getElementById('btnVoltar').addEventListener('click', () => F360.irParaPainel());
         tela.querySelectorAll('.aba').forEach(b => b.addEventListener('click', () => trocarAba(b.dataset.aba)));
 
-        // Setas ←/→ navegam entre as abas quando o foco está numa delas.
-        tela.querySelector('.abas').addEventListener('keydown', (e) => {
-            if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        // Padrão WAI-ARIA de abas: ←/→ percorrem, Home/End vão às pontas; só a ativa fica no Tab.
+        const abasEl = tela.querySelector('.abas');
+        abasEl.addEventListener('keydown', (e) => {
+            const teclas = ['ArrowRight', 'ArrowLeft', 'Home', 'End'];
+            if (!teclas.includes(e.key)) return;
+            e.preventDefault();
             const idx = ABAS.findIndex(([k]) => k === abaAtual);
-            const prox = ABAS[(idx + (e.key === 'ArrowRight' ? 1 : ABAS.length - 1)) % ABAS.length][0];
+            const novo = e.key === 'Home' ? 0 : e.key === 'End' ? ABAS.length - 1
+                : (idx + (e.key === 'ArrowRight' ? 1 : ABAS.length - 1)) % ABAS.length;
+            const prox = ABAS[novo][0];
             trocarAba(prox);
             tela.querySelector(`.aba[data-aba="${prox}"]`).focus();
         });
 
         // Some o degradê "tem mais abas →" quando já rolou até o fim.
-        const abasEl = tela.querySelector('.abas');
-        const wrapAbas = tela.querySelector('.abas-wrap');
-        const checarFim = () => wrapAbas.classList.toggle('fim', abasEl.scrollLeft + abasEl.clientWidth >= abasEl.scrollWidth - 4);
+        const checarFim = () => cab.classList.toggle('fim', abasEl.scrollLeft + abasEl.clientWidth >= abasEl.scrollWidth - 4);
         abasEl.addEventListener('scroll', checarFim, { passive: true });
         requestAnimationFrame(() => { centralizarAbaAtiva(false); checarFim(); });
+    }
 
-        renderAba();
+    // Atualiza só o topo (semáforo, abas com contadores, metadados) sem tocar no conteúdo da aba —
+    // usado depois de salvar, pra não perder foco, rolagem nem o que está na tela.
+    function atualizarCabecalho() {
+        const it = item();
+        const cab = document.getElementById('fichaCab');
+        if (!it || !cab) return;
+        cab.className = `ficha-cab sem-${it.semaforo}`;
+        cab.innerHTML = htmlCabecalho(it);
+        document.getElementById('fichaMeta').innerHTML = htmlMeta(it);
+        ligarCabecalho();
     }
 
     function centralizarAbaAtiva(suave) {
         const abasEl = document.querySelector('#telaFicha .abas');
         const ativa = abasEl && abasEl.querySelector('.aba.ativa');
         if (!ativa || abasEl.scrollWidth <= abasEl.clientWidth) return;
+        const reduzir = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const alvo = ativa.offsetLeft - (abasEl.clientWidth - ativa.offsetWidth) / 2;
-        abasEl.scrollTo({ left: Math.max(0, alvo), behavior: suave ? 'smooth' : 'auto' });
+        abasEl.scrollTo({ left: Math.max(0, alvo), behavior: suave && !reduzir ? 'smooth' : 'auto' });
     }
 
-    function trocarAba(aba) {
-        if (!ABAS.some(([k]) => k === aba)) return;
+    async function trocarAba(aba) {
+        if (!ABAS.some(([k]) => k === aba) || aba === abaAtual) return;
+        if (!(await F360.podeSair())) return;
         abaAtual = aba;
         const tela = document.getElementById('telaFicha');
         tela.querySelectorAll('.aba').forEach(x => {
             const ativa = x.dataset.aba === aba;
             x.classList.toggle('ativa', ativa);
             x.setAttribute('aria-selected', String(ativa));
+            x.tabIndex = ativa ? 0 : -1;
         });
+        document.getElementById('conteudoAba').setAttribute('aria-labelledby', `tab-${aba}`);
         // Guarda a aba na URL (sem criar entrada no histórico) — recarregar a página mantém a aba.
         const params = new URLSearchParams(window.location.search);
         if (aba === 'resumo') params.delete('aba'); else params.set('aba', aba);
         history.replaceState({}, '', `?${params.toString()}`);
         centralizarAbaAtiva(true);
-        // Se a pessoa rolou pra baixo e trocou de aba, traz o topo das abas de volta pra tela.
-        const wrap = tela.querySelector('.abas-wrap');
-        if (wrap && wrap.getBoundingClientRect().top < 0) wrap.scrollIntoView({ block: 'start' });
+        // Se a pessoa rolou pra baixo e trocou de aba, volta ao começo do conteúdo.
+        const cab = document.getElementById('fichaCab');
+        if (cab && cab.getBoundingClientRect().top < 0) cab.scrollIntoView({ block: 'start' });
         renderAba();
     }
 
@@ -158,25 +188,29 @@ window.Ficha360Ficha = (function () {
         const ultimoCiclo = it.ciclos.slice().sort((a, b) => String(b.competencia).localeCompare(String(a.competencia)))[0];
         const pendAbertas = it.pendencias.filter(p => p.status === 'aberta').length;
         const cartao = (titulo, numero, sub) =>
-            `<div class="cartao"><h3>${titulo}</h3><div class="numero">${numero}</div><div class="bloqueado">${sub || ''}</div></div>`;
+            `<div class="cartao"><h3>${titulo}</h3><div class="numero">${numero}</div><div class="bloqueado">${sub || '&nbsp;'}</div></div>`;
+        // Alertas mais graves primeiro (crítico, atenção, informativo), mantendo a ordem original dentro de cada grupo.
+        const alertas = it.alertas.map((a, n) => ({ a, n }))
+            .sort((x, y) => (ORDEM_GRAVIDADE[x.a.gravidade] ?? 3) - (ORDEM_GRAVIDADE[y.a.gravidade] ?? 3) || x.n - y.n)
+            .map(x => x.a);
 
         el.innerHTML = `
-          <div class="grade">
-            ${cartao('Empregados ativos', it.empregadosAtivos == null ? '—' : it.empregadosAtivos, `${it.socios.length} sócio(s)`)}
-            ${cartao('Próximo vencimento', vencProx == null ? '—' : (vencProx < 0 ? `vencido ${-vencProx}d` : `${vencProx}d`), `${it.certificados.length} cert. · ${it.licencas.length} lic./alv.`)}
-            ${cartao('Folha', it.possuiFolha ? (ultimoCiclo ? esc(ultimoCiclo.competencia) : 'sem ciclo') : 'não contratada', ultimoCiclo ? (ultimoCiclo.concluido_em ? 'concluída' : 'em andamento') : '')}
-            ${cartao('Contábil', it.possuiContabil ? esc((it.mapeamento && it.mapeamento.nivel_atencao) || 'sem mapeamento') : 'não contratado', `${pendAbertas} pendência(s) aberta(s)`)}
-          </div>
-          <div class="cartao" style="margin-top:12px">
+          <div class="cartao">
             <h3>Alertas (${it.alertas.length})</h3>
-            ${it.alertas.length ? `<ul class="lista-alertas">${it.alertas.map(a => {
+            ${alertas.length ? `<ul class="lista-alertas">${alertas.map(a => {
                 const destino = ABA_DO_MODULO[a.modulo];
                 const conteudo = `<span class="chip chip-${a.gravidade}">${esc(NOME_MODULO[a.modulo] || a.modulo)}</span><span class="alerta-msg">${esc(a.mensagem)}</span>`;
                 return destino
                     ? `<li><button type="button" class="alerta-link" data-ir-aba="${destino}">${conteudo}<span class="alerta-ir">Ver ${esc((ABAS.find(([k]) => k === destino) || [])[1] || '')} ›</span></button></li>`
                     : `<li>${conteudo}</li>`;
             }).join('')}</ul>`
-                : '<div class="bloqueado">✅ Nenhum alerta para esta empresa.</div>'}
+                : `<div class="bloqueado">${F360.ico('ok')}Nenhum alerta para esta empresa.</div>`}
+          </div>
+          <div class="grade">
+            ${cartao('Empregados ativos', it.empregadosAtivos == null ? '—' : it.empregadosAtivos, `${it.socios.length} sócio(s)`)}
+            ${cartao('Próximo vencimento', vencProx == null ? '—' : (vencProx < 0 ? `vencido há ${-vencProx}d` : `${vencProx}d`), `${it.certificados.length} cert. · ${it.licencas.length} lic./alv.`)}
+            ${cartao('Folha', it.possuiFolha ? (ultimoCiclo ? esc(ultimoCiclo.competencia) : 'sem ciclo') : 'não contratada', ultimoCiclo ? (ultimoCiclo.concluido_em ? 'concluída' : 'em andamento') : '')}
+            ${cartao('Contábil', it.possuiContabil ? esc((it.mapeamento && it.mapeamento.nivel_atencao) || 'sem mapeamento') : 'não contratado', `${pendAbertas} pendência(s) aberta(s)`)}
           </div>`;
         el.querySelectorAll('[data-ir-aba]').forEach(b => b.addEventListener('click', () => trocarAba(b.dataset.irAba)));
     }
@@ -207,7 +241,7 @@ window.Ficha360Ficha = (function () {
             ${certs ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Titular</th><th>CPF/CNPJ</th><th>Situação</th><th>Vencimento</th><th class="t-right">Prazo</th></tr></thead><tbody>${certs}</tbody></table></div>`
                 : '<div class="bloqueado">Nenhum certificado vinculado (vínculo por CNPJ da empresa ou CPF dos sócios).</div>'}
           </div>
-          <div class="cartao" style="margin-top:12px"><h3>Licenças e alvarás</h3>
+          <div class="cartao"><h3>Licenças e alvarás</h3>
             ${lics ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Tipo</th><th>Descrição</th><th>Estabelecimento</th><th>Validade</th><th class="t-right">Prazo</th></tr></thead><tbody>${lics}</tbody></table></div>`
                 : '<div class="bloqueado">Nenhuma licença ou alvará ativo.</div>'}
           </div>`;
@@ -246,7 +280,7 @@ window.Ficha360Ficha = (function () {
             if (j.sabadoSempreExtra) partes.push('Sábado sempre extra');
             else if (j.sabadoAtiva) partes.push(`Sábado ${esc(j.sabado)}`);
             return `<li><div><strong>${esc(j.nome)}</strong>${n != null ? ` <span class="chip chip-neutro">${n} empregado(s)</span>` : ''}
-                <div class="bloqueado" style="margin-top:2px">${partes.join(' · ')}</div></div></li>`;
+                <div class="bloqueado">${partes.join(' · ')}</div></div></li>`;
         }).join('');
 
         // Férias que tocam a competência atual e a seguinte (rh_ferias_calculadas).
@@ -263,33 +297,40 @@ window.Ficha360Ficha = (function () {
             <td class="num t-right">${fmtMoeda(v.va)}</td>
         </tr>`).join('');
 
+        // Seções longas ficam recolhidas quando têm muito conteúdo; a tela abre curta e o usuário expande o que precisa.
+        const sumario = (titulo, qtd) => `<summary>${titulo}${qtd != null ? ` <span class="chip chip-neutro">${qtd}</span>` : ''}</summary>`;
+
         el.innerHTML = `${avisoFontes('dp')}
           <div class="grade">
             <div class="cartao"><h3>Folha contratada</h3><div class="numero">${it.possuiFolha ? 'Sim' : 'Não'}</div></div>
             <div class="cartao"><h3>Empregados ativos</h3><div class="numero">${it.empregadosAtivos == null ? '—' : it.empregadosAtivos}</div><div class="bloqueado">${esc(detalheTipos)}</div></div>
             <div class="cartao"><h3>Formulários em aberto</h3><div class="numero">${abertos.length}</div></div>
           </div>
-          <div class="cartao" style="margin-top:12px"><h3>Fechamento da folha (mês passado e atual)</h3>
-            ${ciclosHtml ? `<ul class="lista-alertas">${ciclosHtml}</ul>` : '<div class="bloqueado">Nenhum ciclo nas competências recentes.</div>'}
-          </div>
-          <div class="cartao" style="margin-top:12px"><h3>Jornada de trabalho</h3>
-            ${jornadasHtml ? `<ul class="lista-alertas">${jornadasHtml}</ul>` : '<div class="bloqueado">Nenhuma jornada configurada em Departamento Pessoal > Configurações.</div>'}
-          </div>
-          <div class="cartao" style="margin-top:12px"><h3>Valores de VA/VT por empregado</h3>
-            <div class="bloqueado" style="margin-bottom:8px">Configurados em Departamento Pessoal &gt; Configurações &gt; VA/VT.</div>
-            ${vaVtHtml ? `<div class="tabela-wrap"><table class="tabela">
-                <thead><tr><th>Nome</th><th class="t-right">VT</th><th class="t-right">VA</th></tr></thead>
-                <tbody>${vaVtHtml}</tbody></table></div>`
-                : '<div class="bloqueado">Nenhum empregado elegível para VA/VT nesta empresa.</div>'}
-          </div>
-          <div class="cartao" style="margin-top:12px"><h3>Férias</h3>
-            ${subLabel(labelCompetencia(0))}
-            ${feriasAtualHtml ? `<ul class="lista-alertas">${feriasAtualHtml}</ul>` : '<div class="bloqueado">Ninguém de férias nesta competência.</div>'}
-            <div style="margin-top:12px">${subLabel(labelCompetencia(1))}</div>
-            ${feriasProximaHtml ? `<ul class="lista-alertas">${feriasProximaHtml}</ul>` : '<div class="bloqueado">Ninguém de férias na próxima competência.</div>'}
-          </div>
-          <div class="cartao" style="margin-top:12px"><h3>Análise do QSA</h3>
-            ${qsa ? `<ul class="lista-alertas">${qsa}</ul>` : '<div class="bloqueado">Nenhuma sobreposição entre sócio e empregado.</div>'}
+          <div class="colunas">
+            <div class="cartao"><h3>Fechamento da folha (mês passado e atual)</h3>
+              ${ciclosHtml ? `<ul class="lista-alertas">${ciclosHtml}</ul>` : '<div class="bloqueado">Nenhum ciclo nas competências recentes.</div>'}
+            </div>
+            <div class="cartao"><h3>Jornada de trabalho</h3>
+              ${jornadasHtml ? `<ul class="lista-alertas">${jornadasHtml}</ul>` : '<div class="bloqueado">Nenhuma jornada configurada em Departamento Pessoal &gt; Configurações.</div>'}
+            </div>
+            <div class="cartao"><h3>Férias</h3>
+              ${subLabel(labelCompetencia(0))}
+              ${feriasAtualHtml ? `<ul class="lista-alertas">${feriasAtualHtml}</ul>` : '<div class="bloqueado">Ninguém de férias nesta competência.</div>'}
+              <div class="nota-topo"></div>
+              ${subLabel(labelCompetencia(1))}
+              ${feriasProximaHtml ? `<ul class="lista-alertas">${feriasProximaHtml}</ul>` : '<div class="bloqueado">Ninguém de férias na próxima competência.</div>'}
+            </div>
+            <div class="cartao"><h3>Análise do QSA</h3>
+              ${qsa ? `<ul class="lista-alertas">${qsa}</ul>` : '<div class="bloqueado">Nenhuma sobreposição entre sócio e empregado.</div>'}
+            </div>
+            <div class="cartao largo"><details ${valoresVaVt.length > 0 && valoresVaVt.length <= 6 ? 'open' : ''}>
+              ${sumario('Valores de VA/VT por empregado', valoresVaVt.length)}
+              <div class="bloqueado nota-topo">Configurados em Departamento Pessoal &gt; Configurações &gt; VA/VT.</div>
+              ${vaVtHtml ? `<div class="tabela-wrap"><table class="tabela">
+                  <thead><tr><th>Nome</th><th class="t-right">VT</th><th class="t-right">VA</th></tr></thead>
+                  <tbody>${vaVtHtml}</tbody></table></div>`
+                  : '<div class="bloqueado">Nenhum empregado elegível para VA/VT nesta empresa.</div>'}
+            </details></div>
           </div>`;
     }
 
@@ -350,11 +391,13 @@ window.Ficha360Ficha = (function () {
             <div class="cartao"><h3>Nível de atenção</h3><div class="numero">${esc((it.mapeamento && it.mapeamento.nivel_atencao) || '—')}</div></div>
             <div class="cartao"><h3>Onboarding</h3><div class="numero">${onb ? esc(onb.status) : '—'}</div><div class="bloqueado">${pctOnb == null ? '' : `${pctOnb}% dos itens concluídos`}</div></div>
           </div>
-          <div class="cartao" style="margin-top:12px"><h3>Diário — últimas competências</h3>
-            ${diario ? `<ul class="lista-alertas">${diario}</ul>` : '<div class="bloqueado">Nenhum envio registrado.</div>'}
-          </div>
-          <div class="cartao" style="margin-top:12px"><h3>Pendências do mapeamento</h3>
-            ${pend ? `<ul class="lista-alertas">${pend}</ul>` : '<div class="bloqueado">Nenhuma pendência aberta.</div>'}
+          <div class="colunas">
+            <div class="cartao"><h3>Diário — últimas competências</h3>
+              ${diario ? `<ul class="lista-alertas">${diario}</ul>` : '<div class="bloqueado">Nenhum envio registrado.</div>'}
+            </div>
+            <div class="cartao"><h3>Pendências do mapeamento</h3>
+              ${pend ? `<ul class="lista-alertas">${pend}</ul>` : '<div class="bloqueado">Nenhuma pendência aberta.</div>'}
+            </div>
           </div>`;
     }
 
@@ -363,18 +406,18 @@ window.Ficha360Ficha = (function () {
         const res = await Ficha360Fontes.carregarCrm(F360.sb, it);
         if (abaAtual !== 'crm' || codigoAtual !== it.codigo) return;
         if (!res.ok) {
-            el.innerHTML = `<div class="cartao bloqueado">${res.motivo === 'sem_permissao' ? '🔒 Sem permissão para ver o CRM.' : '⚠️ CRM indisponível no momento.'}</div>`;
+            el.innerHTML = `<div class="cartao bloqueado">${res.motivo === 'sem_permissao' ? `${F360.ico('cadeado')}Sem permissão para ver o CRM.` : `${F360.ico('aviso')}CRM indisponível no momento. Tente novamente em instantes.`}</div>`;
             return;
         }
         const linhas = res.dados.map(c => `<tr>
             <td>${esc(c.protocolo) || '—'}</td><td>${esc(c.contatos && c.contatos.nome) || '—'}</td>
             <td>${esc(c.departamento)}</td><td>${esc(c.status)}</td><td>${F360.fmtData(c.aberto_em)}</td></tr>`).join('');
-        el.innerHTML = `<div class="aviso-fontes">ℹ️ Vínculo por nome da empresa (aproximado).</div>
+        el.innerHTML = `<div class="aviso-fontes">${F360.ico('info')}Vínculo por nome da empresa (aproximado).</div>
           <div class="cartao"><h3>Últimas conversas</h3>
             ${linhas ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Protocolo</th><th>Contato</th><th>Departamento</th><th>Status</th><th>Aberta em</th></tr></thead><tbody>${linhas}</tbody></table></div>`
                 : '<div class="bloqueado">Nenhuma conversa vinculada a esta empresa.</div>'}
           </div>`;
     }
 
-    return { abrir, reabrir };
+    return { abrir, reabrir, atualizarCabecalho };
 })();

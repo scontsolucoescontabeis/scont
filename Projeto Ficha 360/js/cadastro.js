@@ -5,15 +5,23 @@ window.Ficha360Cadastro = (function () {
     const esc = (v) => F360.esc(v);
     const AREAS = { geral: 'Geral', dp: 'DP', contabil: 'Contábil', fiscal: 'Fiscal', financeiro: 'Financeiro' };
 
+    // Cada bloco com formulário controla o seu "não salvo"; F360.sujo é a soma dos dois.
+    const sujos = { scont: false, contato: false };
+    function marcarSujo(bloco, valor) {
+        sujos[bloco] = valor;
+        F360.sujo = sujos.scont || sujos.contato;
+    }
+
     function tabelaIndisponivel(chave) {
         return F360.falhas[chave] === 'tabela_ausente'
-            ? '🛠️ Configuração pendente — SQL da Ficha 360 não executado.'
-            : F360.falhas[chave] === 'sem_permissao' ? '🔒 Sem permissão.' : F360.falhas[chave] ? '⚠️ Indisponível no momento.' : '';
+            ? `${F360.ico('config')}Configuração pendente — SQL da Ficha 360 não executado.`
+            : F360.falhas[chave] === 'sem_permissao' ? `${F360.ico('cadeado')}Sem permissão.` : F360.falhas[chave] ? `${F360.ico('aviso')}Indisponível no momento. Tente atualizar a página.` : '';
     }
 
     function render(el, it) {
+        sujos.scont = false; sujos.contato = false; F360.sujo = false;
         const d = it.dominio;
-        const ro = (rotulo, valor) => `<div class="campo"><span>${rotulo}</span><div class="campo-ro">${esc(valor) || '—'}</div></div>`;
+        const ro = (rotulo, valor) => `<div class="campo"><span class="rotulo">${rotulo}</span><div class="campo-ro">${esc(valor) || '—'}</div></div>`;
 
         el.innerHTML = `
           <div class="cartao"><h3>Dados do Domínio (somente leitura)</h3>
@@ -24,45 +32,49 @@ window.Ficha360Cadastro = (function () {
               ${ro('Cidade / UF', [d.cidade || d.municipio, d.uf].filter(Boolean).join(' / '))}${ro('CEP', d.cep)}${ro('E-mail', d.email)}
               ${ro('Cliente desde', F360.fmtData(d.data_cadastro))}
             </div>
-            <div class="checks" style="margin-top:10px">
+            <div class="checks form-topo">
               <span>DP/Folha: <strong>${it.possuiFolha ? 'Sim' : 'Não'}</strong></span>
               <span>Contábil: <strong>${it.possuiContabil ? 'Sim' : 'Não'}</strong></span>
               <span class="bloqueado">(configurados no Fechamento da Folha e na Central Contábil)</span>
             </div>
           </div>
-          <div class="cartao" style="margin-top:12px" id="blocoScont"></div>
-          <div class="cartao" style="margin-top:12px" id="blocoContatos"></div>`;
+          <div class="cartao" id="blocoScont"></div>
+          <div class="cartao" id="blocoContatos"></div>`;
 
         renderScont(document.getElementById('blocoScont'), it);
         renderContatos(document.getElementById('blocoContatos'), it);
     }
 
     function renderScont(el, it) {
+        marcarSujo('scont', false);
         const indisp = tabelaIndisponivel('fichas');
         if (indisp) { el.innerHTML = `<h3>Dados Scont</h3><div class="bloqueado">${indisp}</div>`; return; }
         const f = it.ficha || {};
         const opt = (valor, rotulo, atual) => `<option value="${valor}" ${valor === atual ? 'selected' : ''}>${rotulo}</option>`;
-        const chk = (id, rotulo, v) => `<label><input type="checkbox" id="${id}" ${v ? 'checked' : ''}> ${rotulo}</label>`;
+        const chk = (id, nome, rotulo, v) => `<label><input type="checkbox" id="${id}" name="${nome}" ${v ? 'checked' : ''}> ${rotulo}</label>`;
 
         el.innerHTML = `<h3>Dados Scont</h3>
           <div class="form-grade">
-            <label class="campo">Status na carteira
-              <select id="cStatus">${Object.entries(F360.ROTULO_STATUS).map(([k, r]) => opt(k, r, f.status_carteira || 'ativo')).join('')}</select></label>
-            <label class="campo">Saída do cliente <input type="date" id="cSaida" value="${esc(f.data_saida_cliente || '')}"></label>
-            <label class="campo">Porte <input type="text" id="cPorte" value="${esc(f.porte || '')}"></label>
-            <label class="campo">Atividade principal <input type="text" id="cAtividade" value="${esc(f.atividade_principal || '')}"></label>
+            <label class="campo"><span class="rotulo">Status na carteira</span>
+              <select id="cStatus" name="status_carteira">${Object.entries(F360.ROTULO_STATUS).map(([k, r]) => opt(k, r, f.status_carteira || 'ativo')).join('')}</select></label>
+            <label class="campo"><span class="rotulo">Saída do cliente</span> <input type="date" id="cSaida" name="data_saida_cliente" autocomplete="off" value="${esc(f.data_saida_cliente || '')}"></label>
+            <label class="campo"><span class="rotulo">Porte</span> <input type="text" id="cPorte" name="porte" autocomplete="off" value="${esc(f.porte || '')}"></label>
+            <label class="campo"><span class="rotulo">Atividade principal</span> <input type="text" id="cAtividade" name="atividade_principal" autocomplete="off" value="${esc(f.atividade_principal || '')}"></label>
           </div>
-          <div class="checks" style="margin-top:10px">
-            ${chk('cFiscal', 'Atende Fiscal', f.atende_fiscal)}${chk('cSocietario', 'Atende Societário', f.atende_societario)}${chk('cBpo', 'Atende BPO', f.atende_bpo)}
+          <div class="checks form-topo">
+            ${chk('cFiscal', 'atende_fiscal', 'Atende Fiscal', f.atende_fiscal)}${chk('cSocietario', 'atende_societario', 'Atende Societário', f.atende_societario)}${chk('cBpo', 'atende_bpo', 'Atende BPO', f.atende_bpo)}
           </div>
-          <label class="campo" style="margin-top:10px">Observação geral <textarea id="cObs">${esc(f.observacao_geral || '')}</textarea></label>
+          <label class="campo form-topo"><span class="rotulo">Observação geral</span> <textarea id="cObs" name="observacao_geral" autocomplete="off">${esc(f.observacao_geral || '')}</textarea></label>
           <div class="acoes">
-            ${f.updated_at ? `<span class="bloqueado" style="margin-right:auto">Atualizado por ${esc(f.atualizado_por || '—')} em ${F360.fmtData(f.updated_at)}</span>` : ''}
-            <button class="btn btn-primario" id="cSalvar">Salvar</button>
+            ${f.updated_at ? `<span class="bloqueado empurra">Atualizado por ${esc(f.atualizado_por || '—')} em ${F360.fmtData(f.updated_at)}</span>` : ''}
+            <button type="button" class="btn btn-primario" id="cSalvar">Salvar dados Scont</button>
           </div>`;
 
+        el.addEventListener('input', () => marcarSujo('scont', true));
+        el.addEventListener('change', () => marcarSujo('scont', true));
+
         document.getElementById('cSalvar').addEventListener('click', async (e) => {
-            const btn = e.target;
+            const btn = e.currentTarget;
             const registro = {
                 codigo_empresa: it.codigo,
                 status_carteira: document.getElementById('cStatus').value,
@@ -75,43 +87,67 @@ window.Ficha360Cadastro = (function () {
                 observacao_geral: document.getElementById('cObs').value.trim() || null,
                 atualizado_por: F360.auth.userData?.nome || F360.auth.email || null,
             };
+            const rotuloOriginal = btn.textContent;
             btn.disabled = true;
+            btn.textContent = 'Salvando…';
             const { data, error } = await F360.sb.from('ficha360_empresa').upsert(registro, { onConflict: 'codigo_empresa' }).select().single();
-            btn.disabled = false;
-            if (error) { alert(`Não foi possível salvar: ${error.message}`); return; }
+            if (error) {
+                btn.disabled = false;
+                btn.textContent = rotuloOriginal;
+                F360.avisar(`Não foi possível salvar os dados Scont: ${error.message}. Confira a conexão e tente de novo.`, 'erro');
+                return;
+            }
             F360.dados.fichas = (F360.dados.fichas || []).filter(x => x.codigo_empresa !== it.codigo).concat([data]);
             F360.recalcular();
-            Ficha360Ficha.reabrir();
+            marcarSujo('scont', false);
+            // Atualiza só o que mudou (topo + este bloco); a página não pisca nem volta ao início.
+            Ficha360Ficha.atualizarCabecalho();
+            const novo = F360.carteira.find(i => i.codigo === it.codigo) || it;
+            renderScont(el, novo);
+            document.getElementById('cSalvar')?.focus({ preventScroll: true });
+            F360.avisar('Dados Scont salvos.');
         });
     }
 
     function renderContatos(el, it) {
+        marcarSujo('contato', false);
         const indisp = tabelaIndisponivel('contatos');
         if (indisp) { el.innerHTML = `<h3>Contatos do cliente</h3><div class="bloqueado">${indisp}</div>`; return; }
         const linhas = it.contatos.slice().sort((a, b) => Number(b.principal) - Number(a.principal)).map(c => `<tr>
-            <td>${c.principal ? '⭐ ' : ''}${esc(c.nome)}</td><td>${esc(c.funcao) || '—'}</td><td>${esc(AREAS[c.area] || c.area)}</td>
+            <td>${c.principal ? `<span title="Contato principal">${F360.ico('estrela')}<span class="sr-only">Principal: </span></span> ` : ''}${esc(c.nome)}</td><td>${esc(c.funcao) || '—'}</td><td>${esc(AREAS[c.area] || c.area)}</td>
             <td>${esc(c.telefone) || '—'}</td><td>${esc(c.whatsapp) || '—'}</td><td>${esc(c.email) || '—'}</td>
-            <td><button class="btn btn-mini btn-perigo" data-excluir="${esc(c.id)}">Excluir</button></td></tr>`).join('');
+            <td><button type="button" class="btn btn-mini btn-perigo" data-excluir="${esc(c.id)}" data-nome="${esc(c.nome)}">Excluir</button></td></tr>`).join('');
 
         el.innerHTML = `<h3>Contatos do cliente</h3>
-          ${linhas ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Nome</th><th>Função</th><th>Área</th><th>Telefone</th><th>WhatsApp</th><th>E-mail</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>`
+          ${linhas ? `<div class="tabela-wrap"><table class="tabela"><thead><tr><th>Nome</th><th>Função</th><th>Área</th><th>Telefone</th><th>WhatsApp</th><th>E-mail</th><th><span class="sr-only">Ações</span></th></tr></thead><tbody>${linhas}</tbody></table></div>`
             : '<div class="bloqueado">Nenhum contato cadastrado.</div>'}
-          <div class="form-grade" style="margin-top:12px">
-            <label class="campo">Nome* <input type="text" id="ktNome"></label>
-            <label class="campo">Função <input type="text" id="ktFuncao"></label>
-            <label class="campo">Área <select id="ktArea">${Object.entries(AREAS).map(([k, r]) => `<option value="${k}">${r}</option>`).join('')}</select></label>
-            <label class="campo">Telefone <input type="text" id="ktTelefone"></label>
-            <label class="campo">WhatsApp <input type="text" id="ktWhats"></label>
-            <label class="campo">E-mail <input type="email" id="ktEmail"></label>
+          <div class="form-grade form-topo">
+            <label class="campo"><span class="rotulo">Nome *</span> <input type="text" id="ktNome" name="nome" autocomplete="off" required></label>
+            <label class="campo"><span class="rotulo">Função</span> <input type="text" id="ktFuncao" name="funcao" autocomplete="off"></label>
+            <label class="campo"><span class="rotulo">Área</span> <select id="ktArea" name="area">${Object.entries(AREAS).map(([k, r]) => `<option value="${k}">${r}</option>`).join('')}</select></label>
+            <label class="campo"><span class="rotulo">Telefone</span> <input type="tel" inputmode="tel" id="ktTelefone" name="telefone" autocomplete="off" placeholder="(61) 3000-0000"></label>
+            <label class="campo"><span class="rotulo">WhatsApp</span> <input type="tel" inputmode="tel" id="ktWhats" name="whatsapp" autocomplete="off" placeholder="(61) 90000-0000"></label>
+            <label class="campo"><span class="rotulo">E-mail</span> <input type="email" inputmode="email" id="ktEmail" name="email" autocomplete="off" spellcheck="false" placeholder="nome@empresa.com.br"></label>
           </div>
+          <div class="erro-campo" id="ktErro" role="alert" hidden></div>
           <div class="acoes">
-            <label class="checks" style="margin-right:auto"><input type="checkbox" id="ktPrincipal"> Contato principal</label>
-            <button class="btn btn-primario" id="ktAdd">Adicionar contato</button>
+            <label class="checks empurra"><input type="checkbox" id="ktPrincipal" name="principal"> Contato principal</label>
+            <button type="button" class="btn btn-primario" id="ktAdd">Adicionar contato</button>
           </div>`;
 
+        el.querySelector('.form-grade').addEventListener('input', () => marcarSujo('contato', true));
+
+        const erro = document.getElementById('ktErro');
         document.getElementById('ktAdd').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
             const nome = document.getElementById('ktNome').value.trim();
-            if (!nome) { alert('Informe o nome do contato.'); return; }
+            if (!nome) {
+                erro.textContent = 'Informe o nome do contato para adicioná-lo.';
+                erro.hidden = false;
+                document.getElementById('ktNome').focus();
+                return;
+            }
+            erro.hidden = true;
             const registro = {
                 codigo_empresa: it.codigo, nome,
                 funcao: document.getElementById('ktFuncao').value.trim() || null,
@@ -121,22 +157,39 @@ window.Ficha360Cadastro = (function () {
                 email: document.getElementById('ktEmail').value.trim() || null,
                 principal: document.getElementById('ktPrincipal').checked,
             };
-            e.target.disabled = true;
+            const rotuloOriginal = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Adicionando…';
             const { data, error } = await F360.sb.from('ficha360_contatos').insert(registro).select().single();
-            e.target.disabled = false;
-            if (error) { alert(`Não foi possível adicionar: ${error.message}`); return; }
+            if (error) {
+                btn.disabled = false;
+                btn.textContent = rotuloOriginal;
+                F360.avisar(`Não foi possível adicionar o contato: ${error.message}. Tente de novo.`, 'erro');
+                return;
+            }
             F360.dados.contatos = (F360.dados.contatos || []).concat([data]);
             F360.recalcular();
-            Ficha360Ficha.reabrir();
+            marcarSujo('contato', false);
+            Ficha360Ficha.atualizarCabecalho();
+            renderContatos(el, F360.carteira.find(i => i.codigo === it.codigo) || it);
+            document.getElementById('ktNome')?.focus({ preventScroll: true });
+            F360.avisar('Contato adicionado.');
         });
 
         el.querySelectorAll('[data-excluir]').forEach(b => b.addEventListener('click', async () => {
-            if (!confirm('Excluir este contato?')) return;
+            if (!(await F360.confirmar(`Excluir o contato "${b.dataset.nome}"? Essa ação não pode ser desfeita.`, 'Excluir contato'))) return;
+            b.disabled = true;
             const { error } = await F360.sb.from('ficha360_contatos').delete().eq('id', b.dataset.excluir);
-            if (error) { alert(`Não foi possível excluir: ${error.message}`); return; }
+            if (error) {
+                b.disabled = false;
+                F360.avisar(`Não foi possível excluir o contato: ${error.message}. Tente de novo.`, 'erro');
+                return;
+            }
             F360.dados.contatos = (F360.dados.contatos || []).filter(x => x.id !== b.dataset.excluir);
             F360.recalcular();
-            Ficha360Ficha.reabrir();
+            Ficha360Ficha.atualizarCabecalho();
+            renderContatos(el, F360.carteira.find(i => i.codigo === it.codigo) || it);
+            F360.avisar('Contato excluído.');
         }));
     }
 
