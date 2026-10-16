@@ -10,7 +10,7 @@
   --danger:#B23A2E; --danger-soft:#F8E7E3;
   --warning:#8A5D12; --warning-soft:#F9EFDC;
   --info:#3498DB; --info-soft:#eaf1ff; --inativo:#9B9488; --inativo-soft:#F1EEE7;
-  --radius:3px; --shadow:none; --topbar-h:56px;
+  --radius:3px; --shadow:none; 
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -20,31 +20,28 @@ button,input,select,textarea{font:inherit;color:inherit}
 button,select,[role=tab],summary{touch-action:manipulation}
 [hidden]{display:none!important}
 .num,.mono{font-variant-numeric:tabular-nums}
-.mono{letter-spacing:.01em}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
 :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.ico{flex-shrink:0;vertical-align:-3px}
+.ico{display:inline-block;margin-right:5px;font-style:normal;line-height:1}
 .skip-link{position:absolute;left:12px;top:-60px;z-index:100000;background:var(--primary);color:#fff;padding:9px 14px;border-radius:2px;text-decoration:none;font-weight:600}
 .skip-link:focus{top:10px;outline-color:#fff}
 
-/* Overlay de verificação de acesso (some quando o portal valida o login) */
-#authOverlay{position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:var(--primary);font-weight:600;font-size:15px}
-#authOverlay::before{content:"";width:26px;height:26px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:girar .8s linear infinite}
-
-/* ===== Estrutura: barra superior fina + conteúdo em largura total ===== */
-.app{display:flex;flex-direction:column;min-height:100vh}
-.topbar{background:linear-gradient(135deg,#8B3A3A 0%,#2C3E50 100%);color:#fff;display:flex;align-items:center;gap:20px;padding:10px 28px;min-height:var(--topbar-h)}
-.brand{display:flex;align-items:center;gap:14px;min-width:0}
-.brand img{width:96px;height:auto;background:#fff;border-radius:4px;padding:4px 8px}
-.brand h1{font-size:17px;margin:0;font-weight:600;white-space:nowrap}
-.brand p{margin:0;opacity:.8;font-size:12.5px;white-space:nowrap}
-.menu{display:flex;gap:6px;margin-left:12px}
-.menu-item,.btn-voltar{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);color:#fff;padding:8px 12px;border-radius:3px;text-align:left;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background-color .15s,border-color .15s}
+/* ===== Estrutura: sidebar em gradiente + conteúdo (mesma identidade do portal) ===== */
+:root{--sidebar:260px}
+.app{display:flex;min-height:100vh}
+.sidebar{width:var(--sidebar);flex-shrink:0;background:linear-gradient(135deg,#8B3A3A 0%,#2C3E50 100%);color:#fff;display:flex;flex-direction:column;padding:24px 16px;position:sticky;top:0;height:100vh}
+.brand img{width:140px;height:auto;background:#fff;border-radius:6px;padding:6px 10px}
+.brand h1{font-size:19px;margin:14px 0 2px;font-weight:600}
+.brand p{margin:0;opacity:.75;font-size:12.5px}
+.menu{margin-top:28px;display:flex;flex-direction:column;gap:6px}
+.menu-item,.btn-voltar{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);color:#fff;padding:10px 12px;border-radius:3px;text-align:left;cursor:pointer;transition:background-color .15s,border-color .15s}
 .menu-item:hover,.btn-voltar:hover{background:rgba(255,255,255,.2)}
-.menu-item.ativo{background:rgba(255,255,255,.24);border-color:rgba(255,255,255,.45)}
+.menu-item.ativo{background:rgba(255,255,255,.24);border-color:rgba(255,255,255,.4)}
 .menu-item:focus-visible,.btn-voltar:focus-visible{outline-color:#fff}
-.topbar-fim{margin-left:auto}
-.main{flex:1;min-width:0;padding:24px 28px 40px;width:100%;max-width:1480px;margin:0 auto}
+.sidebar-footer{margin-top:auto}
+.btn-voltar{width:100%}
+.main{flex:1;min-width:0;padding:24px 28px 40px;max-width:1400px}
 .main:focus{outline:none}
 h2[tabindex="-1"]:focus{outline:none}
 
@@ -53,7 +50,7 @@ h2[tabindex="-1"]:focus{outline:none}
 .carregando::before{content:"";width:26px;height:26px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:girar .8s linear infinite}
 @keyframes girar{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){
-  .carregando::before,#authOverlay::before{animation:none}
+  .carregando::before{animation:none}
   .abas{scroll-behavior:auto}
 }
 
@@ -114,7 +111,7 @@ button.contador:hover{background:var(--surface-2)}
 /* ===== Tabela: densa, com barra de gravidade estrutural na linha ===== */
 .tabela-wrap{background:var(--surface);border:1px solid var(--border);overflow:auto;overscroll-behavior-x:contain}
 table.tabela{width:100%;border-collapse:collapse;font-size:13.5px}
-.tabela th{background:var(--surface-2);text-align:left;padding:10px;border-bottom:1px solid var(--border-strong);position:sticky;top:0;font-size:12.5px;color:var(--muted);font-weight:600}
+.tabela th{background:var(--surface-2);text-align:left;padding:10px;border-bottom:1px solid var(--border-strong);position:sticky;top:0;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}
 .tabela td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}
 .tabela tbody tr:last-child td{border-bottom:none}
 .tabela tbody tr.clicavel{cursor:pointer}
@@ -149,8 +146,9 @@ table.tabela{width:100%;border-collapse:collapse;font-size:13.5px}
 .ficha-topo h2{margin:0;font-size:19px;font-weight:600;line-height:1.25;display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0;overflow-wrap:anywhere}
 .ficha-meta{background:var(--surface);border:1px solid var(--border);border-top:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px 24px;font-size:13px;margin:0;padding:14px 20px}
 .ficha-meta div{display:flex;flex-direction:column;gap:2px;min-width:0}
-.ficha-meta dt{color:var(--muted);font-size:12px}
-.ficha-meta dd{margin:0;color:var(--secondary);font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.ficha-meta dt{color:var(--faint);font-size:11.5px;text-transform:uppercase;letter-spacing:.03em}
+.ficha-meta dd{margin:0;color:var(--secondary);font-size:13.5px;font-weight:600;overflow-wrap:anywhere}
+.ficha-meta dd .mono{font-family:'IBM Plex Sans',"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:15px;letter-spacing:.02em}
 .ficha-meta .meta-larga{grid-column:span 2}
 
 .abas{display:flex;gap:22px;flex-wrap:nowrap;padding:0 18px;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth;position:relative}
@@ -170,7 +168,7 @@ table.tabela{width:100%;border-collapse:collapse;font-size:13.5px}
 /* tiles de estatística: cartões lado a lado, separados por espaço */
 .grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
 .cartao{background:var(--surface);border:1px solid var(--border);border-radius:0;padding:15px 17px;min-width:0}
-.cartao h3{margin:0 0 8px;font-size:13.5px;color:var(--secondary);font-weight:600}
+.cartao h3{margin:0 0 8px;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
 .cartao .numero{font-size:22px;font-weight:600;overflow-wrap:anywhere}
 .cartao details>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;margin:-2px 0}
 .cartao details>summary::-webkit-details-marker{display:none}
@@ -188,7 +186,7 @@ table.tabela{width:100%;border-collapse:collapse;font-size:13.5px}
 .lista-alertas .alerta-ir{color:var(--faint);font-size:12.5px;white-space:nowrap}
 .bloqueado{color:var(--faint);font-size:13px}
 .bloqueado .ico,.aviso-fontes .ico{margin-right:4px}
-.sublabel{font-size:13px;color:var(--muted);font-weight:600;margin:0 0 6px}
+.sublabel{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:600;margin:0 0 6px}
 .nota-topo{margin-bottom:8px}
 
 /* Aba DP / Contábil: duas colunas em telas largas */
@@ -224,19 +222,26 @@ select{background-color:#fff;color:var(--secondary)}
 
 /* ===================================================================== */
 @media (max-width: 900px){
-  /* Nada fica "grudado" (sticky) no celular: tela pequena não tem espaço sobrando pra painel
-     fixo, e dois painéis grudados brigavam pelo topo. */
-  .topbar{padding:8px 14px;gap:8px;flex-wrap:nowrap}
+  .app{flex-direction:column}
+  /* Sidebar vira uma barra de topo compacta — a coluna cheia não faz sentido no celular
+     (empurrava todo o conteúdo pra baixo da dobra). Nada fica "grudado" (sticky) no celular:
+     tela pequena não tem espaço sobrando pra painel fixo, e dois painéis grudados (esse +
+     o cabeçalho da ficha) brigavam pelo topo. */
+  .sidebar{
+    width:100%;height:auto;position:static;
+    flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;
+    padding:8px 14px;gap:8px;
+  }
   .ficha-cab{position:static;top:auto}
-  .brand{gap:8px}
+  .brand{display:flex;align-items:center;gap:8px;min-width:0}
   .brand img{width:26px;height:26px;padding:3px;border-radius:4px;object-fit:cover;object-position:left}
-  .brand h1{font-size:14px}
+  .brand h1{font-size:14px;margin:0;white-space:nowrap}
   .brand p{display:none}
-  .menu{margin-left:auto}
+  .menu{margin-top:0;flex-direction:row;margin-left:auto}
   .menu-item{padding:8px 10px;font-size:12.5px}
-  .btn-voltar{padding:8px 10px;font-size:12.5px}
-  .topbar-fim{margin-left:0}
-  .main{padding:14px 14px 28px}
+  .sidebar-footer{margin-top:0}
+  .btn-voltar{width:auto;padding:8px 10px;font-size:12.5px}
+  .main{padding:14px}
 }
 
 /* Celular: tabelas viram cartões empilhados (sem rolagem lateral), filtros recolhíveis,
@@ -245,7 +250,7 @@ select{background-color:#fff;color:var(--secondary)}
   body{font-size:14.5px}
   .main{padding:12px 12px 28px}
   .menu-item span,.btn-voltar span{display:none}
-  .menu-item,.btn-voltar{min-width:40px;min-height:38px;justify-content:center}
+  .menu-item,.btn-voltar{min-width:40px;min-height:38px;text-align:center}
   .toasts{bottom:12px}
 
   .btn{min-height:40px;padding:8px 14px}

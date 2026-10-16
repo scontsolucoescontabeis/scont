@@ -21,22 +21,14 @@ window.F360 = {
     ROTULO_SEMAFORO: { vermelho: 'Crítico', amarelo: 'Atenção', verde: 'OK', inativo: 'Inativa' },
     ROTULO_STATUS: { ativo: 'Ativo', em_implantacao: 'Em implantação', em_saida: 'Em saída', inativo: 'Inativo' },
 
-    // Ícones SVG inline (traço único, herdam a cor do texto). Substituem os emojis, que mudam por sistema.
+    // Ícones em emoji — mesma linguagem visual do portal e das outras ferramentas.
+    // Sempre escondidos de leitores de tela (o texto ao lado já diz o que é).
     ICONES: {
-        atualizar: '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
-        filtros: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h9M17 18h3"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="15" cy="18" r="2"/>',
-        pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/>',
-        estrela: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
-        fixar: '<path d="M12 17v5M8 3h8l-1 7 3 3v2H6v-2l3-3z"/>',
-        aviso: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17v.5"/>',
-        cadeado: '<rect x="5" y="11" width="14" height="10" rx="1"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
-        ok: '<path d="M4 12.5 9.5 18 20 6"/>',
-        config: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',
-        info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.5"/>',
-        voltar: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+        atualizar: '🔄', filtros: '⚙️', pessoas: '👥', estrela: '⭐', fixar: '📌',
+        aviso: '⚠️', cadeado: '🔒', ok: '✅', config: '🛠️', info: 'ℹ️', voltar: '←',
     },
     ico(nome) {
-        return `<svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${F360.ICONES[nome] || ''}</svg>`;
+        return `<span class="ico" aria-hidden="true">${F360.ICONES[nome] || ''}</span>`;
     },
 
     esc(v) {
