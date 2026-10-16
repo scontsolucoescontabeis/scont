@@ -4,9 +4,17 @@ window.Ficha360Painel = (function () {
 
     const FILTROS_VAZIOS = { busca: '', responsavel: '', regime: '', status: '', depto: '', semaforo: '', inativas: false };
     const filtros = { ...FILTROS_VAZIOS };
+    // Ordenação não conta como "filtro" (não aparece em "Limpar filtros"); lembra a escolha.
+    let ordem = 'nome';
     // Filtros extras (selects) ficam recolhidos no celular; lembra se o usuário abriu.
     let filtrosAbertos = false;
     let timerBusca = null;
+
+    const ORDEM_SEMAFORO = { vermelho: 0, amarelo: 1, verde: 2, inativo: 3 };
+    const ORDENS = [
+        ['nome', 'Nome (A–Z)'], ['codigo', 'Código'],
+        ['gravidade', 'Mais críticas primeiro'], ['alertas', 'Mais alertas primeiro'],
+    ];
 
     function deptoContratado(item, depto) {
         const f = item.ficha || {};
@@ -16,24 +24,47 @@ window.Ficha360Painel = (function () {
         }[depto];
     }
 
+    // Mesma regra de status do filtro, usada também pelos contadores (senão o número do topo
+    // não bate com a lista quando o usuário escolhe outro status).
+    function passaStatus(i) {
+        if (filtros.status) return i.statusCarteira === filtros.status;
+        return filtros.inativas || i.statusCarteira === 'ativo';
+    }
+
     function aplicarFiltros(itens) {
         const busca = filtros.busca.trim().toLowerCase();
         return itens.filter(i => {
-            if (!filtros.status && !filtros.inativas && i.statusCarteira !== 'ativo') return false;
+            if (!passaStatus(i)) return false;
             if (busca && !(`${i.codigo} ${i.nome} ${i.cnpj}`.toLowerCase().includes(busca))) return false;
             if (filtros.responsavel && !i.responsaveisDp.concat(i.responsaveisContabil).includes(filtros.responsavel)) return false;
             if (filtros.regime && i.regime !== filtros.regime) return false;
-            if (filtros.status && i.statusCarteira !== filtros.status) return false;
             if (filtros.depto && !deptoContratado(i, filtros.depto)) return false;
             if (filtros.semaforo === 'sem_responsavel') {
-                const semDp = i.possuiFolha && i.responsaveisDp.length === 0;
-                const semCont = i.possuiContabil && i.responsaveisContabil.length === 0;
-                if (!semDp && !semCont) return false;
+                if (!semResponsavel(i)) return false;
             } else if (filtros.semaforo && i.semaforo !== filtros.semaforo) {
                 return false;
             }
             return true;
         });
+    }
+
+    function semResponsavel(i) {
+        return (i.possuiFolha && i.responsaveisDp.length === 0) || (i.possuiContabil && i.responsaveisContabil.length === 0);
+    }
+
+    const qtdAlertas = (i) => i.alertas.filter(a => a.gravidade !== 'info').length;
+    const qtdCriticos = (i) => i.alertas.filter(a => a.gravidade === 'critico').length;
+
+    function ordenar(lista) {
+        const porNome = (a, b) => a.nome.localeCompare(b.nome, 'pt-BR');
+        const cmp = {
+            nome: porNome,
+            codigo: (a, b) => String(a.codigo).localeCompare(String(b.codigo), 'pt-BR', { numeric: true }),
+            gravidade: (a, b) => (ORDEM_SEMAFORO[a.semaforo] - ORDEM_SEMAFORO[b.semaforo])
+                || (qtdCriticos(b) - qtdCriticos(a)) || (qtdAlertas(b) - qtdAlertas(a)) || porNome(a, b),
+            alertas: (a, b) => (qtdAlertas(b) - qtdAlertas(a)) || porNome(a, b),
+        }[ordem] || porNome;
+        return lista.slice().sort(cmp);
     }
 
     // Quantos filtros "extras" (os selects/checkbox que ficam recolhidos no celular) estão ligados.
@@ -54,68 +85,79 @@ window.Ficha360Painel = (function () {
     function render() {
         const tela = document.getElementById('telaPainel');
         const todos = F360.carteira;
-        const ativos = todos.filter(i => i.statusCarteira === 'ativo');
-        const conta = (fn) => ativos.filter(fn).length;
-        const semResp = conta(i => (i.possuiFolha && !i.responsaveisDp.length) || (i.possuiContabil && !i.responsaveisContabil.length));
-
-        const contador = (valor, rotulo, chave, tom) => {
-            const ativo = filtros.semaforo === chave;
-            return `<button type="button" class="contador ${tom ? 'contador-' + tom : ''} ${ativo ? 'ativo' : ''}" data-semaforo="${chave}" aria-pressed="${ativo}"><strong class="num">${valor}</strong><span>${rotulo}</span></button>`;
-        };
 
         const statusOpts = Object.entries(F360.ROTULO_STATUS).map(([k, v]) =>
             `<option value="${k}" ${filtros.status === k ? 'selected' : ''}>${v}</option>`).join('');
         const deptoOpts = [['folha', 'DP / Folha'], ['contabil', 'Contábil'], ['fiscal', 'Fiscal'], ['societario', 'Societário'], ['bpo', 'BPO']]
             .map(([k, v]) => `<option value="${k}" ${filtros.depto === k ? 'selected' : ''}>${v}</option>`).join('');
+        const ordemOpts = ORDENS.map(([k, v]) => `<option value="${k}" ${ordem === k ? 'selected' : ''}>${v}</option>`).join('');
         const extras = qtdFiltrosExtras();
 
         tela.innerHTML = `
           <div class="cabecalho-tela">
-            <h2>Painel da Carteira<span class="sub">Toque em uma empresa para abrir a ficha completa</span></h2>
-            <button class="btn" id="btnAtualizar" title="Recarregar os dados">🔄 <span>Atualizar</span></button>
+            <h2>Painel da Carteira<span class="sub">Clique em uma empresa para abrir a ficha completa</span></h2>
+            <button type="button" class="btn" id="btnAtualizar" title="Recarregar os dados">${F360.ico('atualizar')}<span>Atualizar</span></button>
           </div>
-          <div class="contadores">
-            ${contador(ativos.length, 'Empresas ativas', '')}
-            ${contador(conta(i => i.semaforo === 'vermelho'), 'Críticas', 'vermelho', 'critico')}
-            ${contador(conta(i => i.semaforo === 'amarelo'), 'Atenção', 'amarelo', 'atencao')}
-            ${contador(semResp, 'Sem responsável', 'sem_responsavel')}
-          </div>
-          <div class="filtros">
-            <label class="busca"><span class="sr-only">Buscar empresa</span>
-              <input type="search" id="fBusca" placeholder="Código, nome ou CNPJ" value="${F360.esc(filtros.busca)}" autocomplete="off" enterkeyhint="search"></label>
+          <div class="contadores" id="contadores"></div>
+          <div class="filtros" role="search">
+            <label class="busca"><span class="sr-only">Buscar empresa por código, nome ou CNPJ</span>
+              <input type="search" id="fBusca" name="busca" placeholder="Código, nome ou CNPJ…" value="${F360.esc(filtros.busca)}" autocomplete="off" spellcheck="false" enterkeyhint="search"></label>
+            <select id="fOrdem" name="ordem" aria-label="Ordenar por">${ordemOpts}</select>
             <button type="button" class="btn btn-filtros" id="btnFiltros" aria-expanded="${filtrosAbertos}" aria-controls="filtrosExtra">
-              ⚙️ Filtros ${extras ? `<span class="badge">${extras}</span>` : ''}</button>
+              ${F360.ico('filtros')}Filtros ${extras ? `<span class="badge">${extras}</span>` : ''}</button>
             <div class="filtros-extra ${filtrosAbertos ? 'aberto' : ''}" id="filtrosExtra">
-              <select id="fResp" aria-label="Responsável">${opcoes(todos.flatMap(i => i.responsaveisDp.concat(i.responsaveisContabil)), filtros.responsavel, 'Responsável')}</select>
-              <select id="fRegime" aria-label="Regime">${opcoes(todos.map(i => i.regime), filtros.regime, 'Regime')}</select>
-              <select id="fStatus" aria-label="Status na carteira"><option value="">Status na carteira</option>${statusOpts}</select>
-              <select id="fDepto" aria-label="Departamento"><option value="">Departamento</option>${deptoOpts}</select>
-              <label><input type="checkbox" id="fInativas" ${filtros.inativas ? 'checked' : ''}> Mostrar todos os status</label>
+              <select id="fResp" name="responsavel" aria-label="Responsável">${opcoes(todos.flatMap(i => i.responsaveisDp.concat(i.responsaveisContabil)), filtros.responsavel, 'Responsável')}</select>
+              <select id="fRegime" name="regime" aria-label="Regime">${opcoes(todos.map(i => i.regime), filtros.regime, 'Regime')}</select>
+              <select id="fStatus" name="status" aria-label="Status na carteira"><option value="">Status na carteira</option>${statusOpts}</select>
+              <select id="fDepto" name="departamento" aria-label="Departamento"><option value="">Departamento</option>${deptoOpts}</select>
+              <label><input type="checkbox" id="fInativas" name="todos-status" ${filtros.inativas ? 'checked' : ''}> Mostrar todos os status</label>
             </div>
           </div>
           <div class="resumo-filtros" id="resumoFiltros" aria-live="polite"></div>
           <div class="tabela-wrap" id="tabelaCarteira"></div>`;
 
+        renderContadores();
         renderTabela();
         ligarEventos(tela);
     }
 
+    // Contadores têm render próprio: clicar neles não recria a tela (busca mantém o foco e o texto).
+    function renderContadores() {
+        const base = F360.carteira.filter(passaStatus);
+        const conta = (fn) => base.filter(fn).length;
+        const contador = (valor, rotulo, chave, tom) => {
+            const ativo = filtros.semaforo === chave;
+            return `<button type="button" class="contador ${tom ? 'contador-' + tom : ''} ${ativo ? 'ativo' : ''}" data-semaforo="${chave}" aria-pressed="${ativo}"><strong class="num">${valor}</strong><span>${rotulo}</span></button>`;
+        };
+        const selecao = filtros.status || filtros.inativas;
+        document.getElementById('contadores').innerHTML =
+            `<div class="contador"><strong class="num">${base.length}</strong><span>${selecao ? 'Empresas na seleção' : 'Empresas ativas'}</span></div>` +
+            contador(conta(i => i.semaforo === 'vermelho'), 'Críticas', 'vermelho', 'critico') +
+            contador(conta(i => i.semaforo === 'amarelo'), 'Atenção', 'amarelo', 'atencao') +
+            contador(conta(semResponsavel), 'Sem responsável', 'sem_responsavel');
+    }
+
+    function limparFiltros() {
+        Object.assign(filtros, FILTROS_VAZIOS);
+        render();
+    }
+
     function renderResumoFiltros(qtd) {
         const el = document.getElementById('resumoFiltros');
-        el.innerHTML = `<span>${qtd} empresa(s)</span>${algumFiltroAtivo() ? '<button type="button" class="btn-link" id="btnLimparFiltros">Limpar filtros</button>' : ''}`;
+        el.innerHTML = `<span>${qtd} ${qtd === 1 ? 'empresa' : 'empresas'}</span>${algumFiltroAtivo() ? '<button type="button" class="btn-link" id="btnLimparFiltros">Limpar filtros</button>' : ''}`;
         const limpar = document.getElementById('btnLimparFiltros');
-        if (limpar) limpar.addEventListener('click', () => { Object.assign(filtros, FILTROS_VAZIOS); render(); });
+        if (limpar) limpar.addEventListener('click', limparFiltros);
     }
 
     function renderTabela() {
-        const lista = aplicarFiltros(F360.carteira);
+        const lista = ordenar(aplicarFiltros(F360.carteira));
         const wrap = document.getElementById('tabelaCarteira');
         renderResumoFiltros(lista.length);
         if (!lista.length) {
             wrap.innerHTML = `<div class="vazio">Nenhuma empresa encontrada com esses filtros.${algumFiltroAtivo()
                 ? '<br><button type="button" class="btn-link" id="btnLimparVazio">Limpar filtros</button>' : ''}</div>`;
             const b = document.getElementById('btnLimparVazio');
-            if (b) b.addEventListener('click', () => { Object.assign(filtros, FILTROS_VAZIOS); render(); });
+            if (b) b.addEventListener('click', limparFiltros);
             return;
         }
         const linhas = lista.map(i => {
@@ -124,19 +166,20 @@ window.Ficha360Painel = (function () {
                 (visiveis.length > 3 ? `<span class="chip chip-neutro">+${visiveis.length - 3}</span>` : '');
             const resp = [
                 i.responsaveisDp.length ? `DP: ${F360.esc(i.responsaveisDp.join(', '))}` : '',
-                i.responsaveisContabil.length ? `Cont.: ${F360.esc(i.responsaveisContabil.join(', '))}` : '',
+                i.responsaveisContabil.length ? `Contábil: ${F360.esc(i.responsaveisContabil.join(', '))}` : '',
             ].filter(Boolean);
             // Linha compacta só do celular: regime · empregados · responsáveis.
             const infoMovel = [
                 i.regime ? F360.esc(i.regime) : '',
-                i.empregadosAtivos == null ? '' : `👥 ${i.empregadosAtivos}`,
+                i.empregadosAtivos == null ? '' : `${F360.ico('pessoas')} ${i.empregadosAtivos}`,
                 ...resp,
             ].filter(Boolean).map(t => `<span>${t}</span>`).join('');
             const rotulo = F360.ROTULO_SEMAFORO[i.semaforo] || '';
-            return `<tr class="clicavel sem-${i.semaforo}" data-codigo="${F360.esc(i.codigo)}" tabindex="0" role="link" aria-label="${F360.esc(`${i.nome} — ${rotulo}`)}">
+            const href = `?empresa=${encodeURIComponent(i.codigo)}`;
+            return `<tr class="clicavel sem-${i.semaforo}" data-codigo="${F360.esc(i.codigo)}">
                 <td class="col-barra" title="${F360.esc(rotulo)}"></td>
                 <td class="mono cel-codigo">${F360.esc(i.codigo)}</td>
-                <td class="cel-nome"><strong>${F360.esc(i.nome)}</strong>${i.grupo ? `<br><span class="chip chip-neutro">${F360.esc(i.grupo)}</span>` : ''}</td>
+                <td class="cel-nome"><a class="link-linha" href="${href}">${F360.esc(i.nome)}<span class="sr-only"> — ${F360.esc(rotulo)}</span></a>${i.grupo ? `<br><span class="chip chip-neutro">${F360.esc(i.grupo)}</span>` : ''}</td>
                 <td class="col-hide-movel">${F360.esc(i.regime) || '—'}</td>
                 <td class="col-hide-movel">${resp.join('<br>') || '<span class="bloqueado">—</span>'}</td>
                 <td class="num t-right col-hide-movel">${i.empregadosAtivos == null ? '—' : i.empregadosAtivos}</td>
@@ -146,51 +189,74 @@ window.Ficha360Painel = (function () {
             </tr>`;
         }).join('');
         wrap.innerHTML = `<table class="tabela tabela-carteira">
-            <thead><tr><th></th><th>Código</th><th>Empresa</th><th class="col-hide-movel">Regime</th><th class="col-hide-movel">Responsáveis</th><th class="t-right col-hide-movel">Empreg. ativos</th><th class="so-movel"></th><th>Alertas</th><th></th></tr></thead>
+            <thead><tr><th><span class="sr-only">Situação</span></th><th>Código</th><th>Empresa</th><th class="col-hide-movel">Regime</th><th class="col-hide-movel">Responsáveis</th><th class="t-right col-hide-movel">Empregados ativos</th><th class="so-movel"></th><th>Alertas</th><th></th></tr></thead>
             <tbody>${linhas}</tbody></table>`;
-        wrap.querySelectorAll('tr.clicavel').forEach(tr => {
-            tr.addEventListener('click', () => F360.irParaEmpresa(tr.dataset.codigo));
-            tr.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); F360.irParaEmpresa(tr.dataset.codigo); }
-            });
-        });
     }
 
     function ligarEventos(tela) {
-        const bind = (id, evento, chave, valor) =>
-            document.getElementById(id).addEventListener(evento, (e) => { filtros[chave] = valor(e.target); atualizarBadgeFiltros(); renderTabela(); });
+        const bind = (id, chave, valor) =>
+            document.getElementById(id).addEventListener('change', (e) => {
+                filtros[chave] = valor(e.target);
+                atualizarBadgeFiltros();
+                renderContadores();
+                renderTabela();
+            });
         document.getElementById('fBusca').addEventListener('input', (e) => {
             filtros.busca = e.target.value;
             clearTimeout(timerBusca);
             timerBusca = setTimeout(renderTabela, 120);
         });
-        bind('fResp', 'change', 'responsavel', el => el.value);
-        bind('fRegime', 'change', 'regime', el => el.value);
-        bind('fStatus', 'change', 'status', el => el.value);
-        bind('fDepto', 'change', 'depto', el => el.value);
-        bind('fInativas', 'change', 'inativas', el => el.checked);
+        bind('fResp', 'responsavel', el => el.value);
+        bind('fRegime', 'regime', el => el.value);
+        bind('fStatus', 'status', el => el.value);
+        bind('fDepto', 'depto', el => el.value);
+        bind('fInativas', 'inativas', el => el.checked);
+        document.getElementById('fOrdem').addEventListener('change', (e) => { ordem = e.target.value; renderTabela(); });
         document.getElementById('btnFiltros').addEventListener('click', (e) => {
             filtrosAbertos = !filtrosAbertos;
             document.getElementById('filtrosExtra').classList.toggle('aberto', filtrosAbertos);
             e.currentTarget.setAttribute('aria-expanded', String(filtrosAbertos));
         });
-        tela.querySelectorAll('.contador').forEach(c => c.addEventListener('click', () => {
+
+        // Delegação: um listener por área em vez de dois por linha.
+        document.getElementById('contadores').addEventListener('click', (e) => {
+            const c = e.target.closest('button.contador');
+            if (!c) return;
             filtros.semaforo = filtros.semaforo === c.dataset.semaforo ? '' : c.dataset.semaforo;
-            render();
-        }));
+            renderContadores();
+            renderTabela();
+        });
+        document.getElementById('tabelaCarteira').addEventListener('click', (e) => {
+            const tr = e.target.closest('tr.clicavel');
+            if (!tr) return;
+            const link = e.target.closest('a');
+            // Ctrl/Cmd/Shift/botão do meio no link: deixa o navegador abrir em outra aba.
+            if (link && (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0)) return;
+            e.preventDefault();
+            F360.irParaEmpresa(tr.dataset.codigo);
+        });
+        // Clique do meio na linha (fora do link) também abre em nova aba.
+        document.getElementById('tabelaCarteira').addEventListener('auxclick', (e) => {
+            const tr = e.target.closest('tr.clicavel');
+            if (tr && e.button === 1 && !e.target.closest('a')) window.open(`?empresa=${encodeURIComponent(tr.dataset.codigo)}`, '_blank', 'noopener');
+        });
+
         document.getElementById('btnAtualizar').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
             btn.disabled = true;
+            const rotulo = btn.querySelector('span');
+            if (rotulo) rotulo.textContent = 'Atualizando…';
             const ok = await F360.carregar();
             btn.disabled = false;
-            if (ok) render();
+            if (ok) { render(); F360.avisar('Carteira atualizada.'); }
+            else if (rotulo) rotulo.textContent = 'Atualizar';
         });
     }
 
     function atualizarBadgeFiltros() {
         const btn = document.getElementById('btnFiltros');
         const n = qtdFiltrosExtras();
-        btn.innerHTML = `⚙️ Filtros ${n ? `<span class="badge">${n}</span>` : ''}`;
+        btn.innerHTML = `${F360.ico('filtros')}Filtros ${n ? `<span class="badge">${n}</span>` : ''}`;
     }
 
     return { render };
