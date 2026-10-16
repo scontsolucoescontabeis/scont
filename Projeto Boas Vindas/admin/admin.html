@@ -133,6 +133,21 @@
                                 <input type="text" id="ramo" name="ramo">
                             </div>
                         </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="origemContabilidade">Origem contábil <span class="obrigatorio">*</span></label>
+                                <select id="origemContabilidade" name="origemContabilidade" required>
+                                    <option value="">Selecione...</option>
+                                    <option value="nova">Empresa nova (balanço de abertura pela Scont)</option>
+                                    <option value="outra_contabilidade">Vem de outra contabilidade</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="inicioCobranca">Início da cobrança dos honorários</label>
+                                <input type="date" id="inicioCobranca" name="inicioCobranca">
+                                <small class="campo-dica">Aparece em "Cobranças iniciam em…". Em branco, a frase é omitida.</small>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- ETAPA 3: ATIVIDADE ECONÔMICA (CNAE) -->

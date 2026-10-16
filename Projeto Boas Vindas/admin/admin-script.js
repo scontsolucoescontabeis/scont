@@ -331,6 +331,8 @@ async function criarApresentacao() {
         regime:            fd.get('regime')    || null,
         porte:             fd.get('porte')     || null,
         ramo:              fd.get('ramo')      || null,
+        origem_contabilidade:       fd.get('origemContabilidade') || null,
+        inicio_cobranca_honorarios: fd.get('inicioCobranca') || null,
         cnae_principal:    `${cnaePrincipalSelecionado.codigo} — ${cnaePrincipalSelecionado.atividade}`,
         cnaes_secundarios: cnaesSecundariosSelecionados.length
             ? cnaesSecundariosSelecionados.map(c => `${c.codigo} — ${c.atividade}`).join('\n')

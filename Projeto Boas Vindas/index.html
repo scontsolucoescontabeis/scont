@@ -1349,7 +1349,8 @@
                 border: 1px solid var(--line);
             }
         }
-    </style>
+        [hidden] { display: none !important; }
+</style>
 </head>
 <body>
     <!-- BARRA DE PROGRESSO DE LEITURA -->
@@ -1517,17 +1518,22 @@
                 </div>
             </div>
 
-            <div class="info-card">
+            <div class="info-card" data-regime="simples" hidden>
+                <strong><i class="fas fa-file-invoice-dollar"></i> DAS — Simples Nacional</strong>
+                <p>Guia única que reúne IRPJ, CSLL, PIS, COFINS, ISS/ICMS e a contribuição patronal previdenciária (CPP). Vencimento: todo dia 20 de cada mês. A alíquota depende do anexo e da faixa de receita bruta acumulada dos últimos 12 meses.</p>
+            </div>
+
+            <div class="info-card" data-regime="presumido">
                 <strong><i class="fas fa-money-bill-wave"></i> ISS</strong>
                 <p>Vencimento: todo dia 20 de cada mês</p>
             </div>
 
-            <div class="info-card">
+            <div class="info-card" data-regime="presumido">
                 <strong><i class="fas fa-percent"></i> PIS e COFINS</strong>
                 <p>Vencimento: todo dia 20 de cada mês</p>
             </div>
 
-            <div class="info-card">
+            <div class="info-card" data-regime="presumido">
                 <strong><i class="fas fa-file-invoice-dollar"></i> IRPJ e CSLL</strong>
                 <p>Vencimento: último dia útil de abril, julho, outubro e janeiro</p>
             </div>
@@ -1544,7 +1550,7 @@
 
             <div class="info-card">
                 <strong><i class="fas fa-file-invoice"></i> 1. Nota Fiscal Eletrônica (NFS-e)</strong>
-                <p>Emissão limitada a 5 NFS-es/mês. Como optante pelo Lucro Presumido, retenha IRPJ e CSLL de prestadores como advocacia, arquitetura, contabilidade e segurança. Na aquisição de bens de fora do DF, recolha o diferencial de alíquota interestadual (DIFAL).</p>
+                <p>Emissão limitada a 5 NFS-es/mês. <span data-regime="presumido">Como optante pelo Lucro Presumido, retenha IRPJ e CSLL de prestadores como advocacia, arquitetura, contabilidade e segurança. </span><span data-regime="simples" hidden>Como optante pelo Simples Nacional, observe o limite de receita bruta e o sublimite estadual, e confira a retenção de ISS e INSS em serviços prestados a pessoas jurídicas. </span>Na aquisição de bens de fora do DF, recolha o diferencial de alíquota interestadual (DIFAL).</p>
             </div>
 
             <div class="info-card">
@@ -1598,7 +1604,10 @@
                         </tr>
                         <tr>
                             <td><strong>INSS</strong></td>
-                            <td>28,8% sobre o salário</td>
+                            <td>
+                                <span data-regime="presumido">28,8% sobre o salário</span>
+                                <span data-regime="simples" hidden>Contribuição patronal incluída no DAS (Anexos I, II, III e V); apenas a retenção do empregado (8% a 14%) é recolhida na folha. Anexo IV: 20% + RAT + terceiros</span>
+                            </td>
                             <td>Dia 20</td>
                         </tr>
                         <tr>
@@ -1651,7 +1660,12 @@
                 <p>A empresa deve informar à contabilidade até o dia 05 do mês seguinte todas as distribuições realizadas. Atraso gera multa e juros de responsabilidade exclusiva da empresa.</p>
             </div>
 
-            <div class="info-card">
+            <div class="info-card" id="cardBalancoNova" hidden>
+                <strong><i class="fas fa-balance-scale"></i> Balanço de Abertura</strong>
+                <p>Por se tratar de empresa nova, a Scont realizará o balanço de abertura — registro inicial do capital social e dos bens, direitos e obrigações com que a empresa inicia suas atividades.</p>
+            </div>
+
+            <div class="info-card" id="cardBalancoMigracao">
                 <strong><i class="fas fa-balance-scale"></i> Balanço de Abertura</strong>
                 <p>Estamos aguardando os saldos finais da contabilidade anterior para proceder com a auditoria e o balanço de abertura — inventário físico e documental dos bens, direitos e obrigações da empresa.</p>
             </div>
@@ -1772,7 +1786,7 @@
             <h3><i class="fas fa-lock"></i> Cuidados Essenciais</h3>
 
             <ul>
-                <li><strong><i class="fas fa-money-bill"></i> Honorário Contábil:</strong> Vence todo dia 10 de cada mês, pago via boleto enviado com 7 dias de antecedência. Cobranças iniciam em novembro/2024.</li>
+                <li><strong><i class="fas fa-money-bill"></i> Honorário Contábil:</strong> Vence todo dia 10 de cada mês, pago via boleto enviado com 7 dias de antecedência. <span id="honorarioInicio"></span></li>
                 <li><strong><i class="fas fa-pen"></i> Contrato Contábil:</strong> Será enviado por e-mail — assine o mais breve possível para continuidade dos serviços.</li>
                 <li><strong><i class="fas fa-home"></i> Contrato de Aluguel:</strong> Em caso de contrato de aluguel, envie-o para verificação de possível retenção de IRRF.</li>
                 <li><strong><i class="fas fa-at"></i> Verificação de E-mail:</strong> Confira o remetente: <code>noreply@gesttamail.com</code>. O e-mail autêntico contém foto da Bruna e da Brenna.</li>
@@ -1901,6 +1915,7 @@
             }
 
             preencherDadosCadastrais(data);
+            aplicarParticularidades(data);
             personalizarHero(data);
             document.getElementById('badgePersonalizada').style.display = 'flex';
             document.title = `${data.razao_social} - Scont Soluções Contábeis`;
@@ -1914,6 +1929,27 @@
             document.getElementById('navCadastro').style.display = 'none';
         } finally {
             document.body.classList.remove('carregando-dados');
+        }
+    }
+
+    // Particularidades: regime tributário, origem contábil e início da cobrança
+    function aplicarParticularidades(dados) {
+        const regime = (dados.regime || '').toLowerCase().includes('simples') ? 'simples' : 'presumido';
+        document.querySelectorAll('[data-regime]').forEach(el => {
+            el.hidden = el.dataset.regime !== regime;
+        });
+
+        const nova = dados.origem_contabilidade === 'nova';
+        document.getElementById('cardBalancoNova').hidden = !nova;
+        document.getElementById('cardBalancoMigracao').hidden = nova;
+
+        const el = document.getElementById('honorarioInicio');
+        const iso = dados.inicio_cobranca_honorarios;
+        if (iso) {
+            const [a, m, d] = iso.split('-').map(Number);
+            el.textContent = 'Cobranças iniciam em ' + new Date(a, m - 1, d).toLocaleDateString('pt-BR') + '.';
+        } else {
+            el.textContent = '';
         }
     }
 
