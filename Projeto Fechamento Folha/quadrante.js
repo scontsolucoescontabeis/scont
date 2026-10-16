@@ -1790,14 +1790,14 @@ async function carregarBancariosConfig() {
             <tr id="editBancRow-${r.id}" style="display:none;background:#fafafa;">
                 <td colspan="11">
                     <div class="inline-register-form" style="flex-wrap:wrap;">
-                        <input type="text" id="editBancNome-${r.id}" value="${escHtml(r.nome_empregado || '')}" placeholder="Nome"
-                            style="width:180px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
-                        <input type="text" id="editBancCpf-${r.id}" value="${escHtml(r.cpf || '')}" placeholder="CPF"
-                            style="width:120px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
-                        <input type="text" id="editBancCargo-${r.id}" value="${escHtml(r.cargo || '')}" placeholder="Cargo"
-                            style="width:130px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
-                        <input type="text" id="editBancCentroCusto-${r.id}" value="${escHtml(r.centro_custo || '')}" placeholder="Centro de Custo"
-                            style="width:130px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" id="editBancNome-${r.id}" value="${escHtml(r.nome_empregado || '')}" placeholder="Nome" readonly
+                            style="background:#F5F6F7;width:180px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" id="editBancCpf-${r.id}" value="${escHtml(r.cpf || '')}" placeholder="CPF" readonly
+                            style="background:#F5F6F7;width:120px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" id="editBancCargo-${r.id}" value="${escHtml(r.cargo || '')}" placeholder="Cargo" readonly
+                            style="background:#F5F6F7;width:130px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                        <input type="text" id="editBancCentroCusto-${r.id}" value="${escHtml(r.centro_custo || '')}" placeholder="Centro de Custo" readonly
+                            style="background:#F5F6F7;width:130px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
                         <input type="text" id="editBancBanco-${r.id}" value="${escHtml(r.banco_codigo || '')}" placeholder="Banco"
                             style="width:90px;padding:6px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:monospace;">
                         <input type="text" id="editBancAgencia-${r.id}" value="${escHtml(r.agencia || '')}" placeholder="Agência"
@@ -1819,6 +1819,72 @@ async function carregarBancariosConfig() {
     }
 }
 
+// Seleção de empregado ativo (rh_empregados) para o cadastro bancário
+let _bancEmpregados = [];
+
+function limparEmpregadoBanc() {
+    ['bancCodigo', 'bancNome', 'bancCpf', 'bancCargo', 'bancCentroCusto'].forEach(id => { document.getElementById(id).value = ''; });
+}
+
+async function abrirSeletorEmpregadoBanc() {
+    const empresa = document.getElementById('bancEmpresa').value;
+    if (!empresa) { mostrarStatusBancario('⚠ Selecione a empresa antes de escolher o empregado.', 'error'); return; }
+    document.getElementById('bancBuscaEmpregado').value = '';
+    document.getElementById('bancListaEmpregados').innerHTML = '<div style="padding:14px;color:#7F8C8D;font-size:13px;">Carregando...</div>';
+    document.getElementById('modalSeletorEmpregadoBanc').classList.add('active');
+    try {
+        const { data, error } = await supabaseClient
+            .from('rh_empregados')
+            .select('codigo_empregado, nome_empregado, cpf, desc_cargo, cod_ccusto, desc_ccusto, situacao, tipo_empregado')
+            .eq('codigo_empresa', empresa)
+            .order('nome_empregado');
+        if (error) throw error;
+        _bancEmpregados = (data || []).filter(e =>
+            (e.situacao || '').trim() !== 'Demitido' && (e.tipo_empregado || '').trim() !== 'Contribuinte');
+        renderSeletorEmpregadoBanc();
+        document.getElementById('bancBuscaEmpregado').focus();
+    } catch (err) {
+        document.getElementById('bancListaEmpregados').innerHTML =
+            `<div style="padding:14px;color:#E74C3C;font-size:13px;">Erro: ${escHtml(err.message)}</div>`;
+    }
+}
+
+function renderSeletorEmpregadoBanc() {
+    const termo = normalizarNome(document.getElementById('bancBuscaEmpregado').value || '');
+    const termoNum = termo.replace(/\D/g, '');
+    const lista = _bancEmpregados.filter(e => !termo ||
+        normalizarNome(e.nome_empregado || '').includes(termo) ||
+        String(e.codigo_empregado).includes(termo) ||
+        (termoNum && String(e.cpf || '').replace(/\D/g, '').includes(termoNum)));
+    const box = document.getElementById('bancListaEmpregados');
+    if (!lista.length) {
+        box.innerHTML = '<div style="padding:14px;color:#7F8C8D;font-size:13px;">Nenhum empregado ativo encontrado.</div>';
+        return;
+    }
+    box.innerHTML = lista.map(e => `
+        <div onclick="selecionarEmpregadoBanc('${escHtml(String(e.codigo_empregado))}')"
+            style="padding:8px 12px;border-bottom:1px solid #EEE;cursor:pointer;font-size:13px;"
+            onmouseover="this.style.background='#F0F4F8'" onmouseout="this.style.background=''">
+            <strong style="font-family:monospace;">${escHtml(e.codigo_empregado)}</strong> — ${escHtml(e.nome_empregado || '')}
+            <div style="font-size:11px;color:#7F8C8D;">${escHtml(formatarCpf(e.cpf) || 'sem CPF')} · ${escHtml(e.desc_cargo || 'sem cargo')}</div>
+        </div>`).join('');
+}
+
+function selecionarEmpregadoBanc(codigo) {
+    const e = _bancEmpregados.find(x => String(x.codigo_empregado) === String(codigo));
+    if (!e) return;
+    document.getElementById('bancCodigo').value      = normalizarCodigo(e.codigo_empregado);
+    document.getElementById('bancNome').value        = e.nome_empregado || '';
+    document.getElementById('bancCpf').value         = String(e.cpf || '').replace(/\D/g, '');
+    document.getElementById('bancCargo').value       = e.desc_cargo || '';
+    document.getElementById('bancCentroCusto').value = e.desc_ccusto || e.cod_ccusto || '';
+    fecharSeletorEmpregadoBanc();
+}
+
+function fecharSeletorEmpregadoBanc() {
+    document.getElementById('modalSeletorEmpregadoBanc').classList.remove('active');
+}
+
 async function salvarBancarioConfig() {
     const empresa     = document.getElementById('bancEmpresa').value.trim();
     const codigo      = normalizarCodigo(document.getElementById('bancCodigo').value.trim());
@@ -1832,7 +1898,7 @@ async function salvarBancarioConfig() {
     const tipoConta   = document.getElementById('bancTipoConta').value;
 
     if (!empresa || !codigo || !nome || !agencia || !conta || bancoCodigo === '000') {
-        mostrarStatusBancario('⚠ Preencha os campos obrigatórios: Empresa, Código, Nome, Banco, Agência e Conta.', 'error');
+        mostrarStatusBancario('⚠ Selecione o empregado e preencha Banco, Agência e Conta.', 'error');
         return;
     }
 

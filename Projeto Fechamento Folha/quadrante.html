@@ -439,36 +439,36 @@
             <div class="config-form-row" style="grid-template-columns:1fr 1fr 1.4fr 1fr;">
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Empresa *</label>
-                    <select id="bancEmpresa" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                    <select id="bancEmpresa" onchange="limparEmpregadoBanc()" style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
                         <option value="">Selecione...</option>
                     </select>
                 </div>
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Código do Empregado *</label>
-                    <input type="text" id="bancCodigo" placeholder="Ex: 000123"
-                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:monospace;">
+                    <input type="text" id="bancCodigo" placeholder="Clique para selecionar" readonly onclick="abrirSeletorEmpregadoBanc()"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:monospace;cursor:pointer;background:#F5F6F7;">
                 </div>
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Nome *</label>
-                    <input type="text" id="bancNome" placeholder="Nome do empregado"
-                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                    <input type="text" id="bancNome" placeholder="Clique para selecionar" readonly onclick="abrirSeletorEmpregadoBanc()"
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;cursor:pointer;background:#F5F6F7;">
                 </div>
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">CPF</label>
-                    <input type="text" id="bancCpf" placeholder="Somente números"
-                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                    <input type="text" id="bancCpf" placeholder="Automático" readonly
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;background:#F5F6F7;">
                 </div>
             </div>
             <div class="config-form-row" style="grid-template-columns:1fr 1fr 0.8fr 0.8fr 1fr 1fr auto;margin-top:10px;">
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Cargo</label>
-                    <input type="text" id="bancCargo" placeholder="Cargo"
-                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                    <input type="text" id="bancCargo" placeholder="Automático" readonly
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;background:#F5F6F7;">
                 </div>
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Centro de Custo</label>
-                    <input type="text" id="bancCentroCusto" placeholder="Centro de custo"
-                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;">
+                    <input type="text" id="bancCentroCusto" placeholder="Automático" readonly
+                        style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;background:#F5F6F7;">
                 </div>
                 <div>
                     <label style="display:block;font-weight:600;font-size:12px;margin-bottom:4px;color:#2C3E50;">Banco *</label>
@@ -580,6 +580,21 @@
         <div class="modal-footer">
             <button class="btn btn-secondary btn-small" onclick="fecharModalTipoProcesso()">Cancelar</button>
             <button class="btn btn-primary btn-small" onclick="confirmarTipoProcesso()">▶ Gerar TXT</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL SELEÇÃO DE EMPREGADO (Informações Bancárias) -->
+<div class="modal" id="modalSeletorEmpregadoBanc">
+    <div class="modal-content" style="max-width:560px;">
+        <div class="modal-header">
+            <h3>👤 Selecionar Empregado Ativo</h3>
+            <button class="modal-close" onclick="fecharSeletorEmpregadoBanc()">×</button>
+        </div>
+        <div class="modal-body">
+            <input type="text" id="bancBuscaEmpregado" placeholder="Buscar por código, nome ou CPF..." oninput="renderSeletorEmpregadoBanc()"
+                style="width:100%;padding:9px 10px;border:1px solid #E0E0E0;border-radius:6px;font-size:13px;margin-bottom:10px;">
+            <div id="bancListaEmpregados" style="max-height:340px;overflow-y:auto;border:1px solid #E0E0E0;border-radius:6px;"></div>
         </div>
     </div>
 </div>
