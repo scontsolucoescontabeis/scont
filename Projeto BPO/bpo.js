@@ -361,6 +361,7 @@
     const { rel, casamento } = importacao;
     const marcadas = new Set(empresasCad.filter((e) => e.possui_bpo).map((e) => e.codigo_empresa));
     const recBpo = casamento.reconhecidos.filter((r) => marcadas.has(r.codigo)).length;
+    const aprox = casamento.reconhecidos.filter((r) => r.metodo === 'aproximado').length;
     const opcoesEmp = rhEmpresas.map((e) => `<option value="${esc(e.codigo_empresa)}">${esc(e.nome_empresa)} (${esc(e.codigo_empresa)})</option>`).join('');
 
     $('previaImportacao').innerHTML = `
@@ -369,7 +370,7 @@
         <p>Período <strong>${esc(U.dataBr(rel.periodo.ini))} a ${esc(U.dataBr(rel.periodo.fim))}</strong> ·
            emitido em <strong>${esc(U.dataBr(rel.emitidoEm, true) || '—')}</strong> ·
            ${rel.clientes.length} clientes · ${rel.totalArquivos} arquivos</p>
-        <p>✅ ${casamento.reconhecidos.length} reconhecidos (${recBpo} com BPO) ·
+        <p>✅ ${casamento.reconhecidos.length} reconhecidos (${recBpo} com BPO${aprox ? `, ${aprox} por nome aproximado` : ''}) ·
            ⚠️ ${casamento.naoReconhecidos.length} não reconhecidos · 🚫 ${casamento.ignorados.length} ignorados</p>
         <p style="margin:6px 0 0"><strong>Competências identificadas</strong> (mês anterior à data de publicação de cada arquivo):</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${resumoCompetencias(casamento.reconhecidos)}</div>
@@ -390,10 +391,17 @@
           <th>Nome no relatório</th><th style="text-align:right">Arquivos</th><th style="text-align:right" title="Arquivos nas pastas dos tipos de documento ativos">Monitorados</th><th>Vincular a</th><th>Ignorar</th></tr></thead><tbody id="corpoNaoRec">
         ${casamento.naoReconhecidos.map((c, i) => {
           const mon = c.arquivos.filter((a) => tipos.some((t) => t.ativo && U.arquivoCasaTipo({ pasta: a.pasta, arquivo: a.arquivo, excluidoEm: a.excluidoEm }, t))).length;
+          const sug = casamento.sugestoes.get(c.nomeNormalizado) || [];
+          const rotulo = (s) => `${s.nome} (${s.codigo})`;
+          // pré-preenche só quando a melhor sugestão é forte e destacada das demais; o usuário ainda confirma
+          const auto = sug[0] && sug[0].score >= 0.85 && (!sug[1] || sug[0].score - sug[1].score >= 0.1) ? sug[0] : null;
+          const chips = sug.filter((s) => s !== auto).map((s) =>
+            `<button type="button" class="vinc-sug" data-i="${i}" data-val="${esc(rotulo(s))}" title="Usar esta empresa" style="border:0;background:none;padding:0;color:var(--muted);font-size:.75rem;cursor:pointer;text-decoration:underline">${esc(rotulo(s))} · ${Math.round(s.score * 100)}%</button>`).join('<br>');
           return `<tr data-nome="${esc(c.nome.toLowerCase())}" data-mon="${mon}">
           <td>${esc(c.nome)}</td><td style="text-align:right">${c.arquivos.length}</td>
           <td style="text-align:right">${mon ? `<span class="bpo-monitorado">${mon}</span>` : '—'}</td>
-          <td><input type="text" class="bpo-input vinc-emp" list="listaEmpresasRh" data-i="${i}" placeholder="Buscar empresa..."></td>
+          <td><input type="text" class="bpo-input vinc-emp" list="listaEmpresasRh" data-i="${i}" placeholder="Buscar empresa..." value="${auto ? esc(rotulo(auto)) : ''}">
+            ${auto ? `<small style="color:var(--muted)">Sugerido (${Math.round(auto.score * 100)}%) — confira antes de confirmar</small>` : ''}${chips ? `<div>${chips}</div>` : ''}</td>
           <td style="text-align:center"><input type="checkbox" class="vinc-ign" data-i="${i}"></td></tr>`;
         }).join('')}
         </tbody></table></div>
@@ -415,6 +423,10 @@
           tr.style.display = ok ? '' : 'none';
         });
       };
+      $('corpoNaoRec').addEventListener('click', (ev) => {
+        const b = ev.target.closest('.vinc-sug');
+        if (b) document.querySelector(`.vinc-emp[data-i="${b.getAttribute('data-i')}"]`).value = b.getAttribute('data-val');
+      });
       $('buscaNaoRec').addEventListener('input', filtrar);
       $('soMonitorados').addEventListener('change', filtrar);
       $('btnIgnorarVisiveis').addEventListener('click', () => {

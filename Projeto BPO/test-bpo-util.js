@@ -142,6 +142,33 @@ assert.strictEqual(pl.naoEncontrados.length, 1);
 assert.strictEqual(pl.naoEncontrados[0].linha, 4);
 assert.strictEqual(pl.duplicados, 1);
 
+// casamento aproximado: sufixo societário, siglas com ponto, ambiguidade e sugestões
+const cl = (nome) => ({ nome, nomeNormalizado: U.normalizar(nome), arquivos: [] });
+const rhA = [
+  { codigo_empresa: '1', nome_empresa: 'A.M.S. Top Car Auto Center' },
+  { codigo_empresa: '2', nome_empresa: 'Drogaria JAC Ltda ME' },
+  { codigo_empresa: '3', nome_empresa: 'ITC Brasil Digital' },
+  { codigo_empresa: '4', nome_empresa: 'ITC Brasil Digital Ltda.' },
+  { codigo_empresa: '5', nome_empresa: 'Quadrante Etiquetas Indústria e Comércio' },
+  { codigo_empresa: '6', nome_empresa: 'Quadrante Industria e Comercio de Rotulos' },
+];
+const ma = U.casarClientes([cl('A.M.S. TOP CAR AUTO CENTER LTDA ME'), cl('DROGARIA JAC LTDA'), cl('ITC BRASIL DIGITAL LTDA ME'),
+  cl('QUADRANTE ETIQUETAS INDUSTRIA COMERCIO LTDA'), cl('Drogaria Jak Ltda')], rhA, []);
+assert.strictEqual(ma.reconhecidos.find((r) => r.cliente.nome.startsWith('A.M.S')).codigo, '1');
+assert.strictEqual(ma.reconhecidos.find((r) => r.cliente.nome === 'DROGARIA JAC LTDA').codigo, '2');
+assert.ok(!ma.reconhecidos.some((r) => r.cliente.nome.startsWith('ITC')), 'ambíguo não casa sozinho');
+assert.ok(ma.naoReconhecidos.some((c) => c.nome.startsWith('ITC')));
+assert.strictEqual(ma.sugestoes.get(U.normalizar('Drogaria Jak Ltda'))[0].codigo, '2');
+assert.strictEqual(U.sugerirEmpresas('Quadrante Etiquetas Industria Comercio', rhA)[0].codigo, '5');
+
+// nome_empresa de rh_empresas vem cortado em 40 caracteres
+const rhC = [{ codigo_empresa: '9', nome_empresa: 'SICILIANI PATRIMONIAL E ADMINISTRACAO DE' },
+  { codigo_empresa: '7', nome_empresa: 'BARONESA COMERCIO DE ARTIGOS DE DECORACA' }, { codigo_empresa: '8', nome_empresa: 'BARONESA COMERCIO DE ARTIGOS DE DECORACA' }];
+const mc = U.casarClientes([cl('SICILIANI PATRIMONIAL E ADMINISTRACAO DE BENS LTDA'), cl('BARONESA COMERCIO DE ARTIGOS DE DECORACAO LTDA')], rhC, []);
+assert.strictEqual(mc.reconhecidos.length, 1);
+assert.strictEqual(mc.reconhecidos[0].codigo, '9');
+assert.strictEqual(mc.naoReconhecidos.length, 1, 'duplicado cortado continua ambíguo');
+
 // relatório real (se estiver na pasta)
 const real = path.join(__dirname, 'documentos-publicados.xlsx');
 if (fs.existsSync(real)) {

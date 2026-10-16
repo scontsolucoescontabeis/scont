@@ -252,22 +252,97 @@ ${miolo}
 
   // ─── CASAMENTO DE NOMES ─────────────────────────────────────
 
+  const SUFIXOS_JURIDICOS = new Set(['ltda', 'limitada', 'me', 'epp', 'eireli', 'mei', 'sa', 'ss', 'slu', 'cia']);
+  const LIMITE_NOME_RH = 40;
+  const LIGACOES = new Set(['de', 'da', 'do', 'das', 'dos', 'e', 'a', 'o']);
+
+  // Tokens do nome sem acento, sem sufixo societário ("Ltda", "ME", "S/A"...) e com siglas
+  // coladas ("A.M.S." -> "ams"). Só tira sufixo do fim, para não mexer em "Soul Serviços".
+  function tokensNome(s) {
+    let t = normalizar(s).split(' ').filter(Boolean);
+    const juntar = [];
+    for (let i = 0; i < t.length; i += 1) {
+      if (t[i].length === 1 && /[a-z]/.test(t[i]) && t[i + 1] && t[i + 1].length === 1 && /[a-z]/.test(t[i + 1])) {
+        let sigla = '';
+        while (t[i] && t[i].length === 1 && /[a-z]/.test(t[i])) { sigla += t[i]; i += 1; }
+        i -= 1;
+        juntar.push(sigla);
+      } else juntar.push(t[i]);
+    }
+    t = juntar;
+    // "s a" / "s s" já foram colapsados em "sa" / "ss" acima
+    while (t.length > 1 && SUFIXOS_JURIDICOS.has(t[t.length - 1])) t.pop();
+    return t;
+  }
+
+  // Chave de comparação exata (ordem importa): "A.M.S. Top Car Auto Center LTDA ME" == "AMS TOP CAR AUTO CENTER".
+  function chaveCanonica(s) { return tokensNome(s).join(' '); }
+
+  function editDist1(a, b) {
+    if (a === b) return true;
+    if (Math.abs(a.length - b.length) > 1 || a.length < 5) return false;
+    let i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
+    if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1);
+    return a.length > b.length ? a.slice(i + 1) === b.slice(i) : a.slice(i) === b.slice(i + 1);
+  }
+
+  // 0..1 — Dice sobre tokens relevantes (sem "de/da/e"), tolerando 1 letra de erro em palavras longas.
+  function similaridadeNomes(a, b) {
+    const ta = tokensNome(a).filter((x) => !LIGACOES.has(x));
+    const tb = tokensNome(b).filter((x) => !LIGACOES.has(x));
+    if (!ta.length || !tb.length) return 0;
+    const usados = new Set();
+    let comuns = 0;
+    ta.forEach((x) => {
+      const j = tb.findIndex((y, k) => !usados.has(k) && (x === y || editDist1(x, y)));
+      if (j >= 0) { usados.add(j); comuns += 1; }
+    });
+    return (2 * comuns) / (ta.length + tb.length);
+  }
+
+  function sugerirEmpresas(nome, empresasRh, max = 3, minimo = 0.5) {
+    return (empresasRh || [])
+      .map((e) => ({ codigo: e.codigo_empresa, nome: e.nome_empresa, score: similaridadeNomes(nome, e.nome_empresa) }))
+      .filter((s) => s.score >= minimo)
+      .sort((x, y) => y.score - x.score)
+      .slice(0, max);
+  }
+
   // empresasRh: [{codigo_empresa, nome_empresa}] · vinculos: [{nome_normalizado, codigo_empresa, ignorar}]
-  // -> { reconhecidos: [{cliente, codigo}], naoReconhecidos: [cliente], ignorados: [cliente] }
+  // Ordem: vínculo salvo > nome idêntico > nome idêntico sem sufixo societário/pontuação (só se for único).
+  // Parecidos NÃO casam sozinhos: viram sugestões para o usuário confirmar.
+  // -> { reconhecidos: [{cliente, codigo, metodo}], naoReconhecidos: [cliente], ignorados: [cliente],
+  //      sugestoes: Map(nomeNormalizado -> [{codigo, nome, score}]) }
   function casarClientes(clientes, empresasRh, vinculos) {
     const porNome = new Map();
+    const porCanon = new Map();
     (empresasRh || []).forEach((e) => {
       const k = normalizar(e.nome_empresa);
       if (k && !porNome.has(k)) porNome.set(k, e.codigo_empresa);
+      const c = chaveCanonica(e.nome_empresa);
+      if (c) porCanon.set(c, porCanon.has(c) && porCanon.get(c) !== e.codigo_empresa ? null : e.codigo_empresa);
     });
+    // rh_empresas.nome_empresa vem cortado em 40 caracteres: o nome do relatório começa com ele
+    const cortados = (empresasRh || []).filter((e) => String(e.nome_empresa || '').length >= LIMITE_NOME_RH - 1)
+      .map((e) => ({ k: normalizar(e.nome_empresa), codigo: e.codigo_empresa })).filter((e) => e.k.length >= 20);
     const vinc = new Map((vinculos || []).map((v) => [v.nome_normalizado, v]));
-    const out = { reconhecidos: [], naoReconhecidos: [], ignorados: [] };
+    const out = { reconhecidos: [], naoReconhecidos: [], ignorados: [], sugestoes: new Map() };
     (clientes || []).forEach((cl) => {
       const v = vinc.get(cl.nomeNormalizado);
       if (v && v.ignorar) { out.ignorados.push(cl); return; }
-      const codigo = (v && v.codigo_empresa) || porNome.get(cl.nomeNormalizado);
-      if (codigo) out.reconhecidos.push({ cliente: cl, codigo });
-      else out.naoReconhecidos.push(cl);
+      let codigo = v && v.codigo_empresa, metodo = 'vinculo';
+      if (!codigo) { codigo = porNome.get(cl.nomeNormalizado); metodo = 'nome'; }
+      if (!codigo) { codigo = porCanon.get(chaveCanonica(cl.nome)); metodo = 'aproximado'; }
+      if (!codigo) {
+        const cods = new Set(cortados.filter((e) => cl.nomeNormalizado.startsWith(e.k)).map((e) => e.codigo));
+        if (cods.size === 1) { codigo = Array.from(cods)[0]; metodo = 'aproximado'; }
+      }
+      if (codigo) out.reconhecidos.push({ cliente: cl, codigo, metodo });
+      else {
+        out.naoReconhecidos.push(cl);
+        out.sugestoes.set(cl.nomeNormalizado, sugerirEmpresas(cl.nome, empresasRh));
+      }
     });
     return out;
   }
@@ -550,7 +625,7 @@ ${miolo}
   const api = {
     MESES, SITUACOES, TIPOS_ETAPA, escapeHtml, normalizar, parseEmails, aplicarVariaveis, textoParaHtml, tituloEmail, envelopeEmail,
     competenciaTextos, dataBr, dataIsoDeBr, dataHoraIsoDeBr, competenciaSugerida, competenciaDaPublicacao, listaCompetencias,
-    parseRelatorio, casarClientes, arquivoCasaTipo, calcularStatus, contar,
+    parseRelatorio, casarClientes, chaveCanonica, similaridadeNomes, sugerirEmpresas, arquivoCasaTipo, calcularStatus, contar,
     feriadosDoAno, ehDiaUtil, proximoDiaUtil, calendarioCompetencia, cicloTextos, mascaraData, dataBrValida, feriadosExtrasParaTexto, textoParaFeriadosExtras,
     etapaAtual, dataLimite,
     emailsValidos, montarFila, lerPlanilhaEmpresas,
