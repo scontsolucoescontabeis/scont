@@ -1532,9 +1532,14 @@
                 <p data-cfg="simples.das">Guia única que reúne IRPJ, CSLL, PIS, COFINS, ISS/ICMS e a contribuição patronal previdenciária (CPP). Vencimento: todo dia 20 de cada mês. A alíquota depende do anexo e da faixa de receita bruta acumulada dos últimos 12 meses.</p>
             </div>
 
-            <div class="info-card" data-regime="presumido">
+            <div class="info-card" data-regime="presumido real">
                 <strong><i class="fas fa-money-bill-wave"></i> ISS</strong>
                 <p data-cfg="presumido.iss">Vencimento: todo dia 20 de cada mês</p>
+            </div>
+
+            <div class="info-card" data-regime="real" hidden>
+                <strong><i class="fas fa-file-invoice-dollar"></i> IRPJ, CSLL, PIS e COFINS — Lucro Real</strong>
+                <p>Apurados com base na escrituração contábil da empresa. Os vencimentos e a forma de apuração (anual com estimativas mensais ou trimestral) são informados pela equipe fiscal.</p>
             </div>
 
             <div class="info-card" data-regime="presumido">
@@ -1621,7 +1626,7 @@
                         <tr>
                             <td><strong>INSS</strong></td>
                             <td>
-                                <span data-regime="presumido" data-cfg="presumido.inss">28,8% sobre o salário</span>
+                                <span data-regime="presumido real" data-cfg="presumido.inss">28,8% sobre o salário</span>
                                 <span data-regime="simples" data-cfg="simples.inss" hidden>Contribuição patronal incluída no DAS (Anexos I, II, III e V); apenas a retenção do empregado (8% a 14%) é recolhida na folha. Anexo IV: 20% + RAT + terceiros</span>
                             </td>
                             <td>Dia 20</td>
@@ -2100,9 +2105,10 @@
             if (typeof v === 'string' && v.trim()) el.textContent = v.trim();
         });
 
-        const regime = (dados.regime || '').toLowerCase().includes('simples') ? 'simples' : 'presumido';
+        const r = (dados.regime || '').toLowerCase();
+        const regime = r.includes('simples') ? 'simples' : r.includes('real') ? 'real' : 'presumido';
         document.querySelectorAll('[data-regime]').forEach(el => {
-            el.hidden = el.dataset.regime !== regime;
+            el.hidden = !el.dataset.regime.split(' ').includes(regime);
         });
 
         renderAliquotas(dados, aliquotas, regime);
