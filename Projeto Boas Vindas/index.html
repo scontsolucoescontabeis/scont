@@ -2120,7 +2120,12 @@
         const iso = dados.inicio_cobranca_honorarios || cfg.inicio_cobranca_padrao;
         if (iso) {
             const [a, m, d] = iso.split('-').map(Number);
-            el.textContent = 'Cobranças iniciam em ' + new Date(a, m - 1, d).toLocaleDateString('pt-BR') + '.';
+            const data = new Date(a, m - 1, d || 1);
+            // Mês fechado (sem dia ou dia 01): "novembro/2026"; com dia específico: data completa
+            const txt = (!d || d === 1)
+                ? data.toLocaleDateString('pt-BR', { month: 'long' }) + '/' + a
+                : data.toLocaleDateString('pt-BR');
+            el.textContent = 'Cobranças iniciam em ' + txt + '.';
         } else {
             el.textContent = '';
         }

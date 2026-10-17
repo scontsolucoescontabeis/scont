@@ -337,7 +337,7 @@ async function criarApresentacao() {
         porte:             fd.get('porte')     || null,
         ramo:              fd.get('ramo')      || null,
         origem_contabilidade:       fd.get('origemContabilidade') || null,
-        inicio_cobranca_honorarios: fd.get('inicioCobranca') || null,
+        inicio_cobranca_honorarios: fd.get('inicioCobranca') ? fd.get('inicioCobranca') + '-01' : null,
         cnae_principal:    `${cnaePrincipalSelecionado.codigo} — ${cnaePrincipalSelecionado.atividade}`,
         cnaes_secundarios: cnaesSecundariosSelecionados.length
             ? cnaesSecundariosSelecionados.map(c => `${c.codigo} — ${c.atividade}`).join('\n')
@@ -860,6 +860,11 @@ document.addEventListener('click', e => {
 });
 
 
+function mesAtual() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
 // ===== CONFIGURAÇÕES (textos por regime/situação e data padrão de cobrança) =====
 async function buscarConfig() {
     const { data, error } = await db.from('apresentacoes_config').select('config').eq('id', 1).maybeSingle();
@@ -901,7 +906,7 @@ async function carregarConfiguracoes() {
         });
         box.appendChild(etapa);
     });
-    document.getElementById('cfgInicioCobranca').value = cfg.inicio_cobranca_padrao || '';
+    document.getElementById('cfgInicioCobranca').value = (cfg.inicio_cobranca_padrao || mesAtual()).slice(0, 7);
 }
 
 async function salvarConfiguracoes() {
@@ -929,6 +934,9 @@ async function aplicarDataPadraoCobranca() {
     try {
         const cfg = await buscarConfig();
         const el = document.getElementById('inicioCobranca');
-        if (el && !el.value && cfg.inicio_cobranca_padrao) el.value = cfg.inicio_cobranca_padrao;
-    } catch (_) { /* tabela ainda não criada: ignora */ }
+        if (el && !el.value) el.value = (cfg.inicio_cobranca_padrao || mesAtual()).slice(0, 7);
+    } catch (_) {
+        const el = document.getElementById('inicioCobranca');
+        if (el && !el.value) el.value = mesAtual();
+    }
 }
