@@ -148,7 +148,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="inicioCobranca">Início da cobrança dos honorários</label>
-                                <input type="month" id="inicioCobranca" name="inicioCobranca">
+                                <input type="text" inputmode="numeric" maxlength="7" placeholder="MM/AAAA" autocomplete="off" id="inicioCobranca" name="inicioCobranca">
                                 <small class="campo-dica">Aparece em "Cobranças iniciam em…". Pré-preenchido com o padrão das Configurações; em branco, a frase é omitida.</small>
                             </div>
                         </div>
@@ -448,7 +448,7 @@
                         </div>
                         <div class="form-group">
                             <label for="cfgInicioCobranca">Início da cobrança (padrão)</label>
-                            <input type="month" id="cfgInicioCobranca">
+                            <input type="text" inputmode="numeric" maxlength="7" placeholder="MM/AAAA" autocomplete="off" id="cfgInicioCobranca">
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Salvar configurações</button>

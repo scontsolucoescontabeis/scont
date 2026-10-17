@@ -45,6 +45,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('formConfiguracoes')
         ?.addEventListener('submit', e => { e.preventDefault(); salvarConfiguracoes(); });
 
+    ['inicioCobranca', 'cfgInicioCobranca'].forEach(id => {
+        const el = document.getElementById(id);
+        el?.addEventListener('input', () => { el.value = formatarMes(el.value); });
+    });
+
     carregarHistorico();
     aplicarDataPadraoCobranca();
 });
@@ -322,6 +327,12 @@ async function criarApresentacao() {
         return;
     }
 
+    const inicio = document.getElementById('inicioCobranca').value.trim();
+    if (inicio && !mesParaIso(inicio)) {
+        showToast('Informe o início da cobrança no formato MM/AAAA', 'error');
+        return;
+    }
+
     const btn = document.querySelector('#formCriarApresentacao button[type="submit"]');
     const textoOriginal = btn.innerHTML;
     btn.disabled = true;
@@ -337,7 +348,7 @@ async function criarApresentacao() {
         porte:             fd.get('porte')     || null,
         ramo:              fd.get('ramo')      || null,
         origem_contabilidade:       fd.get('origemContabilidade') || null,
-        inicio_cobranca_honorarios: fd.get('inicioCobranca') ? fd.get('inicioCobranca') + '-01' : null,
+        inicio_cobranca_honorarios: mesParaIso(fd.get('inicioCobranca')) ? mesParaIso(fd.get('inicioCobranca')) + '-01' : null,
         cnae_principal:    `${cnaePrincipalSelecionado.codigo} — ${cnaePrincipalSelecionado.atividade}`,
         cnaes_secundarios: cnaesSecundariosSelecionados.length
             ? cnaesSecundariosSelecionados.map(c => `${c.codigo} — ${c.atividade}`).join('\n')
@@ -860,6 +871,22 @@ document.addEventListener('click', e => {
 });
 
 
+// Máscara MM/AAAA <-> armazenamento AAAA-MM
+function formatarMes(valor) {
+    const d = valor.replace(/\D/g, '').slice(0, 6);
+    return d.length > 2 ? d.slice(0, 2) + '/' + d.slice(2) : d;
+}
+
+function mesParaIso(texto) {
+    const m = /^(0[1-9]|1[0-2])\/(\d{4})$/.exec((texto || '').trim());
+    return m ? m[2] + '-' + m[1] : '';
+}
+
+function isoParaMes(iso) {
+    const m = /^(\d{4})-(\d{2})/.exec(iso || '');
+    return m ? m[2] + '/' + m[1] : '';
+}
+
 function mesAtual() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
@@ -906,7 +933,7 @@ async function carregarConfiguracoes() {
         });
         box.appendChild(etapa);
     });
-    document.getElementById('cfgInicioCobranca').value = (cfg.inicio_cobranca_padrao || mesAtual()).slice(0, 7);
+    document.getElementById('cfgInicioCobranca').value = isoParaMes(cfg.inicio_cobranca_padrao || mesAtual());
 }
 
 async function salvarConfiguracoes() {
@@ -915,8 +942,13 @@ async function salvarConfiguracoes() {
         const v = t.value.trim();
         if (v) cfg[t.dataset.chave] = v;
     });
-    const data = document.getElementById('cfgInicioCobranca').value;
-    if (data) cfg.inicio_cobranca_padrao = data;
+    const campoMes = document.getElementById('cfgInicioCobranca');
+    const mes = mesParaIso(campoMes.value);
+    if (campoMes.value.trim() && !mes) {
+        showToast('Informe o início da cobrança no formato MM/AAAA', 'error');
+        return;
+    }
+    if (mes) cfg.inicio_cobranca_padrao = mes;
 
     try {
         const { error } = await db.from('apresentacoes_config')
@@ -934,9 +966,9 @@ async function aplicarDataPadraoCobranca() {
     try {
         const cfg = await buscarConfig();
         const el = document.getElementById('inicioCobranca');
-        if (el && !el.value) el.value = (cfg.inicio_cobranca_padrao || mesAtual()).slice(0, 7);
+        if (el && !el.value) el.value = isoParaMes(cfg.inicio_cobranca_padrao || mesAtual());
     } catch (_) {
         const el = document.getElementById('inicioCobranca');
-        if (el && !el.value) el.value = mesAtual();
+        if (el && !el.value) el.value = isoParaMes(mesAtual());
     }
 }
