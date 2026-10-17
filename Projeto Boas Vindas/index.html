@@ -1350,6 +1350,15 @@
             }
         }
         [hidden] { display: none !important; }
+    .aliq-cnae { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin: 14px 0; box-shadow: var(--shadow-sm); }
+    .aliq-cnae.principal { border-left: 4px solid var(--bronze-500); }
+    .aliq-cnae h4 { margin: 0 0 10px; font-size: 0.98rem; color: var(--wine-800); line-height: 1.4; }
+    .aliq-cnae .aliq-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: var(--bronze-tint); color: var(--bronze-600); border-radius: 999px; padding: 2px 9px; margin-left: 8px; vertical-align: middle; }
+    .aliq-cnae table { margin: 8px 0; }
+    .aliq-cnae small { color: var(--ink-500); }
+    .aliq-cnae ul { margin: 6px 0 0; padding-left: 20px; }
+    .aliq-aviso { background: var(--danger-tint); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: 0.9rem; margin: 6px 0; }
+    .aliq-nota { font-size: 0.85rem; color: var(--ink-500); }
 </style>
 </head>
 <body>
@@ -1536,6 +1545,13 @@
             <div class="info-card" data-regime="presumido">
                 <strong><i class="fas fa-file-invoice-dollar"></i> IRPJ e CSLL</strong>
                 <p data-cfg="presumido.irpj_csll">Vencimento: último dia útil de abril, julho, outubro e janeiro</p>
+            </div>
+
+            <div id="aliquotasCnae" hidden>
+                <h3><i class="fas fa-percent"></i> Alíquotas da Sua Atividade</h3>
+                <p id="aliquotasIntro"></p>
+                <div id="aliquotasLista"></div>
+                <p class="aliq-nota" id="aliquotasNota"></p>
             </div>
 
             <div class="alert danger">
@@ -1921,8 +1937,17 @@
                 if (r.data && typeof r.data === 'object') cfg = r.data;
             } catch (_) { /* usa os textos padrão do HTML */ }
 
+            let aliquotas = [];
+            const codigos = codigosCnae(data);
+            if (codigos.length) {
+                try {
+                    const r = await db.rpc('fn_buscar_aliquotas_cnae', { p_codigos: codigos });
+                    if (Array.isArray(r.data)) aliquotas = r.data;
+                } catch (_) { /* sem tabela de alíquotas: bloco fica oculto */ }
+            }
+
             preencherDadosCadastrais(data);
-            aplicarParticularidades(data, cfg);
+            aplicarParticularidades(data, cfg, aliquotas);
             personalizarHero(data);
             document.getElementById('badgePersonalizada').style.display = 'flex';
             document.title = `${data.razao_social} - Scont Soluções Contábeis`;
@@ -1939,8 +1964,136 @@
         }
     }
 
+    // ===== Alíquotas por CNAE (planilha Econet → tabela cnae_aliquotas) =====
+    function codigosCnae(dados) {
+        const txt = [dados.cnae_principal, dados.cnaes_secundarios].filter(Boolean).join('\n');
+        return [...new Set(txt.match(/\d{4}-\d\/\d{2}/g) || [])];
+    }
+
+    const num = v => parseFloat(String(v || '').replace('%', '').replace(',', '.'));
+    const fmtPct = n => String(n).replace('.', ',') + '%';
+
+    // Valor da posição i quando o CNAE tem várias atividades ("8%/32%")
+    function pegar(campo, i, total) {
+        if (!campo) return '—';
+        const partes = String(campo).split('/');
+        if (partes.length === total) return partes[i].trim();
+        return partes.length === 1 ? partes[0].trim() : String(campo);
+    }
+
+    function elem(tag, texto, classe) {
+        const e = document.createElement(tag);
+        if (texto != null) e.textContent = texto;
+        if (classe) e.className = classe;
+        return e;
+    }
+
+    function tabelaLP(l) {
+        const atividades = String(l.base_presuncao).split(';').map(a => a.trim());
+        const n = atividades.length;
+        const linhas = [];
+        atividades.forEach((a, i) => {
+            const nome = a.replace(/\s*[\d.,]+%$/, '');
+            const irpj = pegar(l.irpj_pres_ate5, i, n), irpjAc = pegar(l.irpj_pres_acima5, i, n);
+            const csll = pegar(l.csll_pres_ate5, i, n), csllAc = pegar(l.csll_pres_acima5, i, n);
+            const pis = pegar(l.pis, i, n), cofins = pegar(l.cofins, i, n);
+            const chave = [nome, irpj, csll, pis, cofins].join('|');
+            if (!linhas.some(x => x.chave === chave)) linhas.push({ chave, nome, irpj, irpjAc, csll, csllAc, pis, cofins });
+        });
+
+        const wrap = elem('div', null, 'tabela-scroll');
+        const t = elem('table');
+        const cab = elem('tr');
+        ['Atividade', 'Base presumida IRPJ', 'Base presumida CSLL', 'PIS', 'COFINS'].forEach(h => cab.appendChild(elem('th', h)));
+        t.appendChild(elem('thead')).appendChild(cab);
+        const tb = elem('tbody');
+        linhas.forEach(x => {
+            const tr = elem('tr');
+            tr.appendChild(elem('td', x.nome));
+            [[x.irpj, x.irpjAc], [x.csll, x.csllAc]].forEach(([v, ac]) => {
+                const td = elem('td', v);
+                if (ac && ac !== '—' && ac !== v) { td.appendChild(document.createElement('br')); td.appendChild(elem('small', 'acima de R$ 5 mi: ' + ac)); }
+                tr.appendChild(td);
+            });
+            tr.appendChild(elem('td', x.pis));
+            tr.appendChild(elem('td', x.cofins));
+            tb.appendChild(tr);
+        });
+        t.appendChild(tb);
+        wrap.appendChild(t);
+        return wrap;
+    }
+
+    function renderAliquotas(dados, aliquotas, regime) {
+        const box = document.getElementById('aliquotasCnae');
+        const lista = document.getElementById('aliquotasLista');
+        lista.innerHTML = '';
+        const reg = (dados.regime || '').toLowerCase();
+        const valido = regime === 'simples' || reg.includes('presumido');
+        if (!valido || !aliquotas.length) { box.hidden = true; return; }
+
+        const principal = (dados.cnae_principal || '').match(/\d{4}-\d\/\d{2}/);
+        const ordem = codigosCnae(dados);
+        const porCodigo = Object.fromEntries(aliquotas.map(a => [a.codigo, a]));
+
+        document.getElementById('aliquotasIntro').textContent = regime === 'simples'
+            ? 'Enquadramento no Simples Nacional de cada CNAE da sua empresa:'
+            : 'Tributação no Lucro Presumido de cada CNAE da sua empresa:';
+
+        ordem.forEach(cod => {
+            const l = porCodigo[cod];
+            if (!l) return;
+            const ehPrincipal = principal && principal[0] === cod;
+            const card = elem('div', null, 'aliq-cnae' + (ehPrincipal ? ' principal' : ''));
+            const h = elem('h4', cod + ' — ' + (l.descricao || ''));
+            if (ehPrincipal) h.appendChild(elem('span', 'Principal', 'aliq-tag'));
+            card.appendChild(h);
+
+            if (regime === 'simples') {
+                const sit = l.sn_situacao || '';
+                if (sit && !/^Sem impedimento$/i.test(sit)) {
+                    card.appendChild(elem('div', /^Sem impedimento/i.test(sit) ? sit : 'Atenção: ' + sit, 'aliq-aviso'));
+                } else if (sit) {
+                    card.appendChild(elem('p', 'Sem impedimento para o Simples Nacional.'));
+                }
+                const ul = elem('ul');
+                String(l.sn_anexo || 'Anexo não informado para este CNAE.').split(';')
+                    .forEach(x => ul.appendChild(elem('li', x.trim().replace('→', ''))));
+                card.appendChild(ul);
+            } else if (l.base_presuncao) {
+                card.appendChild(tabelaLP(l));
+                const uniq = v => [...new Set(String(v || '').split('/').map(x => x.trim()))].join(' / ');
+                card.appendChild(elem('p', 'IRPJ: ' + uniq(l.irpj_aliq) + ' sobre a base presumida, mais adicional de 10% sobre a parcela do lucro presumido que exceder R$ 20.000,00 por mês. CSLL: ' + uniq(l.csll_aliq) + ' sobre a base presumida.'));
+                if (l.rat || l.terceiros) {
+                    card.appendChild(elem('p', 'Folha de pagamento: contribuição patronal de 20% + RAT ' + (l.rat || '—') + ' + Terceiros ' + (String(l.terceiros || '—').replace(/^Cód\.\s*\d+:\s*/, '')) + '.'));
+                }
+            } else {
+                card.appendChild(elem('div', l.obs_lp || 'Sem tributação no Lucro Presumido para este CNAE; confirme o enquadramento com a Scont.', 'aliq-aviso'));
+            }
+            lista.appendChild(card);
+        });
+
+        document.getElementById('aliquotasNota').textContent = regime === 'simples'
+            ? 'A alíquota efetiva do Simples Nacional depende do anexo e da receita bruta acumulada dos últimos 12 meses. Referência: Econet (out/2026); o enquadramento final é confirmado pela Scont.'
+            : 'Até R$ 5 milhões de receita bruta anual vale a base normal; o excedente tem acréscimo de 10% sobre o percentual. ISS e ICMS não estão incluídos. Referência: Econet (out/2026); o enquadramento final é confirmado pela Scont.';
+        box.hidden = !lista.children.length;
+    }
+
+    // INSS patronal do Lucro Presumido = 20% + RAT + Terceiros do CNAE principal
+    function inssPorCnae(dados, cfg, aliquotas, regime) {
+        if (regime !== 'presumido' || (cfg['presumido.inss'] || '').trim()) return;
+        const m = (dados.cnae_principal || '').match(/\d{4}-\d\/\d{2}/);
+        const l = m && aliquotas.find(a => a.codigo === m[0]);
+        if (!l) return;
+        const rat = num(String(l.rat || '').split('/')[0]);
+        const terc = num((String(l.terceiros || '').match(/:\s*([\d,]+)%/) || [])[1]);
+        if (isNaN(rat) || isNaN(terc)) return;
+        document.querySelector('[data-cfg="presumido.inss"]').textContent =
+            '20% patronal + RAT ' + fmtPct(rat) + ' + Terceiros ' + fmtPct(terc) + ' = ' + fmtPct(Math.round((20 + rat + terc) * 100) / 100) + ' sobre o salário';
+    }
+
     // Particularidades: regime tributário, origem contábil e início da cobrança
-    function aplicarParticularidades(dados, cfg = {}) {
+    function aplicarParticularidades(dados, cfg = {}, aliquotas = []) {
         // Textos personalizados em Configurações (textContent: sem HTML)
         document.querySelectorAll('[data-cfg]').forEach(el => {
             const v = cfg[el.dataset.cfg];
@@ -1951,6 +2104,9 @@
         document.querySelectorAll('[data-regime]').forEach(el => {
             el.hidden = el.dataset.regime !== regime;
         });
+
+        renderAliquotas(dados, aliquotas, regime);
+        inssPorCnae(dados, cfg, aliquotas, regime);
 
         const nova = dados.origem_contabilidade === 'nova';
         document.getElementById('cardBalancoNova').hidden = !nova;
