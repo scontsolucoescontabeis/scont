@@ -2058,8 +2058,6 @@
                 const sit = l.sn_situacao || '';
                 if (sit && !/^Sem impedimento$/i.test(sit)) {
                     card.appendChild(elem('div', /^Sem impedimento/i.test(sit) ? sit : 'Atenção: ' + sit, 'aliq-aviso'));
-                } else if (sit) {
-                    card.appendChild(elem('p', 'Sem impedimento para o Simples Nacional.'));
                 }
                 const ul = elem('ul');
                 String(l.sn_anexo || 'Anexo não informado para este CNAE.').split(';')
