@@ -50,6 +50,12 @@ document.addEventListener('DOMContentLoaded', () => {
         el?.addEventListener('input', () => { el.value = formatarMes(el.value); });
     });
 
+    // Pendências só fazem sentido para empresa vinda de outra contabilidade
+    const origemSel = document.getElementById('origemContabilidade');
+    origemSel?.addEventListener('change', () => {
+        document.getElementById('grupoPendencias').hidden = origemSel.value !== 'outra_contabilidade';
+    });
+
     const rendaInput = document.getElementById('rendaBruta12m');
     rendaInput?.addEventListener('input', () => { rendaInput.value = formatarMoeda(rendaInput.value); });
 
@@ -375,6 +381,10 @@ async function criarApresentacao() {
         cargo:         fd.get('cargo')    || null,
         mensagem:      fd.get('mensagem') || null,
     };
+
+    // Só envia quando preenchido: não exige a coluna para quem não usa o campo
+    const pendencias = (fd.get('pendencias') || '').trim();
+    if (fd.get('origemContabilidade') === 'outra_contabilidade' && pendencias) payload.pendencias = pendencias;
 
     try {
         const { data, error } = await db

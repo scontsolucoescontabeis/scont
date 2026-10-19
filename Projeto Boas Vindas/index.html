@@ -1692,6 +1692,11 @@
                 <p data-cfg="outra.balanco">Estamos aguardando os saldos finais da contabilidade anterior para proceder com a auditoria e o balanço de abertura — inventário físico e documental dos bens, direitos e obrigações da empresa.</p>
             </div>
 
+            <div class="info-card" id="cardPendencias" hidden>
+                <strong><i class="fas fa-clipboard-list"></i> Pendências</strong>
+                <p id="pendenciasTexto" style="white-space: pre-line;"></p>
+            </div>
+
             <div class="alert info">
                 <span class="alert-icon"><i class="fas fa-envelope"></i></span>
                 <div class="alert-content">
@@ -2186,6 +2191,11 @@
         const nova = dados.origem_contabilidade === 'nova';
         document.getElementById('cardBalancoNova').hidden = !nova;
         document.getElementById('cardBalancoMigracao').hidden = nova;
+
+        // Pendências preenchidas pela Scont (textContent: sem HTML); só para quem vem de outra contabilidade
+        const pend = (dados.pendencias || '').trim();
+        document.getElementById('pendenciasTexto').textContent = pend;
+        document.getElementById('cardPendencias').hidden = nova || !pend;
 
         const el = document.getElementById('honorarioInicio');
         const iso = dados.inicio_cobranca_honorarios || cfg.inicio_cobranca_padrao;
