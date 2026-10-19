@@ -530,6 +530,7 @@ function copiarLinkHistorico(link) {
 // ===== NOVA APRESENTAÇÃO =====
 function novaApresentacao() {
     document.getElementById('formCriarApresentacao').reset();
+    document.getElementById('grupoPendencias').hidden = true;
     aplicarDataPadraoCobranca();
     document.getElementById('resultado').style.display = 'none';
     removerCnaePrincipal();
