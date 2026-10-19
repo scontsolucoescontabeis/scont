@@ -1357,6 +1357,7 @@
     .aliq-cnae table { margin: 8px 0; }
     .aliq-cnae small { color: var(--ink-500); }
     .aliq-cnae ul { margin: 6px 0 0; padding-left: 20px; }
+    .aliq-cnae .aliq-atividade { margin: 12px 0 2px; font-weight: 600; color: var(--ink-700, inherit); }
     .aliq-aviso { background: var(--danger-tint); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: 0.9rem; margin: 6px 0; }
     .aliq-nota { font-size: 0.85rem; color: var(--ink-500); }
 </style>
@@ -2029,6 +2030,42 @@
         return wrap;
     }
 
+    // Tabelas do Simples Nacional (LC 123/2006): [alíquota nominal %, parcela a deduzir R$] por faixa
+    const FAIXAS_SN = [180000, 360000, 720000, 1800000, 3600000, 4800000];
+    const TABELAS_SN = {
+        I:   [[4, 0], [7.3, 5940], [9.5, 13860], [10.7, 22500], [14.3, 87300], [19, 378000]],
+        II:  [[4.5, 0], [7.8, 5940], [10, 13860], [11.2, 22500], [14.7, 85500], [30, 720000]],
+        III: [[6, 0], [11.2, 9360], [13.5, 17640], [16, 35640], [21, 125640], [33, 648000]],
+        IV:  [[4.5, 0], [9, 8100], [10.2, 12420], [14, 39780], [22, 183780], [33, 828000]],
+        V:   [[15.5, 0], [18, 4500], [19.5, 9900], [20.5, 17100], [23, 62100], [30.5, 540000]]
+    };
+    const fmtBRL = n => 'R$ ' + n.toLocaleString('pt-BR');
+    const fmtPct2 = n => n.toFixed(2).replace('.', ',') + '%';
+
+    function tabelaAnexo(anexo) {
+        const linhas = TABELAS_SN[anexo];
+        const wrap = elem('div', null, 'tabela-scroll');
+        const t = elem('table');
+        const cab = elem('tr');
+        ['Anexo ' + anexo + ' — Receita bruta 12 meses', 'Alíquota nominal', 'Parcela a deduzir', 'Alíquota efetiva (limite da faixa)']
+            .forEach(h => cab.appendChild(elem('th', h)));
+        t.appendChild(elem('thead')).appendChild(cab);
+        const tb = elem('tbody');
+        linhas.forEach(([aliq, ded], i) => {
+            const teto = FAIXAS_SN[i];
+            const ini = i ? FAIXAS_SN[i - 1] : 0;
+            const tr = elem('tr');
+            tr.appendChild(elem('td', i ? 'De ' + fmtBRL(ini + 0.01) + ' até ' + fmtBRL(teto) : 'Até ' + fmtBRL(teto)));
+            tr.appendChild(elem('td', fmtPct2(aliq)));
+            tr.appendChild(elem('td', ded ? fmtBRL(ded) : '—'));
+            tr.appendChild(elem('td', fmtPct2((teto * aliq / 100 - ded) / teto * 100)));
+            tb.appendChild(tr);
+        });
+        t.appendChild(tb);
+        wrap.appendChild(t);
+        return wrap;
+    }
+
     function renderAliquotas(dados, aliquotas, regime) {
         const box = document.getElementById('aliquotasCnae');
         const lista = document.getElementById('aliquotasLista');
@@ -2059,10 +2096,28 @@
                 if (sit && !/^Sem impedimento$/i.test(sit)) {
                     card.appendChild(elem('div', /^Sem impedimento/i.test(sit) ? sit : 'Atenção: ' + sit, 'aliq-aviso'));
                 }
-                const ul = elem('ul');
-                String(l.sn_anexo || 'Anexo não informado para este CNAE.').split(';')
-                    .forEach(x => ul.appendChild(elem('li', x.trim().replace('→', ''))));
-                card.appendChild(ul);
+                if (!l.sn_anexo) card.appendChild(elem('p', 'Anexo não informado para este CNAE.'));
+                const jaMostrados = new Set();
+                String(l.sn_anexo || '').split(' ; ').forEach(item => {
+                    const [rotulo, regra = ''] = item.split('→');
+                    const anexo = (regra.match(/Anexo\s+(IV|V|I{1,3})\b/) || [])[1];
+                    if (!anexo) { if (item.trim()) card.appendChild(elem('p', item.trim())); return; }
+                    const alt = (regra.match(/tributada pelo Anexo\s+(IV|V|I{1,3})\s+quando/) || [])[1];
+                    const comFatorR = /Fator "r"/.test(regra);
+                    let txt = rotulo.replace(/\s*-\s*$/, '').trim() + ' — Anexo ' + anexo;
+                    if (comFatorR && alt) {
+                        const ge = /Anexo\s+(IV|V|I{1,3}),? sujeito/.test(regra) && /igual ou superior/.test(regra);
+                        txt += ge
+                            ? ' (Anexo ' + alt + ' quando o Fator "r" for igual ou superior a 28%)'
+                            : ' (Anexo ' + alt + ' quando o Fator "r" for inferior a 28%)';
+                    } else if (/s\/Fator r/.test(regra)) txt += ' (sem Fator "r")';
+                    if (/Industrialização de produtos NT/.test(regra)) txt += ' (apenas produtos NT na TIPI)';
+                    card.appendChild(elem('p', txt, 'aliq-atividade'));
+                    [anexo, alt].filter(a => a && !jaMostrados.has(a)).forEach(a => {
+                        jaMostrados.add(a);
+                        card.appendChild(tabelaAnexo(a));
+                    });
+                });
             } else if (l.base_presuncao) {
                 card.appendChild(tabelaLP(l));
                 const uniq = v => [...new Set(String(v || '').split('/').map(x => x.trim()))].join(' / ');
@@ -2077,7 +2132,7 @@
         });
 
         document.getElementById('aliquotasNota').textContent = regime === 'simples'
-            ? 'A alíquota efetiva do Simples Nacional depende do anexo e da receita bruta acumulada dos últimos 12 meses. Referência: Econet (out/2026); o enquadramento final é confirmado pela Scont.'
+            ? 'Alíquota efetiva = (receita bruta dos últimos 12 meses × alíquota nominal − parcela a deduzir) ÷ receita bruta dos últimos 12 meses. No Anexo IV a contribuição patronal (CPP) não está incluída no DAS. Referência: LC 123/2006 e Econet (out/2026); o enquadramento final é confirmado pela Scont.'
             : 'Até R$ 5 milhões de receita bruta anual vale a base normal; o excedente tem acréscimo de 10% sobre o percentual. ISS e ICMS não estão incluídos. Referência: Econet (out/2026); o enquadramento final é confirmado pela Scont.';
         box.hidden = !lista.children.length;
     }
