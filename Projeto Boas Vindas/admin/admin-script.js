@@ -50,6 +50,9 @@ document.addEventListener('DOMContentLoaded', () => {
         el?.addEventListener('input', () => { el.value = formatarMes(el.value); });
     });
 
+    const rendaInput = document.getElementById('rendaBruta12m');
+    rendaInput?.addEventListener('input', () => { rendaInput.value = formatarMoeda(rendaInput.value); });
+
     carregarHistorico();
     aplicarDataPadraoCobranca();
 });
@@ -62,6 +65,18 @@ function formatarCNPJ(valor) {
         .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
         .replace(/\.(\d{3})(\d)/, '.$1/$2')
         .replace(/(\d{4})(\d)/, '$1-$2');
+}
+
+// Máscara em reais digitando só os dígitos (centavos nas 2 últimas casas)
+function formatarMoeda(valor) {
+    const d = valor.replace(/\D/g, '').slice(0, 14);
+    if (!d) return '';
+    return 'R$ ' + (parseInt(d, 10) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function moedaParaNumero(valor) {
+    const d = String(valor || '').replace(/\D/g, '');
+    return d ? parseInt(d, 10) / 100 : null;
 }
 
 function formatarTelefone(valor) {
@@ -347,6 +362,7 @@ async function criarApresentacao() {
         regime:            fd.get('regime')    || null,
         porte:             fd.get('porte')     || null,
         ramo:              fd.get('ramo')      || null,
+        renda_bruta_12m:   moedaParaNumero(fd.get('rendaBruta12m')),
         origem_contabilidade:       fd.get('origemContabilidade') || null,
         inicio_cobranca_honorarios: mesParaIso(fd.get('inicioCobranca')) ? mesParaIso(fd.get('inicioCobranca')) + '-01' : null,
         cnae_principal:    `${cnaePrincipalSelecionado.codigo} — ${cnaePrincipalSelecionado.atividade}`,

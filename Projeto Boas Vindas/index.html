@@ -1356,6 +1356,8 @@
     .aliq-cnae .aliq-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: var(--bronze-tint); color: var(--bronze-600); border-radius: 999px; padding: 2px 9px; margin-left: 8px; vertical-align: middle; }
     .aliq-cnae table { margin: 8px 0; }
     .aliq-cnae small { color: var(--ink-500); }
+    .aliq-cnae tr.faixa-atual td { background: var(--bronze-tint); color: var(--bronze-600); font-weight: 700; }
+    .aliq-cnae .aliq-faixa-resumo { margin: 4px 0 8px; font-size: 0.9rem; color: var(--ink-700, inherit); }
     .aliq-cnae ul { margin: 6px 0 0; padding-left: 20px; }
     .aliq-cnae .aliq-atividade { margin: 12px 0 2px; font-weight: 600; color: var(--ink-700, inherit); }
     .aliq-aviso { background: var(--danger-tint); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: 0.9rem; margin: 6px 0; }
@@ -2041,8 +2043,16 @@
     const fmtBRL = n => 'R$ ' + n.toLocaleString('pt-BR');
     const fmtPct2 = n => n.toFixed(2).replace('.', ',') + '%';
 
-    function tabelaAnexo(anexo) {
+    // Índice da faixa em que a receita bruta de 12 meses se enquadra (-1 = não informada, 6 = acima do limite)
+    function faixaSN(rbt12) {
+        if (!(rbt12 > 0)) return -1;
+        const i = FAIXAS_SN.findIndex(teto => rbt12 <= teto);
+        return i < 0 ? FAIXAS_SN.length : i;
+    }
+
+    function tabelaAnexo(anexo, rbt12) {
         const linhas = TABELAS_SN[anexo];
+        const faixa = faixaSN(rbt12);
         const wrap = elem('div', null, 'tabela-scroll');
         const t = elem('table');
         const cab = elem('tr');
@@ -2053,7 +2063,7 @@
         linhas.forEach(([aliq, ded], i) => {
             const teto = FAIXAS_SN[i];
             const ini = i ? FAIXAS_SN[i - 1] : 0;
-            const tr = elem('tr');
+            const tr = elem('tr', null, i === faixa ? 'faixa-atual' : '');
             tr.appendChild(elem('td', i ? 'De ' + fmtBRL(ini + 0.01) + ' até ' + fmtBRL(teto) : 'Até ' + fmtBRL(teto)));
             tr.appendChild(elem('td', fmtPct2(aliq)));
             tr.appendChild(elem('td', ded ? fmtBRL(ded) : '—'));
@@ -2062,7 +2072,21 @@
         });
         t.appendChild(tb);
         wrap.appendChild(t);
-        return wrap;
+        if (faixa < 0) return wrap;
+
+        // Resumo com a alíquota efetiva calculada sobre a receita bruta informada
+        const caixa = elem('div');
+        caixa.appendChild(wrap);
+        const resumo = elem('p', null, 'aliq-faixa-resumo');
+        if (faixa >= linhas.length) {
+            resumo.textContent = 'Receita bruta de ' + fmtBRL(rbt12) + ' acima do limite de ' + fmtBRL(FAIXAS_SN[FAIXAS_SN.length - 1]) + ' do Simples Nacional; confirme o enquadramento com a Scont.';
+        } else {
+            const [aliq, ded] = linhas[faixa];
+            const efetiva = (rbt12 * aliq / 100 - ded) / rbt12 * 100;
+            resumo.textContent = 'Com receita bruta de ' + fmtBRL(rbt12) + ' nos últimos 12 meses, sua empresa está na ' + (faixa + 1) + 'ª faixa do Anexo ' + anexo + ': alíquota nominal de ' + fmtPct2(aliq) + ' e alíquota efetiva de ' + fmtPct2(efetiva) + '.';
+        }
+        caixa.appendChild(resumo);
+        return caixa;
     }
 
     function renderAliquotas(dados, aliquotas, regime) {
@@ -2114,7 +2138,7 @@
                     card.appendChild(elem('p', txt, 'aliq-atividade'));
                     [anexo, alt].filter(a => a && !jaMostrados.has(a)).forEach(a => {
                         jaMostrados.add(a);
-                        card.appendChild(tabelaAnexo(a));
+                        card.appendChild(tabelaAnexo(a, Number(dados.renda_bruta_12m)));
                     });
                 });
             } else if (l.base_presuncao) {
