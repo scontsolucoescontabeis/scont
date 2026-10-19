@@ -115,4 +115,24 @@ teste('nivel inicial pendente após D + 15', () => {
     assert.strictEqual(C.nivelInicialPendente('2026-10-07', '2026-10-30', 3), false);
 });
 
+teste('notasIniciais: nota do ciclo anterior; N/A mantém a inicial; sem ficha = nulo', () => {
+    const ant = { pilares: [
+        { pilar: 'tecnicas', nota_inicial: 1, nota_ciclo: 3 }, { pilar: 'comportamentais', nota_inicial: 2, nota_ciclo: 2 },
+        { pilar: 'performance', nota_inicial: 2, na: true, nota_ciclo: null }, { pilar: 'melhorias', nota_inicial: null, nota_ciclo: null },
+    ] };
+    assert.deepStrictEqual(C.notasIniciais(ant), { tecnicas: 3, comportamentais: 2, performance: 2, melhorias: null });
+    assert.deepStrictEqual(C.notasIniciais(null), { tecnicas: null, comportamentais: null, performance: null, melhorias: null });
+});
+
+teste('prioridadesEmLinhas tira marcadores e linhas vazias', () => {
+    assert.deepStrictEqual(C.prioridadesEmLinhas('- Conferir folha\r\n\n 2) Reduzir retrabalho\n• Fechar admissões\nTexto livre'),
+        ['Conferir folha', 'Reduzir retrabalho', 'Fechar admissões', 'Texto livre']);
+    assert.deepStrictEqual(C.prioridadesEmLinhas(null), []);
+});
+
+teste('prazoFimDoCiclo = dias de D até o último dia do ciclo', () => {
+    assert.strictEqual(C.somarDias('2026-10-07', C.prazoFimDoCiclo('2026-10-07', 2)), '2027-04-06');
+    assert.strictEqual(C.somarDias('2026-10-07', C.prazoFimDoCiclo('2026-10-07', 4)), '2027-10-06');
+});
+
 console.log(`\n${n} testes passaram.`);

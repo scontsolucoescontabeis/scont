@@ -9,6 +9,7 @@ window.PdiAdmin = (function () {
         const [pdis, modelos, usuarios, socios] = await Promise.all([Api.listarPdis(), Api.modelos(), Api.usuarios(), Api.socios()]);
         let rhSocios = [];
         try { rhSocios = await Api.rhSocios(); } catch (_) { /* tabela/empresa ausente: cai no fallback manual */ }
+        const renovados = new Set(pdis.map(p => p.pdi_anterior_id).filter(Boolean));
         const nomeUsr = (id) => { const u = usuarios.find(x => x.id === id); return u ? (u.nome || u.email) : null; };
 
         host.innerHTML = `<h1>Administração do PDI</h1>
@@ -22,6 +23,7 @@ window.PdiAdmin = (function () {
                 <td>${fd(p.data_inicio)}</td><td>${e(p.status)}</td>
                 <td><button class="btn peq sec" data-a="vincular" data-id="${p.id}">Vincular usuários</button>
                     <button class="btn peq sec" data-a="status" data-id="${p.id}">Status</button>
+                    ${renovados.has(p.id) ? '' : `<button class="btn peq sec" data-a="renovar" data-id="${p.id}">Renovar</button>`}
                     <button class="btn peq danger" data-a="excluir" data-id="${p.id}">Excluir</button>
                     <button class="btn peq" data-a="abrir" data-id="${p.id}">Abrir</button></td></tr>`).join('')
                 || '<tr><td colspan="7" class="muted">Nenhum PDI cadastrado.</td></tr>'}
@@ -76,6 +78,19 @@ window.PdiAdmin = (function () {
                 const r = await U.formulario('Status do PDI', [
                     { nome: 'status', rotulo: 'Status', tipo: 'select', vazio: false, valor: p.status, opcoes: [['rascunho', 'Rascunho'], ['ativo', 'Ativo'], ['encerrado', 'Encerrado']] }]);
                 if (r) await executar(() => Api.atualizarSemEco('pdis', id, r), 'Status atualizado.');
+            },
+            renovar: async (id) => {
+                const p = pdis.find(x => x.id === id);
+                const sugerida = window.PdiCalculo.fimPdi(p.data_inicio, p.meses_acompanhamento);
+                const r = await U.formulario(`Renovar PDI — ${p.colaborador_nome}`, [
+                    { nome: 'data_inicio', rotulo: 'Início do novo PDI (D)', tipo: 'date', valor: sugerida, obrigatorio: true,
+                        dica: 'Sugestão: o dia em que o PDI atual completa o período de acompanhamento.' },
+                ], {
+                    texto: 'Cria o PDI do próximo período com o mesmo modelo, colaborador e gestor, ligado a este. Copia o contexto e o perfil; as prioridades da última ficha concluída viram ações do ciclo 1; e a primeira ficha já abre com as notas finais deste PDI como notas iniciais.',
+                    confirmar: 'Criar PDI renovado',
+                });
+                if (!r) return;
+                await executar(() => Api.renovarPdi(id, r.data_inicio), 'PDI renovado.');
             },
             excluir: async (id) => {
                 const p = pdis.find(x => x.id === id);

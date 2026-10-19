@@ -141,7 +141,31 @@
         return qtdNiveisRegistrados === 0 && String(hoje) > somarDias(inicio, 15);
     }
 
+    // Nota inicial sugerida para a ficha seguinte: a nota do ciclo anterior (ou, se o pilar foi N/A, a inicial que ele já tinha).
+    function notasIniciais(fichaAnterior) {
+        const out = {};
+        PILARES.forEach(p => {
+            const x = ((fichaAnterior && fichaAnterior.pilares) || []).find(z => z.pilar === p);
+            if (!x) { out[p] = null; return; }
+            out[p] = !x.na && x.nota_ciclo != null ? x.nota_ciclo : (x.nota_inicial != null ? x.nota_inicial : null);
+        });
+        return out;
+    }
+
+    // "Prioridades para o próximo ciclo" (uma por linha, com ou sem marcador) -> lista de textos
+    function prioridadesEmLinhas(texto) {
+        return String(texto || '').split(/\r?\n/)
+            .map(l => l.replace(/^\s*(?:[-•*–]|\d+\s*[.)])\s*/, '').trim())
+            .filter(Boolean);
+    }
+
+    // Prazo (D + n) que faz a ação vencer no último dia do ciclo informado
+    function prazoFimDoCiclo(inicio, numero) {
+        return diasEntre(inicio, ciclos(inicio)[numero - 1].fim);
+    }
+
     return {
+        notasIniciais, prioridadesEmLinhas, prazoFimDoCiclo,
         PILARES, PAPEIS_CIENCIA, somarDias, somarMeses, diasEntre, prazoRelativo, fimPdi, ciclos,
         percentual, atingimento, nivelAtual, progressoTecnico, autonomia, controles, pendencias,
         mediaNotas, validarFicha, nivelInicialPendente,

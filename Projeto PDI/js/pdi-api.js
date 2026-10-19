@@ -136,6 +136,18 @@ window.PdiApi = (function () {
         return q(sb.rpc('pdi_excluir', { p_pdi: id }));
     }
 
+    // Renovação: cria o PDI do ano seguinte ligado a este (admin). Data vazia = fim do PDI anterior.
+    const renovarPdi = (id, dataInicio) => q(sb.rpc('pdi_renovar', { p_anterior: id, p_data_inicio: dataInicio || null }));
+
+    // Última ficha concluída (com pilares) de um PDI: origem das notas iniciais do PDI seguinte
+    async function ultimaFichaConcluida(pdiId) {
+        const av = await q(T('pdi_avaliacoes_trimestrais').select('*').eq('pdi_id', pdiId).eq('status', 'concluida')
+            .order('ciclo_numero', { ascending: false }).limit(1));
+        if (!av.length) return null;
+        const pilares = await q(T('pdi_avaliacao_pilares').select('*').eq('avaliacao_id', av[0].id));
+        return { ...av[0], pilares };
+    }
+
     async function urlRelatorio(path) {
         const { data, error } = await sb.storage.from('pdi-relatorios').createSignedUrl(path, 300);
         if (error) throw new Error(error.message);
@@ -151,7 +163,7 @@ window.PdiApi = (function () {
     return {
         init, tabelaAusente, papeis, sessao, listarPdis, carregarTodos, carregar, ins, upd, del, atualizarSemEco,
         upsertApuracao, upsertAlinhamento, upsertAvaliacao, upsertPilar, modelos, usuarios, socios, rhSocios,
-        criarPdi, excluirPdi, urlRelatorio, enviarRelatorio, CODIGO_EMPRESA_SCONT,
+        criarPdi, excluirPdi, renovarPdi, ultimaFichaConcluida, urlRelatorio, enviarRelatorio, CODIGO_EMPRESA_SCONT,
         client: () => sb,
     };
 })();

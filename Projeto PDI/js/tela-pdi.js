@@ -325,6 +325,7 @@ window.PdiTela = (function () {
           <label>Principais avanços do período<textarea name="avancos" rows="3" ${edita ? '' : 'disabled'}>${e(f.avancos || '')}</textarea></label>
           <label>Pontos que permanecem em desenvolvimento<textarea name="pontos_desenvolvimento" rows="3" ${edita ? '' : 'disabled'}>${e(f.pontos_desenvolvimento || '')}</textarea></label>
           <label>Prioridades para o próximo ciclo<textarea name="prioridades_proximo_ciclo" rows="3" ${edita ? '' : 'disabled'}>${e(f.prioridades_proximo_ciclo || '')}</textarea></label>
+          ${ed && n < 4 && f.prioridades_proximo_ciclo ? `<p class="muted">Uma prioridade por linha. ${btn('prioridades-em-acoes', `Criar ações no ciclo ${n + 1}`, null, 'sec')}</p>` : ''}
           <label>Considerações da colaboradora<textarea name="consideracoes_colaborador" rows="3" ${colEdita || edita ? '' : 'disabled'}>${e(f.consideracoes_colaborador || '')}</textarea></label>
           <fieldset><legend>Resultado do ciclo</legend>${Object.entries(T.RESULTADOS).map(([k, v]) =>
               `<label class="chk"><input type="radio" name="resultado" value="${k}" ${f.resultado === k ? 'checked' : ''} ${edita ? '' : 'disabled'}> ${e(v)}</label>`).join('')}</fieldset>
@@ -407,7 +408,8 @@ window.PdiTela = (function () {
             <div><button class="btn sec peq" data-a="voltar">← Voltar</button></div>
             <div class="pdi-titulo"><h1>${e(p.colaborador_nome)}</h1>
               <p>${e(p.cargo_setor)} · Gestor: ${e(p.gestor_nome || '—')} · Início: ${fd(p.data_inicio)} · ${U.badge(p.status, p.status)}
-              ${p.colaborador_user_id ? '' : ' <span class="aviso">sem usuário vinculado</span>'}</p></div>
+              ${p.colaborador_user_id ? '' : ' <span class="aviso">sem usuário vinculado</span>'}
+              ${p.pdi_anterior_id ? ` · <button class="btn sec peq" data-a="abrir-anterior">Ver PDI anterior</button>` : ''}</p></div>
             <div><button class="btn" data-a="apresentar">Apresentar</button></div>
           </header>
           <nav class="abas" aria-label="Seções do PDI">${ABAS.map(a => `<button class="aba${a[0] === aba ? ' ativa' : ''}" data-aba="${a[0]}"${a[0] === aba ? ' aria-current="page"' : ''}>${e(a[1])}</button>`).join('')}</nav>
@@ -667,10 +669,45 @@ window.PdiTela = (function () {
         },
 
         'ciclo-ficha': (_, v) => { ctx.cicloFicha = Number(v); desenhar(); },
-        'abrir-ficha': () => {
+        'abrir-ficha': async () => {
             const n = ctx.cicloFicha || cicloAtual();
-            salvar(() => Api.upsertAvaliacao({ pdi_id: d.pdi.id, ciclo_numero: n, gestor_nome: d.pdi.gestor_nome }), 'Ficha aberta.');
+            // nota inicial = nota do ciclo anterior (ou, no ciclo 1 de um PDI renovado, a da última ficha do PDI anterior)
+            let origem = null;
+            if (n > 1) origem = d.avaliacoes.filter(a => a.ciclo_numero < n && a.status === 'concluida').pop() || null;
+            else if (d.pdi.pdi_anterior_id) { try { origem = await Api.ultimaFichaConcluida(d.pdi.pdi_anterior_id); } catch (_) { /* sem acesso: ficha abre em branco */ } }
+            const notas = C.notasIniciais(origem);
+            const copiou = origem && C.PILARES.some(p => notas[p] != null);
+            salvar(async () => {
+                const av = await Api.upsertAvaliacao({ pdi_id: d.pdi.id, ciclo_numero: n, gestor_nome: d.pdi.gestor_nome });
+                if (!copiou) return;
+                for (const p of C.PILARES) {
+                    if (notas[p] != null) await Api.upsertPilar({ pdi_id: d.pdi.id, avaliacao_id: av.id, pilar: p, nota_inicial: notas[p] });
+                }
+            }, copiou ? 'Ficha aberta com as notas iniciais copiadas do ciclo anterior.' : 'Ficha aberta.');
         },
+        'prioridades-em-acoes': async () => {
+            const n = ctx.cicloFicha || cicloAtual();
+            const f = fichaDe(n);
+            if (sujo) { U.toast('Salve a ficha antes de criar as ações.', 'erro'); return; }
+            const alvo = n + 1;
+            const norm = (s) => String(s).trim().toLowerCase();
+            const jaTem = new Set(d.acoes.filter(a => a.ciclo === alvo && a.origem === 'ficha_trimestral').map(a => norm(a.foco_acao)));
+            const linhas = C.prioridadesEmLinhas(f.prioridades_proximo_ciclo);
+            const novas = linhas.filter(l => !jaTem.has(norm(l)));
+            if (!linhas.length) { U.toast('Escreva as prioridades, uma por linha.', 'erro'); return; }
+            if (!novas.length) { U.toast(`Todas as prioridades já viraram ações do ciclo ${alvo}.`, 'erro'); return; }
+            const prazo = C.prazoFimDoCiclo(d.pdi.data_inicio, alvo);
+            if (!await U.confirmar(`Criar ${novas.length} ação(ões) no ciclo ${alvo}`,
+                `${novas.join(' • ')} — prazo: D + ${prazo} dias (fim do ciclo ${alvo}); responsáveis: colaborador(a) e gestor. Você pode ajustar depois no Plano de ação.`, 'Criar ações')) return;
+            salvar(async () => {
+                let ordem = d.acoes.length;
+                for (const l of novas) {
+                    await Api.ins('pdi_acoes', { pdi_id: d.pdi.id, ordem: ++ordem, foco_acao: l, responsaveis: 'Colaborador(a) e gestor',
+                        prazo_dias: prazo, evidencia_esperada: 'Registro da entrega e validação do gestor', ciclo: alvo, origem: 'ficha_trimestral' });
+                }
+            }, `${novas.length} ação(ões) criada(s) no ciclo ${alvo}.`);
+        },
+        'abrir-anterior': () => ctx.abrirPdi(d.pdi.pdi_anterior_id),
         'ficha-status-em_reuniao': () => salvarFicha(host.querySelector('#formFicha'), 'em_reuniao'),
         'ficha-status-aguardando_ciencia': () => salvarFicha(host.querySelector('#formFicha'), 'aguardando_ciencia'),
         'ficha-concluir': async () => {
