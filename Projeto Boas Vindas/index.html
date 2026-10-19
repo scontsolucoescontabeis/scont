@@ -1356,8 +1356,6 @@
     .aliq-cnae .aliq-tag { display: inline-block; font-size: 0.7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; background: var(--bronze-tint); color: var(--bronze-600); border-radius: 999px; padding: 2px 9px; margin-left: 8px; vertical-align: middle; }
     .aliq-cnae table { margin: 8px 0; }
     .aliq-cnae small { color: var(--ink-500); }
-    .aliq-cnae tr.faixa-atual td { background: var(--bronze-tint); color: var(--bronze-600); font-weight: 700; }
-    .aliq-cnae .aliq-faixa-resumo { margin: 4px 0 8px; font-size: 0.9rem; color: var(--ink-700, inherit); }
     .aliq-cnae ul { margin: 6px 0 0; padding-left: 20px; }
     .aliq-cnae .aliq-atividade { margin: 12px 0 2px; font-weight: 600; color: var(--ink-700, inherit); }
     .aliq-aviso { background: var(--danger-tint); color: var(--danger); border-radius: 8px; padding: 10px 12px; font-size: 0.9rem; margin: 6px 0; }
@@ -2050,49 +2048,43 @@
         return i < 0 ? FAIXAS_SN.length : i;
     }
 
+    // Com a receita bruta de 12 meses informada, mostra só a linha da faixa da empresa
+    // (alíquota efetiva sobre a receita real); sem ela, a tabela completa do anexo
     function tabelaAnexo(anexo, rbt12) {
         const linhas = TABELAS_SN[anexo];
         const faixa = faixaSN(rbt12);
+        if (faixa >= linhas.length) {
+            return elem('div', 'Receita bruta de ' + fmtBRL(rbt12) + ' acima do limite de ' + fmtBRL(FAIXAS_SN[FAIXAS_SN.length - 1]) + ' do Simples Nacional; confirme o enquadramento com a Scont.', 'aliq-aviso');
+        }
         const wrap = elem('div', null, 'tabela-scroll');
         const t = elem('table');
         const cab = elem('tr');
-        ['Anexo ' + anexo + ' — Receita bruta 12 meses', 'Alíquota nominal', 'Parcela a deduzir', 'Alíquota efetiva (limite da faixa)']
+        ['Anexo ' + anexo + ' — Receita bruta 12 meses', 'Alíquota nominal', 'Parcela a deduzir', faixa < 0 ? 'Alíquota efetiva (limite da faixa)' : 'Alíquota efetiva']
             .forEach(h => cab.appendChild(elem('th', h)));
         t.appendChild(elem('thead')).appendChild(cab);
         const tb = elem('tbody');
         linhas.forEach(([aliq, ded], i) => {
+            if (faixa >= 0 && i !== faixa) return;
             const teto = FAIXAS_SN[i];
             const ini = i ? FAIXAS_SN[i - 1] : 0;
-            const tr = elem('tr', null, i === faixa ? 'faixa-atual' : '');
+            const base = faixa < 0 ? teto : rbt12;
+            const tr = elem('tr');
             tr.appendChild(elem('td', i ? 'De ' + fmtBRL(ini + 0.01) + ' até ' + fmtBRL(teto) : 'Até ' + fmtBRL(teto)));
             tr.appendChild(elem('td', fmtPct2(aliq)));
             tr.appendChild(elem('td', ded ? fmtBRL(ded) : '—'));
-            tr.appendChild(elem('td', fmtPct2((teto * aliq / 100 - ded) / teto * 100)));
+            tr.appendChild(elem('td', fmtPct2((base * aliq / 100 - ded) / base * 100)));
             tb.appendChild(tr);
         });
         t.appendChild(tb);
         wrap.appendChild(t);
-        if (faixa < 0) return wrap;
-
-        // Resumo com a alíquota efetiva calculada sobre a receita bruta informada
-        const caixa = elem('div');
-        caixa.appendChild(wrap);
-        const resumo = elem('p', null, 'aliq-faixa-resumo');
-        if (faixa >= linhas.length) {
-            resumo.textContent = 'Receita bruta de ' + fmtBRL(rbt12) + ' acima do limite de ' + fmtBRL(FAIXAS_SN[FAIXAS_SN.length - 1]) + ' do Simples Nacional; confirme o enquadramento com a Scont.';
-        } else {
-            const [aliq, ded] = linhas[faixa];
-            const efetiva = (rbt12 * aliq / 100 - ded) / rbt12 * 100;
-            resumo.textContent = 'Com receita bruta de ' + fmtBRL(rbt12) + ' nos últimos 12 meses, sua empresa está na ' + (faixa + 1) + 'ª faixa do Anexo ' + anexo + ': alíquota nominal de ' + fmtPct2(aliq) + ' e alíquota efetiva de ' + fmtPct2(efetiva) + '.';
-        }
-        caixa.appendChild(resumo);
-        return caixa;
+        return wrap;
     }
 
     function renderAliquotas(dados, aliquotas, regime) {
         const box = document.getElementById('aliquotasCnae');
         const lista = document.getElementById('aliquotasLista');
         lista.innerHTML = '';
+        const frag = document.createDocumentFragment();
         const reg = (dados.regime || '').toLowerCase();
         const valido = regime === 'simples' || reg.includes('presumido');
         if (!valido || !aliquotas.length) { box.hidden = true; return; }
@@ -2151,8 +2143,9 @@
             } else {
                 card.appendChild(elem('div', l.obs_lp || 'Sem tributação no Lucro Presumido para este CNAE; confirme o enquadramento com a Scont.', 'aliq-aviso'));
             }
-            lista.appendChild(card);
+            frag.appendChild(card);
         });
+        lista.appendChild(frag);
 
         document.getElementById('aliquotasNota').textContent = regime === 'simples'
             ? 'Alíquota efetiva = (receita bruta dos últimos 12 meses × alíquota nominal − parcela a deduzir) ÷ receita bruta dos últimos 12 meses. No Anexo IV a contribuição patronal (CPP) não está incluída no DAS. Referência: LC 123/2006 e Econet (out/2026); o enquadramento final é confirmado pela Scont.'
