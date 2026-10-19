@@ -1926,6 +1926,10 @@
             // removida porque não restringia por id, só por ativo=true, e
             // qualquer requisição direta na API sem esse filtro do cliente
             // conseguia ler os dados de TODOS os clientes ativos.
+            // Config e acesso não dependem da apresentação: disparam em paralelo
+            // (o rpc do supabase-js é thenable, sem .catch — usar Promise.resolve)
+            const cfgPromise =Promise.resolve(db.rpc('fn_buscar_config_apresentacoes')).catch(() => ({}));
+
             const { data: linhas, error } = await db
                 .rpc('fn_buscar_apresentacao_publica', { p_id: id });
             const data = linhas && linhas[0];
@@ -1937,20 +1941,15 @@
                 return;
             }
 
-            let cfg = {};
-            try {
-                const r = await db.rpc('fn_buscar_config_apresentacoes');
-                if (r.data && typeof r.data === 'object') cfg = r.data;
-            } catch (_) { /* usa os textos padrão do HTML */ }
-
             let aliquotas = [];
             const codigos = codigosCnae(data);
-            if (codigos.length) {
-                try {
-                    const r = await db.rpc('fn_buscar_aliquotas_cnae', { p_codigos: codigos });
-                    if (Array.isArray(r.data)) aliquotas = r.data;
-                } catch (_) { /* sem tabela de alíquotas: bloco fica oculto */ }
-            }
+            const aliqPromise = codigos.length
+                ? Promise.resolve(db.rpc('fn_buscar_aliquotas_cnae', { p_codigos: codigos })).catch(() => ({}))
+                : Promise.resolve({});
+            const [rCfg, rAliq] = await Promise.all([cfgPromise, aliqPromise]);
+            // sem config: textos padrão do HTML; sem alíquotas: bloco fica oculto
+            const cfg = rCfg.data && typeof rCfg.data === 'object' ? rCfg.data : {};
+            if (Array.isArray(rAliq.data)) aliquotas = rAliq.data;
 
             preencherDadosCadastrais(data);
             aplicarParticularidades(data, cfg, aliquotas);
@@ -1958,8 +1957,8 @@
             document.getElementById('badgePersonalizada').style.display = 'flex';
             document.title = `${data.razao_social} - Scont Soluções Contábeis`;
 
-            // Registrar acesso assincronamente
-            db.rpc('fn_registrar_acesso_apresentacao', { p_id: id }).catch(() => {});
+            // Registrar acesso sem bloquear a página (rpc é thenable, sem .catch)
+            Promise.resolve(db.rpc('fn_registrar_acesso_apresentacao', { p_id: id })).catch(() => {});
 
         } catch (err) {
             console.error('Erro ao carregar apresentação:', err);
