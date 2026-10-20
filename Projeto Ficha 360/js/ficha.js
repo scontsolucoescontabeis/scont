@@ -181,6 +181,45 @@ window.Ficha360Ficha = (function () {
         render(el, it);
     }
 
+    // Todos os campos de rh_empresas da empresa aberta (busca só esta linha; o logo em base64 fica de fora).
+    const OCULTOS_CADASTRO = new Set(['id', 'logo_base64']);
+    const ROTULOS_CADASTRO = {
+        codigo_empresa: 'Código', nome_empresa: 'Razão social', cnpj: 'CNPJ', regime_enquadramento: 'Regime',
+        inscricao_estadual: 'Inscrição estadual', inscricao_municipal: 'Inscrição municipal', status_situacao: 'Situação no Domínio',
+        cep: 'CEP', uf: 'UF', email_responsavel: 'E-mail do responsável', data_cadastro: 'Cliente desde', data_criacao: 'Criado em'
+    };
+    function rotuloCadastro(k) {
+        if (ROTULOS_CADASTRO[k]) return ROTULOS_CADASTRO[k];
+        const t = k.replace(/_/g, ' ');
+        return t.charAt(0).toUpperCase() + t.slice(1);
+    }
+    function valorCadastro(k, v) {
+        if (v === null || v === undefined || v === '') return '—';
+        if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
+        if (typeof v === 'object') return JSON.stringify(v);
+        if (/^(data_|dt_)|_(em|at)$/.test(k) && /^\d{4}-\d{2}-\d{2}/.test(String(v))) return F360.fmtData(String(v).slice(0, 10));
+        return String(v);
+    }
+    async function renderDadosCadastrais(el, it) {
+        const bloco = document.createElement('div');
+        bloco.className = 'cartao';
+        bloco.innerHTML = '<h3>Dados cadastrais</h3><div class="bloqueado">Carregando…</div>';
+        el.insertBefore(bloco, el.firstChild);
+        let linha = null;
+        try {
+            const { data, error } = await F360.sb.from('rh_empresas').select('*').eq('id', it.empresaId).single();
+            if (error) throw error;
+            linha = data;
+        } catch (e) {
+            linha = it.dominio; // fallback: colunas já carregadas na carteira
+        }
+        if (!bloco.isConnected) return;
+        const FIXOS = ['codigo_empresa', 'nome_empresa', 'cnpj', 'inscricao_estadual', 'inscricao_municipal'];
+        const campos = FIXOS.concat(Object.keys(linha || {}).filter(k => !OCULTOS_CADASTRO.has(k) && !FIXOS.includes(k)));
+        bloco.innerHTML = `<h3>Dados cadastrais</h3><div class="form-grade ro-grade">${campos.map(k =>
+            `<div class="campo"><span class="rotulo">${esc(rotuloCadastro(k))}</span><div class="campo-ro">${esc(valorCadastro(k, (linha || {})[k]))}</div></div>`).join('')}</div>`;
+    }
+
     function renderResumo(el, it) {
         const vencProx = it.certificados.concat(it.licencas)
             .map(x => Ficha360Regras.diasAte(x.data_vencimento || x.data_validade, F360.hoje))
@@ -213,6 +252,7 @@ window.Ficha360Ficha = (function () {
             ${cartao('Contábil', it.possuiContabil ? esc((it.mapeamento && it.mapeamento.nivel_atencao) || 'sem mapeamento') : 'não contratado', `${pendAbertas} pendência(s) aberta(s)`)}
           </div>`;
         el.querySelectorAll('[data-ir-aba]').forEach(b => b.addEventListener('click', () => trocarAba(b.dataset.irAba)));
+        renderDadosCadastrais(el, it);
     }
 
     // Rótulo "SET/2026" pro mês atual (offsetMeses=0) ou seguinte (offsetMeses=1), a partir de F360.hoje.
