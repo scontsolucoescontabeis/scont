@@ -364,6 +364,7 @@ textarea.form-control { min-height: 120px; resize: vertical; }
     max-width: 560px; max-height: 90vh; overflow-y: auto;
 }
 .modal-box.wide { max-width: 780px; }
+.modal-box.xwide { max-width: min(1400px, 96vw); }
 .modal-head {
     display: flex; align-items: center; justify-content: space-between;
     padding: 18px 22px; border-bottom: 2px solid var(--border-light);

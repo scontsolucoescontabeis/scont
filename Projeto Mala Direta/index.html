@@ -898,7 +898,7 @@ Equipe SCONT"
 
   <!-- Modal: Ver Envio / Mensagem -->
   <div id="modal-envio" class="modal-overlay">
-    <div class="modal-box wide">
+    <div class="modal-box wide xwide">
       <div class="modal-head">
         <h3 id="modal-env-nome">Mensagem Personalizada</h3>
         <button class="modal-close" onclick="closeModal('modal-envio')">×</button>
@@ -1612,7 +1612,7 @@ Equipe SCONT"
       `<span class="badge badge-${campanhaAtual.status}">${labelStatus(campanhaAtual.status)}</span>
        &nbsp; ${labelTipoConf(campanhaAtual.tipo_confirmacao)}&nbsp;·&nbsp;Criada em ${formatDate(campanhaAtual.created_at)}
        ${campanhaAtual.data_agendamento ? `&nbsp;·&nbsp;<span style="background:#EEF6FF;color:#1E40AF;padding:1px 8px;border-radius:4px;font-weight:600;font-size:11px">📅 Envio em ${formatDateBR(campanhaAtual.data_agendamento)}${_convDiasRestantes(campanhaAtual.data_agendamento)}</span>` : ''}`;
-    _renderTemplateEl(document.getElementById('det-template'), campanhaAtual.template);
+    _renderTemplateEl(document.getElementById('det-template'), campanhaAtual.template, 1.35);
 
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('overlay').classList.remove('show');
@@ -1742,7 +1742,7 @@ Equipe SCONT"
       if (campanhaAtualId === id) {
         campanhaAtual = campanhas.find(c => c.id === id);
         document.getElementById('det-nome').textContent = campanhaAtual.nome;
-        _renderTemplateEl(document.getElementById('det-template'), campanhaAtual.template);
+        _renderTemplateEl(document.getElementById('det-template'), campanhaAtual.template, 1.35);
       }
       renderCampanhas();
     }
@@ -2106,7 +2106,7 @@ Equipe SCONT"
     doc.open(); doc.write(tpl || ''); doc.close();
   }
 
-  function _renderTemplateEl(el, html) {
+  function _renderTemplateEl(el, html, zoom) {
     el.querySelectorAll('iframe').forEach(f => f.remove());
     if (isHtmlTemplate(html)) {
       el.textContent = '';
@@ -2119,10 +2119,12 @@ Equipe SCONT"
       el.appendChild(iframe);
       const doc = iframe.contentDocument || iframe.contentWindow.document;
       doc.open(); doc.write(html || ''); doc.close();
+      if (zoom && doc.body) doc.body.style.zoom = zoom;
       iframe.onload = () => {
         try {
+          if (zoom && iframe.contentDocument.body) iframe.contentDocument.body.style.zoom = zoom;
           const h = iframe.contentDocument.documentElement.scrollHeight;
-          if (h > 80) iframe.style.height = Math.min(h + 20, 620) + 'px';
+          if (h > 80) iframe.style.height = Math.min(h + 20, zoom ? 1100 : 620) + 'px';
         } catch(e) {}
       };
     } else {
