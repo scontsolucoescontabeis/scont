@@ -1612,7 +1612,7 @@ Equipe SCONT"
       `<span class="badge badge-${campanhaAtual.status}">${labelStatus(campanhaAtual.status)}</span>
        &nbsp; ${labelTipoConf(campanhaAtual.tipo_confirmacao)}&nbsp;·&nbsp;Criada em ${formatDate(campanhaAtual.created_at)}
        ${campanhaAtual.data_agendamento ? `&nbsp;·&nbsp;<span style="background:#EEF6FF;color:#1E40AF;padding:1px 8px;border-radius:4px;font-weight:600;font-size:11px">📅 Envio em ${formatDateBR(campanhaAtual.data_agendamento)}${_convDiasRestantes(campanhaAtual.data_agendamento)}</span>` : ''}`;
-    _renderTemplateEl(document.getElementById('det-template'), campanhaAtual.template, 1.35);
+    _renderTemplateEl(document.getElementById('det-template'), campanhaAtual.template);
 
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('overlay').classList.remove('show');
@@ -1742,7 +1742,7 @@ Equipe SCONT"
       if (campanhaAtualId === id) {
         campanhaAtual = campanhas.find(c => c.id === id);
         document.getElementById('det-nome').textContent = campanhaAtual.nome;
-        _renderTemplateEl(document.getElementById('det-template'), campanhaAtual.template, 1.35);
+        _renderTemplateEl(document.getElementById('det-template'), campanhaAtual.template);
       }
       renderCampanhas();
     }
