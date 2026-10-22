@@ -3379,7 +3379,7 @@ async function _calcularLinhasBeneficios(comp, codigosEmpresas) {
             { data: jornadasData, error: errJorn },
         ] = await Promise.all([
             supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, cnpj, uf, municipio, cidade').in('codigo_empresa', codigosEmpresas),
-            supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, situacao, tipo_empregado, jornada_id').in('codigo_empresa', codigosEmpresas),
+            supabaseClient.from('rh_empregados').select('codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, situacao, tipo_empregado, jornada_id, data_admissao').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_valores_va_vt').select('codigo_empresa, codigo_empregado, valor_vt, valor_va').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_ferias_calculadas').select('codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim').in('codigo_empresa', codigosEmpresas),
             supabaseClient.from('rh_saves').select('*').in('empresa_codigo', codigosEmpresas).eq('competencia', comp).order('data_criacao', { ascending: false }),
@@ -3489,7 +3489,11 @@ async function _calcularLinhasBeneficios(comp, codigosEmpresas) {
             // "Dias a Trabalhar" ignoram feriados (comportamento antigo da empresa).
             const feriadosEmp = excluirFeriados ? _feriadosDaEmpresaParaComp(comp, empresa) : [];
             const resumoEscala = calcularResumoMes(escala, compParaDias, periodos, diaInicio, diaFim, excecoesFolga, feriadosEmp);
-            const diasTrabalhoConsiderados = resumoEscala.dias.filter(d => d.tipo === 'trabalho');
+            // Admissão dentro do período apurado: só conta a partir da data de admissão (proporcional).
+            const admissaoIso = emp.data_admissao ? String(emp.data_admissao).slice(0, 10) : null;
+            const diasTrabalhoConsiderados = resumoEscala.dias.filter(d =>
+                d.tipo === 'trabalho' && (!admissaoIso || d.data.split('/').reverse().join('-') >= admissaoIso)
+            );
             const diasTrabalhar = diasTrabalhoConsiderados.length;
             const datasDescontar = save ? _datasDescontarFolhaSalva(save) : [];
             const diasDescontar = datasDescontar.length;
