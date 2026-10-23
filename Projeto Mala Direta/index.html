@@ -1652,7 +1652,9 @@ Equipe SCONT"
           <div style="font-weight:600;color:var(--primary)">${esc(e.nome)}</div>
           <div style="font-size:11px;color:var(--muted)">${esc(e.empresa||'')}${e.cargo?' · '+esc(e.cargo):''}</div>
         </td>
-        <td style="font-size:12px;word-break:break-all">${e.email ? esc(e.email) : '<span style="color:var(--muted)">—</span>'}</td>
+        <td style="font-size:12px;white-space:nowrap;min-width:260px">${e.email
+          ? String(e.email).split(/[;,\s]+/).filter(Boolean).map(m => `<div>${esc(m)}</div>`).join('')
+          : '<span style="color:var(--muted)">—</span>'}</td>
         <td>${labelCanal(e.canal)}</td>
         <td>
           ${e.status_envio === 'enviado'
