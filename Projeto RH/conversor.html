@@ -185,13 +185,16 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="../portal-auth-guard.js"></script>
+<script src="../Projeto Departamento Pessoal/dp-permissoes.js"></script>
 <script src="folha-ponto-solides-parser.js"></script>
 <script src="folha-ponto-smartponto-parser.js"></script>
 <script src="conversor.js"></script>
 <script>
 (async () => {
-    const ok = await window.PortalAuthGuard.init(1);
+    const ok = await window.PortalAuthGuard.init(1, { skipToolCheck: true });
     if (!ok) return;
+    const okDp = await window.DPPermissoes.exigir(ok, 'frequencia', 1);
+    if (!okDp) return;
     document.getElementById('portalAuthOverlay').remove();
     init();
 })();
