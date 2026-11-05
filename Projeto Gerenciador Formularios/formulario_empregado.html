@@ -673,7 +673,7 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                            <input type="checkbox" id="empregadoComissionado" name="empregadoComissionado" style="width:auto;margin:0;" onchange="var g=document.getElementById('grupoValorComissao');g.style.display=this.checked?'':'none';document.getElementById('valorComissao').required=this.checked;if(!this.checked)document.getElementById('valorComissao').value='';">
+                            <input type="checkbox" id="empregadoComissionado" name="empregadoComissionado" style="width:auto;margin:0;" onchange="var g=document.getElementById('grupoValorComissao');g.style.display=this.checked?'':'none';document.getElementById('valorComissao').required=this.checked;document.getElementById('salarioContratual').required=!this.checked;document.getElementById('labelSalarioContratual').textContent=this.checked?'Salário Contratual (R$)':'Salário Contratual (R$) *';if(!this.checked)document.getElementById('valorComissao').value='';">
                             Empregado comissionado?
                         </label>
                     </div>
@@ -685,7 +685,7 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="salarioContratual">Salário Contratual (R$) *</label>
+                        <label for="salarioContratual" id="labelSalarioContratual">Salário Contratual (R$) *</label>
                         <input type="number" id="salarioContratual" name="salarioContratual" placeholder="0.00" step="0.01" min="0" required>
                     </div>
                     <div class="form-group">
@@ -1172,7 +1172,7 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
                 if (formData.comissionado) {
                     addDataLine('Empregado Comissionado:', 'Sim - ' + (formData.valorComissao != null ? parseFloat(formData.valorComissao).toFixed(2).replace('.', ',') : '0,00') + '%');
                 }
-                addDataLine('Salário Contratual:', 'R$ ' + parseFloat(formData.salarioContratual).toFixed(2));
+                addDataLine('Salário Contratual:', formData.salarioContratual != null ? 'R$ ' + parseFloat(formData.salarioContratual).toFixed(2) : 'Não informado (comissionado)');
                 addDataLine('Dias de Trabalho:', formData.diasTrabalho.join(', '));
                 addDataLine('Horário de Trabalho:', formData.horarioTrabalho);
                 addDataLine('Contrato de Experiência:', formData.contratoExperiencia);
@@ -1362,7 +1362,7 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
 
     // ===== VALIDAR FORMULÁRIO =====
    window.validateForm = function() {
-    const requiredFields = ['nomeCompleto', 'cpf', 'email', 'celular', 'estadoCivil', 'dataNascimento', 'naturalidade', 'grauEscolaridade', 'raca', 'endereco', 'cep', 'nomeEmpresa', 'dataAdmissao', 'salarioContratual', 'contratoExperiencia', 'horarioTrabalho', 'valeTransporte', 'temFilhos'];
+    const requiredFields = ['nomeCompleto', 'cpf', 'email', 'celular', 'estadoCivil', 'dataNascimento', 'naturalidade', 'grauEscolaridade', 'raca', 'endereco', 'cep', 'nomeEmpresa', 'dataAdmissao', 'contratoExperiencia', 'horarioTrabalho', 'valeTransporte', 'temFilhos'];
 
         for (let field of requiredFields) {
             const element = form.elements[field];
@@ -1379,6 +1379,12 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
                 element.focus();
                 return false;
             }
+        }
+
+        if (!form.elements['empregadoComissionado'].checked && !form.elements['salarioContratual'].value) {
+            alert('Por favor, preencha o campo obrigatório: Salário Contratual (R$)');
+            form.elements['salarioContratual'].focus();
+            return false;
         }
 
         if (form.elements['empregadoComissionado'].checked) {
@@ -1459,7 +1465,7 @@ const formData = {
                 dataAdmissao: form.elements['dataAdmissao'].value,
                 comissionado: form.elements['empregadoComissionado'].checked,
                 valorComissao: form.elements['empregadoComissionado'].checked && form.elements['valorComissao'].value ? parseInt(form.elements['valorComissao'].value.replace(/\D/g, ''), 10) / 100 : null,
-                salarioContratual: parseFloat(form.elements['salarioContratual'].value),
+                salarioContratual: form.elements['salarioContratual'].value ? parseFloat(form.elements['salarioContratual'].value) : null,
                 diasTrabalho: Array.from(document.querySelectorAll('input[name="diasTrabalho"]:checked')).map(el => el.value),
                 horarioTrabalho: form.elements['horarioTrabalho'].value,
                 contratoExperiencia: form.elements['contratoExperiencia'].value,
