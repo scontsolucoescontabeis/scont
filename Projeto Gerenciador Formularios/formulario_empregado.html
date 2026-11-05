@@ -672,6 +672,19 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
+                        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                            <input type="checkbox" id="empregadoComissionado" name="empregadoComissionado" style="width:auto;margin:0;" onchange="var g=document.getElementById('grupoValorComissao');g.style.display=this.checked?'':'none';document.getElementById('valorComissao').required=this.checked;if(!this.checked)document.getElementById('valorComissao').value='';">
+                            Empregado comissionado?
+                        </label>
+                    </div>
+                    <div class="form-group" id="grupoValorComissao" style="display:none;">
+                        <label for="valorComissao">Valor da Comissão (R$) *</label>
+                        <input type="text" id="valorComissao" name="valorComissao" placeholder="R$ 0,00" inputmode="numeric" autocomplete="off"
+                               oninput="var d=this.value.replace(/\D/g,'');if(!d){this.value='';return;}this.value='R$ '+(parseInt(d,10)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
                         <label for="salarioContratual">Salário Contratual (R$) *</label>
                         <input type="number" id="salarioContratual" name="salarioContratual" placeholder="0.00" step="0.01" min="0" required>
                     </div>
@@ -680,6 +693,7 @@
                         <select id="contratoExperiencia" name="contratoExperiencia" required>
                             <option value="">Selecione...</option>
                             <option value="30_30">30 dias + 30 dias</option>
+                            <option value="30_60">30 dias + 60 dias</option>
                             <option value="45_45">45 dias + 45 dias</option>
                             <option value="90">90 dias</option>
                             <option value="nao_tera">Não terá</option>
@@ -1155,6 +1169,9 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
                 addDataLine('Cargo/Função:', formData.cargo);
                 addDataLine('Departamento:', formData.departamento);
                 addDataLine('Data de Admissão:', formData.dataAdmissao);
+                if (formData.comissionado) {
+                    addDataLine('Empregado Comissionado:', 'Sim - R$ ' + (formData.valorComissao != null ? parseFloat(formData.valorComissao).toFixed(2) : '0.00'));
+                }
                 addDataLine('Salário Contratual:', 'R$ ' + parseFloat(formData.salarioContratual).toFixed(2));
                 addDataLine('Dias de Trabalho:', formData.diasTrabalho.join(', '));
                 addDataLine('Horário de Trabalho:', formData.horarioTrabalho);
@@ -1364,6 +1381,15 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
             }
         }
 
+        if (form.elements['empregadoComissionado'].checked) {
+            const vc = form.elements['valorComissao'];
+            if (!vc.value || parseInt(vc.value.replace(/\D/g, ''), 10) <= 0) {
+                alert('Por favor, informe o valor da comissão.');
+                vc.focus();
+                return false;
+            }
+        }
+
         const diasTrabalho = document.querySelectorAll('input[name="diasTrabalho"]:checked');
         if (diasTrabalho.length === 0) {
             alert('Por favor, selecione pelo menos um dia de trabalho.');
@@ -1431,6 +1457,8 @@ const formData = {
    		departamento: form.elements['departamento'].value || null,
      		numeroPIS: form.elements['numeroPIS'].value || null,
                 dataAdmissao: form.elements['dataAdmissao'].value,
+                comissionado: form.elements['empregadoComissionado'].checked,
+                valorComissao: form.elements['empregadoComissionado'].checked && form.elements['valorComissao'].value ? parseInt(form.elements['valorComissao'].value.replace(/\D/g, ''), 10) / 100 : null,
                 salarioContratual: parseFloat(form.elements['salarioContratual'].value),
                 diasTrabalho: Array.from(document.querySelectorAll('input[name="diasTrabalho"]:checked')).map(el => el.value),
                 horarioTrabalho: form.elements['horarioTrabalho'].value,
@@ -1487,6 +1515,8 @@ const { data: empregadoData, error: empregadoError } = await supabase
                     consentimento_lgpd: formData.consentimentoLGPD,
                     data_preenchimento: formData.dataPreenchimento,
                     hora_preenchimento: formData.horaPreenchimento,
+                    // Só envia colunas de comissão quando marcado (evita erro se o SQL ainda não foi rodado)
+                    ...(formData.comissionado ? { comissionado: true, valor_comissao: formData.valorComissao } : {}),
                     status: 'recebido'
                 }])
                 .select();

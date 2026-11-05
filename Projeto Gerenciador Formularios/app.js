@@ -699,6 +699,10 @@ function createDetailContent(form, sociosDoBanco = [], dependentesDoBanco = []) 
                         <span class="detail-label">Salário Contratual</span>
                         <div class="detail-value">${formatCurrency(form.salario_contratual || form.salarioContratual || 0)}</div>
                     </div>
+                    ${form.comissionado ? `<div class="detail-field">
+                        <span class="detail-label">Comissão</span>
+                        <div class="detail-value">${formatCurrency(form.valor_comissao || 0)}</div>
+                    </div>` : ''}
                     <div class="detail-field">
                         <span class="detail-label">Contrato de Experiência</span>
                         <div class="detail-value">${sanitizeOutput((form.contrato_experiencia || form.contratoExperiencia || '-')).replace(/_/g, ' ')}</div>
@@ -1199,6 +1203,7 @@ function createEditForm(form, sociosDoBanco = [], dependentesDoBanco = [], empre
                         <select id="editContratoExperiencia" class="filter-select" style="padding: var(--spacing-md);">
                             <option value="">Selecione...</option>
                             <option value="30_30" ${(form.contrato_experiencia||form.contratoExperiencia) === '30_30' ? 'selected' : ''}>30 dias + 30 dias</option>
+                            <option value="30_60" ${(form.contrato_experiencia||form.contratoExperiencia) === '30_60' ? 'selected' : ''}>30 dias + 60 dias</option>
                             <option value="45_45" ${(form.contrato_experiencia||form.contratoExperiencia) === '45_45' ? 'selected' : ''}>45 dias + 45 dias</option>
                             <option value="90" ${(form.contrato_experiencia||form.contratoExperiencia) === '90' ? 'selected' : ''}>90 dias</option>
                             <option value="nao_tera" ${(form.contrato_experiencia||form.contratoExperiencia) === 'nao_tera' ? 'selected' : ''}>Não terá</option>
