@@ -701,7 +701,7 @@ function createDetailContent(form, sociosDoBanco = [], dependentesDoBanco = []) 
                     </div>
                     ${form.comissionado ? `<div class="detail-field">
                         <span class="detail-label">Comissão</span>
-                        <div class="detail-value">${formatCurrency(form.valor_comissao || 0)}</div>
+                        <div class="detail-value">${Number(form.valor_comissao || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}%</div>
                     </div>` : ''}
                     <div class="detail-field">
                         <span class="detail-label">Contrato de Experiência</span>

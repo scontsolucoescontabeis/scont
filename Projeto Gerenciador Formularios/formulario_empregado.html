@@ -678,9 +678,9 @@
                         </label>
                     </div>
                     <div class="form-group" id="grupoValorComissao" style="display:none;">
-                        <label for="valorComissao">Valor da Comissão (R$) *</label>
-                        <input type="text" id="valorComissao" name="valorComissao" placeholder="R$ 0,00" inputmode="numeric" autocomplete="off"
-                               oninput="var d=this.value.replace(/\D/g,'');if(!d){this.value='';return;}this.value='R$ '+(parseInt(d,10)/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});">
+                        <label for="valorComissao">Comissão (%) *</label>
+                        <input type="text" id="valorComissao" name="valorComissao" placeholder="0,00 %" inputmode="numeric" autocomplete="off"
+                               oninput="var d=this.value.replace(/\D/g,'');if(!d){this.value='';return;}var n=Math.min(parseInt(d,10),10000)/100;this.value=n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+' %';">
                     </div>
                 </div>
                 <div class="form-row">
@@ -1170,7 +1170,7 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
                 addDataLine('Departamento:', formData.departamento);
                 addDataLine('Data de Admissão:', formData.dataAdmissao);
                 if (formData.comissionado) {
-                    addDataLine('Empregado Comissionado:', 'Sim - R$ ' + (formData.valorComissao != null ? parseFloat(formData.valorComissao).toFixed(2) : '0.00'));
+                    addDataLine('Empregado Comissionado:', 'Sim - ' + (formData.valorComissao != null ? parseFloat(formData.valorComissao).toFixed(2).replace('.', ',') : '0,00') + '%');
                 }
                 addDataLine('Salário Contratual:', 'R$ ' + parseFloat(formData.salarioContratual).toFixed(2));
                 addDataLine('Dias de Trabalho:', formData.diasTrabalho.join(', '));
@@ -1384,7 +1384,7 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
         if (form.elements['empregadoComissionado'].checked) {
             const vc = form.elements['valorComissao'];
             if (!vc.value || parseInt(vc.value.replace(/\D/g, ''), 10) <= 0) {
-                alert('Por favor, informe o valor da comissão.');
+                alert('Por favor, informe o percentual de comissão.');
                 vc.focus();
                 return false;
             }
