@@ -332,6 +332,7 @@
     .status.active{background:var(--success-soft);color:var(--success)}
     .status.pending{background:var(--warning-soft);color:var(--warning)}
     .status.expired{background:var(--danger-soft);color:var(--danger)}
+    .status.inactive{background:#eef0f3;color:#6b7280}
     .status.review{background:var(--info-soft);color:var(--info)}
     .row-alert{
       background: linear-gradient(90deg, rgba(201,122,0,.10), transparent);
@@ -634,7 +635,16 @@
     .hidden{display:none !important}
     .field{
       display:grid;
+      grid-template-columns:minmax(0,1fr);
+      min-width:0;
       gap:8px;
+    }
+    .field select{
+      width:100%;
+      max-width:100%;
+      min-width:0;
+      box-sizing:border-box;
+      text-overflow:ellipsis;
     }
     .field label{
       font-weight:600;
@@ -1423,8 +1433,8 @@
     // ============================================
 async function loadDashboard() {
   try {
-    const { data: licencas } = await supabaseClient.from('licencas').select('*');
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
     const { data: empresasRh } = await supabaseClient.from('rh_empresas').select('status_situacao');
     const empresasAtivas = (empresasRh || []).filter(e => !e.status_situacao || String(e.status_situacao).trim().toLowerCase().startsWith('ativ')).length;
 
@@ -1453,8 +1463,8 @@ async function loadDashboard() {
 
 async function loadDashboardTable() {
   try {
-    const { data: licencas } = await supabaseClient.from('licencas').select('*');
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
     
     const allDocs = [...(licencas || []), ...(alvaras || [])].filter(d => d.data_validade);
     const today = new Date();
@@ -1516,8 +1526,8 @@ async function loadDashboardTable() {
     const diasAlertas = window.appConfig?.alertDays || 30;
     console.log(`📅 Usando ${diasAlertas} dias como limite de alerta`);
     
-    const { data: licencas } = await supabaseClient.from('licencas').select('*');
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
     
     const allDocs = [...(licencas || []), ...(alvaras || [])].filter(d => d.data_validade);
     const today = new Date();
@@ -1612,8 +1622,8 @@ async function loadDashboardTable() {
 
     async function fetchDocumentos() {
       try {
-        const { data: licencas } = await supabaseClient.from('licencas').select('*').order('data_validade', { ascending: true });
-        const { data: alvaras } = await supabaseClient.from('alvaras').select('*').order('data_validade', { ascending: true });
+        const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true).order('data_validade', { ascending: true });
+        const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true).order('data_validade', { ascending: true });
         const allDocs = [
           ...(licencas || []).map(d => ({ ...d, tipo_tabela: 'licencas' })),
           ...(alvaras || []).map(d => ({ ...d, tipo_tabela: 'alvaras' }))
@@ -1628,12 +1638,16 @@ async function loadDashboardTable() {
         }
 
         allDocs.forEach(doc => {
-          const isEmissao = doc.tipo_operacao === 'emissao';
-          const operacaoLabel = isEmissao ? 'Emissão' : 'Renovação';
-          const operacaoBadge = isEmissao ? 'info' : 'success';
+          const isDispensada = doc.tipo_operacao === 'dispensada';
+          const isEmissao = doc.tipo_operacao === 'emissao' || isDispensada; // sem número/datas
+          const operacaoLabel = isDispensada ? 'Dispensada' : (isEmissao ? 'Emissão' : 'Renovação');
+          const operacaoBadge = isDispensada ? 'inactive' : (isEmissao ? 'info' : 'success');
 
           let status, statusText;
-          if (isEmissao) {
+          if (isDispensada) {
+            status = 'inactive';
+            statusText = 'Dispensada';
+          } else if (isEmissao) {
             status = 'pending';
             statusText = 'Em emissão';
           } else {
@@ -1692,7 +1706,7 @@ async function loadDashboardTable() {
 
     async function fetchProcessos() {
       try {
-        const { data, error } = await supabaseClient.from('processos').select('*').order('data_abertura', { ascending: false });
+        const { data, error } = await supabaseClient.from('processos').select('*').eq('ativo', true).order('data_abertura', { ascending: false });
         if (error) throw error;
 
         const tbody = document.getElementById('processosTable');
@@ -1778,8 +1792,8 @@ async function loadDashboardTable() {
 
 async function loadReportSaude() {
   try {
-    const { data: licencas } = await supabaseClient.from('licencas').select('*');
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
     
     const allDocs = [...(licencas || []), ...(alvaras || [])];
     const today = new Date();
@@ -1845,8 +1859,8 @@ async function loadReportSaude() {
 
 async function loadReportVencimentos() {
   try {
-    const { data: licencas } = await supabaseClient.from('licencas').select('*');
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
     
     const allDocs = [...(licencas || []), ...(alvaras || [])];
     const today = new Date();
@@ -1887,8 +1901,8 @@ async function loadReportVencimentos() {
 
 async function loadReportTipo() {
   try {
-    const { data: licencas } = await supabaseClient.from('licencas').select('*');
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
     
     const today = new Date();
     const tipos = {};
@@ -1974,8 +1988,8 @@ async function loadReportTipo() {
 
 async function loadReportClientesVencidos() {
   try {
-    const { data: licencas } = await supabaseClient.from('licencas').select('*');
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
     
     const today = new Date();
     const allDocs = [...(licencas || []), ...(alvaras || [])];
@@ -2017,8 +2031,8 @@ async function loadReportClientesVencidos() {
 
 async function loadReportTemporal() {
   try {
-    const { data: licencas } = await supabaseClient.from('licencas').select('*');
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
     
     const allDocs = [...(licencas || []), ...(alvaras || [])];
     const today = new Date();
@@ -2078,8 +2092,8 @@ async function loadReportTemporal() {
 
 async function loadReportConformidade() {
   try {
-    const { data: licencas } = await supabaseClient.from('licencas').select('*');
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
     
     const today = new Date();
     const allDocs = [...(licencas || []), ...(alvaras || [])];
@@ -2120,8 +2134,8 @@ async function loadReportVencimentosConfiguravel() {
   try {
     const diasConfiguravelRelatorio = parseInt(document.getElementById('diasVencimento').value) || 30;
     
-    const { data: licencas } = await supabaseClient.from('licencas').select('*');
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*');
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
     
     const allDocs = [...(licencas || []), ...(alvaras || [])];
     const today = new Date();
@@ -2192,7 +2206,7 @@ async function loadReportVencimentosConfiguravel() {
 
 async function loadReportProcessos() {
   try {
-    const { data } = await supabaseClient.from('processos').select('*');
+    const { data } = await supabaseClient.from('processos').select('*').eq('ativo', true);
     
     if (!data || data.length === 0) return;
     
@@ -2449,16 +2463,27 @@ function exportReports(format) {
     // REALTIME - SINCRONIZAÇÃO AUTOMÁTICA
     // ============================================
 
+    // Sincroniza TODAS as telas (dashboard, documentos, processos) — chamado após
+    // cada gravação/edição/exclusão e a cada evento realtime (com debounce).
+    let _syncTimer = null;
+    function sincronizarTudo() {
+      clearTimeout(_syncTimer);
+      _syncTimer = setTimeout(async () => {
+        try {
+          await Promise.all([loadDashboard(), fetchDocumentos(), fetchProcessos()]);
+        } catch (e) {
+          console.error('Erro ao sincronizar:', e);
+        }
+      }, 150);
+    }
+
     function setupRealtimeListeners() {
       // Listener para Licenças
       const licencasChannel = supabaseClient
         .channel('public:licencas')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'licencas' }, payload => {
           console.log('📡 Licenças atualizadas:', payload);
-          if (document.getElementById('documentosTable').closest('.section-view').classList.contains('active')) {
-            fetchDocumentos();
-          }
-          loadDashboard();
+          sincronizarTudo();
         })
         .subscribe();
       realtimeSubscriptions.push(licencasChannel);
@@ -2468,10 +2493,7 @@ function exportReports(format) {
         .channel('public:alvaras')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'alvaras' }, payload => {
           console.log('📡 Alvarás atualizados:', payload);
-          if (document.getElementById('documentosTable').closest('.section-view').classList.contains('active')) {
-            fetchDocumentos();
-          }
-          loadDashboard();
+          sincronizarTudo();
         })
         .subscribe();
       realtimeSubscriptions.push(alvarasChannel);
@@ -2481,9 +2503,7 @@ function exportReports(format) {
         .channel('public:processos')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'processos' }, payload => {
           console.log('📡 Processos atualizados:', payload);
-          if (document.getElementById('processosTable').closest('.section-view').classList.contains('active')) {
-            fetchProcessos();
-          }
+          sincronizarTudo();
         })
         .subscribe();
       realtimeSubscriptions.push(processosChannel);
@@ -2493,7 +2513,7 @@ function exportReports(format) {
         .channel('public:rh_empresas')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rh_empresas' }, payload => {
           console.log('📡 Empresas atualizadas:', payload);
-          loadDashboard();
+          sincronizarTudo();
         })
         .subscribe();
       realtimeSubscriptions.push(empresasChannel);
@@ -2675,6 +2695,7 @@ function exportReports(format) {
                 <option value="">Selecione...</option>
                 <option value="emissao">Emissão</option>
                 <option value="renovacao">Renovação</option>
+                <option value="dispensada">Dispensada</option>
               </select>
             </div>
             <div class="field">
@@ -2864,7 +2885,7 @@ function exportReports(format) {
       const campoDataEmissao = document.getElementById('campoDataEmissao');
       const campoDataValidade = document.getElementById('campoDataValidade');
 
-      if (tipoOperacao === 'emissao') {
+      if (tipoOperacao === 'emissao' || tipoOperacao === 'dispensada') {
         campoNumero.style.display = 'none';
         campoDataEmissao.style.display = 'none';
         campoDataValidade.style.display = 'none';
@@ -2898,14 +2919,15 @@ function exportReports(format) {
         }
       }
 
+      const semDatas = tipoOperacao === 'emissao' || tipoOperacao === 'dispensada';
       const empresaIdVal = document.getElementById('empresaId')?.value || null;
       const data = {
         empresa_id: empresaIdVal || null,
         estabelecimento: document.getElementById('estabelecimento').value,
         tipo: document.getElementById('tipo').value,
-        numero: tipoOperacao === 'emissao' ? 'PENDENTE' : document.getElementById('numero').value,
-        data_emissao: tipoOperacao === 'emissao' ? null : document.getElementById('dataEmissao').value,
-        data_validade: tipoOperacao === 'emissao' ? null : document.getElementById('dataValidade').value,
+        numero: tipoOperacao === 'emissao' ? 'PENDENTE' : (tipoOperacao === 'dispensada' ? 'DISPENSADA' : document.getElementById('numero').value),
+        data_emissao: semDatas ? null : document.getElementById('dataEmissao').value,
+        data_validade: semDatas ? null : document.getElementById('dataValidade').value,
         orgao_emissor: document.getElementById('orgaoEmissor').value || 'Não informado',
         responsavel: document.getElementById('responsavel').value || 'Não informado',
         observacoes: document.getElementById('observacoes').value,
@@ -2920,8 +2942,7 @@ function exportReports(format) {
         console.log('✓ Licença salva com sucesso');
         showAlert('✓ Licença salva com sucesso!', 'success');
         closeModal();
-        fetchDocumentos();
-        loadDashboard();
+        sincronizarTudo();
       } catch (error) {
         console.error('❌ Erro ao salvar licença:', error);
         showAlert('❌ Erro ao salvar licença: ' + error.message, 'error');
@@ -2936,6 +2957,7 @@ function exportReports(format) {
 
     function situacaoDocumento(doc) {
       if (doc.tipo_operacao === 'emissao') return 'Em emissão';
+      if (doc.tipo_operacao === 'dispensada') return 'Dispensada';
       if (!doc.data_validade) return 'Sem validade';
       const hoje = new Date();
       const validade = new Date(doc.data_validade);
@@ -3172,8 +3194,7 @@ function exportReports(format) {
 
         showAlert('✓ Processo salvo com sucesso!', 'success');
         closeModal();
-        fetchProcessos();
-        loadDashboard();
+        sincronizarTudo();
       } catch (error) {
         console.error('❌ Erro ao salvar processo:', error);
         showAlert('❌ Erro ao salvar processo: ' + error.message, 'error');
@@ -3412,12 +3433,18 @@ function exportReports(format) {
 
         showAlert('Registro atualizado com sucesso!', 'success');
         closeModal();
-        fetchDocumentos();
-        loadDashboard();
+        sincronizarTudo();
       } catch (error) {
         console.error('Erro ao atualizar registro:', error);
         showAlert('Erro ao atualizar registro', 'error');
       }
+    }
+
+    // O DELETE do Supabase não falha quando a RLS bloqueia (0 linhas afetadas).
+    // Confirma que o registro realmente saiu da listagem.
+    async function verificarExclusao(table, id) {
+      const { data } = await supabaseClient.from(table).select('id').eq('id', id).eq('ativo', true).maybeSingle();
+      if (data) throw new Error('Exclusão não aplicada (sem permissão para excluir)');
     }
 
     async function deleteRecord(id, table) {
@@ -3426,13 +3453,13 @@ function exportReports(format) {
       try {
         const { error } = await supabaseClient.from(table).delete().eq('id', id);
         if (error) throw error;
+        await verificarExclusao(table, id);
 
         showAlert('Registro excluído com sucesso!', 'success');
-        fetchDocumentos();
-        loadDashboard();
+        sincronizarTudo();
       } catch (error) {
         console.error('Erro ao excluir registro:', error);
-        showAlert('Erro ao excluir registro', 'error');
+        showAlert('Erro ao excluir registro: ' + (error.message || error), 'error');
       }
     }
 
@@ -3442,18 +3469,19 @@ function exportReports(format) {
       try {
         const { error } = await supabaseClient.from('processos').delete().eq('id', id);
         if (error) throw error;
+        await verificarExclusao('processos', id);
 
         showAlert('Processo excluído com sucesso!', 'success');
-        fetchProcessos();
+        sincronizarTudo();
       } catch (error) {
         console.error('Erro ao excluir processo:', error);
-        showAlert('Erro ao excluir processo', 'error');
+        showAlert('Erro ao excluir processo: ' + (error.message || error), 'error');
       }
     }
 
     async function viewProcesso(id) {
       try {
-        const { data, error } = await supabaseClient.from('processos').select('*').eq('id', id).single();
+        const { data, error } = await supabaseClient.from('processos').select('*').eq('ativo', true).eq('id', id).single();
         if (error) throw error;
 
         await loadAndamentoForProcesso(id);
@@ -3485,7 +3513,7 @@ function exportReports(format) {
 
     async function editProcesso(id) {
       try {
-        const { data, error } = await supabaseClient.from('processos').select('*').eq('id', id).single();
+        const { data, error } = await supabaseClient.from('processos').select('*').eq('ativo', true).eq('id', id).single();
         if (error) throw error;
 
         const modal = document.getElementById('recordModal');
@@ -3848,6 +3876,8 @@ function exportReports(format) {
 
             const tipoOp = String(r['tipo_operacao'] || '').trim().toLowerCase();
             const isEmissao = tipoOp === 'emissao';
+            const isDispensada = tipoOp === 'dispensada';
+            const semDatas = isEmissao || isDispensada;
 
             const nomeEmpresa = String(r['empresa'] || '').trim().toLowerCase();
             const empresa_id = nomeEmpresa ? (empresaMap[nomeEmpresa] || null) : null;
@@ -3856,10 +3886,10 @@ function exportReports(format) {
               empresa_id,
               estabelecimento: estab,
               tipo,
-              tipo_operacao: isEmissao ? 'emissao' : (tipoOp === 'renovacao' ? 'renovacao' : null),
-              numero: isEmissao ? 'PENDENTE' : (String(r['numero'] || '').trim() || null),
-              data_emissao: isEmissao ? null : (parseDateExcel(r['data_emissao']) || null),
-              data_validade: isEmissao ? null : (parseDateExcel(r['data_validade']) || null),
+              tipo_operacao: isEmissao ? 'emissao' : (isDispensada ? 'dispensada' : (tipoOp === 'renovacao' ? 'renovacao' : null)),
+              numero: isEmissao ? 'PENDENTE' : (isDispensada ? 'DISPENSADA' : (String(r['numero'] || '').trim() || null)),
+              data_emissao: semDatas ? null : (parseDateExcel(r['data_emissao']) || null),
+              data_validade: semDatas ? null : (parseDateExcel(r['data_validade']) || null),
               orgao_emissor: String(r['orgao_emissor'] || '').trim() || null,
               responsavel: String(r['responsavel'] || '').trim() || null,
               observacoes: String(r['observacoes'] || '').trim() || null,
@@ -3873,8 +3903,7 @@ function exportReports(format) {
           }
           closeModal();
           showAlert(`✓ ${ok} licença(s) importada(s). ${fail ? fail + ' falharam — verifique o console.' : ''}`, ok ? 'success' : 'error');
-          fetchDocumentos();
-          loadDashboard();
+          sincronizarTudo();
         });
       } catch (err) {
         console.error('Erro ao ler Excel de licenças:', err);
