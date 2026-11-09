@@ -3444,7 +3444,7 @@ function exportReports(format) {
     // Confirma que o registro realmente saiu da listagem.
     async function verificarExclusao(table, id) {
       const { data } = await supabaseClient.from(table).select('id').eq('id', id).eq('ativo', true).maybeSingle();
-      if (data) throw new Error('Exclusão não aplicada (sem permissão para excluir)');
+      if (data) throw new Error('Você não tem permissão para excluir. Solicite ao administrador (Editar Acesso › Controle de Licenças › Excluir)');
     }
 
     async function deleteRecord(id, table) {

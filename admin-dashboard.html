@@ -959,7 +959,9 @@ function buildFerCheckboxes(containerId, idsAtuais, permAtuais, cbClass, cbSubCl
                 const sCb = document.createElement('input');
                 sCb.type = 'checkbox'; sCb.value = s.key;
                 sCb.className = cbSubClass; sCb.dataset.ferId = f.id;
-                sCb.checked = allChecked || userPerms.includes(s.key);
+                // optin: permissão sensível, nunca concedida por padrão (vazio ≠ acesso total)
+                if (s.optin) sCb.dataset.optin = '1';
+                sCb.checked = s.optin ? userPerms.includes(s.key) : (allChecked || userPerms.includes(s.key));
                 const sSp = document.createElement('span');
                 sSp.textContent = s.label;
                 sLbl.append(sCb, sSp);
@@ -968,7 +970,7 @@ function buildFerCheckboxes(containerId, idsAtuais, permAtuais, cbClass, cbSubCl
 
             cb.addEventListener('change', () => {
                 subGroup.classList.toggle('visible', cb.checked);
-                if (cb.checked) subGroup.querySelectorAll('input').forEach(c => c.checked = true);
+                if (cb.checked) subGroup.querySelectorAll('input').forEach(c => { if (!c.dataset.optin) c.checked = true; });
             });
 
             wrapper.appendChild(subGroup);
