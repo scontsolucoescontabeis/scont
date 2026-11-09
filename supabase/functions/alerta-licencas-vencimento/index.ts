@@ -86,7 +86,8 @@ Deno.serve(async (req) => {
             const { data: docs, error: docErr } = await adminDb
                 .from(tabela)
                 .select('id, empresa_id, estabelecimento, tipo, numero, data_validade, ativo, ultimo_alerta_nivel')
-                .is('deletado_em', null);
+                .is('deletado_em', null)
+                .eq('inativa', false);
             if (docErr) throw new Error(`Erro ao ler ${tabela}: ` + docErr.message);
 
             for (const doc of (docs ?? []) as Documento[]) {

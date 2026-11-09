@@ -600,8 +600,8 @@
   try {
     console.log('🔔 Carregando alertas...');
     
-    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true);
-    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true);
+    const { data: licencas } = await supabaseClient.from('licencas').select('*').eq('ativo', true).eq('inativa', false);
+    const { data: alvaras } = await supabaseClient.from('alvaras').select('*').eq('ativo', true).eq('inativa', false);
 
     const allDocs = [...(licencas || []), ...(alvaras || [])];
     const today = new Date();

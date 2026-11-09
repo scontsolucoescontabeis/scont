@@ -239,6 +239,7 @@ SELECT
 FROM public.licencas l
 WHERE l.ativo = TRUE
   AND l.deletado_em IS NULL
+  AND l.inativa = FALSE
   AND l.data_validade IS NOT NULL
   AND l.data_validade <= CURRENT_DATE + 30
 
@@ -280,6 +281,7 @@ SELECT
 FROM public.alvaras a
 WHERE a.ativo = TRUE
   AND a.deletado_em IS NULL
+  AND a.inativa = FALSE
   AND a.data_validade IS NOT NULL
   AND a.data_validade <= CURRENT_DATE + 30
 
