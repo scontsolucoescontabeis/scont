@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#8B3A3A" />
+  <title>Demandas de Clientes — Scont</title>
+  <link rel="icon" type="image/x-icon" href="../assets/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" />
+  <link rel="stylesheet" href="css/demandas.css" />
+  <script src="../supabase-config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="../portal-auth-guard.js"></script>
+</head>
+<body>
+<div id="authOverlay" role="status" style="position:fixed;inset:0;background:#FAF8F3;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="font-size:40px;" aria-hidden="true">🔐</div>
+  <p style="font-family:sans-serif;color:#8B3A3A;font-weight:600;font-size:15px;">Verificando acesso…</p>
+</div>
+<a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT" width="140" height="50">
+      <h1>Demandas</h1>
+      <p>Controle de demandas de clientes</p>
+    </div>
+    <nav class="menu" aria-label="Principal">
+      <button class="menu-item" data-tela="painel"><span aria-hidden="true">📊</span> Painel</button>
+      <button class="menu-item" data-tela="lista"><span aria-hidden="true">📋</span> Demandas</button>
+      <button class="menu-item" data-tela="clientes"><span aria-hidden="true">🏢</span> Por cliente</button>
+      <button class="menu-item" data-tela="importar"><span aria-hidden="true">📥</span> Importar planilha</button>
+      <button class="menu-item" data-tela="historico"><span aria-hidden="true">🕘</span> Histórico de importações</button>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn-voltar" onclick="window.location.href='../portal.html'"><span aria-hidden="true">🏠</span> Voltar ao Portal</button>
+    </div>
+  </aside>
+
+  <main class="main" id="conteudo" tabindex="-1">
+    <div id="carregando" class="carregando" role="status" hidden>Carregando demandas…</div>
+    <div id="erroGlobal" class="aviso aviso-erro" role="alert" hidden></div>
+    <section id="tela-painel" hidden></section>
+    <section id="tela-lista" hidden></section>
+    <section id="tela-detalhe" hidden></section>
+    <section id="tela-clientes" hidden></section>
+    <section id="tela-importar" hidden></section>
+    <section id="tela-historico" hidden></section>
+  </main>
+</div>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script src="js/parser.js"></script>
+<script src="js/diff.js"></script>
+<script src="js/metricas.js"></script>
+<script src="js/app.js"></script>
+<script src="js/painel.js"></script>
+<script src="js/lista.js"></script>
+<script src="js/detalhe.js"></script>
+<script src="js/clientes.js"></script>
+<script src="js/importar.js"></script>
+<script src="js/historico.js"></script>
+<script>DEM.iniciar();</script>
+</body>
+</html>
