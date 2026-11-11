@@ -319,8 +319,7 @@ UPDATE public.gm_modelos SET template = $doc$<link href="https://fonts.googleapi
     <!-- Rodapé -->
     <div class="footer">
       <div class="footer-inner">
-        SCONT Soluções Contábeis · Departamento Pessoal<br>
-        Modelo de acordo para compensação de horas de trabalho.
+        SCONT Soluções Contábeis · Departamento Pessoal
       </div>
     </div>
 
