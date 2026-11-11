@@ -799,6 +799,10 @@ let wizardPanelAtual = 'modelo';
 let _dbEmpregados = [];
 let _dbSocios     = [];
 let _dbRubricas   = [];
+let _dbJornadas   = [];   // rh_jornada_trabalho das empresas selecionadas
+let _dataAssinaturaModo = null; // null (não perguntado) | 'hoje' | 'admissao' — só no evento Admissão - Quadrante
+let _prorrogManual = {};        // chave -> { horas, hora_normal, percentual, hora_extra_valor } (Acordo de Prorrogação)
+let _jornadaManual = {};  // preenchimento manual (só desta geração): chave -> { dia: {entrada,intervalo_inicio,intervalo_fim,saida} }
 
 // Seleções do usuário em cada painel
 let wizardEmpregadosSelecionados = []; // array de ids
@@ -845,6 +849,8 @@ async function iniciarWizard() {
   wizardColunaEmpresaExcel       = '';
   wizardColunaCodigoEmpresaExcel = '';
   _dbEmpregados = []; _dbSocios = []; _dbRubricas = [];
+  _dbJornadas = []; _jornadaManual = {};
+  _dataAssinaturaModo = null; _prorrogManual = {};
   excelData = []; excelHeaders = [];
   _limparUIPlanilha();
 
@@ -922,6 +928,9 @@ async function wizardAvançar() {
     construirRegistros();
     buildWizardResumo();
     renderPreview();
+    mostrarPainel(proximo);
+    await verificarPendenciasGeracao();
+    return;
   }
 
   mostrarPainel(proximo);
@@ -1107,10 +1116,310 @@ async function carregarDadosDasEmpresas() {
   _dbEmpregados = r1.data || [];
   _dbSocios     = r2.data || [];
   _dbRubricas   = r3.data || [];
+  await carregarJornadasDasEmpresas(codigos);
   // Pré-seleciona todos por padrão
   wizardEmpregadosSelecionados = _dbEmpregados.map(e => e.id);
   wizardSociosSelecionados     = _dbSocios.map(s => s.id);
   wizardRubricasSelecionados   = _dbRubricas.map(r => r.id);
+}
+
+// ── Jornada de trabalho (rh_jornada_trabalho) ─────────────────
+const JORNADA_DIAS = [
+  ['segunda','Segunda'], ['terca','Terça'], ['quarta','Quarta'], ['quinta','Quinta'],
+  ['sexta','Sexta'], ['sabado','Sábado'], ['domingo','Domingo'],
+];
+
+// Pagina de 1000 em 1000 (limite padrão do PostgREST). Falha não bloqueia a
+// geração: a jornada simplesmente fica vazia e o usuário é avisado.
+async function carregarJornadasDasEmpresas(codigos) {
+  _dbJornadas = [];
+  try {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await sb.from('rh_jornada_trabalho')
+        .select('codigo_empresa,codigo_empregado,dia_semana,entrada,intervalo_inicio,intervalo_fim,saida')
+        .in('codigo_empresa', codigos).range(from, from + 999);
+      if (error) throw error;
+      _dbJornadas.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+  } catch (e) {
+    console.warn('[Gerador de Modelos] Não foi possível carregar rh_jornada_trabalho:', e);
+  }
+}
+
+const _jornadaChave = (o) => `${String(o.codigo_empresa ?? '').trim()}|${String(o.codigo_empregado ?? '').trim()}`;
+// 00:00 → 00:00 é jornada zerada (folga), não horário real.
+const _jornadaDiaValido = (r) => !!(r && r.entrada && r.saida && !(r.entrada === '00:00' && r.saida === '00:00'));
+
+// Retorna { dias: {dia: registro}, origem: 'banco'|'manual'|'vazia' }
+function _jornadaDoEmpregado(emp) {
+  const chave = _jornadaChave(emp);
+  if (_jornadaManual[chave]) return { dias: _jornadaManual[chave], origem: 'manual' };
+  const dias = {};
+  _dbJornadas.forEach(r => {
+    if (_jornadaChave(r) === chave && _jornadaDiaValido(r)) dias[r.dia_semana] = r;
+  });
+  return { dias, origem: Object.keys(dias).length ? 'banco' : 'vazia' };
+}
+
+function _jornadaVars(emp) {
+  const map = {};
+  if (!emp || !emp.codigo_empregado) return map;
+  const { dias, origem } = _jornadaDoEmpregado(emp);
+  map['jornada._origem'] = origem;
+  map['jornada._chave']  = _jornadaChave(emp);
+  for (const [dia] of JORNADA_DIAS) {
+    const r = _jornadaDiaValido(dias[dia]) ? dias[dia] : null;
+    map[`jornada.${dia}.entrada`]          = r?.entrada || '';
+    map[`jornada.${dia}.saida`]            = r?.saida || '';
+    map[`jornada.${dia}.intervalo_inicio`] = r?.intervalo_inicio || '';
+    map[`jornada.${dia}.intervalo_fim`]    = r?.intervalo_fim || '';
+    map[`jornada.${dia}.as`]               = r ? 'às' : '';
+    map[`jornada.${dia}.as_intervalo`]     = (r?.intervalo_inicio && r?.intervalo_fim) ? 'às' : '';
+  }
+  return map;
+}
+
+function _templatesEmUso() {
+  if (wizardEventoAtivo) return wizardEventoAtivo.modelosOrdenados.map(m => m.template || '');
+  return [wizardModeloSelecionado?.template || ''];
+}
+
+// Após montar os registros: se o modelo usa {{jornada.*}} e algum empregado
+// está sem jornada, avisa e oferece o preenchimento. Ignorar mantém em branco.
+let _jornadaResolve = null;
+function verificarJornadasVazias() {
+  if (!_templatesEmUso().some(t => t.includes('{{jornada.'))) return Promise.resolve();
+  const vistos = new Map();
+  wizardRegistros.forEach(r => {
+    const chave = r['jornada._chave'];
+    if (chave && r['jornada._origem'] === 'vazia' && !vistos.has(chave)) {
+      vistos.set(chave, { chave, nome: r['empregado.nome_empregado'] || chave, empresa: r['empresa.nome_empresa'] || '' });
+    }
+  });
+  if (!vistos.size) return Promise.resolve();
+  return new Promise(res => { _jornadaResolve = res; abrirModalJornada([...vistos.values()]); });
+}
+
+function abrirModalJornada(lista) {
+  let modal = document.getElementById('modal-jornada-vazia');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'modal-jornada-vazia';
+    document.body.appendChild(modal);
+  }
+  const inp = (chave, dia, campo) =>
+    `<input type="time" data-jch="${esc(chave)}" data-dia="${dia}" data-campo="${campo}" style="width:104px;padding:4px;border:1px solid var(--border);border-radius:4px">`;
+  const blocos = lista.map(emp => `
+    <div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <strong style="font-size:13px">${esc(emp.nome)}</strong>
+        <button class="btn btn-secondary btn-sm" type="button" onclick="copiarSegundaParaUteis(this)" data-jch="${esc(emp.chave)}">Copiar Segunda → Sex</button>
+      </div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <tr style="text-align:left;color:var(--muted)"><th>Dia</th><th>Entrada</th><th>Int. início</th><th>Int. fim</th><th>Saída</th></tr>
+        ${JORNADA_DIAS.map(([d, lbl]) => `<tr><td style="padding:3px 0">${lbl}</td>
+          <td>${inp(emp.chave, d, 'entrada')}</td><td>${inp(emp.chave, d, 'intervalo_inicio')}</td>
+          <td>${inp(emp.chave, d, 'intervalo_fim')}</td><td>${inp(emp.chave, d, 'saida')}</td></tr>`).join('')}
+      </table>
+    </div>`).join('');
+  modal.innerHTML = `
+    <div class="modal-box wide">
+      <div class="modal-head"><span>⚠ Jornada de trabalho não encontrada</span>
+        <button class="modal-close" onclick="fecharModalJornada()">✕</button></div>
+      <div class="modal-body" style="padding:20px">
+        <p style="margin:0 0 14px;font-size:13px">
+          ${lista.length === 1 ? 'O empregado abaixo não tem' : `${lista.length} empregados não têm`} jornada cadastrada em
+          <code>rh_jornada_trabalho</code> (ou ela está zerada). Preencha se quiser que o horário saia no documento;
+          dias deixados em branco continuam em branco. O preenchimento vale só para esta geração.
+        </p>${blocos}
+      </div>
+      <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px">
+        <button class="btn btn-secondary" onclick="fecharModalJornada()">Manter em branco</button>
+        <button class="btn btn-primary" onclick="confirmarJornadaManual()">Aplicar jornada</button>
+      </div>
+    </div>`;
+  modal.classList.add('open');
+}
+
+function fecharModalJornada() {
+  document.getElementById('modal-jornada-vazia')?.classList.remove('open');
+  if (_jornadaResolve) { const r = _jornadaResolve; _jornadaResolve = null; r(); }
+}
+
+// ── Data de assinatura (evento Admissão - Quadrante) ──────────
+function _parseDataISO(v) {
+  const s = String(v ?? '').trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return { y: +m[1], m: +m[2], d: +m[3] };
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m) return { y: +m[3], m: +m[2], d: +m[1] };
+  return null;
+}
+
+const _ehEventoAdmissaoQuadrante = () =>
+  !!wizardEventoAtivo && /admiss/i.test(wizardEventoAtivo.nome || '') && /quadrante/i.test(wizardEventoAtivo.nome || '');
+
+function _abrirModalGenerico(id, html) {
+  let modal = document.getElementById(id);
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = id;
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = html;
+  modal.classList.add('open');
+  return modal;
+}
+
+function perguntarDataAssinatura() {
+  if (!_ehEventoAdmissaoQuadrante()) return Promise.resolve();
+  return new Promise(resolve => {
+    _abrirModalGenerico('modal-data-assinatura', `
+      <div class="modal-box" style="max-width:480px">
+        <div class="modal-head"><span>Data de assinatura dos documentos</span></div>
+        <div class="modal-body" style="padding:20px;font-size:14px">
+          <p style="margin:0 0 14px">Qual data deve constar na assinatura dos documentos deste evento?</p>
+          <label style="display:block;margin-bottom:10px;cursor:pointer"><input type="radio" name="modo-data-ass" value="hoje" checked> Data do dia (${new Date().toLocaleDateString('pt-BR')})</label>
+          <label style="display:block;cursor:pointer"><input type="radio" name="modo-data-ass" value="admissao"> Data de admissão de cada empregado (de <code>rh_empregados</code>)</label>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:flex-end;padding:12px 20px">
+          <button class="btn btn-primary" id="btn-confirma-data-ass">Confirmar</button>
+        </div>
+      </div>`);
+    document.getElementById('btn-confirma-data-ass').onclick = () => {
+      _dataAssinaturaModo = document.querySelector('input[name="modo-data-ass"]:checked').value;
+      document.getElementById('modal-data-assinatura').classList.remove('open');
+      construirRegistros(); buildWizardResumo(); renderPreview();
+      if (_dataAssinaturaModo === 'admissao') {
+        const sem = wizardRegistros.filter(r => r['empregado.nome_empregado'] && !_parseDataISO(
+          _dbEmpregados.find(e => e.nome_empregado === r['empregado.nome_empregado'] && String(e.codigo_empresa) === String(r['empresa.codigo_empresa']))?.data_admissao)).length;
+        if (sem) toast(`${sem} empregado(s) sem data de admissão cadastrada — usada a data do dia.`, 'error');
+      }
+      resolve();
+    };
+  });
+}
+
+// ── Acordo de Prorrogação de Horas — campos em aberto ─────────
+const _prorrogChave = (empresa, emp) =>
+  emp?.codigo_empregado ? _jornadaChave(emp) : `emp:${String(empresa?.codigo_empresa ?? '').trim()}`;
+
+function _prorrogVars(empresa, emp) {
+  const chave = _prorrogChave(empresa, emp);
+  const v = _prorrogManual[chave] || {};
+  const horasNum = parseInt(String(v.horas ?? '').trim(), 10);
+  return {
+    'prorrogacao._chave':           chave,
+    'prorrogacao.horas':            v.horas || '',
+    'prorrogacao.horas_extenso':    Number.isInteger(horasNum) && String(horasNum) === String(v.horas).trim() ? _numExtenso(horasNum) : '',
+    'prorrogacao.hora_normal':      v.hora_normal || '',
+    'prorrogacao.percentual':       v.percentual || '',
+    'prorrogacao.hora_extra_valor': v.hora_extra_valor || '',
+  };
+}
+
+function perguntarCamposProrrogacao() {
+  if (!_templatesEmUso().some(t => t.includes('{{prorrogacao.'))) return Promise.resolve();
+  const vistos = new Map();
+  wizardRegistros.forEach(r => {
+    const chave = r['prorrogacao._chave'];
+    if (chave && !vistos.has(chave)) vistos.set(chave, r['empregado.nome_empregado'] || r['empresa.nome_empresa'] || chave);
+  });
+  if (!vistos.size) return Promise.resolve();
+  const campos = [['horas','Horas (nº)','60px'], ['hora_normal','Hora normal R$','90px'], ['percentual','Hora extra %','70px'], ['hora_extra_valor','Hora extra R$','90px']];
+  const inp = (chave, c, w) => `<input type="text" data-pch="${esc(chave)}" data-pc="${c}" value="${esc(_prorrogManual[chave]?.[c] || '')}" style="width:${w};padding:4px;border:1px solid var(--border);border-radius:4px">`;
+  const linhas = [...vistos].map(([chave, nome]) => `<tr><td style="padding:4px 6px 4px 0">${esc(nome)}</td>${campos.map(([c,,w]) => `<td>${inp(chave, c, w)}</td>`).join('')}</tr>`).join('');
+  return new Promise(resolve => {
+    const modal = _abrirModalGenerico('modal-prorrogacao', `
+      <div class="modal-box wide">
+        <div class="modal-head"><span>Acordo de Prorrogação de Horas — campos em aberto</span></div>
+        <div class="modal-body" style="padding:20px;font-size:13px">
+          <p style="margin:0 0 12px">Informe os valores das cláusulas 1ª e 2ª. O que ficar vazio permanece em branco no documento.
+            A quantidade por extenso é gerada automaticamente; o valor da hora extra é calculado ao informar hora normal e %, mas pode ser editado.</p>
+          <div style="margin-bottom:12px;padding:8px;background:var(--bg-light);border-radius:6px;display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+            ${campos.map(([c,l,w]) => `<label style="font-size:11px">${l}<br><input type="text" id="prorr-todos-${c}" style="width:${w};padding:4px;border:1px solid var(--border);border-radius:4px"></label>`).join('')}
+            <button class="btn btn-secondary btn-sm" type="button" id="btn-prorr-todos">Aplicar a todos</button>
+          </div>
+          <table style="width:100%;border-collapse:collapse"><tr style="text-align:left;color:var(--muted);font-size:11px"><th>Empregado</th>${campos.map(([,l]) => `<th>${l}</th>`).join('')}</tr>${linhas}</table>
+        </div>
+        <div class="modal-footer" style="display:flex;justify-content:flex-end;gap:8px;padding:12px 20px">
+          <button class="btn btn-secondary" id="btn-prorr-branco">Manter em branco</button>
+          <button class="btn btn-primary" id="btn-prorr-ok">Aplicar</button>
+        </div>
+      </div>`);
+    const num = (s) => parseFloat(String(s).replace(/\./g, '').replace(',', '.'));
+    const fmt = (n) => n.toFixed(2).replace('.', ',');
+    const q = (chave, c) => modal.querySelector(`input[data-pch="${CSS.escape(chave)}"][data-pc="${c}"]`);
+    // hora extra R$ = hora normal × (1 + %/100), enquanto o usuário não digitou o valor à mão
+    modal.addEventListener('input', (ev) => {
+      const el = ev.target; if (!el.dataset?.pch) return;
+      const chave = el.dataset.pch;
+      if (el.dataset.pc === 'hora_extra_valor') { el.dataset.manual = '1'; return; }
+      if (el.dataset.pc === 'hora_normal' || el.dataset.pc === 'percentual') {
+        const alvo = q(chave, 'hora_extra_valor');
+        const n = num(q(chave, 'hora_normal').value), p = num(q(chave, 'percentual').value);
+        if (!alvo.dataset.manual && isFinite(n) && isFinite(p)) alvo.value = fmt(n * (1 + p / 100));
+      }
+    });
+    document.getElementById('btn-prorr-todos').onclick = () => {
+      campos.forEach(([c]) => {
+        const v = document.getElementById(`prorr-todos-${c}`).value;
+        if (v !== '') modal.querySelectorAll(`input[data-pc="${c}"]`).forEach(i => { i.value = v; });
+      });
+    };
+    const fechar = () => { modal.classList.remove('open'); resolve(); };
+    document.getElementById('btn-prorr-branco').onclick = fechar;
+    document.getElementById('btn-prorr-ok').onclick = () => {
+      const por = {};
+      modal.querySelectorAll('input[data-pch]').forEach(i => { (por[i.dataset.pch] ??= {})[i.dataset.pc] = i.value.trim(); });
+      for (const [chave, v] of Object.entries(por)) {
+        if (Object.values(v).some(x => x)) _prorrogManual[chave] = v; else delete _prorrogManual[chave];
+      }
+      construirRegistros(); buildWizardResumo(); renderPreview();
+      fechar();
+    };
+  });
+}
+
+// Sequência de perguntas ao entrar na etapa Exportar
+async function verificarPendenciasGeracao() {
+  await perguntarDataAssinatura();
+  await perguntarCamposProrrogacao();
+  await verificarJornadasVazias();
+}
+
+function copiarSegundaParaUteis(btn) {
+  const chave = btn.dataset.jch;
+  const q = (dia, campo) => document.querySelector(`#modal-jornada-vazia input[data-jch="${CSS.escape(chave)}"][data-dia="${dia}"][data-campo="${campo}"]`);
+  ['entrada','intervalo_inicio','intervalo_fim','saida'].forEach(c => {
+    const v = q('segunda', c).value;
+    ['terca','quarta','quinta','sexta'].forEach(d => { q(d, c).value = v; });
+  });
+}
+
+function confirmarJornadaManual() {
+  const porEmp = {};
+  document.querySelectorAll('#modal-jornada-vazia input[data-jch]').forEach(i => {
+    const { jch, dia, campo } = i.dataset;
+    ((porEmp[jch] ??= {})[dia] ??= {})[campo] = i.value;
+  });
+  let preenchidos = 0;
+  for (const [chave, dias] of Object.entries(porEmp)) {
+    const validos = {};
+    for (const [dia, c] of Object.entries(dias)) {
+      if (c.entrada && c.saida) validos[dia] = { ...c };
+    }
+    if (Object.keys(validos).length) { _jornadaManual[chave] = validos; preenchidos++; }
+  }
+  fecharModalJornada();
+  if (!preenchidos) { toast('Jornada mantida em branco.'); return; }
+  construirRegistros();
+  buildWizardResumo();
+  renderPreview();
+  toast(`Jornada aplicada a ${preenchidos} empregado(s).`, 'success');
 }
 
 // ── Empregados ────────────────────────────────────────────────
@@ -1311,8 +1620,18 @@ function buildVarMap(empresa, empregado, socio, rubrica, excelRow) {
   for (const [campo] of VARS_DEF.socios.campos)      map[`socio.${campo}`]     = socio[campo]     ?? '';
   for (const [campo] of VARS_DEF.rubricas.campos)    map[`rubrica.${campo}`]   = rubrica[campo]   ?? '';
   for (const h of excelHeaders)                       map[`excel.${h}`]         = excelRow[h]      ?? '';
+  Object.assign(map, _jornadaVars(empregado));
+  Object.assign(map, _prorrogVars(empresa, empregado));
   map['sistema.data_atual']         = new Date().toLocaleDateString('pt-BR');
   map['sistema.data_atual_extenso'] = _dataAtualExtenso();
+  // Evento Admissão - Quadrante: a data de assinatura pode ser a data de admissão
+  if (_dataAssinaturaModo === 'admissao') {
+    const d = _parseDataISO(empregado?.data_admissao);
+    if (d) {
+      map['sistema.data_atual']         = `${String(d.d).padStart(2,'0')}/${String(d.m).padStart(2,'0')}/${d.y}`;
+      map['sistema.data_atual_extenso'] = `${d.d} de ${MESES_EXTENSO[d.m - 1]} de ${d.y}`;
+    }
+  }
   return map;
 }
 
@@ -1366,6 +1685,8 @@ function substituirVars(template, varMap, highlight = false) {
     let extenso = false;
     if (key.startsWith('extenso:')) { extenso = true; key = key.slice(8).trim(); }
     const val = varMap[key];
+    // Jornada vazia sai em branco (nunca mostra o {{placeholder}} cru).
+    if (/^(jornada|prorrogacao)\./.test(key) && (val === undefined || val === null || val === '')) return '';
     if (val === undefined || val === null || val === '') {
       return highlight ? `<span class="var-missing">${esc(match)}</span>` : match;
     }
@@ -1699,7 +2020,7 @@ async function exportarExcel() {
     toast('Nenhum dado para exportar.', 'error'); return;
   }
   const modelo = wizardModeloSelecionado;
-  const chaves = wizardRegistros[0] ? Object.keys(wizardRegistros[0]) : [];
+  const chaves = wizardRegistros[0] ? Object.keys(wizardRegistros[0]).filter(k => !/^(jornada|prorrogacao)\./.test(k)) : [];
   const rows = wizardRegistros.map(varMap => {
     const row = {};
     for (const k of chaves) row[k] = varMap[k] ?? '';
