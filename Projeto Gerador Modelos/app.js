@@ -1850,14 +1850,14 @@ function _agruparRegistrosPorEmpresa(registros) {
 // Monta o HTML das páginas (um documento por registro, ou por modelo do
 // evento) a partir de uma lista de registros — reaproveitado tanto para o
 // arquivo único quanto para cada arquivo por empresa.
-function _montarPaginasPDF(modelo, registros) {
+function _montarPaginasPDF(modelo, registros, modelosSel = null) {
   const bodyStyle = 'padding:16px 0;font-family:Segoe UI,Arial,sans-serif;font-size:11px;line-height:1.7;color:#2C3E50;';
 
   let paginas;
   if (wizardEventoAtivo) {
     // Um cabeçalho por modelo do evento — cada documento em folha própria,
     // tanto entre modelos de um mesmo registro quanto entre registros.
-    const modelosEvento = wizardEventoAtivo.modelosOrdenados;
+    const modelosEvento = modelosSel || wizardEventoAtivo.modelosOrdenados;
     const blocos = [];
     registros.forEach((varMap) => {
       modelosEvento.forEach((m) => {
@@ -1945,14 +1945,61 @@ function _abrirJanelaImpressao(titulo, innerHtml, printDelayMs = 300, caberUmaPa
   return true;
 }
 
-async function exportarPDF() {
+// Em eventos, pergunta se os modelos saem em um único PDF ou em um PDF por
+// modelo. O clique no botão do modal é o gesto que permite abrir as janelas.
+function _escolherModoPDFEvento() {
+  const n = wizardEventoAtivo.modelosOrdenados.length;
+  _abrirModalGenerico('modal-modo-pdf-evento', `
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-head"><span>Salvar PDF — ${esc(wizardEventoAtivo.nome)}</span>
+        <button class="modal-close" onclick="document.getElementById('modal-modo-pdf-evento').classList.remove('open')">✕</button></div>
+      <div class="modal-body" style="padding:20px;font-size:14px">
+        <p style="margin:0 0 14px">O evento tem ${n} modelos. Como deseja salvar?</p>
+        <button class="btn btn-primary" style="width:100%;margin-bottom:10px" onclick="confirmarModoPDFEvento('unico')">📄 Todos os modelos em um único PDF</button>
+        <button class="btn btn-secondary" style="width:100%" onclick="confirmarModoPDFEvento('individual')">📑 Um PDF para cada modelo (${n} arquivos)</button>
+        <p style="margin:12px 0 0;font-size:12px;color:var(--muted)">No modo individual abre uma janela de impressão por modelo — permita pop-ups nesta página.</p>
+      </div>
+    </div>`);
+}
+
+function confirmarModoPDFEvento(modo) {
+  document.getElementById('modal-modo-pdf-evento')?.classList.remove('open');
+  exportarPDF(modo);
+}
+
+async function exportarPDF(modoEvento = null) {
   if (!wizardModeloSelecionado || !wizardRegistros.length) {
     toast('Nenhum dado para exportar.', 'error'); return;
+  }
+  if (wizardEventoAtivo && modoEvento !== 'unico' && modoEvento !== 'individual') {
+    _escolherModoPDFEvento(); return;
   }
 
   const modelo = wizardModeloSelecionado;
   const grupos = _agruparRegistrosPorEmpresa(wizardRegistros);
   const multiplasEmpresas = grupos.length > 1;
+
+  if (wizardEventoAtivo && modoEvento === 'individual') {
+    const modelosEvento = wizardEventoAtivo.modelosOrdenados;
+    toast(`Gerando ${grupos.length * modelosEvento.length} PDFs — um por modelo${multiplasEmpresas ? ' e empresa' : ''}…`, '');
+    const bloqueadas = [];
+    let i = 0, total = 0;
+    grupos.forEach((grupo) => {
+      modelosEvento.forEach((m) => {
+        total++;
+        const innerHtml = _montarPaginasPDF(modelo, grupo.registros, [m]);
+        const titulo = multiplasEmpresas ? `${m.nome} — ${grupo.nomeEmpresa}` : m.nome;
+        if (!_abrirJanelaImpressao(titulo, innerHtml, 300 + (i++) * 700, wizardCaberUmaPagina)) bloqueadas.push(m.nome);
+      });
+    });
+    await registrarGeracao();
+    if (bloqueadas.length) {
+      toast(`Permita pop-ups nesta página — ${bloqueadas.length} de ${total} PDF(s) não abriram.`, 'error');
+    } else {
+      toast(`${total} diálogos de impressão abertos — um por modelo. Desmarque "Cabeçalhos e rodapés" para remover a data.`, 'success');
+    }
+    return;
+  }
 
   toast(multiplasEmpresas ? `Gerando ${grupos.length} PDFs — um por empresa…` : 'Gerando PDF…', '');
 
