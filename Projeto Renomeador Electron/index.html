@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCONT — Renomeador de Arquivos</title>
+    <style>
+        :root {
+            --primary-color: #8B3A3A;
+            --primary-hover: #6B2A2A;
+            --secondary-color: #2C3E50;
+            --background-color: #F4F7F6;
+            --card-bg: #FFFFFF;
+            --text-primary: #2C3E50;
+            --text-secondary: #7F8C8D;
+            --border-color: #E0E6ED;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--background-color); color: var(--text-primary); line-height: 1.6; }
+
+        /* ── LOGIN ─────────────────────────────────────────────── */
+        #loginScreen {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+        }
+        .login-box {
+            background: white; border-radius: 14px; padding: 40px 36px;
+            width: 100%; max-width: 380px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+        }
+        .login-logo { text-align: center; margin-bottom: 24px; }
+        .login-logo img { height: 52px; }
+        .login-box h2 { text-align: center; color: var(--primary-color); font-size: 20px; margin-bottom: 6px; }
+        .login-box p  { text-align: center; color: var(--text-secondary); font-size: 13px; margin-bottom: 28px; }
+        .login-field  { margin-bottom: 16px; }
+        .login-field label { display: block; font-size: 12px; font-weight: 600; color: var(--secondary-color); margin-bottom: 6px; }
+        .login-field input {
+            width: 100%; padding: 11px 14px; border: 1px solid var(--border-color);
+            border-radius: 7px; font-size: 14px; transition: border 0.2s;
+        }
+        .login-field input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(139,58,58,0.1); }
+        #btnLogin {
+            width: 100%; padding: 12px; border: none; border-radius: 7px; cursor: pointer;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            color: white; font-size: 14px; font-weight: 700; margin-top: 8px; transition: opacity 0.2s;
+        }
+        #btnLogin:hover { opacity: 0.9; }
+        #loginErro { color: #C0392B; font-size: 12px; margin-top: 10px; text-align: center; display: none; }
+
+        /* ── HEADER ────────────────────────────────────────────── */
+        #appScreen { display: none; }
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+            color: white; padding: 16px 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .header-left img { height: 40px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); }
+        .header-left h1 { font-size: 20px; margin: 0; }
+        .header-left p  { font-size: 12px; opacity: 0.85; margin: 0; }
+        .header-right { display: flex; align-items: center; gap: 12px; }
+        #userLabel { font-size: 12px; opacity: 0.85; }
+        .btn-header {
+            background: rgba(255,255,255,0.2); color: white;
+            border: 1px solid rgba(255,255,255,0.3); padding: 7px 14px;
+            border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s;
+        }
+        .btn-header:hover { background: rgba(255,255,255,0.3); }
+
+        /* ── CONTEÚDO ───────────────────────────────────────────── */
+        .renomeador-container { max-width: 1200px; margin: 28px auto; padding: 0 20px; }
+        .step-card {
+            background: var(--card-bg); border-radius: 12px; padding: 24px;
+            margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+        }
+        .step-title {
+            color: var(--primary-color); font-size: 17px; margin-bottom: 18px;
+            display: flex; align-items: center; gap: 10px;
+            border-bottom: 2px solid #F5F5F5; padding-bottom: 10px;
+        }
+        .step-title span {
+            background: var(--primary-color); color: white;
+            width: 28px; height: 28px; display: flex; align-items: center;
+            justify-content: center; border-radius: 50%; font-size: 13px; font-weight: bold;
+        }
+
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: var(--secondary-color); font-size: 12px; }
+        .input-browse { display: flex; gap: 8px; }
+        .input-browse input { flex: 1; }
+        .form-group input {
+            width: 100%; padding: 9px 12px; border: 1px solid var(--border-color);
+            border-radius: 6px; font-size: 13px; font-family: monospace;
+        }
+        .form-group input:focus { outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(139,58,58,0.1); }
+        .form-group small { color: var(--text-secondary); font-size: 11px; margin-top: 4px; display: block; }
+        .btn-browse {
+            padding: 9px 14px; background: #F0F0F0; border: 1px solid var(--border-color);
+            border-radius: 6px; cursor: pointer; font-size: 12px; white-space: nowrap;
+            transition: background 0.2s;
+        }
+        .btn-browse:hover { background: #E0E0E0; }
+
+        .upload-area {
+            border: 2px dashed var(--primary-color); border-radius: 8px;
+            padding: 36px 20px; text-align: center; background: #FDF8F8;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+        .upload-area:hover, .upload-area.dragover { background: #F9EBEB; border-color: var(--primary-hover); }
+        .upload-icon { font-size: 44px; margin-bottom: 12px; }
+        .upload-text { color: var(--secondary-color); font-weight: 600; margin-bottom: 4px; }
+        .upload-hint { font-size: 12px; color: var(--text-secondary); }
+
+        .btn-action {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
+            color: white; border: none; padding: 11px 22px; border-radius: 6px;
+            cursor: pointer; font-weight: 600; font-size: 14px;
+            transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-action:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(139,58,58,0.25); }
+        .btn-action:disabled { background: #BDC3C7; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .table-container { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 18px; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .data-table th { background: #F8F9FA; padding: 11px; text-align: left; font-weight: 600; color: var(--secondary-color); border-bottom: 2px solid var(--border-color); }
+        .data-table td { padding: 11px; border-bottom: 1px solid var(--border-color); color: var(--secondary-color); word-break: break-all; }
+        .data-table td:last-child { white-space: nowrap; width: 1%; }
+
+        .status-badge { padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; white-space: nowrap; display: inline-block; }
+        .status-ok      { background: #D4EDDA; color: #155724; }
+        .status-error   { background: #F8D7DA; color: #721C24; }
+        .status-warning { background: #FFF3CD; color: #856404; }
+
+        .info-box { background: #E8F4F8; border-left: 4px solid #3498DB; padding: 14px; border-radius: 4px; margin-bottom: 20px; font-size: 13px; color: var(--secondary-color); }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; width: 90%; max-width: 420px; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .modal-header { padding: 14px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h3 { margin: 0; color: var(--primary-color); font-size: 15px; }
+        .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary); }
+        .modal-body { padding: 20px; font-size: 13px; white-space: pre-wrap; line-height: 1.6; }
+        .modal-footer { padding: 12px 20px; border-top: 1px solid var(--border-color); text-align: right; background: #F8F9FA; }
+        .btn-primary { background: var(--primary-color); color: white; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════ LOGIN -->
+<div id="loginScreen">
+    <div class="login-box">
+        <div class="login-logo">
+            <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+        </div>
+        <h2>Renomeador de Arquivos</h2>
+        <p>Entre com sua conta SCONT para continuar</p>
+
+        <div class="login-field">
+            <label>E-MAIL</label>
+            <input type="email" id="loginEmail" placeholder="seu@email.com" autocomplete="email">
+        </div>
+        <div class="login-field">
+            <label>SENHA</label>
+            <input type="password" id="loginSenha" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button id="btnLogin" onclick="fazerLogin()">Entrar</button>
+        <div id="loginErro">E-mail ou senha incorretos.</div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ APP -->
+<div id="appScreen">
+
+    <div class="header">
+        <div class="header-left">
+            <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+            <div>
+                <h1>Renomeador de Arquivos</h1>
+                <p>Organização e padronização automática de documentos</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <span id="userLabel"></span>
+            <button class="btn-header" onclick="fazerLogout()">Sair</button>
+        </div>
+    </div>
+
+    <div class="renomeador-container">
+
+        <div class="info-box">
+            <strong>Como funciona:</strong> Configure os caminhos de destino, faça o upload dos arquivos, analise e clique em <strong>Salvar nos Destinos</strong>. Os arquivos serão gravados diretamente nas pastas configuradas.
+        </div>
+
+        <!-- PASSO 1: PARÂMETROS -->
+        <div class="step-card">
+            <h2 class="step-title"><span>1</span> Parâmetros de Destino</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>Competência (MM/AAAA) *</label>
+                    <input type="text" id="renCompetencia" placeholder="Ex: 04/2026" maxlength="7">
+                </div>
+                <div class="form-group">
+                    <label>Caminho EXPRESS *</label>
+                    <div class="input-browse">
+                        <input type="text" id="caminhoExpress" placeholder="Ex: Z:\SCONT\EXPRESS" value="Z:\SCONT\EXPRESS">
+                        <button class="btn-browse" onclick="browsePasta('caminhoExpress')">📁</button>
+                    </div>
+                    <small>Pasta fixa — arquivo vai direto na raiz</small>
+                </div>
+                <div class="form-group">
+                    <label>Caminho Dinâmico *</label>
+                    <div class="input-browse">
+                        <input type="text" id="caminhoDinamico" placeholder="Ex: C:\Clientes\{NOME_EMPRESA}\{AAAA}\{MM}" value="C:\Clientes\{NOME_EMPRESA}\{AAAA}\{MM}">
+                        <button class="btn-browse" onclick="browsePasta('caminhoDinamico', true)">📁</button>
+                    </div>
+                    <small>Tokens: {NOME_EMPRESA} {CODIGO_EMPRESA} {AAAA} {MM}</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- PASSO 2: UPLOAD -->
+        <div class="step-card">
+            <h2 class="step-title"><span>2</span> Upload dos Arquivos Originais</h2>
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📂</div>
+                <div class="upload-text">Clique aqui ou arraste os arquivos que deseja renomear</div>
+                <div class="upload-hint">Você pode selecionar múltiplos arquivos de uma vez.</div>
+            </div>
+            <input type="file" id="fileInput" multiple style="display:none;" onchange="handleFileSelect(event)">
+            <div id="fileCountInfo" style="margin-top:14px;font-weight:bold;color:var(--primary-color);display:none;">
+                <span id="fileCount">0</span> arquivo(s) carregado(s).
+            </div>
+            <div style="margin-top:18px;text-align:right;">
+                <button class="btn-action" id="btnAnalisar" onclick="analisarArquivos()" disabled>
+                    🔍 Analisar e Aplicar Regras
+                </button>
+            </div>
+        </div>
+
+        <!-- PASSO 3: PRÉVIA -->
+        <div class="step-card" id="step3" style="display:none;">
+            <h2 class="step-title"><span>3</span> Prévia e Execução</h2>
+
+            <div id="avisoErros" style="background:#FFF3CD;color:#856404;padding:14px;border-radius:6px;margin-bottom:14px;font-size:13px;display:none;border:1px solid #FFEEBA;">
+                ⚠️ <strong>Atenção:</strong> Alguns arquivos não puderam ser processados. Verifique a coluna "Status".
+            </div>
+
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Arquivo Original</th>
+                            <th>Novo Nome</th>
+                            <th>Destino EXPRESS</th>
+                            <th>Destino Dinâmico</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewBody"></tbody>
+                </table>
+            </div>
+
+            <div style="margin-top:22px;text-align:right;">
+                <button class="btn-action" id="btnSalvar" onclick="salvarNosDestinos()" style="background:linear-gradient(135deg,#27AE60,#1E8449);">
+                    💾 Salvar nos Destinos
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- MODAL -->
+<div id="messageModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="messageTitle">Mensagem</h3>
+            <button class="modal-close" onclick="fecharModalMensagem()">×</button>
+        </div>
+        <div class="modal-body"><p id="messageText"></p></div>
+        <div class="modal-footer"><button class="btn-primary" onclick="fecharModalMensagem()">OK</button></div>
+    </div>
+</div>
+
+<script src="renomeador-engine.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

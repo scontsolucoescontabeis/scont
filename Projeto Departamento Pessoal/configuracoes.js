@@ -71,6 +71,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     carregarRubricas();
     carregarFeriados();
     carregarRegras();
+    carregarTagsRenomeacao();
     carregarMapeamentos();
     carregarGruposCfg();
     configurarUpload();
@@ -2425,6 +2426,141 @@ async function deletarRegra(id) {
         mostrarStatus('statusRegras', '✅ Regra deletada com sucesso!', 'success');
         carregarRegras();
     } catch (erro) { mostrarStatus('statusRegras', 'Erro ao deletar regra: ' + erro.message, 'error'); }
+}
+
+// --- TAGS DE RENOMEAÇÃO (rh_renomeador_tags) ---
+// As tags são dados: o motor (Projeto RH/renomeador-engine.js) as lê no portal e no app
+// desktop. Escrita só para admin (RLS public.is_admin() + gate client-side). Se a tabela
+// ainda não existir (SQL pendente), mostra o conjunto embutido em modo somente leitura.
+
+let _todasTags = [];
+let _tagEditandoNome = null;
+let _tagsTabelaOk = false;
+
+async function carregarTagsRenomeacao() {
+    try {
+        const { data, error } = await supabaseClient.from('rh_renomeador_tags').select('*').order('nome');
+        if (error) throw error;
+        _tagsTabelaOk = true;
+        _todasTags = (data && data.length) ? data : RenomeadorEngine.TAGS_PADRAO;
+    } catch (erro) {
+        _tagsTabelaOk = false;
+        _todasTags = RenomeadorEngine.TAGS_PADRAO;
+    }
+    renderizarListaTags();
+    const editor = document.getElementById('editorTagsRenomeacao');
+    if (editor) {
+        editor.style.display = (_isAdminFolhaContratada() && _tagsTabelaOk) ? '' : 'none';
+        renderizarTabelaTags();
+    }
+}
+
+function _escHtmlTag(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderizarListaTags() {
+    const ul = document.getElementById('listaTagsRenomeacao');
+    if (!ul) return;
+    ul.innerHTML = _todasTags.filter(t => t.ativo !== false).map(t =>
+        `<li><code>{${_escHtmlTag(t.nome)}}</code> : ${_escHtmlTag(t.descricao || '')}</li>`).join('');
+}
+
+function renderizarTabelaTags() {
+    const tbody = document.getElementById('tagsTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = _todasTags.map(t => `<tr>
+        <td><code>{${_escHtmlTag(t.nome)}}</code></td>
+        <td style="font-family:monospace;font-size:11px;">${_escHtmlTag(t.regex_de || '—')}</td>
+        <td style="font-size:12px;">${_escHtmlTag(t.tipo_para)} ${_escHtmlTag(JSON.stringify(t.config_para || {}))}</td>
+        <td>${t.ativo === false ? 'Não' : 'Sim'}</td>
+        <td style="display:flex;gap:6px;">
+            <button type="button" class="btn-edit" data-tag="${_escHtmlTag(t.nome)}" onclick="editarTag(this.dataset.tag)">Editar</button>
+            <button type="button" class="btn-delete" data-tag="${_escHtmlTag(t.nome)}" onclick="deletarTag(this.dataset.tag)">Deletar</button>
+        </td></tr>`).join('');
+}
+
+function editarTag(nome) {
+    const t = _todasTags.find(x => x.nome === nome);
+    if (!t) return;
+    _tagEditandoNome = nome;
+    document.getElementById('tagNome').value = t.nome;
+    document.getElementById('tagNome').disabled = true;
+    document.getElementById('tagDescricao').value = t.descricao || '';
+    document.getElementById('tagRegexDe').value = t.regex_de || '';
+    document.getElementById('tagGrupoDe').value = t.grupo_de || '';
+    document.getElementById('tagEmpresaChave').value = t.empresa_chave || '';
+    document.getElementById('tagTipoPara').value = t.tipo_para || 'nenhum';
+    document.getElementById('tagConfigPara').value = JSON.stringify(t.config_para || {});
+    document.getElementById('tagAtivo').checked = t.ativo !== false;
+    document.getElementById('btnSalvarTag').textContent = '💾 Atualizar Tag';
+    document.getElementById('btnCancelarTag').style.display = '';
+}
+
+function cancelarEdicaoTag() {
+    _tagEditandoNome = null;
+    document.getElementById('tagNome').value = '';
+    document.getElementById('tagNome').disabled = false;
+    document.getElementById('tagDescricao').value = '';
+    document.getElementById('tagRegexDe').value = '';
+    document.getElementById('tagGrupoDe').value = '';
+    document.getElementById('tagEmpresaChave').value = '';
+    document.getElementById('tagTipoPara').value = 'nenhum';
+    document.getElementById('tagConfigPara').value = '{}';
+    document.getElementById('tagAtivo').checked = true;
+    document.getElementById('btnSalvarTag').textContent = '➕ Salvar Tag';
+    document.getElementById('btnCancelarTag').style.display = 'none';
+}
+
+async function salvarTagRenomeacao() {
+    if (!_isAdminFolhaContratada()) { mostrarStatus('statusTags', 'Somente administradores podem editar tags.', 'error'); return; }
+    const nome = document.getElementById('tagNome').value.trim().replace(/^\{|\}$/g, '');
+    const regexDe = document.getElementById('tagRegexDe').value.trim();
+    const configTxt = document.getElementById('tagConfigPara').value.trim() || '{}';
+    let config;
+
+    if (!/^[A-Za-z0-9_-]+$/.test(nome)) { mostrarStatus('statusTags', 'Nome inválido: use apenas letras, números, _ e -.', 'error'); return; }
+    if (regexDe) { try { new RegExp(regexDe); } catch (e) { mostrarStatus('statusTags', 'Regex DE inválida: ' + e.message, 'error'); return; } }
+    try { config = JSON.parse(configTxt); } catch (e) { mostrarStatus('statusTags', 'Configuração do PARA não é um JSON válido.', 'error'); return; }
+
+    const registro = {
+        nome,
+        descricao: document.getElementById('tagDescricao').value.trim(),
+        regex_de: regexDe || null,
+        grupo_de: document.getElementById('tagGrupoDe').value.trim() || null,
+        empresa_chave: document.getElementById('tagEmpresaChave').value || null,
+        tipo_para: document.getElementById('tagTipoPara').value,
+        config_para: config,
+        ativo: document.getElementById('tagAtivo').checked,
+        atualizado_em: new Date().toISOString()
+    };
+    if (registro.empresa_chave && !registro.grupo_de) { mostrarStatus('statusTags', 'Informe o grupo nomeado que identifica a empresa.', 'error'); return; }
+
+    try {
+        let resp;
+        if (_tagEditandoNome) {
+            resp = await supabaseClient.from('rh_renomeador_tags').update(registro).eq('nome', _tagEditandoNome);
+        } else {
+            if (_todasTags.some(t => t.nome === nome)) { mostrarStatus('statusTags', 'Já existe uma tag com esse nome.', 'error'); return; }
+            resp = await supabaseClient.from('rh_renomeador_tags').insert([registro]);
+        }
+        if (resp.error) throw resp.error;
+        mostrarStatus('statusTags', '✅ Tag salva com sucesso!', 'success');
+        cancelarEdicaoTag();
+        carregarTagsRenomeacao();
+    } catch (erro) { mostrarStatus('statusTags', 'Erro ao salvar tag: ' + erro.message, 'error'); }
+}
+
+async function deletarTag(nome) {
+    if (!_isAdminFolhaContratada()) return;
+    if (!confirm('Deletar a tag {' + nome + '}? Regras que a usam deixarão de reconhecê-la.')) return;
+    try {
+        const { error } = await supabaseClient.from('rh_renomeador_tags').delete().eq('nome', nome);
+        if (error) throw error;
+        if (_tagEditandoNome === nome) cancelarEdicaoTag();
+        mostrarStatus('statusTags', '✅ Tag deletada.', 'success');
+        carregarTagsRenomeacao();
+    } catch (erro) { mostrarStatus('statusTags', 'Erro ao deletar tag: ' + erro.message, 'error'); }
 }
 
 // --- MAPEAMENTO DE NOMES DE DOCUMENTOS ---

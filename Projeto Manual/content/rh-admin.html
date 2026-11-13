@@ -184,6 +184,7 @@ contém "DIAS FALTAS" e contém "DSR"      →  rubrica de desconto de DSR por f
         <li>Tags disponíveis: <code>{CODIGO_EMPRESA}</code>, <code>{NOME_EMPRESA}</code>, <code>{NOME_ARQUIVO}</code>, <code>{NOME_DOCUMENTO}</code>, <code>{MM}</code>, <code>{AAAA}</code>, <code>{DD}</code>, <code>{CNPJ}</code>, <code>{COMPETENCIA_GERACAO}</code>, <code>{MM-1}</code>, <code>{AAAA-1}</code>, <code>{IGNORAR}</code>.</li>
         <li><code>{CNPJ}</code> (no DE) identifica a empresa pelo CNPJ do arquivo — com ou sem máscara — em vez do código; assim o <code>{NOME_EMPRESA}</code> do PARA sai com o nome cadastrado. <code>{DD}</code> extrai (DE) e insere (PARA) o dia.</li>
         <li><code>{COMPETENCIA_GERACAO}</code> (no DE, formato MMAAAA) indica que o número do arquivo é o mês em que ele foi gerado; nesse caso use <code>{MM-1}</code> e <code>{AAAA-1}</code> no PARA para obter o mês/ano anterior (em janeiro, vira dezembro do ano anterior). Ex.: DE <code>{CNPJ}_{NOME_ARQUIVO}_{COMPETENCIA_GERACAO}</code> → PARA <code>{NOME_DOCUMENTO}_{NOME_EMPRESA}_{AAAA-1}_{MM-1}</code>.</li>
+        <li>Administradores veem, abaixo dos padrões, o bloco <strong>Gerenciar Tags</strong>: ali é possível criar, editar, desativar ou excluir tags. As tags valem para o Renomeador do portal e para o aplicativo desktop (carregadas no login, sem reinstalar). Tags de comportamento novo, que o sistema ainda não conhece, exigem atualização do aplicativo.</li>
         <li>Vários padrões podem ficar cadastrados ao mesmo tempo, para diferentes formatos de arquivo recebidos.</li>
     </ul>
 

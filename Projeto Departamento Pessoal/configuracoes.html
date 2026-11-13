@@ -760,7 +760,7 @@
                     <h3 style="color: #2C3E50; margin-bottom: 15px;">1. Padrões de Renomeação</h3>
                     <div style="background: #F5F5F5; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px;">
                         <p><strong>Tags Disponíveis:</strong></p>
-                        <ul style="margin-top: 5px; padding-left: 20px; color: #666;">
+                        <ul id="listaTagsRenomeacao" style="margin-top: 5px; padding-left: 20px; color: #666;">
                             <li><code>{CODIGO_EMPRESA}</code> : Extrai o código (DE) ou insere o código (PARA).</li>
                             <li><code>{NOME_EMPRESA}</code> : Insere o nome da empresa (apenas no PARA).</li>
                             <li><code>{NOME_ARQUIVO}</code> : Extrai o nome original (DE).</li>
@@ -788,6 +788,29 @@
                     </div>
                     <button type="button" id="btnSalvarRegra" class="btn-save" onclick="adicionarRegra()">➕ Salvar Padrão</button>
                     <button type="button" id="btnCancelarRegra" class="btn-cancel-edit" style="display:none;" onclick="cancelarEdicaoRegra()">✕ Cancelar Edição</button>
+                    <details id="editorTagsRenomeacao" style="display:none; margin-top: 20px; border: 1px solid #E0E0E0; border-radius: 8px; padding: 12px 15px;">
+                        <summary style="cursor:pointer; font-weight:600; color:#2C3E50;">⚙️ Gerenciar Tags (somente administradores)</summary>
+                        <p style="font-size:12px; color:#666; margin:10px 0;">As tags valem para o portal e para o app desktop (que as carrega no login), sem precisar de nova versão. Comportamentos de PARA suportados: <code>captura</code> {"grupo":"dia"} · <code>empresa_campo</code> {"campo":"nome_empresa"} · <code>mapeamento</code> {"grupo":"nome"} · <code>competencia</code> {"campo":"mes","deslocamento":-1,"grupo_mes":"gerMes","grupo_ano":"gerAno"}.</p>
+                        <div id="statusTags" class="status-message"></div>
+                        <div class="form-group"><label for="tagNome">Nome da tag (sem chaves) *</label><input type="text" id="tagNome" placeholder="Ex: CNPJ ou MM-1"></div>
+                        <div class="form-group"><label for="tagDescricao">Descrição</label><input type="text" id="tagDescricao"></div>
+                        <div class="form-group"><label for="tagRegexDe">Regex no padrão DE (vazio = tag não vale no DE)</label><input type="text" id="tagRegexDe" placeholder="Ex: (?&lt;dia&gt;\d{2})"></div>
+                        <div class="form-group"><label for="tagGrupoDe">Grupo nomeado que identifica a empresa (se aplicável)</label><input type="text" id="tagGrupoDe" placeholder="Ex: cnpj"></div>
+                        <div class="form-group"><label for="tagEmpresaChave">Esta tag identifica a empresa por</label>
+                            <select id="tagEmpresaChave"><option value="">Não identifica empresa</option><option value="codigo_empresa">Código da empresa</option><option value="cnpj">CNPJ</option></select></div>
+                        <div class="form-group"><label for="tagTipoPara">Comportamento no PARA</label>
+                            <select id="tagTipoPara"><option value="nenhum">nenhum (apenas DE)</option><option value="captura">captura</option><option value="empresa_campo">empresa_campo</option><option value="mapeamento">mapeamento</option><option value="competencia">competencia</option></select></div>
+                        <div class="form-group"><label for="tagConfigPara">Configuração do PARA (JSON)</label><input type="text" id="tagConfigPara" value="{}" style="font-family:monospace;"></div>
+                        <div class="form-group"><label class="inline-check"><input type="checkbox" id="tagAtivo" checked> Tag ativa</label></div>
+                        <button type="button" id="btnSalvarTag" class="btn-save" onclick="salvarTagRenomeacao()">➕ Salvar Tag</button>
+                        <button type="button" id="btnCancelarTag" class="btn-cancel-edit" style="display:none;" onclick="cancelarEdicaoTag()">✕ Cancelar Edição</button>
+                        <div class="table-container" style="margin-top:15px;">
+                            <table class="admin-table">
+                                <thead><tr><th>Tag</th><th>Regex DE</th><th>PARA</th><th>Ativa</th><th>Ações</th></tr></thead>
+                                <tbody id="tagsTableBody"></tbody>
+                            </table>
+                        </div>
+                    </details>
                     <h4 style="color: #2C3E50; margin-top: 20px; margin-bottom: 10px;">Padrões Cadastrados</h4>
                     <div class="table-container">
                         <table class="admin-table">
@@ -1807,6 +1830,7 @@
 <script src="../Projeto RH/socios-parser.js"></script>
 <script src="../Projeto RH/qsa-analise.js"></script>
 <script src="../Projeto RH/feriados-calculo.js"></script>
+<script src="../Projeto RH/renomeador-engine.js"></script>
 <script src="../portal-auth-guard.js"></script>
 <script src="dp-permissoes.js"></script>
 <script src="configuracoes.js"></script>

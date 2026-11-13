@@ -7,8 +7,9 @@
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let regrasCadastradas = [];
-let empresasCadastradas = {};
-let empresasPorCnpj = {};
+let empresasLista = [];
+let tagsCadastradas = [];
+let motor = null;
 let mapeamentosCadastrados = {};
 let arquivosCarregados = []; 
 let arquivosAnalisados = []; 
@@ -43,16 +44,18 @@ async function carregarDadosBase() {
         regrasCadastradas = regras || [];
 
         const { data: empresas } = await supabaseClient.from('rh_empresas').select('codigo_empresa, nome_empresa, cnpj');
-        (empresas || []).forEach(emp => {
-            empresasCadastradas[emp.codigo_empresa] = emp.nome_empresa;
-            const cnpjDigitos = somenteDigitos(emp.cnpj);
-            if (cnpjDigitos) empresasPorCnpj[cnpjDigitos] = emp.codigo_empresa;
-        });
+        empresasLista = empresas || [];
+
+        // Tags do Supabase; se a tabela não existir/estiver vazia, o motor usa o conjunto embutido.
+        const { data: tags, error: erroTags } = await supabaseClient.from('rh_renomeador_tags').select('*').eq('ativo', true);
+        tagsCadastradas = erroTags ? [] : (tags || []);
 
         const { data: mapeamentos } = await supabaseClient.from('rh_mapeamento_nomes').select('nome_arquivo, nome_documento');
         (mapeamentos || []).forEach(map => {
             mapeamentosCadastrados[map.nome_arquivo] = map.nome_documento;
         });
+
+        motor = RenomeadorEngine.criarMotor({ tags: tagsCadastradas, empresas: empresasLista, mapeamentos: mapeamentosCadastrados });
 
     } catch (erro) {
         console.error("Erro ao carregar dados base:", erro);
@@ -101,40 +104,6 @@ function adicionarArquivos(files) {
 
 // --- MOTOR DE REGEX E ANÁLISE ---
 
-function criarRegexDoPadrao(padraoDe) {
-    let regexStr = padraoDe.replace(/[.*+?^$()|[\]\\]/g, '\\$&');
-    regexStr = regexStr.replace(/{CODIGO_EMPRESA}/g, '(?<codigo>\\d+)');
-    regexStr = regexStr.replace(/{NOME_ARQUIVO}/g, '(?<nome>.+?)');
-    regexStr = regexStr.replace(/{MM}/g, '(?<mes>\\d{2})');
-    regexStr = regexStr.replace(/{AAAA}/g, '(?<ano>\\d{4})');
-    regexStr = regexStr.replace(/{DD}/g, '(?<dia>\\d{2})');
-    // CNPJ com ou sem máscara (00.000.000/0000-00 ou 14 dígitos)
-    regexStr = regexStr.replace(/{CNPJ}/g, '(?<cnpj>\\d{2}\\.?\\d{3}\\.?\\d{3}[\\/_-]?\\d{4}[-_]?\\d{2})');
-    // Competência de geração do arquivo: MMAAAA (aceita separador - _ .)
-    regexStr = regexStr.replace(/{COMPETENCIA_GERACAO}/g, '(?<gerMes>\\d{2})[-_.]?(?<gerAno>\\d{4})');
-    regexStr = regexStr.replace(/{IGNORAR}/g, '.*?');
-    return new RegExp('^' + regexStr + '$', 'i');
-}
-
-function somenteDigitos(s) { return (s || '').replace(/\D/g, ''); }
-
-// Mês/ano imediatamente anterior ao informado (trata virada de ano)
-function competenciaAnterior(mes, ano) {
-    let m = parseInt(mes, 10) - 1;
-    let a = parseInt(ano, 10);
-    if (m < 1) { m = 12; a -= 1; }
-    return { mes: String(m).padStart(2, '0'), ano: String(a) };
-}
-
-function aplicarTagsData(str, ctx) {
-    return str
-        .replace(/{DD}/g, ctx.dia)
-        .replace(/{MM-1}/g, ctx.mesAnterior)
-        .replace(/{AAAA-1}/g, ctx.anoAnterior)
-        .replace(/{MM}/g, ctx.mes)
-        .replace(/{AAAA}/g, ctx.ano);
-}
-
 function analisarArquivos() {
     const competencia = document.getElementById('renCompetencia').value;
     const caminhoExpressRaw = document.getElementById('caminhoExpress').value.trim();
@@ -147,7 +116,9 @@ function analisarArquivos() {
     if (regrasCadastradas.length === 0) { mostrarMensagem('Erro', 'Nenhuma regra de renomeação cadastrada no sistema.'); return; }
 
     const [mesComp, anoComp] = competencia.split('/');
-    
+
+    if (!motor) motor = RenomeadorEngine.criarMotor({ empresas: empresasLista, mapeamentos: mapeamentosCadastrados });
+
     arquivosAnalisados = [];
     let temErros = false;
     let temSucesso = false;
@@ -162,19 +133,6 @@ function analisarArquivos() {
         const nomeSemExt = lastDotIndex !== -1 ? nomeOriginal.substring(0, lastDotIndex) : nomeOriginal;
         const extensao = lastDotIndex !== -1 ? nomeOriginal.substring(lastDotIndex) : '';
 
-        let regraAplicada = null;
-        let matchResult = null;
-
-        for (const regra of regrasCadastradas) {
-            const regex = criarRegexDoPadrao(regra.padrao_de);
-            const match = nomeSemExt.match(regex);
-            if (match) {
-                regraAplicada = regra;
-                matchResult = match.groups;
-                break;
-            }
-        }
-
         let status = '';
         let classeStatus = '';
         let novoNomeFinal = '';
@@ -182,73 +140,32 @@ function analisarArquivos() {
         let exibicaoExpress = '';
         let exibicaoDinamico = '';
 
-        if (!regraAplicada) {
+        const resultado = motor.processar(nomeSemExt, regrasCadastradas, { mes: mesComp, ano: anoComp }, caminhoDinamicoRaw);
+
+        if (resultado.reconhecido === false) {
             status = 'Padrão não reconhecido';
             classeStatus = 'status-error';
             temErros = true;
+        } else if (resultado.erro) {
+            status = resultado.erro;
+            classeStatus = 'status-warning';
+            temErros = true;
         } else {
-            // Empresa: por código ou, se a regra usa {CNPJ}, pelo CNPJ do arquivo
-            let codigoExtraido = matchResult.codigo;
-            let rotuloEmpresa = codigoExtraido;
-            if (!codigoExtraido && matchResult.cnpj) {
-                const cnpjDigitos = somenteDigitos(matchResult.cnpj);
-                codigoExtraido = empresasPorCnpj[cnpjDigitos];
-                rotuloEmpresa = `CNPJ ${matchResult.cnpj}`;
-            }
-            const nomeArqExtraido = matchResult.nome || '';
-            const nomeEmpresa = codigoExtraido ? empresasCadastradas[codigoExtraido] : undefined;
-            const nomeDocumentoMapeado = mapeamentosCadastrados[nomeArqExtraido] || nomeArqExtraido;
+            novoNomeFinal = resultado.novoNomeBase + extensao;
 
-            // Competência de geração no DE => mês/ano do arquivo renomeado = geração - 1
-            const temGeracao = matchResult.gerMes !== undefined;
-            const refMes = temGeracao ? matchResult.gerMes : mesComp;
-            const refAno = temGeracao ? matchResult.gerAno : anoComp;
-            const ant = competenciaAnterior(refMes, refAno);
-            const ctxData = {
-                dia: matchResult.dia || '',
-                mes: mesComp, ano: anoComp,
-                mesAnterior: ant.mes, anoAnterior: ant.ano
-            };
-            const usaDiaSemValor = !matchResult.dia && /{DD}/.test(regraAplicada.padrao_para + caminhoDinamicoRaw);
+            // Caminho Dinâmico relativo — normaliza barras (sempre / internamente)
+            caminhoRelativoDinamico = resultado.caminhoDinamico.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
 
-            if (!nomeEmpresa) {
-                status = `Empresa ${rotuloEmpresa || '(sem código/CNPJ no padrão)'} não encontrada`;
-                classeStatus = 'status-warning';
-                temErros = true;
-            } else if (usaDiaSemValor) {
-                status = 'Tag {DD} usada no PARA, mas o dia não existe no padrão DE';
-                classeStatus = 'status-warning';
-                temErros = true;
-            } else {
-                // 1. Construir Novo Nome
-                let novoNomeBase = regraAplicada.padrao_para;
-                novoNomeBase = novoNomeBase.replace(/{CODIGO_EMPRESA}/g, codigoExtraido);
-                novoNomeBase = novoNomeBase.replace(/{NOME_EMPRESA}/g, nomeEmpresa);
-                novoNomeBase = novoNomeBase.replace(/{NOME_ARQUIVO}/g, nomeArqExtraido);
-                novoNomeBase = novoNomeBase.replace(/{NOME_DOCUMENTO}/g, nomeDocumentoMapeado);
-                novoNomeBase = aplicarTagsData(novoNomeBase, ctxData);
-                novoNomeFinal = novoNomeBase + extensao;
+            // Caminhos Absolutos apenas para exibição visual na tabela
+            const separador = '\\';
+            const raizExpressLimpa = caminhoExpressRaw.replace(/[\/]+$/, '');
 
-                // 2. Construir Caminho Dinâmico (Relativo para o ZIP)
-                caminhoRelativoDinamico = caminhoDinamicoRaw;
-                caminhoRelativoDinamico = caminhoRelativoDinamico.replace(/{CODIGO_EMPRESA}/g, codigoExtraido);
-                caminhoRelativoDinamico = caminhoRelativoDinamico.replace(/{NOME_EMPRESA}/g, nomeEmpresa);
-                caminhoRelativoDinamico = aplicarTagsData(caminhoRelativoDinamico, ctxData);
+            exibicaoExpress = `${raizExpressLimpa}${separador}${novoNomeFinal}`;
+            exibicaoDinamico = `${caminhoRelativoDinamico.replace(/\//g, separador)}${separador}${novoNomeFinal}`;
 
-                // Normaliza barras para o ZIP (sempre usar / internamente no ZIP)
-                caminhoRelativoDinamico = caminhoRelativoDinamico.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
-
-                // 3. Caminhos Absolutos apenas para exibição visual na tabela
-                const separador = '\\';
-                const raizExpressLimpa = caminhoExpressRaw.replace(/[\/]+$/, '');
-                
-                exibicaoExpress = `${raizExpressLimpa}${separador}${novoNomeFinal}`;
-                exibicaoDinamico = `${caminhoRelativoDinamico.replace(/\//g, separador)}${separador}${novoNomeFinal}`;
-
-                status = 'Pronto';
-                classeStatus = 'status-ok';
-                temSucesso = true;
-            }
+            status = 'Pronto';
+            classeStatus = 'status-ok';
+            temSucesso = true;
         }
 
         arquivosAnalisados.push({
