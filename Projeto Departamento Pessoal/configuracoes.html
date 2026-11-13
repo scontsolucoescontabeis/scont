@@ -767,10 +767,16 @@
                             <li><code>{NOME_DOCUMENTO}</code> : Insere o nome mapeado (apenas no PARA). Requer cadastro no passo 2 abaixo.</li>
                             <li><code>{MM}</code> : Mês da competência (2 dígitos).</li>
                             <li><code>{AAAA}</code> : Ano da competência (4 dígitos).</li>
+                            <li><code>{DD}</code> : Dia (2 dígitos). No DE extrai o dia do nome; no PARA insere o dia extraído.</li>
+                            <li><code>{CNPJ}</code> : Extrai o CNPJ (DE), com ou sem máscara, e identifica a empresa por ele — use no lugar de <code>{CODIGO_EMPRESA}</code> para renomear para o nome da empresa a partir do CNPJ.</li>
+                            <li><code>{COMPETENCIA_GERACAO}</code> : Competência de geração do arquivo (DE), formato MMAAAA (aceita separador <code>-</code>, <code>_</code> ou <code>.</code>). Quando usada no DE, o mês/ano do arquivo renomeado deve usar <code>{MM-1}</code> e <code>{AAAA-1}</code>.</li>
+                            <li><code>{MM-1}</code> / <code>{AAAA-1}</code> : Mês / ano anterior (apenas no PARA). Parte da competência de geração se existir no DE; caso contrário, da competência informada. Em janeiro, <code>{MM-1}</code> = 12 e <code>{AAAA-1}</code> = ano anterior.</li>
                             <li><code>{IGNORAR}</code> : Ignora uma parte do texto original (apenas no DE).</li>
                         </ul>
                         <p style="margin-top: 10px;"><strong>Exemplo DE:</strong> <code>{CODIGO_EMPRESA}_{NOME_ARQUIVO}_{IGNORAR}_{MM}{AAAA}</code></p>
                         <p><strong>Exemplo PARA:</strong> <code>{NOME_DOCUMENTO}_{NOME_EMPRESA}_{AAAA}_{MM}</code></p>
+                        <p style="margin-top: 10px;"><strong>Exemplo DE (por CNPJ):</strong> <code>{CNPJ}_{NOME_ARQUIVO}_{COMPETENCIA_GERACAO}</code></p>
+                        <p><strong>Exemplo PARA:</strong> <code>{NOME_DOCUMENTO}_{NOME_EMPRESA}_{AAAA-1}_{MM-1}</code></p>
                     </div>
                     <div class="form-group">
                         <label for="padraoDe">Padrão DE (Formato Original do Arquivo) *</label>

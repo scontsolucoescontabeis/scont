@@ -69,7 +69,11 @@
 {NOME_ARQUIVO}    → (?&lt;nome&gt;.+?)
 {MM}              → (?&lt;mes&gt;\d{2})
 {AAAA}            → (?&lt;ano&gt;\d{4})
+{DD}              → (?&lt;dia&gt;\d{2})
+{CNPJ}            → (?&lt;cnpj&gt;CNPJ com ou sem máscara)
+{COMPETENCIA_GERACAO} → (?&lt;gerMes&gt;\d{2})[-_.]?(?&lt;gerAno&gt;\d{4})
 {IGNORAR}         → .*?  (trecho descartado)</div>
+  <p>Quando a regra usa <code>{CNPJ}</code> em vez de <code>{CODIGO_EMPRESA}</code>, a empresa é localizada pelo CNPJ (somente dígitos) em <code>rh_empresas</code>. Quando usa <code>{COMPETENCIA_GERACAO}</code>, as tags <code>{MM-1}</code> e <code>{AAAA-1}</code> do padrão de saída (e do caminho Dinâmico) trazem o mês/ano anteriores ao da geração (janeiro → 12 do ano anterior); sem essa tag no DE, partem da Competência do Passo 1. <code>{DD}</code> vem do dia capturado no DE; se o PARA usar <code>{DD}</code> e o DE não tiver, o arquivo fica com aviso e não é processado.</p>
   <p>O nome do arquivo (sem extensão) é testado contra cada regra cadastrada, na ordem em que estão no sistema; a primeira que casar é aplicada. Se nenhuma casar, o status fica "Padrão não reconhecido".</p>
   <p>Com a regra casada, o <strong>novo nome</strong> e os <strong>dois caminhos de destino</strong> são montados substituindo os mesmos placeholders (mais <code>{NOME_EMPRESA}</code> e <code>{NOME_DOCUMENTO}</code>, resolvidos pelo código extraído e pelo mapeamento de nomes) no padrão de saída (<code>padrao_para</code>) da regra e no caminho Dinâmico informado no Passo 1. A extensão original do arquivo é sempre preservada.</p>
   <p>Se o código de empresa extraído do nome do arquivo não existir em <code>rh_empresas</code>, o arquivo fica com status "Empresa &lt;código&gt; não encontrada" e não é processado no Passo 3.</p>
