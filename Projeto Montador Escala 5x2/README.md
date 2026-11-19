@@ -10,7 +10,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm test           # Vitest (motor de conformidade, gerador, impacto)
 npm run lint
-npm run build      # tsc + vite build -> ../montador-escala (estático)
+npm run build      # tsc + vite build -> ./app (estático, versionado)
 ```
 
 ## Estrutura
@@ -38,7 +38,7 @@ npm run build      # tsc + vite build -> ../montador-escala (estático)
 ## Publicar
 
 `npm run build` gera HTML/JS/CSS estáticos em `../montador-escala` (`base: './'`, funciona em qualquer subpasta).
-Basta publicar essa pasta junto ao portal (mesmo padrão do CRM em `../crm`). Para link no portal, aponte para `montador-escala/index.html`.
+URL: `Projeto Montador Escala 5x2/app/index.html`.
 
 ## Trocar localStorage / envio por Supabase
 
