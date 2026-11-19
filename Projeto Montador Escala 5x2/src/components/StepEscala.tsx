@@ -90,7 +90,7 @@ export function StepEscala() {
           <div className="cartao">
             <Calendario escala={escala} alertas={resultado.alertas} />
           </div>
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-4">
             <PainelAlertas escala={escala} resultado={resultado} />
             <Saida escala={escala} resultado={resultado} />
           </div>
