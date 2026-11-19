@@ -1,17 +1,18 @@
 /**
- * Tema visual. Troque os valores pelas cores oficiais da SCONT quando
- * disponíveis — o Tailwind (tailwind.config.js) e o PDF/Excel leem daqui.
+ * Tema visual — identidade do Portal SCONT (espelha ../../shared.css).
+ * O Tailwind (tailwind.config.ts) e o PDF/Excel leem daqui.
  */
 export const TEMA = {
   nome: 'SCONT Soluções Contábeis',
   cores: {
-    acento: '#0b5ed7', // TODO: trocar pelo azul/cor oficial da SCONT
-    acentoEscuro: '#0842a0',
-    acentoClaro: '#e7f0fe',
-    texto: '#1f2937',
-    textoSuave: '#4b5563',
-    borda: '#d1d5db',
-    fundo: '#f8fafc',
+    acento: '#8B3A3A', // --primary do portal
+    acentoEscuro: '#6B2A2A', // --primary-dark
+    acentoClaro: '#F7ECEC',
+    secundaria: '#2C3E50', // --secondary
+    texto: '#2C3E50',
+    textoSuave: '#5A6C7D',
+    borda: '#E0E6ED',
+    fundo: '#F0F2F5',
     verde: '#15803d',
     amarelo: '#a16207',
     vermelho: '#b91c1c',

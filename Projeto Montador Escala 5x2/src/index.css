@@ -23,9 +23,15 @@ body {
     @apply btn bg-brand text-white hover:bg-brand-dark;
   }
   .btn-sec {
-    @apply btn border border-line bg-white text-ink hover:bg-brand-light;
+    @apply btn border border-line bg-white text-ink hover:border-brand hover:bg-brand-light;
   }
   .cartao {
-    @apply rounded-xl border border-line bg-white p-4 shadow-sm sm:p-6;
+    @apply rounded-xl border border-line bg-white p-4 shadow-card sm:p-6;
   }
+}
+
+.cartao > h2,
+.cartao > h3,
+.cartao > div > h3 {
+  @apply text-brand;
 }
