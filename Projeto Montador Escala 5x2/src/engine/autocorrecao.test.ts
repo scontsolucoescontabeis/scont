@@ -46,4 +46,20 @@ describe('correção automática em cadeia', () => {
     expect(r.aplicadas).toBe(0)
     expect(r.escala).toBe(e)
   })
+
+  it('aplica a troca do domingo mesmo criando furo de cobertura, sem entrar em ciclo', () => {
+    // 2 pessoas, domingo exige 2: ambas trabalham domingo e folgam seg/ter -> sem descanso no domingo
+    const a = ['F', 'F', 't8', 't8', 't8', 't8', 't8']
+    const e = esc('2026-12-21', [a, a], [T8])
+    const cobertura = [{ id: 'c', turnoId: 't8', minimo: 2, diasSemana: [0] }]
+    const v = (x: Escala) =>
+      validarEscala({ escala: x, cobertura, feriados: [], empresaFuncionaFeriados: true, compensacaoDiaria: false })
+    expect(v(e).alertas.some((x) => x.regraId === 'etapa1.repousoPreferencialDomingo')).toBe(true)
+    const r = corrigirTudo(e, v)
+    const depois = v(r.escala)
+    // a 1ª troca vira furo amarelo (1 de 2); a 2ª deixaria o domingo vazio (vermelho) e é recusada
+    expect(r.aplicadas).toBe(1)
+    expect(depois.alertas.filter((x) => x.regraId === 'cobertura')[0].severidade).toBe('amarelo')
+    expect(depois.contagem.vermelho).toBe(0)
+  })
 })
