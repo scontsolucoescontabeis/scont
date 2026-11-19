@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { fmtHoras, horasLiquidasMin } from '../engine/conformidade'
 import { useStore } from '../store/useStore'
+import { DIAS_CURTOS } from '../utils/analise'
 import type { Turno } from '../types'
 import { Campo } from './ui'
 
@@ -8,6 +9,19 @@ export function StepCobertura() {
   const turnos = useStore((s) => s.turnos)
   const cobertura = useStore((s) => s.cobertura)
   const set = useStore((s) => s.set)
+  const dias = useStore((s) => s.empresa.diasFuncionamento)
+
+  // Coerência com o passo 1: dias em que a empresa não funciona não exigem pessoas.
+  const abertosUteis = [1, 2, 3, 4, 5].filter((d) => dias[d])
+  const grupos = {
+    util: {
+      aberto: abertosUteis.length > 0,
+      nome: abertosUteis.length === 5 ? 'segunda a sexta' : abertosUteis.map((d) => DIAS_CURTOS[d]).join(', ') || 'segunda a sexta',
+    },
+    sab: { aberto: dias[6], nome: 'sábado' },
+    dom: { aberto: dias[0], nome: 'domingo' },
+  } as const
+  const fechados = (['util', 'sab', 'dom'] as const).filter((g) => !grupos[g].aberto)
 
   const limpar = { escala: null, propostas: [] }
 
@@ -38,9 +52,14 @@ export function StepCobertura() {
         3. Turnos e cobertura
       </h2>
       <p className="text-sm text-soft">
-        Defina os turnos de trabalho e quantas pessoas, no mínimo, precisam estar presentes em cada um. Dias em que a
-        empresa não funciona (passo 1) são ignorados.
+        Defina os turnos de trabalho e quantas pessoas, no mínimo, precisam estar presentes em cada um. Os dias seguem o
+        que você informou no passo 1: onde a empresa não funciona, não se exige ninguém.
       </p>
+      {fechados.length > 0 && (
+        <p className="rounded-lg border border-line bg-brand-light p-2 text-xs" role="note">
+          Empresa fechada em: {fechados.map((g) => (g === 'util' ? 'dias úteis' : grupos[g].nome)).join(', ')} (passo 1).
+        </p>
+      )}
 
       {turnos.map((t) => {
         const c = cobertura[t.id] ?? { util: 0, sab: 0, dom: 0 }
@@ -73,15 +92,22 @@ export function StepCobertura() {
             </div>
             <p className="text-xs text-soft">Horas trabalhadas por dia neste turno: {fmtHoras(horasLiquidasMin(t))}</p>
             <div className="grid gap-3 sm:grid-cols-3">
-              <Campo rotulo="Pessoas mínimas — segunda a sexta">
-                <input type="number" min={0} className="campo" value={c.util} onChange={(e) => atualizarCob(t.id, 'util', Number(e.target.value))} />
-              </Campo>
-              <Campo rotulo="Pessoas mínimas — sábado">
-                <input type="number" min={0} className="campo" value={c.sab} onChange={(e) => atualizarCob(t.id, 'sab', Number(e.target.value))} />
-              </Campo>
-              <Campo rotulo="Pessoas mínimas — domingo">
-                <input type="number" min={0} className="campo" value={c.dom} onChange={(e) => atualizarCob(t.id, 'dom', Number(e.target.value))} />
-              </Campo>
+              {(['util', 'sab', 'dom'] as const).map((g) => (
+                <Campo
+                  key={g}
+                  rotulo={`Pessoas mínimas — ${grupos[g].nome}`}
+                  ajuda={grupos[g].aberto ? undefined : 'A empresa não funciona nesse(s) dia(s) (passo 1), então não se exige ninguém.'}
+                >
+                  <input
+                    type="number"
+                    min={0}
+                    className="campo disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-soft"
+                    disabled={!grupos[g].aberto}
+                    value={grupos[g].aberto ? c[g] : 0}
+                    onChange={(e) => atualizarCob(t.id, g, Number(e.target.value))}
+                  />
+                </Campo>
+              ))}
             </div>
             {turnos.length > 1 && (
               <button type="button" className="btn-sec" onClick={() => remover(t.id)}>
