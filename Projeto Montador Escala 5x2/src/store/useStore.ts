@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { FERIADOS_PADRAO, type Feriado } from '../config/feriados'
+import { corrigirTudo } from '../engine/autocorrecao'
 import { aplicarCorrecao } from '../engine/conformidade'
+import { gerarPropostas } from '../engine/gerador'
 import { CUSTO_PADRAO } from '../engine/impacto'
 import type {
   AlteracaoCelula,
@@ -14,6 +16,7 @@ import type {
   Turno,
 } from '../types'
 import { carregar, limpar, salvar } from '../services/storage'
+import { analisar } from '../utils/analise'
 
 export interface Dados {
   passo: number
@@ -29,6 +32,8 @@ export interface Dados {
   propostas: Proposta[]
   comparar: string[]
   etapaImpacto: 'etapa1' | 'etapa2'
+  /** Proposta (modelo) em uso no calendário; mantida ao regenerar. */
+  propostaAtivaId: string | null
 }
 
 export const EMPRESA_PADRAO: Empresa = {
@@ -72,6 +77,7 @@ export const DADOS_PADRAO: Dados = {
   propostas: [],
   comparar: [],
   etapaImpacto: 'etapa1',
+  propostaAtivaId: null,
 }
 
 interface Acoes {
@@ -81,6 +87,10 @@ interface Acoes {
   trocarCelulas: (a: { f: string; d: number }, b: { f: string; d: number }) => void
   corrigir: (correcao: AlteracaoCelula[]) => void
   usarProposta: (id: string) => void
+  /** Regenera as propostas a partir dos passos 1–3 (já com correções automáticas). */
+  sugerirEscala: () => void
+  /** Navega para um passo; ao abrir a Escala, atualiza a sugestão com os dados atuais. */
+  irParaPasso: (i: number) => void
   reiniciar: () => void
 }
 
@@ -115,7 +125,34 @@ export const useStore = create<Store>((set, get) => ({
   },
   usarProposta: (id) => {
     const p = get().propostas.find((x) => x.id === id)
-    if (p) set({ escala: p.escala })
+    if (p) set({ escala: p.escala, propostaAtivaId: id })
+  },
+  sugerirEscala: () => {
+    const d = get()
+    const novas = gerarPropostas({
+      empresa: d.empresa,
+      funcoes: d.funcoes,
+      turnos: d.turnos,
+      cobertura: d.cobertura,
+      feriados: d.feriados.map((f) => f.data),
+      inicio: d.inicioEscala,
+      semanas: d.semanas,
+    })
+    const corrigidas = novas.map((p) => ({
+      ...p,
+      escala: corrigirTudo(p.escala, (e) => analisar(d, e)).escala,
+    }))
+    const ativa = corrigidas.find((p) => p.id === d.propostaAtivaId) ?? corrigidas[0]
+    set({
+      propostas: corrigidas,
+      comparar: corrigidas.map((p) => p.id),
+      escala: ativa.escala,
+      propostaAtivaId: ativa.id,
+    })
+  },
+  irParaPasso: (i) => {
+    set({ passo: i })
+    if (i === 3) get().sugerirEscala()
   },
   reiniciar: () => {
     limpar()
@@ -142,6 +179,7 @@ useStore.subscribe((estado) => {
       propostas: estado.propostas,
       comparar: estado.comparar,
       etapaImpacto: estado.etapaImpacto,
+      propostaAtivaId: estado.propostaAtivaId,
     }
     salvar(dados)
   }, 300)

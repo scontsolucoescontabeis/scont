@@ -18,13 +18,13 @@ const PASSOS = [
 
 export default function App() {
   const passo = useStore((s) => s.passo)
-  const set = useStore((s) => s.set)
+  const irParaPasso = useStore((s) => s.irParaPasso)
   const reiniciar = useStore((s) => s.reiniciar)
   const e1 = limitesDaEtapa('etapa1')
   const [menuAberto, setMenuAberto] = useState(false)
 
   const irPara = (i: number) => {
-    set({ passo: i })
+    irParaPasso(i)
     setMenuAberto(false)
   }
 
@@ -111,14 +111,14 @@ export default function App() {
           </main>
 
           <div className="mt-4 flex justify-between">
-            <button type="button" className="btn-sec" disabled={passo === 0} onClick={() => set({ passo: passo - 1 })}>
+            <button type="button" className="btn-sec" disabled={passo === 0} onClick={() => irPara(passo - 1)}>
               <ArrowLeft size={16} aria-hidden /> Voltar
             </button>
             <button
               type="button"
               className="btn-primario"
               disabled={passo === PASSOS.length - 1}
-              onClick={() => set({ passo: passo + 1 })}
+              onClick={() => irPara(passo + 1)}
             >
               Avançar <ArrowRight size={16} aria-hidden />
             </button>

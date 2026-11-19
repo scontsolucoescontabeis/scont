@@ -1,31 +1,12 @@
 import { Sparkles } from 'lucide-react'
-import { corrigirTudo } from '../engine/autocorrecao'
-import { contarDomingosTrabalhados, gerarPropostas } from '../engine/gerador'
+import { contarDomingosTrabalhados } from '../engine/gerador'
 import { useStore } from '../store/useStore'
 import { analisar } from '../utils/analise'
 import { Semaforo } from './ui'
 
 export function Propostas() {
   const dados = useStore()
-  const { set, usarProposta, propostas, comparar } = dados
-
-  const sugerir = () => {
-    const novas = gerarPropostas({
-      empresa: dados.empresa,
-      funcoes: dados.funcoes,
-      turnos: dados.turnos,
-      cobertura: dados.cobertura,
-      feriados: dados.feriados.map((f) => f.data),
-      inicio: dados.inicioEscala,
-      semanas: dados.semanas,
-    })
-    // Já entrega as propostas com tudo que pode ser corrigido automaticamente corrigido.
-    const corrigidas = novas.map((p) => ({
-      ...p,
-      escala: corrigirTudo(p.escala, (e) => analisar(dados, e)).escala,
-    }))
-    set({ propostas: corrigidas, comparar: corrigidas.map((p) => p.id), escala: corrigidas[0].escala })
-  }
+  const { set, usarProposta, sugerirEscala, propostas, comparar } = dados
 
   const alternar = (id: string) => {
     const lista = comparar.includes(id) ? comparar.filter((x) => x !== id) : [...comparar, id].slice(-3)
@@ -59,7 +40,7 @@ export function Propostas() {
             ))}
           </select>
         </label>
-        <button type="button" className="btn-primario" onClick={sugerir}>
+        <button type="button" className="btn-primario" onClick={sugerirEscala}>
           <Sparkles size={16} aria-hidden /> Sugerir escala
         </button>
       </div>
