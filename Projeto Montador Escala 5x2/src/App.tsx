@@ -94,7 +94,7 @@ export default function App() {
       </aside>
 
       <div className="px-4 pb-16 pt-14 lg:ml-[260px] lg:p-8">
-        <div className="mx-auto max-w-6xl">
+        <div className="max-w-6xl">
           <header className="mb-6 rounded-xl border-l-4 border-brand bg-white p-5 shadow-card sm:p-6">
             <h1 className="text-2xl font-bold tracking-tight text-brand">Montador de Escala 5x2</h1>
             <p className="text-sm text-soft">
