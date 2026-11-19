@@ -5,6 +5,7 @@ import { analisar, formatarData } from '../utils/analise'
 import { Calendario } from './Calendario'
 import { Impacto } from './Impacto'
 import { PainelAlertas } from './PainelAlertas'
+import { QuadroContratacoes } from './QuadroContratacoes'
 import { Propostas } from './Propostas'
 import { Saida } from './Saida'
 
@@ -93,6 +94,7 @@ export function StepEscala() {
             <PainelAlertas escala={escala} resultado={resultado} />
             <Saida escala={escala} resultado={resultado} />
           </div>
+          <QuadroContratacoes />
           <Impacto />
         </>
       ) : (
