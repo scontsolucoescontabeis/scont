@@ -1,4 +1,5 @@
 import { Sparkles } from 'lucide-react'
+import { corrigirTudo } from '../engine/autocorrecao'
 import { contarDomingosTrabalhados, gerarPropostas } from '../engine/gerador'
 import { useStore } from '../store/useStore'
 import { analisar } from '../utils/analise'
@@ -18,7 +19,12 @@ export function Propostas() {
       inicio: dados.inicioEscala,
       semanas: dados.semanas,
     })
-    set({ propostas: novas, comparar: novas.map((p) => p.id), escala: novas[0].escala })
+    // Já entrega as propostas com tudo que pode ser corrigido automaticamente corrigido.
+    const corrigidas = novas.map((p) => ({
+      ...p,
+      escala: corrigirTudo(p.escala, (e) => analisar(dados, e)).escala,
+    }))
+    set({ propostas: corrigidas, comparar: corrigidas.map((p) => p.id), escala: corrigidas[0].escala })
   }
 
   const alternar = (id: string) => {

@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { corrigirTudo } from '../engine/autocorrecao'
 import { useStore } from '../store/useStore'
 import { analisar, formatarData } from '../utils/analise'
 import { Calendario } from './Calendario'
@@ -75,6 +76,19 @@ export function StepEscala() {
   const cobertura = useStore((s) => s.cobertura)
   const feriados = useStore((s) => s.feriados)
 
+  const set = useStore((s) => s.set)
+  const [autoCorrigidas, setAutoCorrigidas] = useState(0)
+
+  // Correção automática: tudo que o motor sabe corrigir é corrigido assim que a escala muda.
+  useEffect(() => {
+    if (!escala) return
+    const r = corrigirTudo(escala, (e) => analisar({ empresa, cobertura, feriados }, e))
+    if (r.aplicadas > 0) {
+      setAutoCorrigidas((n) => n + r.aplicadas)
+      set({ escala: r.escala })
+    }
+  }, [escala, empresa, cobertura, feriados, set])
+
   const resultado = useMemo(
     () => (escala ? analisar({ empresa, cobertura, feriados }, escala) : null),
     [escala, empresa, cobertura, feriados],
@@ -91,7 +105,7 @@ export function StepEscala() {
             <Calendario escala={escala} alertas={resultado.alertas} />
           </div>
           <div className="space-y-4">
-            <PainelAlertas escala={escala} resultado={resultado} />
+            <PainelAlertas escala={escala} resultado={resultado} autoCorrigidas={autoCorrigidas} />
             <Saida escala={escala} resultado={resultado} />
           </div>
           <QuadroContratacoes />

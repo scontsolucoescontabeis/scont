@@ -3,11 +3,17 @@ import { useStore } from '../store/useStore'
 import type { Escala, ResultadoConformidade } from '../types'
 import { Semaforo } from './ui'
 
-export function PainelAlertas({ escala, resultado }: { escala: Escala; resultado: ResultadoConformidade }) {
+export function PainelAlertas({
+  escala,
+  resultado,
+  autoCorrigidas,
+}: {
+  escala: Escala
+  resultado: ResultadoConformidade
+  autoCorrigidas: number
+}) {
   const corrigir = useStore((s) => s.corrigir)
   const nome = (id?: string) => escala.funcionarios.find((f) => f.id === id)?.nome
-
-  const corrigiveis = resultado.alertas.filter((a) => a.correcao)
 
   return (
     <section className="cartao space-y-3" aria-labelledby="t-alertas" aria-live="polite">
@@ -21,17 +27,12 @@ export function PainelAlertas({ escala, resultado }: { escala: Escala; resultado
         {resultado.contagem.vermelho} fora da regra · {resultado.contagem.amarelo} pedem atenção
       </p>
 
-      {corrigiveis.length > 0 && (
-        <button
-          type="button"
-          className="btn-sec"
-          onClick={() => {
-            // aplica uma correção por vez: a primeira, pois as demais podem mudar após a alteração
-            corrigir(corrigiveis[0].correcao!)
-          }}
-        >
-          <Wrench size={16} aria-hidden /> Corrigir o próximo alerta automaticamente
-        </button>
+      {autoCorrigidas > 0 && (
+        <p className="rounded-lg border border-green-300 bg-green-50 p-2 text-sm text-green-800" role="status">
+          <Wrench size={14} className="mr-1 inline" aria-hidden />
+          {autoCorrigidas} correção(ões) automática(s) já aplicada(s) nesta escala. O que sobrou abaixo precisa de decisão
+          sua.
+        </p>
       )}
 
       {resultado.alertas.length === 0 && <p className="text-sm">Nenhum alerta. A escala atende às regras cadastradas.</p>}
