@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CoberturaTurno, Empresa, Funcao, Turno } from '../types'
+import { corrigirTudo } from './autocorrecao'
 import { validarEscala } from './conformidade'
 import { calcularImpacto } from './impacto'
 import { coberturaParaRegras, gerarPropostas, type EntradaGerador } from './gerador'
@@ -51,6 +52,47 @@ describe('gerador de propostas', () => {
       compensacaoDiaria: false,
     })
     expect(r.alertas.filter((a) => a.regraId.endsWith('repousosSemanais'))).toEqual([])
+  })
+})
+
+describe('empresa que não funciona no fim de semana', () => {
+  it('nunca escala ninguém no sábado/domingo (todas as propostas)', () => {
+    const e = base(false, { util: 2, sab: 0, dom: 0 })
+    e.empresa.diasFuncionamento = [false, true, true, true, true, true, false]
+    for (const p of gerarPropostas({ ...e, funcoes: [{ ...funcoes[0], quantidade: 5 }] })) {
+      for (const f of p.escala.funcionarios) {
+        p.escala.celulas[f.id].forEach((c, i) => {
+          const dow = (i + 1) % 7 // a escala começa na segunda
+          if (dow === 0 || dow === 6) expect(c.tipo, `${p.nome} dia ${i}`).not.toBe('trabalho')
+        })
+      }
+    }
+  })
+
+  it('continua sem trabalho no fim de semana depois da correção automática', () => {
+    const e = base(false, { util: 3, sab: 0, dom: 0 })
+    e.empresa.diasFuncionamento = [false, true, true, true, true, true, false]
+    const regras = coberturaParaRegras(e.cobertura, e.empresa.diasFuncionamento)
+    const validar = (x: Parameters<typeof validarEscala>[0]['escala']) =>
+      validarEscala({ escala: x, cobertura: regras, feriados: [], empresaFuncionaFeriados: false, compensacaoDiaria: false })
+    for (const p of gerarPropostas({ ...e, funcoes: [{ ...funcoes[0], quantidade: 6 }] })) {
+      const r = corrigirTudo(p.escala, validar)
+      for (const f of r.escala.funcionarios) {
+        r.escala.celulas[f.id].forEach((c, i) => {
+          const dow = (i + 1) % 7
+          if (dow === 0 || dow === 6) expect(c.tipo, `${p.nome} dia ${i}`).not.toBe('trabalho')
+        })
+      }
+    }
+  })
+
+  it('com só o domingo fechado, domingo é DSR para todos', () => {
+    const e = base(false, { util: 3, sab: 3, dom: 0 })
+    for (const p of gerarPropostas(e)) {
+      for (const f of p.escala.funcionarios) {
+        expect(p.escala.celulas[f.id][6].tipo, p.nome).not.toBe('trabalho')
+      }
+    }
   })
 })
 

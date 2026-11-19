@@ -76,7 +76,7 @@ function escolherRepousos(
   presentes: number[],
   need: number[],
   permitido: boolean[],
-  forcado: number | null,
+  forcados: number[],
   preferirDomingo: boolean,
   desempate: number,
 ): number[] {
@@ -85,7 +85,8 @@ function escolherRepousos(
     escolhidos.push(d)
     presentes[d] -= 1
   }
-  if (forcado !== null) tomar(forcado)
+  // Dias forçados (empresa/turno fechado) sempre viram repouso, mesmo que passem de 2.
+  forcados.forEach(tomar)
   while (escolhidos.length < 2) {
     let melhor = -1
     let melhorPont = -Infinity
@@ -163,17 +164,18 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           rep = repousoFixo.get(f.id)!
           rep.forEach((d) => (presentes[d] -= 1))
         } else {
-          let forcado: number | null = null
+          // Dias em que o turno não funciona (cobertura 0) são repouso para todos.
+          const forcados = need.map((n, d) => (n === 0 ? d : -1)).filter((d) => d >= 0)
           const permitido = Array.from({ length: 7 }, () => true)
-          if (modelo === 'rodizio_domingo') {
-            if ((s + k) % cicloDomingo === 0) forcado = 6
+          if (modelo === 'rodizio_domingo' && !forcados.includes(6)) {
+            if ((s + k) % cicloDomingo === 0) forcados.push(6)
             else permitido[6] = false
           }
           rep = escolherRepousos(
             presentes,
             need,
             permitido,
-            forcado,
+            forcados,
             modelo !== 'rodizio_domingo',
             modelo === 'folga_movel' ? (s + k) % 7 : k % 7,
           )
