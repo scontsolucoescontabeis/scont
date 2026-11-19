@@ -15,7 +15,7 @@ export function Impacto() {
     <section className="cartao space-y-4" aria-labelledby="t-imp">
       <div className="flex flex-wrap items-center gap-2">
         <h3 id="t-imp" className="mr-auto text-lg font-bold">
-          Impacto da nova regra{' '}
+          Impacto da nova regra — manter as horas de hoje{' '}
           <span className="rounded bg-yellow-100 px-2 py-0.5 text-xs text-yellow-900">ESTIMATIVA</span>
         </h3>
         <select
@@ -81,16 +81,18 @@ export function Impacto() {
           <dd className="text-lg font-bold">{formatarMoeda(r.custoMensalAtual)}</dd>
         </div>
         <div className="rounded-lg border border-line p-3">
-          <dt className="text-soft">Cobrindo com contratações (aprox.)</dt>
+          <dt className="text-soft">Mantendo as horas de hoje, com contratações (aprox.)</dt>
           <dd className="text-lg font-bold">{formatarMoeda(r.custoMensalContratando)}</dd>
         </div>
         <div className="rounded-lg border border-line p-3">
-          <dt className="text-soft">Cobrindo com horas extras (aprox.)</dt>
+          <dt className="text-soft">Mantendo as horas de hoje, com horas extras (aprox.)</dt>
           <dd className="text-lg font-bold">{formatarMoeda(r.custoMensalHoraExtra)}</dd>
         </div>
       </dl>
       <p className="text-xs text-soft">
-        ESTIMATIVA: assume salário mensal mantido, 52/12 semanas por mês e os percentuais acima. Sem salário-base
+        ESTIMATIVA: considera que a empresa quer <strong>manter o mesmo volume total de horas trabalhadas de hoje</strong>.
+        Se a cobertura mínima já é atendida pela equipe atual (veja o quadro de contratações acima), essa contratação pode
+        não ser necessária. Assume salário mensal mantido, 52/12 semanas por mês e os percentuais acima. Sem salário-base
         informado, os valores aparecem como “—”.
       </p>
     </section>

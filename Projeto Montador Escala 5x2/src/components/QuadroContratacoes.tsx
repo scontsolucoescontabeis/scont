@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { calcularQuadro } from '../engine/contratacoes'
+import { calcularImpacto } from '../engine/impacto'
 import { useStore } from '../store/useStore'
 import { formatarMoeda } from '../utils/analise'
 
@@ -15,6 +16,8 @@ export function QuadroContratacoes() {
     () => calcularQuadro({ empresa, funcoes, turnos, cobertura, custo }, etapa),
     [empresa, funcoes, turnos, cobertura, custo, etapa],
   )
+
+  const impacto = useMemo(() => calcularImpacto(funcoes, etapa, custo), [funcoes, etapa, custo])
 
   return (
     <section className="cartao space-y-4" aria-labelledby="t-quadro">
@@ -36,8 +39,17 @@ export function QuadroContratacoes() {
       >
         {q.contratar > 0
           ? `Para cobrir a cobertura mínima na escala 5x2 são necessárias ${q.necessarioTotal} pessoas; a equipe atual tem ${q.equipeAtual}. Sugestão: contratar ${q.contratar}.`
-          : `A equipe atual (${q.equipeAtual}) é suficiente para a cobertura informada (necessárias: ${q.necessarioTotal}).`}
+          : `A equipe atual (${q.equipeAtual}) é suficiente para a cobertura mínima informada (necessárias: ${q.necessarioTotal}).`}
       </p>
+      {q.contratar === 0 && impacto.contratacoesEquivalentes > 0 && (
+        <p className="rounded-lg border border-line bg-brand-light p-3 text-sm">
+          <strong>Por que o quadro de impacto mostra contratações?</strong> Ele parte de outra premissa: manter o mesmo
+          volume total de horas de hoje ({impacto.horasSemanaisAtuais}h/semana), o que exigiria cerca de{' '}
+          {impacto.contratacoesEquivalentes.toFixed(2)} contratação(ões) equivalente(s). Como a cobertura mínima que você
+          informou já é atendida, esse valor só vale se a empresa quiser manter as horas totais atuais (por exemplo, para
+          atender mais que o mínimo).
+        </p>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
