@@ -1,7 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { fmtHoras, horasLiquidasMin } from '../engine/conformidade'
 import { useStore } from '../store/useStore'
-import { DIAS_CURTOS } from '../utils/analise'
+import { DIAS_CURTOS, horarioDoDia } from '../utils/analise'
 import type { Turno } from '../types'
 import { Campo } from './ui'
 
@@ -9,7 +9,8 @@ export function StepCobertura() {
   const turnos = useStore((s) => s.turnos)
   const cobertura = useStore((s) => s.cobertura)
   const set = useStore((s) => s.set)
-  const dias = useStore((s) => s.empresa.diasFuncionamento)
+  const empresa = useStore((s) => s.empresa)
+  const dias = empresa.diasFuncionamento
 
   // Coerência com o passo 1: dias em que a empresa não funciona não exigem pessoas.
   const abertosUteis = [1, 2, 3, 4, 5].filter((d) => dias[d])
@@ -22,6 +23,19 @@ export function StepCobertura() {
     dom: { aberto: dias[0], nome: 'domingo' },
   } as const
   const fechados = (['util', 'sab', 'dom'] as const).filter((g) => !grupos[g].aberto)
+
+  // Avisa quando o turno começa antes de abrir ou termina depois de fechar em algum dia exigido.
+  const foraDoHorario = (t: Turno, c: { util: number; sab: number; dom: number }) => {
+    const out: string[] = []
+    for (const d of [1, 2, 3, 4, 5, 6, 0]) {
+      if (!dias[d]) continue
+      const exigido = d === 0 ? c.dom : d === 6 ? c.sab : c.util
+      if (exigido <= 0) continue
+      const h = horarioDoDia(empresa, d)
+      if (t.inicio < h.abre || t.fim > h.fecha) out.push(`${DIAS_CURTOS[d]} (${h.abre}–${h.fecha})`)
+    }
+    return out
+  }
 
   const limpar = { escala: null, propostas: [] }
 
@@ -91,6 +105,12 @@ export function StepCobertura() {
               </Campo>
             </div>
             <p className="text-xs text-soft">Horas trabalhadas por dia neste turno: {fmtHoras(horasLiquidasMin(t))}</p>
+            {foraDoHorario(t, c).length > 0 && (
+              <p className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs" role="note">
+                Atenção: este turno ({t.inicio}–{t.fim}) passa do horário de funcionamento em:{' '}
+                {foraDoHorario(t, c).join('; ')}. Ajuste o turno ou o horário do dia (passo 1).
+              </p>
+            )}
             <div className="grid gap-3 sm:grid-cols-3">
               {(['util', 'sab', 'dom'] as const).map((g) => (
                 <Campo

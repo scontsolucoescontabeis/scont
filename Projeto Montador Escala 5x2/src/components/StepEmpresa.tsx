@@ -1,6 +1,6 @@
 import { useStore } from '../store/useStore'
 import type { AcordoColetivo } from '../types'
-import { DIAS_CURTOS } from '../utils/analise'
+import { DIAS_CURTOS, horarioDoDia } from '../utils/analise'
 import { Campo } from './ui'
 
 const ORDEM_DIAS = [1, 2, 3, 4, 5, 6, 0]
@@ -13,6 +13,16 @@ export function StepEmpresa() {
     const dias = [...empresa.diasFuncionamento]
     dias[d] = !dias[d]
     setEmpresa({ diasFuncionamento: dias })
+  }
+
+  const alterarHorario = (d: number, p: Partial<{ abre: string; fecha: string }>) =>
+    setEmpresa({ horarios: { ...empresa.horarios, [d]: { ...horarioDoDia(empresa, d), ...p } } })
+
+  const copiarParaTodos = () => {
+    const ref = horarioDoDia(empresa, empresa.diasFuncionamento[1] ? 1 : ORDEM_DIAS.find((d) => empresa.diasFuncionamento[d]) ?? 1)
+    const horarios: Record<number, { abre: string; fecha: string }> = {}
+    for (let d = 0; d < 7; d++) horarios[d] = { ...ref }
+    setEmpresa({ horarios })
   }
 
   return (
@@ -60,24 +70,40 @@ export function StepEmpresa() {
         </div>
       </fieldset>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Campo rotulo="Abre às">
-          <input
-            type="time"
-            className="campo"
-            value={empresa.horaAbertura}
-            onChange={(e) => setEmpresa({ horaAbertura: e.target.value })}
-          />
-        </Campo>
-        <Campo rotulo="Fecha às">
-          <input
-            type="time"
-            className="campo"
-            value={empresa.horaFechamento}
-            onChange={(e) => setEmpresa({ horaFechamento: e.target.value })}
-          />
-        </Campo>
-      </div>
+      <fieldset>
+        <legend className="mb-1 text-sm font-medium">Horário de funcionamento por dia</legend>
+        <p className="mb-2 text-xs text-soft">
+          Cada dia pode ter seu próprio horário (ex.: sábado só até o meio-dia). Dias desmarcados acima não aparecem aqui.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {ORDEM_DIAS.filter((d) => empresa.diasFuncionamento[d]).map((d) => {
+            const h = horarioDoDia(empresa, d)
+            return (
+              <div key={d} className="flex items-center gap-2 rounded-lg border border-line p-2">
+                <span className="w-10 text-sm font-semibold">{DIAS_CURTOS[d]}</span>
+                <input
+                  type="time"
+                  className="campo"
+                  aria-label={`Abre às, ${DIAS_CURTOS[d]}`}
+                  value={h.abre}
+                  onChange={(e) => alterarHorario(d, { abre: e.target.value })}
+                />
+                <span className="text-xs text-soft">às</span>
+                <input
+                  type="time"
+                  className="campo"
+                  aria-label={`Fecha às, ${DIAS_CURTOS[d]}`}
+                  value={h.fecha}
+                  onChange={(e) => alterarHorario(d, { fecha: e.target.value })}
+                />
+              </div>
+            )
+          })}
+        </div>
+        <button type="button" className="btn-sec mt-2" onClick={copiarParaTodos}>
+          Copiar o horário de segunda para todos os dias
+        </button>
+      </fieldset>
 
       <label className="flex items-start gap-2">
         <input

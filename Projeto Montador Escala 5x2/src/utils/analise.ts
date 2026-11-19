@@ -53,3 +53,11 @@ export function formatarData(d: string): string {
   const [a, m, dia] = d.split('-')
   return `${dia}/${m}/${a}`
 }
+
+/** Horário de funcionamento da empresa em um dia (0 = domingo), com o padrão como reserva. */
+export function horarioDoDia(
+  empresa: { horaAbertura: string; horaFechamento: string; horarios?: Record<number, { abre: string; fecha: string }> },
+  dia: number,
+): { abre: string; fecha: string } {
+  return empresa.horarios?.[dia] ?? { abre: empresa.horaAbertura, fecha: empresa.horaFechamento }
+}

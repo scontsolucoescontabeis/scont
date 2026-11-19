@@ -87,8 +87,11 @@ export interface Empresa {
   setor: string
   /** Índice 0 = domingo ... 6 = sábado. */
   diasFuncionamento: boolean[]
+  /** Horário padrão; vale para os dias sem horário próprio em `horarios`. */
   horaAbertura: string
   horaFechamento: string
+  /** Horário específico por dia (0 = domingo ... 6 = sábado); sobrepõe o padrão. */
+  horarios?: Record<number, { abre: string; fecha: string }>
   funcionaFeriados: boolean
   acordoColetivo: AcordoColetivo
   /** Existe acordo/banco de horas que permita compensar a jornada diária. */
