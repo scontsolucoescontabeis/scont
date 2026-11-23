@@ -1945,6 +1945,48 @@ function _abrirJanelaImpressao(titulo, innerHtml, printDelayMs = 300, caberUmaPa
   return true;
 }
 
+// Abre UMA única janela que imprime vários documentos em sequência: para cada
+// item troca o conteúdo e chama window.print() (que bloqueia até o diálogo ser
+// fechado). Evita o bloqueador de pop-ups, que só deixa passar a 1ª janela de
+// um mesmo clique. O título do documento vira o nome sugerido do PDF.
+function _abrirJanelaImpressaoSequencial(itens, caberUmaPagina = false) {
+  const printWin = window.open('', '_blank');
+  if (!printWin) return false;
+  const dados = JSON.stringify(itens).replace(/</g, '\\u003c');
+  printWin.document.write(`<!DOCTYPE html><html lang="pt-BR"><head>
+    <meta charset="UTF-8"><title>Imprimindo…</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; line-height: 1.7; color: #2C3E50; background: #fff; }
+      @page { size: A4 portrait; margin: 12mm 15mm; }
+      @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+      ${caberUmaPagina ? '.pdf-fit-page { width: 180mm; } .pdf-fit-inner { transform-origin: top left; }' : ''}
+    </style></head><body></body>
+    <script>
+      var itens = ${dados};
+      var caber = ${caberUmaPagina ? 'true' : 'false'};
+      function ajustar() {
+        var alturaDisponivel = 273 * 96 / 25.4;
+        document.querySelectorAll('.pdf-fit-page').forEach(function (p) {
+          var inner = p.querySelector('.pdf-fit-inner');
+          if (!inner) return;
+          var escala = Math.min(1, alturaDisponivel / inner.scrollHeight);
+          if (escala < 1) inner.style.transform = 'scale(' + escala + ')';
+        });
+      }
+      function proximo(i) {
+        if (i >= itens.length) { document.title = 'Concluído'; setTimeout(function () { window.close(); }, 300); return; }
+        document.title = itens[i].titulo;
+        document.body.innerHTML = itens[i].html;
+        if (caber) ajustar();
+        setTimeout(function () { window.print(); setTimeout(function () { proximo(i + 1); }, 400); }, 300);
+      }
+      window.onload = function () { proximo(0); };
+    <\/script></html>`);
+  printWin.document.close();
+  return true;
+}
+
 // Em eventos, pergunta se os modelos saem em um único PDF ou em um PDF por
 // modelo. O clique no botão do modal é o gesto que permite abrir as janelas.
 function _escolherModoPDFEvento() {
@@ -1957,7 +1999,7 @@ function _escolherModoPDFEvento() {
         <p style="margin:0 0 14px">O evento tem ${n} modelos. Como deseja salvar?</p>
         <button class="btn btn-primary" style="width:100%;margin-bottom:10px" onclick="confirmarModoPDFEvento('unico')">📄 Todos os modelos em um único PDF</button>
         <button class="btn btn-secondary" style="width:100%" onclick="confirmarModoPDFEvento('individual')">📑 Um PDF para cada modelo (${n} arquivos)</button>
-        <p style="margin:12px 0 0;font-size:12px;color:var(--muted)">No modo individual abre uma janela de impressão por modelo — permita pop-ups nesta página.</p>
+        <p style="margin:12px 0 0;font-size:12px;color:var(--muted)">No modo individual abre uma janela que mostra um diálogo de salvar por modelo, um após o outro (o navegador não permite abrir todos ao mesmo tempo).</p>
       </div>
     </div>`);
 }
@@ -1982,21 +2024,23 @@ async function exportarPDF(modoEvento = null) {
   if (wizardEventoAtivo && modoEvento === 'individual') {
     const modelosEvento = wizardEventoAtivo.modelosOrdenados;
     toast(`Gerando ${grupos.length * modelosEvento.length} PDFs — um por modelo${multiplasEmpresas ? ' e empresa' : ''}…`, '');
-    const bloqueadas = [];
-    let i = 0, total = 0;
+    // Uma única janela imprime todos em sequência (o navegador só libera a
+    // 1ª janela por clique, então abrir N janelas não funciona).
+    const itens = [];
     grupos.forEach((grupo) => {
       modelosEvento.forEach((m) => {
-        total++;
-        const innerHtml = _montarPaginasPDF(modelo, grupo.registros, [m]);
-        const titulo = multiplasEmpresas ? `${m.nome} — ${grupo.nomeEmpresa}` : m.nome;
-        if (!_abrirJanelaImpressao(titulo, innerHtml, 300 + (i++) * 700, wizardCaberUmaPagina)) bloqueadas.push(m.nome);
+        itens.push({
+          titulo: multiplasEmpresas ? `${m.nome} — ${grupo.nomeEmpresa}` : m.nome,
+          html: _montarPaginasPDF(modelo, grupo.registros, [m]),
+        });
       });
     });
+    const ok = _abrirJanelaImpressaoSequencial(itens, wizardCaberUmaPagina);
     await registrarGeracao();
-    if (bloqueadas.length) {
-      toast(`Permita pop-ups nesta página — ${bloqueadas.length} de ${total} PDF(s) não abriram.`, 'error');
+    if (!ok) {
+      toast('Permita pop-ups nesta página para gerar os PDFs.', 'error');
     } else {
-      toast(`${total} diálogos de impressão abertos — um por modelo. Desmarque "Cabeçalhos e rodapés" para remover a data.`, 'success');
+      toast(`${itens.length} PDFs em sequência — salve cada um no diálogo que abrir (o nome já vem sugerido). Desmarque "Cabeçalhos e rodapés" para remover a data.`, 'success');
     }
     return;
   }
