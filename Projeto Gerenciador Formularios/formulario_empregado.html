@@ -602,10 +602,10 @@
                     <table class="dependents-table">
                         <thead>
                             <tr>
-                                <th>Nome Completo</th>
-                                <th>CPF</th>
-                                <th>Data de Nascimento</th>
-                                <th>Grau de Parentesco</th>
+                                <th>Nome Completo *</th>
+                                <th>CPF *</th>
+                                <th>Data de Nascimento *</th>
+                                <th>Grau de Parentesco *</th>
                                 <th>Ação</th>
                             </tr>
                         </thead>
@@ -1033,7 +1033,7 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
         const row = document.createElement('tr');
         row.id = 'dependent_' + dependentsCount;
         
-        const html = `<td><input type="text" placeholder="Nome completo" class="dependent-name" required></td><td><input type="text" placeholder="000.000.000-00" class="dependent-cpf" maxlength="14"></td><td><input type="date" class="dependent-birth" required></td><td><select class="dependent-relationship" required><option value="">Selecione...</option><option value="filho">Filho(a)</option><option value="enteado">Enteado(a)</option><option value="neto">Neto(a)</option><option value="outro">Outro</option></select></td><td><button type="button" class="btn-remove-row" onclick="window.removeDependentRow(${dependentsCount})">Remover</button></td>`;
+        const html = `<td><input type="text" placeholder="Nome completo" class="dependent-name" required></td><td><input type="text" placeholder="000.000.000-00" class="dependent-cpf" maxlength="14" required></td><td><input type="date" class="dependent-birth" required></td><td><select class="dependent-relationship" required><option value="">Selecione...</option><option value="filho">Filho(a)</option><option value="enteado">Enteado(a)</option><option value="neto">Neto(a)</option><option value="outro">Outro</option></select></td><td><button type="button" class="btn-remove-row" onclick="window.removeDependentRow(${dependentsCount})">Remover</button></td>`;
         
         row.innerHTML = html;
         dependentsTableBody.appendChild(row);
@@ -1378,6 +1378,36 @@ function gerarCaminhoCompleto(nomeEmpresa, nomeEmpregado, categoria, nomeArquivo
                 alert('Por favor, preencha o campo obrigatório: ' + (element.labels ? element.labels[0].textContent : field));
                 element.focus();
                 return false;
+            }
+        }
+
+        // Tem filhos = Sim → ao menos 1 dependente, com nome, CPF, nascimento e parentesco
+        const temFilhosSim = document.querySelector('input[name="temFilhos"]:checked');
+        if (temFilhosSim && temFilhosSim.value === 'sim') {
+            const depRows = document.querySelectorAll('#dependentsTableBody tr');
+            if (depRows.length === 0) {
+                alert('Você informou que tem filhos. Adicione ao menos um dependente.');
+                return false;
+            }
+            for (let i = 0; i < depRows.length; i++) {
+                const campos = [
+                    ['.dependent-name', 'Nome'],
+                    ['.dependent-cpf', 'CPF'],
+                    ['.dependent-birth', 'Data de Nascimento'],
+                    ['.dependent-relationship', 'Grau de Parentesco']
+                ];
+                for (const [sel, rotulo] of campos) {
+                    const el = depRows[i].querySelector(sel);
+                    const valor = el ? el.value.trim() : '';
+                    const cpfIncompleto = sel === '.dependent-cpf' && valor && valor.replace(/\D/g, '').length !== 11;
+                    if (!valor || cpfIncompleto) {
+                        alert(cpfIncompleto
+                            ? `Dependente ${i + 1}: CPF inválido. Informe os 11 dígitos.`
+                            : `Dependente ${i + 1}: preencha o campo obrigatório "${rotulo}".`);
+                        if (el) el.focus();
+                        return false;
+                    }
+                }
             }
         }
 
