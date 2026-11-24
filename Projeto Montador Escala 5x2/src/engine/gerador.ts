@@ -1,9 +1,11 @@
 /**
- * Gerador de propostas de escala 5x2. Função pura: dado equipe, turnos e
- * cobertura, devolve 3 propostas (fixo, rodízio de domingos, folga móvel).
- * Cada empregado recebe 1 turno e 2 dias de repouso por semana; feriados em que
- * a empresa não funciona viram "feriado". A conformidade é verificada depois,
- * pelo motor (conformidade.ts) — o gerador só tenta cobrir a demanda.
+ * Gerador de propostas de escala 5x2. Função pura: dado equipe, períodos de
+ * cobertura do estabelecimento (passo 3) e jornada das funções, devolve 3
+ * propostas (fixo, rodízio de domingos, folga móvel). Cada empregado recebe o
+ * próprio horário (jornada legal, nunca o período inteiro) e 2 dias de repouso
+ * por semana; feriados em que a empresa não funciona viram "feriado". A
+ * conformidade é verificada depois, pelo motor (conformidade.ts) — o gerador só
+ * tenta cobrir a demanda.
  */
 import type {
   CoberturaTurno,
@@ -17,11 +19,13 @@ import type {
   RegraCobertura,
   Turno,
 } from '../types'
-import { diaDaSemana, segundaDaSemana, somarDias } from './datas'
+import { diaDaSemana, hhmmDe, minutosDe, segundaDaSemana, somarDias } from './datas'
+import { jornadaDaFuncao } from './jornada'
 
 export interface EntradaGerador {
   empresa: Empresa
   funcoes: Funcao[]
+  /** Períodos do estabelecimento (passo 3), não horários de empregados. */
   turnos: Turno[]
   cobertura: Record<string, CoberturaTurno>
   feriados: string[]
@@ -29,6 +33,9 @@ export interface EntradaGerador {
   inicio: string
   semanas: number
 }
+
+export const SLOT = 15
+export const NSLOTS = 1440 / SLOT
 
 export function criarFuncionarios(funcoes: Funcao[]): Funcionario[] {
   const lista: Funcionario[] = []
@@ -71,29 +78,69 @@ function necessidade(c: CoberturaTurno | undefined, dow: number, aberto: boolean
   return dow === 0 ? c.dom : dow === 6 ? c.sab : c.util
 }
 
+/**
+ * Necessidade do estabelecimento: pessoas mínimas por dia da semana (0 = domingo)
+ * e faixa de 15 min. Os "turnos" do passo 3 são períodos do estabelecimento, não
+ * horários de empregados.
+ */
+export function perfilNecessidade(
+  empresa: Empresa,
+  periodos: Turno[],
+  cobertura: Record<string, CoberturaTurno>,
+): number[][] {
+  const perfil = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
+  for (const t of periodos) {
+    const c = cobertura[t.id]
+    if (!c) continue
+    const ini = minutosDe(t.inicio)
+    const fim = minutosDe(t.fim) <= ini ? 1440 : minutosDe(t.fim)
+    for (let dow = 0; dow < 7; dow++) {
+      const n = necessidade(c, dow, empresa.diasFuncionamento[dow])
+      if (n <= 0) continue
+      for (let s = Math.floor(ini / SLOT); s < Math.ceil(fim / SLOT); s++) {
+        perfil[dow][s] = Math.max(perfil[dow][s], n)
+      }
+    }
+  }
+  const semDemanda = !perfil.some((l) => l.some((n) => n > 0))
+  if (semDemanda) {
+    // Sem cobertura informada: exige 1 pessoa durante o horário de funcionamento.
+    for (let dow = 0; dow < 7; dow++) {
+      if (!empresa.diasFuncionamento[dow]) continue
+      const h = empresa.horarios?.[dow] ?? { abre: empresa.horaAbertura, fecha: empresa.horaFechamento }
+      for (let s = Math.floor(minutosDe(h.abre) / SLOT); s < Math.ceil(minutosDe(h.fecha) / SLOT); s++) {
+        perfil[dow][s] = 1
+      }
+    }
+  }
+  return perfil
+}
+
+/** Faixas de 15 min cobertas por um horário que começa em `inicio` e dura `bruto` minutos. */
+function faixas(inicio: number, bruto: number): number[] {
+  const out: number[] = []
+  const fim = Math.min(1440, inicio + bruto)
+  for (let s = Math.floor(inicio / SLOT); s * SLOT < fim; s++) out.push(s)
+  return out
+}
+
 /** Escolhe 2 dias de repouso (índices 0=seg..6=dom) maximizando a folga de cobertura. */
 function escolherRepousos(
-  presentes: number[],
-  need: number[],
+  folga: number[],
   permitido: boolean[],
   forcados: number[],
   preferirDomingo: boolean,
   desempate: number,
 ): number[] {
-  const escolhidos: number[] = []
-  const tomar = (d: number) => {
-    escolhidos.push(d)
-    presentes[d] -= 1
-  }
-  // Dias forçados (empresa/turno fechado) sempre viram repouso, mesmo que passem de 2.
-  forcados.forEach(tomar)
+  // Dias forçados (empresa fechada / sem demanda para o horário) sempre viram repouso, mesmo que passem de 2.
+  const escolhidos: number[] = [...forcados]
   while (escolhidos.length < 2) {
     let melhor = -1
     let melhorPont = -Infinity
     for (let k = 0; k < 7; k++) {
       const d = (k + desempate) % 7
       if (!permitido[d] || escolhidos.includes(d)) continue
-      let pont = presentes[d] - need[d]
+      let pont = folga[d]
       if (preferirDomingo && d === 6 && escolhidos.length === 0) pont += 0.5
       if (pont > melhorPont) {
         melhorPont = pont
@@ -101,7 +148,7 @@ function escolherRepousos(
       }
     }
     if (melhor < 0) break
-    tomar(melhor)
+    escolhidos.push(melhor)
   }
   return escolhidos
 }
@@ -112,34 +159,77 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   const dias = semanas * 7
   const funcionarios = criarFuncionarios(funcoes)
   const feriadoSet = new Set(feriados)
-  const turnosAtivos = turnos.filter((t) => cobertura[t.id])
-  const base = turnosAtivos.length > 0 ? turnosAtivos : turnos.slice(0, 1)
+  const perfil = perfilNecessidade(empresa, turnos, cobertura)
 
-  // 1) Distribui funcionários nos turnos conforme a demanda semanal
-  const demanda = base.map((t) => {
-    const soma = [0, 1, 2, 3, 4, 5, 6].reduce(
-      (s, d) => s + necessidade(cobertura[t.id], d, empresa.diasFuncionamento[d]),
-      0,
-    )
-    return Math.max(soma, 1)
-  })
-  const alocados = base.map(() => 0)
-  const turnoDoFunc = new Map<string, string>()
-  for (const f of funcionarios) {
-    let alvo = 0
-    let menor = Infinity
-    base.forEach((_, i) => {
-      const razao = alocados[i] / demanda[i]
-      if (razao < menor) {
-        menor = razao
-        alvo = i
+  // 1) Horário de trabalho de cada empregado: jornada legal da função, com a
+  //    entrada escolhida para cobrir as faixas do estabelecimento com menos gente.
+  let janIni = NSLOTS
+  let janFim = 0
+  for (const linha of perfil) {
+    linha.forEach((n, s) => {
+      if (n > 0) {
+        janIni = Math.min(janIni, s)
+        janFim = Math.max(janFim, s + 1)
       }
     })
-    alocados[alvo] += 1
-    turnoDoFunc.set(f.id, base[alvo].id)
+  }
+  if (janFim === 0) {
+    janIni = 32
+    janFim = 72
+  }
+  const contagem = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
+  const jornadas = new Map(funcoes.map((f) => [f.id, jornadaDaFuncao(f)]))
+  const horarioDe = new Map<string, { inicio: number; bruto: number; intervaloMin: number }>()
+  for (const f of funcionarios) {
+    const j = jornadas.get(f.funcaoId)!
+    let ini = j.inicioFixo
+    if (ini === undefined) {
+      ini = janIni * SLOT
+      const ultimo = Math.max(janIni * SLOT, janFim * SLOT - j.bruto)
+      let melhorPont = -Infinity
+      for (let c = janIni * SLOT; c <= ultimo; c += SLOT) {
+        let pont = 0
+        for (let dow = 0; dow < 7; dow++) {
+          for (const s of faixas(c, j.bruto)) {
+            const n = perfil[dow][s]
+            if (n <= 0) continue
+            // Falta de gente pesa muito; empate prefere a faixa menos cheia.
+            pont += Math.max(0, n * 7 - contagem[dow][s] * 5) * 1000 - contagem[dow][s]
+          }
+        }
+        if (pont > melhorPont) {
+          melhorPont = pont
+          ini = c
+        }
+      }
+    }
+    horarioDe.set(f.id, { inicio: ini, bruto: j.bruto, intervaloMin: j.intervaloMin })
+    for (let dow = 0; dow < 7; dow++) for (const s of faixas(ini, j.bruto)) contagem[dow][s] += 1
   }
 
-  // 2) Repousos por turno, semana a semana
+  const turnosTrabalho = new Map<string, Turno>()
+  const turnoDoFunc = new Map<string, string>()
+  const posNoTurno = new Map<string, number>()
+  const contTurno = new Map<string, number>()
+  for (const f of funcionarios) {
+    const h = horarioDe.get(f.id)!
+    const id = `ts-${hhmmDe(h.inicio)}-${hhmmDe(h.inicio + h.bruto)}-${h.intervaloMin}`
+    if (!turnosTrabalho.has(id)) {
+      turnosTrabalho.set(id, {
+        id,
+        nome: `${hhmmDe(h.inicio)}–${hhmmDe(h.inicio + h.bruto)}`,
+        inicio: hhmmDe(h.inicio),
+        fim: hhmmDe(h.inicio + h.bruto),
+        intervaloMin: h.intervaloMin,
+      })
+    }
+    turnoDoFunc.set(f.id, id)
+    const k = contTurno.get(id) ?? 0
+    posNoTurno.set(f.id, k)
+    contTurno.set(id, k + 1)
+  }
+
+  // 2) Repousos, semana a semana, olhando a presença faixa a faixa
   const celulas: Record<string, DiaEscala[]> = Object.fromEntries(
     funcionarios.map((f) => [f.id, [] as DiaEscala[]]),
   )
@@ -147,57 +237,64 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   const repousoFixo = new Map<string, number[]>()
 
   for (let s = 0; s < semanas; s++) {
-    for (const t of base) {
-      const grupo = funcionarios.filter((f) => turnoDoFunc.get(f.id) === t.id)
-      if (grupo.length === 0) continue
-      const c = cobertura[t.id]
-      // índices 0=seg..6=dom
-      const need = Array.from({ length: 7 }, (_, d) => {
-        const dow = (d + 1) % 7
-        return necessidade(c, dow, empresa.diasFuncionamento[dow])
-      })
-      const presentes = Array.from({ length: 7 }, () => grupo.length)
+    // presentes[d][faixa], d = 0 (seg) .. 6 (dom)
+    const presentes = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
+    for (const f of funcionarios) {
+      const h = horarioDe.get(f.id)!
+      for (let d = 0; d < 7; d++) for (const sl of faixas(h.inicio, h.bruto)) presentes[d][sl] += 1
+    }
 
-      grupo.forEach((f, k) => {
-        let rep: number[]
-        if (modelo === 'fixo' && repousoFixo.has(f.id)) {
-          rep = repousoFixo.get(f.id)!
-          rep.forEach((d) => (presentes[d] -= 1))
-        } else {
-          // Dias em que o turno não funciona (cobertura 0) são repouso para todos.
-          const forcados = need.map((n, d) => (n === 0 ? d : -1)).filter((d) => d >= 0)
-          const permitido = Array.from({ length: 7 }, () => true)
-          if (modelo === 'rodizio_domingo' && !forcados.includes(6)) {
-            if ((s + k) % cicloDomingo === 0) forcados.push(6)
-            else permitido[6] = false
-          }
-          rep = escolherRepousos(
-            presentes,
-            need,
-            permitido,
-            forcados,
-            modelo !== 'rodizio_domingo',
-            modelo === 'folga_movel' ? (s + k) % 7 : k % 7,
-          )
-          if (modelo === 'fixo') repousoFixo.set(f.id, rep)
-        }
+    for (const f of funcionarios) {
+      const h = horarioDe.get(f.id)!
+      const span = faixas(h.inicio, h.bruto)
+      const k = posNoTurno.get(f.id)!
+      let rep: number[]
+      if (modelo === 'fixo' && repousoFixo.has(f.id)) {
+        rep = repousoFixo.get(f.id)!
+      } else {
+        const folga: number[] = []
+        const forcados: number[] = []
         for (let d = 0; d < 7; d++) {
-          const data = somarDias(inicio, s * 7 + d)
-          let cel: DiaEscala
-          if (feriadoSet.has(data) && !empresa.funcionaFeriados && !rep.includes(d)) {
-            cel = { tipo: 'feriado' }
-          } else if (rep.includes(d)) {
-            cel = { tipo: d === 6 ? 'dsr' : 'folga' }
+          const dow = (d + 1) % 7
+          const exigidas = span.filter((sl) => perfil[dow][sl] > 0)
+          if (exigidas.length === 0) {
+            forcados.push(d)
+            folga.push(-Infinity)
           } else {
-            cel = { tipo: 'trabalho', turnoId: t.id }
+            folga.push(Math.min(...exigidas.map((sl) => presentes[d][sl] - perfil[dow][sl])))
           }
-          celulas[f.id].push(cel)
         }
-      })
+        const permitido = Array.from({ length: 7 }, () => true)
+        if (modelo === 'rodizio_domingo' && !forcados.includes(6)) {
+          if ((s + k) % cicloDomingo === 0) forcados.push(6)
+          else permitido[6] = false
+        }
+        rep = escolherRepousos(
+          folga,
+          permitido,
+          forcados,
+          modelo !== 'rodizio_domingo',
+          modelo === 'folga_movel' ? (s + k) % 7 : k % 7,
+        )
+        if (modelo === 'fixo') repousoFixo.set(f.id, rep)
+      }
+      rep.forEach((d) => span.forEach((sl) => (presentes[d][sl] -= 1)))
+      for (let d = 0; d < 7; d++) {
+        const data = somarDias(inicio, s * 7 + d)
+        let cel: DiaEscala
+        if (feriadoSet.has(data) && !empresa.funcionaFeriados && !rep.includes(d)) {
+          cel = { tipo: 'feriado' }
+        } else if (rep.includes(d)) {
+          cel = { tipo: d === 6 ? 'dsr' : 'folga' }
+        } else {
+          cel = { tipo: 'trabalho', turnoId: turnoDoFunc.get(f.id) }
+        }
+        celulas[f.id].push(cel)
+      }
     }
   }
 
-  return { inicio, dias, funcionarios, turnos, celulas }
+  return { inicio, dias, funcionarios, turnos: [...turnosTrabalho.values()], celulas }
 }
 
 export const MODELOS: { modelo: ModeloEscala; nome: string; descricao: string }[] = [

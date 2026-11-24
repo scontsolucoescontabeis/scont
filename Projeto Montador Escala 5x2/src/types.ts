@@ -1,6 +1,10 @@
 export type TipoDia = 'trabalho' | 'folga' | 'dsr' | 'feriado' | 'ausencia'
 
-/** Turno de trabalho. Se fim <= inicio, o turno termina no dia seguinte. */
+/**
+ * Horário de trabalho (em `Escala.turnos`) ou, no passo 3, um PERÍODO do
+ * estabelecimento com mínimo de pessoas (`intervaloMin` não se aplica).
+ * Se fim <= inicio, termina no dia seguinte.
+ */
 export interface Turno {
   id: string
   nome: string
@@ -78,6 +82,10 @@ export interface Funcao {
   jornadaContratual: string // "44h", "6x1", "12x36"...
   horasSemanaisAtuais: number
   salarioBase?: number
+  /** Horário fixo desta função (HH:mm). Sem ele, o gerador monta a jornada. */
+  entrada?: string
+  saida?: string
+  intervaloMin?: number
 }
 
 export type AcordoColetivo = 'sim' | 'nao' | 'nao_sei'

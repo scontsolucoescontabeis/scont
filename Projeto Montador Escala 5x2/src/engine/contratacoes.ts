@@ -2,14 +2,16 @@
  * Quadro sugerido de contratações para cobrir a cobertura mínima informada.
  * Função pura — tudo é ESTIMATIVA.
  *
- * Lógica: por turno, soma-se quantas "presenças" por semana a cobertura exige
- * (mínimo de pessoas × dias de funcionamento). Cada pessoa trabalha, no máximo,
- * 5 turnos/semana (5x2) e também não pode passar do limite semanal da etapa
- * (turnos × horas líquidas). Pessoas necessárias = presenças ÷ turnos por pessoa.
+ * Lógica: por período do estabelecimento, soma-se a demanda semanal em
+ * pessoa-dia (mínimo de pessoas × dias de funcionamento × duração do período ÷
+ * jornada diária de uma pessoa, que é limitada a 8h líquidas + intervalo).
+ * Cada pessoa trabalha, no máximo, 5 dias/semana (5x2) e não passa do limite
+ * semanal da etapa. Pessoas necessárias = pessoa-dia ÷ dias por pessoa.
  */
 import { REGRAS, limitesDaEtapa, type EtapaId, type RegrasLegais } from '../config/regras'
 import type { CoberturaTurno, Empresa, Funcao, ParametrosCusto, Turno } from '../types'
-import { horasLiquidasMin } from './conformidade'
+import { minutosDe } from './datas'
+import { intervaloParaBruto } from './jornada'
 
 export interface LinhaTurnoQuadro {
   turnoId: string
@@ -83,15 +85,21 @@ export function calcularQuadro(
         (s, d) => s + (empresa.diasFuncionamento[d] ? demandaDia(c, d) : 0),
         0,
       )
-      const liquida = Math.max(1, horasLiquidasMin(t))
-      const porPessoa = Math.max(1, Math.min(5, Math.floor((limiteHoras * 60) / liquida)))
+      // O período é do estabelecimento; cada pessoa cumpre a jornada legal (≤ 8h líquidas + intervalo).
+      const ini = minutosDe(t.inicio)
+      const duracao = Math.max(1, (minutosDe(t.fim) - ini + 1440) % 1440 || 1440)
+      const liquida = Math.min(regras.jornadaDiariaMax * 60, Math.floor((limiteHoras * 60) / 5))
+      const intervalo = intervaloParaBruto(liquida)
+      const bruto = Math.max(1, liquida + Math.max(intervalo, intervaloParaBruto(liquida + intervalo)))
+      const porPessoa = Math.max(1, Math.min(5, Math.floor((limiteHoras * 60) / Math.max(1, liquida))))
+      const diasPessoa = Math.ceil((presencas * duracao) / bruto)
       return {
         turnoId: t.id,
         nome: t.nome,
-        presencasSemana: presencas,
+        presencasSemana: diasPessoa,
         turnosPorPessoa: porPessoa,
-        necessarios: Math.ceil(presencas / porPessoa),
-        necessariosNa6x1: Math.ceil(presencas / 6),
+        necessarios: Math.ceil(diasPessoa / porPessoa),
+        necessariosNa6x1: Math.ceil(diasPessoa / 6),
       }
     })
 

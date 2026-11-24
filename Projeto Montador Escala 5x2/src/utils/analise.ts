@@ -5,7 +5,7 @@ import { somarDias } from '../engine/datas'
 import type { Dados } from '../store/useStore'
 import type { DiaEscala, Escala, ResultadoConformidade, Turno } from '../types'
 
-export type DadosAnalise = Pick<Dados, 'empresa' | 'cobertura' | 'feriados'>
+export type DadosAnalise = Pick<Dados, 'empresa' | 'cobertura' | 'feriados'> & { turnos?: Dados['turnos'] }
 
 export function analisar(dados: DadosAnalise, escala: Escala): ResultadoConformidade {
   return validarEscala({
@@ -13,6 +13,7 @@ export function analisar(dados: DadosAnalise, escala: Escala): ResultadoConformi
     cobertura: coberturaParaRegras(dados.cobertura, dados.empresa.diasFuncionamento),
     feriados: dados.feriados.map((f) => f.data),
     empresaFuncionaFeriados: dados.empresa.funcionaFeriados,
+    periodos: dados.turnos,
     compensacaoDiaria: dados.empresa.compensacaoDiaria,
     regras: REGRAS,
   })

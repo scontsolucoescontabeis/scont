@@ -53,12 +53,12 @@ export function QuadroContratacoes() {
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <caption className="sr-only">Pessoas necessárias por turno</caption>
+          <caption className="sr-only">Pessoas necessárias por período</caption>
           <thead>
             <tr className="border-b border-line">
-              <th className="py-1 pr-2">Turno</th>
-              <th className="px-2">Presenças/semana</th>
-              <th className="px-2">Turnos por pessoa</th>
+              <th className="py-1 pr-2">Período</th>
+              <th className="px-2">Pessoa-dia/semana</th>
+              <th className="px-2">Dias por pessoa</th>
               <th className="px-2">Necessárias (5x2)</th>
               <th className="px-2">Seriam (6x1)</th>
             </tr>
@@ -122,7 +122,7 @@ export function QuadroContratacoes() {
       </div>
 
       <p className="text-xs text-soft">
-        ESTIMATIVA: cada pessoa faz no máximo 5 turnos por semana e respeita o limite de horas da etapa. As contratações
+        ESTIMATIVA: cada pessoa trabalha no máximo 5 dias por semana, em jornada de até 8h e respeita o limite de horas da etapa. As contratações
         são distribuídas entre as funções na proporção da equipe atual — ajuste conforme a necessidade real de cada
         função. Custo = salário-base × (1 + encargos); sem salário informado aparece “—”. Não considera férias, faltas
         nem rodízio de domingos.

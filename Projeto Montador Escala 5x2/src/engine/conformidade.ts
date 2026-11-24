@@ -35,6 +35,12 @@ export interface EntradaConformidade {
   /** Feriados (YYYY-MM-DD) que caem no período. */
   feriados: string[]
   empresaFuncionaFeriados: boolean
+  /**
+   * Períodos do estabelecimento (passo 3) referenciados por `cobertura`. Com
+   * eles, a cobertura é conferida por faixa de horário (quem está presente em
+   * cada instante); sem eles, por igualdade de turno.
+   */
+  periodos?: Turno[]
   /** Existe acordo/regime de compensação de jornada diária. */
   compensacaoDiaria: boolean
   regras?: RegrasLegais
@@ -75,6 +81,7 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
   const { escala, cobertura, feriados, empresaFuncionaFeriados, compensacaoDiaria } = entrada
   const alertas: Alerta[] = []
   const turnos = new Map(escala.turnos.map((t) => [t.id, t]))
+  const periodos = entrada.periodos ? new Map(entrada.periodos.map((t) => [t.id, t])) : undefined
   const feriadoSet = new Set(feriados)
   const datas = Array.from({ length: escala.dias }, (_, i) => somarDias(escala.inicio, i))
   const indiceDe = new Map(datas.map((d, i) => [d, i]))
@@ -328,18 +335,48 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
   }
 
   // ---------- Cobertura ----------
+  const hhmm = (min: number) =>
+    `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
   for (const r of cobertura) {
     const turno = turnos.get(r.turnoId)
+    const periodo = periodos?.get(r.turnoId)
     for (let i = 0; i < datas.length; i++) {
       const data = datas[i]
       if (!r.diasSemana.includes(diaDaSemana(data))) continue
       if (feriadoSet.has(data) && !empresaFuncionaFeriados) continue
-      const presentes = escala.funcionarios.filter((f) => {
-        if (r.funcaoId && f.funcaoId !== r.funcaoId) return false
-        const c = celula(f.id, i)
-        return c?.tipo === 'trabalho' && c.turnoId === r.turnoId
-      })
-      if (presentes.length >= r.minimo) continue
+
+      // Faixas de 15 min do período com gente abaixo do mínimo (modo por período).
+      let faltas: { de: number; ate: number; pessoas: number }[] = []
+      let presentesN = 0
+      if (periodo) {
+        const ini = minutosDe(periodo.inicio)
+        const fim = minutosDe(periodo.fim) <= ini ? 1440 : minutosDe(periodo.fim)
+        const trabalhando = escala.funcionarios
+          .filter((f) => !r.funcaoId || f.funcaoId === r.funcaoId)
+          .map((f) => turnoDe(celula(f.id, i)))
+          .filter((t): t is Turno => !!t)
+        for (let m = Math.floor(ini / 15) * 15; m < fim; m += 15) {
+          const n = trabalhando.filter((t) => {
+            const a = minutosDe(t.inicio)
+            return a <= m && m < a + duracaoBrutaMin(t)
+          }).length
+          if (n >= r.minimo) continue
+          const ult = faltas[faltas.length - 1]
+          if (ult && ult.ate === m && ult.pessoas === n) ult.ate = m + 15
+          else faltas.push({ de: m, ate: m + 15, pessoas: n })
+        }
+        if (faltas.length === 0) continue
+        presentesN = Math.min(...faltas.map((x) => x.pessoas))
+      } else {
+        const presentes = escala.funcionarios.filter((f) => {
+          if (r.funcaoId && f.funcaoId !== r.funcaoId) return false
+          const c = celula(f.id, i)
+          return c?.tipo === 'trabalho' && c.turnoId === r.turnoId
+        })
+        if (presentes.length >= r.minimo) continue
+        presentesN = presentes.length
+        faltas = []
+      }
 
       // Correção: alguém de folga nesse dia cuja semana tem repouso sobrando.
       let correcao: AlteracaoCelula[] | undefined
@@ -356,9 +393,19 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
           (s, x) => s + (turnoDe(celula(f.id, x)) ? horasLiquidasMin(turnoDe(celula(f.id, x))!) : 0),
           0,
         )
-        const extra = turno ? horasLiquidasMin(turno) : 0
+        // Com períodos, a pessoa volta no horário que ela mesma faz (e que cobre a falta).
+        const usual = periodo
+          ? turnoDe(escala.celulas[f.id]?.find((x) => x.tipo === 'trabalho'))
+          : turno
+        if (!usual) continue
+        if (periodo) {
+          const a = minutosDe(usual.inicio)
+          const b = a + duracaoBrutaMin(usual)
+          if (!faltas.some((x) => x.de < b && x.ate > a)) continue
+        }
+        const extra = horasLiquidasMin(usual)
         if (nRep > lim.repousosSemanais && horasAtuais + extra <= lim.jornadaSemanalMax * 60) {
-          correcao = [{ funcionarioId: f.id, dia: i, novo: { tipo: 'trabalho', turnoId: r.turnoId } }]
+          correcao = [{ funcionarioId: f.id, dia: i, novo: { tipo: 'trabalho', turnoId: usual.id } }]
           break
         }
       }
@@ -366,13 +413,19 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
       alertas.push({
         id: `cob|${r.id}|${data}`,
         regraId: 'cobertura',
-        severidade: presentes.length === 0 ? 'vermelho' : 'amarelo',
-        titulo: 'Falta gente no turno',
+        severidade: presentesN === 0 ? 'vermelho' : 'amarelo',
+        titulo: periodo ? 'Falta gente no período' : 'Falta gente no turno',
         mensagem: comRegra(
-          `Em ${DIAS_PT[diaDaSemana(data)]}, ${fmtDataBR(data)}, o turno "${turno?.nome ?? r.turnoId}" tem ${presentes.length} pessoa(s); o mínimo informado é ${r.minimo}.`,
+          periodo
+            ? `Em ${DIAS_PT[diaDaSemana(data)]}, ${fmtDataBR(data)}, o período "${periodo.nome}" (${periodo.inicio}–${periodo.fim}) fica abaixo do mínimo de ${r.minimo} pessoa(s): ` +
+                faltas.map((x) => `${hhmm(x.de)}–${hhmm(x.ate)} com ${x.pessoas}`).join('; ') +
+                '.'
+            : `Em ${DIAS_PT[diaDaSemana(data)]}, ${fmtDataBR(data)}, o turno "${turno?.nome ?? r.turnoId}" tem ${presentesN} pessoa(s); o mínimo informado é ${r.minimo}.`,
           'cobertura',
         ),
-        sugestao: 'Escale mais alguém nesse turno ou ajuste o mínimo de cobertura.',
+        sugestao: periodo
+          ? 'Escale mais alguém nesse horário, desloque a entrada de alguém ou ajuste o mínimo do período.'
+          : 'Escale mais alguém nesse turno ou ajuste o mínimo de cobertura.',
         data,
         correcao,
       })

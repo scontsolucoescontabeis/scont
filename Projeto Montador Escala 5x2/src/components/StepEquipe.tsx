@@ -113,6 +113,29 @@ export function StepEquipe() {
                 />
               </Campo>
             )}
+            <Campo
+              rotulo="Entrada fixa (opcional)"
+              ajuda="Em branco: a ferramenta escolhe o horário para cobrir o estabelecimento."
+            >
+              <input
+                type="time"
+                className="campo"
+                value={f.entrada ?? ""}
+                onChange={(e) =>
+                  atualizar(f.id, { entrada: e.target.value || undefined })
+                }
+              />
+            </Campo>
+            <Campo rotulo="Saída fixa (opcional)">
+              <input
+                type="time"
+                className="campo"
+                value={f.saida ?? ""}
+                onChange={(e) =>
+                  atualizar(f.id, { saida: e.target.value || undefined })
+                }
+              />
+            </Campo>
             <Campo rotulo="Salário-base (opcional)">
               <input
                 type="number"

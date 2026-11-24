@@ -1,5 +1,4 @@
 import { Plus, Trash2 } from "lucide-react";
-import { fmtHoras, horasLiquidasMin } from "../engine/conformidade";
 import { useStore } from "../store/useStore";
 import { DIAS_CURTOS, horarioDoDia } from "../utils/analise";
 import type { Turno } from "../types";
@@ -47,7 +46,7 @@ export function StepCobertura() {
     return out;
   };
 
-  // Dias com cobertura exigida cujo horário de funcionamento não é totalmente coberto pelos turnos.
+  // Dias com cobertura exigida cujo horário de funcionamento não é totalmente coberto pelos períodos.
   const lacunas: string[] = [];
   for (const d of [1, 2, 3, 4, 5, 6, 0]) {
     if (!dias[d]) continue;
@@ -107,7 +106,7 @@ export function StepCobertura() {
         ...turnos,
         {
           id,
-          nome: "Novo turno",
+          nome: "Novo período",
           inicio: "13:00",
           fim: "22:00",
           intervaloMin: 60,
@@ -131,12 +130,15 @@ export function StepCobertura() {
   return (
     <section className="cartao space-y-4" aria-labelledby="t-cob">
       <h2 id="t-cob" className="text-xl font-bold">
-        3. Turnos e cobertura
+        3. Períodos e cobertura
       </h2>
       <p className="text-sm text-soft">
-        Defina os turnos de trabalho e quantas pessoas, no mínimo, precisam
-        estar presentes em cada um. Os dias seguem o que você informou no passo
-        1: onde a empresa não funciona, não se exige ninguém.
+        Defina os períodos do dia do estabelecimento e quantas pessoas, no
+        mínimo, precisam estar presentes durante cada um. Isto NÃO é o horário
+        do empregado: a ferramenta monta o horário de cada pessoa respeitando a
+        jornada diária, o intervalo e o descanso entre jornadas. Os dias seguem
+        o que você informou no passo 1: onde a empresa não funciona, não se
+        exige ninguém.
       </p>
       {fechados.length > 0 && (
         <p
@@ -170,8 +172,8 @@ export function StepCobertura() {
             className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs"
             role="note"
           >
-            Os turnos não cobrem todo o horário de funcionamento em:{" "}
-            {lacunas.join("; ")}. Ajuste os turnos ou inclua outro.
+            Os períodos não cobrem todo o horário de funcionamento em:{" "}
+            {lacunas.join("; ")}. Ajuste os períodos ou inclua outro.
           </p>
         )}
       </div>
@@ -183,9 +185,9 @@ export function StepCobertura() {
             key={t.id}
             className="space-y-3 rounded-lg border border-line p-3"
           >
-            <div className="grid gap-3 sm:grid-cols-5">
+            <div className="grid gap-3 sm:grid-cols-4">
               <div className="sm:col-span-2">
-                <Campo rotulo="Nome do turno">
+                <Campo rotulo="Nome do período">
                   <input
                     className="campo"
                     value={t.nome}
@@ -195,7 +197,7 @@ export function StepCobertura() {
                   />
                 </Campo>
               </div>
-              <Campo rotulo="Entrada">
+              <Campo rotulo="Início">
                 <input
                   type="time"
                   className="campo"
@@ -205,7 +207,7 @@ export function StepCobertura() {
                   }
                 />
               </Campo>
-              <Campo rotulo="Saída">
+              <Campo rotulo="Fim">
                 <input
                   type="time"
                   className="campo"
@@ -215,42 +217,22 @@ export function StepCobertura() {
                   }
                 />
               </Campo>
-              <Campo
-                rotulo="Intervalo (min)"
-                ajuda="Mais de 6h de jornada exige no mínimo 60 min de intervalo; de 4h a 6h, 15 min."
-              >
-                <input
-                  type="number"
-                  min={0}
-                  className="campo"
-                  value={t.intervaloMin}
-                  onChange={(e) =>
-                    atualizarTurno(t.id, {
-                      intervaloMin: Number(e.target.value) || 0,
-                    })
-                  }
-                />
-              </Campo>
             </div>
-            <p className="text-xs text-soft">
-              Horas trabalhadas por dia neste turno:{" "}
-              {fmtHoras(horasLiquidasMin(t))}
-            </p>
             {foraDoHorario(t, c).length > 0 && (
               <p
                 className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs"
                 role="note"
               >
-                Atenção: este turno ({t.inicio}–{t.fim}) passa do horário de
+                Atenção: este período ({t.inicio}–{t.fim}) passa do horário de
                 funcionamento em: {foraDoHorario(t, c).join("; ")}. Ajuste o
-                turno ou o horário do dia (passo 1).
+                período ou o horário do dia (passo 1).
               </p>
             )}
             <div className="grid gap-3 sm:grid-cols-3">
               {(["util", "sab", "dom"] as const).map((g) => (
                 <Campo
                   key={g}
-                  rotulo={`Pessoas mínimas — ${grupos[g].nome}`}
+                  rotulo={`Mínimo de pessoas presentes — ${grupos[g].nome}`}
                   ajuda={
                     grupos[g].aberto
                       ? undefined
@@ -275,7 +257,7 @@ export function StepCobertura() {
               className="btn-sec"
               onClick={() => ajustarAoHorario(t.id, c)}
             >
-              Ajustar este turno ao horário de funcionamento
+              Usar todo o horário de funcionamento neste período
             </button>
             {turnos.length > 1 && (
               <button
@@ -283,7 +265,7 @@ export function StepCobertura() {
                 className="btn-sec"
                 onClick={() => remover(t.id)}
               >
-                <Trash2 size={16} aria-hidden /> Remover turno
+                <Trash2 size={16} aria-hidden /> Remover período
               </button>
             )}
           </div>
@@ -291,7 +273,7 @@ export function StepCobertura() {
       })}
 
       <button type="button" className="btn-sec" onClick={adicionar}>
-        <Plus size={16} aria-hidden /> Adicionar turno
+        <Plus size={16} aria-hidden /> Adicionar período
       </button>
     </section>
   );

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CoberturaTurno, Empresa, Funcao, Turno } from '../types'
 import { corrigirTudo } from './autocorrecao'
-import { validarEscala } from './conformidade'
+import { horasLiquidasMin, validarEscala } from './conformidade'
 import { calcularImpacto } from './impacto'
 import { coberturaParaRegras, gerarPropostas, type EntradaGerador } from './gerador'
 
@@ -35,6 +35,7 @@ describe('gerador de propostas', () => {
         cobertura: coberturaParaRegras(e.cobertura, e.empresa.diasFuncionamento),
         feriados: [],
         empresaFuncionaFeriados: false,
+        periodos: e.turnos,
         compensacaoDiaria: false,
       })
       expect(r.alertas.filter((a) => a.severidade === 'vermelho'), p.nome).toEqual([])
@@ -49,6 +50,7 @@ describe('gerador de propostas', () => {
       cobertura: coberturaParaRegras(e.cobertura, e.empresa.diasFuncionamento),
       feriados: [],
       empresaFuncionaFeriados: false,
+        periodos: e.turnos,
       compensacaoDiaria: false,
     })
     expect(r.alertas.filter((a) => a.regraId.endsWith('repousosSemanais'))).toEqual([])
@@ -74,7 +76,8 @@ describe('empresa que não funciona no fim de semana', () => {
     e.empresa.diasFuncionamento = [false, true, true, true, true, true, false]
     const regras = coberturaParaRegras(e.cobertura, e.empresa.diasFuncionamento)
     const validar = (x: Parameters<typeof validarEscala>[0]['escala']) =>
-      validarEscala({ escala: x, cobertura: regras, feriados: [], empresaFuncionaFeriados: false, compensacaoDiaria: false })
+      validarEscala({ escala: x, cobertura: regras, feriados: [], empresaFuncionaFeriados: false,
+        periodos: e.turnos, compensacaoDiaria: false })
     for (const p of gerarPropostas({ ...e, funcoes: [{ ...funcoes[0], quantidade: 6 }] })) {
       const r = corrigirTudo(p.escala, validar)
       for (const f of r.escala.funcionarios) {
@@ -110,5 +113,33 @@ describe('calculadora de impacto', () => {
     const r = calcularImpacto([{ ...funcoes[0], salarioBase: undefined }], 'etapa2')
     expect(r.custoMensalAtual).toBeNull()
     expect(r.deficitHorasSemana).toBe(24)
+  })
+})
+
+describe('período de cobertura longo (estabelecimento aberto o dia todo)', () => {
+  it('ninguém trabalha o período inteiro: jornada ≤ 8h, interjornada ok e cobertura mantida', () => {
+    const e = base(true, { util: 2, sab: 2, dom: 2 })
+    e.empresa.horaAbertura = '06:00'
+    e.empresa.horaFechamento = '23:00'
+    e.turnos = [{ id: 't1', nome: 'Dia todo', inicio: '06:00', fim: '23:00', intervaloMin: 0 }]
+    e.funcoes = [{ id: 'atd', nome: 'Atendente', quantidade: 10, jornadaContratual: '44h', horasSemanaisAtuais: 44 }]
+    for (const p of gerarPropostas(e)) {
+      for (const t of p.escala.turnos) {
+        expect(horasLiquidasMin(t), p.nome).toBeLessThanOrEqual(8 * 60)
+      }
+      const r = validarEscala({
+        escala: p.escala,
+        cobertura: coberturaParaRegras(e.cobertura, e.empresa.diasFuncionamento),
+        feriados: [],
+        empresaFuncionaFeriados: false,
+        periodos: e.turnos,
+        compensacaoDiaria: false,
+      })
+      const graves = r.alertas.filter((a) =>
+        ['jornadaDiariaMax', 'interjornadaMinHoras', 'intrajornada'].includes(a.regraId),
+      )
+      expect(graves, p.nome).toEqual([])
+      expect(p.escala.turnos.length, p.nome).toBeGreaterThan(1)
+    }
   })
 })

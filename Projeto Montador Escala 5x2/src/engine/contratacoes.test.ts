@@ -46,13 +46,14 @@ describe('quadro de contratações', () => {
     expect(calcularQuadro({ ...base, funcoes: funcoes(2) }, 'etapa1').custoMensal).toBeNull()
   })
 
-  it('turno de 9h líquidas na etapa 2 (40h) permite só 4 turnos por pessoa', () => {
+  it('período de 10h na etapa 2 (40h): pessoa cumpre 8h+1h, então precisa de mais pessoa-dia que o período', () => {
     const t9: Turno = { id: 't1', nome: 'Longo', inicio: '07:00', fim: '17:00', intervaloMin: 60 }
     const q = calcularQuadro(
       { empresa: empresa(seisDias), funcoes: funcoes(2), turnos: [t9], cobertura: { t1: { util: 2, sab: 2, dom: 0 } }, custo: CUSTO_PADRAO },
       'etapa2',
     )
-    expect(q.linhasTurno[0].turnosPorPessoa).toBe(4)
+    expect(q.linhasTurno[0].turnosPorPessoa).toBe(5)
+    expect(q.linhasTurno[0].presencasSemana).toBe(14)
     expect(q.linhasTurno[0].necessarios).toBe(3)
   })
 })
