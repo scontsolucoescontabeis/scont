@@ -4,7 +4,7 @@
  *
  * Lógica: por período do estabelecimento, soma-se a demanda semanal em
  * pessoa-dia (mínimo de pessoas × dias de funcionamento × duração do período ÷
- * jornada diária de uma pessoa, que é limitada a 8h líquidas + intervalo).
+ * jornada diária de uma pessoa, que é limitada a 8h24 líquidas + intervalo).
  * Cada pessoa trabalha, no máximo, 5 dias/semana (5x2) e não passa do limite
  * semanal da etapa. Pessoas necessárias = pessoa-dia ÷ dias por pessoa.
  */
@@ -85,7 +85,7 @@ export function calcularQuadro(
         (s, d) => s + (empresa.diasFuncionamento[d] ? demandaDia(c, d) : 0),
         0,
       )
-      // O período é do estabelecimento; cada pessoa cumpre a jornada legal (≤ 8h líquidas + intervalo).
+      // O período é do estabelecimento; cada pessoa cumpre a jornada legal (≤ 8h24 líquidas + intervalo).
       const ini = minutosDe(t.inicio)
       const duracao = Math.max(1, (minutosDe(t.fim) - ini + 1440) % 1440 || 1440)
       const liquida = Math.min(regras.jornadaDiariaMax * 60, Math.floor((limiteHoras * 60) / 5))

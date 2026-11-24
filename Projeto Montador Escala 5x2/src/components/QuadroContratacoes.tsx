@@ -122,7 +122,7 @@ export function QuadroContratacoes() {
       </div>
 
       <p className="text-xs text-soft">
-        ESTIMATIVA: cada pessoa trabalha no máximo 5 dias por semana, em jornada de até 8h e respeita o limite de horas da etapa. As contratações
+        ESTIMATIVA: cada pessoa trabalha no máximo 5 dias por semana, em jornada de até 8h24 líquidas e respeita o limite de horas da etapa. As contratações
         são distribuídas entre as funções na proporção da equipe atual — ajuste conforme a necessidade real de cada
         função. Custo = salário-base × (1 + encargos); sem salário informado aparece “—”. Não considera férias, faltas
         nem rodízio de domingos.

@@ -23,14 +23,15 @@ export interface JornadaPessoa {
   inicioFixo?: number
 }
 
-export function jornadaDaFuncao(f: Funcao): JornadaPessoa {
+/** `tetoSemanalH`: limite semanal da etapa vigente; a jornada diária líquida sai de min(carga da função, teto) ÷ 5. */
+export function jornadaDaFuncao(f: Funcao, tetoSemanalH = Infinity): JornadaPessoa {
   if (f.entrada && f.saida) {
     const ini = minutosDe(f.entrada)
     const bruto = (minutosDe(f.saida) - ini + 1440) % 1440 || 1440
     return { bruto, intervaloMin: f.intervaloMin ?? intervaloParaBruto(bruto), inicioFixo: ini }
   }
-  const semanal = f.horasSemanaisAtuais > 0 ? f.horasSemanaisAtuais : 44
-  const liquida = Math.min(REGRAS.jornadaDiariaMax * 60, Math.round((semanal * 60) / 5 / 15) * 15)
+  const semanal = Math.min(f.horasSemanaisAtuais > 0 ? f.horasSemanaisAtuais : 44, tetoSemanalH)
+  const liquida = Math.min(Math.round(REGRAS.jornadaDiariaMax * 60), Math.round((semanal * 60) / 5))
   let intervalo = intervaloParaBruto(liquida)
   intervalo = Math.max(intervalo, intervaloParaBruto(liquida + intervalo))
   return { bruto: liquida + intervalo, intervaloMin: intervalo }

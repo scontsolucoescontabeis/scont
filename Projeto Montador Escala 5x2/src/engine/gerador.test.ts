@@ -126,7 +126,7 @@ describe('período de cobertura longo (estabelecimento aberto o dia todo)', () =
     e.funcoes = [{ id: 'atd', nome: 'Atendente', quantidade: 10, jornadaContratual: '44h', horasSemanaisAtuais: 44 }]
     for (const p of gerarPropostas(e)) {
       for (const t of p.escala.turnos) {
-        expect(horasLiquidasMin(t), p.nome).toBeLessThanOrEqual(8 * 60)
+        expect(horasLiquidasMin(t), p.nome).toBeLessThanOrEqual(8 * 60 + 24)
       }
       const r = validarEscala({
         escala: p.escala,
@@ -188,6 +188,22 @@ describe('início da escala', () => {
     for (const p of gerarPropostas(e)) {
       expect(p.escala.inicio, p.nome).toBe('2026-12-20')
       expect(diaDaSemana(p.escala.inicio)).toBe(0)
+    }
+  })
+})
+
+describe('jornada diária gerada', () => {
+  it('é de 8h24 líquidas na 1ª etapa (42h÷5) e de 8h na 2ª (40h÷5), com 1h de intervalo', () => {
+    const e1 = base(true, { util: 3, sab: 3, dom: 2 })
+    for (const p of gerarPropostas(e1)) {
+      for (const t of p.escala.turnos) {
+        expect(horasLiquidasMin(t), p.nome).toBe(8 * 60 + 24)
+        expect(t.intervaloMin).toBe(60)
+      }
+    }
+    const e2 = { ...base(true, { util: 3, sab: 3, dom: 2 }), inicio: '2027-12-19' }
+    for (const p of gerarPropostas(e2)) {
+      for (const t of p.escala.turnos) expect(horasLiquidasMin(t), p.nome).toBe(8 * 60)
     }
   })
 })

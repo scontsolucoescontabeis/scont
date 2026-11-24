@@ -230,9 +230,9 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
           id: `dia|${f.id}|${data}`,
           regraId: 'jornadaDiariaMax',
           severidade: compensacaoDiaria ? 'amarelo' : 'vermelho',
-          titulo: 'Jornada diária acima de 8h',
+          titulo: `Jornada diária acima de ${fmtHoras(regras.jornadaDiariaMax * 60)}`,
           mensagem: comRegra(
-            `${f.nome} trabalha ${fmtHoras(horasLiquidasMin(t))} em ${fmtDataBR(data)}; o limite diário é ${regras.jornadaDiariaMax}h.` +
+            `${f.nome} trabalha ${fmtHoras(horasLiquidasMin(t))} em ${fmtDataBR(data)}; o limite diário é ${fmtHoras(regras.jornadaDiariaMax * 60)}.` +
               (compensacaoDiaria
                 ? ' Há compensação informada: confirme o acordo.'
                 : ' Sem acordo de compensação isso não é permitido.'),

@@ -75,7 +75,8 @@ export const REGRAS: RegrasLegais = {
     repousoPreferencialDomingo: true,
   },
 
-  jornadaDiariaMax: 8,
+  // 8h24 líquidas = 42h ÷ 5 dias (distribuição da 1ª etapa em cinco jornadas, sem horas extras).
+  jornadaDiariaMax: 8.4,
   interjornadaMinHoras: 11,
 
   intrajornada: {

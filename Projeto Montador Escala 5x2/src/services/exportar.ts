@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { REGRAS } from '../config/regras'
 import { TEMA } from '../config/tema'
+import { fmtHoras } from '../engine/conformidade'
 import { diaDaSemana } from '../engine/datas'
 import { diasPreVigencia, presencaPorDia, resumoAlertas, resumoPorEmpregado, textoHorasSemana } from '../utils/resumo'
 import { calcularImpacto } from '../engine/impacto'
@@ -37,7 +38,7 @@ function linhasParametros(dados: Dados): [string, string][] {
     ['Versão das regras', `${REGRAS.versao} (atualizada em ${formatarData(REGRAS.atualizadoEm)})`],
     ['1ª etapa', `a partir de ${formatarData(REGRAS.etapa1.inicio)}: ${REGRAS.etapa1.jornadaSemanalMax}h/semana, ${REGRAS.etapa1.repousosSemanais} repousos`],
     ['2ª etapa', `a partir de ${formatarData(REGRAS.etapa2.inicio)}: ${REGRAS.etapa2.jornadaSemanalMax}h/semana`],
-    ['Jornada diária máx.', `${REGRAS.jornadaDiariaMax}h`],
+    ['Jornada diária máx.', fmtHoras(REGRAS.jornadaDiariaMax * 60)],
     ['Interjornada mín.', `${REGRAS.interjornadaMinHoras}h`],
     ['Modo de transição', REGRAS.modoTransicao],
     ['Compensação diária', dados.empresa.compensacaoDiaria ? 'Sim' : 'Não'],

@@ -20,6 +20,7 @@ import type {
   Turno,
 } from '../types'
 import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './datas'
+import { REGRAS, etapaVigente, limitesDaEtapa } from '../config/regras'
 import { jornadaDaFuncao } from './jornada'
 
 export interface EntradaGerador {
@@ -178,7 +179,8 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     janFim = 72
   }
   const contagem = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
-  const jornadas = new Map(funcoes.map((f) => [f.id, jornadaDaFuncao(f)]))
+  const teto = limitesDaEtapa(etapaVigente(somarDias(inicio, 6), REGRAS), REGRAS).jornadaSemanalMax
+  const jornadas = new Map(funcoes.map((f) => [f.id, jornadaDaFuncao(f, teto)]))
   const horarioDe = new Map<string, { inicio: number; bruto: number; intervaloMin: number }>()
   for (const f of funcionarios) {
     const j = jornadas.get(f.funcaoId)!

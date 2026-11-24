@@ -132,7 +132,7 @@ export function StepEmpresa() {
         </Campo>
         <Campo
           rotulo="Existe compensação de jornada (banco de horas)?"
-          ajuda="Com acordo de compensação, passar de 8h em um dia é aceitável (vira alerta amarelo). Sem acordo, é erro (vermelho)."
+          ajuda="Com acordo de compensação, passar de 8h24 líquidas em um dia é aceitável (vira alerta amarelo). Sem acordo, é erro (vermelho)."
         >
           <select
             className="campo"
