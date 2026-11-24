@@ -40,3 +40,8 @@ export function hhmmDe(min: number): string {
   const m = min % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
+
+/** Domingo que abre a semana (domingo a sábado) que contém a data. */
+export function domingoDaSemana(data: string): string {
+  return somarDias(data, -diaDaSemana(data))
+}

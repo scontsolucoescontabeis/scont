@@ -3,6 +3,7 @@ import type { CoberturaTurno, Empresa, Funcao, Turno } from '../types'
 import { corrigirTudo } from './autocorrecao'
 import { horasLiquidasMin, validarEscala } from './conformidade'
 import { calcularImpacto } from './impacto'
+import { diaDaSemana } from './datas'
 import { coberturaParaRegras, gerarPropostas, type EntradaGerador } from './gerador'
 
 const turnos: Turno[] = [{ id: 't1', nome: 'Comercial', inicio: '08:00', fim: '17:00', intervaloMin: 60 }]
@@ -21,7 +22,7 @@ function base(abreDomingo: boolean, cob: CoberturaTurno): EntradaGerador {
     acordoColetivo: 'nao',
     compensacaoDiaria: false,
   }
-  return { empresa, funcoes, turnos, cobertura: { t1: cob }, feriados: [], inicio: '2026-12-21', semanas: 4 }
+  return { empresa, funcoes, turnos, cobertura: { t1: cob }, feriados: [], inicio: '2026-12-20', semanas: 4 }
 }
 
 describe('gerador de propostas', () => {
@@ -64,7 +65,7 @@ describe('empresa que não funciona no fim de semana', () => {
     for (const p of gerarPropostas({ ...e, funcoes: [{ ...funcoes[0], quantidade: 5 }] })) {
       for (const f of p.escala.funcionarios) {
         p.escala.celulas[f.id].forEach((c, i) => {
-          const dow = (i + 1) % 7 // a escala começa na segunda
+          const dow = i % 7 // a escala começa no domingo
           if (dow === 0 || dow === 6) expect(c.tipo, `${p.nome} dia ${i}`).not.toBe('trabalho')
         })
       }
@@ -82,7 +83,7 @@ describe('empresa que não funciona no fim de semana', () => {
       const r = corrigirTudo(p.escala, validar)
       for (const f of r.escala.funcionarios) {
         r.escala.celulas[f.id].forEach((c, i) => {
-          const dow = (i + 1) % 7
+          const dow = i % 7
           if (dow === 0 || dow === 6) expect(c.tipo, `${p.nome} dia ${i}`).not.toBe('trabalho')
         })
       }
@@ -93,7 +94,7 @@ describe('empresa que não funciona no fim de semana', () => {
     const e = base(false, { util: 3, sab: 3, dom: 0 })
     for (const p of gerarPropostas(e)) {
       for (const f of p.escala.funcionarios) {
-        expect(p.escala.celulas[f.id][6].tipo, p.nome).not.toBe('trabalho')
+        expect(p.escala.celulas[f.id][0].tipo, p.nome).not.toBe('trabalho')
       }
     }
   })
@@ -173,9 +174,20 @@ describe('rodízio de domingos', () => {
       validarEscala({ escala: x, cobertura: cob, feriados: [], empresaFuncionaFeriados: false, periodos: e.turnos, compensacaoDiaria: false }),
     )
     for (const f of escala.funcionarios) {
-      const dom = [0, 1, 2, 3, 4].map((s) => escala.celulas[f.id][s * 7 + 6].tipo)
+      const dom = [0, 1, 2, 3, 4].map((s) => escala.celulas[f.id][s * 7].tipo)
       expect(dom.includes('dsr'), `${f.nome} ${dom}`).toBe(true)
       expect(dom.includes('trabalho'), `${f.nome} ${dom}`).toBe(true)
+    }
+  })
+})
+
+describe('início da escala', () => {
+  it('começa no domingo, mesmo que a data informada seja outro dia', () => {
+    const e = base(true, { util: 3, sab: 3, dom: 2 })
+    e.inicio = '2026-12-23' // quarta
+    for (const p of gerarPropostas(e)) {
+      expect(p.escala.inicio, p.nome).toBe('2026-12-20')
+      expect(diaDaSemana(p.escala.inicio)).toBe(0)
     }
   })
 })

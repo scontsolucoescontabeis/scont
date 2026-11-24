@@ -20,7 +20,7 @@ export function Propostas() {
           Sugestões de escala
         </h3>
         <label className="text-sm">
-          Início
+          Início (a escala começa no domingo da semana)
           <input
             type="date"
             className="campo ml-2 !w-auto"

@@ -3,7 +3,7 @@
  * Todos os limites vêm de `regras` (src/config/regras.ts).
  *
  * Premissas de modelagem (validar com o DP):
- *  - Semana = segunda a domingo; só semanas COMPLETAS dentro da escala são avaliadas.
+ *  - Semana = domingo a sábado; só semanas COMPLETAS dentro da escala são avaliadas.
  *  - Semana com dia de ausência (atestado/férias) não é avaliada (jornada/repouso).
  *  - Repouso = dia do tipo "folga" ou "dsr". Feriado não trabalhado não conta como repouso.
  *  - A etapa aplicada a uma semana é a vigente no ÚLTIMO dia (domingo) da semana.
@@ -27,7 +27,7 @@ import type {
   Severidade,
   Turno,
 } from '../types'
-import { diaDaSemana, diffDias, minutosDe, segundaDaSemana, somarDias } from './datas'
+import { diaDaSemana, diffDias, minutosDe, domingoDaSemana, somarDias } from './datas'
 
 export interface EntradaConformidade {
   escala: Escala
@@ -102,7 +102,7 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
   // ---------- Semanas completas ----------
   const segundas: string[] = []
   for (const d of datas) {
-    const seg = segundaDaSemana(d)
+    const seg = domingoDaSemana(d)
     if (!segundas.includes(seg)) segundas.push(seg)
   }
 
@@ -110,7 +110,7 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
     // Rodízio de domingos: o domingo trabalhado só preocupa se não houver nenhum domingo
     // de folga no ciclo (3 semanas para cada lado).
     const domingosDeFolga = segundas.filter((seg) => {
-      const i = indiceDe.get(somarDias(seg, 6))
+      const i = indiceDe.get(seg)
       return i !== undefined && ehRepouso(celula(f.id, i))
     })
     for (const seg of segundas) {
@@ -119,8 +119,8 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
       const dias = idx as number[]
       const cels = dias.map((i) => celula(f.id, i))
       if (cels.some((c) => c?.tipo === 'ausencia')) continue
-      const domingo = somarDias(seg, 6)
-      const etapa = etapaVigente(domingo, regras)
+      const domingo = seg
+      const etapa = etapaVigente(somarDias(seg, 6), regras)
       const lim = limitesDaEtapa(etapa, regras)
 
       // Repousos
@@ -133,13 +133,13 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         const trabalhados = dias
           .map((i, k) => ({ i, k }))
           .filter(({ k }) => cels[k]?.tipo === 'trabalho')
-          .sort((a, b) => (b.k === 6 ? 1 : 0) - (a.k === 6 ? 1 : 0))
+          .sort((a, b) => (b.k === 0 ? 1 : 0) - (a.k === 0 ? 1 : 0))
         const correcao: AlteracaoCelula[] | undefined =
           trabalhados.length >= faltam
             ? trabalhados.slice(0, faltam).map(({ i, k }) => ({
                 funcionarioId: f.id,
                 dia: i,
-                novo: { tipo: k === 6 ? 'dsr' : 'folga' },
+                novo: { tipo: k === 0 ? 'dsr' : 'folga' },
               }))
             : undefined
         alertas.push({
@@ -159,19 +159,19 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
       } else if (
         lim.repousoPreferencialDomingo &&
         nRep >= 1 &&
-        !ehRepouso(cels[6]) &&
+        !ehRepouso(cels[0]) &&
         !domingosDeFolga.some((x) => Math.abs(diffDias(x, seg)) <= 21)
       ) {
         const id = rid(etapa, 'repousoPreferencialDomingo')
-        const turnoDom = cels[6]?.tipo === 'trabalho' ? cels[6] : undefined
+        const turnoDom = cels[0]?.tipo === 'trabalho' ? cels[0] : undefined
         // O DSR da semana passa para o domingo; o dia que era DSR (ou, na falta, folga) volta a ser trabalhado.
         const outro =
-          dias.find((_, k) => k < 6 && cels[k]?.tipo === 'dsr') ??
-          dias.find((_, k) => k < 6 && cels[k]?.tipo === 'folga')
+          dias.find((_, k) => k > 0 && cels[k]?.tipo === 'dsr') ??
+          dias.find((_, k) => k > 0 && cels[k]?.tipo === 'folga')
         const correcao: AlteracaoCelula[] | undefined =
           turnoDom && outro !== undefined
             ? [
-                { funcionarioId: f.id, dia: dias[6], novo: { tipo: 'dsr' } },
+                { funcionarioId: f.id, dia: dias[0], novo: { tipo: 'dsr' } },
                 {
                   funcionarioId: f.id,
                   dia: outro,
@@ -398,7 +398,7 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         if (r.funcaoId && f.funcaoId !== r.funcaoId) continue
         const c = celula(f.id, i)
         if (c?.tipo !== 'folga') continue
-        const seg = segundaDaSemana(data)
+        const seg = domingoDaSemana(data)
         const semIdx = Array.from({ length: 7 }, (_, k) => indiceDe.get(somarDias(seg, k)))
         if (semIdx.some((x) => x === undefined)) continue
         const lim = limitesDaEtapa(etapaVigente(somarDias(seg, 6), regras), regras)

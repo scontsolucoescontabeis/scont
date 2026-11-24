@@ -19,7 +19,7 @@ import type {
   RegraCobertura,
   Turno,
 } from '../types'
-import { diaDaSemana, hhmmDe, minutosDe, segundaDaSemana, somarDias } from './datas'
+import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './datas'
 import { jornadaDaFuncao } from './jornada'
 
 export interface EntradaGerador {
@@ -29,7 +29,7 @@ export interface EntradaGerador {
   turnos: Turno[]
   cobertura: Record<string, CoberturaTurno>
   feriados: string[]
-  /** Qualquer data; a escala começa na segunda-feira da semana dela. */
+  /** Qualquer data; a escala começa no domingo da semana dela. */
   inicio: string
   semanas: number
 }
@@ -124,7 +124,7 @@ function faixas(inicio: number, bruto: number): number[] {
   return out
 }
 
-/** Escolhe 2 dias de repouso (índices 0=seg..6=dom) maximizando a folga de cobertura. */
+/** Escolhe 2 dias de repouso (índices 0=dom..6=sáb) maximizando a folga de cobertura. */
 function escolherRepousos(
   folga: number[],
   permitido: boolean[],
@@ -141,7 +141,7 @@ function escolherRepousos(
       const d = (k + desempate) % 7
       if (!permitido[d] || escolhidos.includes(d)) continue
       let pont = folga[d]
-      if (preferirDomingo && d === 6 && escolhidos.length === 0) pont += 0.5
+      if (preferirDomingo && d === 0 && escolhidos.length === 0) pont += 0.5
       if (pont > melhorPont) {
         melhorPont = pont
         melhor = d
@@ -155,7 +155,7 @@ function escolherRepousos(
 
 export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Escala {
   const { empresa, funcoes, turnos, cobertura, feriados, semanas } = entrada
-  const inicio = segundaDaSemana(entrada.inicio)
+  const inicio = domingoDaSemana(entrada.inicio)
   const dias = semanas * 7
   const funcionarios = criarFuncionarios(funcoes)
   const feriadoSet = new Set(feriados)
@@ -237,7 +237,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   const repousoFixo = new Map<string, number[]>()
 
   for (let s = 0; s < semanas; s++) {
-    // presentes[d][faixa], d = 0 (seg) .. 6 (dom)
+    // presentes[d][faixa], d = 0 (dom) .. 6 (sáb) = dia da semana
     const presentes = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
     for (const f of funcionarios) {
       const h = horarioDe.get(f.id)!
@@ -274,7 +274,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         const folga: number[] = []
         const forcados: number[] = []
         for (let d = 0; d < 7; d++) {
-          const dow = (d + 1) % 7
+          const dow = d
           const exigidas = span.filter((sl) => perfil[dow][sl] > 0)
           if (exigidas.length === 0) {
             forcados.push(d)
@@ -284,9 +284,9 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           }
         }
         const permitido = Array.from({ length: 7 }, () => true)
-        if (trabalhaDomingo && !forcados.includes(6)) {
-          if (trabalhaDomingo.has(f.id)) permitido[6] = false
-          else forcados.push(6)
+        if (trabalhaDomingo && !forcados.includes(0)) {
+          if (trabalhaDomingo.has(f.id)) permitido[0] = false
+          else forcados.push(0)
         }
         rep = escolherRepousos(
           folga,
@@ -299,7 +299,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       }
       rep.forEach((d) => span.forEach((sl) => (presentes[d][sl] -= 1)))
       // Cada semana tem 1 DSR (o domingo, quando é repouso; senão o 1º repouso) e as demais folgas.
-      const dsrDia = rep.includes(6) ? 6 : rep[0]
+      const dsrDia = rep.includes(0) ? 0 : rep[0]
       for (let d = 0; d < 7; d++) {
         const data = somarDias(inicio, s * 7 + d)
         let cel: DiaEscala

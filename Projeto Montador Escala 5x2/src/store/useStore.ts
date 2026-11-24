@@ -71,7 +71,7 @@ export const DADOS_PADRAO: Dados = {
   cobertura: { [TURNO_PADRAO.id]: { util: 2, sab: 2, dom: 0 } },
   feriados: FERIADOS_PADRAO,
   custo: CUSTO_PADRAO,
-  inicioEscala: '2026-12-21',
+  inicioEscala: '2026-12-20',
   semanas: 5,
   escala: null,
   propostas: [],

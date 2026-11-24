@@ -9,8 +9,11 @@ const T6X1: Turno = { id: 't6', nome: 'Seis por um', inicio: '08:00', fim: '16:2
 const TTARDE: Turno = { id: 'tt', nome: 'Tarde', inicio: '14:00', fim: '23:00', intervaloMin: 60 }
 
 /** Códigos: T<id> trabalho, F folga, D dsr, A ausência, H feriado */
+/** Escreva a semana como seg..dom; a escala usa semana domingo..sábado, então o último dia vai para o início. */
 function linha(...cod: string[]): DiaEscala[] {
-  return cod.map((c) => {
+  const rot: string[] = []
+  for (let i = 0; i < cod.length; i += 7) rot.push(cod[i + 6], ...cod.slice(i, i + 6))
+  return rot.map((c) => {
     if (c === 'F') return { tipo: 'folga' }
     if (c === 'D') return { tipo: 'dsr' }
     if (c === 'A') return { tipo: 'ausencia' }
@@ -42,9 +45,9 @@ function entrada(e: Escala, extra: Partial<EntradaConformidade> = {}): EntradaCo
 
 const ids = (r: ReturnType<typeof validarEscala>) => r.alertas.map((a) => a.regraId)
 
-// Segunda 2026-12-21 (1ª etapa), segunda 2026-06-01 (regra antiga)
-const SEG_ETAPA1 = '2026-12-21'
-const SEG_LEGADO = '2026-06-01'
+// Domingo 2026-12-20 (1ª etapa), domingo 2026-05-31 (regra antiga); semanas de domingo a sábado
+const SEG_ETAPA1 = '2026-12-20'
+const SEG_LEGADO = '2026-05-31'
 
 describe('etapas', () => {
   it('identifica a etapa vigente pelas datas parametrizadas', () => {
@@ -178,14 +181,14 @@ describe('mudança de etapa em 16/12/2027', () => {
   const cinco = linha('t41', 't41', 't41', 't41', 't41', 'F', 'D')
 
   it('semana que termina antes de 16/12/2027 usa 42h', () => {
-    // 06/12 a 12/12/2027
-    const r = validarEscala(entrada(escala('2027-12-06', [cinco], [T41])))
+    // 05/12 a 11/12/2027
+    const r = validarEscala(entrada(escala('2027-12-05', [cinco], [T41])))
     expect(ids(r)).not.toContain('etapa1.jornadaSemanalMax')
   })
 
   it('semana que termina em/depois de 16/12/2027 usa 40h', () => {
-    // 13/12 a 19/12/2027
-    const r = validarEscala(entrada(escala('2027-12-13', [cinco], [T41])))
+    // 12/12 a 18/12/2027
+    const r = validarEscala(entrada(escala('2027-12-12', [cinco], [T41])))
     expect(ids(r)).toContain('etapa2.jornadaSemanalMax')
   })
 })

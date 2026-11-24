@@ -10,6 +10,12 @@ const T8: Turno = { id: 't8', nome: 'Comercial', inicio: '08:00', fim: '17:00', 
 function esc(inicio: string, linhas: string[][], turnos: Turno[]): Escala {
   const conv = (c: string): DiaEscala =>
     c === 'F' ? { tipo: 'folga' } : c === 'D' ? { tipo: 'dsr' } : { tipo: 'trabalho', turnoId: c }
+  // Escreva a semana como seg..dom; a escala usa semana domingo..sábado.
+  linhas = linhas.map((l) => {
+    const r: string[] = []
+    for (let i = 0; i < l.length; i += 7) r.push(l[i + 6], ...l.slice(i, i + 6))
+    return r
+  })
   return {
     inicio,
     dias: linhas[0].length,
@@ -25,7 +31,7 @@ const validar = (e: Escala) =>
 describe('correção automática em cadeia', () => {
   it('corrige falta de repouso em todas as semanas', () => {
     const seis = ['t6', 't6', 't6', 't6', 't6', 't6', 'F']
-    const e = esc('2026-12-21', [[...seis, ...seis, ...seis]], [T6])
+    const e = esc('2026-12-20', [[...seis, ...seis, ...seis]], [T6])
     const antes = validar(e)
     expect(antes.alertas.some((a) => a.regraId === 'etapa1.repousosSemanais')).toBe(true)
     const r = corrigirTudo(e, validar)
@@ -34,14 +40,14 @@ describe('correção automática em cadeia', () => {
   })
 
   it('corrige interjornada e nunca piora a pontuação', () => {
-    const e = esc('2026-12-21', [['tt', 't8', 'F', 'F', 'F', 'F', 'D']], [TT, T8])
+    const e = esc('2026-12-20', [['tt', 't8', 'F', 'F', 'F', 'F', 'D']], [TT, T8])
     const r = corrigirTudo(e, validar)
     expect(validar(r.escala).alertas.some((a) => a.regraId === 'interjornadaMinHoras')).toBe(false)
     expect(pontuacao(validar(r.escala))).toBeLessThanOrEqual(pontuacao(validar(e)))
   })
 
   it('não altera escala já conforme', () => {
-    const e = esc('2026-12-21', [['t8', 't8', 't8', 't8', 't8', 'F', 'D']], [T8])
+    const e = esc('2026-12-20', [['t8', 't8', 't8', 't8', 't8', 'F', 'D']], [T8])
     const r = corrigirTudo(e, validar)
     expect(r.aplicadas).toBe(0)
     expect(r.escala).toBe(e)
@@ -50,7 +56,7 @@ describe('correção automática em cadeia', () => {
   it('aplica a troca do domingo mesmo criando furo de cobertura, sem entrar em ciclo', () => {
     // 2 pessoas, domingo exige 2: ambas trabalham domingo e folgam seg/ter -> sem descanso no domingo
     const a = ['F', 'F', 't8', 't8', 't8', 't8', 't8']
-    const e = esc('2026-12-21', [a, a], [T8])
+    const e = esc('2026-12-20', [a, a], [T8])
     const cobertura = [{ id: 'c', turnoId: 't8', minimo: 2, diasSemana: [0] }]
     const v = (x: Escala) =>
       validarEscala({ escala: x, cobertura, feriados: [], empresaFuncionaFeriados: true, compensacaoDiaria: false })
