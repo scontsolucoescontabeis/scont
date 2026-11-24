@@ -233,7 +233,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   const celulas: Record<string, DiaEscala[]> = Object.fromEntries(
     funcionarios.map((f) => [f.id, [] as DiaEscala[]]),
   )
-  const cicloDomingo = Math.max(2, Math.min(4, semanas))
+  const domTrabalhados = new Map<string, number>(funcionarios.map((f) => [f.id, 0]))
   const repousoFixo = new Map<string, number[]>()
 
   for (let s = 0; s < semanas; s++) {
@@ -242,6 +242,25 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     for (const f of funcionarios) {
       const h = horarioDe.get(f.id)!
       for (let d = 0; d < 7; d++) for (const sl of faixas(h.inicio, h.bruto)) presentes[d][sl] += 1
+    }
+
+    // Rodízio: a cada domingo trabalham só quantos a cobertura exige, escolhidos entre
+    // quem menos trabalhou domingos até aqui; todos os demais folgam (DSR).
+    let trabalhaDomingo: Set<string> | null = null
+    if (modelo === 'rodizio_domingo') {
+      trabalhaDomingo = new Set()
+      const cobertos = new Array<number>(NSLOTS).fill(0)
+      const ordem = [...funcionarios].sort(
+        (a, b) => domTrabalhados.get(a.id)! - domTrabalhados.get(b.id)!,
+      )
+      for (const f of ordem) {
+        const h = horarioDe.get(f.id)!
+        const util = faixas(h.inicio, h.bruto).filter((sl) => perfil[0][sl] > cobertos[sl])
+        if (util.length === 0) continue
+        trabalhaDomingo.add(f.id)
+        faixas(h.inicio, h.bruto).forEach((sl) => (cobertos[sl] += 1))
+      }
+      trabalhaDomingo.forEach((id) => domTrabalhados.set(id, domTrabalhados.get(id)! + 1))
     }
 
     for (const f of funcionarios) {
@@ -265,9 +284,9 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           }
         }
         const permitido = Array.from({ length: 7 }, () => true)
-        if (modelo === 'rodizio_domingo' && !forcados.includes(6)) {
-          if ((s + k) % cicloDomingo === 0) forcados.push(6)
-          else permitido[6] = false
+        if (trabalhaDomingo && !forcados.includes(6)) {
+          if (trabalhaDomingo.has(f.id)) permitido[6] = false
+          else forcados.push(6)
         }
         rep = escolherRepousos(
           folga,

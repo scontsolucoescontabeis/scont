@@ -161,3 +161,21 @@ describe('repouso semanal', () => {
     }
   })
 })
+
+describe('rodízio de domingos', () => {
+  it('aplica a todos: cada empregado folga e trabalha domingos, mesmo após a correção automática', () => {
+    const e = base(true, { util: 3, sab: 3, dom: 3 })
+    e.funcoes = [{ id: 'atd', nome: 'Atendente', quantidade: 6, jornadaContratual: '44h', horasSemanaisAtuais: 44 }]
+    e.semanas = 5
+    const cob = coberturaParaRegras(e.cobertura, e.empresa.diasFuncionamento)
+    const prop = gerarPropostas(e).find((p) => p.modelo === 'rodizio_domingo')!
+    const { escala } = corrigirTudo(prop.escala, (x) =>
+      validarEscala({ escala: x, cobertura: cob, feriados: [], empresaFuncionaFeriados: false, periodos: e.turnos, compensacaoDiaria: false }),
+    )
+    for (const f of escala.funcionarios) {
+      const dom = [0, 1, 2, 3, 4].map((s) => escala.celulas[f.id][s * 7 + 6].tipo)
+      expect(dom.includes('dsr'), `${f.nome} ${dom}`).toBe(true)
+      expect(dom.includes('trabalho'), `${f.nome} ${dom}`).toBe(true)
+    }
+  })
+})

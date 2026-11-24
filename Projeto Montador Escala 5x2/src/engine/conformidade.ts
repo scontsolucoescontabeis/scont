@@ -27,7 +27,7 @@ import type {
   Severidade,
   Turno,
 } from '../types'
-import { diaDaSemana, minutosDe, segundaDaSemana, somarDias } from './datas'
+import { diaDaSemana, diffDias, minutosDe, segundaDaSemana, somarDias } from './datas'
 
 export interface EntradaConformidade {
   escala: Escala
@@ -107,6 +107,12 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
   }
 
   for (const f of escala.funcionarios) {
+    // Rodízio de domingos: o domingo trabalhado só preocupa se não houver nenhum domingo
+    // de folga no ciclo (3 semanas para cada lado).
+    const domingosDeFolga = segundas.filter((seg) => {
+      const i = indiceDe.get(somarDias(seg, 6))
+      return i !== undefined && ehRepouso(celula(f.id, i))
+    })
     for (const seg of segundas) {
       const idx = Array.from({ length: 7 }, (_, k) => indiceDe.get(somarDias(seg, k)))
       if (idx.some((i) => i === undefined)) continue // semana incompleta
@@ -150,7 +156,12 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
           data: seg,
           correcao,
         })
-      } else if (lim.repousoPreferencialDomingo && nRep >= 1 && !ehRepouso(cels[6])) {
+      } else if (
+        lim.repousoPreferencialDomingo &&
+        nRep >= 1 &&
+        !ehRepouso(cels[6]) &&
+        !domingosDeFolga.some((x) => Math.abs(diffDias(x, seg)) <= 21)
+      ) {
         const id = rid(etapa, 'repousoPreferencialDomingo')
         const turnoDom = cels[6]?.tipo === 'trabalho' ? cels[6] : undefined
         // O DSR da semana passa para o domingo; o dia que era DSR (ou, na falta, folga) volta a ser trabalhado.
