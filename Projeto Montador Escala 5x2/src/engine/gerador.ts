@@ -16,6 +16,7 @@ import type {
   Escala,
   Funcao,
   Funcionario,
+  MinimosDia,
   ModeloEscala,
   Proposta,
   RegraCobertura,
@@ -58,8 +59,9 @@ export function criarFuncionarios(funcoes: Funcao[]): Funcionario[] {
 export function coberturaParaRegras(
   cobertura: Record<string, CoberturaTurno>,
   diasFuncionamento: boolean[],
+  funcoes?: { id: string; nome: string }[],
 ): RegraCobertura[] {
-  const grupos: [keyof CoberturaTurno, number[]][] = [
+  const grupos: [keyof MinimosDia, number[]][] = [
     ['util', [1, 2, 3, 4, 5]],
     ['sab', [6]],
     ['dom', [0]],
@@ -71,12 +73,27 @@ export function coberturaParaRegras(
       if (c[chave] > 0 && abertos.length > 0) {
         regras.push({ id: `${turnoId}-${chave}`, turnoId, minimo: c[chave], diasSemana: abertos })
       }
+      // Mínimo por função (além do total do período).
+      for (const [funcaoId, m] of Object.entries(c.porFuncao ?? {})) {
+        const fn = funcoes?.find((x) => x.id === funcaoId)
+        if (funcoes && !fn) continue // função removida
+        if (m[chave] > 0 && abertos.length > 0) {
+          regras.push({
+            id: `${turnoId}-${funcaoId}-${chave}`,
+            turnoId,
+            funcaoId,
+            rotulo: fn?.nome,
+            minimo: m[chave],
+            diasSemana: abertos,
+          })
+        }
+      }
     }
   }
   return regras
 }
 
-function necessidade(c: CoberturaTurno | undefined, dow: number, aberto: boolean): number {
+function necessidade(c: MinimosDia | undefined, dow: number, aberto: boolean): number {
   if (!c || !aberto) return 0
   return dow === 0 ? c.dom : dow === 6 ? c.sab : c.util
 }
@@ -90,6 +107,7 @@ export function perfilNecessidade(
   empresa: Empresa,
   periodos: Turno[],
   cobertura: Record<string, CoberturaTurno>,
+  funcaoIds?: string[],
 ): number[][] {
   const perfil = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
   for (const t of periodos) {
@@ -98,7 +116,12 @@ export function perfilNecessidade(
     const ini = minutosDe(t.inicio)
     const fim = minutosDe(t.fim) <= ini ? 1440 : minutosDe(t.fim)
     for (let dow = 0; dow < 7; dow++) {
-      const n = necessidade(c, dow, empresa.diasFuncionamento[dow])
+      const aberto = empresa.diasFuncionamento[dow]
+      // O total nunca é menor que a soma dos mínimos por função.
+      const somaFuncoes = Object.entries(c.porFuncao ?? {})
+        .filter(([id]) => !funcaoIds || funcaoIds.includes(id))
+        .reduce((acc, [, m]) => acc + necessidade(m, dow, aberto), 0)
+      const n = Math.max(necessidade(c, dow, aberto), somaFuncoes)
       if (n <= 0) continue
       for (let s = Math.floor(ini / SLOT); s < Math.ceil(fim / SLOT); s++) {
         perfil[dow][s] = Math.max(perfil[dow][s], n)
@@ -117,6 +140,34 @@ export function perfilNecessidade(
     }
   }
   return perfil
+}
+
+/** Necessidade de pessoas de cada função (mínimo por função), por dia da semana e faixa de 15 min. */
+export function perfilPorFuncao(
+  empresa: Empresa,
+  periodos: Turno[],
+  cobertura: Record<string, CoberturaTurno>,
+  funcaoIds: string[],
+): Record<string, number[][]> {
+  const out: Record<string, number[][]> = {}
+  for (const t of periodos) {
+    const c = cobertura[t.id]
+    if (!c?.porFuncao) continue
+    const ini = minutosDe(t.inicio)
+    const fim = minutosDe(t.fim) <= ini ? 1440 : minutosDe(t.fim)
+    for (const [fid, m] of Object.entries(c.porFuncao)) {
+      if (!funcaoIds.includes(fid)) continue
+      for (let dow = 0; dow < 7; dow++) {
+        const n = necessidade(m, dow, empresa.diasFuncionamento[dow])
+        if (n <= 0) continue
+        out[fid] ??= Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
+        for (let s = Math.floor(ini / SLOT); s < Math.ceil(fim / SLOT); s++) {
+          out[fid][dow][s] = Math.max(out[fid][dow][s], n)
+        }
+      }
+    }
+  }
+  return out
 }
 
 /** Faixas de 15 min cobertas por um horário que começa em `inicio` e dura `bruto` minutos. */
@@ -162,7 +213,10 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   const dias = semanas * 7
   const funcionarios = criarFuncionarios(funcoes)
   const feriadoSet = new Set(feriados)
-  const perfil = perfilNecessidade(empresa, turnos, cobertura)
+  const funcaoIds = funcoes.map((f) => f.id)
+  const perfil = perfilNecessidade(empresa, turnos, cobertura, funcaoIds)
+  const perfilFn = perfilPorFuncao(empresa, turnos, cobertura, funcaoIds)
+  const novaGrade = () => Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
 
   // 1) Horário de trabalho de cada empregado: jornada legal da função, com a
   //    entrada escolhida para cobrir as faixas do estabelecimento com menos gente.
@@ -188,6 +242,9 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     janFim = 72
   }
   const contagem = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
+  const contagemFn: Record<string, number[][]> = Object.fromEntries(
+    Object.keys(perfilFn).map((id) => [id, novaGrade()]),
+  )
   const teto = tetoSemanalNaData(inicio)
   const jornadas = new Map(funcoes.map((f) => [f.id, jornadaDaFuncao(f, teto)]))
   const horarioDe = new Map<string, { inicio: number; bruto: number; intervaloMin: number }>()
@@ -202,6 +259,12 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         let pont = 0
         for (let dow = 0; dow < 7; dow++) {
           for (const s of faixas(c, j.bruto)) {
+            // Mínimo da própria função: pesa tanto quanto o total.
+            const nf = perfilFn[f.funcaoId]?.[dow][s] ?? 0
+            if (nf > 0) {
+              const cf = contagemFn[f.funcaoId][dow][s]
+              pont += Math.max(0, nf * 7 - cf * 5) * 1000 - cf
+            }
             const n = perfil[dow][s]
             if (n <= 0) continue
             // Falta de gente pesa muito; empate prefere a faixa menos cheia.
@@ -215,7 +278,12 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       }
     }
     horarioDe.set(f.id, { inicio: ini, bruto: j.bruto, intervaloMin: j.intervaloMin })
-    for (let dow = 0; dow < 7; dow++) for (const s of faixas(ini, j.bruto)) contagem[dow][s] += 1
+    for (let dow = 0; dow < 7; dow++) {
+      for (const s of faixas(ini, j.bruto)) {
+        contagem[dow][s] += 1
+        if (contagemFn[f.funcaoId]) contagemFn[f.funcaoId][dow][s] += 1
+      }
+    }
   }
 
   const turnosTrabalho = new Map<string, Turno>()
@@ -255,9 +323,17 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   for (let s = 0; s < semanas; s++) {
     // presentes[d][faixa], d = 0 (dom) .. 6 (sáb) = dia da semana
     const presentes = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
+    const presentesFn: Record<string, number[][]> = Object.fromEntries(
+      Object.keys(perfilFn).map((id) => [id, novaGrade()]),
+    )
     for (const f of funcionarios) {
       const h = horarioDe.get(f.id)!
-      for (let d = 0; d < 7; d++) for (const sl of faixas(h.inicio, h.bruto)) presentes[d][sl] += 1
+      for (let d = 0; d < 7; d++) {
+        for (const sl of faixas(h.inicio, h.bruto)) {
+          presentes[d][sl] += 1
+          if (presentesFn[f.funcaoId]) presentesFn[f.funcaoId][d][sl] += 1
+        }
+      }
     }
 
     // Rodízio: a cada domingo trabalham só quantos a cobertura exige, escolhidos entre
@@ -266,16 +342,25 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     if (modelo === 'rodizio_domingo') {
       trabalhaDomingo = new Set()
       const cobertos = new Array<number>(NSLOTS).fill(0)
+      const cobertosFn: Record<string, number[]> = Object.fromEntries(
+        Object.keys(perfilFn).map((id) => [id, new Array<number>(NSLOTS).fill(0)]),
+      )
       // Quem já trabalhou ciclo-1 domingos seguidos precisa folgar neste.
       const ordem = funcionarios
         .filter((f) => domSeguidos.get(f.id)! < ciclo - 1)
         .sort((a, b) => domTrabalhados.get(a.id)! - domTrabalhados.get(b.id)!)
       for (const f of ordem) {
         const h = horarioDe.get(f.id)!
-        const util = faixas(h.inicio, h.bruto).filter((sl) => perfil[0][sl] > cobertos[sl])
+        const pf = perfilFn[f.funcaoId]
+        const util = faixas(h.inicio, h.bruto).filter(
+          (sl) => perfil[0][sl] > cobertos[sl] || (pf && pf[0][sl] > cobertosFn[f.funcaoId][sl]),
+        )
         if (util.length === 0) continue
         trabalhaDomingo.add(f.id)
-        faixas(h.inicio, h.bruto).forEach((sl) => (cobertos[sl] += 1))
+        faixas(h.inicio, h.bruto).forEach((sl) => {
+          cobertos[sl] += 1
+          if (pf) cobertosFn[f.funcaoId][sl] += 1
+        })
       }
       trabalhaDomingo.forEach((id) => domTrabalhados.set(id, domTrabalhados.get(id)! + 1))
     }
@@ -297,7 +382,13 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
             forcados.push(d)
             folga.push(-Infinity)
           } else {
-            folga.push(Math.min(...exigidas.map((sl) => presentes[d][sl] - perfil[dow][sl])))
+            let f0 = Math.min(...exigidas.map((sl) => presentes[d][sl] - perfil[dow][sl]))
+            const pf = perfilFn[f.funcaoId]
+            const exFn = pf ? span.filter((sl) => pf[dow][sl] > 0) : []
+            if (pf && exFn.length > 0) {
+              f0 = Math.min(f0, ...exFn.map((sl) => presentesFn[f.funcaoId][d][sl] - pf[dow][sl]))
+            }
+            folga.push(f0)
           }
         }
         const permitido = Array.from({ length: 7 }, () => true)
@@ -333,7 +424,12 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         garantir(limite)
         protegidos.add(limite)
       }
-      rep.forEach((d) => span.forEach((sl) => (presentes[d][sl] -= 1)))
+      rep.forEach((d) =>
+        span.forEach((sl) => {
+          presentes[d][sl] -= 1
+          if (presentesFn[f.funcaoId]) presentesFn[f.funcaoId][d][sl] -= 1
+        }),
+      )
       // Cada semana tem 1 DSR (o domingo, quando é repouso; senão o 1º repouso) e as demais folgas.
       const dsrDia = rep.includes(0) ? 0 : rep[0]
       for (let d = 0; d < 7; d++) {

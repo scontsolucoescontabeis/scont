@@ -102,6 +102,30 @@ export function StepCobertura() {
       ...limpar,
     });
 
+  const atualizarCobFuncao = (
+    id: string,
+    funcaoId: string,
+    chave: "util" | "sab" | "dom",
+    v: number,
+  ) => {
+    const atual = cobertura[id] ?? { util: 0, sab: 0, dom: 0 };
+    const minimos = atual.porFuncao?.[funcaoId] ?? { util: 0, sab: 0, dom: 0 };
+    const porFuncao = {
+      ...atual.porFuncao,
+      [funcaoId]: { ...minimos, [chave]: Math.max(0, v) },
+    };
+    // Sem nenhum mínimo, remove a função para não guardar zeros.
+    const m = porFuncao[funcaoId];
+    if (m.util + m.sab + m.dom === 0) delete porFuncao[funcaoId];
+    set({
+      cobertura: {
+        ...cobertura,
+        [id]: { ...atual, porFuncao },
+      },
+      ...limpar,
+    });
+  };
+
   const ajustarAoHorario = (
     id: string,
     c: { util: number; sab: number; dom: number },
@@ -312,6 +336,71 @@ export function StepCobertura() {
                 </Campo>
               ))}
             </div>
+            {funcoes.length > 1 && (
+              <div className="rounded-lg border border-line bg-brand-light/40 p-3">
+                <p className="text-sm font-medium">
+                  Mínimo por função (opcional)
+                </p>
+                <p className="mb-2 text-xs text-soft">
+                  Além do total acima, exija um mínimo de pessoas de uma função
+                  neste período. Deixe 0 para não exigir. Se a soma dos mínimos
+                  por função passar do total, vale a soma.
+                </p>
+                <div className="space-y-2">
+                  {funcoes.map((fn) => {
+                    const m = c.porFuncao?.[fn.id] ?? { util: 0, sab: 0, dom: 0 };
+                    return (
+                      <div
+                        key={fn.id}
+                        className="grid items-end gap-3 sm:grid-cols-4"
+                      >
+                        <p className="text-sm font-medium sm:pb-2">
+                          {fn.nome}{" "}
+                          <span className="text-xs font-normal text-soft">
+                            ({fn.quantidade} na equipe)
+                          </span>
+                        </p>
+                        {(["util", "sab", "dom"] as const).map((g) => (
+                          <Campo
+                            key={g}
+                            rotulo={`Mínimo — ${grupos[g].nome}`}
+                          >
+                            <input
+                              type="number"
+                              min={0}
+                              className="campo disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-soft"
+                              disabled={!grupos[g].aberto}
+                              aria-label={`Mínimo de ${fn.nome} — ${grupos[g].nome} — ${t.nome}`}
+                              value={grupos[g].aberto ? m[g] : 0}
+                              onChange={(e) =>
+                                atualizarCobFuncao(
+                                  t.id,
+                                  fn.id,
+                                  g,
+                                  Number(e.target.value),
+                                )
+                              }
+                            />
+                          </Campo>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+                {(["util", "sab", "dom"] as const).some((g) => {
+                  const soma = funcoes.reduce(
+                    (a, fn) => a + (c.porFuncao?.[fn.id]?.[g] ?? 0),
+                    0,
+                  );
+                  return grupos[g].aberto && soma > c[g];
+                }) && (
+                  <p className="mt-2 text-xs text-amber-800" role="note">
+                    A soma dos mínimos por função passa do total em algum grupo
+                    de dias; a ferramenta considera a soma como o mínimo real.
+                  </p>
+                )}
+              </div>
+            )}
             <button
               type="button"
               className="btn-sec"

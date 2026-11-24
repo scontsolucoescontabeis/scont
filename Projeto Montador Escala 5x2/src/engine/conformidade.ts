@@ -577,6 +577,7 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         }
       }
 
+      const quem = r.funcaoId ? ` de "${r.rotulo ?? 'função'}"` : ''
       alertas.push({
         id: `cob|${r.id}|${data}`,
         regraId: 'cobertura',
@@ -584,10 +585,10 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         titulo: periodo ? 'Falta gente no período' : 'Falta gente no turno',
         mensagem: comRegra(
           periodo
-            ? `Em ${DIAS_PT[diaDaSemana(data)]}, ${fmtDataBR(data)}, o período "${periodo.nome}" (${periodo.inicio}–${periodo.fim}) fica abaixo do mínimo de ${r.minimo} pessoa(s): ` +
+            ? `Em ${DIAS_PT[diaDaSemana(data)]}, ${fmtDataBR(data)}, o período "${periodo.nome}" (${periodo.inicio}–${periodo.fim}) fica abaixo do mínimo de ${r.minimo} pessoa(s)${quem}: ` +
                 faltas.map((x) => `${hhmm(x.de)}–${hhmm(x.ate)} com ${x.pessoas}`).join('; ') +
                 '.'
-            : `Em ${DIAS_PT[diaDaSemana(data)]}, ${fmtDataBR(data)}, o turno "${turno?.nome ?? r.turnoId}" tem ${presentesN} pessoa(s); o mínimo informado é ${r.minimo}.`,
+            : `Em ${DIAS_PT[diaDaSemana(data)]}, ${fmtDataBR(data)}, o turno "${turno?.nome ?? r.turnoId}" tem ${presentesN} pessoa(s)${quem}; o mínimo informado é ${r.minimo}.`,
           'cobertura',
         ),
         sugestao: periodo
