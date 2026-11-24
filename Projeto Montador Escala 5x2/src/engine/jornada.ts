@@ -3,9 +3,14 @@
  * do estabelecimento. Sem horário fixo na função, sai da carga semanal em 5
  * dias, limitada à jornada diária máxima, com o intervalo legal.
  */
-import { REGRAS } from '../config/regras'
+import { REGRAS, etapaVigente, limitesDaEtapa } from '../config/regras'
 import type { Funcao } from '../types'
-import { minutosDe } from './datas'
+import { domingoDaSemana, minutosDe, somarDias } from './datas'
+
+/** Teto semanal (h) da etapa vigente na semana (domingo a sábado) que contém `inicio`. */
+export function tetoSemanalNaData(inicio: string): number {
+  return limitesDaEtapa(etapaVigente(somarDias(domingoDaSemana(inicio), 6), REGRAS), REGRAS).jornadaSemanalMax
+}
 
 /** Intervalo mínimo para uma jornada de duração bruta `brutoMin`. */
 export function intervaloParaBruto(brutoMin: number): number {

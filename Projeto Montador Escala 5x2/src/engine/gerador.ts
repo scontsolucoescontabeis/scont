@@ -20,8 +20,7 @@ import type {
   Turno,
 } from '../types'
 import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './datas'
-import { REGRAS, etapaVigente, limitesDaEtapa } from '../config/regras'
-import { jornadaDaFuncao } from './jornada'
+import { jornadaDaFuncao, tetoSemanalNaData } from './jornada'
 
 export interface EntradaGerador {
   empresa: Empresa
@@ -174,12 +173,19 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       }
     })
   }
+  // O horário de funcionamento também limita onde uma jornada pode caber (entrada ≥ abertura, saída ≤ fechamento).
+  for (let dow = 0; dow < 7; dow++) {
+    if (!empresa.diasFuncionamento[dow]) continue
+    const h = empresa.horarios?.[dow] ?? { abre: empresa.horaAbertura, fecha: empresa.horaFechamento }
+    janIni = Math.min(janIni, Math.floor(minutosDe(h.abre) / SLOT))
+    janFim = Math.max(janFim, Math.ceil(minutosDe(h.fecha) / SLOT))
+  }
   if (janFim === 0) {
     janIni = 32
     janFim = 72
   }
   const contagem = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
-  const teto = limitesDaEtapa(etapaVigente(somarDias(inicio, 6), REGRAS), REGRAS).jornadaSemanalMax
+  const teto = tetoSemanalNaData(inicio)
   const jornadas = new Map(funcoes.map((f) => [f.id, jornadaDaFuncao(f, teto)]))
   const horarioDe = new Map<string, { inicio: number; bruto: number; intervaloMin: number }>()
   for (const f of funcionarios) {

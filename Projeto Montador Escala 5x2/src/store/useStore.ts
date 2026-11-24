@@ -51,7 +51,7 @@ const TURNO_PADRAO: Turno = {
   id: 'turno-1',
   nome: 'Comercial',
   inicio: '08:00',
-  fim: '17:00',
+  fim: '17:24',
   intervaloMin: 60,
 }
 

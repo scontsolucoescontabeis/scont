@@ -2,6 +2,9 @@ import { Plus, Trash2 } from "lucide-react";
 import { useStore } from "../store/useStore";
 import { DIAS_CURTOS, horarioDoDia } from "../utils/analise";
 import type { Turno } from "../types";
+import { fmtHoras } from "../engine/conformidade";
+import { minutosDe } from "../engine/datas";
+import { jornadaDaFuncao, tetoSemanalNaData } from "../engine/jornada";
 import { Campo } from "./ui";
 
 export function StepCobertura() {
@@ -10,6 +13,21 @@ export function StepCobertura() {
   const set = useStore((s) => s.set);
   const empresa = useStore((s) => s.empresa);
   const dias = empresa.diasFuncionamento;
+  const funcoes = useStore((s) => s.funcoes);
+  const inicioEscala = useStore((s) => s.inicioEscala);
+
+  // Jornada de cada função (horário do empregado, separado dos períodos abaixo).
+  const teto = tetoSemanalNaData(inicioEscala);
+  const jornadas = funcoes.map((f) => ({ f, j: jornadaDaFuncao(f, teto) }));
+  const brutoRef = Math.max(1, ...jornadas.map((x) => x.j.bruto));
+  // Dias em que o horário de funcionamento é menor que a jornada: a entrada–saída não cabe.
+  const naoCabe = [1, 2, 3, 4, 5, 6, 0]
+    .filter((d) => dias[d])
+    .filter((d) => {
+      const h = horarioDoDia(empresa, d);
+      return minutosDe(h.fecha) - minutosDe(h.abre) < brutoRef;
+    })
+    .map((d) => DIAS_CURTOS[d]);
 
   // Coerência com o passo 1: dias em que a empresa não funciona não exigem pessoas.
   const abertosUteis = [1, 2, 3, 4, 5].filter((d) => dias[d]);
@@ -178,6 +196,36 @@ export function StepCobertura() {
         )}
       </div>
 
+      <div className="rounded-lg border border-line p-3 text-sm">
+        <p className="mb-1 font-medium">
+          Jornada dos empregados (gerada pela ferramenta; limite semanal da
+          etapa: {teto}h)
+        </p>
+        <ul className="list-disc pl-5 text-xs">
+          {jornadas.map(({ f, j }) => (
+            <li key={f.id}>
+              {f.nome}: {fmtHoras(j.bruto - j.intervaloMin)} líquidas +{" "}
+              {j.intervaloMin} min de intervalo = {fmtHoras(j.bruto)} entre
+              entrada e saída
+              {j.inicioFixo !== undefined
+                ? ` (horário fixo ${f.entrada}–${f.saida})`
+                : ""}
+            </li>
+          ))}
+        </ul>
+        {naoCabe.length > 0 && (
+          <p
+            className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs"
+            role="note"
+          >
+            O horário de funcionamento é menor que a jornada de{" "}
+            {fmtHoras(brutoRef)} em: {naoCabe.join(", ")}. A entrada–saída
+            passará do fechamento; amplie o horário no passo 1 ou defina uma
+            entrada/saída fixa menor para a função no passo 2.
+          </p>
+        )}
+      </div>
+
       {turnos.map((t) => {
         const c = cobertura[t.id] ?? { util: 0, sab: 0, dom: 0 };
         return (
@@ -218,6 +266,18 @@ export function StepCobertura() {
                 />
               </Campo>
             </div>
+            <p className="text-xs text-soft">
+              Duração do período:{" "}
+              {fmtHoras((minutosDe(t.fim) - minutosDe(t.inicio) + 1440) % 1440 || 1440)}
+              . Com jornadas de {fmtHoras(brutoRef)}, manter o mínimo exige
+              cerca de{" "}
+              {Math.ceil(
+                (c.util *
+                  ((minutosDe(t.fim) - minutosDe(t.inicio) + 1440) % 1440 || 1440)) /
+                  brutoRef,
+              )}{" "}
+              jornada(s) por dia útil.
+            </p>
             {foraDoHorario(t, c).length > 0 && (
               <p
                 className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs"

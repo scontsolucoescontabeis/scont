@@ -207,3 +207,17 @@ describe('jornada diária gerada', () => {
     }
   })
 })
+
+describe('horários dentro do funcionamento', () => {
+  it('as jornadas de 9h24 ficam entre abertura e fechamento quando cabem', () => {
+    const e = base(false, { util: 3, sab: 2, dom: 0 })
+    e.empresa.horaAbertura = '08:00'
+    e.empresa.horaFechamento = '18:00'
+    e.turnos = [{ id: 't1', nome: 'Comercial', inicio: '08:00', fim: '17:24', intervaloMin: 0 }]
+    for (const p of gerarPropostas(e)) {
+      for (const t of p.escala.turnos) {
+        expect(t.inicio >= '08:00' && t.fim <= '18:00', `${p.nome} ${t.nome}`).toBe(true)
+      }
+    }
+  })
+})

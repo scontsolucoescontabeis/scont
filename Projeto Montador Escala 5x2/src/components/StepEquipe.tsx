@@ -46,7 +46,10 @@ export function StepEquipe() {
       </h2>
       <p className="text-sm text-soft">
         Liste as funções, quantas pessoas há em cada uma e como trabalham hoje.
-        O salário é opcional e só serve para estimar custos.
+        O salário é opcional e só serve para estimar custos. A jornada de cada
+        pessoa (horas líquidas por dia, intervalo e entrada) é gerada pela
+        ferramenta; só informe entrada e saída fixas se a função tem horário
+        próprio.
       </p>
 
       {funcoes.map((f) => {
