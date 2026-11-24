@@ -153,7 +153,10 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
       } else if (lim.repousoPreferencialDomingo && nRep >= 1 && !ehRepouso(cels[6])) {
         const id = rid(etapa, 'repousoPreferencialDomingo')
         const turnoDom = cels[6]?.tipo === 'trabalho' ? cels[6] : undefined
-        const outro = dias.find((_, k) => k < 6 && cels[k]?.tipo === 'folga')
+        // O DSR da semana passa para o domingo; o dia que era DSR (ou, na falta, folga) volta a ser trabalhado.
+        const outro =
+          dias.find((_, k) => k < 6 && cels[k]?.tipo === 'dsr') ??
+          dias.find((_, k) => k < 6 && cels[k]?.tipo === 'folga')
         const correcao: AlteracaoCelula[] | undefined =
           turnoDom && outro !== undefined
             ? [

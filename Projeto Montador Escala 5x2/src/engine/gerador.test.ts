@@ -143,3 +143,21 @@ describe('período de cobertura longo (estabelecimento aberto o dia todo)', () =
     }
   })
 })
+
+describe('repouso semanal', () => {
+  it('toda semana completa tem exatamente 1 DSR e 1 folga por empregado', () => {
+    for (const abre of [false, true]) {
+      const e = base(abre, { util: 4, sab: 3, dom: abre ? 2 : 0 })
+      for (const p of gerarPropostas(e)) {
+        for (const f of p.escala.funcionarios) {
+          const c = p.escala.celulas[f.id]
+          for (let s = 0; s < e.semanas; s++) {
+            const sem = c.slice(s * 7, s * 7 + 7).map((x) => x.tipo)
+            expect(sem.filter((t) => t === 'dsr'), `${p.nome} ${f.nome} sem ${s}`).toHaveLength(1)
+            expect(sem.filter((t) => t === 'folga'), `${p.nome} ${f.nome} sem ${s}`).toHaveLength(1)
+          }
+        }
+      }
+    }
+  })
+})

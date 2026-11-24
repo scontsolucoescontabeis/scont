@@ -279,13 +279,15 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         if (modelo === 'fixo') repousoFixo.set(f.id, rep)
       }
       rep.forEach((d) => span.forEach((sl) => (presentes[d][sl] -= 1)))
+      // Cada semana tem 1 DSR (o domingo, quando é repouso; senão o 1º repouso) e as demais folgas.
+      const dsrDia = rep.includes(6) ? 6 : rep[0]
       for (let d = 0; d < 7; d++) {
         const data = somarDias(inicio, s * 7 + d)
         let cel: DiaEscala
         if (feriadoSet.has(data) && !empresa.funcionaFeriados && !rep.includes(d)) {
           cel = { tipo: 'feriado' }
         } else if (rep.includes(d)) {
-          cel = { tipo: d === 6 ? 'dsr' : 'folga' }
+          cel = { tipo: d === dsrDia ? 'dsr' : 'folga' }
         } else {
           cel = { tipo: 'trabalho', turnoId: turnoDoFunc.get(f.id) }
         }
