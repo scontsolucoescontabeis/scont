@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
-import { REGRAS } from '../config/regras'
+import { REGRAS, cicloDomingoDoSetor } from '../config/regras'
 import { TEMA } from '../config/tema'
 import { fmtHoras } from '../engine/conformidade'
 import { diaDaSemana } from '../engine/datas'
@@ -40,6 +40,9 @@ function linhasParametros(dados: Dados): [string, string][] {
     ['2ª etapa', `a partir de ${formatarData(REGRAS.etapa2.inicio)}: ${REGRAS.etapa2.jornadaSemanalMax}h/semana`],
     ['Jornada diária máx.', fmtHoras(REGRAS.jornadaDiariaMax * 60)],
     ['Interjornada mín.', `${REGRAS.interjornadaMinHoras}h`],
+    ['Domingo de folga', `ao menos 1 a cada ${cicloDomingoDoSetor(dados.empresa.setor)} semanas`],
+    ['Dias seguidos (máx.)', `${REGRAS.diasConsecutivosMax}`],
+    ['DSR + interjornada', `${REGRAS.repousoSemanalComInterjornadaHoras}h`],
     ['Modo de transição', REGRAS.modoTransicao],
     ['Compensação diária', dados.empresa.compensacaoDiaria ? 'Sim' : 'Não'],
     ['Encargos / Hora extra (estimativa)', `${dados.custo.encargosPct}% / ${dados.custo.horaExtraPct}%`],

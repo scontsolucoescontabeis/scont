@@ -5,7 +5,9 @@
  * próprio horário (jornada legal, nunca o período inteiro) e 2 dias de repouso
  * por semana; feriados em que a empresa não funciona viram "feriado". A
  * conformidade é verificada depois, pelo motor (conformidade.ts) — o gerador só
- * tenta cobrir a demanda.
+ * tenta cobrir a demanda, mas já respeita duas travas legais: o repouso cai no
+ * domingo ao menos 1 vez a cada N semanas (Lei 10.101/2000 art. 6º, p. único) e
+ * ninguém passa de 6 dias seguidos de trabalho (CLT art. 67; OJ 410 SDI-1/TST).
  */
 import type {
   CoberturaTurno,
@@ -21,6 +23,7 @@ import type {
 } from '../types'
 import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './datas'
 import { jornadaDaFuncao, tetoSemanalNaData } from './jornada'
+import { REGRAS, cicloDomingoDoSetor } from '../config/regras'
 
 export interface EntradaGerador {
   empresa: Empresa
@@ -242,6 +245,11 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     funcionarios.map((f) => [f.id, [] as DiaEscala[]]),
   )
   const domTrabalhados = new Map<string, number>(funcionarios.map((f) => [f.id, 0]))
+  // Domingos trabalhados em sequência e dias de trabalho seguidos ao fim da semana anterior.
+  const ciclo = Math.max(2, cicloDomingoDoSetor(empresa.setor))
+  const domSeguidos = new Map<string, number>(funcionarios.map((f) => [f.id, 0]))
+  const diasSeguidos = new Map<string, number>(funcionarios.map((f) => [f.id, 0]))
+  const maxSeguidos = REGRAS.diasConsecutivosMax
   const repousoFixo = new Map<string, number[]>()
 
   for (let s = 0; s < semanas; s++) {
@@ -258,9 +266,10 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     if (modelo === 'rodizio_domingo') {
       trabalhaDomingo = new Set()
       const cobertos = new Array<number>(NSLOTS).fill(0)
-      const ordem = [...funcionarios].sort(
-        (a, b) => domTrabalhados.get(a.id)! - domTrabalhados.get(b.id)!,
-      )
+      // Quem já trabalhou ciclo-1 domingos seguidos precisa folgar neste.
+      const ordem = funcionarios
+        .filter((f) => domSeguidos.get(f.id)! < ciclo - 1)
+        .sort((a, b) => domTrabalhados.get(a.id)! - domTrabalhados.get(b.id)!)
       for (const f of ordem) {
         const h = horarioDe.get(f.id)!
         const util = faixas(h.inicio, h.bruto).filter((sl) => perfil[0][sl] > cobertos[sl])
@@ -305,6 +314,25 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         )
         if (modelo === 'fixo') repousoFixo.set(f.id, rep)
       }
+      // Travas legais: domingo de folga a cada `ciclo` semanas e no máx. 6 dias seguidos.
+      const fechados = Array.from({ length: 7 }, (_, d) => d).filter((d) =>
+        span.every((sl) => perfil[d][sl] <= 0),
+      )
+      const domObrigatorio = domSeguidos.get(f.id)! >= ciclo - 1 && !fechados.includes(0)
+      const protegidos = new Set<number>(fechados)
+      if (domObrigatorio) protegidos.add(0)
+      const garantir = (d: number) => {
+        if (rep.includes(d)) return
+        const sai = [...rep].reverse().find((x) => !protegidos.has(x))
+        rep = sai === undefined ? [...rep, d] : rep.map((x) => (x === sai ? d : x))
+      }
+      if (domObrigatorio) garantir(0)
+      // O 1º repouso da semana precisa vir antes de estourar 6 dias seguidos.
+      const limite = Math.max(0, maxSeguidos - diasSeguidos.get(f.id)!)
+      if (Math.min(...rep) > limite) {
+        garantir(limite)
+        protegidos.add(limite)
+      }
       rep.forEach((d) => span.forEach((sl) => (presentes[d][sl] -= 1)))
       // Cada semana tem 1 DSR (o domingo, quando é repouso; senão o 1º repouso) e as demais folgas.
       const dsrDia = rep.includes(0) ? 0 : rep[0]
@@ -319,6 +347,8 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           cel = { tipo: 'trabalho', turnoId: turnoDoFunc.get(f.id) }
         }
         celulas[f.id].push(cel)
+        if (d === 0) domSeguidos.set(f.id, cel.tipo === 'trabalho' ? domSeguidos.get(f.id)! + 1 : 0)
+        diasSeguidos.set(f.id, cel.tipo === 'trabalho' ? diasSeguidos.get(f.id)! + 1 : 0)
       }
     }
   }

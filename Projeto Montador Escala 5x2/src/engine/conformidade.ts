@@ -43,6 +43,8 @@ export interface EntradaConformidade {
   periodos?: Turno[]
   /** Existe acordo/regime de compensação de jornada diária. */
   compensacaoDiaria: boolean
+  /** Ciclo do domingo em semanas (ver `cicloDomingoDoSetor`); padrão: comércio. */
+  cicloDomingoSemanas?: number
   regras?: RegrasLegais
 }
 
@@ -78,6 +80,7 @@ function comRegra(texto: string, id: RegraId): string {
 
 export function validarEscala(entrada: EntradaConformidade): ResultadoConformidade {
   const regras = entrada.regras ?? REGRAS
+  const ciclo = Math.max(2, entrada.cicloDomingoSemanas ?? regras.domingo.cicloSemanasComercio)
   const { escala, cobertura, feriados, empresaFuncionaFeriados, compensacaoDiaria } = entrada
   const alertas: Alerta[] = []
   const turnos = new Map(escala.turnos.map((t) => [t.id, t]))
@@ -160,7 +163,7 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         lim.repousoPreferencialDomingo &&
         nRep >= 1 &&
         !ehRepouso(cels[0]) &&
-        !domingosDeFolga.some((x) => Math.abs(diffDias(x, seg)) <= 21)
+        !domingosDeFolga.some((x) => Math.abs(diffDias(x, seg)) <= 7 * ciclo)
       ) {
         const id = rid(etapa, 'repousoPreferencialDomingo')
         const turnoDom = cels[0]?.tipo === 'trabalho' ? cels[0] : undefined
@@ -212,6 +215,113 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
           sugestao: 'Reduza a duração dos turnos ou retire um dia de trabalho dessa semana.',
           funcionarioId: f.id,
           data: seg,
+        })
+      }
+    }
+
+    // ---------- Domingo: repouso coincide com o domingo ao menos 1 vez a cada `ciclo` semanas ----------
+    // (Lei 10.101/2000 art. 6º, p. único) => no máximo ciclo-1 domingos trabalhados seguidos.
+    {
+      let seguidos = 0
+      let anterior: number | undefined
+      for (const seg of segundas) {
+        const i = indiceDe.get(seg)
+        if (i === undefined) continue
+        const c = celula(f.id, i)
+        if (anterior !== undefined && i - anterior !== 7) seguidos = 0
+        anterior = i
+        if (c?.tipo !== 'trabalho') {
+          seguidos = 0
+          continue
+        }
+        seguidos++
+        if (seguidos < ciclo) continue
+        seguidos = 0
+        const semana = Array.from({ length: 6 }, (_, k) => i + 1 + k)
+        const outro =
+          semana.find((x) => celula(f.id, x)?.tipo === 'dsr') ??
+          semana.find((x) => celula(f.id, x)?.tipo === 'folga')
+        alertas.push({
+          id: `domrod|${f.id}|${seg}`,
+          regraId: 'domingoRodizio',
+          severidade: 'vermelho',
+          titulo: `Domingo de folga ao menos a cada ${ciclo} semanas`,
+          mensagem: comRegra(
+            `${f.nome} trabalha ${ciclo} domingos seguidos até ${fmtDataBR(seg)}. O repouso semanal deve coincidir com o domingo pelo menos 1 vez a cada ${ciclo} semanas (Lei 10.101/2000 art. 6º, p. único; Lei 605/1949).`,
+            'domingoRodizio',
+          ),
+          sugestao: 'Faça o rodízio: dê o domingo de folga (DSR) a esta pessoa e passe o domingo para quem folgou mais recentemente.',
+          funcionarioId: f.id,
+          data: seg,
+          correcao:
+            c.turnoId && outro !== undefined
+              ? [
+                  { funcionarioId: f.id, dia: i, novo: { tipo: 'dsr' } },
+                  { funcionarioId: f.id, dia: outro, novo: { tipo: 'trabalho', turnoId: c.turnoId } },
+                ]
+              : undefined,
+        })
+      }
+    }
+
+    // ---------- Dias seguidos de trabalho (CLT art. 67; OJ 410 SDI-1/TST) ----------
+    {
+      let run = 0
+      for (let i = 0; i < datas.length; i++) {
+        if (celula(f.id, i)?.tipo !== 'trabalho') {
+          run = 0
+          continue
+        }
+        run++
+        if (run <= regras.diasConsecutivosMax) continue
+        run = 0
+        alertas.push({
+          id: `seq|${f.id}|${datas[i]}`,
+          regraId: 'diasConsecutivosMax',
+          severidade: 'vermelho',
+          titulo: `Mais de ${regras.diasConsecutivosMax} dias seguidos de trabalho`,
+          mensagem: comRegra(
+            `${f.nome} chega a ${regras.diasConsecutivosMax + 1} dias seguidos de trabalho em ${fmtDataBR(datas[i])}. O descanso semanal não pode ser concedido após o 7º dia consecutivo: se for, o repouso é pago em dobro (CLT art. 67; OJ 410 da SDI-1 do TST).`,
+            'diasConsecutivosMax',
+          ),
+          sugestao: 'Antecipe uma folga para que nenhum período de trabalho passe de 6 dias seguidos (inclusive na virada de semana).',
+          funcionarioId: f.id,
+          data: datas[i],
+          correcao: [{ funcionarioId: f.id, dia: i, novo: { tipo: 'folga' } }],
+        })
+      }
+    }
+
+    // ---------- Repouso semanal + interjornada: 24h + 11h = 35h (Súmula 110/TST) ----------
+    {
+      const minDescanso = regras.repousoSemanalComInterjornadaHoras * 60
+      const fimDe = (i: number) => {
+        const t = turnoDe(celula(f.id, i))!
+        return i * 1440 + minutosDe(t.inicio) + duracaoBrutaMin(t)
+      }
+      const naoTrab = (i: number) => celula(f.id, i)?.tipo !== 'trabalho'
+      for (let i = 0; i < datas.length; i++) {
+        if (celula(f.id, i)?.tipo !== 'dsr') continue
+        let a = i - 1
+        while (a >= 0 && naoTrab(a)) a--
+        let b = i + 1
+        while (b < datas.length && naoTrab(b)) b++
+        if (a < 0 || b >= datas.length) continue
+        const tb = turnoDe(celula(f.id, b))!
+        const gap = b * 1440 + minutosDe(tb.inicio) - fimDe(a)
+        if (gap >= minDescanso) continue
+        alertas.push({
+          id: `rsi|${f.id}|${datas[i]}`,
+          regraId: 'repousoSemanalInterjornada',
+          severidade: 'amarelo',
+          titulo: 'Descanso do DSR com menos de 35h',
+          mensagem: comRegra(
+            `${f.nome} descansa só ${fmtHoras(Math.max(0, gap))} em torno do DSR de ${fmtDataBR(datas[i])}; o repouso de 24h deve ser somado às 11h de interjornada (35h). As horas suprimidas são pagas como extras (Súmula 110 do TST).`,
+            'repousoSemanalInterjornada',
+          ),
+          sugestao: 'Atrase a entrada do primeiro dia após o DSR ou antecipe a saída do dia anterior.',
+          funcionarioId: f.id,
+          data: datas[i],
         })
       }
     }
@@ -293,7 +403,7 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         severidade: 'amarelo',
         titulo: 'Feriado trabalhado',
         mensagem: comRegra(
-          `${f.nome} trabalha em ${feriadosTrab.map(fmtDataBR).join(', ')} (feriado). Trabalho em feriado no comércio costuma exigir autorização na convenção coletiva e, se houver, lei municipal (confirmar); pode gerar adicional ou folga compensatória.`,
+          `${f.nome} trabalha em ${feriadosTrab.map(fmtDataBR).join(', ')} (feriado). Trabalho em feriado no comércio costuma exigir autorização na convenção coletiva e, se houver, lei municipal (confirmar); sem folga compensatória o dia é pago em dobro (Lei 605/1949 art. 9º; Súmula 146 do TST).`,
           'domingoFeriadoTrabalhado',
         ),
         sugestao: 'Confirme com o DP a autorização na convenção coletiva/lei municipal e o pagamento em dobro ou a folga compensatória.',
@@ -308,7 +418,7 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         severidade: 'amarelo',
         titulo: 'Domingo trabalhado',
         mensagem: comRegra(
-          `${f.nome} trabalha em ${sundaysWorked.length} domingo(s) do período. Verifique DSR e adicionais conforme a convenção.`,
+          `${f.nome} trabalha em ${sundaysWorked.length} domingo(s) do período. Sem folga compensatória na semana, o domingo é pago em dobro (Súmula 146 do TST); confira também a convenção coletiva.`,
           'domingoFeriadoTrabalhado',
         ),
         sugestao: 'Garanta a folga compensatória na semana e a regra de rodízio da convenção.',
@@ -346,6 +456,49 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         sugestao: `Aumente o intervalo do turno para pelo menos ${exigido} minutos.`,
       })
     }
+  }
+
+  // ---------- Intervalo máximo (art. 71) e trabalho noturno (art. 73) ----------
+  const nIni = minutosDe(regras.noturno.inicio)
+  const nFim = minutosDe(regras.noturno.fim)
+  for (const t of escala.turnos) {
+    if (!usados.has(t.id)) continue
+    if (t.intervaloMin > regras.intervaloMaxMinutos) {
+      alertas.push({
+        id: `intramax|${t.id}`,
+        regraId: 'intervaloMaxMinutos',
+        severidade: 'amarelo',
+        titulo: 'Intervalo acima de 2 horas',
+        mensagem: comRegra(
+          `O turno "${t.nome}" tem ${t.intervaloMin} min de intervalo; acima de ${regras.intervaloMaxMinutos / 60}h só é válido com acordo escrito ou convenção coletiva (CLT art. 71, caput).`,
+          'intervaloMaxMinutos',
+        ),
+        sugestao: 'Reduza o intervalo para no máximo 2 horas ou formalize o acordo.',
+      })
+    }
+    // minutos do turno dentro da faixa noturna (22h–5h), olhando ontem, hoje e amanhã
+    const ini = minutosDe(t.inicio)
+    const fim = ini + duracaoBrutaMin(t)
+    let noite = 0
+    for (const base of [-1440, 0, 1440]) {
+      const a = Math.max(ini, base + nIni)
+      const b = Math.min(fim, base + 1440 + nFim)
+      if (b > a) noite += b - a
+    }
+    if (noite <= 0) continue
+    const computada = horasLiquidasMin(t) + noite * (60 / regras.noturno.minutosHoraReduzida - 1)
+    alertas.push({
+      id: `noturno|${t.id}`,
+      regraId: 'jornadaNoturna',
+      severidade: 'amarelo',
+      titulo: 'Turno com trabalho noturno',
+      mensagem: comRegra(
+        `O turno "${t.nome}" (${t.inicio}–${t.fim}) tem ${fmtHoras(noite)} entre ${regras.noturno.inicio} e ${regras.noturno.fim}. A hora noturna é reduzida (52min30s) e tem adicional de 20% (CLT art. 73): a jornada computada fica em ${fmtHoras(computada)}` +
+          (computada > regras.jornadaDiariaMax * 60 ? `, acima do limite diário de ${fmtHoras(regras.jornadaDiariaMax * 60)}.` : '.'),
+        'jornadaNoturna',
+      ),
+      sugestao: 'Considere a hora reduzida e o adicional noturno no cálculo da jornada e da folha.',
+    })
   }
 
   // ---------- Cobertura ----------
