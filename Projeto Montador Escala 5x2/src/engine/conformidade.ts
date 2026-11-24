@@ -293,10 +293,10 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         severidade: 'amarelo',
         titulo: 'Feriado trabalhado',
         mensagem: comRegra(
-          `${f.nome} trabalha em ${feriadosTrab.map(fmtDataBR).join(', ')} (feriado). Pode gerar adicional ou folga compensatória conforme a convenção.`,
+          `${f.nome} trabalha em ${feriadosTrab.map(fmtDataBR).join(', ')} (feriado). Trabalho em feriado no comércio costuma exigir autorização na convenção coletiva e, se houver, lei municipal (confirmar); pode gerar adicional ou folga compensatória.`,
           'domingoFeriadoTrabalhado',
         ),
-        sugestao: 'Confirme com o DP o pagamento em dobro ou a folga compensatória.',
+        sugestao: 'Confirme com o DP a autorização na convenção coletiva/lei municipal e o pagamento em dobro ou a folga compensatória.',
         funcionarioId: f.id,
         data: feriadosTrab[0],
       })

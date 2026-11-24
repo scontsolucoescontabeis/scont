@@ -46,6 +46,8 @@ export interface RegrasLegais {
    */
   modoTransicao: ModoTransicao
   avisoLegal: string
+  /** Base legal citada no rodapé dos relatórios. */
+  baseLegal: string[]
 }
 
 export const REGRAS: RegrasLegais = {
@@ -90,6 +92,13 @@ export const REGRAS: RegrasLegais = {
     'nem de assessoria jurídica. Os parâmetros seguem a EC 141/2026 conforme interpretação vigente na ' +
     'data de atualização indicada e podem mudar por regulamentação, decisão do STF ou convenção coletiva. ' +
     'Valores de custo são ESTIMATIVAS.',
+
+  // Texto informado pelo responsável da ferramenta; conferir na fonte oficial ao atualizar `versao`.
+  baseLegal: [
+    'Vigência da 1ª etapa da EC 141/2026: 16/12/2026 (há fonte que indica 15/12/2026; trate 15/12 como prazo interno).',
+    'Liminar do STF de 12/11/2026 (ADIs 8.041 e 8.042): permite, sem convenção ou acordo coletivo até 15/12/2026, distribuir as 42 horas em cinco jornadas de até 8h24, sem horas extras, até 15/12/2027.',
+    'A decisão ainda depende de referendo do Plenário; em 17/11/2026 o rito foi convertido em julgamento de mérito.',
+  ],
 }
 
 /** Identificadores de regra citados nas mensagens de conformidade. */
