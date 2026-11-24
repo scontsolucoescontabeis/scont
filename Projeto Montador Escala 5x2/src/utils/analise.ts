@@ -1,20 +1,24 @@
-import { REGRAS } from '../config/regras'
+import { REGRAS, cicloDomingoDoSetor } from '../config/regras'
 import { validarEscala } from '../engine/conformidade'
 import { coberturaParaRegras } from '../engine/gerador'
 import { somarDias } from '../engine/datas'
 import type { Dados } from '../store/useStore'
 import type { DiaEscala, Escala, ResultadoConformidade, Turno } from '../types'
 
-export type DadosAnalise = Pick<Dados, 'empresa' | 'cobertura' | 'feriados'> & { turnos?: Dados['turnos'] }
+export type DadosAnalise = Pick<Dados, 'empresa' | 'cobertura' | 'feriados'> & {
+  turnos?: Dados['turnos']
+  funcoes?: Dados['funcoes']
+}
 
 export function analisar(dados: DadosAnalise, escala: Escala): ResultadoConformidade {
   return validarEscala({
     escala,
-    cobertura: coberturaParaRegras(dados.cobertura, dados.empresa.diasFuncionamento),
+    cobertura: coberturaParaRegras(dados.cobertura, dados.empresa.diasFuncionamento, dados.funcoes),
     feriados: dados.feriados.map((f) => f.data),
     empresaFuncionaFeriados: dados.empresa.funcionaFeriados,
     periodos: dados.turnos,
     compensacaoDiaria: dados.empresa.compensacaoDiaria,
+    cicloDomingoSemanas: cicloDomingoDoSetor(dados.empresa.setor),
     regras: REGRAS,
   })
 }

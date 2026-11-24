@@ -45,6 +45,22 @@ export interface RegrasLegais {
    * as infrações próprias da etapa 1, pedindo validação do DP.
    */
   modoTransicao: ModoTransicao
+  /**
+   * Repouso semanal no domingo (Lei 605/49 art. 1º; Lei 10.101/2000 art. 6º, p. único).
+   * No comércio o repouso deve coincidir com o domingo ao menos 1 vez a cada
+   * `cicloSemanasComercio` semanas (=> no máximo cicloSemanas-1 domingos seguidos
+   * trabalhados). Demais setores: `cicloSemanasDemais` (Portaria MTb 417/1966; confirmar
+   * a atividade e a convenção coletiva).
+   */
+  domingo: { cicloSemanasComercio: number; cicloSemanasDemais: number }
+  /** Máximo de dias seguidos de trabalho (CLT art. 67; OJ 410 SDI-1/TST: RSR após o 7º dia é pago em dobro). */
+  diasConsecutivosMax: number
+  /** Descanso mínimo (h) que envolve o repouso semanal: 24h + 11h de interjornada (Súmula 110/TST). */
+  repousoSemanalComInterjornadaHoras: number
+  /** Intervalo intrajornada máximo, sem acordo escrito (CLT art. 71, caput), em minutos. */
+  intervaloMaxMinutos: number
+  /** Trabalho noturno urbano (CLT art. 73): 22h–5h, hora reduzida de 52min30s. */
+  noturno: { inicio: string; fim: string; minutosHoraReduzida: number }
   avisoLegal: string
   /** Base legal citada no rodapé dos relatórios. */
   baseLegal: string[]
@@ -88,6 +104,12 @@ export const REGRAS: RegrasLegais = {
 
   modoTransicao: 'padrao',
 
+  domingo: { cicloSemanasComercio: 3, cicloSemanasDemais: 7 },
+  diasConsecutivosMax: 6,
+  repousoSemanalComInterjornadaHoras: 35,
+  intervaloMaxMinutos: 120,
+  noturno: { inicio: '22:00', fim: '05:00', minutosHoraReduzida: 52.5 },
+
   avisoLegal:
     'Esta ferramenta é um apoio ao planejamento e NÃO substitui a análise do Departamento Pessoal ' +
     'nem de assessoria jurídica. Os parâmetros seguem a EC 141/2026 conforme interpretação vigente na ' +
@@ -98,6 +120,7 @@ export const REGRAS: RegrasLegais = {
   baseLegal: [
     'Vigência da 1ª etapa da EC 141/2026: 16/12/2026 (há fonte que indica 15/12/2026; trate 15/12 como prazo interno).',
     'Liminar do STF de 12/11/2026 (ADIs 8.041 e 8.042): permite, sem convenção ou acordo coletivo até 15/12/2026, distribuir as 42 horas em cinco jornadas de até 8h24, sem horas extras, até 15/12/2027.',
+    'CLT arts. 58, 59, 66, 67, 71 e 73; Lei 605/1949 (RSR); Lei 10.101/2000 art. 6º (domingo ao menos 1 vez a cada 3 semanas no comércio); Súmula 110 e OJ 410 (SDI-1) do TST.',
     'A decisão ainda depende de referendo do Plenário; em 17/11/2026 o rito foi convertido em julgamento de mérito.',
   ],
 }
@@ -118,6 +141,11 @@ export type RegraId =
   | 'intrajornada'
   | 'cobertura'
   | 'domingoFeriadoTrabalhado'
+  | 'domingoRodizio'
+  | 'diasConsecutivosMax'
+  | 'repousoSemanalInterjornada'
+  | 'intervaloMaxMinutos'
+  | 'jornadaNoturna'
 
 export type EtapaId = 'legado' | 'etapa1' | 'etapa2'
 
@@ -139,4 +167,14 @@ export const NOME_ETAPA: Record<EtapaId, string> = {
   legado: 'regra atual (antes da EC 141/2026)',
   etapa1: '1ª etapa da EC 141/2026',
   etapa2: '2ª etapa da EC 141/2026',
+}
+
+/**
+ * Ciclo (em semanas) em que o repouso deve cair no domingo ao menos 1 vez, conforme o setor
+ * informado. Padrão: comércio (3 semanas, Lei 10.101/2000 art. 6º, p. único). Setores
+ * claramente industriais usam o ciclo dos demais (confirmar atividade e convenção coletiva).
+ */
+export function cicloDomingoDoSetor(setor: string | undefined, regras: RegrasLegais = REGRAS): number {
+  const industrial = /ind[uú]stria|f[aá]brica|fabril|manufatur|metal[uú]rg|montadora/i.test(setor ?? '')
+  return industrial ? regras.domingo.cicloSemanasDemais : regras.domingo.cicloSemanasComercio
 }

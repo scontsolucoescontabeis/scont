@@ -135,7 +135,7 @@ export function presencaPorDia(
   periodos: Turno[],
   cobertura: Record<string, CoberturaTurno>,
 ): PresencaDia {
-  const perfil = perfilNecessidade(empresa, periodos, cobertura)
+  const perfil = perfilNecessidade(empresa, periodos, cobertura, [...new Set(escala.funcionarios.map((f) => f.funcaoId))])
   const total = Array<number>(escala.dias).fill(0)
   const exigido = Array.from({ length: escala.dias }, (_, i) => {
     const dow = (new Date(`${somarDias(escala.inicio, i)}T00:00:00Z`).getUTCDay())

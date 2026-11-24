@@ -9,7 +9,7 @@
  * semanal da etapa. Pessoas necessárias = pessoa-dia ÷ dias por pessoa.
  */
 import { REGRAS, limitesDaEtapa, type EtapaId, type RegrasLegais } from '../config/regras'
-import type { CoberturaTurno, Empresa, Funcao, ParametrosCusto, Turno } from '../types'
+import type { CoberturaTurno, Empresa, Funcao, MinimosDia, ParametrosCusto, Turno } from '../types'
 import { minutosDe } from './datas'
 import { intervaloParaBruto } from './jornada'
 
@@ -43,7 +43,7 @@ export interface QuadroContratacoes {
   rotulo: 'ESTIMATIVA'
 }
 
-function demandaDia(c: CoberturaTurno, dow: number): number {
+function demandaDia(c: MinimosDia, dow: number): number {
   return dow === 0 ? c.dom : dow === 6 ? c.sab : c.util
 }
 
@@ -77,21 +77,38 @@ export function calcularQuadro(
   const { empresa, funcoes, turnos, cobertura, custo } = entrada
   const limiteHoras = limitesDaEtapa(etapa, regras).jornadaSemanalMax
 
+  // O período é do estabelecimento; cada pessoa cumpre a jornada legal (≤ 8h24 líquidas + intervalo).
+  const liquida = Math.min(regras.jornadaDiariaMax * 60, Math.floor((limiteHoras * 60) / 5))
+  const intervalo = intervaloParaBruto(liquida)
+  const bruto = Math.max(1, liquida + Math.max(intervalo, intervaloParaBruto(liquida + intervalo)))
+  const porPessoa = Math.max(1, Math.min(5, Math.floor((limiteHoras * 60) / Math.max(1, liquida))))
+  const duracaoDe = (t: Turno) => Math.max(1, (minutosDe(t.fim) - minutosDe(t.inicio) + 1440) % 1440 || 1440)
+  const presencasDe = (m: MinimosDia) =>
+    [0, 1, 2, 3, 4, 5, 6].reduce((s, d) => s + (empresa.diasFuncionamento[d] ? demandaDia(m, d) : 0), 0)
+
+  // Pessoas necessárias de cada função com mínimo próprio (soma dos períodos).
+  const necessarioFn = new Map<string, number>()
+  for (const f of funcoes) {
+    const dias = turnos.reduce((s, t) => {
+      const m = cobertura[t.id]?.porFuncao?.[f.id]
+      return m ? s + Math.ceil((presencasDe(m) * duracaoDe(t)) / bruto) : s
+    }, 0)
+    if (dias > 0) necessarioFn.set(f.id, Math.ceil(dias / porPessoa))
+  }
+
   const linhasTurno: LinhaTurnoQuadro[] = turnos
     .filter((t) => cobertura[t.id])
     .map((t) => {
       const c = cobertura[t.id]
+      const somaFn = (d: number) =>
+        Object.entries(c.porFuncao ?? {})
+          .filter(([id]) => funcoes.some((f) => f.id === id))
+          .reduce((s, [, m]) => s + demandaDia(m, d), 0)
       const presencas = [0, 1, 2, 3, 4, 5, 6].reduce(
-        (s, d) => s + (empresa.diasFuncionamento[d] ? demandaDia(c, d) : 0),
+        (s, d) => s + (empresa.diasFuncionamento[d] ? Math.max(demandaDia(c, d), somaFn(d)) : 0),
         0,
       )
-      // O período é do estabelecimento; cada pessoa cumpre a jornada legal (≤ 8h24 líquidas + intervalo).
-      const ini = minutosDe(t.inicio)
-      const duracao = Math.max(1, (minutosDe(t.fim) - ini + 1440) % 1440 || 1440)
-      const liquida = Math.min(regras.jornadaDiariaMax * 60, Math.floor((limiteHoras * 60) / 5))
-      const intervalo = intervaloParaBruto(liquida)
-      const bruto = Math.max(1, liquida + Math.max(intervalo, intervaloParaBruto(liquida + intervalo)))
-      const porPessoa = Math.max(1, Math.min(5, Math.floor((limiteHoras * 60) / Math.max(1, liquida))))
+      const duracao = duracaoDe(t)
       const diasPessoa = Math.ceil((presencas * duracao) / bruto)
       return {
         turnoId: t.id,
@@ -105,8 +122,13 @@ export function calcularQuadro(
 
   const necessarioTotal = linhasTurno.reduce((s, l) => s + l.necessarios, 0)
   const equipeAtual = funcoes.reduce((s, f) => s + f.quantidade, 0)
-  const contratar = Math.max(0, necessarioTotal - equipeAtual)
-  const extras = distribuir(contratar, funcoes.map((f) => f.quantidade))
+  // Cada função com mínimo próprio precisa de, no mínimo, as pessoas que ele exige; o que sobrar
+  // do total é distribuído proporcionalmente à equipe atual.
+  const base = funcoes.map((f) => Math.max(0, (necessarioFn.get(f.id) ?? 0) - f.quantidade))
+  const faltaTotal = Math.max(0, necessarioTotal - (equipeAtual + base.reduce((a, b) => a + b, 0)))
+  const resto = distribuir(faltaTotal, funcoes.map((f) => f.quantidade))
+  const extras = base.map((b, i) => b + resto[i])
+  const contratar = extras.reduce((a, b) => a + b, 0)
   const fator = 1 + custo.encargosPct / 100
   const temSalario = funcoes.some((f) => f.salarioBase && f.salarioBase > 0)
 

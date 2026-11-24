@@ -44,6 +44,8 @@ export interface RegraCobertura {
   minimo: number
   /** 0 = domingo ... 6 = sábado */
   diasSemana: number[]
+  /** Nome da função (só para citar nas mensagens quando `funcaoId` é informado). */
+  rotulo?: string
 }
 
 export type Severidade = 'verde' | 'amarelo' | 'vermelho'
@@ -106,11 +108,19 @@ export interface Empresa {
   compensacaoDiaria: boolean
 }
 
-/** Mínimo de pessoas por turno: dias úteis, sábado e domingo. */
-export interface CoberturaTurno {
+/** Mínimo de pessoas: dias úteis, sábado e domingo. */
+export interface MinimosDia {
   util: number
   sab: number
   dom: number
+}
+
+/**
+ * Mínimo de pessoas por período: dias úteis, sábado e domingo (total, de qualquer
+ * função). `porFuncao` (opcional) exige, além do total, um mínimo de cada função.
+ */
+export interface CoberturaTurno extends MinimosDia {
+  porFuncao?: Record<string, MinimosDia>
 }
 
 export interface ParametrosCusto {
