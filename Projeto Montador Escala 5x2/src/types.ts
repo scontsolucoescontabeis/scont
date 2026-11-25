@@ -89,6 +89,20 @@ export interface PessoaEscala {
   saida?: string
   intervaloMin?: number
   ferias: { inicio: string; fim: string }[]
+  /** Sexo cadastrado no banco; ausente quando não informado. Nunca vem de edição do usuário. */
+  sexo?: 'F' | 'M'
+  /** Menor de 18 anos (banco). */
+  menor: boolean
+  /** Estagiário (banco, pelo tipo do empregado). */
+  estagiario: boolean
+}
+
+/** Regras por pessoa configuráveis pelo usuário (não são dados pessoais; são persistidas). */
+export type RegrasPessoais = {
+  /** Mulheres: ao menos 1 domingo de folga a cada 2 semanas (CLT art. 386). */
+  mulheresDomingoQuinzenal: boolean
+  /** Carga semanal do estagiário (Lei 11.788/2008 art. 10). */
+  estagioHorasSemanais: 20 | 30 | 40
 }
 
 export interface Funcao {

@@ -7,6 +7,8 @@ const pessoa = (id: string, extra: Partial<PessoaEscala> = {}): PessoaEscala => 
   nome: `Pessoa ${id}`,
   escalar: true,
   jornadaPadrao: false,
+  menor: false,
+  estagiario: false,
   ferias: [],
   ...extra,
 })

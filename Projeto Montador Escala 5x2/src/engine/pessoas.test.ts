@@ -7,7 +7,7 @@ import { minutosDe } from './datas'
 const turnos: Turno[] = [{ id: 't1', nome: 'Comercial', inicio: '08:00', fim: '20:00', intervaloMin: 60 }]
 
 function pessoa(id: string, nome: string, extra: Partial<PessoaEscala> = {}): PessoaEscala {
-  return { id, nome, escalar: true, jornadaPadrao: true, ferias: [], ...extra }
+  return { id, nome, escalar: true, jornadaPadrao: true, menor: false, estagiario: false, ferias: [], ...extra }
 }
 
 function fn(extra: Partial<Funcao> = {}): Funcao {

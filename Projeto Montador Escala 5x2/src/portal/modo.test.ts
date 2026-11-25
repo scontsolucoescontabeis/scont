@@ -6,6 +6,8 @@ const pessoa = (o: Partial<PessoaEscala> & { id: string }): PessoaEscala => ({
   nome: `Nome ${o.id}`,
   escalar: true,
   jornadaPadrao: true,
+  menor: false,
+  estagiario: false,
   horasSemanais: 44,
   ferias: [],
   ...o,
@@ -107,5 +109,13 @@ describe('deveMostrarConteudo', () => {
     expect(deveMostrarConteudo(vazio)).toBe(true)
     expect(deveMostrarConteudo({ ...base, carregando: true })).toBe(false)
     expect(deveMostrarConteudo({ ...base, erro: 'falhou' })).toBe(false)
+  })
+
+  it('sexo, menor e estagiario nunca vêm de sobreposições', () => {
+    const b = [funcao('a', [pessoa({ id: '1', sexo: 'F', menor: true, estagiario: true })])]
+    const sob = { a: { '1': { escalar: false, sexo: 'M', menor: false, estagiario: false } } } as never
+    const p = aplicarSobreposicoes(b, sob)[0].pessoas![0]
+    expect([p.sexo, p.menor, p.estagiario]).toEqual(['F', true, true])
+    expect(p.escalar).toBe(false)
   })
 })
