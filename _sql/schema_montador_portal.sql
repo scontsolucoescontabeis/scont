@@ -42,7 +42,8 @@ BEGIN
     -- nada de CPF, salario ou endereco.
     WITH elegiveis AS (
         SELECT e.codigo_empresa, e.codigo_empregado, e.nome_empregado,
-               e.desc_cargo, e.desc_funcao, e.tipo_empregado
+               e.desc_cargo, e.desc_funcao, e.tipo_empregado,
+               e.sexo, e.data_nascimento
           FROM public.rh_empregados e
          WHERE e.codigo_empresa = p_codigo
            AND btrim(e.situacao) = 'Trabalhando'
@@ -54,7 +55,15 @@ BEGIN
                     'codigo_empregado', x.codigo_empregado,
                     'nome_empregado',   x.nome_empregado,
                     'cargo',            COALESCE(NULLIF(x.desc_cargo, ''), NULLIF(x.desc_funcao, '')),
-                    'tipo_empregado',   x.tipo_empregado)
+                    'tipo_empregado',   x.tipo_empregado,
+                    -- sexo normalizado ('F'/'M'/null); o texto bruto nao sai daqui
+                    'sexo',             CASE upper(left(btrim(x.sexo), 1))
+                                            WHEN 'F' THEN 'F'
+                                            WHEN 'M' THEN 'M'
+                                            ELSE NULL END,
+                    -- derivado no banco; a data de nascimento NUNCA e devolvida.
+                    -- data_nascimento nula (desconhecida) e tratada como adulto (false).
+                    'menor_de_idade',   COALESCE(x.data_nascimento > current_date - interval '18 years', false))
                 ORDER BY x.nome_empregado, x.codigo_empregado), '[]'::jsonb)
            FROM elegiveis x),
         (SELECT COALESCE(jsonb_agg(jsonb_build_object(
@@ -92,7 +101,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.montador_dados_empresa(text) IS
-    'Dados minimos (empresa, empregados ativos sem dados pessoais, jornadas, ferias futuras) para o Montador de Escala no portal do cliente. Exige acesso a empresa.';
+    'Dados minimos (empresa, empregados ativos sem dados pessoais (so sexo e menor_de_idade derivados), jornadas, ferias futuras) para o Montador de Escala no portal do cliente. Exige acesso a empresa.';
 
 REVOKE ALL ON FUNCTION public.montador_dados_empresa(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.montador_dados_empresa(text) TO authenticated;
