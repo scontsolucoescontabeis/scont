@@ -9,6 +9,7 @@
  * domingo ao menos 1 vez a cada N semanas (Lei 10.101/2000 art. 6º, p. único) e
  * ninguém passa de 6 dias seguidos de trabalho (CLT art. 67; OJ 410 SDI-1/TST).
  */
+import type { JornadaPessoa } from './jornada'
 import type {
   CoberturaTurno,
   DiaEscala,
@@ -18,12 +19,13 @@ import type {
   Funcionario,
   MinimosDia,
   ModeloEscala,
+  PessoaEscala,
   Proposta,
   RegraCobertura,
   Turno,
 } from '../types'
 import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './datas'
-import { jornadaDaFuncao, tetoSemanalNaData } from './jornada'
+import { jornadaDaPessoa, tetoSemanalNaData } from './jornada'
 import { REGRAS, cicloDomingoDoSetor } from '../config/regras'
 
 export interface EntradaGerador {
@@ -44,6 +46,13 @@ export const NSLOTS = 1440 / SLOT
 export function criarFuncionarios(funcoes: Funcao[]): Funcionario[] {
   const lista: Funcionario[] = []
   for (const fn of funcoes) {
+    if (fn.pessoas) {
+      // Equipe nominal: um funcionário por pessoa escalável; `quantidade` é ignorada.
+      for (const p of fn.pessoas) {
+        if (p.escalar) lista.push({ id: `${fn.id}-${p.id}`, nome: p.nome, funcaoId: fn.id })
+      }
+      continue
+    }
     for (let i = 1; i <= fn.quantidade; i++) {
       lista.push({
         id: `${fn.id}-${i}`,
@@ -246,10 +255,16 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     Object.keys(perfilFn).map((id) => [id, novaGrade()]),
   )
   const teto = tetoSemanalNaData(inicio)
-  const jornadas = new Map(funcoes.map((f) => [f.id, jornadaDaFuncao(f, teto)]))
+  // Jornada de cada funcionário: a da função com as sobreposições da pessoa (quando nominal).
+  const jornadas = new Map<string, JornadaPessoa>()
+  for (const f of funcionarios) {
+    const fnc = funcoes.find((x) => x.id === f.funcaoId)!
+    const pessoa: PessoaEscala | undefined = fnc.pessoas?.find((p) => `${fnc.id}-${p.id}` === f.id)
+    jornadas.set(f.id, jornadaDaPessoa(fnc, pessoa, teto))
+  }
   const horarioDe = new Map<string, { inicio: number; bruto: number; intervaloMin: number }>()
   for (const f of funcionarios) {
-    const j = jornadas.get(f.funcaoId)!
+    const j = jornadas.get(f.id)!
     let ini = j.inicioFixo
     if (ini === undefined) {
       ini = janIni * SLOT
