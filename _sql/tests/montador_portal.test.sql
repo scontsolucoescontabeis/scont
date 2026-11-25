@@ -10,7 +10,10 @@ BEGIN
         ('M-C', 'Zzmont Vazia Ltda', '33.444.555/0001-63', 'MG', 'Uberaba');
     INSERT INTO public.rh_empregados (codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, desc_funcao, situacao, tipo_empregado, cpf, salario, endereco) VALUES
         ('M-A','1','Zeca Zulu','Vendedor','Vend X','Trabalhando','Empregado','111.111.111-11',2000,'Rua 1'),
-        ('M-A','2','Ana Alves',NULL,'Auxiliar','Trabalhando','Estagiário','222.222.222-22',1000,'Rua 2'),
+        -- grafia legada de producao: 'Est' + a-agudo + 'giario' (sem o segundo 'a' acentuado do correto)
+        ('M-A','2','Ana Alves',NULL,'Auxiliar','Trabalhando','Est' || chr(225) || 'giario','222.222.222-22',1000,'Rua 2'),
+        -- espacos sobrando em tipo/situacao continuam elegiveis
+        ('M-A','6','Bia Borges','Auxiliar','Aux','Trabalhando ','Empregado ','666.666.666-66',1,'Rua 6'),
         ('M-A','3','Demitido Dino','Gerente','G','Demitido','Empregado','333.333.333-33',3000,'Rua 3'),
         ('M-A','4','Socio Sol','Diretor','D','Trabalhando','Contribuinte','444.444.444-44',0,'Rua 4'),
         ('M-A','5','Sem Cargo',NULL,NULL,'Trabalhando','Empregado','555.555.555-55',1,'Rua 5'),
@@ -20,6 +23,7 @@ BEGIN
     INSERT INTO public.rh_jornada_trabalho (codigo_empresa, codigo_empregado, dia_semana, entrada, intervalo_inicio, intervalo_fim, saida) VALUES
         ('M-A','1','segunda','08:00','12:00','13:00','17:00'),
         ('M-A','2','terca','09:00','12:00','13:00','18:00'),
+        ('M-A','6','quinta','09:00','12:00','13:00','18:00'),
         ('M-B','9','sexta','08:00','12:00','13:00','17:00'),
         -- nao elegiveis em M-A (demitido 3, contribuinte 4)
         ('M-A','3','quarta','07:00','11:00','12:00','16:00'),
@@ -29,6 +33,7 @@ BEGIN
     INSERT INTO public.rh_ferias_calculadas (codigo_empresa, codigo_empregado, ferias_inicio, ferias_fim) VALUES
         ('M-A','1', current_date - 40, current_date - 10),
         ('M-A','2', current_date + 10, current_date + 40),
+        ('M-A','6', current_date + 12, current_date + 42),
         ('M-A','3', current_date + 10, current_date + 40),
         ('M-A','4', current_date + 10, current_date + 40),
         ('M-B','1', current_date + 5,  current_date + 20),
@@ -55,10 +60,10 @@ BEGIN
     ASSERT NOT EXISTS (SELECT 1 FROM jsonb_array_elements(r->'jornadas') j WHERE j->>'codigo_empregado' = '9'),
        'cliente_le_so_a_propria: vazou jornada de outra empresa';
     ASSERT (SELECT array_agg(j->>'codigo_empregado' || ':' || (j->>'dia_semana') ORDER BY j->>'codigo_empregado') FROM jsonb_array_elements(r->'jornadas') j)
-           = ARRAY['1:segunda','2:terca'],
+           = ARRAY['1:segunda','2:terca','6:quinta'],
        'jornadas_so_elegiveis_e_chave_dupla: jornadas de A: ' || (r->'jornadas')::text;
-    -- so_trabalhando_empregado_estagiario (ordenado por nome: Ana, Sem Cargo, Zeca)
-    ASSERT (SELECT array_agg(e->>'codigo_empregado') FROM jsonb_array_elements(r->'empregados') e) = ARRAY['2','5','1'],
+    -- so_trabalhando_empregado_estagiario (ordenado por nome: Ana, Bia, Sem Cargo, Zeca)
+    ASSERT (SELECT array_agg(e->>'codigo_empregado') FROM jsonb_array_elements(r->'empregados') e) = ARRAY['2','6','5','1'],
        'so_trabalhando_empregado_estagiario: lista errada: ' || (r->'empregados')::text;
     -- sem_dados_pessoais: chaves exatas
     SELECT bool_and(k) INTO ok FROM (
@@ -66,13 +71,17 @@ BEGIN
                = ARRAY['cargo','codigo_empregado','nome_empregado','tipo_empregado'] AS k
         FROM jsonb_array_elements(r->'empregados') e) s;
     ASSERT ok, 'sem_dados_pessoais: chaves de empregado diferentes do permitido: ' || (r->'empregados')::text;
+    -- estagiario com a grafia legada de producao volta com o valor armazenado, intacto
+    ASSERT (SELECT e->>'tipo_empregado' FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '2')
+           = 'Est' || chr(225) || 'giario',
+       'estagiario_grafia_legada: tipo_empregado alterado ou estagiario ausente: ' || (r->'empregados')::text;
     -- cargo_cai_para_funcao
     ASSERT (SELECT e->>'cargo' FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '2') = 'Auxiliar',
        'cargo_cai_para_funcao: nao caiu para desc_funcao';
     ASSERT (SELECT e->'cargo' FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '5') = 'null'::jsonb,
        'cargo_cai_para_funcao: sem cargo/funcao deveria ser null';
     -- ferias_passadas_fora
-    ASSERT jsonb_array_length(r->'ferias') = 1 AND r->'ferias'->0->>'codigo_empregado' = '2',
+    ASSERT (SELECT array_agg(f->>'codigo_empregado' ORDER BY f->>'codigo_empregado') FROM jsonb_array_elements(r->'ferias') f) = ARRAY['2','6'],
        'ferias_so_elegiveis_e_passadas_fora: ferias: ' || (r->'ferias')::text;
     -- cliente_outra_empresa_42501
     BEGIN

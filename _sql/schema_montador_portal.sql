@@ -35,52 +35,53 @@ BEGIN
       FROM public.rh_empresas r
      WHERE r.codigo_empresa = p_codigo;
 
-    -- Somente campos necessarios: nada de CPF, salario ou endereco.
-    SELECT COALESCE(jsonb_agg(jsonb_build_object(
-               'codigo_empregado', e.codigo_empregado,
-               'nome_empregado',   e.nome_empregado,
-               'cargo',            COALESCE(NULLIF(e.desc_cargo, ''), NULLIF(e.desc_funcao, '')),
-               'tipo_empregado',   e.tipo_empregado)
-           ORDER BY e.nome_empregado, e.codigo_empregado), '[]'::jsonb)
-      INTO v_empregados
-      FROM public.rh_empregados e
-     WHERE e.codigo_empresa = p_codigo
-       AND e.situacao = 'Trabalhando'
-       AND e.tipo_empregado IN ('Empregado', 'Estagiário');
-
-    SELECT COALESCE(jsonb_agg(jsonb_build_object(
-               'codigo_empregado', j.codigo_empregado,
-               'dia_semana',       j.dia_semana,
-               'entrada',          j.entrada,
-               'intervalo_inicio', j.intervalo_inicio,
-               'intervalo_fim',    j.intervalo_fim,
-               'saida',            j.saida)
-           ORDER BY j.codigo_empregado, j.dia_semana), '[]'::jsonb)
-      INTO v_jornadas
-      FROM public.rh_jornada_trabalho j
-     WHERE j.codigo_empresa = p_codigo
-       -- so empregados elegiveis, casando as DUAS chaves (empresa + empregado)
-       AND EXISTS (SELECT 1 FROM public.rh_empregados e
-                    WHERE e.codigo_empresa = j.codigo_empresa
-                      AND e.codigo_empregado = j.codigo_empregado
-                      AND e.situacao = 'Trabalhando'
-                      AND e.tipo_empregado IN ('Empregado', 'Estagiário'));
-
-    SELECT COALESCE(jsonb_agg(jsonb_build_object(
-               'codigo_empregado', f.codigo_empregado,
-               'ferias_inicio',    f.ferias_inicio,
-               'ferias_fim',       f.ferias_fim)
-           ORDER BY f.codigo_empregado, f.ferias_inicio), '[]'::jsonb)
-      INTO v_ferias
-      FROM public.rh_ferias_calculadas f
-     WHERE f.codigo_empresa = p_codigo
-       -- so empregados elegiveis, casando as DUAS chaves (empresa + empregado)
-       AND EXISTS (SELECT 1 FROM public.rh_empregados e
-                    WHERE e.codigo_empresa = f.codigo_empresa
-                      AND e.codigo_empregado = f.codigo_empregado
-                      AND e.situacao = 'Trabalhando'
-                      AND e.tipo_empregado IN ('Empregado', 'Estagiário'))
-       AND f.ferias_fim >= current_date;
+    -- Elegiveis calculados uma so vez (chaves: codigo_empresa + codigo_empregado) e
+    -- reaproveitados pelas tres leituras. Producao grava o estagiario como
+    -- 'Est' || 'a' agudo || 'giario' (grafia legada); aceitamos tambem as grafias
+    -- corretas. 'Contribuinte' (socios) fica de fora. Somente campos necessarios:
+    -- nada de CPF, salario ou endereco.
+    WITH elegiveis AS (
+        SELECT e.codigo_empresa, e.codigo_empregado, e.nome_empregado,
+               e.desc_cargo, e.desc_funcao, e.tipo_empregado
+          FROM public.rh_empregados e
+         WHERE e.codigo_empresa = p_codigo
+           AND btrim(e.situacao) = 'Trabalhando'
+           AND btrim(e.tipo_empregado) IN ('Empregado', 'Est' || chr(225) || 'giario',
+                                           'Estagi' || chr(225) || 'rio', 'Estagiario')
+    )
+    SELECT
+        (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                    'codigo_empregado', x.codigo_empregado,
+                    'nome_empregado',   x.nome_empregado,
+                    'cargo',            COALESCE(NULLIF(x.desc_cargo, ''), NULLIF(x.desc_funcao, '')),
+                    'tipo_empregado',   x.tipo_empregado)
+                ORDER BY x.nome_empregado, x.codigo_empregado), '[]'::jsonb)
+           FROM elegiveis x),
+        (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                    'codigo_empregado', j.codigo_empregado,
+                    'dia_semana',       j.dia_semana,
+                    'entrada',          j.entrada,
+                    'intervalo_inicio', j.intervalo_inicio,
+                    'intervalo_fim',    j.intervalo_fim,
+                    'saida',            j.saida)
+                ORDER BY j.codigo_empregado, j.dia_semana), '[]'::jsonb)
+           FROM public.rh_jornada_trabalho j
+          WHERE j.codigo_empresa = p_codigo
+            AND EXISTS (SELECT 1 FROM elegiveis x
+                         WHERE x.codigo_empresa = j.codigo_empresa
+                           AND x.codigo_empregado = j.codigo_empregado)),
+        (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+                    'codigo_empregado', f.codigo_empregado,
+                    'ferias_inicio',    f.ferias_inicio,
+                    'ferias_fim',       f.ferias_fim)
+                ORDER BY f.codigo_empregado, f.ferias_inicio), '[]'::jsonb)
+           FROM public.rh_ferias_calculadas f
+          WHERE f.codigo_empresa = p_codigo
+            AND f.ferias_fim >= current_date
+            AND EXISTS (SELECT 1 FROM elegiveis x
+                         WHERE x.codigo_empresa = f.codigo_empresa
+                           AND x.codigo_empregado = f.codigo_empregado))
+      INTO v_empregados, v_jornadas, v_ferias;
 
     RETURN jsonb_build_object(
         'empresa',    COALESCE(v_empresa, 'null'::jsonb),
