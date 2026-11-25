@@ -2,6 +2,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useStore } from "../store/useStore";
 import type { Funcao } from "../types";
 import { Campo } from "./ui";
+import { EquipeNominal } from "./EquipeNominal";
 
 const JORNADAS: { rotulo: string; horas: number }[] = [
   { rotulo: "44h semanais", horas: 44 },
@@ -15,6 +16,7 @@ const JORNADAS: { rotulo: string; horas: number }[] = [
 export function StepEquipe() {
   const funcoes = useStore((s) => s.funcoes);
   const set = useStore((s) => s.set);
+  const modoPortal = useStore((s) => s.portal) !== null;
 
   const atualizar = (id: string, p: Partial<Funcao>) =>
     set({
@@ -38,6 +40,23 @@ export function StepEquipe() {
       escala: null,
       propostas: [],
     });
+
+  if (modoPortal) {
+    return (
+      <section className="space-y-4" aria-labelledby="t-equipe">
+        <div className="cartao space-y-2">
+          <h2 id="t-equipe" className="text-xl font-bold">
+            2. Sua equipe
+          </h2>
+          <p className="text-sm text-soft">
+            Esta é a equipe ativa cadastrada no RH. Ajuste a carga e o horário de
+            cada pessoa ou desmarque quem não deve entrar na escala.
+          </p>
+        </div>
+        <EquipeNominal />
+      </section>
+    );
+  }
 
   return (
     <section className="cartao space-y-4" aria-labelledby="t-equipe">

@@ -5,6 +5,7 @@ import type { Turno } from "../types";
 import { fmtHoras } from "../engine/conformidade";
 import { minutosDe } from "../engine/datas";
 import { jornadaDaFuncao, tetoSemanalNaData } from "../engine/jornada";
+import { jornadaMaisComum } from "../portal/equipe";
 import { Campo } from "./ui";
 
 export function StepCobertura() {
@@ -18,7 +19,20 @@ export function StepCobertura() {
 
   // Jornada de cada função (horário do empregado, separado dos períodos abaixo).
   const teto = tetoSemanalNaData(inicioEscala);
-  const jornadas = funcoes.map((f) => ({ f, j: jornadaDaFuncao(f, teto) }));
+  const jornadas = funcoes.map((f) => {
+    if (!f.pessoas) return { f, j: jornadaDaFuncao(f, teto), comum: false };
+    const c = jornadaMaisComum(f);
+    const ef = c
+      ? {
+          ...f,
+          horasSemanaisAtuais: c.horasSemanais,
+          entrada: c.entrada,
+          saida: c.saida,
+          intervaloMin: c.intervaloMin,
+        }
+      : f;
+    return { f: ef, j: jornadaDaFuncao(ef, teto), comum: true };
+  });
   const brutoRef = Math.max(1, ...jornadas.map((x) => x.j.bruto));
   // Dias em que o horário de funcionamento é menor que a jornada: a entrada–saída não cabe.
   const naoCabe = [1, 2, 3, 4, 5, 6, 0]
@@ -226,9 +240,11 @@ export function StepCobertura() {
           etapa: {teto}h)
         </p>
         <ul className="list-disc pl-5 text-xs">
-          {jornadas.map(({ f, j }) => (
+          {jornadas.map(({ f, j, comum }) => (
             <li key={f.id}>
-              {f.nome}: {fmtHoras(j.bruto - j.intervaloMin)} líquidas +{" "}
+              {f.nome}
+              {comum ? " (jornada mais comum da equipe)" : ""}:{" "}
+              {fmtHoras(j.bruto - j.intervaloMin)} líquidas +{" "}
               {j.intervaloMin} min de intervalo = {fmtHoras(j.bruto)} entre
               entrada e saída
               {j.inicioFixo !== undefined
