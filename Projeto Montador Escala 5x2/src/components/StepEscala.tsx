@@ -4,7 +4,6 @@ import { corrigirTudo } from '../engine/autocorrecao'
 import { useStore } from '../store/useStore'
 import { analisar, formatarData } from '../utils/analise'
 import { Calendario } from './Calendario'
-import { Impacto } from './Impacto'
 import { PainelAlertas } from './PainelAlertas'
 import { QuadroContratacoes } from './QuadroContratacoes'
 import { Propostas } from './Propostas'
@@ -111,7 +110,6 @@ export function StepEscala() {
             <Saida escala={escala} resultado={resultado} />
           </div>
           <QuadroContratacoes />
-          <Impacto />
         </>
       ) : (
         <p className="cartao text-sm">

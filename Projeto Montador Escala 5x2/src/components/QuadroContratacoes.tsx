@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { calcularQuadro } from '../engine/contratacoes'
-import { calcularImpacto } from '../engine/impacto'
+import { REGRAS } from '../config/regras'
 import { useStore } from '../store/useStore'
 import { formatarMoeda } from '../utils/analise'
 
@@ -11,13 +11,12 @@ export function QuadroContratacoes() {
   const cobertura = useStore((s) => s.cobertura)
   const custo = useStore((s) => s.custo)
   const etapa = useStore((s) => s.etapaImpacto)
+  const set = useStore((s) => s.set)
 
   const q = useMemo(
     () => calcularQuadro({ empresa, funcoes, turnos, cobertura, custo }, etapa),
     [empresa, funcoes, turnos, cobertura, custo, etapa],
   )
-
-  const impacto = useMemo(() => calcularImpacto(funcoes, etapa, custo), [funcoes, etapa, custo])
 
   return (
     <section className="cartao space-y-4" aria-labelledby="t-quadro">
@@ -26,9 +25,15 @@ export function QuadroContratacoes() {
           Quadro sugerido de contratações{' '}
           <span className="rounded bg-yellow-100 px-2 py-0.5 text-xs text-yellow-900">ESTIMATIVA</span>
         </h3>
-        <span className="text-xs text-soft">
-          Calculado para a {etapa === 'etapa1' ? '1ª' : '2ª'} etapa (alterne no quadro de impacto abaixo)
-        </span>
+        <select
+          aria-label="Etapa a simular"
+          className="campo !w-auto"
+          value={etapa}
+          onChange={(e) => set({ etapaImpacto: e.target.value as 'etapa1' | 'etapa2' })}
+        >
+          <option value="etapa1">1ª etapa — {REGRAS.etapa1.jornadaSemanalMax}h</option>
+          <option value="etapa2">2ª etapa — {REGRAS.etapa2.jornadaSemanalMax}h</option>
+        </select>
       </div>
 
       <p
@@ -41,16 +46,6 @@ export function QuadroContratacoes() {
           ? `Para cobrir a cobertura mínima na escala 5x2 são necessárias ${q.necessarioTotal} pessoas; a equipe atual tem ${q.equipeAtual}. Sugestão: contratar ${q.contratar}.`
           : `A equipe atual (${q.equipeAtual}) é suficiente para a cobertura mínima informada (necessárias: ${q.necessarioTotal}).`}
       </p>
-      {q.contratar === 0 && impacto.contratacoesEquivalentes > 0 && (
-        <p className="rounded-lg border border-line bg-brand-light p-3 text-sm">
-          <strong>Por que o quadro de impacto mostra contratações?</strong> Ele parte de outra premissa: manter o mesmo
-          volume total de horas de hoje ({impacto.horasSemanaisAtuais}h/semana), o que exigiria cerca de{' '}
-          {impacto.contratacoesEquivalentes.toFixed(2)} contratação(ões) equivalente(s). Como a cobertura mínima que você
-          informou já é atendida, esse valor só vale se a empresa quiser manter as horas totais atuais (por exemplo, para
-          atender mais que o mínimo).
-        </p>
-      )}
-
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Pessoas necessárias por período</caption>

@@ -346,9 +346,19 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         Object.keys(perfilFn).map((id) => [id, new Array<number>(NSLOTS).fill(0)]),
       )
       // Quem já trabalhou ciclo-1 domingos seguidos precisa folgar neste.
+      // Cada empregado tem uma "fase" no ciclo (posição na equipe): na semana da fase dele o
+      // domingo é de folga, salvo se a cobertura exigir. Assim as folgas de domingo ficam
+      // escalonadas, inclusive dentro da mesma função.
+      const folgaDaVez = new Set(
+        funcionarios.filter((_, i) => (s + i) % ciclo === 0).map((f) => f.id),
+      )
       const ordem = funcionarios
         .filter((f) => domSeguidos.get(f.id)! < ciclo - 1)
-        .sort((a, b) => domTrabalhados.get(a.id)! - domTrabalhados.get(b.id)!)
+        .sort(
+          (a, b) =>
+            Number(folgaDaVez.has(a.id)) - Number(folgaDaVez.has(b.id)) ||
+            domTrabalhados.get(a.id)! - domTrabalhados.get(b.id)!,
+        )
       for (const f of ordem) {
         const h = horarioDe.get(f.id)!
         const pf = perfilFn[f.funcaoId]
@@ -361,6 +371,20 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           cobertos[sl] += 1
           if (pf) cobertosFn[f.funcaoId][sl] += 1
         })
+      }
+      // Rodízio de verdade: além da cobertura, só podem folgar juntos no domingo
+      // ceil(N / ciclo) empregados (cada um folga 1 domingo a cada `ciclo`). Os demais
+      // trabalham o domingo e levam o DSR/folga em outro dia da semana.
+      if (empresa.diasFuncionamento[0]) {
+        const maxFolgas = Math.ceil(funcionarios.length / ciclo)
+        const alvoTrabalho = funcionarios.length - maxFolgas
+        for (const f of ordem) {
+          if (trabalhaDomingo.size >= alvoTrabalho) break
+          if (trabalhaDomingo.has(f.id) || folgaDaVez.has(f.id)) continue
+          const h = horarioDe.get(f.id)!
+          if (!faixas(h.inicio, h.bruto).some((sl) => perfil[0][sl] > 0)) continue
+          trabalhaDomingo.add(f.id)
+        }
       }
       trabalhaDomingo.forEach((id) => domTrabalhados.set(id, domTrabalhados.get(id)! + 1))
     }

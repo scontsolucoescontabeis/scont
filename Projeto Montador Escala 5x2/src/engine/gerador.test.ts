@@ -221,3 +221,22 @@ describe('horários dentro do funcionamento', () => {
     }
   })
 })
+
+describe('rodízio de domingos escalonado', () => {
+  it('não coloca todos os empregados em DSR no mesmo domingo, mesmo com cobertura baixa', () => {
+    const e = base(true, { util: 4, sab: 4, dom: 1 }) // 6 empregados, 1 pessoa exigida no domingo
+    e.semanas = 6
+    const p = gerarPropostas(e).find((x) => x.modelo === 'rodizio_domingo')!
+    const { funcionarios, celulas, inicio } = p.escala
+    for (let s = 0; s < 6; s++) {
+      const folgas = funcionarios.filter((f) => celulas[f.id][s * 7].tipo !== 'trabalho').length
+      expect(folgas, `domingo da semana ${s + 1}`).toBeLessThanOrEqual(Math.ceil(funcionarios.length / 3))
+      expect(diaDaSemana(inicio), 'a escala começa no domingo').toBe(0)
+    }
+    // cada empregado folga ao menos 1 domingo a cada 3 semanas
+    for (const f of funcionarios) {
+      const dom = [0, 1, 2, 3, 4, 5].map((s) => celulas[f.id][s * 7].tipo === 'trabalho')
+      for (let i = 0; i + 2 < dom.length; i++) expect(dom.slice(i, i + 3).every(Boolean), f.nome).toBe(false)
+    }
+  })
+})
