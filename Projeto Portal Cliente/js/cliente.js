@@ -9,6 +9,7 @@ const ESTADOS = ['login', 'cadastro', 'aguardando', 'negado', 'seletor', 'home']
 let empresaSelecionadaCadastro = null; // { codigo_empresa, nome_empresa }
 let perfilAtual = null;                // { nome, ... } de cliente_usuarios
 let empresasAprovadas = [];
+let modoAdmin = false;                 // administrador do portal visualizando como cliente
 
 // ─── Utilidades ──────────────────────────────────────────
 function $(id) { return document.getElementById(id); }
@@ -75,6 +76,7 @@ async function sair() {
     gravarSession(CHAVE_EMPRESA, null);
     perfilAtual = null;
     empresasAprovadas = [];
+    modoAdmin = false;
     mostrarEstado('login');
 }
 
@@ -100,6 +102,27 @@ async function buscarEmpresas(texto) {
 async function rotearPorEstado() {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) { mostrarEstado('login'); return; }
+
+    // Administrador do portal: visualiza qualquer empresa (o banco é quem autoriza: empresas_do_cliente()).
+    const { data: adm } = await sb.from('usuarios').select('nome, is_admin').eq('id', user.id).maybeSingle();
+    if (adm && adm.is_admin === true) {
+        const { data: empresas, error: empErr } = await sb
+            .from('rh_empresas').select('codigo_empresa, nome_empresa').order('nome_empresa');
+        if (empErr) {
+            mostrarEstado('login');
+            mostrarAlerta($('alertLogin'), 'Não foi possível carregar as empresas. Tente novamente.', 'error');
+            return;
+        }
+        modoAdmin = true;
+        perfilAtual = { nome: adm.nome || user.email };
+        empresasAprovadas = (empresas || []).map(e => e.codigo_empresa);
+        (empresas || []).forEach(e => lembrarNome(e.codigo_empresa, e.nome_empresa));
+        const guardadaAdm = lerSession(CHAVE_EMPRESA);
+        if (guardadaAdm && empresasAprovadas.includes(guardadaAdm)) { abrirHome(guardadaAdm); }
+        else { montarSeletor(empresasAprovadas); mostrarEstado('seletor'); }
+        return;
+    }
+    modoAdmin = false;
 
     // Perfil de cliente (admin lê todos, por isso filtra pelo próprio id)
     const { data: perfil, error: perfilErr } = await sb
@@ -158,6 +181,11 @@ async function rotearPorEstado() {
 function montarSeletor(codigos) {
     const ul = $('listaEmpresas');
     ul.replaceChildren();
+    $('seletorFiltroWrap').hidden = !modoAdmin;
+    $('seletorTexto').textContent = modoAdmin
+        ? 'Modo administrador: escolha qualquer empresa para visualizar o portal como o cliente.'
+        : 'Você tem acesso a mais de uma empresa. Selecione qual deseja acessar.';
+    if (modoAdmin) $('seletorFiltro').value = '';
     codigos.forEach(cod => {
         const li = document.createElement('li');
         const b = document.createElement('button');
@@ -174,6 +202,7 @@ function abrirHome(codigo) {
     $('homeEmpresa').textContent = rotuloEmpresa(codigo);
     $('homeNome').textContent = (perfilAtual && perfilAtual.nome) || '';
     $('btnTrocarEmpresa').hidden = empresasAprovadas.length < 2;
+    $('bannerAdmin').hidden = !modoAdmin;
     mostrarEstado('home');
 }
 
@@ -189,6 +218,13 @@ $('btnTrocarEmpresa').addEventListener('click', () => {
     gravarSession(CHAVE_EMPRESA, null);
     montarSeletor(empresasAprovadas);
     mostrarEstado('seletor');
+});
+
+$('seletorFiltro').addEventListener('input', () => {
+    const t = window.EstadoCliente.normalizarBusca($('seletorFiltro').value);
+    document.querySelectorAll('#listaEmpresas li').forEach(li => {
+        li.hidden = t !== '' && !window.EstadoCliente.normalizarBusca(li.textContent).includes(t);
+    });
 });
 
 $('loginForm').addEventListener('submit', async (e) => {

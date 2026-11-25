@@ -20,6 +20,9 @@ fi
 # SKIP_BLOQUEIO=1 permite ver o RED (teste de isolacao sem a politica restritiva)
 if [ -z "${SKIP_BLOQUEIO:-}" ]; then psql_ -d portal_test < _sql/schema_portal_cliente_bloqueio.sql; fi
 psql_ -d portal_test < _sql/tests/portal_cliente_isolamento.test.sql
+# administrador visualiza qualquer empresa (SKIP_ADMIN=1 mostra o RED)
+if [ -z "${SKIP_ADMIN:-}" ]; then psql_ -d portal_test < _sql/schema_portal_cliente_admin.sql; fi
+psql_ -d portal_test < _sql/tests/portal_cliente_admin_visualiza.test.sql
 if [ -z "${SKIP_BLOQUEIO:-}" ]; then
   psql_ -d portal_test < _sql/tests/portal_cliente_revisao_final.test.sql
 fi

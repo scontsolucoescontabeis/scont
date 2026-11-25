@@ -16,7 +16,14 @@
         return { estado: 'negado', empresas: [], motivo: comMotivo ? comMotivo.motivo.trim() : null };
     }
 
-    const api = { decidirEstado };
+    // Texto de busca/filtro: minúsculas, sem acentos, espaços colapsados.
+    function normalizarBusca(t) {
+        return String(t == null ? '' : t)
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+
+    const api = { decidirEstado, normalizarBusca };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.EstadoCliente = api;
 })(typeof window !== 'undefined' ? window : globalThis);
