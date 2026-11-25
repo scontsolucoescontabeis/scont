@@ -7,6 +7,8 @@
     <script src="supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="portal-inatividade.js"></script>
+    <script src="assets/nome-apoio.js"></script>
+    <script src="assets/admin-clientes.js"></script>
     <style>
         :root {
             --primary:#4e1820; --primary-hover:#3a1018; --secondary:#2C3E50;
@@ -208,6 +210,7 @@
         <li><button class="menu-btn" data-tab="usuarios">👥 Usuários</button></li>
         <li><button class="menu-btn" data-tab="ferramentas">🔧 Ferramentas</button></li>
         <li><button class="menu-btn" data-tab="acessos">🔐 Acessos</button></li>
+        <li><button class="menu-btn" data-tab="acessos_clientes">🏢 Acessos de clientes</button></li>
         <li><button class="menu-btn" data-tab="crm">💬 CRM Messenger</button></li>
         <li><button class="menu-btn" data-tab="configuracoes">⚙️ Configurações</button></li>
     </ul>
@@ -287,6 +290,24 @@
                 <table>
                     <thead><tr><th>Usuário</th><th>E-mail</th><th>Ferramenta</th><th>Concedido em</th><th>Ações</th></tr></thead>
                     <tbody id="tblAcessos"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACESSOS DE CLIENTES -->
+    <div id="acessos_clientes" class="tab-content">
+        <div class="tabs" id="tabsAcessosClientes">
+            <button class="tab-btn active" data-cfiltro="pendentes">Pendentes</button>
+            <button class="tab-btn" data-cfiltro="liberados">Liberados</button>
+            <button class="tab-btn" data-cfiltro="encerrados">Recusados / Revogados</button>
+        </div>
+        <div class="card">
+            <h3>Acessos de clientes</h3>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Cliente</th><th>E-mail</th><th>Cargo / Telefone</th><th>Empresa</th><th>Apoio</th><th>Data</th><th>Ações</th></tr></thead>
+                    <tbody id="tblAcessosClientes"></tbody>
                 </table>
             </div>
         </div>
@@ -678,6 +699,12 @@ async function loadFerramentas() {
 
 async function loadUsuarios() {
     const tbody = document.getElementById('tblUsuarios');
+    // Clientes do portal do cliente não aparecem aqui; se a consulta falhar, não oculta ninguém.
+    let idsClientes = new Set();
+    try {
+        const { data: cli, error: cliErr } = await sb.from('cliente_usuarios').select('id');
+        if (!cliErr && cli) idsClientes = new Set(cli.map(c => c.id));
+    } catch (e) { console.warn('loadUsuarios (cliente_usuarios):', e); }
     const { data, error } = await sb
         .from('solicitacoes_acesso')
         .select('id, nome, email, empresa, cargo, telefone, data_avaliacao')
@@ -688,7 +715,7 @@ async function loadUsuarios() {
         tbody.innerHTML = `<tr><td colspan="6" class="empty-cell" style="color:var(--danger)">⚠️ Erro ao carregar usuários: ${sanitize(error.message)}</td></tr>`;
         return;
     }
-    renderUsuarios(data || []);
+    renderUsuarios((data || []).filter(u => !idsClientes.has(u.id)));
 }
 
 async function loadAcessos() {
@@ -1602,6 +1629,7 @@ document.querySelectorAll('.menu-btn').forEach(btn => btn.addEventListener('clic
     if (tab === 'usuarios')       loadUsuarios();
     if (tab === 'ferramentas')    loadFerramentas();
     if (tab === 'acessos')        loadAcessos();
+    if (tab === 'acessos_clientes') loadAcessosClientes();
     if (tab === 'configuracoes')  loadConfiguracoes();
 }));
 
@@ -1609,6 +1637,202 @@ document.querySelectorAll('.tab-btn[data-filter]').forEach(btn => btn.addEventLi
     document.querySelectorAll('.tab-btn[data-filter]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     renderSolicitacoes();
+}));
+
+// ─── ACESSOS DE CLIENTES (portal do cliente) ───────────────
+let acessosClientes = [];     // cliente_acessos + cliente_usuarios
+let apoioClientes   = {};     // acesso.id -> { tipo, rotulo }
+let empresasNomes   = {};     // codigo_empresa -> nome_empresa
+
+function emailAdminLogado() {
+    try { return JSON.parse(sessionStorage.getItem('adminAuth') || 'null')?.email || null; } catch { return null; }
+}
+
+async function loadAcessosClientes() {
+    const tbody = document.getElementById('tblAcessosClientes');
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">Carregando...</td></tr>';
+    const { data, error } = await sb
+        .from('cliente_acessos')
+        .select('id, usuario_id, codigo_empresa, status, motivo, decidido_por, decidido_em, created_at, cliente_usuarios ( nome, email, cargo, telefone )')
+        .order('created_at', { ascending: false });
+    if (error) {
+        console.error('loadAcessosClientes:', error);
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-cell" style="color:var(--danger)">⚠️ Erro ao carregar acessos de clientes: ${sanitize(error.message)}</td></tr>`;
+        return;
+    }
+    acessosClientes = data || [];
+
+    // Nomes das empresas
+    empresasNomes = {};
+    const codigos = [...new Set(acessosClientes.map(a => a.codigo_empresa))];
+    if (codigos.length) {
+        const { data: emps, error: empErr } = await sb.from('rh_empresas').select('codigo_empresa, nome_empresa').in('codigo_empresa', codigos);
+        if (empErr) console.error('loadAcessosClientes (rh_empresas):', empErr);
+        (emps || []).forEach(e => { empresasNomes[e.codigo_empresa] = e.nome_empresa; });
+    }
+
+    // Apoio (sócios/empregados) só para pendentes, uma consulta por empresa
+    apoioClientes = {};
+    const pendentes = acessosClientes.filter(a => a.status === 'pendente');
+    const codPend = [...new Set(pendentes.map(a => a.codigo_empresa))];
+    const pessoas = {};
+    await Promise.all(codPend.map(async cod => {
+        const [soc, emp] = await Promise.all([
+            sb.from('rh_socios').select('nome_socio').eq('codigo_empresa', cod),
+            sb.from('rh_empregados').select('nome_empregado').eq('codigo_empresa', cod),
+        ]);
+        if (soc.error) console.error('rh_socios:', soc.error);
+        if (emp.error) console.error('rh_empregados:', emp.error);
+        pessoas[cod] = {
+            socios: (soc.data || []).map(r => r.nome_socio),
+            empregados: (emp.data || []).map(r => r.nome_empregado),
+        };
+    }));
+    pendentes.forEach(a => {
+        const p = pessoas[a.codigo_empresa] || { socios: [], empregados: [] };
+        apoioClientes[a.id] = window.AdminClientes.montarApoio(a.cliente_usuarios?.nome, p.socios, p.empregados);
+    });
+
+    renderAcessosClientes();
+}
+
+function renderAcessosClientes() {
+    const filtro = document.querySelector('#tabsAcessosClientes .tab-btn.active')?.dataset.cfiltro || 'pendentes';
+    const grupos = window.AdminClientes.agruparPorStatus(acessosClientes);
+    const lista = grupos[filtro] || [];
+    const tbody = document.getElementById('tblAcessosClientes');
+    tbody.innerHTML = '';
+    if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">Nenhum acesso nesta lista.</td></tr>';
+        return;
+    }
+    lista.forEach(a => {
+        const u = a.cliente_usuarios || {};
+        const apoio = apoioClientes[a.id];
+        let apoioHtml = '—';
+        if (a.status === 'pendente' && apoio) {
+            const cor = apoio.tipo === 'exato' ? 'var(--success)' : apoio.tipo === 'parcial' ? '#B9770E' : 'var(--muted)';
+            apoioHtml = `<span style="color:${cor};font-weight:600">${sanitize(apoio.rotulo)}</span>`;
+        } else if (a.status !== 'pendente') {
+            apoioHtml = sanitize(a.motivo || '—') + (a.decidido_por ? `<br><span style="font-size:11px;color:var(--muted)">por ${sanitize(a.decidido_por)}</span>` : '');
+        }
+        const nomeEmp = empresasNomes[a.codigo_empresa];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><strong>${sanitize(u.nome)}</strong></td>
+            <td>${sanitize(u.email)}</td>
+            <td>${sanitize(u.cargo || '—')}<br><span style="font-size:11px;color:var(--muted)">${sanitize(u.telefone || '—')}</span></td>
+            <td>${sanitize(nomeEmp || a.codigo_empresa)}<br><span style="font-size:11px;color:var(--muted)">${sanitize(a.codigo_empresa)}</span></td>
+            <td>${apoioHtml}</td>
+            <td>${fmtDate(a.decidido_em || a.created_at)}</td>
+            <td class="acts"></td>`;
+        const acts = tr.querySelector('.acts');
+        const mk = (cls, txt, fn) => {
+            const b = document.createElement('button');
+            b.className = 'btn-sm ' + cls; b.textContent = txt; b.onclick = fn; acts.appendChild(b);
+        };
+        if (a.status === 'pendente') {
+            mk('btn-approve', '✓ Liberar', () => decidirAcessoCliente(a.id, 'aprovado'));
+            mk('btn-reject', '✕ Recusar', () => decidirAcessoCliente(a.id, 'recusado'));
+        }
+        if (a.status === 'aprovado') {
+            mk('btn-reject', '⛔ Revogar', () => decidirAcessoCliente(a.id, 'revogado'));
+        }
+        if (a.status === 'pendente' || a.status === 'aprovado') {
+            mk('btn-edit', '➕ Vincular empresa', () => abrirModalVincularCliente(a.usuario_id, u.nome));
+        }
+        tbody.appendChild(tr);
+    });
+}
+
+async function decidirAcessoCliente(acessoId, status, motivo) {
+    const acesso = acessosClientes.find(a => a.id === acessoId);
+    const nome = acesso?.cliente_usuarios?.nome || 'o cliente';
+    if (status === 'aprovado') {
+        if (!confirm(`Liberar o acesso de "${nome}" à empresa ${acesso?.codigo_empresa || ''}?`)) return;
+        motivo = null;
+    } else if (motivo === undefined) {
+        const rotulo = status === 'recusado' ? 'recusar' : 'revogar';
+        motivo = prompt(`Informe o motivo para ${rotulo} o acesso de "${nome}" (obrigatório):`);
+        if (motivo === null) return;
+    }
+    const v = window.AdminClientes.validarDecisao(status, motivo);
+    if (!v.ok) { alert(v.erro); return; }
+
+    try {
+        const { data, error } = await sb
+            .from('cliente_acessos')
+            .update({
+                status,
+                motivo: status === 'aprovado' ? null : String(motivo).trim(),
+                decidido_por: emailAdminLogado(),
+                decidido_em: new Date().toISOString(),
+            })
+            .eq('id', acessoId)
+            .select('id');
+        if (error) throw error;
+        if (!data || !data.length) {
+            throw new Error('Nenhum registro foi atualizado. Verifique se seu usuário tem is_admin = TRUE (RLS).');
+        }
+        await loadAcessosClientes();
+    } catch (err) {
+        console.error('decidirAcessoCliente:', err);
+        alert('Erro ao atualizar acesso: ' + err.message);
+    }
+}
+
+async function abrirModalVincularCliente(usuarioId, nomeCliente) {
+    const sel = document.getElementById('vincEmpresaSel');
+    sel.innerHTML = '<option value="">Carregando...</option>';
+    document.getElementById('vincClienteNome').value = nomeCliente || '';
+    openModal('modalVincularCliente');
+    const { data, error } = await sb.from('rh_empresas').select('codigo_empresa, nome_empresa').order('nome_empresa');
+    if (error) {
+        sel.innerHTML = '<option value="">Erro ao carregar empresas</option>';
+        alert('Erro ao carregar empresas: ' + error.message);
+        return;
+    }
+    sel.innerHTML = '<option value="">Selecione...</option>' + (data || []).map(e =>
+        `<option value="${sanitize(e.codigo_empresa)}">${sanitize(e.nome_empresa)} (${sanitize(e.codigo_empresa)})</option>`).join('');
+    document.getElementById('btnConfirmarVinculo').onclick = async () => {
+        const cod = sel.value;
+        if (!cod) { alert('Selecione uma empresa.'); return; }
+        await vincularEmpresaCliente(usuarioId, cod);
+    };
+}
+
+async function vincularEmpresaCliente(usuarioId, codigoEmpresa) {
+    try {
+        const { data, error } = await sb
+            .from('cliente_acessos')
+            .insert({
+                usuario_id: usuarioId,
+                codigo_empresa: codigoEmpresa,
+                status: 'aprovado',
+                decidido_por: emailAdminLogado(),
+                decidido_em: new Date().toISOString(),
+            })
+            .select('id');
+        if (error) {
+            if (error.code === '23505') {
+                alert('Este cliente já tem um vínculo com essa empresa (veja nas listas de Pendentes, Liberados ou Recusados/Revogados).');
+                return;
+            }
+            throw error;
+        }
+        if (!data || !data.length) throw new Error('Nenhum registro foi criado. Verifique se seu usuário tem is_admin = TRUE (RLS).');
+        closeModal('modalVincularCliente');
+        await loadAcessosClientes();
+    } catch (err) {
+        console.error('vincularEmpresaCliente:', err);
+        alert('Erro ao vincular empresa: ' + err.message);
+    }
+}
+
+document.querySelectorAll('#tabsAcessosClientes .tab-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabsAcessosClientes .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderAcessosClientes();
 }));
 
 // ─── CRM MESSENGER — GESTÃO DE ACESSO ─────────────────────
@@ -1775,6 +1999,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
 });
 </script>
+<!-- MODAL VINCULAR EMPRESA (cliente) -->
+<div class="modal" id="modalVincularCliente">
+  <div class="modal-content" style="max-width:480px">
+    <div class="modal-header">
+        <h2>🏢 Vincular empresa adicional</h2>
+        <button class="modal-close" data-close="modalVincularCliente">✕</button>
+    </div>
+    <div class="form-group">
+        <label>Cliente</label>
+        <input id="vincClienteNome" type="text" readonly>
+    </div>
+    <div class="form-group">
+        <label>Empresa</label>
+        <select id="vincEmpresaSel"></select>
+    </div>
+    <div class="modal-actions">
+        <button class="btn-modal btn-modal-secondary" data-close="modalVincularCliente">Cancelar</button>
+        <button class="btn-modal btn-modal-primary" id="btnConfirmarVinculo">✅ Vincular (já liberado)</button>
+    </div>
+  </div>
+</div>
 <!-- MODAL CRM -->
 <div class="modal" id="modalCRM">
   <div class="modal-content" style="max-width:480px">
