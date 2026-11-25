@@ -28,18 +28,20 @@ export interface DadosPortal {
 const SEM_CARGO = 'Sem cargo'
 const BRUTO_MAX_MIN = 16 * 60
 const PADRAO_HORAS = 44
+const HORAS_MAX = 60
 
 function semAcento(s: string): string {
   return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
 
-function chaveCargo(cargo: string | null | undefined): string {
-  const k = semAcento((cargo ?? '').trim().toLowerCase()).replace(/\s+/g, ' ')
-  return k === '' ? 'sem cargo' : k
-}
-
 function slug(chave: string): string {
   return chave.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+/** Chave do grupo = slug do cargo normalizado; vazio (ou só pontuação) vira 'sem-cargo'. */
+function chaveCargo(cargo: string | null | undefined): string {
+  const k = slug(semAcento((cargo ?? '').trim().toLowerCase()))
+  return k === '' ? 'sem-cargo' : k
 }
 
 const DIAS = new Set(['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'])
@@ -130,7 +132,7 @@ function montarPessoa(
   const pessoa: PessoaEscala = {
     ...base,
     jornadaPadrao: false,
-    horasSemanais: arred1(dias.reduce((a, d) => a + d.liquidoMin, 0) / 60),
+    horasSemanais: Math.min(HORAS_MAX, arred1(dias.reduce((a, d) => a + d.liquidoMin, 0) / 60)),
   }
   if (dias.every((d) => d.entrada === dias[0].entrada && d.saida === dias[0].saida)) {
     pessoa.entrada = dias[0].entrada
@@ -163,14 +165,14 @@ export function mapearDadosPortal(d: DadosPortal): { nomeEmpresa: string; funcoe
     const pessoa = montarPessoa(e, jornadasPor.get(cod) ?? [], feriasPor.get(cod) ?? [])
     const g = grupos.get(k)
     if (g) g.pessoas.push(pessoa)
-    else grupos.set(k, { nome: k === 'sem cargo' ? SEM_CARGO : (e.cargo ?? '').trim(), pessoas: [pessoa] })
+    else grupos.set(k, { nome: k === 'sem-cargo' ? SEM_CARGO : (e.cargo ?? '').trim(), pessoas: [pessoa] })
   }
 
   const funcoes: Funcao[] = [...grupos.entries()].map(([k, g]) => {
     const pessoas = [...g.pessoas].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
     const horas = mediana(pessoas.map((p) => p.horasSemanais ?? PADRAO_HORAS))
     return {
-      id: `cargo-${slug(k)}`,
+      id: `cargo-${k}`,
       nome: g.nome,
       quantidade: pessoas.filter((p) => p.escalar).length,
       jornadaContratual: `${Math.round(horas)}h semanais`,

@@ -191,4 +191,46 @@ describe('mapearDadosPortal', () => {
     expect(f.horasSemanaisAtuais).toBe(44)
     expect(f.jornadaContratual).toBe('44h semanais')
   })
+
+  it('pontuação/espaços variantes do cargo viram UMA função', () => {
+    const r = mapearDadosPortal(dados({ empregados: [emp('1', 'A', 'Aux. Admin'), emp('2', 'B', 'Aux Admin'), emp('3', 'C', 'AUX-ADMIN')] }))
+    expect(r.funcoes).toHaveLength(1)
+    expect(r.funcoes[0].id).toBe('cargo-aux-admin')
+    expect(r.funcoes[0].pessoas).toHaveLength(3)
+  })
+
+  it('cargo só pontuação, vazio e null: um único Sem cargo', () => {
+    const r = mapearDadosPortal(dados({ empregados: [emp('1', 'A', '---'), emp('2', 'B', ''), emp('3', 'C', null)] }))
+    expect(r.funcoes).toHaveLength(1)
+    expect(r.funcoes[0].nome).toBe('Sem cargo')
+    expect(r.funcoes[0].id).toBe('cargo-sem-cargo')
+  })
+
+  it('ids únicos e estáveis (mesma entrada, ordem invertida)', () => {
+    const lista = [emp('1', 'A', 'A/B'), emp('2', 'B', 'A-B'), emp('3', 'C', 'Vendedor'), emp('4', 'D', 'Aux. Admin'), emp('5', 'E', null), emp('6', 'F', 'Caixa')]
+    const ids = (l: typeof lista) => mapearDadosPortal(dados({ empregados: l })).funcoes.map((f) => f.id)
+    const a = ids(lista)
+    expect(new Set(a).size).toBe(a.length)
+    expect(ids(lista)).toEqual(a)
+    expect(ids([...lista].reverse())).toEqual(a)
+  })
+
+  it('horas limitadas a 60 (pessoa e função)', () => {
+    const dias = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'].map((d) => j('1', d, '00:00', '23:00'))
+    const f = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: dias })).funcoes[0]
+    expect(f.pessoas![0].horasSemanais).toBe(60)
+    expect(f.horasSemanaisAtuais).toBe(60)
+  })
+
+  it('horário na forma curta 8:00', () => {
+    const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: [j('1', 'segunda', '8:00', '17:00')] })).funcoes[0].pessoas![0]
+    expect(p.entrada).toBe('08:00')
+    expect(p.horasSemanais).toBe(8)
+  })
+
+  it('intervalo maior que o turno: líquido 0, sem NaN', () => {
+    const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: [j('1', 'segunda', '08:00', '10:00', '08:30', '13:00')] })).funcoes[0].pessoas![0]
+    expect(p.horasSemanais).toBe(0)
+    expect(p.intervaloMin).toBe(270)
+  })
 })
