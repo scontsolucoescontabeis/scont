@@ -9,7 +9,7 @@
 
   // Cruza o nome do pedido com sócios e empregados (arrays de nomes).
   // Exato vence parcial. Rótulo em português para o administrador.
-  function montarApoio(pedidoNome, socios, empregados) {
+  function montarApoio(pedidoNome, socios, empregados, truncado) {
     var NA = getNomeApoio();
     var pessoas = [];
     (Array.isArray(socios) ? socios : []).forEach(function (n) { pessoas.push({ nome: n, origem: 'sócio' }); });
@@ -27,6 +27,7 @@
     if (exatos.length) return { tipo: 'exato', rotulo: '✔ Exato: ' + exatos.join(', ') };
     var parciais = origens('parcial');
     if (parciais.length) return { tipo: 'parcial', rotulo: '~ Parcial: ' + parciais.join(', ') };
+    if (truncado) return { tipo: 'truncado', rotulo: 'Base truncada — conferir manualmente' };
     return { tipo: 'nenhum', rotulo: 'Nenhuma correspondência' };
   }
 
@@ -51,7 +52,21 @@
     return { ok: true };
   }
 
-  var api = { montarApoio: montarApoio, agruparPorStatus: agruparPorStatus, validarDecisao: validarDecisao };
+  // Lê todas as páginas via fetchPage(from, to) -> Promise<array>. Para na primeira página curta;
+  // se atingir maxPaginas com páginas cheias, marca truncado.
+  async function paginar(fetchPage, tamanho, maxPaginas) {
+    tamanho = tamanho || 1000;
+    maxPaginas = maxPaginas || 20;
+    var rows = [];
+    for (var i = 0; i < maxPaginas; i++) {
+      var pagina = (await fetchPage(i * tamanho, i * tamanho + tamanho - 1)) || [];
+      rows = rows.concat(pagina);
+      if (pagina.length < tamanho) return { rows: rows, truncado: false };
+    }
+    return { rows: rows, truncado: true };
+  }
+
+  var api = { paginar: paginar, montarApoio: montarApoio, agruparPorStatus: agruparPorStatus, validarDecisao: validarDecisao };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof window !== 'undefined') window.AdminClientes = api;
 })();

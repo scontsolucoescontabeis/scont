@@ -621,6 +621,27 @@
   </div>
 </div>
 
+<!-- MODAL VINCULAR EMPRESA (cliente) -->
+<div class="modal" id="modalVincularCliente">
+  <div class="modal-content" style="max-width:480px">
+    <div class="modal-header">
+        <h2>🏢 Vincular empresa adicional</h2>
+        <button class="modal-close" data-close="modalVincularCliente">✕</button>
+    </div>
+    <div class="form-group">
+        <label>Cliente</label>
+        <input id="vincClienteNome" type="text" readonly>
+    </div>
+    <div class="form-group">
+        <label>Empresa</label>
+        <select id="vincEmpresaSel"></select>
+    </div>
+    <div class="modal-actions">
+        <button class="btn-modal btn-modal-secondary" data-close="modalVincularCliente">Cancelar</button>
+        <button class="btn-modal btn-modal-primary" id="btnConfirmarVinculo">✅ Vincular (já liberado)</button>
+    </div>
+  </div>
+</div>
 <script>
 // ─── CONFIG ────────────────────────────────────────────────
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -1676,21 +1697,25 @@ async function loadAcessosClientes() {
     const pendentes = acessosClientes.filter(a => a.status === 'pendente');
     const codPend = [...new Set(pendentes.map(a => a.codigo_empresa))];
     const pessoas = {};
+    const lerTudo = (tabela, coluna, cod) => window.AdminClientes.paginar(async (from, to) => {
+        const { data, error } = await sb.from(tabela).select(coluna).eq('codigo_empresa', cod).order(coluna).range(from, to);
+        if (error) throw error;
+        return data || [];
+    });
     await Promise.all(codPend.map(async cod => {
         const [soc, emp] = await Promise.all([
-            sb.from('rh_socios').select('nome_socio').eq('codigo_empresa', cod),
-            sb.from('rh_empregados').select('nome_empregado').eq('codigo_empresa', cod),
+            lerTudo('rh_socios', 'nome_socio', cod).catch(e => { console.error('rh_socios:', e); return { rows: [], truncado: true }; }),
+            lerTudo('rh_empregados', 'nome_empregado', cod).catch(e => { console.error('rh_empregados:', e); return { rows: [], truncado: true }; }),
         ]);
-        if (soc.error) console.error('rh_socios:', soc.error);
-        if (emp.error) console.error('rh_empregados:', emp.error);
         pessoas[cod] = {
-            socios: (soc.data || []).map(r => r.nome_socio),
-            empregados: (emp.data || []).map(r => r.nome_empregado),
+            socios: soc.rows.map(r => r.nome_socio),
+            empregados: emp.rows.map(r => r.nome_empregado),
+            truncado: soc.truncado || emp.truncado,
         };
     }));
     pendentes.forEach(a => {
-        const p = pessoas[a.codigo_empresa] || { socios: [], empregados: [] };
-        apoioClientes[a.id] = window.AdminClientes.montarApoio(a.cliente_usuarios?.nome, p.socios, p.empregados);
+        const p = pessoas[a.codigo_empresa] || { socios: [], empregados: [], truncado: true };
+        apoioClientes[a.id] = window.AdminClientes.montarApoio(a.cliente_usuarios?.nome, p.socios, p.empregados, p.truncado);
     });
 
     renderAcessosClientes();
@@ -1711,7 +1736,7 @@ function renderAcessosClientes() {
         const apoio = apoioClientes[a.id];
         let apoioHtml = '—';
         if (a.status === 'pendente' && apoio) {
-            const cor = apoio.tipo === 'exato' ? 'var(--success)' : apoio.tipo === 'parcial' ? '#B9770E' : 'var(--muted)';
+            const cor = apoio.tipo === 'exato' ? 'var(--success)' : (apoio.tipo === 'parcial' || apoio.tipo === 'truncado') ? '#B9770E' : 'var(--muted)';
             apoioHtml = `<span style="color:${cor};font-weight:600">${sanitize(apoio.rotulo)}</span>`;
         } else if (a.status !== 'pendente') {
             apoioHtml = sanitize(a.motivo || '—') + (a.decidido_por ? `<br><span style="font-size:11px;color:var(--muted)">por ${sanitize(a.decidido_por)}</span>` : '');
@@ -1999,27 +2024,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     })
 });
 </script>
-<!-- MODAL VINCULAR EMPRESA (cliente) -->
-<div class="modal" id="modalVincularCliente">
-  <div class="modal-content" style="max-width:480px">
-    <div class="modal-header">
-        <h2>🏢 Vincular empresa adicional</h2>
-        <button class="modal-close" data-close="modalVincularCliente">✕</button>
-    </div>
-    <div class="form-group">
-        <label>Cliente</label>
-        <input id="vincClienteNome" type="text" readonly>
-    </div>
-    <div class="form-group">
-        <label>Empresa</label>
-        <select id="vincEmpresaSel"></select>
-    </div>
-    <div class="modal-actions">
-        <button class="btn-modal btn-modal-secondary" data-close="modalVincularCliente">Cancelar</button>
-        <button class="btn-modal btn-modal-primary" id="btnConfirmarVinculo">✅ Vincular (já liberado)</button>
-    </div>
-  </div>
-</div>
 <!-- MODAL CRM -->
 <div class="modal" id="modalCRM">
   <div class="modal-content" style="max-width:480px">

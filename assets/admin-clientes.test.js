@@ -42,3 +42,40 @@ test('validarDecisao', () => {
   assert.strictEqual(AC.validarDecisao('pendente', 'x').ok, false);
   assert.strictEqual(AC.validarDecisao(undefined, 'x').ok, false);
 });
+
+function fakeFetch(total) {
+  const calls = [];
+  const fn = async (from, to) => {
+    calls.push([from, to]);
+    const n = Math.max(0, Math.min(to, total - 1) - from + 1);
+    return Array.from({ length: n }, (_, i) => from + i);
+  };
+  fn.calls = calls;
+  return fn;
+}
+test('paginar: 0 linhas', async () => {
+  const r = await AC.paginar(fakeFetch(0));
+  assert.deepStrictEqual(r, { rows: [], truncado: false });
+});
+test('paginar: exatamente 1000 busca a pagina seguinte e nao trunca', async () => {
+  const f = fakeFetch(1000);
+  const r = await AC.paginar(f);
+  assert.strictEqual(r.rows.length, 1000);
+  assert.strictEqual(r.truncado, false);
+  assert.deepStrictEqual(f.calls, [[0, 999], [1000, 1999]]);
+});
+test('paginar: 2500 linhas em 3 paginas', async () => {
+  const r = await AC.paginar(fakeFetch(2500));
+  assert.strictEqual(r.rows.length, 2500);
+  assert.strictEqual(r.truncado, false);
+});
+test('paginar: limite de paginas marca truncado', async () => {
+  const r = await AC.paginar(fakeFetch(100000), 1000, 3);
+  assert.strictEqual(r.rows.length, 3000);
+  assert.strictEqual(r.truncado, true);
+});
+test('montarApoio: truncado sem correspondencia', () => {
+  assert.deepStrictEqual(AC.montarApoio('Fulano Tal', ['Beltrano'], [], true),
+    { tipo: 'truncado', rotulo: 'Base truncada — conferir manualmente' });
+  assert.strictEqual(AC.montarApoio('Ana Lima', ['Ana Lima'], [], true).tipo, 'exato');
+});
