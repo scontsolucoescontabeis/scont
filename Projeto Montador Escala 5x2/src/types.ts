@@ -77,6 +77,20 @@ export interface ResultadoConformidade {
   contagem: { vermelho: number; amarelo: number }
 }
 
+/** Pessoa real (nominal) de uma função, vinda do banco no portal do cliente. */
+export interface PessoaEscala {
+  id: string
+  nome: string
+  escalar: boolean
+  /** Sem jornada cadastrada: usa a jornada padrão (44h). */
+  jornadaPadrao: boolean
+  horasSemanais?: number
+  entrada?: string
+  saida?: string
+  intervaloMin?: number
+  ferias: { inicio: string; fim: string }[]
+}
+
 export interface Funcao {
   id: string
   nome: string
@@ -88,6 +102,8 @@ export interface Funcao {
   entrada?: string
   saida?: string
   intervaloMin?: number
+  /** Equipe nominal (portal do cliente). */
+  pessoas?: PessoaEscala[]
 }
 
 export type AcordoColetivo = 'sim' | 'nao' | 'nao_sei'
