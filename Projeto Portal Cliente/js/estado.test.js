@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { decidirEstado } = require('./estado.js');
+const { decidirEstado, normalizarBusca } = require('./estado.js');
 
 test('sem vínculos (vazio, undefined, null) => sem_pedido', () => {
     for (const v of [[], undefined, null]) {
@@ -62,4 +62,28 @@ test('cliente.js: cliente_acessos filtrado por usuario_id do usuário logado', (
     const m = src.match(/from\('cliente_acessos'\)[^;]*;/);
     assert.ok(m, 'consulta de cliente_acessos não encontrada');
     assert.ok(/\.eq\('usuario_id',\s*user\.id\)/.test(m[0]), 'falta .eq(usuario_id, user.id): ' + m[0]);
+});
+
+test('normalizarBusca: minúsculas, sem acento, espaços colapsados', () => {
+    assert.strictEqual(normalizarBusca('  Padaria  PÃO Quente '), 'padaria pao quente');
+    assert.strictEqual(normalizarBusca('Açaí & Cia.'), 'acai & cia.');
+});
+
+test('normalizarBusca: null, undefined e número não quebram', () => {
+    assert.strictEqual(normalizarBusca(null), '');
+    assert.strictEqual(normalizarBusca(undefined), '');
+    assert.strictEqual(normalizarBusca(123), '123');
+});
+
+// Modo administrador: o admin é detectado por usuarios.is_admin e carrega rh_empresas ANTES
+// da checagem de perfil de cliente (senão seria deslogado com "Esta área é para clientes").
+test('cliente.js: administrador é tratado antes da checagem de perfil de cliente', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const src = fs.readFileSync(path.join(__dirname, 'cliente.js'), 'utf8');
+    const iAdmin = src.indexOf("from('usuarios')");
+    const iPerfil = src.indexOf("from('cliente_usuarios')");
+    assert.ok(iAdmin > 0 && iPerfil > 0 && iAdmin < iPerfil, 'checagem de admin deve vir antes do perfil de cliente');
+    assert.ok(/is_admin\s*===\s*true/.test(src), 'deve exigir is_admin === true');
+    assert.ok(/from\('rh_empresas'\)/.test(src), 'admin deve listar rh_empresas');
 });

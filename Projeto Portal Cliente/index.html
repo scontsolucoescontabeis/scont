@@ -91,13 +91,20 @@
         <!-- SELETOR -->
         <section id="estado-seletor" class="estado">
             <h2>Escolha a empresa</h2>
-            <p class="texto">Você tem acesso a mais de uma empresa. Selecione qual deseja acessar.</p>
+            <p class="texto" id="seletorTexto">Você tem acesso a mais de uma empresa. Selecione qual deseja acessar.</p>
+            <div class="form-group" id="seletorFiltroWrap" hidden>
+                <input type="search" id="seletorFiltro" placeholder="Filtrar por nome ou código da empresa" autocomplete="off">
+            </div>
             <ul class="lista-empresas" id="listaEmpresas"></ul>
             <button type="button" class="btn-secondary" data-acao="sair">Sair</button>
         </section>
 
         <!-- HOME -->
         <section id="estado-home" class="estado">
+            <div class="alert alert-info show" id="bannerAdmin" hidden>
+                Modo administrador: você está visualizando o portal como o cliente desta empresa.
+                <a href="../admin-dashboard.html">Voltar ao painel do administrador</a>
+            </div>
             <p class="empresa-atual">Empresa: <strong id="homeEmpresa"></strong></p>
             <h2>Olá, <span id="homeNome"></span></h2>
             <p class="texto">Suas ferramentas aparecerão aqui.</p>
