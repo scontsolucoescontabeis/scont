@@ -223,6 +223,7 @@ export const useStore = create<Store>((set, get) => ({
       feriados: d.feriados.map((f) => f.data),
       inicio: d.inicioEscala,
       semanas: d.semanas,
+      regrasPessoais: d.regrasPessoais,
     })
     const corrigidas = novas.map((p) => ({
       ...p,

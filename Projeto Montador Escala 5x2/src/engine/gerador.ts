@@ -22,12 +22,13 @@ import type {
   PessoaEscala,
   Proposta,
   RegraCobertura,
+  RegrasPessoais,
   Turno,
 } from '../types'
 import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './datas'
-import { jornadaDaPessoa, tetoSemanalNaData } from './jornada'
+import { cicloDomingoDe, jornadaDaPessoa, tetoSemanalNaData, tocaNoturnoMenor } from './jornada'
 import { diasDeFerias } from './ferias'
-import { REGRAS, cicloDomingoDoSetor } from '../config/regras'
+import { REGRAS, REGRAS_PESSOAIS_PADRAO, cicloDomingoDoSetor } from '../config/regras'
 
 export interface EntradaGerador {
   empresa: Empresa
@@ -39,6 +40,8 @@ export interface EntradaGerador {
   /** Qualquer data; a escala começa no domingo da semana dela. */
   inicio: string
   semanas: number
+  /** Regras por pessoa (mulheres, estagiários); padrão: `REGRAS_PESSOAIS_PADRAO`. */
+  regrasPessoais?: RegrasPessoais
 }
 
 export const SLOT = 15
@@ -50,7 +53,16 @@ export function criarFuncionarios(funcoes: Funcao[]): Funcionario[] {
     if (fn.pessoas) {
       // Equipe nominal: um funcionário por pessoa escalável; `quantidade` é ignorada.
       for (const p of fn.pessoas) {
-        if (p.escalar) lista.push({ id: `${fn.id}-${p.id}`, nome: p.nome, funcaoId: fn.id })
+        if (!p.escalar) continue
+        // Atributos só entram quando presentes: sem eles, o funcionário fica igual ao de antes.
+        lista.push({
+          id: `${fn.id}-${p.id}`,
+          nome: p.nome,
+          funcaoId: fn.id,
+          ...(p.sexo ? { sexo: p.sexo } : {}),
+          ...(p.menor ? { menor: true } : {}),
+          ...(p.estagiario ? { estagiario: true } : {}),
+        })
       }
       continue
     }
@@ -220,6 +232,7 @@ function escolherRepousos(
 
 export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Escala {
   const { empresa, funcoes, turnos, cobertura, feriados, semanas } = entrada
+  const regrasPessoais = entrada.regrasPessoais ?? REGRAS_PESSOAIS_PADRAO
   const inicio = domingoDaSemana(entrada.inicio)
   const dias = semanas * 7
   const funcionarios = criarFuncionarios(funcoes)
@@ -264,7 +277,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   for (const f of funcionarios) {
     const fnc = funcoes.find((x) => x.id === f.funcaoId)!
     const pessoa: PessoaEscala | undefined = fnc.pessoas?.find((p) => `${fnc.id}-${p.id}` === f.id)
-    jornadas.set(f.id, jornadaDaPessoa(fnc, pessoa, teto))
+    jornadas.set(f.id, jornadaDaPessoa(fnc, pessoa, teto, regrasPessoais))
     ausentes.set(f.id, diasDeFerias(inicio, dias, pessoa?.ferias ?? []))
   }
   const horarioDe = new Map<string, { inicio: number; bruto: number; intervaloMin: number }>()
@@ -274,8 +287,13 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     if (ini === undefined) {
       ini = janIni * SLOT
       const ultimo = Math.max(janIni * SLOT, janFim * SLOT - j.bruto)
+      // Menor de 18 (CLT art. 404): só horários inteiramente entre 5h e 22h. Horário fixo é mantido
+      // (a conformidade aponta); sem nenhum candidato diurno na janela, entra às 5h.
+      const diurno = (c: number) => !f.menor || !tocaNoturnoMenor(c, j.bruto)
+      if (f.menor && !diurno(ini)) ini = minutosDe(REGRAS.pessoas.menorNoturno.fim)
       let melhorPont = -Infinity
       for (let c = janIni * SLOT; c <= ultimo; c += SLOT) {
+        if (!diurno(c)) continue
         let pont = 0
         for (let dow = 0; dow < 7; dow++) {
           for (const s of faixas(c, j.bruto)) {
@@ -335,6 +353,11 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   const domTrabalhados = new Map<string, number>(funcionarios.map((f) => [f.id, 0]))
   // Domingos trabalhados em sequência e dias de trabalho seguidos ao fim da semana anterior.
   const ciclo = Math.max(2, cicloDomingoDoSetor(empresa.setor))
+  // Ciclo de cada funcionário (mulheres com o art. 386: 2 semanas).
+  const cicloDe = new Map<string, number>(funcionarios.map((f) => [f.id, cicloDomingoDe(f, ciclo, regrasPessoais)]))
+  // Denominador comum dos ciclos, para somar 1/ciclo sem erro de ponto flutuante.
+  const mdc = (a: number, b: number): number => (b === 0 ? a : mdc(b, a % b))
+  const mmcCiclos = [...cicloDe.values()].reduce((a, b) => (a * b) / mdc(a, b), 1)
   const domSeguidos = new Map<string, number>(funcionarios.map((f) => [f.id, 0]))
   const diasSeguidos = new Map<string, number>(funcionarios.map((f) => [f.id, 0]))
   const maxSeguidos = REGRAS.diasConsecutivosMax
@@ -373,12 +396,12 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       // domingo é de folga, salvo se a cobertura exigir. Assim as folgas de domingo ficam
       // escalonadas, inclusive dentro da mesma função.
       const folgaDaVez = new Set(
-        funcionarios.filter((_, i) => (s + i) % ciclo === 0).map((f) => f.id),
+        funcionarios.filter((f, i) => (s + i) % cicloDe.get(f.id)! === 0).map((f) => f.id),
       )
       // Quem está de férias neste domingo não entra no rodízio (já está fora).
       const disponiveis = funcionarios.filter((f) => !ausente(f.id, 0))
       const ordem = disponiveis
-        .filter((f) => domSeguidos.get(f.id)! < ciclo - 1)
+        .filter((f) => domSeguidos.get(f.id)! < cicloDe.get(f.id)! - 1)
         .sort(
           (a, b) =>
             Number(folgaDaVez.has(a.id)) - Number(folgaDaVez.has(b.id)) ||
@@ -398,11 +421,12 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         })
       }
       // Rodízio de verdade: além da cobertura, só podem folgar juntos no domingo
-      // ceil(N / ciclo) empregados (cada um folga 1 domingo a cada `ciclo`). Os demais
-      // trabalham o domingo e levam o DSR/folga em outro dia da semana. Quem está de
-      // férias no domingo não conta como possível trabalhador.
+      // ceil(Σ 1/ciclo_i) empregados (cada um folga 1 domingo a cada `ciclo_i`; com ciclo único,
+      // ceil(N / ciclo)). Os demais trabalham o domingo e levam o DSR/folga em outro dia da
+      // semana. Quem está de férias no domingo não conta como possível trabalhador.
       if (empresa.diasFuncionamento[0]) {
-        const maxFolgas = Math.ceil(disponiveis.length / ciclo)
+        const somaFolgas = disponiveis.reduce((acc, f) => acc + mmcCiclos / cicloDe.get(f.id)!, 0)
+        const maxFolgas = Math.ceil(somaFolgas / mmcCiclos)
         const alvoTrabalho = disponiveis.length - maxFolgas
         for (const f of ordem) {
           if (trabalhaDomingo.size >= alvoTrabalho) break
@@ -470,7 +494,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       const fechados = Array.from({ length: 7 }, (_, d) => d).filter((d) =>
         span.every((sl) => perfil[d][sl] <= 0),
       )
-      const domObrigatorio = domSeguidos.get(f.id)! >= ciclo - 1 && !fechados.includes(0) && !aus.includes(0)
+      const domObrigatorio = domSeguidos.get(f.id)! >= cicloDe.get(f.id)! - 1 &&!fechados.includes(0) && !aus.includes(0)
       const protegidos = new Set<number>(fechados)
       if (domObrigatorio) protegidos.add(0)
       const garantir = (d: number) => {

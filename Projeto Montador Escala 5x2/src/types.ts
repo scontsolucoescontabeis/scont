@@ -23,6 +23,10 @@ export interface Funcionario {
   id: string
   nome: string
   funcaoId: string
+  /** Atributos da pessoa (equipe nominal); ausentes no modo avulso. */
+  sexo?: 'F' | 'M'
+  menor?: boolean
+  estagiario?: boolean
 }
 
 export interface Escala {
