@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCONT - Portal do Cliente</title>
+    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png">
+    <link rel="stylesheet" href="css/cliente.css">
+    <script src="../supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="login-container">
+  <div class="login-card">
+    <div class="login-header">
+        <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+    </div>
+    <div class="login-body">
+
+        <!-- LOGIN -->
+        <section id="estado-login" class="estado">
+            <div class="tabs">
+                <button type="button" class="tab-btn active" data-ir="login">Entrar</button>
+                <button type="button" class="tab-btn" data-ir="cadastro">Criar conta</button>
+            </div>
+            <div id="alertLogin" class="alert" role="alert"></div>
+            <form id="loginForm">
+                <div class="form-group"><label for="loginEmail">E-mail</label>
+                    <input type="email" id="loginEmail" placeholder="seu@email.com" required autocomplete="email"></div>
+                <div class="form-group"><label for="loginSenha">Senha</label>
+                    <input type="password" id="loginSenha" placeholder="••••••••" required autocomplete="current-password"></div>
+                <button type="submit" class="btn-primary" id="btnLogin">Entrar</button>
+            </form>
+            <p class="link-linha"><button type="button" class="link-btn" id="btnEsqueci">Esqueci a senha</button></p>
+        </section>
+
+        <!-- CADASTRO -->
+        <section id="estado-cadastro" class="estado">
+            <div class="tabs">
+                <button type="button" class="tab-btn" data-ir="login">Entrar</button>
+                <button type="button" class="tab-btn active" data-ir="cadastro">Criar conta</button>
+            </div>
+            <div id="alertCadastro" class="alert" role="alert"></div>
+            <div id="cadastroConfirmacao" class="alert alert-success" role="status"></div>
+            <form id="cadastroForm">
+                <div class="form-group"><label for="cadNome">Nome completo *</label>
+                    <input type="text" id="cadNome" required autocomplete="name"></div>
+                <div class="form-group"><label for="cadEmail">E-mail *</label>
+                    <input type="email" id="cadEmail" required autocomplete="email"></div>
+                <div class="form-row">
+                    <div class="form-group"><label for="cadSenha">Senha *</label>
+                        <input type="password" id="cadSenha" required minlength="6" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+                    <div class="form-group"><label for="cadSenha2">Confirmar senha *</label>
+                        <input type="password" id="cadSenha2" required minlength="6" autocomplete="new-password"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label for="cadCargo">Cargo *</label>
+                        <input type="text" id="cadCargo" required></div>
+                    <div class="form-group"><label for="cadTelefone">Telefone</label>
+                        <input type="tel" id="cadTelefone" placeholder="(61) 99999-9999" autocomplete="tel"></div>
+                </div>
+                <div class="form-group"><label for="cadBusca">Sua empresa *</label>
+                    <input type="text" id="cadBusca" placeholder="Nome, código ou CNPJ da empresa" autocomplete="off">
+                    <p class="dica" id="buscaDica">Digite ao menos 4 letras ou o CNPJ</p>
+                    <ul class="resultados" id="buscaResultados"></ul>
+                    <div class="escolhida" id="empresaEscolhida" hidden></div>
+                </div>
+                <button type="submit" class="btn-primary" id="btnCadastro">Solicitar acesso</button>
+                <p class="dica" style="text-align:center;margin-top:14px;">Seu acesso será analisado pela equipe SCONT.</p>
+            </form>
+        </section>
+
+        <!-- AGUARDANDO -->
+        <section id="estado-aguardando" class="estado">
+            <h2>Aguardando análise</h2>
+            <p class="texto">Recebemos seu pedido de acesso. A equipe SCONT irá analisá-lo e você poderá entrar assim que for aprovado.</p>
+            <button type="button" class="btn-primary" data-acao="atualizar">Verificar novamente</button>
+            <button type="button" class="btn-secondary" data-acao="sair">Sair</button>
+        </section>
+
+        <!-- NEGADO -->
+        <section id="estado-negado" class="estado">
+            <h2>Acesso não liberado</h2>
+            <p class="texto" id="negadoTexto"></p>
+            <div class="alert alert-error" id="negadoMotivo"></div>
+            <button type="button" class="btn-secondary" data-acao="sair">Sair</button>
+        </section>
+
+        <!-- SELETOR -->
+        <section id="estado-seletor" class="estado">
+            <h2>Escolha a empresa</h2>
+            <p class="texto">Você tem acesso a mais de uma empresa. Selecione qual deseja acessar.</p>
+            <ul class="lista-empresas" id="listaEmpresas"></ul>
+            <button type="button" class="btn-secondary" data-acao="sair">Sair</button>
+        </section>
+
+        <!-- HOME -->
+        <section id="estado-home" class="estado">
+            <p class="empresa-atual">Empresa: <strong id="homeEmpresa"></strong></p>
+            <h2>Olá, <span id="homeNome"></span></h2>
+            <p class="texto">Suas ferramentas aparecerão aqui.</p>
+            <div class="cartao-ferramenta">Montador de Escala 5x2 — em breve</div>
+            <button type="button" class="btn-secondary" id="btnTrocarEmpresa" hidden>Trocar de empresa</button>
+            <button type="button" class="btn-secondary" data-acao="sair">Sair</button>
+        </section>
+
+    </div>
+    <div class="login-footer">© 2026 SCONT. Todos os direitos reservados.</div>
+  </div>
+</div>
+
+<script src="js/estado.js"></script>
+<script src="js/cliente.js"></script>
+</body>
+</html>
