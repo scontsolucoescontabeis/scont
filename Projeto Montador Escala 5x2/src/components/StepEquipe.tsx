@@ -50,7 +50,8 @@ export function StepEquipe() {
           </h2>
           <p className="text-sm text-soft">
             Esta é a equipe ativa cadastrada no RH. Ajuste a carga e o horário de
-            cada pessoa ou desmarque quem não deve entrar na escala.
+            cada pessoa ou desmarque quem não deve entrar na escala. Sexo,
+            estágio e idade vêm do cadastro do RH e não são editáveis aqui.
           </p>
         </div>
         <EquipeNominal />

@@ -46,6 +46,16 @@ URL: `Projeto Montador Escala 5x2/app/index.html`.
 - `enviarAoDP.ts`: reimplemente `enviarAoDP` com `supabase.functions.invoke(...)` mantendo `EnviarAoDP`.
 - Contatos do DP em `CONTATO_DP` são **placeholders** (TODO).
 
+## Quadro sugerido de contratações (passo 4)
+
+`src/engine/contratacoes.ts` estima as pessoas pelo perfil real de demanda (faixas de 15 min): cada pessoa
+cumpre uma jornada **inteira** (até 8h24 + intervalo), sempre no mesmo horário (como o gerador), até 5 dias por
+semana. Os turnos saem de um guloso sobre o perfil combinado dos períodos (turnos compartilhados); jornadas com o
+mesmo início formam uma camada, e cada camada respeita o rodízio de domingos do setor. A equipe atual conta em
+tempo integral equivalente (horas ÷ limite da etapa; estagiário/menor limitados pela jornada diária). Com o
+art. 386 ligado, o domingo quinzenal das mulheres pode somar contratações. Um teste de propriedade confere o
+quadro contra o gerador.
+
 ## Premissas legais a validar pelo DP
 
 Veja a lista no resumo da entrega e os comentários no topo de `conformidade.ts` e `regras.ts`.
@@ -61,5 +71,8 @@ monta esse link automaticamente (código codificado com `encodeURIComponent`).
 - **Equipe:** empregados com situação "Trabalhando" e tipo Empregado ou Estagiário.
 - **Edições por pessoa** são guardadas por empresa no navegador, como *overrides* sobre os dados do RH.
 - **Férias** entram na escala como ausência.
+- **Regras por pessoa (Passo 2):** coluna Sexo e etiquetas "estagiário" / "menor de 18" (somente leitura, do RH);
+  cartão "Regras por pessoa" com o interruptor do art. 386 da CLT (domingo quinzenal das mulheres, ligado por
+  padrão) e a jornada máxima do estagiário (20/30/40 h). Persistidos; valide com o DP.
 - **SQL a aplicar:** `_sql/schema_montador_portal.sql` — **PENDENTE de aplicar em produção**.
 - **Modo avulso** (sem `?empresa=`) permanece inalterado.
