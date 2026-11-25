@@ -67,9 +67,9 @@ BEGIN
     SELECT count(*) INTO n FROM pg_policies
       WHERE schemaname = 'storage' AND policyname LIKE 'storage documentos:%';
     ASSERT n = 4, 'reverter: politicas antigas de storage afetadas ('||n||')';
-    -- reverter preserva politicas antigas
+    -- reverter preserva politicas antigas (5 das fixtures 01 + 3 das tabelas rh_* da fixture 02)
     SELECT count(*) INTO n FROM pg_policies WHERE policyname = 'fixture: authenticated tudo';
-    ASSERT n = 5, 'reverter: politicas antigas afetadas ('||n||')';
+    ASSERT n = 8, 'reverter: politicas antigas afetadas ('||n||')';
     SELECT count(*) INTO n FROM pg_policies WHERE tablename IN ('usuarios','solicitacoes_acesso') AND policyname = 'portal_cliente: somente equipe';
     ASSERT n = 0, 'reverter: restaram politicas owner-scoped';
 END $$;
