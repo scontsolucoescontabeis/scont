@@ -72,5 +72,9 @@ p.texto { font-size:14px; color:var(--muted); line-height:1.5; margin-bottom:16p
 .lista-empresas li button:hover { border-color:var(--primary); color:var(--primary); }
 .empresa-atual { font-size:13px; color:var(--muted); margin-bottom:16px; }
 .empresa-atual strong { color:var(--secondary); }
-.cartao-ferramenta { border:1px dashed var(--border); border-radius:var(--radius); padding:18px; background:var(--bg); color:var(--muted); font-weight:600; text-align:center; }
+.cartao-ferramenta { display:block; border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; margin-bottom:10px; background:#fff; color:var(--secondary); text-decoration:none; transition:var(--transition); }
+.cartao-ferramenta[hidden] { display:none; }
+.cartao-ferramenta strong { display:block; font-size:14px; }
+.cartao-ferramenta span { display:block; margin-top:4px; font-size:13px; font-weight:400; color:var(--muted); }
+.cartao-ferramenta:hover { border-color:var(--primary); color:var(--primary); }
 @media (max-width:480px) { .login-header,.login-body { padding:24px 18px; } .form-row { grid-template-columns:1fr; } }

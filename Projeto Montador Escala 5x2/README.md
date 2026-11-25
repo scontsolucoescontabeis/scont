@@ -49,3 +49,17 @@ URL: `Projeto Montador Escala 5x2/app/index.html`.
 ## Premissas legais a validar pelo DP
 
 Veja a lista no resumo da entrega e os comentários no topo de `conformidade.ts` e `regras.ts`.
+
+## Modo portal (Portal do Cliente)
+
+Abrindo o app com `?empresa=<codigo>` (ex.: `app/index.html?empresa=123`), ele entra em **modo portal**: os dados
+da empresa vêm do banco em vez de serem digitados. O card "Montador de Escala 5x2" da home do Portal do Cliente
+monta esse link automaticamente (código codificado com `encodeURIComponent`).
+
+- **Tabelas de origem:** `rh_empresas`, `rh_empregados`, `rh_jornada_trabalho` e `rh_ferias_calculadas`
+  (esta última lida por meio de uma função SQL).
+- **Equipe:** empregados com situação "Trabalhando" e tipo Empregado ou Estagiário.
+- **Edições por pessoa** são guardadas por empresa no navegador, como *overrides* sobre os dados do RH.
+- **Férias** entram na escala como ausência.
+- **SQL a aplicar:** `_sql/schema_montador_portal.sql` — **PENDENTE de aplicar em produção**.
+- **Modo avulso** (sem `?empresa=`) permanece inalterado.
