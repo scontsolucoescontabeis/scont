@@ -578,6 +578,11 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
       }
 
       const quem = r.funcaoId ? ` de "${r.rotulo ?? 'função'}"` : ''
+      // Quem da regra está ausente (férias/atestado) nesse dia: ajuda a entender a falta.
+      const ausentes = escala.funcionarios
+        .filter((f) => (!r.funcaoId || f.funcaoId === r.funcaoId) && celula(f.id, i)?.tipo === 'ausencia')
+        .map((f) => f.nome)
+      const notaAusencia = ausentes.length > 0 ? ` Há ausência (férias/atestado) de: ${ausentes.join(', ')}.` : ''
       alertas.push({
         id: `cob|${r.id}|${data}`,
         regraId: 'cobertura',
@@ -587,8 +592,9 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
           periodo
             ? `Em ${DIAS_PT[diaDaSemana(data)]}, ${fmtDataBR(data)}, o período "${periodo.nome}" (${periodo.inicio}–${periodo.fim}) fica abaixo do mínimo de ${r.minimo} pessoa(s)${quem}: ` +
                 faltas.map((x) => `${hhmm(x.de)}–${hhmm(x.ate)} com ${x.pessoas}`).join('; ') +
-                '.'
-            : `Em ${DIAS_PT[diaDaSemana(data)]}, ${fmtDataBR(data)}, o turno "${turno?.nome ?? r.turnoId}" tem ${presentesN} pessoa(s)${quem}; o mínimo informado é ${r.minimo}.`,
+                '.' +
+                notaAusencia
+            : `Em ${DIAS_PT[diaDaSemana(data)]}, ${fmtDataBR(data)}, o turno "${turno?.nome ?? r.turnoId}" tem ${presentesN} pessoa(s)${quem}; o mínimo informado é ${r.minimo}.${notaAusencia}`,
           'cobertura',
         ),
         sugestao: periodo

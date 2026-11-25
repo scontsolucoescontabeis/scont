@@ -1,0 +1,7639 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > avulso abre=false fixo 1`] = `
+{
+  "celulas": {
+    "atd-1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-2": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-3": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-4": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-5": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-1",
+      "nome": "Atendente 1",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-2",
+      "nome": "Atendente 2",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-3",
+      "nome": "Atendente 3",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-4",
+      "nome": "Atendente 4",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-5",
+      "nome": "Atendente 5",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > avulso abre=false folga_movel 1`] = `
+{
+  "celulas": {
+    "atd-1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-2": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-3": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+    ],
+    "atd-4": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-5": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-1",
+      "nome": "Atendente 1",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-2",
+      "nome": "Atendente 2",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-3",
+      "nome": "Atendente 3",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-4",
+      "nome": "Atendente 4",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-5",
+      "nome": "Atendente 5",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > avulso abre=false rodizio_domingo 1`] = `
+{
+  "celulas": {
+    "atd-1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-2": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-3": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-4": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-5": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-1",
+      "nome": "Atendente 1",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-2",
+      "nome": "Atendente 2",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-3",
+      "nome": "Atendente 3",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-4",
+      "nome": "Atendente 4",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-5",
+      "nome": "Atendente 5",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > avulso abre=true fixo 1`] = `
+{
+  "celulas": {
+    "atd-1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-2": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-3": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-4": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+    ],
+    "atd-5": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-1",
+      "nome": "Atendente 1",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-2",
+      "nome": "Atendente 2",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-3",
+      "nome": "Atendente 3",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-4",
+      "nome": "Atendente 4",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-5",
+      "nome": "Atendente 5",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > avulso abre=true folga_movel 1`] = `
+{
+  "celulas": {
+    "atd-1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-2": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-3": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+    ],
+    "atd-4": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-5": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-1",
+      "nome": "Atendente 1",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-2",
+      "nome": "Atendente 2",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-3",
+      "nome": "Atendente 3",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-4",
+      "nome": "Atendente 4",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-5",
+      "nome": "Atendente 5",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > avulso abre=true rodizio_domingo 1`] = `
+{
+  "celulas": {
+    "atd-1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-2": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-3": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-4": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+    ],
+    "atd-5": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-1",
+      "nome": "Atendente 1",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-2",
+      "nome": "Atendente 2",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-3",
+      "nome": "Atendente 3",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-4",
+      "nome": "Atendente 4",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-5",
+      "nome": "Atendente 5",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > nominal abre=false fixo 1`] = `
+{
+  "celulas": {
+    "atd-p1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p2": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p3": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p4": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-p1",
+      "nome": "Ana",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p2",
+      "nome": "Bia",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p3",
+      "nome": "Caio",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p4",
+      "nome": "Duda",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > nominal abre=false folga_movel 1`] = `
+{
+  "celulas": {
+    "atd-p1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p2": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p3": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+    ],
+    "atd-p4": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-p1",
+      "nome": "Ana",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p2",
+      "nome": "Bia",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p3",
+      "nome": "Caio",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p4",
+      "nome": "Duda",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > nominal abre=false rodizio_domingo 1`] = `
+{
+  "celulas": {
+    "atd-p1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p2": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p3": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p4": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-p1",
+      "nome": "Ana",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p2",
+      "nome": "Bia",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p3",
+      "nome": "Caio",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p4",
+      "nome": "Duda",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > nominal abre=true fixo 1`] = `
+{
+  "celulas": {
+    "atd-p1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p2": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p3": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p4": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-p1",
+      "nome": "Ana",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p2",
+      "nome": "Bia",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p3",
+      "nome": "Caio",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p4",
+      "nome": "Duda",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > nominal abre=true folga_movel 1`] = `
+{
+  "celulas": {
+    "atd-p1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p2": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p3": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+    ],
+    "atd-p4": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-p1",
+      "nome": "Ana",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p2",
+      "nome": "Bia",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p3",
+      "nome": "Caio",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p4",
+      "nome": "Duda",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
+
+exports[`férias na escala > sem férias, resultado idêntico ao de antes > nominal abre=true rodizio_domingo 1`] = `
+{
+  "celulas": {
+    "atd-p1": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p2": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p3": [
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+    ],
+    "atd-p4": [
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+    ],
+  },
+  "dias": 35,
+  "funcionarios": [
+    {
+      "funcaoId": "atd",
+      "id": "atd-p1",
+      "nome": "Ana",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p2",
+      "nome": "Bia",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p3",
+      "nome": "Caio",
+    },
+    {
+      "funcaoId": "atd",
+      "id": "atd-p4",
+      "nome": "Duda",
+    },
+  ],
+  "inicio": "2026-12-20",
+  "turnos": [
+    {
+      "fim": "17:24",
+      "id": "ts-08:00-17:24-60",
+      "inicio": "08:00",
+      "intervaloMin": 60,
+      "nome": "08:00–17:24",
+    },
+  ],
+}
+`;
