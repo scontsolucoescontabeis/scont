@@ -203,6 +203,10 @@ function abrirHome(codigo) {
     $('homeNome').textContent = (perfilAtual && perfilAtual.nome) || '';
     $('btnTrocarEmpresa').hidden = empresasAprovadas.length < 2;
     $('bannerAdmin').hidden = !modoAdmin;
+    const cardMontador = $('cardMontador');
+    const hrefMontador = window.EstadoCliente.urlMontador(codigo);
+    if (hrefMontador) cardMontador.setAttribute('href', hrefMontador);
+    cardMontador.hidden = !hrefMontador;
     mostrarEstado('home');
 }
 

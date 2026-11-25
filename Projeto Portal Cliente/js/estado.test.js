@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { decidirEstado, normalizarBusca } = require('./estado.js');
+const { decidirEstado, normalizarBusca, urlMontador } = require('./estado.js');
 
 test('sem vínculos (vazio, undefined, null) => sem_pedido', () => {
     for (const v of [[], undefined, null]) {
@@ -86,4 +86,25 @@ test('cliente.js: administrador é tratado antes da checagem de perfil de client
     assert.ok(iAdmin > 0 && iPerfil > 0 && iAdmin < iPerfil, 'checagem de admin deve vir antes do perfil de cliente');
     assert.ok(/is_admin\s*===\s*true/.test(src), 'deve exigir is_admin === true');
     assert.ok(/from\('rh_empresas'\)/.test(src), 'admin deve listar rh_empresas');
+});
+
+test('urlMontador monta o link com o código codificado', () => {
+    assert.strictEqual(urlMontador('123'), '../Projeto Montador Escala 5x2/app/index.html?empresa=123');
+    assert.strictEqual(urlMontador('A&B 1?'),
+        '../Projeto Montador Escala 5x2/app/index.html?empresa=' + encodeURIComponent('A&B 1?'));
+    assert.ok(urlMontador('Ação').endsWith('?empresa=A%C3%A7%C3%A3o'));
+});
+
+test('urlMontador devolve vazio para código vazio/nulo', () => {
+    for (const v of ['', null, undefined]) assert.strictEqual(urlMontador(v), '');
+});
+
+test('cliente.js usa urlMontador em abrirHome e index.html tem o card', () => {
+    const fs = require('node:fs'), path = require('node:path');
+    const js = fs.readFileSync(path.join(__dirname, 'cliente.js'), 'utf8');
+    const corpo = js.slice(js.indexOf('function abrirHome'));
+    assert.ok(/urlMontador\(/.test(corpo.slice(0, corpo.indexOf('\n}\n'))), 'abrirHome deve usar urlMontador');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    assert.ok(!/em breve/i.test(html), 'sem "em breve"');
+    assert.ok(html.includes('id="cardMontador"'));
 });

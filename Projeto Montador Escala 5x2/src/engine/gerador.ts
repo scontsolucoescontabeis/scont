@@ -9,6 +9,7 @@
  * domingo ao menos 1 vez a cada N semanas (Lei 10.101/2000 art. 6º, p. único) e
  * ninguém passa de 6 dias seguidos de trabalho (CLT art. 67; OJ 410 SDI-1/TST).
  */
+import type { JornadaPessoa } from './jornada'
 import type {
   CoberturaTurno,
   DiaEscala,
@@ -18,12 +19,14 @@ import type {
   Funcionario,
   MinimosDia,
   ModeloEscala,
+  PessoaEscala,
   Proposta,
   RegraCobertura,
   Turno,
 } from '../types'
 import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './datas'
-import { jornadaDaFuncao, tetoSemanalNaData } from './jornada'
+import { jornadaDaPessoa, tetoSemanalNaData } from './jornada'
+import { diasDeFerias } from './ferias'
 import { REGRAS, cicloDomingoDoSetor } from '../config/regras'
 
 export interface EntradaGerador {
@@ -44,6 +47,13 @@ export const NSLOTS = 1440 / SLOT
 export function criarFuncionarios(funcoes: Funcao[]): Funcionario[] {
   const lista: Funcionario[] = []
   for (const fn of funcoes) {
+    if (fn.pessoas) {
+      // Equipe nominal: um funcionário por pessoa escalável; `quantidade` é ignorada.
+      for (const p of fn.pessoas) {
+        if (p.escalar) lista.push({ id: `${fn.id}-${p.id}`, nome: p.nome, funcaoId: fn.id })
+      }
+      continue
+    }
     for (let i = 1; i <= fn.quantidade; i++) {
       lista.push({
         id: `${fn.id}-${i}`,
@@ -185,10 +195,11 @@ function escolherRepousos(
   forcados: number[],
   preferirDomingo: boolean,
   desempate: number,
+  quantos = 2,
 ): number[] {
   // Dias forçados (empresa fechada / sem demanda para o horário) sempre viram repouso, mesmo que passem de 2.
   const escolhidos: number[] = [...forcados]
-  while (escolhidos.length < 2) {
+  while (escolhidos.length < quantos) {
     let melhor = -1
     let melhorPont = -Infinity
     for (let k = 0; k < 7; k++) {
@@ -246,10 +257,19 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     Object.keys(perfilFn).map((id) => [id, novaGrade()]),
   )
   const teto = tetoSemanalNaData(inicio)
-  const jornadas = new Map(funcoes.map((f) => [f.id, jornadaDaFuncao(f, teto)]))
+  // Jornada de cada funcionário: a da função com as sobreposições da pessoa (quando nominal).
+  const jornadas = new Map<string, JornadaPessoa>()
+  // Dias (índice na escala) em que o funcionário está de férias: célula "ausencia".
+  const ausentes = new Map<string, Set<number>>()
+  for (const f of funcionarios) {
+    const fnc = funcoes.find((x) => x.id === f.funcaoId)!
+    const pessoa: PessoaEscala | undefined = fnc.pessoas?.find((p) => `${fnc.id}-${p.id}` === f.id)
+    jornadas.set(f.id, jornadaDaPessoa(fnc, pessoa, teto))
+    ausentes.set(f.id, diasDeFerias(inicio, dias, pessoa?.ferias ?? []))
+  }
   const horarioDe = new Map<string, { inicio: number; bruto: number; intervaloMin: number }>()
   for (const f of funcionarios) {
-    const j = jornadas.get(f.funcaoId)!
+    const j = jornadas.get(f.id)!
     let ini = j.inicioFixo
     if (ini === undefined) {
       ini = janIni * SLOT
@@ -321,6 +341,8 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   const repousoFixo = new Map<string, number[]>()
 
   for (let s = 0; s < semanas; s++) {
+    /** O funcionário está de férias no dia `d` (0 = dom .. 6 = sáb) desta semana. */
+    const ausente = (id: string, d: number) => ausentes.get(id)!.has(s * 7 + d)
     // presentes[d][faixa], d = 0 (dom) .. 6 (sáb) = dia da semana
     const presentes = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
     const presentesFn: Record<string, number[][]> = Object.fromEntries(
@@ -329,6 +351,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     for (const f of funcionarios) {
       const h = horarioDe.get(f.id)!
       for (let d = 0; d < 7; d++) {
+        if (ausente(f.id, d)) continue
         for (const sl of faixas(h.inicio, h.bruto)) {
           presentes[d][sl] += 1
           if (presentesFn[f.funcaoId]) presentesFn[f.funcaoId][d][sl] += 1
@@ -352,7 +375,9 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       const folgaDaVez = new Set(
         funcionarios.filter((_, i) => (s + i) % ciclo === 0).map((f) => f.id),
       )
-      const ordem = funcionarios
+      // Quem está de férias neste domingo não entra no rodízio (já está fora).
+      const disponiveis = funcionarios.filter((f) => !ausente(f.id, 0))
+      const ordem = disponiveis
         .filter((f) => domSeguidos.get(f.id)! < ciclo - 1)
         .sort(
           (a, b) =>
@@ -374,10 +399,11 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       }
       // Rodízio de verdade: além da cobertura, só podem folgar juntos no domingo
       // ceil(N / ciclo) empregados (cada um folga 1 domingo a cada `ciclo`). Os demais
-      // trabalham o domingo e levam o DSR/folga em outro dia da semana.
+      // trabalham o domingo e levam o DSR/folga em outro dia da semana. Quem está de
+      // férias no domingo não conta como possível trabalhador.
       if (empresa.diasFuncionamento[0]) {
-        const maxFolgas = Math.ceil(funcionarios.length / ciclo)
-        const alvoTrabalho = funcionarios.length - maxFolgas
+        const maxFolgas = Math.ceil(disponiveis.length / ciclo)
+        const alvoTrabalho = disponiveis.length - maxFolgas
         for (const f of ordem) {
           if (trabalhaDomingo.size >= alvoTrabalho) break
           if (trabalhaDomingo.has(f.id) || folgaDaVez.has(f.id)) continue
@@ -393,8 +419,14 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       const h = horarioDe.get(f.id)!
       const span = faixas(h.inicio, h.bruto)
       const k = posNoTurno.get(f.id)!
+      // Dias de férias nesta semana: não trabalham nem consomem os 2 repousos.
+      const aus = Array.from({ length: 7 }, (_, d) => d).filter((d) => ausente(f.id, d))
+      // Repousos possíveis: 2, ou menos quando restam poucos dias fora das férias (7 → 2, 2 → 1, 1 → 0).
+      const quantos = Math.min(2, Math.max(0, 7 - aus.length - 1))
       let rep: number[]
-      if (modelo === 'fixo' && repousoFixo.has(f.id)) {
+      if (aus.length === 7) {
+        rep = []
+      } else if (modelo === 'fixo' && repousoFixo.has(f.id) && !repousoFixo.get(f.id)!.some((d) => aus.includes(d))) {
         rep = repousoFixo.get(f.id)!
       } else {
         const folga: number[] = []
@@ -402,7 +434,9 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         for (let d = 0; d < 7; d++) {
           const dow = d
           const exigidas = span.filter((sl) => perfil[dow][sl] > 0)
-          if (exigidas.length === 0) {
+          if (aus.includes(d)) {
+            folga.push(-Infinity)
+          } else if (exigidas.length === 0) {
             forcados.push(d)
             folga.push(-Infinity)
           } else {
@@ -415,8 +449,8 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
             folga.push(f0)
           }
         }
-        const permitido = Array.from({ length: 7 }, () => true)
-        if (trabalhaDomingo && !forcados.includes(0)) {
+        const permitido = Array.from({ length: 7 }, (_, d) => !aus.includes(d))
+        if (trabalhaDomingo && !forcados.includes(0) && !aus.includes(0)) {
           if (trabalhaDomingo.has(f.id)) permitido[0] = false
           else forcados.push(0)
         }
@@ -426,14 +460,17 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           forcados,
           modelo !== 'rodizio_domingo',
           modelo === 'folga_movel' ? (s + k) % 7 : k % 7,
+          quantos,
         )
-        if (modelo === 'fixo') repousoFixo.set(f.id, rep)
+        // O padrão fixo só é aprendido numa semana sem férias.
+        if (modelo === 'fixo' && aus.length === 0) repousoFixo.set(f.id, rep)
       }
       // Travas legais: domingo de folga a cada `ciclo` semanas e no máx. 6 dias seguidos.
+      // Férias contam como dia sem trabalho (domingo de férias = domingo de folga).
       const fechados = Array.from({ length: 7 }, (_, d) => d).filter((d) =>
         span.every((sl) => perfil[d][sl] <= 0),
       )
-      const domObrigatorio = domSeguidos.get(f.id)! >= ciclo - 1 && !fechados.includes(0)
+      const domObrigatorio = domSeguidos.get(f.id)! >= ciclo - 1 && !fechados.includes(0) && !aus.includes(0)
       const protegidos = new Set<number>(fechados)
       if (domObrigatorio) protegidos.add(0)
       const garantir = (d: number) => {
@@ -441,12 +478,14 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         const sai = [...rep].reverse().find((x) => !protegidos.has(x))
         rep = sai === undefined ? [...rep, d] : rep.map((x) => (x === sai ? d : x))
       }
-      if (domObrigatorio) garantir(0)
-      // O 1º repouso da semana precisa vir antes de estourar 6 dias seguidos.
-      const limite = Math.max(0, maxSeguidos - diasSeguidos.get(f.id)!)
-      if (Math.min(...rep) > limite) {
-        garantir(limite)
-        protegidos.add(limite)
+      if (aus.length < 7) {
+        if (domObrigatorio) garantir(0)
+        // O 1º dia sem trabalho da semana (repouso ou férias) precisa vir antes de estourar 6 dias seguidos.
+        const limite = Math.max(0, maxSeguidos - diasSeguidos.get(f.id)!)
+        if (Math.min(...rep, ...aus) > limite) {
+          garantir(limite)
+          protegidos.add(limite)
+        }
       }
       rep.forEach((d) =>
         span.forEach((sl) => {
@@ -459,7 +498,9 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       for (let d = 0; d < 7; d++) {
         const data = somarDias(inicio, s * 7 + d)
         let cel: DiaEscala
-        if (feriadoSet.has(data) && !empresa.funcionaFeriados && !rep.includes(d)) {
+        if (aus.includes(d)) {
+          cel = { tipo: 'ausencia' }
+        } else if (feriadoSet.has(data) && !empresa.funcionaFeriados && !rep.includes(d)) {
           cel = { tipo: 'feriado' }
         } else if (rep.includes(d)) {
           cel = { tipo: d === dsrDia ? 'dsr' : 'folga' }

@@ -15,6 +15,9 @@ import type {
   Proposta,
   Turno,
 } from '../types'
+import { aplicarSobreposicoes, calcularSobreposicoes, empresaDoPortal, type Sobreposicoes } from '../portal/modo'
+import { mapearDadosPortal } from '../portal/mapear'
+import { carregarDadosPortal } from '../portal/supabase'
 import { carregar, limpar, salvar } from '../services/storage'
 import { analisar } from '../utils/analise'
 
@@ -80,7 +83,18 @@ export const DADOS_PADRAO: Dados = {
   propostaAtivaId: null,
 }
 
+/** Estado do modo portal (não persistido); null no modo avulso. */
+export interface EstadoPortal {
+  codigo: string
+  carregando: boolean
+  erro: string | null
+  nenhumEmpregado: boolean
+}
+
 interface Acoes {
+  portal: EstadoPortal | null
+  /** Carrega empresa/equipe do banco (sessão do portal) e mescla com o estado salvo. */
+  carregarDoPortal: (codigo: string) => Promise<void>
   set: (parcial: Partial<Dados>) => void
   setEmpresa: (p: Partial<Empresa>) => void
   setCelula: (funcionarioId: string, dia: number, valor: DiaEscala) => void
@@ -96,10 +110,52 @@ interface Acoes {
 
 export type Store = Dados & Acoes
 
-const inicial: Dados = { ...DADOS_PADRAO, ...(carregar<Partial<Dados>>() ?? {}) }
+const codigoPortal = typeof window === 'undefined' ? null : empresaDoPortal(window.location.search)
+
+type Salvo = Partial<Dados> & { sobreposicoes?: Sobreposicoes }
+const salvoInicial = carregar<Salvo>() ?? {}
+// No portal a equipe vem sempre do banco; só as sobreposições do usuário são persistidas.
+if (codigoPortal) {
+  delete salvoInicial.funcoes
+  // saves antigos podem ter guardado dados pessoais; escala/propostas só existem na sessão
+  delete salvoInicial.escala
+  delete salvoInicial.propostas
+}
+const inicial: Dados = { ...DADOS_PADRAO, ...salvoInicial }
+
+/** Equipe como veio do banco na última carga (não persistida). */
+let baseBanco: Funcao[] | null = null
+const portalInicial: EstadoPortal | null = codigoPortal
+  ? { codigo: codigoPortal, carregando: true, erro: null, nenhumEmpregado: false }
+  : null
 
 export const useStore = create<Store>((set, get) => ({
   ...inicial,
+  portal: portalInicial,
+  carregarDoPortal: async (codigo) => {
+    set({ portal: { codigo, carregando: true, erro: null, nenhumEmpregado: false } })
+    baseBanco = null
+    const sobreposicoes = carregar<Salvo>()?.sobreposicoes
+    try {
+      const dados = await carregarDadosPortal(codigo)
+      const { nomeEmpresa, funcoes: doBanco } = mapearDadosPortal(dados)
+      const funcoes = aplicarSobreposicoes(doBanco, sobreposicoes)
+      baseBanco = doBanco
+      const nenhumEmpregado = !funcoes.some((f) => (f.pessoas?.length ?? 0) > 0)
+      set({
+        empresa: { ...get().empresa, nome: nomeEmpresa },
+        funcoes,
+        escala: null,
+        propostas: [],
+        comparar: [],
+        propostaAtivaId: null,
+        portal: { codigo, carregando: false, erro: null, nenhumEmpregado },
+      })
+    } catch (e) {
+      const erro = e instanceof Error ? e.message : 'Não foi possível carregar os dados da empresa'
+      set({ portal: { codigo, carregando: false, erro, nenhumEmpregado: false } })
+    }
+  },
   set: (parcial) => set(parcial),
   setEmpresa: (p) => set({ empresa: { ...get().empresa, ...p } }),
   setCelula: (fid, dia, valor) => {
@@ -155,8 +211,11 @@ export const useStore = create<Store>((set, get) => ({
     if (i === 3) get().sugerirEscala()
   },
   reiniciar: () => {
+    clearTimeout(timer)
     limpar()
     set({ ...DADOS_PADRAO })
+    const portal = get().portal
+    if (portal) void get().carregarDoPortal(portal.codigo)
   },
 }))
 
@@ -165,22 +224,27 @@ let timer: ReturnType<typeof setTimeout> | undefined
 useStore.subscribe((estado) => {
   clearTimeout(timer)
   timer = setTimeout(() => {
-    const dados: Dados = {
+    const portal = estado.portal
+    if (portal && (portal.carregando || portal.erro || !baseBanco)) return
+    // Portal: nada de dados pessoais (funcoes/escala/propostas ficam só na sessão).
+    const pessoais: Partial<Salvo> = portal
+      ? {}
+      : { funcoes: estado.funcoes, escala: estado.escala, propostas: estado.propostas }
+    const dados: Salvo = {
       passo: estado.passo,
       empresa: estado.empresa,
-      funcoes: estado.funcoes,
+      ...pessoais,
       turnos: estado.turnos,
       cobertura: estado.cobertura,
       feriados: estado.feriados,
       custo: estado.custo,
       inicioEscala: estado.inicioEscala,
       semanas: estado.semanas,
-      escala: estado.escala,
-      propostas: estado.propostas,
       comparar: estado.comparar,
       etapaImpacto: estado.etapaImpacto,
       propostaAtivaId: estado.propostaAtivaId,
     }
+    if (portal && baseBanco) dados.sobreposicoes = calcularSobreposicoes(baseBanco, estado.funcoes)
     salvar(dados)
   }, 300)
 })

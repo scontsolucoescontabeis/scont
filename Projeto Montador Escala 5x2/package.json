@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
     "date-fns": "^4.1.0",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",

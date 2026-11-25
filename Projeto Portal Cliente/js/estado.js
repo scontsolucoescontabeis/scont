@@ -23,7 +23,13 @@
             .toLowerCase().replace(/\s+/g, ' ').trim();
     }
 
-    const api = { decidirEstado, normalizarBusca };
+    // Link do Montador de Escala 5x2 em modo portal (relativo à página do portal).
+    function urlMontador(codigo) {
+        if (codigo == null || String(codigo) === '') return '';
+        return '../Projeto Montador Escala 5x2/app/index.html?empresa=' + encodeURIComponent(String(codigo));
+    }
+
+    const api = { decidirEstado, normalizarBusca, urlMontador };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.EstadoCliente = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -158,6 +158,18 @@ describe('cobertura', () => {
     expect(furos[0].severidade).toBe('amarelo') // 1 de 2
   })
 
+  it('lista no máximo 5 ausentes na mensagem, com "e mais N"', () => {
+    const presente = linha('t8', 't8', 't8', 't8', 't8', 'F', 'D')
+    const ausente = linha('t8', 't8', 'A', 't8', 't8', 'F', 'D')
+    const mk = (n: number) => entrada(escala(SEG_ETAPA1, [presente, ...Array.from({ length: n }, () => ausente)]), { cobertura: cob })
+    const msg = (n: number) => validarEscala(mk(n)).alertas.find((a) => a.regraId === 'cobertura')!
+    const m7 = msg(7)
+    expect(m7.mensagem).toContain('Há ausência (férias/atestado) de: Func 2, Func 3, Func 4, Func 5, Func 6 e mais 2.')
+    expect(m7.mensagem).not.toContain('Func 7')
+    expect(msg(5).mensagem).toContain('de: Func 2, Func 3, Func 4, Func 5, Func 6.')
+    expect(msg(5).mensagem).not.toContain('e mais')
+  })
+
   it('não acusa quando a cobertura está completa', () => {
     const r = validarEscala(entrada(escala(SEG_ETAPA1, dois(['t8', 't8', 't8', 't8', 't8', 'F', 'D'])), { cobertura: cob }))
     expect(ids(r)).not.toContain('cobertura')
