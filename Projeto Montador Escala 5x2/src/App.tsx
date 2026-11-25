@@ -1,6 +1,19 @@
-import { ArrowLeft, ArrowRight, Building2, CalendarDays, Home, Menu, RotateCcw, ShieldCheck, Users, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Building2,
+  CalendarDays,
+  HelpCircle,
+  Home,
+  Menu,
+  RotateCcw,
+  ShieldCheck,
+  Users,
+  X,
+} from 'lucide-react'
 import { useState } from 'react'
 import { REGRAS, limitesDaEtapa } from './config/regras'
+import { Faq } from './components/Faq'
 import { StepCobertura } from './components/StepCobertura'
 import { StepEmpresa } from './components/StepEmpresa'
 import { StepEquipe } from './components/StepEquipe'
@@ -22,9 +35,16 @@ export default function App() {
   const reiniciar = useStore((s) => s.reiniciar)
   const e1 = limitesDaEtapa('etapa1')
   const [menuAberto, setMenuAberto] = useState(false)
+  const [faqAberto, setFaqAberto] = useState(false)
 
   const irPara = (i: number) => {
     irParaPasso(i)
+    setFaqAberto(false)
+    setMenuAberto(false)
+  }
+
+  const abrirFaq = () => {
+    setFaqAberto(true)
     setMenuAberto(false)
   }
 
@@ -62,10 +82,10 @@ export default function App() {
               <li key={nome}>
                 <button
                   type="button"
-                  aria-current={i === passo ? 'step' : undefined}
+                  aria-current={!faqAberto && i === passo ? 'step' : undefined}
                   onClick={() => irPara(i)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
-                    i === passo ? 'bg-white text-brand shadow-card' : 'text-white/90 hover:bg-white/15'
+                    !faqAberto && i === passo ? 'bg-white text-brand shadow-card' : 'text-white/90 hover:bg-white/15'
                   }`}
                 >
                   <Icone size={18} aria-hidden />
@@ -74,6 +94,19 @@ export default function App() {
               </li>
             ))}
           </ol>
+          <div className="mt-4 border-t border-white/15 pt-4">
+            <button
+              type="button"
+              aria-current={faqAberto ? 'page' : undefined}
+              onClick={abrirFaq}
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
+                faqAberto ? 'bg-white text-brand shadow-card' : 'text-white/90 hover:bg-white/15'
+              }`}
+            >
+              <HelpCircle size={18} aria-hidden />
+              Dúvidas sobre o fim da 6x1
+            </button>
+          </div>
         </nav>
 
         <div className="mt-auto space-y-2 border-t border-white/15 pt-5">
@@ -94,7 +127,7 @@ export default function App() {
       </aside>
 
       <div className="px-4 pb-16 pt-14 lg:ml-[260px] lg:p-8">
-        <div className={passo === 3 ? 'w-full' : 'max-w-6xl'}>
+        <div className={!faqAberto && passo === 3 ? 'w-full' : 'max-w-6xl'}>
           <header className="mb-6 rounded-xl border-l-4 border-brand bg-white p-5 shadow-card sm:p-6">
             <h1 className="text-2xl font-bold tracking-tight text-brand">Montador de Escala 5x2</h1>
             <p className="text-sm text-soft">
@@ -104,13 +137,14 @@ export default function App() {
           </header>
 
           <main>
-            {passo === 0 && <StepEmpresa />}
-            {passo === 1 && <StepEquipe />}
-            {passo === 2 && <StepCobertura />}
-            {passo === 3 && <StepEscala />}
+            {faqAberto && <Faq />}
+            {!faqAberto && passo === 0 && <StepEmpresa />}
+            {!faqAberto && passo === 1 && <StepEquipe />}
+            {!faqAberto && passo === 2 && <StepCobertura />}
+            {!faqAberto && passo === 3 && <StepEscala />}
           </main>
 
-          <div className="mt-4 flex justify-between">
+          <div className={`mt-4 flex justify-between ${faqAberto ? 'hidden' : ''}`}>
             <button type="button" className="btn-sec" disabled={passo === 0} onClick={() => irPara(passo - 1)}>
               <ArrowLeft size={16} aria-hidden /> Voltar
             </button>

@@ -44,7 +44,6 @@ function linhasParametros(dados: Dados): [string, string][] {
     ['Dias seguidos (máx.)', `${REGRAS.diasConsecutivosMax}`],
     ['DSR + interjornada', `${REGRAS.repousoSemanalComInterjornadaHoras}h`],
     ['Modo de transição', REGRAS.modoTransicao],
-    ['Compensação diária', dados.empresa.compensacaoDiaria ? 'Sim' : 'Não'],
     ['Encargos / Hora extra (estimativa)', `${dados.custo.encargosPct}% / ${dados.custo.horaExtraPct}%`],
   ]
 }

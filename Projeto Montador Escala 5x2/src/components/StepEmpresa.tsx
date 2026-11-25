@@ -1,5 +1,4 @@
 import { useStore } from '../store/useStore'
-import type { AcordoColetivo } from '../types'
 import { DIAS_CURTOS, horarioDoDia } from '../utils/analise'
 import { Campo } from './ui'
 
@@ -114,36 +113,6 @@ export function StepEmpresa() {
         />
         <span className="text-sm">A empresa funciona em feriados.</span>
       </label>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Campo
-          rotulo="Tem convenção ou acordo coletivo?"
-          ajuda="Convenções coletivas podem trazer regras próprias de jornada, domingos e feriados. Se não souber, o DP da SCONT confere para você."
-        >
-          <select
-            className="campo"
-            value={empresa.acordoColetivo}
-            onChange={(e) => setEmpresa({ acordoColetivo: e.target.value as AcordoColetivo })}
-          >
-            <option value="sim">Sim</option>
-            <option value="nao">Não</option>
-            <option value="nao_sei">Não sei</option>
-          </select>
-        </Campo>
-        <Campo
-          rotulo="Existe compensação de jornada (banco de horas)?"
-          ajuda="Com acordo de compensação, passar de 8h24 líquidas em um dia é aceitável (vira alerta amarelo). Sem acordo, é erro (vermelho)."
-        >
-          <select
-            className="campo"
-            value={empresa.compensacaoDiaria ? 'sim' : 'nao'}
-            onChange={(e) => setEmpresa({ compensacaoDiaria: e.target.value === 'sim' })}
-          >
-            <option value="nao">Não</option>
-            <option value="sim">Sim</option>
-          </select>
-        </Campo>
-      </div>
     </section>
   )
 }
