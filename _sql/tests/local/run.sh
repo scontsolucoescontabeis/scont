@@ -10,6 +10,14 @@ psql_ -d postgres -c "DROP DATABASE IF EXISTS portal_test WITH (FORCE)" -c "CREA
 # roles sao globais: recria limpo
 psql_ -d postgres -c "DROP ROLE IF EXISTS anon" -c "DROP ROLE IF EXISTS authenticated" >/dev/null 2>&1 || true
 psql_ -d portal_test < _sql/tests/local/00_supabase_stub.sql
+psql_ -d portal_test < _sql/tests/local/01_fixtures_tabelas_atuais.sql
 if [ -z "${SKIP_SCHEMA:-}" ]; then psql_ -d portal_test < _sql/schema_portal_cliente.sql; fi
+# SKIP_BLOQUEIO=1 permite ver o RED (teste de isolacao sem a politica restritiva)
+if [ -z "${SKIP_BLOQUEIO:-}" ]; then psql_ -d portal_test < _sql/schema_portal_cliente_bloqueio.sql; fi
 psql_ -d portal_test < _sql/tests/portal_cliente_isolamento.test.sql
+if [ -z "${SKIP_BLOQUEIO:-}" ]; then
+  sed -e '/@@APLICAR@@/{r _sql/schema_portal_cliente_bloqueio.sql' -e 'd}'       -e '/@@REVERTER@@/{r _sql/schema_portal_cliente_bloqueio_reverter.sql' -e 'd}'       _sql/tests/portal_cliente_bloqueio.test.sql | psql_ -d portal_test
+fi
+# auditoria: so valida que o SQL e valido (dados locais sao vazios)
+psql_ -d portal_test < _sql/tests/portal_cliente_auditoria_equipe.sql >/dev/null
 echo "OK: testes de isolacao passaram"

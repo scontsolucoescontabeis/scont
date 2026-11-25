@@ -139,4 +139,118 @@ BEGIN
     RESET ROLE;
 END $$;
 
+-- =====================================================================
+-- Task 2: bloqueio nas tabelas atuais (politica restritiva somente-equipe)
+-- =====================================================================
+DO $$
+DECLARE
+    ua uuid := gen_random_uuid();   -- cliente A aprovado
+    uav uuid := gen_random_uuid();  -- cadastro avulso (sem metadados nem solicitacao)
+    ueq uuid := gen_random_uuid();  -- equipe via solicitacoes_acesso
+    ueqc uuid := gen_random_uuid(); -- equipe que tambem e cliente
+    n int;
+    arr text[];
+    r record;
+BEGIN
+    -- rh_empresas T-A ja foi inserida no bloco anterior (mesma transacao)
+    INSERT INTO public.rh_socios (codigo_empresa, nome) VALUES ('T-A', 'Socio Teste');
+    INSERT INTO public.fixture_formulario_anon (conteudo) VALUES ('publico');
+    INSERT INTO public.fixture_sem_rls (valor) VALUES ('x');
+
+    INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES
+        (ua,   'a2@cliente.test',  '{"portal":"cliente","codigo_empresa":"T-A"}'),
+        (uav,  'avulso@x.test',    '{}'),
+        (ueq,  'eq2@scont.test',   '{}'),
+        (ueqc, 'eqc@scont.test',   '{"portal":"cliente","codigo_empresa":"T-A"}');
+    INSERT INTO public.solicitacoes_acesso (nome, email, status) VALUES
+        ('Eq2', 'eq2@scont.test', 'aprovado'),
+        ('EqC', 'EQC@scont.test', 'aprovado');
+    UPDATE public.cliente_acessos SET status = 'aprovado' WHERE usuario_id IN (ua, ueqc);
+
+    -- cliente_nao_le_tabela_atual (inclui vinculo APROVADO a T-A)
+    PERFORM set_config('request.jwt.claims',
+        json_build_object('sub', ua, 'email', 'a2@cliente.test')::text, true);
+    SET LOCAL ROLE authenticated;
+    SELECT array_agg(x) INTO arr FROM public.empresas_do_cliente() x;
+    ASSERT arr = ARRAY['T-A'], 'cliente_nao_le_tabela_atual: setup, A deveria estar aprovado';
+    SELECT count(*) INTO n FROM public.rh_empresas;
+    ASSERT n = 0, 'cliente_nao_le_tabela_atual: cliente leu rh_empresas';
+    SELECT count(*) INTO n FROM public.rh_socios;
+    ASSERT n = 0, 'cliente_nao_le_tabela_atual: cliente leu rh_socios';
+    SELECT count(*) INTO n FROM public.usuarios;
+    ASSERT n = 0, 'cliente_nao_le_tabela_atual: cliente leu usuarios';
+    SELECT count(*) INTO n FROM public.solicitacoes_acesso;
+    ASSERT n = 0, 'cliente_nao_le_tabela_atual: cliente leu solicitacoes_acesso';
+    BEGIN
+        INSERT INTO public.rh_empresas (codigo_empresa, nome_empresa) VALUES ('T-X', 'Invasor');
+        ASSERT false, 'cliente_nao_le_tabela_atual: cliente conseguiu INSERT em rh_empresas';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+    UPDATE public.rh_empresas SET nome_empresa = 'hack';
+    GET DIAGNOSTICS n = ROW_COUNT;
+    ASSERT n = 0, 'cliente_nao_le_tabela_atual: cliente conseguiu UPDATE em rh_empresas';
+    DELETE FROM public.rh_socios;
+    GET DIAGNOSTICS n = ROW_COUNT;
+    ASSERT n = 0, 'cliente_nao_le_tabela_atual: cliente conseguiu DELETE em rh_socios';
+    RESET ROLE;
+
+    -- cadastro_avulso_nao_le_tabela_atual
+    PERFORM set_config('request.jwt.claims',
+        json_build_object('sub', uav, 'email', 'avulso@x.test')::text, true);
+    SET LOCAL ROLE authenticated;
+    ASSERT public.eh_equipe() = false, 'cadastro_avulso_nao_le_tabela_atual: avulso deveria ser nao-equipe';
+    SELECT count(*) INTO n FROM public.rh_empresas;
+    ASSERT n = 0, 'cadastro_avulso_nao_le_tabela_atual: avulso leu rh_empresas';
+    RESET ROLE;
+
+    -- equipe_continua_lendo
+    PERFORM set_config('request.jwt.claims',
+        json_build_object('sub', ueq, 'email', 'eq2@scont.test')::text, true);
+    SET LOCAL ROLE authenticated;
+    SELECT count(*) INTO n FROM public.rh_empresas;
+    ASSERT n >= 1, 'equipe_continua_lendo: equipe nao leu rh_empresas';
+    SELECT count(*) INTO n FROM public.rh_socios;
+    ASSERT n = 1, 'equipe_continua_lendo: equipe nao leu rh_socios';
+    INSERT INTO public.rh_socios (codigo_empresa, nome) VALUES ('T-A', 'Novo');
+    RESET ROLE;
+
+    -- email_igual_cliente_equipe
+    PERFORM set_config('request.jwt.claims',
+        json_build_object('sub', ueqc, 'email', 'eqc@scont.test')::text, true);
+    SET LOCAL ROLE authenticated;
+    ASSERT public.eh_equipe() = true, 'email_igual_cliente_equipe: deveria ser equipe';
+    SELECT count(*) INTO n FROM public.rh_empresas;
+    ASSERT n >= 1, 'email_igual_cliente_equipe: nao leu rh_empresas';
+    RESET ROLE;
+
+    -- tabelas SECURITY DEFINER continuam funcionando apos o bloqueio
+    PERFORM set_config('request.jwt.claims', '', true);
+    SET LOCAL ROLE anon;
+    SELECT count(*) INTO n FROM public.buscar_empresas_publico('Zzteste Alfa');
+    ASSERT n = 1, 'definer_apos_bloqueio: buscar_empresas_publico quebrou para anon';
+    RESET ROLE;
+    PERFORM set_config('request.jwt.claims',
+        json_build_object('sub', ua, 'email', 'a2@cliente.test')::text, true);
+    SET LOCAL ROLE authenticated;
+    SELECT count(*) INTO n FROM public.buscar_empresas_publico('Zzteste Alfa');
+    ASSERT n = 1, 'definer_apos_bloqueio: buscar_empresas_publico quebrou para cliente';
+    SELECT array_agg(x) INTO arr FROM public.empresas_do_cliente() x;
+    ASSERT arr = ARRAY['T-A'], 'definer_apos_bloqueio: empresas_do_cliente quebrou';
+    RESET ROLE;
+
+    -- anon_inalterado: politica restritiva e so TO authenticated
+    PERFORM set_config('request.jwt.claims', '', true);
+    SET LOCAL ROLE anon;
+    SELECT count(*) INTO n FROM public.fixture_formulario_anon;
+    ASSERT n = 1, 'anon_inalterado: anon perdeu leitura em tabela com politica anon';
+    RESET ROLE;
+
+    -- tabela sem RLS permanece intocada
+    SELECT count(*) INTO n FROM pg_policies
+      WHERE tablename = 'fixture_sem_rls' AND policyname = 'portal_cliente: somente equipe';
+    ASSERT n = 0, 'sem_rls_intocada: politica criada em tabela sem RLS';
+    SELECT rowsecurity INTO r FROM pg_tables WHERE tablename = 'fixture_sem_rls';
+    ASSERT r.rowsecurity = false, 'sem_rls_intocada: RLS foi ligada sozinha';
+END $$;
+
 ROLLBACK;
