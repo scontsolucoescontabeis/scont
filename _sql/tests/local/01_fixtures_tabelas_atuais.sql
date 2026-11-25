@@ -31,3 +31,10 @@ CREATE TABLE public.fixture_sem_rls (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     valor text
 );
+
+-- Politicas permissivas para usuarios/solicitacoes_acesso (como no portal real,
+-- onde o login le/escreve nelas); o bloqueio deve restringi-las ao dono.
+CREATE POLICY "fixture: authenticated tudo" ON public.usuarios
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "fixture: authenticated tudo" ON public.solicitacoes_acesso
+    FOR ALL TO authenticated USING (true) WITH CHECK (true);

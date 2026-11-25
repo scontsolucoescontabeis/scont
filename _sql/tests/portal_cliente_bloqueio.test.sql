@@ -11,11 +11,11 @@ BEGIN
     -- tabelas elegiveis: public, RLS ligada, fora da lista de exclusao
     SELECT count(*) INTO esperadas FROM pg_tables
       WHERE schemaname = 'public' AND rowsecurity
-        AND tablename NOT IN ('cliente_usuarios', 'cliente_acessos');
-    ASSERT esperadas >= 4, 'bloqueio_idempotente: poucas tabelas elegiveis ('||esperadas||')';
+        AND tablename NOT IN ('cliente_usuarios', 'cliente_acessos', 'usuarios', 'solicitacoes_acesso');
+    ASSERT esperadas >= 2, 'bloqueio_idempotente: poucas tabelas elegiveis ('||esperadas||')';
     SELECT count(*) INTO n FROM pg_policies
       WHERE schemaname = 'public' AND policyname = 'portal_cliente: somente equipe';
-    ASSERT n = esperadas, 'bloqueio_idempotente: politicas='||n||' esperadas='||esperadas;
+    ASSERT n = esperadas + 2, 'bloqueio_idempotente: politicas='||n||' esperadas='||(esperadas+2);
     -- exatamente uma por tabela, restritiva, so authenticated
     SELECT count(*) INTO n FROM (
         SELECT tablename FROM pg_policies
@@ -43,6 +43,8 @@ BEGIN
     ASSERT n = 0, 'reverter: restaram '||n||' politicas';
     -- reverter preserva politicas antigas
     SELECT count(*) INTO n FROM pg_policies WHERE policyname = 'fixture: authenticated tudo';
-    ASSERT n = 3, 'reverter: politicas antigas afetadas ('||n||')';
+    ASSERT n = 5, 'reverter: politicas antigas afetadas ('||n||')';
+    SELECT count(*) INTO n FROM pg_policies WHERE tablename IN ('usuarios','solicitacoes_acesso') AND policyname = 'portal_cliente: somente equipe';
+    ASSERT n = 0, 'reverter: restaram politicas owner-scoped';
 END $$;
 ROLLBACK;

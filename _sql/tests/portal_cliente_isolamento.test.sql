@@ -148,6 +148,7 @@ DECLARE
     uav uuid := gen_random_uuid();  -- cadastro avulso (sem metadados nem solicitacao)
     ueq uuid := gen_random_uuid();  -- equipe via solicitacoes_acesso
     ueqc uuid := gen_random_uuid(); -- equipe que tambem e cliente
+    upend uuid := gen_random_uuid(); -- cadastro de equipe pendente
     n int;
     arr text[];
     r record;
@@ -178,9 +179,9 @@ BEGIN
     SELECT count(*) INTO n FROM public.rh_socios;
     ASSERT n = 0, 'cliente_nao_le_tabela_atual: cliente leu rh_socios';
     SELECT count(*) INTO n FROM public.usuarios;
-    ASSERT n = 0, 'cliente_nao_le_tabela_atual: cliente leu usuarios';
+    ASSERT n = 1, 'cliente_le_so_proprio_usuarios: esperado 1 (propria linha, aceitavel), veio '||n;
     SELECT count(*) INTO n FROM public.solicitacoes_acesso;
-    ASSERT n = 0, 'cliente_nao_le_tabela_atual: cliente leu solicitacoes_acesso';
+    ASSERT n = 0, 'cliente_nao_le_tabela_atual: cliente leu solicitacoes_acesso de outros';
     BEGIN
         INSERT INTO public.rh_empresas (codigo_empresa, nome_empresa) VALUES ('T-X', 'Invasor');
         ASSERT false, 'cliente_nao_le_tabela_atual: cliente conseguiu INSERT em rh_empresas';
@@ -243,6 +244,57 @@ BEGIN
     SET LOCAL ROLE anon;
     SELECT count(*) INTO n FROM public.fixture_formulario_anon;
     ASSERT n = 1, 'anon_inalterado: anon perdeu leitura em tabela com politica anon';
+    RESET ROLE;
+
+    -- === usuario pendente (cadastro de equipe, ainda nao aprovado) ===
+    INSERT INTO auth.users (id, email, raw_user_meta_data) VALUES (upend, 'pend@scont.test', '{}');
+    PERFORM set_config('request.jwt.claims',
+        json_build_object('sub', upend, 'email', 'Pend@Scont.test')::text, true);
+    SET LOCAL ROLE authenticated;
+    ASSERT public.eh_equipe() = false, 'pendente: deveria ser nao-equipe';
+    INSERT INTO public.solicitacoes_acesso (nome, email, status) VALUES ('Pend', 'pend@scont.test', 'pendente');
+    SELECT count(*) INTO n FROM public.solicitacoes_acesso;
+    ASSERT n = 1, 'pendente_le_so_a_propria: esperado 1 (ha outras linhas), veio '||n;
+    SELECT count(*) INTO n FROM public.solicitacoes_acesso WHERE email = 'pend@scont.test';
+    ASSERT n = 1, 'pendente_le_so_a_propria: nao leu a propria';
+    UPDATE public.solicitacoes_acesso SET status = 'aprovado' WHERE email <> 'pend@scont.test';
+    GET DIAGNOSTICS n = ROW_COUNT;
+    ASSERT n = 0, 'pendente_nao_altera_outras: UPDATE afetou '||n;
+    DELETE FROM public.solicitacoes_acesso WHERE email <> 'pend@scont.test';
+    GET DIAGNOSTICS n = ROW_COUNT;
+    ASSERT n = 0, 'pendente_nao_altera_outras: DELETE afetou '||n;
+    BEGIN
+        UPDATE public.solicitacoes_acesso SET status = 'aprovado' WHERE email = 'pend@scont.test';
+        ASSERT false, 'pendente_nao_se_aprova: UPDATE para aprovado passou';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+    BEGIN
+        INSERT INTO public.solicitacoes_acesso (nome, email, status) VALUES ('X', 'x1@scont.test', 'aprovado');
+        ASSERT false, 'pendente_nao_insere_aprovado: INSERT aprovado passou';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+    BEGIN
+        INSERT INTO public.solicitacoes_acesso (nome, email, status) VALUES ('X', 'outro@scont.test', 'pendente');
+        ASSERT false, 'pendente_nao_insere_alheio: INSERT com e-mail alheio passou';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+    SELECT count(*) INTO n FROM public.usuarios;
+    ASSERT n = 1, 'pendente_usuarios_so_proprio: esperado 1, veio '||n;
+    SELECT count(*) INTO n FROM public.usuarios WHERE id <> upend;
+    ASSERT n = 0, 'pendente_usuarios_so_proprio: leu linha alheia';
+    UPDATE public.usuarios SET nome = 'hack' WHERE id <> upend;
+    GET DIAGNOSTICS n = ROW_COUNT;
+    ASSERT n = 0, 'pendente_usuarios_so_proprio: alterou linha alheia';
+    RESET ROLE;
+
+    -- equipe ve todas as solicitacoes e usuarios
+    PERFORM set_config('request.jwt.claims',
+        json_build_object('sub', ueq, 'email', 'eq2@scont.test')::text, true);
+    SET LOCAL ROLE authenticated;
+    SELECT count(*) INTO n FROM public.solicitacoes_acesso;
+    ASSERT n >= 3, 'equipe_ve_solicitacoes: veio '||n;
+    SELECT count(*) INTO n FROM public.usuarios;
+    ASSERT n >= 4, 'equipe_ve_usuarios: veio '||n;
     RESET ROLE;
 
     -- tabela sem RLS permanece intocada
