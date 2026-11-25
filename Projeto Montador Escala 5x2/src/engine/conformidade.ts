@@ -582,7 +582,9 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
       const ausentes = escala.funcionarios
         .filter((f) => (!r.funcaoId || f.funcaoId === r.funcaoId) && celula(f.id, i)?.tipo === 'ausencia')
         .map((f) => f.nome)
-      const notaAusencia = ausentes.length > 0 ? ` Há ausência (férias/atestado) de: ${ausentes.join(', ')}.` : ''
+      const listaAusentes =
+        ausentes.length > 5 ? `${ausentes.slice(0, 5).join(', ')} e mais ${ausentes.length - 5}` : ausentes.join(', ')
+      const notaAusencia = ausentes.length > 0 ? ` Há ausência (férias/atestado) de: ${listaAusentes}.` : ''
       alertas.push({
         id: `cob|${r.id}|${data}`,
         regraId: 'cobertura',

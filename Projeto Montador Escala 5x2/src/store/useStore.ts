@@ -115,7 +115,12 @@ const codigoPortal = typeof window === 'undefined' ? null : empresaDoPortal(wind
 type Salvo = Partial<Dados> & { sobreposicoes?: Sobreposicoes }
 const salvoInicial = carregar<Salvo>() ?? {}
 // No portal a equipe vem sempre do banco; só as sobreposições do usuário são persistidas.
-if (codigoPortal) delete salvoInicial.funcoes
+if (codigoPortal) {
+  delete salvoInicial.funcoes
+  // saves antigos podem ter guardado dados pessoais; escala/propostas só existem na sessão
+  delete salvoInicial.escala
+  delete salvoInicial.propostas
+}
 const inicial: Dados = { ...DADOS_PADRAO, ...salvoInicial }
 
 /** Equipe como veio do banco na última carga (não persistida). */
@@ -221,18 +226,20 @@ useStore.subscribe((estado) => {
   timer = setTimeout(() => {
     const portal = estado.portal
     if (portal && (portal.carregando || portal.erro || !baseBanco)) return
+    // Portal: nada de dados pessoais (funcoes/escala/propostas ficam só na sessão).
+    const pessoais: Partial<Salvo> = portal
+      ? {}
+      : { funcoes: estado.funcoes, escala: estado.escala, propostas: estado.propostas }
     const dados: Salvo = {
       passo: estado.passo,
       empresa: estado.empresa,
-      funcoes: estado.funcoes,
+      ...pessoais,
       turnos: estado.turnos,
       cobertura: estado.cobertura,
       feriados: estado.feriados,
       custo: estado.custo,
       inicioEscala: estado.inicioEscala,
       semanas: estado.semanas,
-      escala: estado.escala,
-      propostas: estado.propostas,
       comparar: estado.comparar,
       etapaImpacto: estado.etapaImpacto,
       propostaAtivaId: estado.propostaAtivaId,

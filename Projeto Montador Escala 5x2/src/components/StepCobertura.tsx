@@ -31,7 +31,7 @@ export function StepCobertura() {
           intervaloMin: c.intervaloMin,
         }
       : f;
-    return { f: ef, j: jornadaDaFuncao(ef, teto), comum: true };
+    return { f: ef, j: jornadaDaFuncao(ef, teto), comum: c !== null };
   });
   const brutoRef = Math.max(1, ...jornadas.map((x) => x.j.bruto));
   // Dias em que o horário de funcionamento é menor que a jornada: a entrada–saída não cabe.

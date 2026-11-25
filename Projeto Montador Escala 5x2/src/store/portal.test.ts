@@ -114,4 +114,38 @@ describe('carregarDoPortal (store)', () => {
     expect(pessoas(s)[0].escalar).toBe(true)
     expect(salvo().sobreposicoes ?? {}).toEqual({})
   })
+
+  it('modo portal não persiste nomes, funcoes, escala nem propostas', async () => {
+    carregarDadosPortal.mockResolvedValue(dados('08:00'))
+    const s = await novaStore()
+    await s.getState().carregarDoPortal('55')
+    const f0 = s.getState().funcoes[0]
+    s.getState().set({
+      passo: 2,
+      funcoes: [{ ...f0, pessoas: [{ ...pessoas(s)[0], entrada: '10:00' }, pessoas(s)[1]] }],
+      escala: { inicio: '2026-12-21', dias: 7, turnos: [], funcionarios: [{ id: 'x', nome: 'Ana', funcaoId: FN }], celulas: {} },
+      propostas: [{ id: 'p1', nome: 'Ana', escala: null } as never],
+    })
+    vi.advanceTimersByTime(400)
+    const bruto = mem.get(CHAVE)!
+    const o = JSON.parse(bruto)
+    expect(bruto).not.toContain('Ana')
+    expect(bruto).not.toContain('Bia')
+    expect(o).not.toHaveProperty('funcoes')
+    expect(o).not.toHaveProperty('escala')
+    expect(o).not.toHaveProperty('propostas')
+    expect(o.passo).toBe(2)
+    expect(o.empresa.nome).toBe('ACME')
+    expect(o.sobreposicoes).toEqual({ [FN]: { '1': { entrada: '10:00' } } })
+  })
+
+  it('modo avulso continua salvando todos os campos', async () => {
+    vi.stubGlobal('window', { location: { search: '' } })
+    const s = await novaStore()
+    s.getState().set({ passo: 1 })
+    vi.advanceTimersByTime(400)
+    const o = JSON.parse(mem.get('scont.montador-escala-5x2.v1')!)
+    for (const k of ['funcoes', 'escala', 'propostas', 'passo', 'empresa', 'turnos', 'cobertura', 'feriados', 'custo', 'inicioEscala', 'semanas', 'comparar', 'etapaImpacto', 'propostaAtivaId'])
+      expect(Object.keys(o)).toContain(k)
+  })
 })

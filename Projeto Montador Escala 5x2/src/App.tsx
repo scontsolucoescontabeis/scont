@@ -19,6 +19,7 @@ import { StepEmpresa } from './components/StepEmpresa'
 import { StepEquipe } from './components/StepEquipe'
 import { StepEscala } from './components/StepEscala'
 import { AvisoLegal } from './components/ui'
+import { deveMostrarConteudo } from './portal/modo'
 import { useStore } from './store/useStore'
 
 const LOGO_URL = 'https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png'
@@ -35,6 +36,7 @@ export default function App() {
   const irParaPasso = useStore((s) => s.irParaPasso)
   const reiniciar = useStore((s) => s.reiniciar)
   const portal = useStore((s) => s.portal)
+  const mostrarConteudo = deveMostrarConteudo(portal)
   const nomeEmpresa = useStore((s) => s.empresa.nome)
   const e1 = limitesDaEtapa('etapa1')
   const [menuAberto, setMenuAberto] = useState(false)
@@ -163,6 +165,8 @@ export default function App() {
             </p>
           )}
 
+          {mostrarConteudo && (
+          <>
           <main>
             {faqAberto && <Faq />}
             {!faqAberto && passo === 0 && <StepEmpresa />}
@@ -184,6 +188,8 @@ export default function App() {
               Avançar <ArrowRight size={16} aria-hidden />
             </button>
           </div>
+          </>
+          )}
 
           <footer className="mt-8 space-y-1">
             <AvisoLegal texto={REGRAS.avisoLegal} />

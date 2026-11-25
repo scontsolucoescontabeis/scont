@@ -1,5 +1,5 @@
 import { useStore } from '../store/useStore'
-import { atualizarPessoa, resumoFerias, type EdicaoPessoa } from '../portal/equipe'
+import { atualizarPessoa, normalizarHoras, normalizarIntervalo, resumoFerias, type EdicaoPessoa } from '../portal/equipe'
 import { Dica } from './ui'
 
 export function EquipeNominal() {
@@ -71,7 +71,7 @@ export function EquipeNominal() {
                             className="campo w-24"
                             aria-label={`Horas por semana de ${p.nome}`}
                             value={p.horasSemanais ?? ''}
-                            onChange={(e) => editar(f.id, p.id, { horasSemanais: numero(e.target.value) })}
+                            onChange={(e) => editar(f.id, p.id, { horasSemanais: normalizarHoras(numero(e.target.value)) })}
                           />
                         </td>
                         <td className="px-2 py-2">
@@ -102,7 +102,7 @@ export function EquipeNominal() {
                             placeholder="Automático"
                             aria-label={`Intervalo em minutos de ${p.nome}`}
                             value={p.intervaloMin ?? ''}
-                            onChange={(e) => editar(f.id, p.id, { intervaloMin: numero(e.target.value) })}
+                            onChange={(e) => editar(f.id, p.id, { intervaloMin: normalizarIntervalo(numero(e.target.value)) })}
                           />
                         </td>
                         <td className="px-2 py-2">

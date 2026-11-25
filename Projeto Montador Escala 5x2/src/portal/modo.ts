@@ -3,6 +3,13 @@ import type { Funcao, PessoaEscala } from '../types'
 
 const CHAVE_BASE = 'scont.montador-escala-5x2.v1'
 
+/** Portal: o conteúdo dos passos só aparece com os dados carregados e sem erro (evita mostrar a equipe de demonstração). */
+export function deveMostrarConteudo(
+  portal: { carregando: boolean; erro: string | null } | null,
+): boolean {
+  return !portal || (!portal.carregando && !portal.erro)
+}
+
 /** Código da empresa em `?empresa=`; vazio/ausente → null (modo avulso). */
 export function empresaDoPortal(search: string): string | null {
   const v = new URLSearchParams(search).get('empresa')?.trim()

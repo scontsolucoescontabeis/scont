@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Funcao, PessoaEscala } from '../types'
-import { aplicarSobreposicoes, calcularSobreposicoes, chaveArmazenamento, empresaDoPortal } from './modo'
+import { aplicarSobreposicoes, calcularSobreposicoes, chaveArmazenamento, deveMostrarConteudo, empresaDoPortal } from './modo'
 
 const pessoa = (o: Partial<PessoaEscala> & { id: string }): PessoaEscala => ({
   nome: `Nome ${o.id}`,
@@ -95,5 +95,17 @@ describe('calcularSobreposicoes / aplicarSobreposicoes', () => {
   it('idempotente', () => {
     const sob = { a: { '1': { escalar: false, entrada: null, horasSemanais: 36 }, '2': { intervaloMin: 45 } } }
     expect(calcularSobreposicoes(base(), aplicarSobreposicoes(base(), sob))).toEqual(sob)
+  })
+})
+
+describe('deveMostrarConteudo', () => {
+  const base = { codigo: '1', carregando: false, erro: null, nenhumEmpregado: false }
+  it('avulso (null) mostra; portal oculta enquanto carrega ou em erro', () => {
+    expect(deveMostrarConteudo(null)).toBe(true)
+    expect(deveMostrarConteudo(base)).toBe(true)
+    const vazio = { ...base, nenhumEmpregado: true }
+    expect(deveMostrarConteudo(vazio)).toBe(true)
+    expect(deveMostrarConteudo({ ...base, carregando: true })).toBe(false)
+    expect(deveMostrarConteudo({ ...base, erro: 'falhou' })).toBe(false)
   })
 })

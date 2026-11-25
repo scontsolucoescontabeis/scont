@@ -61,3 +61,15 @@ export function jornadaMaisComum(
   for (const g of grupos.values()) if (!melhor || g.n > melhor.n) melhor = g
   return melhor?.j ?? null
 }
+
+/** Intervalo em minutos: vazio/NaN → undefined; inteiro entre 0 e 240. */
+export function normalizarIntervalo(v: number | undefined): number | undefined {
+  if (v === undefined || Number.isNaN(v)) return undefined
+  return Math.min(240, Math.max(0, Math.round(v)))
+}
+
+/** Horas semanais: vazio/NaN → undefined; entre 1 e 60 com uma casa decimal. */
+export function normalizarHoras(v: number | undefined): number | undefined {
+  if (v === undefined || Number.isNaN(v)) return undefined
+  return Math.min(60, Math.max(1, Math.round(v * 10) / 10))
+}

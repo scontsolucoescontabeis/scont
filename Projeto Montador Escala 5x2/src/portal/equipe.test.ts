@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Funcao, PessoaEscala } from '../types'
-import { atualizarPessoa, jornadaMaisComum, resumoFerias } from './equipe'
+import { atualizarPessoa, jornadaMaisComum, normalizarHoras, normalizarIntervalo, resumoFerias } from './equipe'
 
 const pessoa = (id: string, extra: Partial<PessoaEscala> = {}): PessoaEscala => ({
   id,
@@ -116,5 +116,29 @@ describe('jornadaMaisComum', () => {
       pessoa('c'),
     ])
     expect(jornadaMaisComum(f)).toEqual({ horasSemanais: 44 })
+  })
+})
+
+describe('normalizarIntervalo', () => {
+  it('undefined/NaN viram undefined; limita a 0..240 inteiro', () => {
+    expect(normalizarIntervalo(undefined)).toBeUndefined()
+    expect(normalizarIntervalo(NaN)).toBeUndefined()
+    expect(normalizarIntervalo(-30)).toBe(0)
+    expect(normalizarIntervalo(999)).toBe(240)
+    expect(normalizarIntervalo(60)).toBe(60)
+    expect(normalizarIntervalo(59.6)).toBe(60)
+    expect(normalizarIntervalo(0)).toBe(0)
+  })
+})
+
+describe('normalizarHoras', () => {
+  it('undefined/NaN viram undefined; limita a 1..60 com uma casa', () => {
+    expect(normalizarHoras(undefined)).toBeUndefined()
+    expect(normalizarHoras(NaN)).toBeUndefined()
+    expect(normalizarHoras(0)).toBe(1)
+    expect(normalizarHoras(-5)).toBe(1)
+    expect(normalizarHoras(100)).toBe(60)
+    expect(normalizarHoras(44)).toBe(44)
+    expect(normalizarHoras(43.46)).toBe(43.5)
   })
 })
