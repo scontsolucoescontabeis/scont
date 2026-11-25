@@ -139,6 +139,28 @@ export function StepEquipe() {
                 }
               />
             </Campo>
+            <Campo
+              rotulo="Intervalo (min)"
+              ajuda="Intervalo intrajornada (refeição/descanso) desta função. Em branco: a ferramenta usa o mínimo legal (1h acima de 6h; 15 min entre 4h e 6h). Abaixo do mínimo gera alerta de conformidade."
+            >
+              <input
+                type="number"
+                min={0}
+                max={240}
+                step={5}
+                className="campo"
+                value={f.intervaloMin ?? ""}
+                onChange={(e) =>
+                  atualizar(f.id, {
+                    intervaloMin:
+                      e.target.value === ""
+                        ? undefined
+                        : Math.max(0, Number(e.target.value) || 0),
+                  })
+                }
+                placeholder="Automático"
+              />
+            </Campo>
             <Campo rotulo="Salário-base (opcional)">
               <input
                 type="number"

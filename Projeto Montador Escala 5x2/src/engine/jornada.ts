@@ -37,6 +37,7 @@ export function jornadaDaFuncao(f: Funcao, tetoSemanalH = Infinity): JornadaPess
   }
   const semanal = Math.min(f.horasSemanaisAtuais > 0 ? f.horasSemanaisAtuais : 44, tetoSemanalH)
   const liquida = Math.min(Math.round(REGRAS.jornadaDiariaMax * 60), Math.round((semanal * 60) / 5))
+  if (f.intervaloMin !== undefined) return { bruto: liquida + f.intervaloMin, intervaloMin: f.intervaloMin }
   let intervalo = intervaloParaBruto(liquida)
   intervalo = Math.max(intervalo, intervaloParaBruto(liquida + intervalo))
   return { bruto: liquida + intervalo, intervaloMin: intervalo }
