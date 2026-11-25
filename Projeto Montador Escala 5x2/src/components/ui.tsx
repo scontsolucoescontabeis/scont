@@ -1,6 +1,73 @@
 import { AlertTriangle, CheckCircle2, HelpCircle, XCircle } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useId, type ReactNode } from 'react'
 import type { Severidade } from '../types'
+
+/**
+ * Número com botões − / + (aceita digitação; nunca abaixo de 0).
+ * `descricao` completa os rótulos acessíveis: "Aumentar mínimo de pessoas — {descricao}".
+ */
+export function Contador({
+  rotulo,
+  descricao,
+  valor,
+  onChange,
+  desabilitado = false,
+}: {
+  rotulo: string
+  descricao: string
+  valor: number
+  onChange: (v: number) => void
+  desabilitado?: boolean
+}) {
+  const id = useId()
+  const mudar = (v: number) => onChange(Math.max(0, Math.floor(Number.isFinite(v) ? v : 0)))
+  return (
+    <div>
+      {desabilitado ? (
+        <p className="mb-1 text-sm font-medium">{rotulo}</p>
+      ) : (
+        <label htmlFor={id} className="mb-1 block text-sm font-medium">
+          {rotulo}
+        </label>
+      )}
+      {desabilitado ? (
+        <p className="rounded-lg border border-line bg-gray-100 px-3 py-2 text-sm text-soft">
+          fechado <span className="sr-only">— a empresa não abre nesse dia</span>
+        </p>
+      ) : (
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="btn-sec !px-3"
+            aria-label={`Diminuir mínimo de pessoas — ${descricao}`}
+            disabled={valor <= 0}
+            onClick={() => mudar(valor - 1)}
+          >
+            −
+          </button>
+          <input
+            id={id}
+            type="number"
+            min={0}
+            inputMode="numeric"
+            className="campo !w-16 text-center"
+            aria-label={`Mínimo de pessoas — ${descricao}`}
+            value={valor}
+            onChange={(e) => mudar(e.target.value === '' ? 0 : Number(e.target.value))}
+          />
+          <button
+            type="button"
+            className="btn-sec !px-3"
+            aria-label={`Aumentar mínimo de pessoas — ${descricao}`}
+            onClick={() => mudar(valor + 1)}
+          >
+            +
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function Campo({
   rotulo,
