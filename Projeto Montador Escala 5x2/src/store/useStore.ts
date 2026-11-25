@@ -15,6 +15,9 @@ import type {
   Proposta,
   Turno,
 } from '../types'
+import { empresaDoPortal, mesclarEstadoSalvo } from '../portal/modo'
+import { mapearDadosPortal } from '../portal/mapear'
+import { carregarDadosPortal } from '../portal/supabase'
 import { carregar, limpar, salvar } from '../services/storage'
 import { analisar } from '../utils/analise'
 
@@ -80,7 +83,18 @@ export const DADOS_PADRAO: Dados = {
   propostaAtivaId: null,
 }
 
+/** Estado do modo portal (não persistido); null no modo avulso. */
+export interface EstadoPortal {
+  codigo: string
+  carregando: boolean
+  erro: string | null
+  nenhumEmpregado: boolean
+}
+
 interface Acoes {
+  portal: EstadoPortal | null
+  /** Carrega empresa/equipe do banco (sessão do portal) e mescla com o estado salvo. */
+  carregarDoPortal: (codigo: string) => Promise<void>
   set: (parcial: Partial<Dados>) => void
   setEmpresa: (p: Partial<Empresa>) => void
   setCelula: (funcionarioId: string, dia: number, valor: DiaEscala) => void
@@ -98,8 +112,35 @@ export type Store = Dados & Acoes
 
 const inicial: Dados = { ...DADOS_PADRAO, ...(carregar<Partial<Dados>>() ?? {}) }
 
+const codigoPortal = typeof window === 'undefined' ? null : empresaDoPortal(window.location.search)
+const portalInicial: EstadoPortal | null = codigoPortal
+  ? { codigo: codigoPortal, carregando: true, erro: null, nenhumEmpregado: false }
+  : null
+
 export const useStore = create<Store>((set, get) => ({
   ...inicial,
+  portal: portalInicial,
+  carregarDoPortal: async (codigo) => {
+    set({ portal: { codigo, carregando: true, erro: null, nenhumEmpregado: false } })
+    try {
+      const dados = await carregarDadosPortal(codigo)
+      const { nomeEmpresa, funcoes: doBanco } = mapearDadosPortal(dados)
+      const funcoes = mesclarEstadoSalvo(doBanco, get().funcoes)
+      const nenhumEmpregado = !funcoes.some((f) => (f.pessoas?.length ?? 0) > 0)
+      set({
+        empresa: { ...get().empresa, nome: nomeEmpresa },
+        funcoes,
+        escala: null,
+        propostas: [],
+        comparar: [],
+        propostaAtivaId: null,
+        portal: { codigo, carregando: false, erro: null, nenhumEmpregado },
+      })
+    } catch (e) {
+      const erro = e instanceof Error ? e.message : 'Não foi possível carregar os dados da empresa'
+      set({ portal: { codigo, carregando: false, erro, nenhumEmpregado: false } })
+    }
+  },
   set: (parcial) => set(parcial),
   setEmpresa: (p) => set({ empresa: { ...get().empresa, ...p } }),
   setCelula: (fid, dia, valor) => {
@@ -157,6 +198,8 @@ export const useStore = create<Store>((set, get) => ({
   reiniciar: () => {
     limpar()
     set({ ...DADOS_PADRAO })
+    const portal = get().portal
+    if (portal) void get().carregarDoPortal(portal.codigo)
   },
 }))
 

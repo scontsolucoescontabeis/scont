@@ -22,6 +22,7 @@ import { AvisoLegal } from './components/ui'
 import { useStore } from './store/useStore'
 
 const LOGO_URL = 'https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png'
+const URL_PORTAL_CLIENTE = '../../Projeto Portal Cliente/index.html'
 const PASSOS = [
   { nome: 'Empresa', Icone: Building2 },
   { nome: 'Equipe', Icone: Users },
@@ -33,6 +34,8 @@ export default function App() {
   const passo = useStore((s) => s.passo)
   const irParaPasso = useStore((s) => s.irParaPasso)
   const reiniciar = useStore((s) => s.reiniciar)
+  const portal = useStore((s) => s.portal)
+  const nomeEmpresa = useStore((s) => s.empresa.nome)
   const e1 = limitesDaEtapa('etapa1')
   const [menuAberto, setMenuAberto] = useState(false)
   const [faqAberto, setFaqAberto] = useState(false)
@@ -111,10 +114,10 @@ export default function App() {
 
         <div className="mt-auto space-y-2 border-t border-white/15 pt-5">
           <a
-            href="../../portal.html"
+            href={portal ? URL_PORTAL_CLIENTE : '../../portal.html'}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/40 px-3 py-2 text-sm font-semibold hover:bg-white/15"
           >
-            <Home size={16} aria-hidden /> Voltar ao Portal
+            <Home size={16} aria-hidden /> {portal ? 'Voltar ao portal' : 'Voltar ao Portal'}
           </a>
           <button
             type="button"
@@ -129,12 +132,36 @@ export default function App() {
       <div className="px-4 pb-16 pt-14 lg:ml-[260px] lg:p-8">
         <div className={!faqAberto && passo === 3 ? 'w-full' : 'max-w-6xl'}>
           <header className="mb-6 rounded-xl border-l-4 border-brand bg-white p-5 shadow-card sm:p-6">
+            {portal && (
+              <p className="mb-1 text-sm font-semibold text-secondary">
+                Portal do Cliente{nomeEmpresa ? ` · ${nomeEmpresa}` : ''}
+              </p>
+            )}
             <h1 className="text-2xl font-bold tracking-tight text-brand">Montador de Escala 5x2</h1>
             <p className="text-sm text-soft">
               Planeje a escala para a EC 141/2026 — 1ª etapa em {REGRAS.etapa1.inicio.split('-').reverse().join('/')} (
               {e1.jornadaSemanalMax}h semanais).
             </p>
           </header>
+
+          {portal?.carregando && (
+            <p role="status" className="mb-4 rounded-lg bg-white p-4 text-sm text-soft shadow-card">
+              Carregando os dados da empresa…
+            </p>
+          )}
+          {portal?.erro && (
+            <div role="alert" className="mb-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+              <p>{portal.erro}</p>
+              <a href={URL_PORTAL_CLIENTE} className="mt-2 inline-block font-semibold underline">
+                Voltar ao portal
+              </a>
+            </div>
+          )}
+          {portal?.nenhumEmpregado && (
+            <p role="status" className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+              Nenhum empregado ativo encontrado para esta empresa
+            </p>
+          )}
 
           <main>
             {faqAberto && <Faq />}
