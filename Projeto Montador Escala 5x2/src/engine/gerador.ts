@@ -192,8 +192,37 @@ export function perfilPorFuncao(
   return out
 }
 
+/**
+ * Janela (em faixas de 15 min, [janIni, janFim)) onde as jornadas podem caber: da primeira à última faixa com
+ * demanda em qualquer dia, estendida ao horário de funcionamento. Sem nada, 08:00–18:00.
+ */
+export function janelaDeJornada(empresa: Empresa, perfil: number[][]): { janIni: number; janFim: number } {
+  let janIni = NSLOTS
+  let janFim = 0
+  for (const linha of perfil) {
+    linha.forEach((n, s) => {
+      if (n > 0) {
+        janIni = Math.min(janIni, s)
+        janFim = Math.max(janFim, s + 1)
+      }
+    })
+  }
+  // O horário de funcionamento também limita onde uma jornada pode caber (entrada ≥ abertura, saída ≤ fechamento).
+  for (let dow = 0; dow < 7; dow++) {
+    if (!empresa.diasFuncionamento[dow]) continue
+    const h = empresa.horarios?.[dow] ?? { abre: empresa.horaAbertura, fecha: empresa.horaFechamento }
+    janIni = Math.min(janIni, Math.floor(minutosDe(h.abre) / SLOT))
+    janFim = Math.max(janFim, Math.ceil(minutosDe(h.fecha) / SLOT))
+  }
+  if (janFim === 0) {
+    janIni = 32
+    janFim = 72
+  }
+  return { janIni, janFim }
+}
+
 /** Faixas de 15 min cobertas por um horário que começa em `inicio` e dura `bruto` minutos. */
-function faixas(inicio: number, bruto: number): number[] {
+export function faixas(inicio: number, bruto: number): number[] {
   const out: number[] = []
   const fim = Math.min(1440, inicio + bruto)
   for (let s = Math.floor(inicio / SLOT); s * SLOT < fim; s++) out.push(s)
@@ -244,27 +273,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
 
   // 1) Horário de trabalho de cada empregado: jornada legal da função, com a
   //    entrada escolhida para cobrir as faixas do estabelecimento com menos gente.
-  let janIni = NSLOTS
-  let janFim = 0
-  for (const linha of perfil) {
-    linha.forEach((n, s) => {
-      if (n > 0) {
-        janIni = Math.min(janIni, s)
-        janFim = Math.max(janFim, s + 1)
-      }
-    })
-  }
-  // O horário de funcionamento também limita onde uma jornada pode caber (entrada ≥ abertura, saída ≤ fechamento).
-  for (let dow = 0; dow < 7; dow++) {
-    if (!empresa.diasFuncionamento[dow]) continue
-    const h = empresa.horarios?.[dow] ?? { abre: empresa.horaAbertura, fecha: empresa.horaFechamento }
-    janIni = Math.min(janIni, Math.floor(minutosDe(h.abre) / SLOT))
-    janFim = Math.max(janFim, Math.ceil(minutosDe(h.fecha) / SLOT))
-  }
-  if (janFim === 0) {
-    janIni = 32
-    janFim = 72
-  }
+  const { janIni, janFim } = janelaDeJornada(empresa, perfil)
   const contagem = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
   const contagemFn: Record<string, number[][]> = Object.fromEntries(
     Object.keys(perfilFn).map((id) => [id, novaGrade()]),
