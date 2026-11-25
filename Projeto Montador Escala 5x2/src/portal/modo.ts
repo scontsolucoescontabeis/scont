@@ -13,27 +13,55 @@ export function chaveArmazenamento(codigo: string | null): string {
   return codigo ? `${CHAVE_BASE}:${codigo}` : CHAVE_BASE
 }
 
-/**
- * Reaplica sobre a equipe vinda do banco (`base`) as edições do usuário guardadas
- * (`salvas`), por Funcao.id e pessoa.id. Só os campos editáveis são reaplicados;
- * nome, id, férias e jornadaPadrao vêm sempre do banco.
- */
-export function mesclarEstadoSalvo(base: Funcao[], salvas: Funcao[] | undefined): Funcao[] {
-  const salvasPorId = new Map((salvas ?? []).map((f) => [f.id, f]))
+type CampoEditavel = 'escalar' | 'horasSemanais' | 'entrada' | 'saida' | 'intervaloMin'
+const CAMPOS: CampoEditavel[] = ['escalar', 'horasSemanais', 'entrada', 'saida', 'intervaloMin']
+
+/** Edição do usuário sobre uma pessoa; `null` = campo limpo (undefined). */
+export type SobreposicaoPessoa = {
+  escalar?: boolean
+  horasSemanais?: number | null
+  entrada?: string | null
+  saida?: string | null
+  intervaloMin?: number | null
+}
+/** funcaoId -> pessoaId -> edições. Só guarda o que difere do banco. */
+export type Sobreposicoes = Record<string, Record<string, SobreposicaoPessoa>>
+
+/** Diferenças (campos editáveis) entre a equipe do banco e a atual. */
+export function calcularSobreposicoes(base: Funcao[], atual: Funcao[]): Sobreposicoes {
+  const out: Sobreposicoes = {}
+  const atualPorId = new Map(atual.map((f) => [f.id, f]))
+  for (const f of base) {
+    const pessoasAtuais = new Map((atualPorId.get(f.id)?.pessoas ?? []).map((p) => [p.id, p]))
+    for (const p of f.pessoas ?? []) {
+      const a = pessoasAtuais.get(p.id)
+      if (!a) continue
+      const dif: Record<string, unknown> = {}
+      for (const c of CAMPOS) if (a[c] !== p[c]) dif[c] = a[c] === undefined ? null : a[c]
+      if (Object.keys(dif).length > 0) (out[f.id] ??= {})[p.id] = dif as SobreposicaoPessoa
+    }
+  }
+  return out
+}
+
+/** Aplica as edições do usuário sobre uma cópia da equipe do banco. */
+export function aplicarSobreposicoes(base: Funcao[], sob: Sobreposicoes | undefined): Funcao[] {
   return base.map((f) => {
-    const salvaF = salvasPorId.get(f.id)
-    const porPessoa = new Map((salvaF?.pessoas ?? []).map((p) => [p.id, p]))
-    const pessoas = (f.pessoas ?? []).map((p): PessoaEscala => {
-      const s = porPessoa.get(p.id)
-      if (!s) return { ...p }
-      const r: PessoaEscala = { ...p, escalar: s.escalar }
-      if (s.horasSemanais !== undefined) r.horasSemanais = s.horasSemanais
-      if (s.entrada !== undefined) r.entrada = s.entrada
-      if (s.saida !== undefined) r.saida = s.saida
-      if (s.intervaloMin !== undefined) r.intervaloMin = s.intervaloMin
+    if (!f.pessoas) return { ...f }
+    const porPessoa = sob?.[f.id] ?? {}
+    const pessoas = f.pessoas.map((p): PessoaEscala => {
+      const o = porPessoa[p.id]
+      const r: PessoaEscala = { ...p }
+      if (!o) return r
+      for (const c of CAMPOS) {
+        if (!(c in o)) continue
+        const v = o[c]
+        if (c === 'escalar') r.escalar = v as boolean
+        else if (v === null || v === undefined) delete r[c]
+        else (r as unknown as Record<string, unknown>)[c] = v
+      }
       return r
     })
-    if (!f.pessoas) return { ...f }
     return { ...f, pessoas, quantidade: pessoas.filter((p) => p.escalar).length }
   })
 }

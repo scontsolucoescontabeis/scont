@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Funcao, PessoaEscala } from '../types'
-import { chaveArmazenamento, empresaDoPortal, mesclarEstadoSalvo } from './modo'
+import { aplicarSobreposicoes, calcularSobreposicoes, chaveArmazenamento, empresaDoPortal } from './modo'
 
 const pessoa = (o: Partial<PessoaEscala> & { id: string }): PessoaEscala => ({
   nome: `Nome ${o.id}`,
@@ -47,62 +47,53 @@ describe('chaveArmazenamento', () => {
   })
 })
 
-describe('mesclarEstadoSalvo', () => {
-  it('sem estado salvo devolve a base', () => {
-    const base = [funcao('a', [pessoa({ id: '1' })])]
-    expect(mesclarEstadoSalvo(base, undefined)).toEqual(base)
+
+describe('calcularSobreposicoes / aplicarSobreposicoes', () => {
+  const base = () => [
+    funcao('a', [pessoa({ id: '1', entrada: '08:00', saida: '17:00' }), pessoa({ id: '2' })]),
+    funcao('b', [pessoa({ id: '9' })]),
+  ]
+  const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x))
+
+  it('só registra campos que diferem; omite quem não mudou', () => {
+    const atual = clone(base())
+    atual[0].pessoas![0].escalar = false
+    atual[0].pessoas![0].horasSemanais = 40
+    expect(calcularSobreposicoes(base(), atual)).toEqual({ a: { '1': { escalar: false, horasSemanais: 40 } } })
+    expect(calcularSobreposicoes(base(), clone(base()))).toEqual({})
   })
-  it('reaplica edições do usuário por funcao.id e pessoa.id', () => {
-    const base = [funcao('a', [pessoa({ id: '1' }), pessoa({ id: '2' })])]
-    const salvas = [
-      funcao('a', [
-        pessoa({ id: '1', escalar: false, horasSemanais: 40, entrada: '09:00', saida: '18:00', intervaloMin: 90 }),
-        pessoa({ id: '2' }),
-      ]),
-    ]
-    const r = mesclarEstadoSalvo(base, salvas)
-    expect(r[0].pessoas![0]).toMatchObject({ escalar: false, horasSemanais: 40, entrada: '09:00', saida: '18:00', intervaloMin: 90 })
-    expect(r[0].pessoas![1]).toEqual(base[0].pessoas![1])
+  it('campo limpo vira null e é reaplicado como ausente', () => {
+    const atual = clone(base())
+    delete atual[0].pessoas![0].entrada
+    const sob = calcularSobreposicoes(base(), atual)
+    expect(sob).toEqual({ a: { '1': { entrada: null } } })
+    expect(aplicarSobreposicoes(base(), sob)[0].pessoas![0].entrada).toBeUndefined()
   })
-  it('descarta pessoas ausentes do banco e mantém novas', () => {
-    const base = [funcao('a', [pessoa({ id: '2' }), pessoa({ id: '3', nome: 'Nova' })])]
-    const salvas = [funcao('a', [pessoa({ id: '1' }), pessoa({ id: '2', escalar: false })])]
-    const r = mesclarEstadoSalvo(base, salvas)
-    expect(r[0].pessoas!.map((p) => p.id)).toEqual(['2', '3'])
-    expect(r[0].pessoas![0].escalar).toBe(false)
-    expect(r[0].pessoas![1]).toEqual(base[0].pessoas![1])
+  it('campo definido onde o banco não tinha é registrado', () => {
+    const atual = clone(base())
+    atual[0].pessoas![1].intervaloMin = 90
+    expect(calcularSobreposicoes(base(), atual)).toEqual({ a: { '2': { intervaloMin: 90 } } })
   })
-  it('não toma nome, id, ferias nem jornadaPadrao do salvo', () => {
-    const feriasBanco = [{ inicio: '2026-12-01', fim: '2026-12-10' }]
-    const base = [funcao('a', [pessoa({ id: '1', nome: 'Do Banco', ferias: feriasBanco, jornadaPadrao: false })])]
-    const salvas = [funcao('a', [pessoa({ id: '1', nome: 'Antigo', ferias: [], jornadaPadrao: true, escalar: false })])]
-    const p = mesclarEstadoSalvo(base, salvas)[0].pessoas![0]
-    expect(p.nome).toBe('Do Banco')
-    expect(p.id).toBe('1')
-    expect(p.ferias).toEqual(feriasBanco)
-    expect(p.jornadaPadrao).toBe(false)
+  it('ignora pessoas e funções que saíram do banco', () => {
+    const r = aplicarSobreposicoes(base(), { a: { '77': { escalar: false } }, zz: { '1': { escalar: false } } })
+    expect(r).toEqual(aplicarSobreposicoes(base(), undefined))
   })
-  it('recalcula quantidade pelas pessoas a escalar', () => {
-    const base = [funcao('a', [pessoa({ id: '1' }), pessoa({ id: '2' }), pessoa({ id: '3' })])]
-    const salvas = [funcao('a', [pessoa({ id: '1', escalar: false }), pessoa({ id: '2' }), pessoa({ id: '3' })])]
-    expect(mesclarEstadoSalvo(base, salvas)[0].quantidade).toBe(2)
-  })
-  it('funcao ausente nas salvas fica como na base; edição igual à base é no-op', () => {
-    const base = [funcao('a', [pessoa({ id: '1' })]), funcao('b', [pessoa({ id: '9' })])]
-    const salvas = [funcao('a', [pessoa({ id: '1' })])]
-    expect(mesclarEstadoSalvo(base, salvas)).toEqual(base)
+  it('recalcula quantidade e preserva nome/id/ferias/jornadaPadrao do banco', () => {
+    const b = base()
+    b[0].pessoas![0].ferias = [{ inicio: '2026-12-01', fim: '2026-12-05' }]
+    const r = aplicarSobreposicoes(b, { a: { '1': { escalar: false, horasSemanais: 30 } } })
+    expect(r[0].quantidade).toBe(1)
+    expect(r[0].pessoas![0]).toMatchObject({ id: '1', nome: 'Nome 1', jornadaPadrao: true, horasSemanais: 30 })
+    expect(r[0].pessoas![0].ferias).toEqual(b[0].pessoas![0].ferias)
   })
   it('não muta a base', () => {
-    const base = [funcao('a', [pessoa({ id: '1' })])]
-    const copia = JSON.parse(JSON.stringify(base))
-    mesclarEstadoSalvo(base, [funcao('a', [pessoa({ id: '1', escalar: false })])])
-    expect(base).toEqual(copia)
+    const b = base()
+    const copia = clone(b)
+    aplicarSobreposicoes(b, { a: { '1': { escalar: false } } })
+    expect(b).toEqual(copia)
   })
-  it('campos opcionais ausentes no salvo mantêm o valor da base', () => {
-    const base = [funcao('a', [pessoa({ id: '1', entrada: '08:00', saida: '17:00' })])]
-    const salvas = [funcao('a', [pessoa({ id: '1' })])]
-    const p = mesclarEstadoSalvo(base, salvas)[0].pessoas![0]
-    expect(p.entrada).toBe('08:00')
-    expect(p.saida).toBe('17:00')
+  it('idempotente', () => {
+    const sob = { a: { '1': { escalar: false, entrada: null, horasSemanais: 36 }, '2': { intervaloMin: 45 } } }
+    expect(calcularSobreposicoes(base(), aplicarSobreposicoes(base(), sob))).toEqual(sob)
   })
 })

@@ -15,7 +15,7 @@ import type {
   Proposta,
   Turno,
 } from '../types'
-import { empresaDoPortal, mesclarEstadoSalvo } from '../portal/modo'
+import { aplicarSobreposicoes, calcularSobreposicoes, empresaDoPortal, type Sobreposicoes } from '../portal/modo'
 import { mapearDadosPortal } from '../portal/mapear'
 import { carregarDadosPortal } from '../portal/supabase'
 import { carregar, limpar, salvar } from '../services/storage'
@@ -110,9 +110,16 @@ interface Acoes {
 
 export type Store = Dados & Acoes
 
-const inicial: Dados = { ...DADOS_PADRAO, ...(carregar<Partial<Dados>>() ?? {}) }
-
 const codigoPortal = typeof window === 'undefined' ? null : empresaDoPortal(window.location.search)
+
+type Salvo = Partial<Dados> & { sobreposicoes?: Sobreposicoes }
+const salvoInicial = carregar<Salvo>() ?? {}
+// No portal a equipe vem sempre do banco; só as sobreposições do usuário são persistidas.
+if (codigoPortal) delete salvoInicial.funcoes
+const inicial: Dados = { ...DADOS_PADRAO, ...salvoInicial }
+
+/** Equipe como veio do banco na última carga (não persistida). */
+let baseBanco: Funcao[] | null = null
 const portalInicial: EstadoPortal | null = codigoPortal
   ? { codigo: codigoPortal, carregando: true, erro: null, nenhumEmpregado: false }
   : null
@@ -122,10 +129,13 @@ export const useStore = create<Store>((set, get) => ({
   portal: portalInicial,
   carregarDoPortal: async (codigo) => {
     set({ portal: { codigo, carregando: true, erro: null, nenhumEmpregado: false } })
+    baseBanco = null
+    const sobreposicoes = carregar<Salvo>()?.sobreposicoes
     try {
       const dados = await carregarDadosPortal(codigo)
       const { nomeEmpresa, funcoes: doBanco } = mapearDadosPortal(dados)
-      const funcoes = mesclarEstadoSalvo(doBanco, get().funcoes)
+      const funcoes = aplicarSobreposicoes(doBanco, sobreposicoes)
+      baseBanco = doBanco
       const nenhumEmpregado = !funcoes.some((f) => (f.pessoas?.length ?? 0) > 0)
       set({
         empresa: { ...get().empresa, nome: nomeEmpresa },
@@ -196,6 +206,7 @@ export const useStore = create<Store>((set, get) => ({
     if (i === 3) get().sugerirEscala()
   },
   reiniciar: () => {
+    clearTimeout(timer)
     limpar()
     set({ ...DADOS_PADRAO })
     const portal = get().portal
@@ -208,7 +219,9 @@ let timer: ReturnType<typeof setTimeout> | undefined
 useStore.subscribe((estado) => {
   clearTimeout(timer)
   timer = setTimeout(() => {
-    const dados: Dados = {
+    const portal = estado.portal
+    if (portal && (portal.carregando || portal.erro || !baseBanco)) return
+    const dados: Salvo = {
       passo: estado.passo,
       empresa: estado.empresa,
       funcoes: estado.funcoes,
@@ -224,6 +237,7 @@ useStore.subscribe((estado) => {
       etapaImpacto: estado.etapaImpacto,
       propostaAtivaId: estado.propostaAtivaId,
     }
+    if (portal && baseBanco) dados.sobreposicoes = calcularSobreposicoes(baseBanco, estado.funcoes)
     salvar(dados)
   }, 300)
 })
