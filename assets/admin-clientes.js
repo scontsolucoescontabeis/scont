@@ -9,6 +9,8 @@
 
   // Cruza o nome do pedido com sócios e empregados (arrays de nomes).
   // Exato vence parcial. Rótulo em português para o administrador.
+  // Nomes de sócios são públicos (QSA): coincidência de nome NÃO prova
+  // identidade, por isso o rótulo sempre pede confirmação com a empresa.
   function montarApoio(pedidoNome, socios, empregados, truncado) {
     var NA = getNomeApoio();
     var pessoas = [];
@@ -24,9 +26,9 @@
       return lista;
     }
     var exatos = origens('exato');
-    if (exatos.length) return { tipo: 'exato', rotulo: '✔ Exato: ' + exatos.join(', ') };
+    if (exatos.length) return { tipo: 'exato', rotulo: 'Nome coincide com ' + exatos.join(', ') + ' — confirmar com a empresa' };
     var parciais = origens('parcial');
-    if (parciais.length) return { tipo: 'parcial', rotulo: '~ Parcial: ' + parciais.join(', ') };
+    if (parciais.length) return { tipo: 'parcial', rotulo: 'Nome parecido com ' + parciais.join(', ') + ' — confirmar com a empresa' };
     if (truncado) return { tipo: 'truncado', rotulo: 'Base truncada — conferir manualmente' };
     return { tipo: 'nenhum', rotulo: 'Nenhuma correspondência' };
   }
@@ -52,6 +54,33 @@
     return { ok: true };
   }
 
+  // Status que o acesso precisa ter para a decisão valer (evita que uma aba
+  // desatualizada sobrescreva uma decisão mais nova).
+  function statusAnteriorEsperado(status) {
+    if (status === 'aprovado' || status === 'recusado') return 'pendente';
+    if (status === 'revogado') return 'aprovado';
+    return null;
+  }
+
+  function normalizarEmail(e) {
+    return String(e == null ? '' : e).trim().toLowerCase();
+  }
+
+  // Conjunto de e-mails (normalizados) a partir de linhas de cliente_usuarios.
+  function emailsDeClientes(linhas) {
+    var s = new Set();
+    (Array.isArray(linhas) ? linhas : []).forEach(function (l) {
+      var e = l ? normalizarEmail(l.email) : '';
+      if (e) s.add(e);
+    });
+    return s;
+  }
+
+  function ehEmailCliente(conjunto, email) {
+    var e = normalizarEmail(email);
+    return !!(e && conjunto && conjunto.has(e));
+  }
+
   // Lê todas as páginas via fetchPage(from, to) -> Promise<array>. Para na primeira página curta;
   // se atingir maxPaginas com páginas cheias, marca truncado.
   async function paginar(fetchPage, tamanho, maxPaginas) {
@@ -66,7 +95,10 @@
     return { rows: rows, truncado: true };
   }
 
-  var api = { paginar: paginar, montarApoio: montarApoio, agruparPorStatus: agruparPorStatus, validarDecisao: validarDecisao };
+  var api = {
+    paginar: paginar, montarApoio: montarApoio, agruparPorStatus: agruparPorStatus, validarDecisao: validarDecisao,
+    statusAnteriorEsperado: statusAnteriorEsperado, emailsDeClientes: emailsDeClientes, ehEmailCliente: ehEmailCliente,
+  };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof window !== 'undefined') window.AdminClientes = api;
 })();

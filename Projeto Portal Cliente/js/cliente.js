@@ -118,7 +118,8 @@ async function rotearPorEstado() {
     perfilAtual = perfil;
 
     const { data: vinculos, error: vincErr } = await sb
-        .from('cliente_acessos').select('codigo_empresa, status, motivo');
+        .from('cliente_acessos').select('codigo_empresa, status, motivo')
+        .eq('usuario_id', user.id);
     if (vincErr) {
         mostrarEstado('login');
         mostrarAlerta($('alertLogin'), 'Não foi possível consultar seus acessos. Tente novamente.', 'error');

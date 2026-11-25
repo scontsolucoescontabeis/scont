@@ -52,3 +52,14 @@ test('negado sem motivo => motivo null', () => {
     const r = decidirEstado([{ codigo_empresa: '1', status: 'revogado', motivo: null }]);
     assert.deepStrictEqual(r, { estado: 'negado', empresas: [], motivo: null });
 });
+
+// Verificação estática do cliente.js: admin lê todos os vínculos, então a
+// consulta de cliente_acessos precisa filtrar pelo próprio usuário.
+test('cliente.js: cliente_acessos filtrado por usuario_id do usuário logado', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const src = fs.readFileSync(path.join(__dirname, 'cliente.js'), 'utf8');
+    const m = src.match(/from\('cliente_acessos'\)[^;]*;/);
+    assert.ok(m, 'consulta de cliente_acessos não encontrada');
+    assert.ok(/\.eq\('usuario_id',\s*user\.id\)/.test(m[0]), 'falta .eq(usuario_id, user.id): ' + m[0]);
+});

@@ -4,20 +4,20 @@ const AC = require('./admin-clientes.js');
 
 test('montarApoio: exato em sócio', () => {
   const r = AC.montarApoio('João da Silva', ['joao da silva', 'Outro'], []);
-  assert.deepStrictEqual(r, { tipo: 'exato', rotulo: '✔ Exato: sócio' });
+  assert.deepStrictEqual(r, { tipo: 'exato', rotulo: 'Nome coincide com sócio — confirmar com a empresa' });
 });
 test('montarApoio: parcial em empregado', () => {
   const r = AC.montarApoio('Maria Souza', [], ['Maria Aparecida Souza']);
-  assert.deepStrictEqual(r, { tipo: 'parcial', rotulo: '~ Parcial: empregado' });
+  assert.deepStrictEqual(r, { tipo: 'parcial', rotulo: 'Nome parecido com empregado — confirmar com a empresa' });
 });
 test('montarApoio: exato vence parcial', () => {
   const r = AC.montarApoio('Maria Souza', ['Maria Aparecida Souza'], ['Maria Souza']);
   assert.strictEqual(r.tipo, 'exato');
-  assert.strictEqual(r.rotulo, '✔ Exato: empregado');
+  assert.strictEqual(r.rotulo, 'Nome coincide com empregado — confirmar com a empresa');
 });
 test('montarApoio: exato em sócio e empregado', () => {
   const r = AC.montarApoio('Ana Lima', ['Ana Lima'], ['Ana Lima']);
-  assert.strictEqual(r.rotulo, '✔ Exato: sócio, empregado');
+  assert.strictEqual(r.rotulo, 'Nome coincide com sócio, empregado — confirmar com a empresa');
 });
 test('montarApoio: nenhum e entradas inválidas', () => {
   assert.deepStrictEqual(AC.montarApoio('Fulano Tal', ['Beltrano'], []), { tipo: 'nenhum', rotulo: 'Nenhuma correspondência' });
@@ -78,4 +78,53 @@ test('montarApoio: truncado sem correspondencia', () => {
   assert.deepStrictEqual(AC.montarApoio('Fulano Tal', ['Beltrano'], [], true),
     { tipo: 'truncado', rotulo: 'Base truncada — conferir manualmente' });
   assert.strictEqual(AC.montarApoio('Ana Lima', ['Ana Lima'], [], true).tipo, 'exato');
+});
+
+test('montarApoio: rótulo nunca afirma identidade (nomes de sócios são públicos)', () => {
+  for (const r of [AC.montarApoio('Ana Lima', ['Ana Lima'], []), AC.montarApoio('Maria Souza', [], ['Maria Aparecida Souza'])]) {
+    assert.ok(/confirmar com a empresa/.test(r.rotulo), r.rotulo);
+    assert.ok(!/Exato|✔/.test(r.rotulo), r.rotulo);
+  }
+});
+
+test('statusAnteriorEsperado: decisão só vale sobre o status mostrado na tela', () => {
+  assert.strictEqual(AC.statusAnteriorEsperado('aprovado'), 'pendente');
+  assert.strictEqual(AC.statusAnteriorEsperado('recusado'), 'pendente');
+  assert.strictEqual(AC.statusAnteriorEsperado('revogado'), 'aprovado');
+  assert.strictEqual(AC.statusAnteriorEsperado('pendente'), null);
+  assert.strictEqual(AC.statusAnteriorEsperado(undefined), null);
+});
+
+test('emailsDeClientes: conjunto normalizado (minúsculas, sem espaços, ignora vazios)', () => {
+  const s = AC.emailsDeClientes([{ email: ' Ana@Cliente.COM ' }, { email: null }, {}, null, { email: 'b@x.com' }]);
+  assert.ok(s instanceof Set);
+  assert.deepStrictEqual([...s].sort(), ['ana@cliente.com', 'b@x.com']);
+  assert.strictEqual(AC.ehEmailCliente(s, 'ANA@cliente.com'), true);
+  assert.strictEqual(AC.ehEmailCliente(s, 'outro@x.com'), false);
+  assert.strictEqual(AC.ehEmailCliente(s, null), false);
+  assert.strictEqual(AC.emailsDeClientes(null).size, 0);
+});
+
+// Verificações estáticas do admin-dashboard.html (script inline, sem DOM nos testes)
+const fs = require('node:fs');
+const path = require('node:path');
+const dash = fs.readFileSync(path.join(__dirname, '..', 'admin-dashboard.html'), 'utf8');
+function corpoFuncao(fonte, nome) {
+  const i = fonte.indexOf('async function ' + nome + '(');
+  assert.ok(i >= 0, 'função ' + nome + ' não encontrada');
+  const prox = /\n(async )?function /g;
+  prox.lastIndex = i + 10;
+  const m = prox.exec(fonte);
+  return fonte.slice(i, m ? m.index : undefined);
+}
+test('decidirAcessoCliente: update condicionado ao status anterior e mensagem de conflito', () => {
+  const f = corpoFuncao(dash, 'decidirAcessoCliente');
+  assert.ok(/\.eq\('status',\s*anterior\)/.test(f), 'falta .eq(status, anterior) no update');
+  assert.ok(f.includes('statusAnteriorEsperado('), 'falta statusAnteriorEsperado');
+  assert.ok(f.includes('o pedido mudou; recarregue'), 'falta mensagem de conflito');
+});
+test('Solicitações: marca e-mail de cliente com aviso', () => {
+  const f = corpoFuncao(dash, 'loadSolicitacoes');
+  assert.ok(f.includes("from('cliente_usuarios')"), 'loadSolicitacoes não consulta cliente_usuarios');
+  assert.ok(dash.includes('e-mail de cliente — aprovar dá acesso interno'), 'falta texto do aviso');
 });

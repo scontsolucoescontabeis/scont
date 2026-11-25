@@ -661,6 +661,7 @@ document.querySelectorAll('.modal').forEach(m =>
 // ─── ESTADO ────────────────────────────────────────────────
 let solicitacoes       = [];
 let ferramentas        = [];
+let emailsClientes     = new Set(); // e-mails de cliente_usuarios (aviso na aba Solicitações)
 let currentSolId       = null;   // solicitacoes_acesso.id atual no modal
 let currentSolTelefone = null;   // telefone do solicitante atual
 let editingFId         = null;   // ferramenta.id em edição (null = nova)
@@ -699,6 +700,19 @@ async function loadSolicitacoes() {
         return;
     }
     solicitacoes = data || [];
+    // E-mails que já são de clientes do portal: aprovar daria acesso interno.
+    // Se a consulta falhar, a aba continua funcionando (só sem o aviso).
+    try {
+        const r = await window.AdminClientes.paginar(async (from, to) => {
+            const { data: cli, error: cliErr } = await sb.from('cliente_usuarios').select('email').order('id').range(from, to);
+            if (cliErr) throw cliErr;
+            return cli || [];
+        });
+        emailsClientes = window.AdminClientes.emailsDeClientes(r.rows);
+    } catch (e) {
+        emailsClientes = new Set();
+        console.warn('loadSolicitacoes (cliente_usuarios):', e);
+    }
     renderSolicitacoes();
     updateStats();
 }
@@ -785,6 +799,14 @@ function renderSolicitacoes() {
             <td>${fmtDate(sol.data_solicitacao)}</td>
             <td><span class="badge ${badgeMap[sol.status]}">${sanitize(sol.status)}</span></td>
             <td class="acts"></td>`;
+
+        if (window.AdminClientes.ehEmailCliente(emailsClientes, sol.email)) {
+            const aviso = document.createElement('span');
+            aviso.className = 'badge badge-rejected';
+            aviso.style.cssText = 'margin-left:6px;text-transform:none';
+            aviso.textContent = '⚠ e-mail de cliente — aprovar dá acesso interno';
+            tr.children[1].appendChild(aviso);
+        }
 
         if (sol.status === 'pendente') {
             const btnA = document.createElement('button');
@@ -1783,6 +1805,8 @@ async function decidirAcessoCliente(acessoId, status, motivo) {
     }
     const v = window.AdminClientes.validarDecisao(status, motivo);
     if (!v.ok) { alert(v.erro); return; }
+    // Só aplica se o pedido ainda está no status mostrado (aba desatualizada não sobrescreve)
+    const anterior = window.AdminClientes.statusAnteriorEsperado(status);
 
     try {
         const { data, error } = await sb
@@ -1794,10 +1818,12 @@ async function decidirAcessoCliente(acessoId, status, motivo) {
                 decidido_em: new Date().toISOString(),
             })
             .eq('id', acessoId)
+            .eq('status', anterior)
             .select('id');
         if (error) throw error;
         if (!data || !data.length) {
-            throw new Error('Nenhum registro foi atualizado. Verifique se seu usuário tem is_admin = TRUE (RLS).');
+            await loadAcessosClientes();
+            throw new Error('Nenhum registro foi atualizado: o pedido mudou; recarregue a lista e confira (se persistir, verifique se seu usuário tem is_admin = TRUE).');
         }
         await loadAcessosClientes();
     } catch (err) {
