@@ -18,7 +18,10 @@ GRANT USAGE ON SCHEMA auth TO anon, authenticated;
 CREATE TABLE auth.users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     email text,
-    raw_user_meta_data jsonb DEFAULT '{}'::jsonb
+    raw_user_meta_data jsonb DEFAULT '{}'::jsonb,
+    created_at timestamptz DEFAULT now(),
+    email_confirmed_at timestamptz,
+    last_sign_in_at timestamptz
 );
 CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS
 $$ SELECT COALESCE(NULLIF(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
@@ -80,3 +83,14 @@ CREATE TABLE public.rh_empresas (
     cnpj            TEXT
 );
 ALTER TABLE public.rh_empresas ENABLE ROW LEVEL SECURITY;
+
+-- Schema storage (minimo): storage.objects com RLS, como no Supabase.
+CREATE SCHEMA storage;
+GRANT USAGE ON SCHEMA storage TO anon, authenticated;
+CREATE TABLE storage.objects (
+    id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    bucket_id text,
+    name      text
+);
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+GRANT ALL ON storage.objects TO anon, authenticated;

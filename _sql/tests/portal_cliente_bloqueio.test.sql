@@ -34,13 +34,39 @@ BEGIN
     SELECT count(*) INTO n FROM pg_policies
       WHERE policyname = 'portal_cliente: somente equipe' AND tablename = 'fixture_sem_rls';
     ASSERT n = 0, 'bloqueio_sem_rls: politica criada em tabela sem RLS';
+    -- InitPlan: eh_equipe() avaliada uma vez por consulta, nao por linha
+    SELECT count(*) INTO n FROM pg_policies
+      WHERE schemaname IN ('public', 'storage') AND policyname = 'portal_cliente: somente equipe'
+        AND (qual NOT LIKE '%( SELECT eh_equipe() AS eh_equipe)%'
+             OR with_check NOT LIKE '%( SELECT eh_equipe() AS eh_equipe)%');
+    ASSERT n = 0, 'bloqueio_initplan: '||n||' politicas sem (SELECT public.eh_equipe())';
+    -- usuarios: so equipe grava (fecha auto-edicao de is_admin)
+    SELECT count(*) INTO n FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'usuarios'
+        AND policyname = 'portal_cliente: somente equipe'
+        AND with_check = '( SELECT eh_equipe() AS eh_equipe)';
+    ASSERT n = 1, 'bloqueio_usuarios_check: WITH CHECK de usuarios nao e so equipe';
+    -- anon so cria solicitacao pendente
+    SELECT count(*) INTO n FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = 'solicitacoes_acesso'
+        AND policyname = 'portal_cliente: anon so pendente'
+        AND permissive = 'RESTRICTIVE' AND cmd = 'INSERT' AND roles = '{anon}';
+    ASSERT n = 1, 'bloqueio_anon_pendente: politica ausente ou com formato errado';
+    -- storage.objects
+    SELECT count(*) INTO n FROM pg_policies
+      WHERE schemaname = 'storage' AND tablename = 'objects'
+        AND policyname = 'portal_cliente: somente equipe';
+    ASSERT n = 1, 'bloqueio_storage: politica em storage.objects='||n;
 END $$;
 -- @@REVERTER@@ (run.sh injeta schema_portal_cliente_bloqueio_reverter.sql aqui)
 DO $$
 DECLARE n int;
 BEGIN
-    SELECT count(*) INTO n FROM pg_policies WHERE policyname = 'portal_cliente: somente equipe';
-    ASSERT n = 0, 'reverter: restaram '||n||' politicas';
+    SELECT count(*) INTO n FROM pg_policies WHERE policyname LIKE 'portal\_cliente:%';
+    ASSERT n = 0, 'reverter: restaram '||n||' politicas portal_cliente:* (public/storage)';
+    SELECT count(*) INTO n FROM pg_policies
+      WHERE schemaname = 'storage' AND policyname LIKE 'storage documentos:%';
+    ASSERT n = 4, 'reverter: politicas antigas de storage afetadas ('||n||')';
     -- reverter preserva politicas antigas
     SELECT count(*) INTO n FROM pg_policies WHERE policyname = 'fixture: authenticated tudo';
     ASSERT n = 5, 'reverter: politicas antigas afetadas ('||n||')';

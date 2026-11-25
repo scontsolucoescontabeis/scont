@@ -17,7 +17,10 @@ CREATE TABLE IF NOT EXISTS public.cliente_usuarios (
 CREATE TABLE IF NOT EXISTS public.cliente_acessos (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     usuario_id      UUID NOT NULL REFERENCES public.cliente_usuarios(id) ON DELETE CASCADE,
-    codigo_empresa  TEXT NOT NULL REFERENCES public.rh_empresas(codigo_empresa) ON DELETE CASCADE,
+    -- RESTRICT (nao CASCADE): Projeto Departamento Pessoal/configuracoes.js apaga
+    -- empresas (uma a uma e apaga-tudo-e-reinsere); CASCADE apagaria em silencio
+    -- os acessos dos clientes. Com RESTRICT a exclusao falha e o erro aparece.
+    codigo_empresa  TEXT NOT NULL REFERENCES public.rh_empresas(codigo_empresa) ON DELETE RESTRICT,
     status          TEXT NOT NULL DEFAULT 'pendente'
                         CHECK (status IN ('pendente', 'aprovado', 'recusado', 'revogado')),
     motivo          TEXT,
@@ -26,6 +29,12 @@ CREATE TABLE IF NOT EXISTS public.cliente_acessos (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT cliente_acessos_usuario_empresa_unique UNIQUE (usuario_id, codigo_empresa)
 );
+
+-- Tabela ja criada com CASCADE: troca a FK para RESTRICT (idempotente).
+ALTER TABLE public.cliente_acessos
+    DROP CONSTRAINT IF EXISTS cliente_acessos_codigo_empresa_fkey,
+    ADD CONSTRAINT cliente_acessos_codigo_empresa_fkey
+        FOREIGN KEY (codigo_empresa) REFERENCES public.rh_empresas(codigo_empresa) ON DELETE RESTRICT;
 
 CREATE INDEX IF NOT EXISTS idx_cliente_acessos_usuario ON public.cliente_acessos (usuario_id, status);
 CREATE INDEX IF NOT EXISTS idx_cliente_acessos_empresa ON public.cliente_acessos (codigo_empresa);

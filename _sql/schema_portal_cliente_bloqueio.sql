@@ -8,9 +8,12 @@
 -- Requer: schema_portal_cliente.sql (public.eh_equipe()).
 -- Excecoes: usuarios e solicitacoes_acesso recebem politica restritiva do proprio
 -- dono (login/cadastro de quem ainda nao e equipe), no fim deste arquivo.
+-- Tambem cria "portal_cliente: anon so pendente" (solicitacoes_acesso, anon) e
+-- "portal_cliente: somente equipe" em storage.objects (se existir).
 -- Limites: pg_tables inclui pai de tabela particionada (particao consultada direto
 -- mantem as proprias politicas); views sem security_invoker ignoram politicas das
--- tabelas; outros schemas estao fora do escopo.
+-- tabelas; funcoes SECURITY DEFINER ignoram RLS (ver schema_portal_cliente_guardas.sql);
+-- outros schemas alem de public/storage estao fora do escopo.
 -- =====================================================================
 DO $$
 DECLARE
@@ -29,23 +32,47 @@ BEGIN
         END IF;
         EXECUTE format('DROP POLICY IF EXISTS "portal_cliente: somente equipe" ON public.%I', t.tablename);
         EXECUTE format(
-            'CREATE POLICY "portal_cliente: somente equipe" ON public.%I AS RESTRICTIVE FOR ALL TO authenticated USING (public.eh_equipe()) WITH CHECK (public.eh_equipe())',
+            'CREATE POLICY "portal_cliente: somente equipe" ON public.%I AS RESTRICTIVE FOR ALL TO authenticated USING ((SELECT public.eh_equipe())) WITH CHECK ((SELECT public.eh_equipe()))',
             t.tablename);
     END LOOP;
 END $$;
 
--- usuarios: equipe ve tudo; qualquer um ve/edita apenas a propria linha.
+-- (SELECT public.eh_equipe()) = InitPlan: avaliada uma vez por consulta.
+-- usuarios: equipe ve tudo; nao-equipe ve apenas a propria linha e NAO grava
+-- (a politica antiga usuarios_update_own do CRM nao tem WITH CHECK e deixaria
+-- o cliente marcar is_admin = true na propria linha).
 DROP POLICY IF EXISTS "portal_cliente: somente equipe" ON public.usuarios;
 CREATE POLICY "portal_cliente: somente equipe" ON public.usuarios
     AS RESTRICTIVE FOR ALL TO authenticated
-    USING (public.eh_equipe() OR id = auth.uid())
-    WITH CHECK (public.eh_equipe() OR id = auth.uid());
+    USING ((SELECT public.eh_equipe()) OR id = auth.uid())
+    WITH CHECK ((SELECT public.eh_equipe()));
 
 -- solicitacoes_acesso: quem ainda nao e equipe cria/le so a propria solicitacao
 -- (por e-mail do JWT) e nunca com status diferente de 'pendente'.
 DROP POLICY IF EXISTS "portal_cliente: somente equipe" ON public.solicitacoes_acesso;
 CREATE POLICY "portal_cliente: somente equipe" ON public.solicitacoes_acesso
     AS RESTRICTIVE FOR ALL TO authenticated
-    USING (public.eh_equipe() OR lower(email) = lower(auth.jwt() ->> 'email'))
-    WITH CHECK (public.eh_equipe()
+    USING ((SELECT public.eh_equipe()) OR lower(email) = lower(auth.jwt() ->> 'email'))
+    WITH CHECK ((SELECT public.eh_equipe())
                 OR (lower(email) = lower(auth.jwt() ->> 'email') AND status = 'pendente'));
+
+-- solicitacoes_acesso, anon: o cadastro de equipe (login.html) insere como anon.
+-- A politica antiga "solicitacoes: inserir cadastro" (schema.sql, sem TO) aceita
+-- qualquer linha, inclusive status 'aprovado' -- o que tornaria o anon equipe.
+DROP POLICY IF EXISTS "portal_cliente: anon so pendente" ON public.solicitacoes_acesso;
+CREATE POLICY "portal_cliente: anon so pendente" ON public.solicitacoes_acesso
+    AS RESTRICTIVE FOR INSERT TO anon
+    WITH CHECK (status = 'pendente' AND avaliado_por IS NULL AND data_avaliacao IS NULL);
+
+-- storage.objects: politicas antigas (ex.: bucket 'documentos' do Gerenciador
+-- de Formularios) liberam leitura/exclusao a qualquer authenticated. So aplica
+-- se o schema storage existir. anon (upload de formulario publico) inalterado.
+DO $$
+BEGIN
+    IF to_regclass('storage.objects') IS NULL THEN
+        RAISE NOTICE 'storage.objects nao existe: bloqueio de storage nao aplicado.';
+        RETURN;
+    END IF;
+    EXECUTE 'DROP POLICY IF EXISTS "portal_cliente: somente equipe" ON storage.objects';
+    EXECUTE 'CREATE POLICY "portal_cliente: somente equipe" ON storage.objects AS RESTRICTIVE FOR ALL TO authenticated USING ((SELECT public.eh_equipe())) WITH CHECK ((SELECT public.eh_equipe()))';
+END $$;

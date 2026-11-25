@@ -1,13 +1,15 @@
--- Reverte schema_portal_cliente_bloqueio.sql: remove a politica restritiva
--- "portal_cliente: somente equipe" de todas as tabelas de public.
+-- Reverte schema_portal_cliente_bloqueio.sql: remove TODAS as politicas
+-- "portal_cliente: ..." (somente equipe, anon so pendente) de public e storage.
+-- Politicas antigas nao sao tocadas.
 DO $$
 DECLARE
     p record;
 BEGIN
     FOR p IN
-        SELECT schemaname, tablename FROM pg_policies
-        WHERE schemaname = 'public' AND policyname = 'portal_cliente: somente equipe'
+        SELECT schemaname, tablename, policyname FROM pg_policies
+        WHERE schemaname IN ('public', 'storage')
+          AND policyname LIKE 'portal\_cliente:%'
     LOOP
-        EXECUTE format('DROP POLICY IF EXISTS "portal_cliente: somente equipe" ON %I.%I', p.schemaname, p.tablename);
+        EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', p.policyname, p.schemaname, p.tablename);
     END LOOP;
 END $$;
