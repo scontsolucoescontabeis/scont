@@ -20,7 +20,7 @@ DECLARE
 BEGIN
     -- Autorizacao ANTES de tocar em qualquer dado.
     -- O admin passa sempre (codigo inexistente devolve empresa: null).
-    IF NOT public.is_admin() AND (p_codigo IS NULL OR NOT EXISTS (
+    IF NOT COALESCE(public.is_admin(), false) AND (p_codigo IS NULL OR NOT EXISTS (
         SELECT 1 FROM public.empresas_do_cliente() e WHERE e = p_codigo
     )) THEN
         RAISE EXCEPTION 'Sem acesso a esta empresa' USING ERRCODE = '42501';
@@ -58,7 +58,13 @@ BEGIN
            ORDER BY j.codigo_empregado, j.dia_semana), '[]'::jsonb)
       INTO v_jornadas
       FROM public.rh_jornada_trabalho j
-     WHERE j.codigo_empresa = p_codigo;
+     WHERE j.codigo_empresa = p_codigo
+       -- so empregados elegiveis, casando as DUAS chaves (empresa + empregado)
+       AND EXISTS (SELECT 1 FROM public.rh_empregados e
+                    WHERE e.codigo_empresa = j.codigo_empresa
+                      AND e.codigo_empregado = j.codigo_empregado
+                      AND e.situacao = 'Trabalhando'
+                      AND e.tipo_empregado IN ('Empregado', 'Estagiário'));
 
     SELECT COALESCE(jsonb_agg(jsonb_build_object(
                'codigo_empregado', f.codigo_empregado,
@@ -68,6 +74,12 @@ BEGIN
       INTO v_ferias
       FROM public.rh_ferias_calculadas f
      WHERE f.codigo_empresa = p_codigo
+       -- so empregados elegiveis, casando as DUAS chaves (empresa + empregado)
+       AND EXISTS (SELECT 1 FROM public.rh_empregados e
+                    WHERE e.codigo_empresa = f.codigo_empresa
+                      AND e.codigo_empregado = f.codigo_empregado
+                      AND e.situacao = 'Trabalhando'
+                      AND e.tipo_empregado IN ('Empregado', 'Estagiário'))
        AND f.ferias_fim >= current_date;
 
     RETURN jsonb_build_object(
