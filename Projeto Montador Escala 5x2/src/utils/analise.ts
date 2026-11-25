@@ -8,6 +8,8 @@ import type { DiaEscala, Escala, ResultadoConformidade, Turno } from '../types'
 export type DadosAnalise = Pick<Dados, 'empresa' | 'cobertura' | 'feriados'> & {
   turnos?: Dados['turnos']
   funcoes?: Dados['funcoes']
+  /** Regras por pessoa; sem elas, o padrão (`REGRAS_PESSOAIS_PADRAO`). */
+  regrasPessoais?: Dados['regrasPessoais']
 }
 
 export function analisar(dados: DadosAnalise, escala: Escala): ResultadoConformidade {
@@ -20,6 +22,7 @@ export function analisar(dados: DadosAnalise, escala: Escala): ResultadoConformi
     compensacaoDiaria: dados.empresa.compensacaoDiaria,
     cicloDomingoSemanas: cicloDomingoDoSetor(dados.empresa.setor),
     regras: REGRAS,
+    regrasPessoais: dados.regrasPessoais,
   })
 }
 

@@ -4,7 +4,8 @@
  */
 import { intervaloParaBruto } from '../engine/jornada'
 import { minutosDe } from '../engine/datas'
-import type { Funcao, PessoaEscala } from '../types'
+import { REGRAS_PESSOAIS_PADRAO } from '../config/regras'
+import type { Funcao, PessoaEscala, RegrasPessoais } from '../types'
 
 export interface DadosPortal {
   empresa: { codigo_empresa: string; nome_empresa: string; uf?: string | null; municipio?: string | null } | null
@@ -13,6 +14,8 @@ export interface DadosPortal {
     nome_empregado: string
     cargo: string | null
     tipo_empregado?: string | null
+    sexo?: string | null
+    menor_de_idade?: boolean | null
   }[]
   jornadas: {
     codigo_empregado: string
@@ -113,6 +116,7 @@ function montarPessoa(
   e: DadosPortal['empregados'][number],
   linhas: DadosPortal['jornadas'],
   feriasDe: DadosPortal['ferias'],
+  regras: RegrasPessoais,
 ): PessoaEscala {
   const porDia = new Map<string, DadosPortal['jornadas'][number]>()
   for (const r of linhas) {
@@ -126,13 +130,25 @@ function montarPessoa(
     .map((f) => ({ inicio: f.ferias_inicio as string, fim: f.ferias_fim as string }))
     .sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0))
 
-  const base = { id: String(e.codigo_empregado), nome: e.nome_empregado, escalar: true, ferias }
-  if (dias.length === 0) return { ...base, jornadaPadrao: true, horasSemanais: PADRAO_HORAS }
+  const sexoNorm = (e.sexo ?? '').trim().toUpperCase()
+  const estagiario = semAcento((e.tipo_empregado ?? '').trim().toLowerCase()).startsWith('estag')
+  const base = {
+    id: String(e.codigo_empregado),
+    nome: e.nome_empregado,
+    escalar: true,
+    ferias,
+    ...(sexoNorm === 'F' || sexoNorm === 'M' ? { sexo: sexoNorm as 'F' | 'M' } : {}),
+    menor: e.menor_de_idade === true,
+    estagiario,
+  }
+  if (dias.length === 0)
+    return { ...base, jornadaPadrao: true, horasSemanais: estagiario ? regras.estagioHorasSemanais : PADRAO_HORAS }
 
+  const derivadas = Math.min(HORAS_MAX, arred1(dias.reduce((a, d) => a + d.liquidoMin, 0) / 60))
   const pessoa: PessoaEscala = {
     ...base,
     jornadaPadrao: false,
-    horasSemanais: Math.min(HORAS_MAX, arred1(dias.reduce((a, d) => a + d.liquidoMin, 0) / 60)),
+    horasSemanais: estagiario ? Math.min(derivadas, regras.estagioHorasSemanais) : derivadas,
   }
   if (dias.every((d) => d.entrada === dias[0].entrada && d.saida === dias[0].saida)) {
     pessoa.entrada = dias[0].entrada
@@ -154,7 +170,10 @@ function agrupar<T>(itens: T[], chave: (t: T) => string): Map<string, T[]> {
   return m
 }
 
-export function mapearDadosPortal(d: DadosPortal): { nomeEmpresa: string; funcoes: Funcao[] } {
+export function mapearDadosPortal(
+  d: DadosPortal,
+  regras: RegrasPessoais = REGRAS_PESSOAIS_PADRAO,
+): { nomeEmpresa: string; funcoes: Funcao[] } {
   const jornadasPor = agrupar(d.jornadas, (r) => String(r.codigo_empregado))
   const feriasPor = agrupar(d.ferias, (r) => String(r.codigo_empregado))
   const grupos = new Map<string, { nome: string; pessoas: PessoaEscala[] }>()
@@ -162,7 +181,7 @@ export function mapearDadosPortal(d: DadosPortal): { nomeEmpresa: string; funcoe
   for (const e of d.empregados) {
     const k = chaveCargo(e.cargo)
     const cod = String(e.codigo_empregado)
-    const pessoa = montarPessoa(e, jornadasPor.get(cod) ?? [], feriasPor.get(cod) ?? [])
+    const pessoa = montarPessoa(e, jornadasPor.get(cod) ?? [], feriasPor.get(cod) ?? [], regras)
     const g = grupos.get(k)
     if (g) g.pessoas.push(pessoa)
     else grupos.set(k, { nome: k === 'sem-cargo' ? SEM_CARGO : (e.cargo ?? '').trim(), pessoas: [pessoa] })

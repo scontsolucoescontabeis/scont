@@ -11,12 +11,19 @@ export function QuadroContratacoes() {
   const cobertura = useStore((s) => s.cobertura)
   const custo = useStore((s) => s.custo)
   const etapa = useStore((s) => s.etapaImpacto)
+  const regrasPessoais = useStore((s) => s.regrasPessoais)
   const set = useStore((s) => s.set)
 
   const q = useMemo(
-    () => calcularQuadro({ empresa, funcoes, turnos, cobertura, custo }, etapa),
-    [empresa, funcoes, turnos, cobertura, custo, etapa],
+    () => calcularQuadro({ empresa, funcoes, turnos, cobertura, custo }, etapa, REGRAS, regrasPessoais),
+    [empresa, funcoes, turnos, cobertura, custo, etapa, regrasPessoais],
   )
+  const fmt1 = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+  const difere = Math.abs(q.equipeEquivalente - q.equipeAtual) > 0.05
+  const equipeTxt = difere
+    ? `${q.equipeAtual} pessoas, ≈ ${fmt1(q.equipeEquivalente)} em tempo integral`
+    : `${q.equipeAtual} pessoas`
+  const somaLinhas = q.linhasTurno.reduce((s, l) => s + l.necessarios, 0)
 
   return (
     <section className="cartao space-y-4" aria-labelledby="t-quadro">
@@ -43,8 +50,10 @@ export function QuadroContratacoes() {
         role="status"
       >
         {q.contratar > 0
-          ? `Para cobrir a cobertura mínima na escala 5x2 são necessárias ${q.necessarioTotal} pessoas; a equipe atual tem ${q.equipeAtual}. Sugestão: contratar ${q.contratar}.`
-          : `A equipe atual (${q.equipeAtual}) é suficiente para a cobertura mínima informada (necessárias: ${q.necessarioTotal}).`}
+          ? `Para cobrir a cobertura mínima na escala 5x2 são necessárias ${q.necessarioTotal} pessoas em tempo integral; a equipe atual tem ${
+              difere ? `${q.equipeAtual} (≈ ${fmt1(q.equipeEquivalente)} em tempo integral)` : q.equipeAtual
+            }. Sugestão: contratar ${q.contratar}.`
+          : `A equipe atual (${equipeTxt}) é suficiente para a cobertura mínima informada (necessárias: ${q.necessarioTotal} em tempo integral).`}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
@@ -52,8 +61,8 @@ export function QuadroContratacoes() {
           <thead>
             <tr className="border-b border-line">
               <th className="py-1 pr-2">Período</th>
-              <th className="px-2">Pessoa-dia/semana</th>
-              <th className="px-2">Dias por pessoa</th>
+              <th className="px-2">Turnos/semana</th>
+              <th className="px-2">Turnos por pessoa</th>
               <th className="px-2">Necessárias (5x2)</th>
               <th className="px-2">Seriam (6x1)</th>
             </tr>
@@ -71,14 +80,20 @@ export function QuadroContratacoes() {
           </tbody>
           <tfoot>
             <tr className="font-semibold">
-              <td className="py-1 pr-2">Total</td>
-              <td className="px-2" />
+              <td className="py-1 pr-2">Total (todos os períodos juntos)</td>
+              <td className="px-2">{q.turnosSemana}</td>
               <td className="px-2" />
               <td className="px-2">{q.necessarioTotal}</td>
               <td className="px-2" />
             </tr>
           </tfoot>
         </table>
+        {somaLinhas !== q.necessarioTotal && (
+          <p className="mt-1 text-xs text-soft">
+            Turnos compartilhados entre períodos: o total não é a soma das linhas, porque a mesma jornada cobre mais de um
+            período (ou um período curto exige jornadas inteiras que também servem aos vizinhos).
+          </p>
+        )}
       </div>
 
       <div className="overflow-x-auto">
@@ -116,11 +131,21 @@ export function QuadroContratacoes() {
         </table>
       </div>
 
+      {q.observacoes.length > 0 && (
+        <ul className="list-disc space-y-1 pl-5 text-sm text-yellow-900">
+          {q.observacoes.map((o, i) => (
+            <li key={i}>{o}</li>
+          ))}
+        </ul>
+      )}
+
       <p className="text-xs text-soft">
-        ESTIMATIVA: cada pessoa trabalha no máximo 5 dias por semana, em jornada de até 8h24 líquidas e respeita o limite de horas da etapa. As contratações
-        são distribuídas entre as funções na proporção da equipe atual — ajuste conforme a necessidade real de cada
-        função. Custo = salário-base × (1 + encargos); sem salário informado aparece “—”. Não considera férias, faltas
-        nem rodízio de domingos.
+        ESTIMATIVA: cada pessoa cumpre jornadas inteiras (até 8h24 líquidas + intervalo), sempre no mesmo horário, no
+        máximo 5 dias por semana e dentro do limite de horas da etapa; um período mais curto que a jornada ainda exige a
+        jornada inteira. Considera o rodízio de domingos do setor. Na equipe atual, quem tem carga menor conta
+        proporcionalmente (ex.: estagiário de 30h ≈ 0,7 pessoa em tempo integral). As contratações são distribuídas
+        entre as funções na proporção da equipe atual — ajuste conforme a necessidade real de cada função. Custo =
+        salário-base × (1 + encargos); sem salário informado aparece “—”. Não considera férias nem faltas.
       </p>
     </section>
   )

@@ -1,12 +1,64 @@
 import { describe, expect, it } from 'vitest'
 import type { Funcao, PessoaEscala } from '../types'
-import { atualizarPessoa, jornadaMaisComum, normalizarHoras, normalizarIntervalo, resumoFerias } from './equipe'
+import {
+  OPCOES_JORNADA_ESTAGIO,
+  ROTULO_REGRA_MULHERES,
+  atualizarPessoa,
+  etiquetasPessoa,
+  jornadaMaisComum,
+  normalizarHoras,
+  normalizarIntervalo,
+  resumoFerias,
+  rotuloSexo,
+} from './equipe'
+import { REGRAS_PESSOAIS_PADRAO } from '../config/regras'
+
+describe('regras por pessoa (passo 2)', () => {
+  const ligado = { ...REGRAS_PESSOAIS_PADRAO, mulheresDomingoQuinzenal: true }
+  const desligado = { ...REGRAS_PESSOAIS_PADRAO, mulheresDomingoQuinzenal: false }
+  const p = (extra: Partial<PessoaEscala> = {}): PessoaEscala => ({
+    id: 'x',
+    nome: 'X',
+    escalar: true,
+    jornadaPadrao: false,
+    menor: false,
+    estagiario: false,
+    ferias: [],
+    ...extra,
+  })
+
+  it('rotuloSexo', () => {
+    expect(rotuloSexo('F')).toBe('Feminino')
+    expect(rotuloSexo('M')).toBe('Masculino')
+    expect(rotuloSexo(undefined)).toBe('—')
+  })
+
+  it('etiquetas: estagiário, menor e domingo quinzenal só para mulheres com a regra ligada', () => {
+    expect(etiquetasPessoa(p(), ligado)).toEqual([])
+    expect(etiquetasPessoa(p({ estagiario: true, menor: true }), ligado)).toEqual(['estagiário', 'menor de 18'])
+    expect(etiquetasPessoa(p({ sexo: 'F' }), ligado)).toEqual(['domingo quinzenal (art. 386)'])
+    expect(etiquetasPessoa(p({ sexo: 'F' }), desligado)).toEqual([])
+    expect(etiquetasPessoa(p({ sexo: 'M' }), ligado)).toEqual([])
+    expect(etiquetasPessoa(p({ sexo: 'F', estagiario: true }), ligado)).toEqual(['estagiário', 'domingo quinzenal (art. 386)'])
+  })
+
+  it('opções da jornada do estagiário: 20, 30 (padrão) e 40 h', () => {
+    expect(OPCOES_JORNADA_ESTAGIO.map((o) => o.valor)).toEqual([20, 30, 40])
+    expect(OPCOES_JORNADA_ESTAGIO[0].rotulo).toBe('20 h (ensino fundamental ou especial — 4 h/dia)')
+    expect(OPCOES_JORNADA_ESTAGIO[1].rotulo).toBe('30 h (padrão — 6 h/dia)')
+    expect(OPCOES_JORNADA_ESTAGIO[2].rotulo).toBe('40 h (cursos que alternam teoria e prática — 8 h/dia)')
+    expect(OPCOES_JORNADA_ESTAGIO.some((o) => o.valor === REGRAS_PESSOAIS_PADRAO.estagioHorasSemanais)).toBe(true)
+    expect(ROTULO_REGRA_MULHERES).toBe('Aplicar CLT art. 386 às mulheres (domingo de folga ao menos a cada 2 semanas)')
+  })
+})
 
 const pessoa = (id: string, extra: Partial<PessoaEscala> = {}): PessoaEscala => ({
   id,
   nome: `Pessoa ${id}`,
   escalar: true,
   jornadaPadrao: false,
+  menor: false,
+  estagiario: false,
   ferias: [],
   ...extra,
 })

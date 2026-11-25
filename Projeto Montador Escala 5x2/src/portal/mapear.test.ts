@@ -234,3 +234,61 @@ describe('mapearDadosPortal', () => {
     expect(p.intervaloMin).toBe(270)
   })
 })
+
+describe('mapearDadosPortal — regras por pessoa', () => {
+  const um = (e: Record<string, unknown>, jornadas: J[] = []) =>
+    mapearDadosPortal(dados({ empregados: [{ ...emp('1', 'Ana'), ...e }], jornadas })).funcoes[0].pessoas![0]
+
+  it('sexo: F e M (qualquer caixa); outros valores e null viram undefined', () => {
+    expect(um({ sexo: 'F' }).sexo).toBe('F')
+    expect(um({ sexo: 'm' }).sexo).toBe('M')
+    expect(um({ sexo: 'Feminino' }).sexo).toBeUndefined()
+    expect(um({ sexo: null }).sexo).toBeUndefined()
+    expect(um({}).sexo).toBeUndefined()
+  })
+
+  it('menor: só quando menor_de_idade === true', () => {
+    expect(um({ menor_de_idade: true }).menor).toBe(true)
+    expect(um({ menor_de_idade: false }).menor).toBe(false)
+    expect(um({ menor_de_idade: null }).menor).toBe(false)
+    expect(um({}).menor).toBe(false)
+  })
+
+  it('estagiário: três grafias; Empregado e ausente não', () => {
+    for (const t of ['Estágiario', 'Estagiário', 'Estagiario', ' ESTAGIÁRIO ']) expect(um({ tipo_empregado: t }).estagiario).toBe(true)
+    expect(um({ tipo_empregado: 'Empregado' }).estagiario).toBe(false)
+    expect(um({ tipo_empregado: null }).estagiario).toBe(false)
+    expect(um({ tipo_empregado: undefined }).estagiario).toBe(false)
+  })
+
+  it('estagiário sem jornada no banco usa a carga das regras (30 padrão; 20/40 com o argumento)', () => {
+    const e = { tipo_empregado: 'Estagiário' }
+    expect(um(e).horasSemanais).toBe(30)
+    for (const h of [20, 30, 40] as const) {
+      const p = mapearDadosPortal(dados({ empregados: [{ ...emp('1', 'Ana'), ...e }] }), { mulheresDomingoQuinzenal: true, estagioHorasSemanais: h }).funcoes[0].pessoas![0]
+      expect(p.horasSemanais).toBe(h)
+      expect(p.jornadaPadrao).toBe(true)
+    }
+  })
+
+  it('estagiário com jornada no banco acima do limite é limitado; abaixo fica', () => {
+    const e = { tipo_empregado: 'Estagiário' }
+    const alta = um(e, semana('1', '08:00', '17:00', '12:00', '13:00')) // 40h
+    expect(alta.horasSemanais).toBe(30)
+    expect(alta.entrada).toBe('08:00')
+    expect(alta.saida).toBe('17:00')
+    expect(alta.intervaloMin).toBe(60)
+    const baixa = um(e, semana('1', '08:00', '12:00')) // 4h x5 = 20h menos intervalo auto
+    expect(baixa.horasSemanais).toBeLessThanOrEqual(30)
+  })
+
+  it('adulto Empregado inalterado (44 padrão; derivado com jornada)', () => {
+    expect(um({}).horasSemanais).toBe(44)
+    expect(um({}, semana('1', '08:00', '17:00', '12:00', '13:00')).horasSemanais).toBe(40)
+  })
+
+  it('mediana do grupo continua funcionando com estagiários', () => {
+    const r = mapearDadosPortal(dados({ empregados: [{ ...emp('1', 'A'), tipo_empregado: 'Estagiário' }, emp('2', 'B'), emp('3', 'C')] }))
+    expect(r.funcoes[0].horasSemanaisAtuais).toBe(44)
+  })
+})

@@ -17,7 +17,7 @@ export type Validador = (escala: Escala) => ResultadoConformidade
 const PESO = { vermelho: 10, amarelo: 1 } as const
 
 /** Correções aceitas mesmo sem reduzir a pontuação, desde que resolvam o próprio alerta. */
-const PRIORIDADE_LEGAL = /(repousoPreferencialDomingo|domingoRodizio)$/
+const PRIORIDADE_LEGAL = /(repousoPreferencialDomingo|domingoRodizio|domingoMulher)$/
 
 export function pontuacao(r: ResultadoConformidade): number {
   return r.contagem.vermelho * PESO.vermelho + r.contagem.amarelo * PESO.amarelo

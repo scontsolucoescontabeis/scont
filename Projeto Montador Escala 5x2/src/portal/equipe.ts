@@ -1,4 +1,28 @@
-import type { Funcao, PessoaEscala } from '../types'
+import type { Funcao, PessoaEscala, RegrasPessoais } from '../types'
+
+/** Rótulo do interruptor do art. 386 da CLT (Passo 2, modo portal). */
+export const ROTULO_REGRA_MULHERES = 'Aplicar CLT art. 386 às mulheres (domingo de folga ao menos a cada 2 semanas)'
+
+/** Opções de jornada máxima do estagiário (Lei 11.788/2008, art. 10). */
+export const OPCOES_JORNADA_ESTAGIO: { valor: RegrasPessoais['estagioHorasSemanais']; rotulo: string }[] = [
+  { valor: 20, rotulo: '20 h (ensino fundamental ou especial — 4 h/dia)' },
+  { valor: 30, rotulo: '30 h (padrão — 6 h/dia)' },
+  { valor: 40, rotulo: '40 h (cursos que alternam teoria e prática — 8 h/dia)' },
+]
+
+/** Sexo do cadastro do RH por extenso; ausente → "—". */
+export function rotuloSexo(s?: 'F' | 'M'): string {
+  return s === 'F' ? 'Feminino' : s === 'M' ? 'Masculino' : '—'
+}
+
+/** Etiquetas ao lado do nome (somente leitura, vindas do RH e das regras por pessoa). */
+export function etiquetasPessoa(p: PessoaEscala, regras: RegrasPessoais): string[] {
+  const out: string[] = []
+  if (p.estagiario) out.push('estagiário')
+  if (p.menor) out.push('menor de 18')
+  if (p.sexo === 'F' && regras.mulheresDomingoQuinzenal) out.push('domingo quinzenal (art. 386)')
+  return out
+}
 
 export type EdicaoPessoa = Partial<
   Pick<PessoaEscala, 'escalar' | 'horasSemanais' | 'entrada' | 'saida' | 'intervaloMin'>

@@ -76,6 +76,7 @@ export function StepEscala() {
   const funcoes = useStore((s) => s.funcoes)
   const turnos = useStore((s) => s.turnos)
   const feriados = useStore((s) => s.feriados)
+  const regrasPessoais = useStore((s) => s.regrasPessoais)
 
   const set = useStore((s) => s.set)
   const [autoCorrigidas, setAutoCorrigidas] = useState(0)
@@ -83,16 +84,16 @@ export function StepEscala() {
   // Correção automática: tudo que o motor sabe corrigir é corrigido assim que a escala muda.
   useEffect(() => {
     if (!escala) return
-    const r = corrigirTudo(escala, (e) => analisar({ empresa, cobertura, feriados, turnos, funcoes }, e))
+    const r = corrigirTudo(escala, (e) => analisar({ empresa, cobertura, feriados, turnos, funcoes, regrasPessoais }, e))
     if (r.aplicadas > 0) {
       setAutoCorrigidas((n) => n + r.aplicadas)
       set({ escala: r.escala })
     }
-  }, [escala, empresa, cobertura, feriados, turnos, funcoes, set])
+  }, [escala, empresa, cobertura, feriados, turnos, funcoes, regrasPessoais, set])
 
   const resultado = useMemo(
-    () => (escala ? analisar({ empresa, cobertura, feriados, turnos, funcoes }, escala) : null),
-    [escala, empresa, cobertura, feriados, turnos, funcoes],
+    () => (escala ? analisar({ empresa, cobertura, feriados, turnos, funcoes, regrasPessoais }, escala) : null),
+    [escala, empresa, cobertura, feriados, turnos, funcoes, regrasPessoais],
   )
 
   return (

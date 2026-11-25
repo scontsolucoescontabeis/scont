@@ -18,6 +18,8 @@ CREATE TABLE public.rh_empregados (
     cpf             text,
     salario         numeric,
     endereco        text,
+    sexo            text,
+    data_nascimento date,
     UNIQUE (codigo_empresa, codigo_empregado)
 );
 CREATE TABLE public.rh_jornada_trabalho (

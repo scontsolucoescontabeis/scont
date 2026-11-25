@@ -148,4 +148,47 @@ describe('carregarDoPortal (store)', () => {
     for (const k of ['funcoes', 'escala', 'propostas', 'passo', 'empresa', 'turnos', 'cobertura', 'feriados', 'custo', 'inicioEscala', 'semanas', 'comparar', 'etapaImpacto', 'propostaAtivaId'])
       expect(Object.keys(o)).toContain(k)
   })
+
+  it('persiste regrasPessoais no portal e no avulso', async () => {
+    carregarDadosPortal.mockResolvedValue(dados('08:00'))
+    let s = await novaStore()
+    await s.getState().carregarDoPortal('55')
+    s.getState().setRegrasPessoais({ mulheresDomingoQuinzenal: false })
+    vi.advanceTimersByTime(400)
+    expect(salvo().regrasPessoais).toEqual({ mulheresDomingoQuinzenal: false, estagioHorasSemanais: 30 })
+
+    vi.stubGlobal('window', { location: { search: '' } })
+    s = await novaStore()
+    s.getState().set({ passo: 1 })
+    vi.advanceTimersByTime(400)
+    expect(JSON.parse(mem.get('scont.montador-escala-5x2.v1')!).regrasPessoais).toEqual({ mulheresDomingoQuinzenal: true, estagioHorasSemanais: 30 })
+  })
+
+  it('setRegrasPessoais re-mapeia estagiário sem jornada (30 -> 20 h) mantendo sobreposições', async () => {
+    const d = dados('08:00', [['1', 'Ana']])
+    d.empregados.push({ codigo_empregado: '9', nome_empregado: 'Teo', cargo: 'Atendente', tipo_empregado: 'Estagiário' } as never)
+    carregarDadosPortal.mockResolvedValue(d)
+    const s = await novaStore()
+    await s.getState().carregarDoPortal('55')
+    const teo = () => pessoas(s).find((p) => p.id === '9')!
+    expect(teo().horasSemanais).toBe(30)
+    expect(teo().estagiario).toBe(true)
+    const f0 = s.getState().funcoes[0]
+    s.getState().set({ funcoes: [{ ...f0, pessoas: f0.pessoas!.map((p) => (p.id === '1' ? { ...p, entrada: '10:00' } : p)) }] })
+    s.getState().setRegrasPessoais({ estagioHorasSemanais: 20 })
+    expect(s.getState().regrasPessoais.estagioHorasSemanais).toBe(20)
+    expect(s.getState().regrasPessoais.mulheresDomingoQuinzenal).toBe(true)
+    expect(teo().horasSemanais).toBe(20)
+    expect(pessoas(s).find((p) => p.id === '1')!.entrada).toBe('10:00')
+  })
+
+  it('carga do portal usa as regras persistidas', async () => {
+    mem.set(CHAVE, JSON.stringify({ regrasPessoais: { mulheresDomingoQuinzenal: true, estagioHorasSemanais: 40 } }))
+    const d = dados('08:00', [])
+    d.empregados.push({ codigo_empregado: '9', nome_empregado: 'Teo', cargo: 'Atendente', tipo_empregado: 'Estagiário' } as never)
+    carregarDadosPortal.mockResolvedValue(d)
+    const s = await novaStore()
+    await s.getState().carregarDoPortal('55')
+    expect(pessoas(s)[0].horasSemanais).toBe(40)
+  })
 })

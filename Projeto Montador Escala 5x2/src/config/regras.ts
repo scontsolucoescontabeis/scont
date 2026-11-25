@@ -1,3 +1,5 @@
+import type { RegrasPessoais } from '../types'
+
 /**
  * REGRAS LEGAIS PARAMETRIZADAS — EC 141/2026 (fim da escala 6x1).
  *
@@ -61,6 +63,19 @@ export interface RegrasLegais {
   intervaloMaxMinutos: number
   /** Trabalho noturno urbano (CLT art. 73): 22h–5h, hora reduzida de 52min30s. */
   noturno: { inicio: string; fim: string; minutosHoraReduzida: number }
+  /** Regras por pessoa (mulheres, estagiários e menores de idade). */
+  pessoas: {
+    /** CLT art. 386: revezamento aos domingos para mulheres, no máximo quinzenal (1 domingo de folga a cada 2 semanas). */
+    domingoMulherCicloSemanas: number
+    /** Lei 11.788/2008 art. 10, I: estagiário até 6 h/dia (30 h/semana). */
+    estagioHorasDiaMax: number
+    /** Lei 11.788/2008 art. 10, §1º: até 8 h/dia em cursos que alternam teoria e prática (40 h/semana). */
+    estagioHorasDiaMax40: number
+    /** CLT arts. 411 e 413: menor de 18 anos, jornada diária de 8 h, sem horas extras (salvo exceções legais). */
+    menorHorasDiaMax: number
+    /** CLT art. 404: proibido o trabalho noturno ao menor de 18 anos (22h–5h). */
+    menorNoturno: { inicio: string; fim: string }
+  }
   avisoLegal: string
   /** Base legal citada no rodapé dos relatórios. */
   baseLegal: string[]
@@ -110,6 +125,14 @@ export const REGRAS: RegrasLegais = {
   intervaloMaxMinutos: 120,
   noturno: { inicio: '22:00', fim: '05:00', minutosHoraReduzida: 52.5 },
 
+  pessoas: {
+    domingoMulherCicloSemanas: 2, // CLT art. 386
+    estagioHorasDiaMax: 6, // Lei 11.788/2008 art. 10, I
+    estagioHorasDiaMax40: 8, // Lei 11.788/2008 art. 10, §1º
+    menorHorasDiaMax: 8, // CLT arts. 411 e 413
+    menorNoturno: { inicio: '22:00', fim: '05:00' }, // CLT art. 404
+  },
+
   avisoLegal:
     'Esta ferramenta é um apoio ao planejamento e NÃO substitui a análise do Departamento Pessoal ' +
     'nem de assessoria jurídica. Os parâmetros seguem a EC 141/2026 conforme interpretação vigente na ' +
@@ -122,6 +145,9 @@ export const REGRAS: RegrasLegais = {
     'Liminar do STF de 12/11/2026 (ADIs 8.041 e 8.042): permite, sem convenção ou acordo coletivo até 15/12/2026, distribuir as 42 horas em cinco jornadas de até 8h24, sem horas extras, até 15/12/2027.',
     'CLT arts. 58, 59, 66, 67, 71 e 73; Lei 605/1949 (RSR); Lei 10.101/2000 art. 6º (domingo ao menos 1 vez a cada 3 semanas no comércio); Súmula 110 e OJ 410 (SDI-1) do TST.',
     'A decisão ainda depende de referendo do Plenário; em 17/11/2026 o rito foi convertido em julgamento de mérito.',
+    'CLT art. 386 (domingo quinzenal às mulheres — validar aplicação e convenção coletiva com o DP)',
+    'Lei 11.788/2008, art. 10 (estagiário: 6 h/dia e 30 h/semana; 4 h/20 h no ensino fundamental ou especial; 40 h em cursos que alternam teoria e prática)',
+    'CLT arts. 404, 411 e 413 (menor de 18 anos: sem trabalho noturno e sem horas extras; 8 h/dia)',
   ],
 }
 
@@ -146,8 +172,15 @@ export type RegraId =
   | 'repousoSemanalInterjornada'
   | 'intervaloMaxMinutos'
   | 'jornadaNoturna'
+  | 'domingoMulher'
+  | 'estagioJornada'
+  | 'menorJornada'
+  | 'menorNoturno'
 
 export type EtapaId = 'legado' | 'etapa1' | 'etapa2'
+
+/** Padrão das regras por pessoa (configuráveis pelo usuário). */
+export const REGRAS_PESSOAIS_PADRAO: RegrasPessoais = { mulheresDomingoQuinzenal: true, estagioHorasSemanais: 30 }
 
 /** Etapa em vigor em determinada data (YYYY-MM-DD). */
 export function etapaVigente(data: string, regras: RegrasLegais = REGRAS): EtapaId {

@@ -11,6 +11,7 @@
  */
 import {
   REGRAS,
+  REGRAS_PESSOAIS_PADRAO,
   etapaVigente,
   limitesDaEtapa,
   type EtapaId,
@@ -23,11 +24,13 @@ import type {
   DiaEscala,
   Escala,
   RegraCobertura,
+  RegrasPessoais,
   ResultadoConformidade,
   Severidade,
   Turno,
 } from '../types'
 import { diaDaSemana, diffDias, minutosDe, domingoDaSemana, somarDias } from './datas'
+import { cicloDomingoDe, limitesEstagio, tocaNoturnoMenor } from './jornada'
 
 export interface EntradaConformidade {
   escala: Escala
@@ -46,6 +49,8 @@ export interface EntradaConformidade {
   /** Ciclo do domingo em semanas (ver `cicloDomingoDoSetor`); padrão: comércio. */
   cicloDomingoSemanas?: number
   regras?: RegrasLegais
+  /** Regras por pessoa (mulheres, estagiários); padrão: `REGRAS_PESSOAIS_PADRAO`. */
+  regrasPessoais?: RegrasPessoais
 }
 
 const DIAS_PT = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
@@ -80,6 +85,8 @@ function comRegra(texto: string, id: RegraId): string {
 
 export function validarEscala(entrada: EntradaConformidade): ResultadoConformidade {
   const regras = entrada.regras ?? REGRAS
+  const rp = entrada.regrasPessoais ?? REGRAS_PESSOAIS_PADRAO
+  const estagio = limitesEstagio(rp)
   const ciclo = Math.max(2, entrada.cicloDomingoSemanas ?? regras.domingo.cicloSemanasComercio)
   const { escala, cobertura, feriados, empresaFuncionaFeriados, compensacaoDiaria } = entrada
   const alertas: Alerta[] = []
@@ -217,11 +224,31 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
           data: seg,
         })
       }
+
+      // Estagiário: carga semanal (Lei 11.788/2008 art. 10)
+      if (f.estagiario && totalMin > estagio.semanalH * 60) {
+        alertas.push({
+          id: `estsem|${f.id}|${seg}`,
+          regraId: 'estagioJornada',
+          severidade: 'vermelho',
+          titulo: 'Estágio acima da carga semanal',
+          mensagem: comRegra(
+            `${f.nome} (estagiário) faz ${fmtHoras(totalMin)} de estágio na semana de ${fmtDataBR(seg)}; o limite é ${estagio.semanalH}h por semana (Lei 11.788/2008, art. 10).`,
+            'estagioJornada',
+          ),
+          sugestao: 'Encurte o horário ou retire um dia de estágio dessa semana; confira a carga do termo de compromisso.',
+          funcionarioId: f.id,
+          data: seg,
+        })
+      }
     }
 
     // ---------- Domingo: repouso coincide com o domingo ao menos 1 vez a cada `ciclo` semanas ----------
     // (Lei 10.101/2000 art. 6º, p. único) => no máximo ciclo-1 domingos trabalhados seguidos.
+    // Mulheres com o art. 386 ligado: ciclo de 2 semanas e alerta próprio (substitui o comum, sem duplicar).
     {
+      const cicloF = cicloDomingoDe(f, ciclo, rp)
+      const regraMulher = rp.mulheresDomingoQuinzenal && f.sexo === 'F'
       let seguidos = 0
       let anterior: number | undefined
       for (const seg of segundas) {
@@ -235,21 +262,34 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
           continue
         }
         seguidos++
-        if (seguidos < ciclo) continue
+        if (seguidos < cicloF) continue
         seguidos = 0
         const semana = Array.from({ length: 6 }, (_, k) => i + 1 + k)
         const outro =
           semana.find((x) => celula(f.id, x)?.tipo === 'dsr') ??
           semana.find((x) => celula(f.id, x)?.tipo === 'folga')
+        const base = regraMulher
+          ? {
+              id: `dommul|${f.id}|${seg}`,
+              regraId: 'domingoMulher' as const,
+              titulo: `Domingo de folga quinzenal (mulher)`,
+              mensagem: comRegra(
+                `${f.nome} trabalha ${cicloF} domingos seguidos até ${fmtDataBR(seg)}. Para mulheres, o trabalho aos domingos exige escala de revezamento quinzenal, com ao menos 1 domingo de folga a cada ${cicloF} semanas (CLT art. 386 — revezamento quinzenal; validar com o DP a aplicação e a convenção coletiva).`,
+                'domingoMulher',
+              ),
+            }
+          : {
+              id: `domrod|${f.id}|${seg}`,
+              regraId: 'domingoRodizio' as const,
+              titulo: `Domingo de folga ao menos a cada ${ciclo} semanas`,
+              mensagem: comRegra(
+                `${f.nome} trabalha ${ciclo} domingos seguidos até ${fmtDataBR(seg)}. O repouso semanal deve coincidir com o domingo pelo menos 1 vez a cada ${ciclo} semanas (Lei 10.101/2000 art. 6º, p. único; Lei 605/1949).`,
+                'domingoRodizio',
+              ),
+            }
         alertas.push({
-          id: `domrod|${f.id}|${seg}`,
-          regraId: 'domingoRodizio',
+          ...base,
           severidade: 'vermelho',
-          titulo: `Domingo de folga ao menos a cada ${ciclo} semanas`,
-          mensagem: comRegra(
-            `${f.nome} trabalha ${ciclo} domingos seguidos até ${fmtDataBR(seg)}. O repouso semanal deve coincidir com o domingo pelo menos 1 vez a cada ${ciclo} semanas (Lei 10.101/2000 art. 6º, p. único; Lei 605/1949).`,
-            'domingoRodizio',
-          ),
           sugestao: 'Faça o rodízio: dê o domingo de folga (DSR) a esta pessoa e passe o domingo para quem folgou mais recentemente.',
           funcionarioId: f.id,
           data: seg,
@@ -349,6 +389,55 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
             'jornadaDiariaMax',
           ),
           sugestao: 'Encurte o turno ou formalize a compensação com a convenção/acordo.',
+          funcionarioId: f.id,
+          data,
+        })
+      }
+
+      // Estagiário: horas por dia (Lei 11.788/2008 art. 10)
+      if (f.estagiario && horasLiquidasMin(t) > estagio.diariaMin) {
+        alertas.push({
+          id: `estdia|${f.id}|${data}`,
+          regraId: 'estagioJornada',
+          severidade: 'vermelho',
+          titulo: 'Estágio acima da carga diária',
+          mensagem: comRegra(
+            `${f.nome} (estagiário) faz ${fmtHoras(horasLiquidasMin(t))} de estágio em ${fmtDataBR(data)}; o limite é ${fmtHoras(estagio.diariaMin)} por dia para a carga de ${estagio.semanalH}h semanais (Lei 11.788/2008, art. 10).`,
+            'estagioJornada',
+          ),
+          sugestao: 'Encurte o horário de estágio desse dia.',
+          funcionarioId: f.id,
+          data,
+        })
+      }
+
+      // Menor de 18 anos: jornada diária (CLT arts. 411 e 413) e trabalho noturno (CLT art. 404)
+      if (f.menor && horasLiquidasMin(t) > regras.pessoas.menorHorasDiaMax * 60) {
+        alertas.push({
+          id: `menjor|${f.id}|${data}`,
+          regraId: 'menorJornada',
+          severidade: 'vermelho',
+          titulo: 'Menor de 18 anos acima de 8 horas no dia',
+          mensagem: comRegra(
+            `${f.nome} (menor de 18 anos) trabalha ${fmtHoras(horasLiquidasMin(t))} em ${fmtDataBR(data)}; o limite é ${fmtHoras(regras.pessoas.menorHorasDiaMax * 60)} por dia, sem horas extras (CLT arts. 411 e 413).`,
+            'menorJornada',
+          ),
+          sugestao: 'Encurte o turno desse dia para no máximo 8 horas.',
+          funcionarioId: f.id,
+          data,
+        })
+      }
+      if (f.menor && tocaNoturnoMenor(minutosDe(t.inicio), duracaoBrutaMin(t))) {
+        alertas.push({
+          id: `mennot|${f.id}|${data}`,
+          regraId: 'menorNoturno',
+          severidade: 'vermelho',
+          titulo: 'Menor de 18 anos em horário noturno',
+          mensagem: comRegra(
+            `${f.nome} (menor de 18 anos) trabalha no turno ${t.inicio}–${t.fim} em ${fmtDataBR(data)}, que entra na faixa de ${regras.pessoas.menorNoturno.inicio} às ${regras.pessoas.menorNoturno.fim}. O trabalho noturno é proibido ao menor de 18 anos (CLT art. 404).`,
+            'menorNoturno',
+          ),
+          sugestao: `Mude o horário para começar e terminar entre ${regras.pessoas.menorNoturno.fim} e ${regras.pessoas.menorNoturno.inicio}.`,
           funcionarioId: f.id,
           data,
         })

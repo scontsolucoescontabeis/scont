@@ -8,18 +8,18 @@ BEGIN
         ('M-A', 'Zzmont Alfa Ltda', '11.222.333/0001-81', 'SP', 'Campinas'),
         ('M-B', 'Zzmont Beta Ltda', '22.333.444/0001-72', 'RJ', 'Niteroi'),
         ('M-C', 'Zzmont Vazia Ltda', '33.444.555/0001-63', 'MG', 'Uberaba');
-    INSERT INTO public.rh_empregados (codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, desc_funcao, situacao, tipo_empregado, cpf, salario, endereco) VALUES
-        ('M-A','1','Zeca Zulu','Vendedor','Vend X','Trabalhando','Empregado','111.111.111-11',2000,'Rua 1'),
+    INSERT INTO public.rh_empregados (codigo_empresa, codigo_empregado, nome_empregado, desc_cargo, desc_funcao, situacao, tipo_empregado, cpf, salario, endereco, sexo, data_nascimento) VALUES
+        ('M-A','1','Zeca Zulu','Vendedor','Vend X','Trabalhando','Empregado','111.111.111-11',2000,'Rua 1','Masculino',(current_date - interval '30 years')::date),
         -- grafia legada de producao: 'Est' + a-agudo + 'giario' (sem o segundo 'a' acentuado do correto)
-        ('M-A','2','Ana Alves',NULL,'Auxiliar','Trabalhando','Est' || chr(225) || 'giario','222.222.222-22',1000,'Rua 2'),
+        ('M-A','2','Ana Alves',NULL,'Auxiliar','Trabalhando','Est' || chr(225) || 'giario','222.222.222-22',1000,'Rua 2','Feminino',(current_date - interval '17 years')::date),
         -- espacos sobrando em tipo/situacao continuam elegiveis
-        ('M-A','6','Bia Borges','Auxiliar','Aux','Trabalhando ','Empregado ','666.666.666-66',1,'Rua 6'),
-        ('M-A','3','Demitido Dino','Gerente','G','Demitido','Empregado','333.333.333-33',3000,'Rua 3'),
-        ('M-A','4','Socio Sol','Diretor','D','Trabalhando','Contribuinte','444.444.444-44',0,'Rua 4'),
-        ('M-A','5','Sem Cargo',NULL,NULL,'Trabalhando','Empregado','555.555.555-55',1,'Rua 5'),
-        ('M-B','9','Beto Beta','Caixa','C','Trabalhando','Empregado','999.999.999-99',1500,'Rua 9'),
+        ('M-A','6','Bia Borges','Auxiliar','Aux','Trabalhando ','Empregado ','666.666.666-66',1,'Rua 6','Outro',NULL),
+        ('M-A','3','Demitido Dino','Gerente','G','Demitido','Empregado','333.333.333-33',3000,'Rua 3',NULL,NULL),
+        ('M-A','4','Socio Sol','Diretor','D','Trabalhando','Contribuinte','444.444.444-44',0,'Rua 4',NULL,NULL),
+        ('M-A','5','Sem Cargo',NULL,NULL,'Trabalhando','Empregado','555.555.555-55',1,'Rua 5',NULL,NULL),
+        ('M-B','9','Beto Beta','Caixa','C','Trabalhando','Empregado','999.999.999-99',1500,'Rua 9',NULL,NULL),
         -- mesmo codigo_empregado '1' em outra empresa, demitido
-        ('M-B','1','Zeca Outro','Gerente','G','Demitido','Empregado','123.123.123-12',1,'Rua B');
+        ('M-B','1','Zeca Outro','Gerente','G','Demitido','Empregado','123.123.123-12',1,'Rua B',NULL,NULL);
     INSERT INTO public.rh_jornada_trabalho (codigo_empresa, codigo_empregado, dia_semana, entrada, intervalo_inicio, intervalo_fim, saida) VALUES
         ('M-A','1','segunda','08:00','12:00','13:00','17:00'),
         ('M-A','2','terca','09:00','12:00','13:00','18:00'),
@@ -68,9 +68,28 @@ BEGIN
     -- sem_dados_pessoais: chaves exatas
     SELECT bool_and(k) INTO ok FROM (
         SELECT (SELECT array_agg(key ORDER BY key) FROM jsonb_object_keys(e) key)
-               = ARRAY['cargo','codigo_empregado','nome_empregado','tipo_empregado'] AS k
+               = ARRAY['cargo','codigo_empregado','menor_de_idade','nome_empregado','sexo','tipo_empregado'] AS k
         FROM jsonb_array_elements(r->'empregados') e) s;
     ASSERT ok, 'sem_dados_pessoais: chaves de empregado diferentes do permitido: ' || (r->'empregados')::text;
+    -- sexo e menor_de_idade derivados; dado bruto nunca sai
+    ASSERT (SELECT e->>'sexo' FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '2') = 'F',
+       'sexo: Feminino deveria virar F';
+    ASSERT (SELECT e->>'sexo' FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '1') = 'M',
+       'sexo: Masculino deveria virar M';
+    ASSERT (SELECT e->'sexo' FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '6') = 'null'::jsonb
+       AND (SELECT e->'sexo' FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '5') = 'null'::jsonb,
+       'sexo: outro/nulo deveria ser null';
+    ASSERT (SELECT (e->>'menor_de_idade')::boolean FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '2') = true,
+       'menor_de_idade: 17 anos deveria ser true';
+    ASSERT (SELECT (e->>'menor_de_idade')::boolean FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '1') = false,
+       'menor_de_idade: 30 anos deveria ser false';
+    ASSERT (SELECT (e->>'menor_de_idade')::boolean FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '5') = false,
+       'menor_de_idade: sem data_nascimento deveria ser false';
+    ASSERT r::text NOT LIKE '%Feminino%' AND r::text NOT LIKE '%Masculino%'
+       AND r::text NOT LIKE '%' || (current_date - interval '17 years')::date::text || '%'
+       AND r::text NOT LIKE '%' || (current_date - interval '30 years')::date::text || '%'
+       AND r::text NOT LIKE '%data_nascimento%',
+       'sem_dados_pessoais: sexo/data_nascimento brutos vazaram: ' || r::text;
     -- estagiario com a grafia legada de producao volta com o valor armazenado, intacto
     ASSERT (SELECT e->>'tipo_empregado' FROM jsonb_array_elements(r->'empregados') e WHERE e->>'codigo_empregado' = '2')
            = 'Est' || chr(225) || 'giario',

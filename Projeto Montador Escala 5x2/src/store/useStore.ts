@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { FERIADOS_PADRAO, type Feriado } from '../config/feriados'
+import { REGRAS_PESSOAIS_PADRAO } from '../config/regras'
 import { corrigirTudo } from '../engine/autocorrecao'
 import { aplicarCorrecao } from '../engine/conformidade'
 import { gerarPropostas } from '../engine/gerador'
@@ -13,10 +14,11 @@ import type {
   Funcao,
   ParametrosCusto,
   Proposta,
+  RegrasPessoais,
   Turno,
 } from '../types'
 import { aplicarSobreposicoes, calcularSobreposicoes, empresaDoPortal, type Sobreposicoes } from '../portal/modo'
-import { mapearDadosPortal } from '../portal/mapear'
+import { mapearDadosPortal, type DadosPortal } from '../portal/mapear'
 import { carregarDadosPortal } from '../portal/supabase'
 import { carregar, limpar, salvar } from '../services/storage'
 import { analisar } from '../utils/analise'
@@ -37,6 +39,8 @@ export interface Dados {
   etapaImpacto: 'etapa1' | 'etapa2'
   /** Proposta (modelo) em uso no calendário; mantida ao regenerar. */
   propostaAtivaId: string | null
+  /** Regras por pessoa (mulheres, estagiários); não são dados pessoais, então são persistidas. */
+  regrasPessoais: RegrasPessoais
 }
 
 export const EMPRESA_PADRAO: Empresa = {
@@ -81,6 +85,7 @@ export const DADOS_PADRAO: Dados = {
   comparar: [],
   etapaImpacto: 'etapa1',
   propostaAtivaId: null,
+  regrasPessoais: REGRAS_PESSOAIS_PADRAO,
 }
 
 /** Estado do modo portal (não persistido); null no modo avulso. */
@@ -97,6 +102,8 @@ interface Acoes {
   carregarDoPortal: (codigo: string) => Promise<void>
   set: (parcial: Partial<Dados>) => void
   setEmpresa: (p: Partial<Empresa>) => void
+  /** Atualiza as regras por pessoa; no portal, re-mapeia a equipe do banco com as novas regras. */
+  setRegrasPessoais: (p: Partial<RegrasPessoais>) => void
   setCelula: (funcionarioId: string, dia: number, valor: DiaEscala) => void
   trocarCelulas: (a: { f: string; d: number }, b: { f: string; d: number }) => void
   corrigir: (correcao: AlteracaoCelula[]) => void
@@ -125,6 +132,8 @@ const inicial: Dados = { ...DADOS_PADRAO, ...salvoInicial }
 
 /** Equipe como veio do banco na última carga (não persistida). */
 let baseBanco: Funcao[] | null = null
+/** Dados crus do banco na última carga, para re-mapear quando as regras por pessoa mudam. */
+let dadosBanco: DadosPortal | null = null
 const portalInicial: EstadoPortal | null = codigoPortal
   ? { codigo: codigoPortal, carregando: true, erro: null, nenhumEmpregado: false }
   : null
@@ -135,12 +144,14 @@ export const useStore = create<Store>((set, get) => ({
   carregarDoPortal: async (codigo) => {
     set({ portal: { codigo, carregando: true, erro: null, nenhumEmpregado: false } })
     baseBanco = null
+    dadosBanco = null
     const sobreposicoes = carregar<Salvo>()?.sobreposicoes
     try {
       const dados = await carregarDadosPortal(codigo)
-      const { nomeEmpresa, funcoes: doBanco } = mapearDadosPortal(dados)
+      const { nomeEmpresa, funcoes: doBanco } = mapearDadosPortal(dados, get().regrasPessoais)
       const funcoes = aplicarSobreposicoes(doBanco, sobreposicoes)
       baseBanco = doBanco
+      dadosBanco = dados
       const nenhumEmpregado = !funcoes.some((f) => (f.pessoas?.length ?? 0) > 0)
       set({
         empresa: { ...get().empresa, nome: nomeEmpresa },
@@ -158,6 +169,25 @@ export const useStore = create<Store>((set, get) => ({
   },
   set: (parcial) => set(parcial),
   setEmpresa: (p) => set({ empresa: { ...get().empresa, ...p } }),
+  setRegrasPessoais: (parcial) => {
+    const regras = { ...get().regrasPessoais, ...parcial }
+    if (!baseBanco || !dadosBanco) {
+      set({ regrasPessoais: regras })
+      return
+    }
+    // Portal: preserva as edições do usuário e reaplica sobre a equipe re-mapeada com as novas regras.
+    const sob = calcularSobreposicoes(baseBanco, get().funcoes)
+    const { funcoes: doBanco } = mapearDadosPortal(dadosBanco, regras)
+    baseBanco = doBanco
+    set({
+      regrasPessoais: regras,
+      funcoes: aplicarSobreposicoes(doBanco, sob),
+      escala: null,
+      propostas: [],
+      comparar: [],
+      propostaAtivaId: null,
+    })
+  },
   setCelula: (fid, dia, valor) => {
     const escala = get().escala
     if (!escala) return
@@ -193,6 +223,7 @@ export const useStore = create<Store>((set, get) => ({
       feriados: d.feriados.map((f) => f.data),
       inicio: d.inicioEscala,
       semanas: d.semanas,
+      regrasPessoais: d.regrasPessoais,
     })
     const corrigidas = novas.map((p) => ({
       ...p,
@@ -243,6 +274,7 @@ useStore.subscribe((estado) => {
       comparar: estado.comparar,
       etapaImpacto: estado.etapaImpacto,
       propostaAtivaId: estado.propostaAtivaId,
+      regrasPessoais: estado.regrasPessoais,
     }
     if (portal && baseBanco) dados.sobreposicoes = calcularSobreposicoes(baseBanco, estado.funcoes)
     salvar(dados)

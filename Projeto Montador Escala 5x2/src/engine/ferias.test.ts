@@ -8,7 +8,7 @@ const MODELOS: ModeloEscala[] = ['fixo', 'rodizio_domingo', 'folga_movel']
 const turnos: Turno[] = [{ id: 't1', nome: 'Comercial', inicio: '08:00', fim: '17:00', intervaloMin: 60 }]
 
 function pessoa(id: string, nome: string, ferias: PessoaEscala['ferias'] = []): PessoaEscala {
-  return { id, nome, escalar: true, jornadaPadrao: true, ferias }
+  return { id, nome, escalar: true, jornadaPadrao: true, menor: false, estagiario: false, ferias }
 }
 
 function fnc(pessoas?: PessoaEscala[], quantidade = 3): Funcao {
