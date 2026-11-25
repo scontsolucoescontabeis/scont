@@ -323,7 +323,13 @@ async function deletarEmpresa(codigo) {
         if (error) throw error;
         mostrarStatus('statusEmpresas', '✅ Empresa deletada com sucesso!', 'success');
         carregarEmpresas();
-    } catch (erro) { mostrarStatus('statusEmpresas', 'Erro ao deletar empresa: ' + erro.message, 'error'); }
+    } catch (erro) {
+        // 23503 = violação de chave estrangeira: a empresa tem acessos de clientes no Portal do Cliente.
+        const msg = erro && erro.code === '23503'
+            ? 'Não é possível excluir: esta empresa tem pedidos ou acessos de clientes registrados no Portal do Cliente (inclusive recusados ou revogados). Consulte a aba "Acessos de clientes" do painel do administrador.'
+            : 'Erro ao deletar empresa: ' + erro.message;
+        mostrarStatus('statusEmpresas', msg, 'error');
+    }
 }
 
 async function salvarEmailResponsavelEmpresa(codigo, valor) {
