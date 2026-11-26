@@ -11,7 +11,6 @@ import {
   type EdicaoPessoa,
 } from '../portal/equipe'
 import type { RegrasPessoais } from '../types'
-import { Dica } from './ui'
 
 export function EquipeNominal() {
   const funcoes = useStore((s) => s.funcoes)
@@ -104,12 +103,6 @@ export function EquipeNominal() {
                               {t}
                             </span>
                           ))}
-                          {p.jornadaPadrao && (
-                            <span className="ml-2 inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-900">
-                              jornada padrão — confira
-                              <Dica texto="Esta pessoa não tem jornada cadastrada no RH; usamos a jornada padrão (44h). Confira e ajuste se preciso." />
-                            </span>
-                          )}
                         </td>
                         <td className="px-2 py-2 text-soft">{rotuloSexo(p.sexo)}</td>
                         <td className="px-2 py-2">
