@@ -29,7 +29,21 @@
         return '../Projeto Montador Escala 5x2/app/index.html?empresa=' + encodeURIComponent(String(codigo));
     }
 
-    const api = { decidirEstado, normalizarBusca, urlMontador };
+    // Iniciais para avatar: até 2 letras, maiúsculas, acentos mantidos.
+    // Usa as duas primeiras palavras significativas (ignora conectores); palavra única => 2 primeiras letras.
+    const CONECTORES = ['de', 'da', 'do', 'dos', 'das', 'e'];
+    function iniciais(nome) {
+        const palavras = String(nome == null ? '' : nome).normalize('NFC').match(/[\p{L}\p{N}]+/gu) || [];
+        if (!palavras.length) return '?';
+        const sig = palavras.filter(p => !CONECTORES.includes(p.toLowerCase()));
+        const usar = sig.length ? sig : palavras;
+        const letras = usar.length >= 2
+            ? [Array.from(usar[0])[0], Array.from(usar[1])[0]]
+            : Array.from(usar[0]).slice(0, 2);
+        return letras.join('').toLocaleUpperCase('pt-BR');
+    }
+
+    const api = { decidirEstado, normalizarBusca, urlMontador, iniciais };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.EstadoCliente = api;
 })(typeof window !== 'undefined' ? window : globalThis);

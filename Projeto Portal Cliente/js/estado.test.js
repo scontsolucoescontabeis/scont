@@ -105,6 +105,60 @@ test('cliente.js usa urlMontador em abrirHome e index.html tem o card', () => {
     const corpo = js.slice(js.indexOf('function abrirHome'));
     assert.ok(/urlMontador\(/.test(corpo.slice(0, corpo.indexOf('\n}\n'))), 'abrirHome deve usar urlMontador');
     const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-    assert.ok(!/em breve/i.test(html), 'sem "em breve"');
+    const card = html.match(/<a\b[^>]*id="cardMontador"[\s\S]*?<\/a>/);
+    assert.ok(card, 'card do Montador não encontrado');
+    assert.ok(!/em breve/i.test(card[0]), 'sem "em breve" no card do Montador');
     assert.ok(html.includes('id="cardMontador"'));
+});
+
+test('iniciais: duas primeiras palavras significativas, maiúsculas', () => {
+    const { iniciais } = require('./estado.js');
+    assert.strictEqual(iniciais('Padaria Pão Quente Ltda'), 'PP');
+    assert.strictEqual(iniciais('herbert gomes'), 'HG');
+    assert.strictEqual(iniciais('  scont   soluções  '), 'SS');
+});
+
+test('iniciais: ignora conectores de/da/do/dos/das/e', () => {
+    const { iniciais } = require('./estado.js');
+    assert.strictEqual(iniciais('Casa de Carnes'), 'CC');
+    assert.strictEqual(iniciais('Maria da Silva'), 'MS');
+    assert.strictEqual(iniciais('Pães e Doces'), 'PD');
+    assert.strictEqual(iniciais('Comércio dos Dos DAS Santos'), 'CS');
+});
+
+test('iniciais: mantém acentos e usa no máximo 2 letras', () => {
+    const { iniciais } = require('./estado.js');
+    assert.strictEqual(iniciais('ética ótica'), 'ÉÓ');
+    assert.strictEqual(iniciais('Ótica'), 'ÓT');
+    assert.strictEqual(iniciais('X'), 'X');
+    assert.ok(iniciais('Um Dois Três Quatro').length <= 2);
+});
+
+test('iniciais: pontuação não conta como letra', () => {
+    const { iniciais } = require('./estado.js');
+    assert.strictEqual(iniciais('A&B Serviços'), 'AB');
+    assert.strictEqual(iniciais('(Grupo) Alfa'), 'GA');
+});
+
+test('iniciais: vazio, nulo, só conectores ou só símbolos => "?" ou fallback', () => {
+    const { iniciais } = require('./estado.js');
+    for (const v of ['', '   ', null, undefined, '---']) assert.strictEqual(iniciais(v), '?');
+    assert.strictEqual(iniciais('de'), 'DE');
+});
+
+// Segurança: nomes vêm do banco; nada de innerHTML no cliente.
+test('cliente.js não usa innerHTML', () => {
+    const fs = require('node:fs'), path = require('node:path');
+    const js = fs.readFileSync(path.join(__dirname, 'cliente.js'), 'utf8');
+    assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML/.test(js));
+});
+
+test('index.html: cartões "em breve" ficam fora do card do Montador e não são links/botões', () => {
+    const fs = require('node:fs'), path = require('node:path');
+    const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+    const bloco = html.match(/<div class="ferramentas-em-breve"[\s\S]*?<!-- \/ferramentas-em-breve -->/);
+    assert.ok(bloco, 'bloco .ferramentas-em-breve não encontrado');
+    assert.ok(/em breve/i.test(bloco[0]));
+    assert.ok(!/<a\b|<button\b/i.test(bloco[0]), 'cartões em breve não podem ser links/botões');
+    assert.strictEqual((bloco[0].match(/aria-disabled="true"/g) || []).length, 2);
 });
