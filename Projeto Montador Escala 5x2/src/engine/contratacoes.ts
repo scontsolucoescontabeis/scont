@@ -18,9 +18,10 @@
  *    contratações) não alcança os turnos do domingo, soma-se o reforço.
  */
 import { REGRAS, REGRAS_PESSOAIS_PADRAO, cicloDomingoDoSetor, limitesDaEtapa, type EtapaId, type RegrasLegais } from '../config/regras'
-import type { CoberturaTurno, Empresa, Funcao, MinimosDia, ParametrosCusto, PessoaEscala, RegrasPessoais, Turno } from '../types'
+import type { CoberturaTurno, Empresa, Funcao, ParametrosCusto, PessoaEscala, RegrasPessoais, Turno } from '../types'
 import { SLOT, NSLOTS, faixas, janelaDeJornada, perfilNecessidade, perfilPorFuncao } from './gerador'
 import { intervaloParaBruto, limitesEstagio } from './jornada'
+import { minimoDoDia } from './minimos'
 
 export interface LinhaTurnoQuadro {
   turnoId: string
@@ -64,10 +65,6 @@ export interface QuadroContratacoes {
 
 const EPS = 1e-9
 const DIAS = [0, 1, 2, 3, 4, 5, 6]
-
-function demandaDia(c: MinimosDia, dow: number): number {
-  return dow === 0 ? c.dom : dow === 6 ? c.sab : c.util
-}
 
 /** Distribui `total` unidades proporcionalmente a `pesos` (maior resto); pesos todos zero contam igual. */
 function distribuir(total: number, pesosIn: number[]): number[] {
@@ -142,8 +139,8 @@ function temDemanda(c: CoberturaTurno | undefined, empresa: Empresa, funcaoIds: 
   return DIAS.some(
     (d) =>
       empresa.diasFuncionamento[d] &&
-      (demandaDia(c, d) > 0 ||
-        Object.entries(c.porFuncao ?? {}).some(([id, m]) => funcaoIds.includes(id) && demandaDia(m, d) > 0)),
+      (minimoDoDia(c, d) > 0 ||
+        Object.entries(c.porFuncao ?? {}).some(([id, m]) => funcaoIds.includes(id) && minimoDoDia(m, d) > 0)),
   )
 }
 
