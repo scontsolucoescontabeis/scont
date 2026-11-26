@@ -1,11 +1,12 @@
-import { AlertTriangle, Redo2, Undo2, XCircle } from 'lucide-react'
+import { AlertTriangle, Redo2, Search, Undo2, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type DragEvent } from 'react'
 import { diaDaSemana } from '../engine/datas'
 import { useStore } from '../store/useStore'
 import type { Alerta, DiaEscala, Escala, TipoDia } from '../types'
 import { DIAS_CURTOS, NOME_TIPO, SIGLA_TIPO, datasDaEscala, formatarData, rotuloTurno } from '../utils/analise'
-import { alertasDaCelula, explicacao, marcasDasCelulas, opcoesDaCelula } from '../utils/passo4'
+import { alertasDaCelula, explicacao, filtrarFuncionarios, marcasDasCelulas, opcoesDaCelula } from '../utils/passo4'
 import { COR_TIPO as COR } from './cores'
+import { LegendaEscala } from './LegendaEscala'
 import { ExplicacoesAlertas, MenuCelula } from './MenuCelula'
 import { LARGURA_POPOVER, posicaoJunto } from './posicao'
 
@@ -74,16 +75,26 @@ export function Calendario({ escala, alertas }: { escala: Escala; alertas: Alert
   const setCelula = useStore((s) => s.setCelula)
   const trocar = useStore((s) => s.trocarCelulas)
   const feriados = useStore((s) => s.feriados)
+  const funcoes = useStore((s) => s.funcoes)
   const [pincel, setPincel] = useState<Pincel>(null)
   const [menu, setMenu] = useState<Alvo | null>(null)
   const [dica, setDica] = useState<Alvo | null>(null)
+  const [funcaoId, setFuncaoId] = useState('')
+  const [texto, setTexto] = useState('')
   const idDica = useId()
   const celulas = useRef(new Map<string, HTMLButtonElement>())
 
   const datas = useMemo(() => datasDaEscala(escala), [escala])
   const listaFeriados = useMemo(() => feriados.map((f) => f.data), [feriados])
   const marcas = useMemo(() => marcasDasCelulas(alertas, datas), [alertas, datas])
-  const visiveis = escala.funcionarios
+  const visiveis = useMemo(
+    () => filtrarFuncionarios(escala, funcoes, { funcaoId, texto }),
+    [escala, funcoes, funcaoId, texto],
+  )
+  const funcoesNaEscala = useMemo(
+    () => funcoes.filter((fn) => escala.funcionarios.some((f) => f.funcaoId === fn.id)),
+    [funcoes, escala.funcionarios],
+  )
 
   const nomeDe = (fid: string) => escala.funcionarios.find((f) => f.id === fid)?.nome ?? ''
   const rotuloData = (i: number) => `${DIAS_LONGOS[diaDaSemana(datas[i])]}, ${formatarData(datas[i])}`
@@ -148,11 +159,57 @@ export function Calendario({ escala, alertas }: { escala: Escala; alertas: Alert
   }
   const alertasDica = dica ? alertasDaCelula(alertas, dica.fid, dica.dia, escala.inicio) : []
   const posDica = dica ? posicaoJunto(dica.el.getBoundingClientRect(), 140) : null
+  const filtrando = visiveis.length !== escala.funcionarios.length
 
   return (
     <div className="space-y-3">
       <div className="sticky top-0 z-30 -mx-4 space-y-2 border-b border-line bg-white/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6">
         <BarraDesfazer />
+        <LegendaEscala />
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="text-sm">
+          Função
+          <select className="campo !w-auto" value={funcaoId} onChange={(e) => setFuncaoId(e.target.value)}>
+            <option value="">Todas</option>
+            {funcoesNaEscala.map((fn) => (
+              <option key={fn.id} value={fn.id}>
+                {fn.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm">
+          Procurar pessoa
+          <span className="relative block">
+            <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-soft" aria-hidden />
+            <input
+              type="search"
+              className="campo !pl-7"
+              placeholder="Digite um nome"
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+            />
+          </span>
+        </label>
+        <p className="text-sm text-soft" aria-live="polite">
+          {filtrando
+            ? `Mostrando ${visiveis.length} de ${escala.funcionarios.length} pessoas. Os alertas e totais continuam contando todas.`
+            : `${escala.funcionarios.length} pessoas na escala.`}
+        </p>
+        {filtrando && (
+          <button
+            type="button"
+            className="btn-sec !py-1.5"
+            onClick={() => {
+              setFuncaoId('')
+              setTexto('')
+            }}
+          >
+            Limpar filtros
+          </button>
+        )}
       </div>
 
       <details className="rounded-lg border border-line p-2 text-sm">
@@ -236,6 +293,13 @@ export function Calendario({ escala, alertas }: { escala: Escala; alertas: Alert
             </tr>
           </thead>
           <tbody>
+            {visiveis.length === 0 && (
+              <tr>
+                <td colSpan={datas.length + 1} className="p-4 text-left text-sm">
+                  Nenhuma pessoa encontrada com esse filtro.
+                </td>
+              </tr>
+            )}
             {visiveis.map((f) => (
               <tr key={f.id}>
                 <th
