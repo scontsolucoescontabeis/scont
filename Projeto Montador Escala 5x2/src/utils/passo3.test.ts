@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { QuadroContratacoes } from '../engine/contratacoes'
+import { calcularQuadro, type QuadroContratacoes } from '../engine/contratacoes'
+import { CUSTO_PADRAO } from '../engine/impacto'
 import type { CoberturaTurno, Empresa, Turno } from '../types'
 import {
   ajustarTurnoAoHorario,
   aplicarAcaoAviso,
   avisosCobertura,
+  descreverMinimosPorDia,
   modeloPeriodos,
   resumoEstimativa,
 } from './passo3'
@@ -288,5 +290,115 @@ describe('aplicarAcaoAviso', () => {
     )
     expect(r.turnos.map((t) => t.id)).toEqual(['t1'])
     expect(r.cobertura).toEqual({ t1: cob(2, 0, 0) })
+  })
+})
+
+describe('passo 3 com mínimo por dia da semana', () => {
+  const base = { jornadaMin: 0 }
+  const porDia = (util: number, dias: Partial<Record<1 | 2 | 3 | 4 | 5, number>>, sab = 0, dom = 0): CoberturaTurno => ({
+    util,
+    sab,
+    dom,
+    porDia: dias,
+  })
+
+  it('modeloPeriodos continua com um único número de segunda a sexta', () => {
+    const r = modeloPeriodos(empresa(cincoDias), 'dia', porDia(2, { 5: 4 }))
+    expect(r.cobertura[r.turnos[0].id]).toEqual({ util: 2, sab: 0, dom: 0 })
+  })
+
+  it('ajustarTurnoAoHorario considera só os dias úteis com mínimo', () => {
+    const e = empresa(cincoDias, '08:00', '18:00', { horarios: { 1: { abre: '10:00', fecha: '14:00' } } })
+    expect(ajustarTurnoAoHorario(e, periodo('t', 'X', '07:00', '20:00'), porDia(2, { 1: 0 }))).toEqual({
+      inicio: '08:00',
+      fim: '18:00',
+    })
+    expect(ajustarTurnoAoHorario(e, periodo('t', 'X', '07:00', '20:00'), porDia(0, { 5: 2 }))).toEqual({
+      inicio: '08:00',
+      fim: '18:00',
+    })
+    expect(ajustarTurnoAoHorario(e, periodo('t', 'X', '07:00', '20:00'), porDia(0, { 1: 2 }))).toEqual({
+      inicio: '10:00',
+      fim: '14:00',
+    })
+  })
+
+  it('período fora do horário só nos dias com mínimo', () => {
+    const e = empresa(cincoDias, '08:00', '18:00', { horarios: { 1: { abre: '10:00', fecha: '18:00' } } })
+    const entrada = (c: CoberturaTurno) => ({ ...base, empresa: e, turnos: [periodo('t1', 'Dia', '08:00', '18:00')], cobertura: { t1: c } })
+    expect(avisosCobertura(entrada(porDia(2, { 1: 0 }))).map((a) => a.id)).toEqual([])
+    expect(avisosCobertura(entrada(porDia(2, {}))).map((a) => a.id)).toEqual(['fora-t1'])
+  })
+
+  it('lacuna por dia: período só da sexta deixa a sexta coberta e o resto não', () => {
+    const a = avisosCobertura({
+      ...base,
+      empresa: empresa(cincoDias),
+      turnos: [periodo('t1', 'Dia', '08:00', '18:00'), periodo('t2', 'Reforço', '10:00', '12:00')],
+      cobertura: { t1: porDia(0, { 5: 3 }), t2: porDia(1, { 5: 0 }) },
+    })
+    expect(a.map((x) => x.texto)).toEqual([
+      'Das 08:00 às 10:00 de segunda a quinta ninguém está coberto.',
+      'Das 12:00 às 18:00 de segunda a quinta ninguém está coberto.',
+    ])
+    // O novo período copia os mínimos do vizinho nos dias da lacuna.
+    expect((a[0].acao?.dados as { minimos: CoberturaTurno }).minimos).toEqual({ util: 1, sab: 0, dom: 0 })
+  })
+
+  it('lacuna com mínimos diferentes por dia no vizinho: o novo período guarda os valores de cada dia', () => {
+    const a = avisosCobertura({
+      ...base,
+      empresa: empresa(cincoDias),
+      turnos: [periodo('t1', 'Dia', '09:00', '18:00')],
+      cobertura: { t1: porDia(2, { 5: 4 }) },
+    })
+    expect(a.map((x) => x.id)).toEqual(['lacuna-08:00-09:00'])
+    expect((a[0].acao?.dados as { minimos: CoberturaTurno }).minimos).toEqual({ util: 2, sab: 0, dom: 0, porDia: { 5: 4 } })
+  })
+
+  it('período que só pede gente num dia fechado → vazio', () => {
+    const quaFechada = [false, true, true, false, true, true, false]
+    const a = avisosCobertura({
+      ...base,
+      empresa: empresa(quaFechada),
+      turnos: [periodo('t1', 'Dia', '08:00', '18:00'), periodo('t2', 'Extra', '10:00', '12:00')],
+      cobertura: { t1: cob(2, 0, 0), t2: porDia(0, { 3: 2 }) },
+    })
+    expect(a.map((x) => x.id)).toEqual(['vazio-t2', 'fechado-3'])
+  })
+
+  it('dia útil fechado com mínimo próprio → aviso do dia', () => {
+    const quaFechada = [false, true, true, false, true, true, false]
+    const a = avisosCobertura({
+      ...base,
+      empresa: empresa(quaFechada),
+      turnos: [periodo('t1', 'Dia', '08:00', '18:00')],
+      cobertura: { t1: porDia(2, { 3: 4 }) },
+    })
+    expect(a.map((x) => x.texto)).toEqual([
+      'A empresa fica fechada na quarta-feira, então o mínimo pedido para esse dia não vale: ninguém será escalado.',
+    ])
+    // Sem porDia, dia útil fechado com o resto aberto não gera aviso (como antes).
+    expect(
+      avisosCobertura({ ...base, empresa: empresa(quaFechada), turnos: [periodo('t1', 'Dia', '08:00', '18:00')], cobertura: { t1: cob(2, 0, 0) } }),
+    ).toEqual([])
+  })
+
+  it('descreverMinimosPorDia', () => {
+    expect(descreverMinimosPorDia(porDia(2, { 1: 3, 5: 4 }), cincoDias)).toBe(
+      'Segunda 3 · Terça 2 · Quarta 2 · Quinta 2 · Sexta 4',
+    )
+    expect(descreverMinimosPorDia(porDia(2, { 1: 3 }), [false, true, true, false, true, true, false])).toBe(
+      'Segunda 3 · Terça 2 · Quarta fechada · Quinta 2 · Sexta 2',
+    )
+  })
+
+  it('estimativa: só a sexta pedindo 4 faz faltar gente numa equipe que dava conta', () => {
+    const e = empresa(seisDias, '08:00', '17:00')
+    const turnos = [{ id: 't1', nome: 'Comercial', inicio: '08:00', fim: '17:00', intervaloMin: 60 }]
+    const fns = [{ id: 'a', nome: 'Atendente', quantidade: 3, jornadaContratual: '44h' as const, horasSemanaisAtuais: 44 }]
+    const q = (c: CoberturaTurno) => calcularQuadro({ empresa: e, funcoes: fns, turnos, cobertura: { t1: c }, custo: CUSTO_PADRAO }, 'etapa1')
+    expect(resumoEstimativa(q(cob(2, 2, 0))).nivel).toBe('ok')
+    expect(resumoEstimativa(q(porDia(2, { 5: 4 }, 2))).nivel).toBe('atencao')
   })
 })

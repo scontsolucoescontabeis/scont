@@ -5,6 +5,7 @@ import type { Severidade } from '../types'
 /**
  * Número com botões − / + (aceita digitação; nunca abaixo de 0).
  * `descricao` completa os rótulos acessíveis: "Aumentar mínimo de pessoas — {descricao}".
+ * Com `aria`, os rótulos ficam "Mínimo de pessoas {aria}" (ex.: "na segunda-feira, Manhã").
  */
 export function Contador({
   rotulo,
@@ -12,14 +13,17 @@ export function Contador({
   valor,
   onChange,
   desabilitado = false,
+  aria,
 }: {
   rotulo: string
   descricao: string
+  aria?: string
   valor: number
   onChange: (v: number) => void
   desabilitado?: boolean
 }) {
   const id = useId()
+  const sufixo = aria ? ` ${aria}` : ` — ${descricao}`
   const mudar = (v: number) => onChange(Math.max(0, Math.floor(Number.isFinite(v) ? v : 0)))
   return (
     <div>
@@ -39,7 +43,7 @@ export function Contador({
           <button
             type="button"
             className="btn-sec !px-3"
-            aria-label={`Diminuir mínimo de pessoas — ${descricao}`}
+            aria-label={`Diminuir mínimo de pessoas${sufixo}`}
             disabled={valor <= 0}
             onClick={() => mudar(valor - 1)}
           >
@@ -51,14 +55,14 @@ export function Contador({
             min={0}
             inputMode="numeric"
             className="campo !w-16 text-center"
-            aria-label={`Mínimo de pessoas — ${descricao}`}
+            aria-label={`Mínimo de pessoas${sufixo}`}
             value={valor}
             onChange={(e) => mudar(e.target.value === '' ? 0 : Number(e.target.value))}
           />
           <button
             type="button"
             className="btn-sec !px-3"
-            aria-label={`Aumentar mínimo de pessoas — ${descricao}`}
+            aria-label={`Aumentar mínimo de pessoas${sufixo}`}
             onClick={() => mudar(valor + 1)}
           >
             +

@@ -1,18 +1,28 @@
 import { AlertTriangle, CheckCircle2, Info, Plus, Trash2 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { REGRAS } from "../config/regras";
 import { fmtHoras } from "../engine/conformidade";
 import { calcularQuadro } from "../engine/contratacoes";
 import { jornadaDaFuncao, tetoSemanalNaData } from "../engine/jornada";
+import {
+  DIAS_UTEIS,
+  agruparDiasUteis,
+  definirMinimoPorDia,
+  minimoDoDia,
+  minimoMaisComum,
+  temMinimosPorDia,
+  valoresDosDiasUteis,
+} from "../engine/minimos";
 import { jornadaMaisComum } from "../portal/equipe";
 import { useStore } from "../store/useStore";
-import type { Turno } from "../types";
+import type { CoberturaTurno, DiaUtil, Turno } from "../types";
 import { DIAS_CURTOS } from "../utils/analise";
 import {
   MODELOS_PERIODOS,
   aplicarAcaoAviso,
   avisosCobertura,
   descreverHorarios,
+  descreverMinimosPorDia,
   modeloPeriodos,
   resumoEstimativa,
   type AcaoAviso,
@@ -21,6 +31,14 @@ import {
 import { Campo, Contador } from "./ui";
 
 const MAX_AVISOS_VISIVEIS = 4;
+const VAZIO: CoberturaTurno = { util: 0, sab: 0, dom: 0 };
+const DIA_UTIL: Record<DiaUtil, { curto: string; longo: string }> = {
+  1: { curto: "Seg", longo: "segunda-feira" },
+  2: { curto: "Ter", longo: "terça-feira" },
+  3: { curto: "Qua", longo: "quarta-feira" },
+  4: { curto: "Qui", longo: "quinta-feira" },
+  5: { curto: "Sex", longo: "sexta-feira" },
+};
 
 export function StepCobertura() {
   const turnos = useStore((s) => s.turnos);
@@ -33,6 +51,8 @@ export function StepCobertura() {
   const custo = useStore((s) => s.custo);
   const etapa = useStore((s) => s.etapaImpacto);
   const regrasPessoais = useStore((s) => s.regrasPessoais);
+  // "Definir por dia" aberto/fechado pelo usuário; sem escolha, abre se já há valores por dia.
+  const [porDiaAberto, setPorDiaAberto] = useState<Record<string, boolean>>({});
 
   // Jornada de cada função (horário do empregado, separado dos períodos abaixo).
   const teto = tetoSemanalNaData(inicioEscala);
@@ -94,14 +114,41 @@ export function StepCobertura() {
       ...limpar,
     });
 
-  const atualizarCob = (id: string, chave: "util" | "sab" | "dom", v: number) =>
+  const atualizarCob = (id: string, chave: "util" | "sab" | "dom", v: number) => {
+    const atual = cobertura[id] ?? VAZIO;
     set({
       cobertura: {
         ...cobertura,
-        [id]: { ...cobertura[id], [chave]: Math.max(0, v) },
+        // Um número só de segunda a sexta: descarta valores por dia antigos.
+        [id]:
+          chave === "util"
+            ? agruparDiasUteis(atual, v)
+            : { ...atual, [chave]: Math.max(0, v) },
       },
       ...limpar,
     });
+  };
+
+  const atualizarCobDia = (id: string, dow: DiaUtil, v: number) =>
+    set({
+      cobertura: {
+        ...cobertura,
+        [id]: definirMinimoPorDia(cobertura[id] ?? VAZIO, dow, v),
+      },
+      ...limpar,
+    });
+
+  const usarMesmoNumero = (id: string) => {
+    const atual = cobertura[id] ?? VAZIO;
+    setPorDiaAberto((p) => ({ ...p, [id]: false }));
+    set({
+      cobertura: {
+        ...cobertura,
+        [id]: agruparDiasUteis(atual, minimoMaisComum(atual, abertosUteis)),
+      },
+      ...limpar,
+    });
+  };
 
   const atualizarCobFuncao = (
     id: string,
@@ -109,15 +156,16 @@ export function StepCobertura() {
     chave: "util" | "sab" | "dom",
     v: number,
   ) => {
-    const atual = cobertura[id] ?? { util: 0, sab: 0, dom: 0 };
-    const minimos = atual.porFuncao?.[funcaoId] ?? { util: 0, sab: 0, dom: 0 };
+    const atual = cobertura[id] ?? VAZIO;
+    const minimos = atual.porFuncao?.[funcaoId] ?? VAZIO;
     const porFuncao = {
       ...atual.porFuncao,
       [funcaoId]: { ...minimos, [chave]: Math.max(0, v) },
     };
     // Sem nenhum mínimo, remove a função para não guardar zeros.
     const m = porFuncao[funcaoId];
-    if (m.util + m.sab + m.dom === 0) delete porFuncao[funcaoId];
+    const somaUteis = valoresDosDiasUteis(m).reduce((a, b) => a + b, 0);
+    if (somaUteis + m.sab + m.dom === 0) delete porFuncao[funcaoId];
     set({
       cobertura: {
         ...cobertura,
@@ -132,7 +180,9 @@ export function StepCobertura() {
     const r = modeloPeriodos(
       empresa,
       id,
-      c0 ? { util: c0.util, sab: c0.sab, dom: c0.dom } : undefined,
+      c0
+        ? { util: minimoMaisComum(c0, abertosUteis), sab: c0.sab, dom: c0.dom }
+        : undefined,
     );
     set({ ...r, ...limpar });
   };
@@ -250,7 +300,9 @@ export function StepCobertura() {
       </p>
 
       {turnos.map((t) => {
-        const c = cobertura[t.id] ?? { util: 0, sab: 0, dom: 0 };
+        const c = cobertura[t.id] ?? VAZIO;
+        const porDia =
+          grupos.util.aberto && (porDiaAberto[t.id] ?? temMinimosPorDia(c));
         const temPorFuncao = Object.keys(c.porFuncao ?? {}).length > 0;
         return (
           <div
@@ -290,16 +342,62 @@ export function StepCobertura() {
                 />
               </Campo>
             </div>
+            {porDia && (
+              <fieldset className="space-y-2 rounded-lg border border-line p-3">
+                <legend className="px-1 text-sm font-medium">
+                  Segunda a sexta, dia a dia
+                </legend>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                  {DIAS_UTEIS.map((d) => (
+                    <Contador
+                      key={d}
+                      rotulo={DIA_UTIL[d].curto}
+                      descricao={`${t.nome}, ${DIA_UTIL[d].longo}`}
+                      aria={`na ${DIA_UTIL[d].longo} — ${t.nome}`}
+                      desabilitado={!dias[d]}
+                      valor={minimoDoDia(c, d)}
+                      onChange={(v) => atualizarCobDia(t.id, d, v)}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-soft">
+                  {descreverMinimosPorDia(c, dias)}
+                </p>
+                <button
+                  type="button"
+                  className="btn-sec !py-1 text-xs"
+                  onClick={() => usarMesmoNumero(t.id)}
+                >
+                  Usar o mesmo número em todos os dias
+                </button>
+              </fieldset>
+            )}
             <div className="grid gap-3 sm:grid-cols-3">
-              {(["util", "sab", "dom"] as const).map((g) => (
-                <Contador
-                  key={g}
-                  rotulo={maiuscula(grupos[g].nome)}
-                  descricao={`${t.nome}, ${grupos[g].nome}`}
-                  desabilitado={!grupos[g].aberto}
-                  valor={c[g]}
-                  onChange={(v) => atualizarCob(t.id, g, v)}
-                />
+              {(porDia
+                ? (["sab", "dom"] as const)
+                : (["util", "sab", "dom"] as const)
+              ).map((g) => (
+                <div key={g}>
+                  <Contador
+                    rotulo={maiuscula(grupos[g].nome)}
+                    descricao={`${t.nome}, ${grupos[g].nome}`}
+                    desabilitado={!grupos[g].aberto}
+                    valor={c[g]}
+                    onChange={(v) => atualizarCob(t.id, g, v)}
+                  />
+                  {g === "util" && grupos.util.aberto && (
+                    <button
+                      type="button"
+                      className="mt-1 text-xs font-medium underline underline-offset-2"
+                      aria-label={`Definir o mínimo de pessoas por dia da semana — ${t.nome}`}
+                      onClick={() =>
+                        setPorDiaAberto((p) => ({ ...p, [t.id]: true }))
+                      }
+                    >
+                      Definir por dia
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
             {funcoes.length > 1 && (
@@ -317,7 +415,7 @@ export function StepCobertura() {
                 </p>
                 <div className="space-y-2">
                   {funcoes.map((fn) => {
-                    const m = c.porFuncao?.[fn.id] ?? { util: 0, sab: 0, dom: 0 };
+                    const m = c.porFuncao?.[fn.id] ?? VAZIO;
                     return (
                       <div
                         key={fn.id}
@@ -356,12 +454,12 @@ export function StepCobertura() {
                     );
                   })}
                 </div>
-                {(["util", "sab", "dom"] as const).some((g) => {
-                  const soma = funcoes.reduce(
-                    (a, fn) => a + (c.porFuncao?.[fn.id]?.[g] ?? 0),
-                    0,
-                  );
-                  return grupos[g].aberto && soma > c[g];
+                {[0, 1, 2, 3, 4, 5, 6].some((d) => {
+                  const soma = funcoes.reduce((a, fn) => {
+                    const mf = c.porFuncao?.[fn.id];
+                    return a + (mf ? minimoDoDia(mf, d) : 0);
+                  }, 0);
+                  return dias[d] && soma > minimoDoDia(c, d);
                 }) && (
                   <p className="mt-2 text-xs text-amber-800" role="note">
                     A soma dos cargos passa do total em algum dia; a ferramenta
