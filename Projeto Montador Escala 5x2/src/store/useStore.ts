@@ -25,6 +25,7 @@ import { carregarDadosPortal } from '../portal/supabase'
 import { carregar, limpar, salvar } from '../services/storage'
 import { analisar } from '../utils/analise'
 import { criarMedidorDeFuros, ordemDeVagasDosDados } from '../utils/vagas'
+import { ajustarFeriadosNaEscala } from '../utils/feriados'
 import * as hist from '../utils/historico'
 
 export interface Dados {
@@ -118,6 +119,8 @@ interface Acoes {
   carregarDoPortal: (codigo: string) => Promise<void>
   set: (parcial: Partial<Dados>) => void
   setEmpresa: (p: Partial<Empresa>) => void
+  /** Troca a lista de feriados e acompanha a escala e as propostas já geradas (sem apagar os ajustes manuais). */
+  atualizarFeriados: (lista: Feriado[]) => void
   /** Atualiza as regras por pessoa; no portal, re-mapeia a equipe do banco com as novas regras. */
   setRegrasPessoais: (p: Partial<RegrasPessoais>) => void
   setCelula: (funcionarioId: string, dia: number, valor: DiaEscala) => void
@@ -218,6 +221,29 @@ export const useStore = create<Store>((set, get) => {
     },
     set: (parcial) => set(parcial),
     setEmpresa: (p) => set({ empresa: { ...get().empresa, ...p } }),
+    atualizarFeriados: (lista) => {
+      const d = get()
+      const sincronizada = assinaturaGeracao !== null && assinaturaGeracao === assinaturaDosDados(d)
+      const antes = d.feriados.map((f) => f.data)
+      const depois = lista.map((f) => f.data)
+      // Empresa que funciona em feriado não marca "feriado" nas células.
+      const ajustar = (e: Escala) => (d.empresa.funcionaFeriados ? e : ajustarFeriadosNaEscala(e, antes, depois))
+      const propostas = d.propostas.map((p) => ({ ...p, escala: ajustar(p.escala) }))
+      const proposta = d.propostas.find((p) => p.id === d.propostaAtivaId)
+      let escala = d.escala
+      let historico = d.historico
+      if (escala) {
+        // Escala igual à da proposta: acompanha a proposta; com ajustes manuais, ajusta a própria escala.
+        const nova = proposta && escala === proposta.escala ? propostas.find((p) => p.id === proposta.id)!.escala : ajustar(escala)
+        if (nova !== escala) {
+          historico = hist.registrar(historico, escala)
+          escala = nova
+        }
+      }
+      set({ feriados: lista, propostas, escala, historico })
+      // A escala já reflete a nova lista: voltar ao Passo 4 não precisa regerar (nem apagar os ajustes).
+      if (sincronizada) assinaturaGeracao = assinaturaDosDados(get())
+    },
     setRegrasPessoais: (parcial) => {
       const regras = { ...get().regrasPessoais, ...parcial }
       if (!baseBanco || !dadosBanco) {
