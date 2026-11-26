@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCONT - Portal do Cliente</title>
+    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="../assets/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/apple-touch-icon.png">
+    <link rel="stylesheet" href="../shared.css">
+    <link rel="stylesheet" href="css/cliente.css">
+    <script src="../supabase-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../portal-inatividade.js"></script>
+</head>
+<body class="pagina-portal">
+    <button type="button" class="hamburger" id="hamburger" aria-label="Menu" aria-controls="sidebar" aria-expanded="false">☰</button>
+    <div class="overlay" id="overlay"></div>
+
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
+            <h2>Portal do Cliente</h2>
+            <p>Suas Ferramentas</p>
+        </div>
+
+        <div class="empresa-info-sidebar" id="sidebarEmpresaBox" hidden>
+            <span class="empresa-info-rotulo">🏢 Empresa</span>
+            <strong id="sidebarEmpresa">—</strong>
+            <button type="button" class="trocar-btn" id="btnTrocarEmpresa" hidden>🔄 Trocar empresa</button>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <strong id="sidebarNome">—</strong>
+                <span id="sidebarEmail">—</span>
+            </div>
+            <button type="button" class="logout-btn" id="btnLogout">🚪 Sair</button>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <div class="faixa-admin" id="bannerAdmin" role="note" hidden>
+            <span>🛡️ <strong>Modo administrador</strong> — você está visualizando o portal como o cliente.</span>
+            <a href="../admin-dashboard.html">← Voltar ao painel do administrador</a>
+        </div>
+
+        <div class="page-header">
+            <div>
+                <h1 id="welcomeMsg">Bem-vindo!</h1>
+                <p class="page-header-empresa" id="headerEmpresa" hidden></p>
+            </div>
+            <div class="page-header-info">
+                <p id="headerEmail">—</p>
+                <p id="headerLogin">Login: —</p>
+            </div>
+        </div>
+
+        <div id="alertPortal" class="alert alert-error" role="alert"></div>
+
+        <!-- ── SELEÇÃO DE EMPRESA ── -->
+        <div class="card" id="cardEmpresas" hidden>
+            <div class="card-title">🏢 Selecione a Empresa</div>
+            <div class="card-body">
+                <p class="card-texto" id="empresasTexto">Você tem acesso a mais de uma empresa. Selecione qual deseja acessar.</p>
+                <div class="busca-ferramentas" id="buscaEmpresasWrap" hidden>
+                    <span class="busca-icon" aria-hidden="true">🔍</span>
+                    <label for="buscaEmpresas" class="sr-only">Pesquisar empresa por nome ou código</label>
+                    <input type="text" id="buscaEmpresas" placeholder="Pesquisar empresa por nome ou código..." autocomplete="off">
+                </div>
+                <div class="empresas-grid" id="empresasGrid"></div>
+            </div>
+        </div>
+
+        <!-- ── FERRAMENTAS ── -->
+        <div class="card" id="cardFerramentas" hidden>
+            <div class="card-title">🔧 Suas Ferramentas</div>
+            <div class="card-body">
+                <div class="busca-ferramentas">
+                    <span class="busca-icon" aria-hidden="true">🔍</span>
+                    <label for="buscaFerramentas" class="sr-only">Pesquisar ferramenta</label>
+                    <input type="text" id="buscaFerramentas" placeholder="Pesquisar ferramenta..." autocomplete="off">
+                </div>
+                <div class="ferramentas-grid" id="ferramentasGrid">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⏳</div>
+                        <p>Carregando ferramentas...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/estado.js"></script>
+    <script src="js/acesso.js"></script>
+    <script src="js/portal.js"></script>
+</body>
+</html>
