@@ -96,6 +96,8 @@ export function StepEscala() {
     }
   }, [escala, semHistorico, empresa, cobertura, feriados, turnos, funcoes, regrasPessoais, set])
 
+  const vagas = useMemo(() => escala?.funcionarios.filter((f) => f.vaga) ?? [], [escala])
+
   const resultado = useMemo(
     () => (escala ? analisar({ empresa, cobertura, feriados, turnos, funcoes, regrasPessoais }, escala) : null),
     [escala, empresa, cobertura, feriados, turnos, funcoes, regrasPessoais],
@@ -132,6 +134,17 @@ export function StepEscala() {
             <h3 id="t-cal" className="text-lg font-bold">
               Ajuste os dias
             </h3>
+            {vagas.length > 0 && (
+              <p className="rounded border border-yellow-400 bg-yellow-50 p-2 text-sm text-yellow-900" role="note">
+                <strong>
+                  Esta escala inclui {vagas.length} {vagas.length === 1 ? 'vaga' : 'vagas'} a contratar
+                </strong>{' '}
+                ({vagas.map((v) => v.nome).join('; ')}). Elas aparecem no calendário com a etiqueta “a contratar” e têm
+                escala proposta como as demais pessoas. Sem contratar, esses horários teriam de ser cobertos com horas
+                extras (CLT art. 59: até 2 h por dia, com adicional de 50% no mínimo), o que a ferramenta não monta; para
+                ver os furos de cobertura sem as vagas, desmarque “Incluir na escala as contratações necessárias”.
+              </p>
+            )}
             <Calendario escala={escala} alertas={resultado.alertas} />
           </section>
           <div className="space-y-4">

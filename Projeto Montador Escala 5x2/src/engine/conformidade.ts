@@ -53,6 +53,7 @@ export interface EntradaConformidade {
   regrasPessoais?: RegrasPessoais
 }
 
+const NOTA_AUSENCIA = ' Há ausência (férias/atestado) de:'
 const DIAS_PT = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
 
 export function duracaoBrutaMin(t: Turno): number {
@@ -673,7 +674,7 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         .map((f) => f.nome)
       const listaAusentes =
         ausentes.length > 5 ? `${ausentes.slice(0, 5).join(', ')} e mais ${ausentes.length - 5}` : ausentes.join(', ')
-      const notaAusencia = ausentes.length > 0 ? ` Há ausência (férias/atestado) de: ${listaAusentes}.` : ''
+      const notaAusencia = ausentes.length > 0 ? `${NOTA_AUSENCIA} ${listaAusentes}.` : ''
       alertas.push({
         id: `cob|${r.id}|${data}`,
         regraId: 'cobertura',
@@ -701,6 +702,11 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
   const amarelo = alertas.filter((a) => a.severidade === 'amarelo').length
   const semaforo: Severidade = vermelho > 0 ? 'vermelho' : amarelo > 0 ? 'amarelo' : 'verde'
   return { semaforo, alertas, contagem: { vermelho, amarelo } }
+}
+
+/** Falta de cobertura que acontece com alguém ausente (férias/atestado) no dia: contratar não é a resposta. */
+export function furoComAusencia(a: Alerta): boolean {
+  return a.regraId === 'cobertura' && a.mensagem.includes(NOTA_AUSENCIA)
 }
 
 /** Aplica as alterações de uma correção, devolvendo uma nova escala (imutável). */

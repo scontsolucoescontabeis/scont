@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { calcularQuadro } from '../engine/contratacoes'
 import { REGRAS } from '../config/regras'
+import { totalDeVagas } from '../engine/vagas'
 import { useStore } from '../store/useStore'
 import { formatarMoeda } from '../utils/analise'
 
@@ -12,6 +13,8 @@ export function QuadroContratacoes() {
   const custo = useStore((s) => s.custo)
   const etapa = useStore((s) => s.etapaImpacto)
   const regrasPessoais = useStore((s) => s.regrasPessoais)
+  const propostas = useStore((s) => s.propostas)
+  const incluir = useStore((s) => s.incluirContratacoes)
   const set = useStore((s) => s.set)
 
   const q = useMemo(
@@ -24,6 +27,7 @@ export function QuadroContratacoes() {
     ? `${q.equipeAtual} pessoas, ≈ ${fmt1(q.equipeEquivalente)} em tempo integral`
     : `${q.equipeAtual} pessoas`
   const somaLinhas = q.linhasTurno.reduce((s, l) => s + l.necessarios, 0)
+  const nasPropostas = propostas.map((p) => ({ nome: p.nome, n: totalDeVagas(p.contratacoes) }))
 
   return (
     <section className="cartao space-y-4" aria-labelledby="t-quadro">
@@ -55,6 +59,13 @@ export function QuadroContratacoes() {
             }. Sugestão: contratar ${q.contratar}.`
           : `A equipe atual (${equipeTxt}) é suficiente para a cobertura mínima informada (necessárias: ${q.necessarioTotal} em tempo integral).`}
       </p>
+      {incluir && propostas.length > 0 && (
+        <p className="text-sm">
+          <strong>Nas sugestões de escala:</strong>{' '}
+          {nasPropostas.map((x) => `${x.nome}: ${x.n === 0 ? 'nenhuma contratação' : `contratar ${x.n}`}`).join(' · ')}. O gerador
+          acrescenta uma vaga por vez até a cobertura mínima fechar, então o número pode diferir da estimativa abaixo.
+        </p>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Pessoas necessárias por período</caption>

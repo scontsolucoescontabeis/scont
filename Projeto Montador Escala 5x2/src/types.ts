@@ -27,6 +27,8 @@ export interface Funcionario {
   sexo?: 'F' | 'M'
   menor?: boolean
   estagiario?: boolean
+  /** Vaga a contratar (não é uma pessoa da equipe atual): entra na proposta para cobrir a cobertura mínima. */
+  vaga?: boolean
 }
 
 export interface Escala {
@@ -171,10 +173,19 @@ export interface ParametrosCusto {
 
 export type ModeloEscala = 'fixo' | 'rodizio_domingo' | 'folga_movel'
 
+/** Contratações que uma proposta de escala exige (vagas já escaladas no calendário dela). */
+export interface ContratacaoProposta {
+  funcaoId: string
+  nome: string
+  quantidade: number
+}
+
 export interface Proposta {
   id: string
   modelo: ModeloEscala
   nome: string
   descricao: string
   escala: Escala
+  /** Vagas a contratar incluídas nesta proposta; ausente/vazio = a equipe atual dá conta. */
+  contratacoes?: ContratacaoProposta[]
 }

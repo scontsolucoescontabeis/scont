@@ -1,7 +1,9 @@
-import { Award, CheckCircle2, Sparkles } from 'lucide-react'
+import { Award, CheckCircle2, Sparkles, UserPlus } from 'lucide-react'
+import { totalDeVagas } from '../engine/vagas'
 import { useStore } from '../store/useStore'
 import { analisar } from '../utils/analise'
 import { destaquesPropostas, resumoProposta, type ResumoProposta } from '../utils/passo4'
+import type { Proposta } from '../types'
 import { Semaforo } from './ui'
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
@@ -17,6 +19,28 @@ function fraseResumo(r: ResumoProposta): string {
   return `${plural(r.domingosTrabalhados, 'domingo trabalhado', 'domingos trabalhados')} no total; ${alertas}.`
 }
 
+/** Quantas contratações a proposta exige, por função. */
+function Contratacoes({ proposta }: { proposta: Proposta }) {
+  const n = totalDeVagas(proposta.contratacoes)
+  if (n === 0) {
+    return (
+      <p className="mt-2 rounded border border-green-300 bg-green-50 p-2 text-xs text-green-800">
+        Nenhuma contratação: a equipe atual dá conta da cobertura mínima.
+      </p>
+    )
+  }
+  const lista = (proposta.contratacoes ?? []).map((c) => `${c.quantidade} ${c.nome}`).join(', ')
+  return (
+    <p className="mt-2 rounded border border-yellow-400 bg-yellow-50 p-2 text-xs text-yellow-900">
+      <UserPlus size={12} className="mr-1 inline" aria-hidden />
+      <strong>
+        Contratar {n} {n === 1 ? 'pessoa' : 'pessoas'}
+      </strong>{' '}
+      ({lista}). Já aparecem no calendário como “Vaga”, com a escala proposta.
+    </p>
+  )
+}
+
 export function Propostas() {
   const dados = useStore()
   const { set, usarProposta, sugerirEscala, propostas, comparar } = dados
@@ -30,6 +54,12 @@ export function Propostas() {
     propostas.filter((p) => comparar.includes(p.id)).map((p) => [p.id, resumoProposta(p.escala, analises[p.id].alertas)]),
   )
   const destaques = destaquesPropostas(resumos)
+
+  const alternarContratacoes = (marcado: boolean) => {
+    if (propostas.length > 0 && !confirmaPerderAjustes()) return
+    set({ incluirContratacoes: marcado })
+    if (propostas.length > 0) sugerirEscala()
+  }
 
   const alternar = (id: string) => {
     const lista = comparar.includes(id) ? comparar.filter((x) => x !== id) : [...comparar, id].slice(-3)
@@ -75,6 +105,22 @@ export function Propostas() {
         )}
       </div>
 
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={dados.incluirContratacoes}
+          onChange={(e) => alternarContratacoes(e.target.checked)}
+        />
+        <span>
+          <strong>Incluir na escala as contratações necessárias</strong>
+          <span className="block text-xs text-soft">
+            Se a equipe atual não der conta da cobertura mínima, cada sugestão acrescenta as vagas que faltam (“Vaga 1 —
+            Atendente”), já com a escala proposta para elas. Férias não geram contratação.
+          </span>
+        </span>
+      </label>
+
       {propostas.length > 0 && (
         <>
           <p className="text-sm text-soft">
@@ -114,6 +160,7 @@ export function Propostas() {
                       </ul>
                     )}
                     <Semaforo nivel={r.semaforo} />
+                    {dados.incluirContratacoes && <Contratacoes proposta={p} />}
                     <p className="mt-2 text-sm">{fraseResumo(resumos[p.id])}</p>
                     <dl className="mt-2 grid grid-cols-2 gap-1 text-xs">
                       <dt>Fora da regra</dt>
