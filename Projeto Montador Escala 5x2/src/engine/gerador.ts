@@ -43,12 +43,14 @@ export interface EntradaGerador {
   semanas: number
   /** Regras por pessoa (mulheres, estagiários); padrão: `REGRAS_PESSOAIS_PADRAO`. */
   regrasPessoais?: RegrasPessoais
+  /** Vagas a contratar por função (id da função → quantidade): entram na escala como "Vaga n — função". */
+  vagas?: Record<string, number>
 }
 
 export const SLOT = 15
 export const NSLOTS = 1440 / SLOT
 
-export function criarFuncionarios(funcoes: Funcao[]): Funcionario[] {
+export function criarFuncionarios(funcoes: Funcao[], vagas?: Record<string, number>): Funcionario[] {
   const lista: Funcionario[] = []
   for (const fn of funcoes) {
     if (fn.pessoas) {
@@ -65,14 +67,18 @@ export function criarFuncionarios(funcoes: Funcao[]): Funcionario[] {
           ...(p.estagiario ? { estagiario: true } : {}),
         })
       }
-      continue
+    } else {
+      for (let i = 1; i <= fn.quantidade; i++) {
+        lista.push({
+          id: `${fn.id}-${i}`,
+          nome: fn.quantidade > 1 ? `${fn.nome} ${i}` : fn.nome,
+          funcaoId: fn.id,
+        })
+      }
     }
-    for (let i = 1; i <= fn.quantidade; i++) {
-      lista.push({
-        id: `${fn.id}-${i}`,
-        nome: fn.quantidade > 1 ? `${fn.nome} ${i}` : fn.nome,
-        funcaoId: fn.id,
-      })
+    // Vagas a contratar: pessoas "genéricas" (sem sexo/menor/estagiário), com a jornada da função.
+    for (let i = 1; i <= (vagas?.[fn.id] ?? 0); i++) {
+      lista.push({ id: `${fn.id}-vaga-${i}`, nome: `Vaga ${i} — ${fn.nome}`, funcaoId: fn.id, vaga: true })
     }
   }
   return lista
@@ -278,7 +284,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   const regrasPessoais = entrada.regrasPessoais ?? REGRAS_PESSOAIS_PADRAO
   const inicio = domingoDaSemana(entrada.inicio)
   const dias = semanas * 7
-  const funcionarios = criarFuncionarios(funcoes)
+  const funcionarios = criarFuncionarios(funcoes, entrada.vagas)
   const feriadoSet = new Set(feriados)
   const funcaoIds = funcoes.map((f) => f.id)
   const perfil = perfilNecessidade(empresa, turnos, cobertura, funcaoIds)

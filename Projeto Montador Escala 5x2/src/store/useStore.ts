@@ -4,6 +4,7 @@ import { REGRAS_PESSOAIS_PADRAO } from '../config/regras'
 import { corrigirTudo } from '../engine/autocorrecao'
 import { aplicarCorrecao } from '../engine/conformidade'
 import { gerarPropostas } from '../engine/gerador'
+import { gerarPropostasComVagas } from '../engine/vagas'
 import { CUSTO_PADRAO } from '../engine/impacto'
 import type {
   AlteracaoCelula,
@@ -23,6 +24,7 @@ import { mapearDadosPortal, type DadosPortal } from '../portal/mapear'
 import { carregarDadosPortal } from '../portal/supabase'
 import { carregar, limpar, salvar } from '../services/storage'
 import { analisar } from '../utils/analise'
+import { criarMedidorDeFuros, ordemDeVagasDosDados } from '../utils/vagas'
 import * as hist from '../utils/historico'
 
 export interface Dados {
@@ -43,6 +45,8 @@ export interface Dados {
   propostaAtivaId: string | null
   /** Regras por pessoa (mulheres, estagiários); não são dados pessoais, então são persistidas. */
   regrasPessoais: RegrasPessoais
+  /** A proposta já traz, escaladas, as contratações que a cobertura mínima exige ("Vaga 1 — função"). */
+  incluirContratacoes: boolean
 }
 
 export const EMPRESA_PADRAO: Empresa = {
@@ -88,6 +92,7 @@ export const DADOS_PADRAO: Dados = {
   etapaImpacto: 'etapa1',
   propostaAtivaId: null,
   regrasPessoais: REGRAS_PESSOAIS_PADRAO,
+  incluirContratacoes: true,
 }
 
 /** Estado do modo portal (não persistido); null no modo avulso. */
@@ -145,7 +150,7 @@ let dadosBanco: DadosPortal | null = null
 /** Assinatura dos dados dos passos 1-3 usados na última geração; permite voltar ao Passo 4 sem perder ajustes manuais. */
 let assinaturaGeracao: string | null = null
 function assinaturaDosDados(d: Dados): string {
-  return JSON.stringify([d.empresa, d.funcoes, d.turnos, d.cobertura, d.feriados, d.inicioEscala, d.semanas, d.regrasPessoais])
+  return JSON.stringify([d.empresa, d.funcoes, d.turnos, d.cobertura, d.feriados, d.inicioEscala, d.semanas, d.regrasPessoais, d.incluirContratacoes, d.incluirContratacoes ? d.etapaImpacto : null])
 }
 const portalInicial: EstadoPortal | null = codigoPortal
   ? { codigo: codigoPortal, carregando: true, erro: null, nenhumEmpregado: false }
@@ -257,7 +262,7 @@ export const useStore = create<Store>((set, get) => {
     },
     sugerirEscala: () => {
       const d = get()
-      const novas = gerarPropostas({
+      const entrada = {
         empresa: d.empresa,
         funcoes: d.funcoes,
         turnos: d.turnos,
@@ -266,7 +271,11 @@ export const useStore = create<Store>((set, get) => {
         inicio: d.inicioEscala,
         semanas: d.semanas,
         regrasPessoais: d.regrasPessoais,
-      })
+      }
+      // Com as contratações incluídas, cada modelo acrescenta as vagas de que precisa (e só elas).
+      const novas = d.incluirContratacoes
+        ? gerarPropostasComVagas(entrada, ordemDeVagasDosDados(d), criarMedidorDeFuros(d))
+        : gerarPropostas(entrada)
       const corrigidas = novas.map((p) => ({
         ...p,
         escala: corrigirTudo(p.escala, (e) => analisar(d, e)).escala,
@@ -329,6 +338,7 @@ useStore.subscribe((estado) => {
       etapaImpacto: estado.etapaImpacto,
       propostaAtivaId: estado.propostaAtivaId,
       regrasPessoais: estado.regrasPessoais,
+      incluirContratacoes: estado.incluirContratacoes,
     }
     if (portal && baseBanco) dados.sobreposicoes = calcularSobreposicoes(baseBanco, estado.funcoes)
     salvar(dados)

@@ -307,6 +307,11 @@ export function Calendario({ escala, alertas }: { escala: Escala; alertas: Alert
                   className="sticky left-0 z-10 border-r border-line bg-white px-2 py-1 text-left font-medium"
                 >
                   {f.nome}
+                  {f.vaga && (
+                    <span className="ml-1 whitespace-nowrap rounded bg-yellow-100 px-1 text-[10px] font-semibold text-yellow-900">
+                      a contratar
+                    </span>
+                  )}
                 </th>
                 {datas.map((d, i) => {
                   const c = escala.celulas[f.id][i]
