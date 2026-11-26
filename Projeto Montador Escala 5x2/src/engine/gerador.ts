@@ -24,6 +24,7 @@ import type {
   Proposta,
   RegraCobertura,
   RegrasPessoais,
+  TipoDia,
   Turno,
 } from '../types'
 import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './datas'
@@ -53,7 +54,19 @@ export interface EntradaGerador {
    * vale em todos os dias de trabalho da pessoa; o resto da escala é refeito em volta dele.
    */
   horariosFixos?: Record<string, HorarioFixo>
+  /**
+   * Dias ajustados à mão no passo 4 (id do funcionário → índice do dia na escala → trava): ficam exatamente como
+   * estão; o gerador monta o resto (os outros dias e as outras pessoas) em volta deles.
+   */
+  travas?: Travas
 }
+
+/** Dia travado pelo usuário. Trabalho sem `horario` usa o horário da própria pessoa naquele dia. */
+export interface Trava {
+  tipo: TipoDia
+  horario?: HorarioFixo
+}
+export type Travas = Record<string, Record<number, Trava>>
 
 /** Horário de trabalho fixado pelo usuário no passo 4 (HH:mm). */
 export interface HorarioFixo {
@@ -365,6 +378,15 @@ interface Horario {
   intervaloMin: number
 }
 
+/** Horário de um dia travado: o informado na trava ou, sem ele, o da própria pessoa (`padrao`). */
+function horarioDaTrava(t: Trava, padrao: Horario): Horario {
+  if (!t.horario) return padrao
+  const h = horarioDoDiaPessoa({ entrada: t.horario.entrada, saida: t.horario.saida })
+  if (!h) return padrao
+  if (t.horario.intervaloMin !== undefined) h.intervaloMin = Math.min(t.horario.intervaloMin, h.bruto)
+  return h
+}
+
 /** Repouso de uma pessoa numa semana, para a busca local. */
 interface PlanoSemana {
   f: Funcionario
@@ -376,6 +398,8 @@ interface PlanoSemana {
   aprendido: number[] | null
   /** O repouso pode ser movido (não é um padrão fixo já aprendido). */
   movel: boolean
+  /** Dias travados à mão (passo 4): não mudam de trabalho para repouso nem o contrário. */
+  travados: Set<number>
 }
 
 /**
@@ -430,9 +454,9 @@ function melhorarRepousos(
       const sp = c.spans.get(p.f.id)!
       for (let i = 0; i < p.rep.length; i++) {
         const a = p.rep[i]
-        if (a === 0 || p.protegidos.has(a) || !c.livre(a)) continue
+        if (a === 0 || p.protegidos.has(a) || p.travados.has(a) || !c.livre(a)) continue
         for (let b = 1; b < 7; b++) {
-          if (b === a || p.rep.includes(b) || p.aus.includes(b) || !c.livre(b)) continue
+          if (b === a || p.rep.includes(b) || p.aus.includes(b) || p.travados.has(b) || !c.livre(b)) continue
           const fn = p.f.funcaoId
           const antes = local(a, sp[a], fn) + local(b, sp[b], fn)
           // a passa a trabalhar (+1) e b passa a ser repouso (−1)
@@ -456,7 +480,7 @@ function melhorarRepousos(
 }
 
 export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Escala {
-  const { empresa, funcoes, turnos, cobertura, feriados, semanas } = entrada
+  const { empresa, funcoes, turnos, cobertura, feriados, semanas, travas } = entrada
   const regrasPessoais = entrada.regrasPessoais ?? REGRAS_PESSOAIS_PADRAO
   const inicio = domingoDaSemana(entrada.inicio)
   const dias = semanas * 7
@@ -692,7 +716,26 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
 
   for (let s = 0; s < semanas; s++) {
     /** O funcionário está de férias no dia `d` (0 = dom .. 6 = sáb) desta semana. */
-    const ausente = (id: string, d: number) => ausentes.get(id)!.has(s * 7 + d)
+    /** Dia travado à mão no passo 4 (d = 0 dom .. 6 sáb desta semana). */
+    const travaDe = (id: string, d: number): Trava | undefined => travas?.[id]?.[s * 7 + d]
+    // Fora do trabalho sem contar como repouso: férias/ausência (ou feriado travado). Trava vale sobre as férias.
+    const ausente = (id: string, d: number) => {
+      const t = travaDe(id, d)
+      return t ? t.tipo === 'ausencia' || t.tipo === 'feriado' : ausentes.get(id)!.has(s * 7 + d)
+    }
+    // Faixas de presença nesta semana: trabalho travado usa o horário travado; repouso travado, nenhuma.
+    const spansSemana = new Map<string, number[][]>(
+      funcionarios.map((f) => [
+        f.id,
+        spans.get(f.id)!.map((sp, d) => {
+          const t = travaDe(f.id, d)
+          if (!t) return sp
+          if (t.tipo !== 'trabalho') return []
+          const h = horarioDaTrava(t, horarioDia.get(f.id)![d])
+          return faixas(h.inicio, h.bruto)
+        }),
+      ]),
+    )
     // presentes[d][faixa], d = 0 (dom) .. 6 (sáb) = dia da semana
     const presentes = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
     const presentesFn: Record<string, number[][]> = Object.fromEntries(
@@ -701,7 +744,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     for (const f of funcionarios) {
       for (let d = 0; d < 7; d++) {
         if (ausente(f.id, d)) continue
-        for (const sl of spans.get(f.id)![d]) {
+        for (const sl of spansSemana.get(f.id)![d]) {
           presentes[d][sl] += 1
           if (presentesFn[f.funcaoId]) presentesFn[f.funcaoId][d][sl] += 1
         }
@@ -724,17 +767,18 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       const folgaDaVez = new Set(
         funcionarios.filter((f, i) => (s + i) % cicloDe.get(f.id)! === 0).map((f) => f.id),
       )
-      // Jornada por dia: o domingo já está definido; quem trabalha nele conta na cobertura e fica fora do rodízio.
-      for (const [id, hs] of diasFixos) {
-        if (!hs[0] || ausente(id, 0)) continue
-        const fn = funcionarios.find((x) => x.id === id)!.funcaoId
-        spans.get(id)![0].forEach((sl) => {
+      // Jornada por dia ou domingo travado à mão: o domingo já está definido; quem trabalha nele conta na
+      // cobertura e fica fora do rodízio.
+      const domDefinido = (id: string) => diasFixos.has(id) || travaDe(id, 0) !== undefined
+      for (const f of funcionarios) {
+        if (!domDefinido(f.id) || ausente(f.id, 0)) continue
+        spansSemana.get(f.id)![0].forEach((sl) => {
           cobertos[sl] += 1
-          if (cobertosFn[fn]) cobertosFn[fn][sl] += 1
+          if (cobertosFn[f.funcaoId]) cobertosFn[f.funcaoId][sl] += 1
         })
       }
       // Quem está de férias neste domingo não entra no rodízio (já está fora).
-      const disponiveis = funcionarios.filter((f) => !ausente(f.id, 0) && !diasFixos.has(f.id))
+      const disponiveis = funcionarios.filter((f) => !ausente(f.id, 0) && !domDefinido(f.id))
       const ordem = disponiveis
         .filter((f) => domSeguidos.get(f.id)! < cicloDe.get(f.id)! - 1)
         .sort(
@@ -776,17 +820,26 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     /** Decisão de repouso de cada pessoa nesta semana (a busca local pode mover os repousos não protegidos). */
     const planos: PlanoSemana[] = []
     for (const f of funcionarios) {
-      const spanDe = spans.get(f.id)!
+      const spanDe = spansSemana.get(f.id)!
       const k = posNoTurno.get(f.id)!
       let aprendido: number[] | null = null
       let reutilizado = false
       // Dias de férias nesta semana: não trabalham nem consomem os 2 repousos.
       const aus = Array.from({ length: 7 }, (_, d) => d).filter((d) => ausente(f.id, d))
+      // Dias travados à mão: repouso (folga/DSR) e trabalho.
+      const repTravado = Array.from({ length: 7 }, (_, d) => d).filter((d) => {
+        const t = travaDe(f.id, d)
+        return t?.tipo === 'folga' || t?.tipo === 'dsr'
+      })
+      const trabTravado = new Set(Array.from({ length: 7 }, (_, d) => d).filter((d) => travaDe(f.id, d)?.tipo === 'trabalho'))
+      const travados = new Set([...repTravado, ...trabTravado])
+      /** Repousos escolhidos + os travados, sem os dias travados como trabalho. */
+      const comTravas = (r: number[]) => [...new Set([...r.filter((d) => !trabTravado.has(d)), ...repTravado])]
       const fixos = diasFixos.get(f.id)
       if (fixos) {
         // Jornada por dia: as folgas são os dias sem horário, como informado (a conformidade aponta o que não fecha).
-        const repFixo = Array.from({ length: 7 }, (_, d) => d).filter((d) => !fixos[d] && !aus.includes(d))
-        planos.push({ f, rep: repFixo, aus, protegidos: new Set(repFixo), aprendido: null, movel: false })
+        const repFixo = comTravas(Array.from({ length: 7 }, (_, d) => d).filter((d) => !fixos[d] && !aus.includes(d)))
+        planos.push({ f, rep: repFixo, aus, protegidos: new Set(repFixo), aprendido: null, movel: false, travados })
         continue
       }
       // Repousos possíveis: 2, ou menos quando restam poucos dias fora das férias (7 → 2, 2 → 1, 1 → 0).
@@ -795,7 +848,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       if (aus.length === 7) {
         rep = []
       } else if (modelo === 'fixo' && !rotacionaDomingo && repousoFixo.has(f.id) && !repousoFixo.get(f.id)!.some((d) => aus.includes(d))) {
-        rep = repousoFixo.get(f.id)!
+        rep = comTravas(repousoFixo.get(f.id)!)
         reutilizado = true
       } else {
         const folga: number[] = []
@@ -803,9 +856,9 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         for (let d = 0; d < 7; d++) {
           const dow = d
           const exigidas = spanDe[d].filter((sl) => perfil[dow][sl] > 0)
-          if (aus.includes(d)) {
+          if (aus.includes(d) || trabTravado.has(d)) {
             folga.push(-Infinity)
-          } else if (exigidas.length === 0) {
+          } else if (repTravado.includes(d) || exigidas.length === 0) {
             forcados.push(d)
             folga.push(-Infinity)
           } else {
@@ -823,8 +876,8 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         fixosFora.forEach((d) => {
           if (Number.isFinite(folga[d])) folga[d] += 1e6
         })
-        const permitido = Array.from({ length: 7 }, (_, d) => !aus.includes(d))
-        if (trabalhaDomingo && !forcados.includes(0) && !aus.includes(0)) {
+        const permitido = Array.from({ length: 7 }, (_, d) => !aus.includes(d) && !trabTravado.has(d))
+        if (trabalhaDomingo && !forcados.includes(0) && !aus.includes(0) && !travados.has(0)) {
           if (trabalhaDomingo.has(f.id)) permitido[0] = false
           else forcados.push(0)
         }
@@ -836,6 +889,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           modelo === 'folga_movel' ? (s + k) % 7 : k % 7,
           quantos,
         )
+        rep = comTravas(rep)
         // O padrão fixo só é aprendido numa semana sem férias.
         if (modelo === 'fixo' && aus.length === 0) aprendido = rotacionaDomingo ? rep.filter((d) => d !== 0) : [...rep]
         // Fixo com domingo em rodízio: depois de aprendido o padrão, os repousos não se movem mais.
@@ -850,10 +904,11 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         spanDe[d].every((sl) => perfil[d][sl] <= 0),
       )
       const domObrigatorio = domSeguidos.get(f.id)! >= cicloDe.get(f.id)! - 1 &&!fechados.includes(0) && !aus.includes(0)
-      const protegidos = new Set<number>(fechados)
+      const protegidos = new Set<number>([...fechados, ...repTravado])
       if (domObrigatorio) protegidos.add(0)
       const garantir = (d: number) => {
-        if (rep.includes(d)) return
+        // Dia travado como trabalho fica como o usuário deixou (a conformidade aponta).
+        if (rep.includes(d) || trabTravado.has(d)) return
         const sai = [...rep].reverse().find((x) => !protegidos.has(x))
         rep = sai === undefined ? [...rep, d] : rep.map((x) => (x === sai ? d : x))
       }
@@ -874,7 +929,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       )
       // O padrão já aprendido não é reaprendido; mas ele pode abrir uma exceção numa semana para cobrir uma falta (a busca só move
       // repouso quando isso reduz a falta de gente; sem falta, o padrão fica como está).
-      planos.push({ f, rep, aus, protegidos, aprendido: reutilizado ? null : aprendido, movel: aus.length < 7 })
+      planos.push({ f, rep, aus, protegidos, aprendido: reutilizado ? null : aprendido, movel: aus.length < 7, travados })
     }
 
     // Busca local: move repousos (nunca o domingo) para dias com gente sobrando, enquanto isso reduz as faltas.
@@ -883,7 +938,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       presentesFn,
       perfil,
       perfilFn,
-      spans,
+      spans: spansSemana,
       maxSeguidos,
       diasSeguidos,
       livre: (d) => !feriadoSet.has(somarDias(inicio, s * 7 + d)),
@@ -902,7 +957,13 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       for (let d = 0; d < 7; d++) {
         const data = somarDias(inicio, s * 7 + d)
         let cel: DiaEscala
-        if (aus.includes(d)) {
+        const trava = travaDe(f.id, d)
+        if (trava) {
+          cel =
+            trava.tipo === 'trabalho'
+              ? { tipo: 'trabalho', turnoId: turnoDoHorario(horarioDaTrava(trava, horarioDia.get(f.id)![d])) }
+              : { tipo: trava.tipo }
+        } else if (aus.includes(d)) {
           cel = { tipo: 'ausencia' }
         } else if (feriadoSet.has(data) && !empresa.funcionaFeriados && !rep.includes(d)) {
           cel = { tipo: 'feriado' }

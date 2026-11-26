@@ -1,6 +1,5 @@
 import { CalendarDays, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { corrigirTudo } from '../engine/autocorrecao'
 import { useStore } from '../store/useStore'
 import { analisar, formatarData } from '../utils/analise'
 import { Calendario } from './Calendario'
@@ -78,7 +77,7 @@ export function StepEscala() {
   const feriados = useStore((s) => s.feriados)
   const regrasPessoais = useStore((s) => s.regrasPessoais)
 
-  const set = useStore((s) => s.set)
+  const autoCorrigirInicial = useStore((s) => s.autoCorrigirInicial)
   const sugerirEscala = useStore((s) => s.sugerirEscala)
   const semHistorico = useStore((s) => s.historico.passado.length === 0 && s.historico.futuro.length === 0)
   const [autoCorrigidas, setAutoCorrigidas] = useState(0)
@@ -89,12 +88,10 @@ export function StepEscala() {
   // (que passa pelo Desfazer).
   useEffect(() => {
     if (!escala || !semHistorico) return
-    const r = corrigirTudo(escala, (e) => analisar({ empresa, cobertura, feriados, turnos, funcoes, regrasPessoais }, e))
-    if (r.aplicadas > 0) {
-      setAutoCorrigidas((n) => n + r.aplicadas)
-      set({ escala: r.escala })
-    }
-  }, [escala, semHistorico, empresa, cobertura, feriados, turnos, funcoes, regrasPessoais, set])
+    // Respeita os dias travados (ajustes manuais mantidos ao refazer a escala).
+    const n = autoCorrigirInicial()
+    if (n > 0) setAutoCorrigidas((x) => x + n)
+  }, [escala, semHistorico, empresa, cobertura, feriados, turnos, funcoes, regrasPessoais, autoCorrigirInicial])
 
   const vagas = useMemo(() => escala?.funcionarios.filter((f) => f.vaga) ?? [], [escala])
 

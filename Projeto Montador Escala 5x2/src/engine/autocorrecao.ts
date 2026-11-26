@@ -33,6 +33,8 @@ export function corrigirTudo(
   validar: Validador,
   maxPassos = 150,
   maxTentativasPorPasso = 20,
+  /** Dias travados à mão (passo 4): correções que mexem neles são ignoradas. */
+  travado?: (funcionarioId: string, dia: number) => boolean,
 ): ResultadoAutocorrecao {
   let atual = escala
   let resultado = validar(atual)
@@ -42,6 +44,7 @@ export function corrigirTudo(
   for (let passo = 0; passo < maxPassos; passo++) {
     const candidatos = resultado.alertas
       .filter((a) => a.correcao && a.correcao.length > 0)
+      .filter((a) => !travado || !a.correcao!.some((c) => travado(c.funcionarioId, c.dia)))
       .sort((a, b) => (a.severidade === b.severidade ? 0 : a.severidade === 'vermelho' ? -1 : 1))
       .slice(0, maxTentativasPorPasso * 3)
     if (candidatos.length === 0) break
