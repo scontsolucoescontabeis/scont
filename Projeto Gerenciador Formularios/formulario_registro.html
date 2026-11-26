@@ -844,9 +844,12 @@
                 return;
             }
 
-            const { data: formulario, error: formularioError } = await supabaseClient
+            // id gerado no navegador: o anônimo só insere, não lê a tabela de volta
+            const novoFormularioId = crypto.randomUUID();
+            const { error: formularioError } = await supabaseClient
                 .from('formularios')
                 .insert([{
+                    id: novoFormularioId,
                     tipo_formulario: 'registro',
                     nome_empresa: formData.nomeEmpresa,
                     nome_proposta1: formData.nomeProposta1,
@@ -867,15 +870,14 @@
                     data_preenchimento: formData.dataPreenchimento,
                     hora_preenchimento: formData.horaPreenchimento,
                     status: 'recebido'
-                }])
-                .select();
+                }]);
 
             if (formularioError) {
                 console.error('❌ Erro ao salvar formulário:', formularioError);
                 throw formularioError;
             }
 
-            submissionId = formulario[0].id;
+            submissionId = novoFormularioId;
             console.log('✅ Formulário salvo com ID:', submissionId);
 
             // 6. Salvar sócios
@@ -924,10 +926,9 @@ try {
     }
 
     if (sociosData.length > 0) {
-        const { data: socios, error: sociosError } = await supabaseClient
+        const { error: sociosError } = await supabaseClient
             .from('socios')
-            .insert(sociosData)
-            .select();
+            .insert(sociosData);
 
         if (sociosError) {
             console.error('❌ Erro ao salvar sócios:', sociosError);

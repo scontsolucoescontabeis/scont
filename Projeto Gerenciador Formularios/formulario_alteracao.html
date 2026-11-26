@@ -1190,9 +1190,12 @@ async function handleFormSubmit(e) {
             showModal();
             return;
         }
-        const { data: formulario, error: formularioError } = await supabaseClient
+        // id gerado no navegador: o anônimo só insere, não lê a tabela de volta
+        const novoFormularioId = crypto.randomUUID();
+        const { error: formularioError } = await supabaseClient
             .from('formularios')
             .insert([{
+                id: novoFormularioId,
                 tipo_formulario: 'alteracao',
                 nome_empresa: formData.nomeEmpresa,
                 alterar_nome: formData.alterarNome === 'sim',
@@ -1219,10 +1222,9 @@ async function handleFormSubmit(e) {
                 data_preenchimento: formData.dataPreenchimento,
                 hora_preenchimento: formData.horaPreenchimento,
                 status: 'recebido'
-            }])
-            .select();
+            }]);
         if (formularioError) throw formularioError;
-        submissionId = formulario[0].id;
+        submissionId = novoFormularioId;
         console.log('✅ Formulario ID:', submissionId);
 
         // 4. Uploads (agora com o formulario_id do registro recém-criado)
@@ -1269,7 +1271,7 @@ async function handleFormSubmit(e) {
                 });
             }
             if (sociosData.length > 0) {
-                const { error: sociosError } = await supabaseClient.from('socios').insert(sociosData).select();
+                const { error: sociosError } = await supabaseClient.from('socios').insert(sociosData);
                 if (sociosError) throw new Error(`Sócios: ${sociosError.message}`);
                 console.log(`✅ ${sociosData.length} sócios salvos.`);
             }

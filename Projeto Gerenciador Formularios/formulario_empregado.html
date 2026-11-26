@@ -1517,9 +1517,12 @@ const formData = {
         
 
 
-const { data: empregadoData, error: empregadoError } = await supabase
+// id gerado no navegador: o anônimo só insere, não lê a tabela de volta
+const novoEmpregadoId = crypto.randomUUID();
+const { error: empregadoError } = await supabase
     .from('empregados')
     .insert([{
+        id: novoEmpregadoId,
         nome_completo: formData.nomeCompleto,
         nome_empresa: formData.nomeEmpresa,
         cpf: formData.cpf,
@@ -1554,8 +1557,7 @@ const { data: empregadoData, error: empregadoError } = await supabase
                     // Só envia colunas de comissão quando marcado (evita erro se o SQL ainda não foi rodado)
                     ...(formData.comissionado ? { comissionado: true, valor_comissao: formData.valorComissao } : {}),
                     status: 'recebido'
-                }])
-                .select();
+                }]);
 
             if (empregadoError) {
                 console.error('❌ Erro ao salvar empregado:', empregadoError);
@@ -1565,7 +1567,7 @@ const { data: empregadoData, error: empregadoError } = await supabase
                 throw new Error('Erro ao salvar empregado: ' + empregadoError.message);
             }
 
-            const empregadoId = empregadoData[0].id;
+            const empregadoId = novoEmpregadoId;
             console.log('✅ Empregado salvo com ID:', empregadoId);
 
             // ===== SALVAR DEPENDENTES =====
