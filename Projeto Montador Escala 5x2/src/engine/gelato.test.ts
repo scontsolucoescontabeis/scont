@@ -202,6 +202,61 @@ describe('SMMF: equipe de 7 com carga de 7h20 por dia (36,7 h por semana)', () =
   })
 })
 
+describe('SMMF a 42 h, sem aplicar o art. 386 às mulheres', () => {
+  const regrasPessoais = { ...REGRAS_PESSOAIS_PADRAO, mulheresDomingoQuinzenal: false }
+  function tela42() {
+    // mesma tela do teste anterior, com 42 h por semana e a regra do art. 386 desligada
+    const base = cenario(2)
+    const pessoas = base.dados.funcoes[0].pessoas!.map((p) => ({ ...p, jornadaPadrao: false, horasSemanais: 42 }))
+    const funcoes: Funcao[] = [{ ...base.dados.funcoes[0], pessoas }]
+    const empresa: Empresa = {
+      ...base.dados.empresa,
+      horaAbertura: '07:10',
+      horarios: {
+        0: { abre: '07:10', fecha: '21:00' },
+        2: { abre: '09:30', fecha: '22:40' },
+        3: { abre: '09:30', fecha: '22:40' },
+        4: { abre: '09:30', fecha: '22:40' },
+        5: { abre: '09:30', fecha: '22:40' },
+      },
+    }
+    const turnos: Turno[] = [
+      { id: 'p1', nome: 'FÁBRICA GELATO', inicio: '07:10', fim: '09:30', intervaloMin: 0 },
+      { id: 'p2', nome: 'ATENDIMENTO SEG-SAB', inicio: '09:30', fim: '22:40', intervaloMin: 0 },
+      { id: 'p3', nome: 'ATENDIMENTO DOM', inicio: '13:30', fim: '21:00', intervaloMin: 0 },
+    ]
+    const cobertura: Record<string, CoberturaTurno> = {
+      p1: { util: 0, porDia: { 1: 2, 2: 0, 3: 0, 4: 0, 5: 0 }, sab: 2, dom: 2 },
+      p2: { util: 2, sab: 2, dom: 0 },
+      p3: { util: 0, sab: 0, dom: 2 },
+    }
+    const dados = { empresa, funcoes, turnos, cobertura, feriados: [] }
+    const entrada: EntradaGerador = { empresa, funcoes, turnos, cobertura, feriados: [], inicio: '2026-12-20', semanas: 5, regrasPessoais }
+    const paraVagas = { ...dados, custo: { encargosPct: 0, horaExtraPct: 0 }, etapaImpacto: 'etapa1' as const, regrasPessoais }
+    return { dados, entrada, paraVagas }
+  }
+  const t = tela42()
+
+  it('o quadro não pede reforço de domingo (7 pessoas, 1 domingo de folga a cada 3 semanas bastam)', () => {
+    const q = calcularQuadro(t.paraVagas, 'etapa1', REGRAS, regrasPessoais)
+    expect(q.contratar).toBe(0)
+    expect(q.extraDomingo).toBe(0)
+  })
+
+  it('nenhum modelo de escala propõe contratação e todos cobrem a cobertura mínima', () => {
+    const medidor = criarMedidorDeFuros(t.paraVagas)
+    for (const m of MODELOS) expect(medidor(gerarEscala(t.entrada, m)), m).toBe(0)
+    const props = gerarPropostasComVagas(t.entrada, ordemDeVagasDosDados(t.paraVagas), medidor, CONTRATOS_PARCIAIS)
+    expect(props.map((p) => totalDeVagas(p.contratacoes))).toEqual([0, 0, 0])
+  })
+
+  it('com o art. 386 ligado o reforço de domingo continua sendo exigido', () => {
+    const q = calcularQuadro(t.paraVagas, 'etapa1', REGRAS, REGRAS_PESSOAIS_PADRAO)
+    expect(q.contratar).toBe(1)
+    expect(q.extraDomingo).toBe(1)
+  })
+})
+
 describe('elevarCarga', () => {
   const f = (p: Partial<PessoaEscala>): Funcao => ({
     id: 'x', nome: 'X', quantidade: 3, jornadaContratual: '44h', horasSemanaisAtuais: 44,

@@ -200,7 +200,9 @@ export function calcularQuadro(
   // Perfil combinado → turnos e pessoas (a necessidade real; turnos são compartilhados entre períodos).
   const camadas: Camadas = perfil ? camadasDoPerfil(perfil, janela, bruto) : new Map()
   const turnosSemana = somaTurnos(camadas)
-  const necessarioTotal = pessoasDasCamadas(camadas, porPessoa, cicloRodizio)
+  // Sem o ciclo do domingo: ele é conferido abaixo para a equipe toda (quem folga no domingo pode ser de qualquer
+  // faixa de horário; somar o ciclo faixa a faixa arredondaria para cima em cada uma e pediria gente a mais).
+  const necessarioBase = pessoasDasCamadas(camadas, porPessoa, null)
   const turnosDomingo = [...camadas.values()].reduce((s, l) => s + l[0], 0)
 
   // Cada período sozinho (só para exibição).
@@ -266,15 +268,18 @@ export function calcularQuadro(
   // Contratações: primeiro o mínimo de cada função, depois o que falta no total.
   const base = funcoes.map((f, i) => Math.max(0, Math.ceil((necessarioFn.get(f.id) ?? 0) - capFn[i] - EPS)))
   const somaBase = base.reduce((a, b) => a + b, 0)
-  const faltaTotal = Math.max(0, Math.ceil(necessarioTotal - (equipeReal + somaBase) - EPS))
+  const faltaTotal = Math.max(0, Math.ceil(necessarioBase - (equipeReal + somaBase) - EPS))
   const semDomingo = somaBase + faltaTotal
   // Domingo: quem pode trabalhar num domingo = capacidade − folgas daquele domingo; contratações entram no ciclo do setor.
   const noDomingo = (k: number) => equipeReal + k - Math.ceil(folgasDomingo + k / ciclo - EPS)
   let contratar = semDomingo
-  if (cicloRodizio !== null && turnosDomingo > 0 && mulheres > 0) {
+  if (cicloRodizio !== null && turnosDomingo > 0) {
     while (noDomingo(contratar) < turnosDomingo - EPS && contratar < semDomingo + turnosDomingo * 2) contratar++
   }
   const extraDomingo = contratar - semDomingo
+  // Pessoas em tempo integral necessárias: o que os turnos pedem; se o domingo exigiu reforço, o que a equipe + o
+  // reforço dá.
+  const necessarioTotal = extraDomingo > 0 ? Math.max(necessarioBase, Math.ceil(equipeReal + contratar - EPS)) : necessarioBase
 
   const resto = distribuir(contratar - somaBase, funcoes.map((f) => f.quantidade))
   const extras = base.map((b, i) => b + resto[i])
@@ -293,9 +298,12 @@ export function calcularQuadro(
   const observacoes: string[] = []
   if (extraDomingo > 0) {
     observacoes.push(
-      `Regra do art. 386 da CLT: ${mulheres} mulher(es) da equipe folgam ao menos 1 domingo a cada 2 semanas; para ` +
-        `cobrir os ${turnosDomingo} turno(s) de domingo são necessárias mais ${extraDomingo} contratação(ões) ` +
-        '(as novas contratações foram consideradas no rodízio de domingos do setor).',
+      mulheres > 0
+        ? `Regra do art. 386 da CLT: ${mulheres} mulher(es) da equipe folgam ao menos 1 domingo a cada 2 semanas; para ` +
+            `cobrir os ${turnosDomingo} turno(s) de domingo são necessárias mais ${extraDomingo} contratação(ões) ` +
+            '(as novas contratações foram consideradas no rodízio de domingos do setor).'
+        : `Rodízio de domingos (1 domingo de folga a cada ${ciclo} semanas): para cobrir os ${turnosDomingo} turno(s) de ` +
+            `domingo são necessárias mais ${extraDomingo} contratação(ões).`,
     )
   }
 
