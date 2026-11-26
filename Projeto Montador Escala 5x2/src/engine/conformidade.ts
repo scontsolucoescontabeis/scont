@@ -30,7 +30,7 @@ import type {
   Turno,
 } from '../types'
 import { diaDaSemana, diffDias, minutosDe, domingoDaSemana, somarDias } from './datas'
-import { cicloDomingoDe, limitesEstagio, tocaNoturnoMenor } from './jornada'
+import { cicloDomingoDe, limitesEstagio, recorteDoDia, tocaNoturnoMenor } from './jornada'
 
 export interface EntradaConformidade {
   escala: Escala
@@ -604,6 +604,62 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
   // ---------- Cobertura ----------
   const hhmm = (min: number) =>
     `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
+  /** Quantas pessoas (da função, se indicada) estão trabalhando no instante `t0` (minuto do dia) do dia `j`. */
+  const presentesEm = (j: number, t0: number, funcaoId?: string) =>
+    escala.funcionarios.filter((f) => {
+      if (funcaoId && f.funcaoId !== funcaoId) return false
+      const t = turnoDe(celula(f.id, j))
+      if (!t) return false
+      const a = minutosDe(t.inicio)
+      return a <= t0 && t0 < a + duracaoBrutaMin(t)
+    }).length
+  /**
+   * Turno (dos que a pessoa já faz) que cobre a falta: o do mesmo dia da semana, se cobre; senão o que mais cobre.
+   * `undefined` se nenhum dos turnos dela cobre.
+   */
+  const turnoQueCobre = (fid: string, dow: number, faltas: { de: number; ate: number }[]): Turno | undefined => {
+    const celulasF = escala.celulas[fid] ?? []
+    const cobre = (t: Turno) => {
+      const a = minutosDe(t.inicio)
+      const b = a + duracaoBrutaMin(t)
+      return faltas.reduce((s, x) => s + Math.max(0, Math.min(b, x.ate) - Math.max(a, x.de)), 0)
+    }
+    const mesmoDia = turnoDe(celulasF.find((x, j) => x.tipo === 'trabalho' && diaDaSemana(datas[j]) === dow))
+    if (mesmoDia && cobre(mesmoDia) > 0) return mesmoDia
+    const distintos = new Map<string, Turno>()
+    for (const x of celulasF) {
+      const t = turnoDe(x)
+      if (t) distintos.set(t.id, t)
+    }
+    let melhor: Turno | undefined
+    for (const t of distintos.values()) if (cobre(t) > (melhor ? cobre(melhor) : 0)) melhor = t
+    return melhor
+  }
+  /** `f` pode deixar de trabalhar no dia `j` sem que algum mínimo de cobertura (de período) fique descoberto. */
+  const semFazerFalta = (f: { id: string; funcaoId: string }, j: number): boolean => {
+    const tj = turnoDe(celula(f.id, j))
+    if (!tj || !periodos) return false
+    if (feriadoSet.has(datas[j]) && !empresaFuncionaFeriados) return true
+    const dowJ = diaDaSemana(datas[j])
+    const a = minutosDe(tj.inicio)
+    const b = a + duracaoBrutaMin(tj)
+    for (const r2 of cobertura) {
+      if (!r2.diasSemana.includes(dowJ)) continue
+      if (r2.funcaoId && r2.funcaoId !== f.funcaoId) continue
+      const p2 = periodos.get(r2.turnoId)
+      if (!p2) return false
+      const ini2 = minutosDe(p2.inicio)
+      const fim2 = minutosDe(p2.fim) <= ini2 ? 1440 : minutosDe(p2.fim)
+      const jan = recorteDoDia(entrada.janelasDia?.[dowJ], ini2, fim2)
+      for (let m = Math.floor(ini2 / 15) * 15; m < fim2; m += 15) {
+        if (jan && (m < Math.floor(jan.ini / 15) * 15 || m >= Math.ceil(jan.fim / 15) * 15)) continue
+        const t0 = Math.max(m, ini2)
+        if (!(a <= t0 && t0 < b)) continue
+        if (presentesEm(j, t0, r2.funcaoId) - 1 < r2.minimo) return false
+      }
+    }
+    return true
+  }
   for (const r of cobertura) {
     const turno = turnos.get(r.turnoId)
     const periodo = periodos?.get(r.turnoId)
@@ -622,12 +678,14 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
           .filter((f) => !r.funcaoId || f.funcaoId === r.funcaoId)
           .map((f) => turnoDe(celula(f.id, i)))
           .filter((t): t is Turno => !!t)
-        const janela = entrada.janelasDia?.[diaDaSemana(data)]
+        const janela = recorteDoDia(entrada.janelasDia?.[diaDaSemana(data)], ini, fim)
         for (let m = Math.floor(ini / 15) * 15; m < fim; m += 15) {
           if (janela && (m < Math.floor(janela.ini / 15) * 15 || m >= Math.ceil(janela.fim / 15) * 15)) continue
+          // Na primeira faixa (parcial) vale o instante em que o período realmente começa.
+          const t0 = Math.max(m, ini)
           const n = trabalhando.filter((t) => {
             const a = minutosDe(t.inicio)
-            return a <= m && m < a + duracaoBrutaMin(t)
+            return a <= t0 && t0 < a + duracaoBrutaMin(t)
           }).length
           if (n >= r.minimo) continue
           const ult = faltas[faltas.length - 1]
@@ -682,6 +740,31 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         if (nRep > lim.repousosSemanais && horasAtuais + extra <= lim.jornadaSemanalMax * 60) {
           correcao = [{ funcionarioId: f.id, dia: i, novo: { tipo: 'trabalho', turnoId: usual.id } }]
           break
+        }
+      }
+
+      // Sem repouso sobrando: troca o repouso por um dia da mesma semana em que a pessoa não faz falta.
+      if (!correcao && periodo) {
+        const dowAlvo = diaDaSemana(data)
+        const seg = domingoDaSemana(data)
+        const semIdx = Array.from({ length: 7 }, (_, k) => indiceDe.get(somarDias(seg, k)))
+        if (!semIdx.some((x) => x === undefined)) {
+          for (const f of escala.funcionarios) {
+            if (r.funcaoId && f.funcaoId !== r.funcaoId) continue
+            const c = celula(f.id, i)
+            if (c?.tipo !== 'folga' && c?.tipo !== 'dsr') continue
+            const usual = turnoQueCobre(f.id, dowAlvo, faltas)
+            if (!usual) continue
+            const alvo = (semIdx as number[]).find(
+              (j) => j !== i && celula(f.id, j)?.tipo === 'trabalho' && semFazerFalta(f, j),
+            )
+            if (alvo === undefined) continue
+            correcao = [
+              { funcionarioId: f.id, dia: i, novo: { tipo: 'trabalho', turnoId: usual.id } },
+              { funcionarioId: f.id, dia: alvo, novo: { tipo: c.tipo } },
+            ]
+            break
+          }
         }
       }
 
