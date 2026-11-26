@@ -82,8 +82,8 @@ function EditorHorario({
         </button>
       </div>
       <p className="mt-2 text-xs text-soft">
-        O horário vale para todos os dias de trabalho de {nome}. O motor refaz as folgas e os horários dos demais para
-        cumprir a cobertura do passo 3; os ajustes feitos à mão nos dias são substituídos pela nova escala.
+        O horário vale para todos os dias de trabalho de {nome}. Os dias que você já ajustou à mão ficam como estão; o
+        motor refaz só o restante (as demais folgas e os horários dos outros) para cumprir a cobertura do passo 3.
       </p>
     </section>
   )
@@ -297,7 +297,7 @@ export function Calendario({ escala, alertas }: { escala: Escala; alertas: Alert
 
       <p className="text-xs text-soft">
         Para mudar o horário de trabalho de alguém, clique no nome da pessoa (ou troque o horário de um dia trabalhado):
-        a escala é refeita com esse horário fixo, seguindo as regras do passo 3.
+        a escala é refeita com esse horário fixo, seguindo as regras do passo 3, e os dias que você ajustou à mão são mantidos.
       </p>
       {horarioDe && (
         <EditorHorario

@@ -66,6 +66,40 @@ describe('passo 4: alterar o horário de trabalho refaz a escala', () => {
     expect(s.getState().horariosPasso4[a.id]).toMatchObject({ entrada: '10:00', saida: '18:00' })
   })
 
+  it('ao alterar o horário, os ajustes manuais dos dias são mantidos e o resto é refeito', async () => {
+    const s = await novaStore()
+    s.getState().set({ incluirContratacoes: false })
+    s.getState().sugerirEscala()
+    const e = s.getState().escala!
+    const [a, b] = e.funcionarios
+    // Ajuste manual: folga para B num dia em que trabalhava; ausência para A no primeiro dia de trabalho dela.
+    const diaB = e.celulas[b.id].findIndex((c) => c.tipo === 'trabalho')
+    const diaA = e.celulas[a.id].findIndex((c) => c.tipo === 'trabalho')
+    s.getState().setCelula(b.id, diaB, { tipo: 'folga' })
+    s.getState().setCelula(a.id, diaA, { tipo: 'ausencia' })
+
+    s.getState().definirHorario(a.id, { entrada: '09:00', saida: '18:00', intervaloMin: 60 })
+    let nova = s.getState().escala!
+    expect(nova).not.toBe(e)
+    expect(nova.celulas[b.id][diaB].tipo).toBe('folga')
+    expect(nova.celulas[a.id][diaA].tipo).toBe('ausencia')
+    expect([...horariosDe(nova, a.id)]).toEqual(['09:00–18:00'])
+
+    // Um novo ajuste depois da regeneração também é mantido na próxima alteração de horário.
+    const diaB2 = nova.celulas[b.id].findIndex((c, i) => c.tipo === 'trabalho' && i !== diaB)
+    s.getState().setCelula(b.id, diaB2, { tipo: 'folga' })
+    s.getState().definirHorario(a.id, { entrada: '10:00', saida: '19:00', intervaloMin: 60 })
+    nova = s.getState().escala!
+    expect(nova.celulas[b.id][diaB].tipo).toBe('folga')
+    expect(nova.celulas[b.id][diaB2].tipo).toBe('folga')
+    expect(nova.celulas[a.id][diaA].tipo).toBe('ausencia')
+    expect([...horariosDe(nova, a.id)]).toEqual(['10:00–19:00'])
+
+    // "Gerar escala sugerida" (sugerirEscala) recomeça do zero.
+    s.getState().sugerirEscala()
+    expect(s.getState().escala!.celulas[a.id][diaA].tipo).not.toBe('ausencia')
+  })
+
   it('folga ↔ trabalho no mesmo horário continua sendo ajuste do dia (sem regenerar)', async () => {
     const s = await novaStore()
     s.getState().set({ incluirContratacoes: false })

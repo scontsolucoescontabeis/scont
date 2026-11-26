@@ -4,7 +4,7 @@ import { REGRAS_PESSOAIS_PADRAO } from '../config/regras'
 import { corrigirTudo } from '../engine/autocorrecao'
 import { elevarCarga } from '../engine/contratacoes'
 import { aplicarCorrecao } from '../engine/conformidade'
-import { gerarPropostas, type HorarioFixo } from '../engine/gerador'
+import { gerarPropostas, type HorarioFixo, type Travas } from '../engine/gerador'
 import { CONTRATOS_PARCIAIS, gerarPropostasComVagas } from '../engine/vagas'
 import { CUSTO_PADRAO } from '../engine/impacto'
 import type {
@@ -135,8 +135,10 @@ interface Acoes {
   trocarCelulas: (a: { f: string; d: number }, b: { f: string; d: number }) => void
   corrigir: (correcao: AlteracaoCelula[]) => void
   usarProposta: (id: string) => void
-  /** Regenera as propostas a partir dos passos 1–3 (já com correções automáticas). */
+  /** Regenera as propostas a partir dos passos 1–3 (já com correções automáticas); descarta os ajustes manuais. */
   sugerirEscala: () => void
+  /** Correção automática da escala recém-gerada (sem histórico, respeitando os dias travados); devolve quantas aplicou. */
+  autoCorrigirInicial: () => number
   /** Navega para um passo; ao abrir a Escala, atualiza a sugestão com os dados atuais. */
   irParaPasso: (i: number) => void
   reiniciar: () => void
@@ -166,6 +168,55 @@ let assinaturaGeracao: string | null = null
 function assinaturaDosDados(d: Dados): string {
   return JSON.stringify([d.empresa, d.funcoes, d.turnos, d.cobertura, d.feriados, d.inicioEscala, d.semanas, d.regrasPessoais, d.incluirContratacoes, d.incluirContratacoes ? d.etapaImpacto : null, d.incluirContratacoes && d.permitirParcial, d.horariosPasso4])
 }
+/** Escala como saiu do gerador (e da correção automática): o que difere dela são ajustes manuais. */
+let escalaBase: Escala | null = null
+/** Dias travados usados na última geração (ajustes manuais mantidos ao refazer a escala). */
+let travasAtivas: Travas = {}
+const travado = (fid: string, dia: number) => travasAtivas[fid]?.[dia] !== undefined
+
+/** Dias em que a escala atual difere da gerada, como travas (trabalho leva o horário do dia). */
+export function travasDaDiferenca(base: Escala, atual: Escala): Travas {
+  const out: Travas = {}
+  const turno = (e: Escala, id?: string) => e.turnos.find((t) => t.id === id)
+  for (const f of atual.funcionarios) {
+    const b = base.celulas[f.id]
+    const a = atual.celulas[f.id]
+    if (!b || !a) continue
+    a.forEach((c, i) => {
+      const o = b[i]
+      const tb = turno(base, o?.turnoId)
+      const ta = turno(atual, c.turnoId)
+      const igual =
+        o?.tipo === c.tipo &&
+        (c.tipo !== 'trabalho' || (tb?.inicio === ta?.inicio && tb?.fim === ta?.fim && tb?.intervaloMin === ta?.intervaloMin))
+      if (igual) return
+      ;(out[f.id] ??= {})[i] =
+        c.tipo === 'trabalho' && ta
+          ? { tipo: 'trabalho', horario: { entrada: ta.inicio, saida: ta.fim, intervaloMin: ta.intervaloMin } }
+          : { tipo: c.tipo }
+    })
+  }
+  return out
+}
+
+/** Junta travas (as de `b` valem sobre as de `a`), copiando para não alterar as originais. */
+function mesclarTravas(a: Travas, b: Travas): Travas {
+  const out: Travas = {}
+  for (const src of [a, b]) {
+    for (const [fid, dias] of Object.entries(src)) {
+      for (const [dia, t] of Object.entries(dias)) {
+        ;(out[fid] ??= {})[Number(dia)] = { ...t, ...(t.horario ? { horario: { ...t.horario } } : {}) }
+      }
+    }
+  }
+  return out
+}
+
+/** Quantos dias ajustados à mão foram mantidos na última geração. */
+export function diasTravados(): number {
+  return Object.values(travasAtivas).reduce((n, dias) => n + Object.keys(dias).length, 0)
+}
+
 const portalInicial: EstadoPortal | null = codigoPortal
   ? { codigo: codigoPortal, carregando: true, erro: null, nenhumEmpregado: false }
   : null
@@ -195,7 +246,7 @@ export const useStore = create<Store>((set, get) => {
       const d = get()
       if (!d.escala) return { antes: [], depois: [] }
       const antes = analisar(d, d.escala).alertas
-      const r = corrigirTudo(d.escala, (e) => analisar(d, e))
+      const r = corrigirTudo(d.escala, (e) => analisar(d, e), undefined, undefined, travado)
       if (r.aplicadas === 0) return { antes, depois: antes }
       editar(r.escala)
       return { antes, depois: analisar(d, r.escala).alertas }
@@ -300,8 +351,13 @@ export const useStore = create<Store>((set, get) => {
       const atuais = { ...get().horariosPasso4 }
       if (h) atuais[fid] = h
       else delete atuais[fid]
+      // Ajustes manuais (o que difere da escala gerada) viram dias travados: o motor refaz só o resto.
+      const escala = get().escala
+      const travas = mesclarTravas(travasAtivas, escala && escalaBase ? travasDaDiferenca(escalaBase, escala) : {})
+      // Nos dias de trabalho travados da própria pessoa, vale o horário novo.
+      for (const t of Object.values(travas[fid] ?? {})) if (t.tipo === 'trabalho') delete t.horario
       set({ horariosPasso4: atuais })
-      get().sugerirEscala()
+      gerar(travas)
     },
     trocarCelulas: (a, b) => {
       const escala = get().escala
@@ -321,43 +377,21 @@ export const useStore = create<Store>((set, get) => {
     },
     usarProposta: (id) => {
       const p = get().propostas.find((x) => x.id === id)
-      if (p) set({ escala: p.escala, propostaAtivaId: id, historico: hist.limpar() })
+      if (!p) return
+      escalaBase = p.escala
+      set({ escala: p.escala, propostaAtivaId: id, historico: hist.limpar() })
     },
-    sugerirEscala: () => {
+    sugerirEscala: () => gerar({}),
+    autoCorrigirInicial: () => {
       const d = get()
-      const entrada = {
-        empresa: d.empresa,
-        funcoes: d.funcoes,
-        turnos: d.turnos,
-        cobertura: d.cobertura,
-        feriados: d.feriados.map((f) => f.data),
-        inicio: d.inicioEscala,
-        semanas: d.semanas,
-        regrasPessoais: d.regrasPessoais,
-        horariosFixos: d.horariosPasso4,
+      if (!d.escala) return 0
+      const r = corrigirTudo(d.escala, (e) => analisar(d, e), undefined, undefined, travado)
+      // Correção automática não é ajuste manual: a base acompanha.
+      if (r.aplicadas > 0) {
+        escalaBase = r.escala
+        set({ escala: r.escala })
       }
-      // Com as contratações incluídas, cada modelo acrescenta as vagas de que precisa (e só elas).
-      const novas = d.incluirContratacoes
-        ? gerarPropostasComVagas(
-            entrada,
-            ordemDeVagasDosDados(d),
-            criarMedidorDeFuros(d),
-            d.permitirParcial ? CONTRATOS_PARCIAIS : [],
-          )
-        : gerarPropostas(entrada)
-      const corrigidas = novas.map((p) => ({
-        ...p,
-        escala: corrigirTudo(p.escala, (e) => analisar(d, e)).escala,
-      }))
-      const ativa = corrigidas.find((p) => p.id === d.propostaAtivaId) ?? corrigidas[0]
-      assinaturaGeracao = assinaturaDosDados(d)
-      set({
-        propostas: corrigidas,
-        comparar: corrigidas.map((p) => p.id),
-        escala: ativa.escala,
-        propostaAtivaId: ativa.id,
-        historico: hist.limpar(),
-      })
+      return r.aplicadas
     },
     irParaPasso: (i) => {
       const d = get()
@@ -375,10 +409,56 @@ export const useStore = create<Store>((set, get) => {
       clearTimeout(timer)
       limpar()
       assinaturaGeracao = null
+      escalaBase = null
+      travasAtivas = {}
       set({ ...DADOS_PADRAO, historico: hist.limpar() })
       const portal = get().portal
       if (portal) void get().carregarDoPortal(portal.codigo)
     },
+  }
+
+  /**
+   * Gera as propostas a partir dos passos 1–3 e dos horários fixados no passo 4, mantendo os dias travados
+   * (ajustes manuais); com `{}`, é a sugestão do zero.
+   */
+  function gerar(travas: Travas) {
+      const d = get()
+      travasAtivas = travas
+      const entrada = {
+        empresa: d.empresa,
+        funcoes: d.funcoes,
+        turnos: d.turnos,
+        cobertura: d.cobertura,
+        feriados: d.feriados.map((f) => f.data),
+        inicio: d.inicioEscala,
+        semanas: d.semanas,
+        regrasPessoais: d.regrasPessoais,
+        horariosFixos: d.horariosPasso4,
+        travas,
+      }
+      // Com as contratações incluídas, cada modelo acrescenta as vagas de que precisa (e só elas).
+      const novas = d.incluirContratacoes
+        ? gerarPropostasComVagas(
+            entrada,
+            ordemDeVagasDosDados(d),
+            criarMedidorDeFuros(d),
+            d.permitirParcial ? CONTRATOS_PARCIAIS : [],
+          )
+        : gerarPropostas(entrada)
+      const corrigidas = novas.map((p) => ({
+        ...p,
+        escala: corrigirTudo(p.escala, (e) => analisar(d, e), undefined, undefined, travado).escala,
+      }))
+      const ativa = corrigidas.find((p) => p.id === d.propostaAtivaId) ?? corrigidas[0]
+      assinaturaGeracao = assinaturaDosDados(d)
+      escalaBase = ativa.escala
+      set({
+        propostas: corrigidas,
+        comparar: corrigidas.map((p) => p.id),
+        escala: ativa.escala,
+        propostaAtivaId: ativa.id,
+        historico: hist.limpar(),
+      })
   }
 })
 
