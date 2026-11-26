@@ -13,10 +13,10 @@ export function Saida({ escala, resultado }: { escala: Escala; resultado: Result
         Levar a escala
       </h3>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn-primario" onClick={() => gerarPDF(dados, escala, resultado)}>
+        <button type="button" className="btn-primario" onClick={() => gerarPDF(dados, escala)}>
           <FileText size={16} aria-hidden /> Baixar PDF
         </button>
-        <button type="button" className="btn-sec" onClick={() => gerarExcel(dados, escala, resultado)}>
+        <button type="button" className="btn-sec" onClick={() => gerarExcel(dados, escala)}>
           <FileSpreadsheet size={16} aria-hidden /> Baixar Excel
         </button>
       </div>

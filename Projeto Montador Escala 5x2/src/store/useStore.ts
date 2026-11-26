@@ -4,7 +4,7 @@ import { REGRAS_PESSOAIS_PADRAO } from '../config/regras'
 import { corrigirTudo } from '../engine/autocorrecao'
 import { elevarCarga } from '../engine/contratacoes'
 import { aplicarCorrecao } from '../engine/conformidade'
-import { gerarPropostas } from '../engine/gerador'
+import { gerarPropostas, type HorarioFixo } from '../engine/gerador'
 import { CONTRATOS_PARCIAIS, gerarPropostasComVagas } from '../engine/vagas'
 import { CUSTO_PADRAO } from '../engine/impacto'
 import type {
@@ -51,6 +51,8 @@ export interface Dados {
   incluirContratacoes: boolean
   /** As vagas podem ser em tempo parcial (até 30 h/semana, CLT art. 58-A) quando for mais barato e ainda cobrir. */
   permitirParcial: boolean
+  /** Horários de trabalho alterados à mão no passo 4 (id do funcionário na escala → horário). */
+  horariosPasso4: Record<string, HorarioFixo>
 }
 
 export const EMPRESA_PADRAO: Empresa = {
@@ -98,6 +100,7 @@ export const DADOS_PADRAO: Dados = {
   regrasPessoais: REGRAS_PESSOAIS_PADRAO,
   incluirContratacoes: true,
   permitirParcial: true,
+  horariosPasso4: {},
 }
 
 /** Estado do modo portal (não persistido); null no modo avulso. */
@@ -127,6 +130,8 @@ interface Acoes {
   /** Atualiza as regras por pessoa; no portal, re-mapeia a equipe do banco com as novas regras. */
   setRegrasPessoais: (p: Partial<RegrasPessoais>) => void
   setCelula: (funcionarioId: string, dia: number, valor: DiaEscala) => void
+  /** Fixa (ou, com null, libera) o horário de trabalho de um funcionário e refaz a escala. */
+  definirHorario: (funcionarioId: string, h: HorarioFixo | null) => void
   trocarCelulas: (a: { f: string; d: number }, b: { f: string; d: number }) => void
   corrigir: (correcao: AlteracaoCelula[]) => void
   usarProposta: (id: string) => void
@@ -159,7 +164,7 @@ let dadosBanco: DadosPortal | null = null
 /** Assinatura dos dados dos passos 1-3 usados na última geração; permite voltar ao Passo 4 sem perder ajustes manuais. */
 let assinaturaGeracao: string | null = null
 function assinaturaDosDados(d: Dados): string {
-  return JSON.stringify([d.empresa, d.funcoes, d.turnos, d.cobertura, d.feriados, d.inicioEscala, d.semanas, d.regrasPessoais, d.incluirContratacoes, d.incluirContratacoes ? d.etapaImpacto : null, d.incluirContratacoes && d.permitirParcial])
+  return JSON.stringify([d.empresa, d.funcoes, d.turnos, d.cobertura, d.feriados, d.inicioEscala, d.semanas, d.regrasPessoais, d.incluirContratacoes, d.incluirContratacoes ? d.etapaImpacto : null, d.incluirContratacoes && d.permitirParcial, d.horariosPasso4])
 }
 const portalInicial: EstadoPortal | null = codigoPortal
   ? { codigo: codigoPortal, carregando: true, erro: null, nenhumEmpregado: false }
@@ -279,7 +284,24 @@ export const useStore = create<Store>((set, get) => {
     setCelula: (fid, dia, valor) => {
       const escala = get().escala
       if (!escala) return
+      // Trocar o horário de um dia trabalhado por outro = alterar o horário de trabalho da pessoa:
+      // o motor refaz a escala com esse horário fixo (e as regras do passo 3).
+      const atual = escala.celulas[fid]?.[dia]
+      if (atual?.tipo === 'trabalho' && valor.tipo === 'trabalho' && atual.turnoId !== valor.turnoId) {
+        const t = escala.turnos.find((x) => x.id === valor.turnoId)
+        if (t) {
+          get().definirHorario(fid, { entrada: t.inicio, saida: t.fim, intervaloMin: t.intervaloMin })
+          return
+        }
+      }
       editar(aplicarCorrecao(escala, [{ funcionarioId: fid, dia, novo: valor }]))
+    },
+    definirHorario: (fid, h) => {
+      const atuais = { ...get().horariosPasso4 }
+      if (h) atuais[fid] = h
+      else delete atuais[fid]
+      set({ horariosPasso4: atuais })
+      get().sugerirEscala()
     },
     trocarCelulas: (a, b) => {
       const escala = get().escala
@@ -312,6 +334,7 @@ export const useStore = create<Store>((set, get) => {
         inicio: d.inicioEscala,
         semanas: d.semanas,
         regrasPessoais: d.regrasPessoais,
+        horariosFixos: d.horariosPasso4,
       }
       // Com as contratações incluídas, cada modelo acrescenta as vagas de que precisa (e só elas).
       const novas = d.incluirContratacoes
@@ -386,6 +409,7 @@ useStore.subscribe((estado) => {
       regrasPessoais: estado.regrasPessoais,
       incluirContratacoes: estado.incluirContratacoes,
       permitirParcial: estado.permitirParcial,
+      horariosPasso4: estado.horariosPasso4,
     }
     if (portal && baseBanco) dados.sobreposicoes = calcularSobreposicoes(baseBanco, estado.funcoes)
     salvar(dados)
