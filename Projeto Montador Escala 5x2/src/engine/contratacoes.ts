@@ -144,6 +144,31 @@ function temDemanda(c: CoberturaTurno | undefined, empresa: Empresa, funcaoIds: 
   )
 }
 
+/**
+ * A equipe com a carga semanal elevada até `limiteH` (o máximo da etapa) para quem trabalha menos que isso.
+ * Estagiário e menor de 18 não entram (têm limite próprio). `ajustadas` = quantas pessoas mudam.
+ */
+export function elevarCarga(funcoes: Funcao[], limiteH: number): { funcoes: Funcao[]; ajustadas: number } {
+  let ajustadas = 0
+  const efetiva = (h: number | undefined, f: Funcao) => (h && h > 0 ? h : f.horasSemanaisAtuais > 0 ? f.horasSemanaisAtuais : 44)
+  const novas = funcoes.map((f) => {
+    if (!f.pessoas) {
+      if (efetiva(undefined, f) >= limiteH) return f
+      ajustadas += f.quantidade
+      return { ...f, horasSemanaisAtuais: limiteH }
+    }
+    return {
+      ...f,
+      pessoas: f.pessoas.map((p) => {
+        if (!p.escalar || p.estagiario || p.menor || efetiva(p.horasSemanais, f) >= limiteH) return p
+        ajustadas++
+        return { ...p, horasSemanais: limiteH }
+      }),
+    }
+  })
+  return { funcoes: novas, ajustadas }
+}
+
 export function calcularQuadro(
   entrada: {
     empresa: Empresa

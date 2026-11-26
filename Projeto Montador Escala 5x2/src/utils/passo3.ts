@@ -79,7 +79,19 @@ export function modeloPeriodos(
 const fmt1 = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })
 const pessoas = (n: number) => `${n} ${n === 1 ? 'pessoa' : 'pessoas'}`
 
-export function resumoEstimativa(q: QuadroContratacoes): {
+/** A mesma estimativa se a equipe atual trabalhasse a carga máxima da etapa (quem tem menos que isso). */
+export interface CargaMaxima {
+  limiteH: number
+  /** Pessoas com carga abaixo do limite. */
+  ajustadas: number
+  contratar: number
+  equivalente: number
+}
+
+export function resumoEstimativa(
+  q: QuadroContratacoes,
+  alt?: CargaMaxima,
+): {
   nivel: 'ok' | 'atencao' | 'neutro'
   titulo: string
   detalhe: string
@@ -97,10 +109,17 @@ export function resumoEstimativa(q: QuadroContratacoes): {
     `Com essa cobertura você precisa de cerca de ${pessoas(q.necessarioTotal)} em tempo integral. ` +
     `Sua equipe tem ${q.equipeAtual}${equivalente}.`
   if (q.contratar > 0) {
+    const sobraCarga =
+      alt && alt.ajustadas > 0 && alt.contratar < q.contratar
+        ? ` ${alt.ajustadas === 1 ? '1 pessoa tem' : `${alt.ajustadas} pessoas têm`} menos de ${alt.limiteH} h por semana: ` +
+          `com ${alt.limiteH} h para toda a equipe ela valeria ≈ ${fmt1(alt.equivalente)} em tempo integral e ` +
+          `${alt.contratar === 0 ? 'não faltaria ninguém' : `faltaria${alt.contratar === 1 ? '' : 'm'} cerca de ${pessoas(alt.contratar)}`} ` +
+          '(isso exige combinar o aumento de carga com a pessoa e ajustar o contrato).'
+        : ''
     return {
       nivel: 'atencao',
       titulo: `${q.contratar === 1 ? 'Falta' : 'Faltam'} cerca de ${pessoas(q.contratar)}`,
-      detalhe,
+      detalhe: detalhe + sobraCarga,
     }
   }
   return { nivel: 'ok', titulo: 'Sua equipe dá conta dessa cobertura', detalhe }

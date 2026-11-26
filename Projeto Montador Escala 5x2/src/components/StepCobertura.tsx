@@ -1,8 +1,8 @@
 import { AlertTriangle, CheckCircle2, Info, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { REGRAS } from "../config/regras";
+import { REGRAS, limitesDaEtapa } from "../config/regras";
 import { fmtHoras } from "../engine/conformidade";
-import { calcularQuadro } from "../engine/contratacoes";
+import { calcularQuadro, elevarCarga } from "../engine/contratacoes";
 import { jornadaDaFuncao, tetoSemanalNaData } from "../engine/jornada";
 import {
   DIAS_UTEIS,
@@ -44,6 +44,7 @@ export function StepCobertura() {
   const turnos = useStore((s) => s.turnos);
   const cobertura = useStore((s) => s.cobertura);
   const set = useStore((s) => s.set);
+  const elevarCargaDaEquipe = useStore((s) => s.elevarCargaDaEquipe);
   const empresa = useStore((s) => s.empresa);
   const dias = empresa.diasFuncionamento;
   const funcoes = useStore((s) => s.funcoes);
@@ -98,7 +99,22 @@ export function StepCobertura() {
       ),
     [empresa, funcoes, turnos, cobertura, custo, etapa, regrasPessoais],
   );
-  const estimativa = resumoEstimativa(q);
+  // E se a equipe atual trabalhasse a carga máxima da etapa? (só vale mostrar quando isso reduz a contratação)
+  const limiteH = limitesDaEtapa(etapa, REGRAS).jornadaSemanalMax;
+  const cargaMax = useMemo(() => {
+    if (q.contratar === 0) return undefined;
+    const { funcoes: elevadas, ajustadas } = elevarCarga(funcoes, limiteH);
+    if (ajustadas === 0) return undefined;
+    const qa = calcularQuadro(
+      { empresa, funcoes: elevadas, turnos, cobertura, custo },
+      etapa,
+      REGRAS,
+      regrasPessoais,
+    );
+    return { limiteH, ajustadas, contratar: qa.contratar, equivalente: qa.equipeEquivalente };
+  }, [q.contratar, funcoes, limiteH, empresa, turnos, cobertura, custo, etapa, regrasPessoais]);
+  const estimativa = resumoEstimativa(q, cargaMax);
+  const podeElevar = !!cargaMax && cargaMax.contratar < q.contratar;
   const avisos = avisosCobertura({
     empresa,
     turnos,
@@ -269,6 +285,15 @@ export function StepCobertura() {
         <div>
           <p className="font-semibold">{estimativa.titulo}</p>
           <p>{estimativa.detalhe}</p>
+          {podeElevar && (
+            <button
+              type="button"
+              className="btn-sec mt-2 !py-1 text-xs"
+              onClick={() => elevarCargaDaEquipe(limiteH)}
+            >
+              Usar {limiteH} h por semana para quem tem menos
+            </button>
+          )}
         </div>
       </div>
 

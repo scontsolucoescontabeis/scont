@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { FERIADOS_PADRAO, type Feriado } from '../config/feriados'
 import { REGRAS_PESSOAIS_PADRAO } from '../config/regras'
 import { corrigirTudo } from '../engine/autocorrecao'
+import { elevarCarga } from '../engine/contratacoes'
 import { aplicarCorrecao } from '../engine/conformidade'
 import { gerarPropostas } from '../engine/gerador'
-import { HORAS_PARCIAIS, gerarPropostasComVagas } from '../engine/vagas'
+import { CONTRATOS_PARCIAIS, gerarPropostasComVagas } from '../engine/vagas'
 import { CUSTO_PADRAO } from '../engine/impacto'
 import type {
   AlteracaoCelula,
@@ -119,6 +120,8 @@ interface Acoes {
   carregarDoPortal: (codigo: string) => Promise<void>
   set: (parcial: Partial<Dados>) => void
   setEmpresa: (p: Partial<Empresa>) => void
+  /** Leva a carga semanal de quem trabalha menos que `limiteH` (exceto estagiário e menor) até esse limite. */
+  elevarCargaDaEquipe: (limiteH: number) => void
   /** Troca a lista de feriados e acompanha a escala e as propostas já geradas (sem apagar os ajustes manuais). */
   atualizarFeriados: (lista: Feriado[]) => void
   /** Atualiza as regras por pessoa; no portal, re-mapeia a equipe do banco com as novas regras. */
@@ -221,6 +224,15 @@ export const useStore = create<Store>((set, get) => {
     },
     set: (parcial) => set(parcial),
     setEmpresa: (p) => set({ empresa: { ...get().empresa, ...p } }),
+    elevarCargaDaEquipe: (limiteH) =>
+      set({
+        funcoes: elevarCarga(get().funcoes, limiteH).funcoes,
+        escala: null,
+        propostas: [],
+        comparar: [],
+        propostaAtivaId: null,
+        historico: hist.limpar(),
+      }),
     atualizarFeriados: (lista) => {
       const d = get()
       const sincronizada = assinaturaGeracao !== null && assinaturaGeracao === assinaturaDosDados(d)
@@ -307,7 +319,7 @@ export const useStore = create<Store>((set, get) => {
             entrada,
             ordemDeVagasDosDados(d),
             criarMedidorDeFuros(d),
-            d.permitirParcial ? HORAS_PARCIAIS : [],
+            d.permitirParcial ? CONTRATOS_PARCIAIS : [],
           )
         : gerarPropostas(entrada)
       const corrigidas = novas.map((p) => ({
