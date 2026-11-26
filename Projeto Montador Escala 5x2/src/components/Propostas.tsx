@@ -1,4 +1,5 @@
 import { Award, CheckCircle2, Sparkles, UserPlus } from 'lucide-react'
+import { descreverContrato } from '../engine/gerador'
 import { totalDeVagas } from '../engine/vagas'
 import { useStore } from '../store/useStore'
 import { analisar } from '../utils/analise'
@@ -35,7 +36,7 @@ function Contratacoes({ proposta }: { proposta: Proposta }) {
       const inteiras = c.quantidade - parciais.length
       return [
         ...(inteiras > 0 ? [`${inteiras} ${c.nome}`] : []),
-        ...parciais.map((h) => `1 ${c.nome} em tempo parcial, ${h} h/semana`),
+        ...parciais.map((x) => `1 ${c.nome} em ${descreverContrato(x)}`),
       ]
     })
     .join(', ')
@@ -147,8 +148,8 @@ export function Propostas() {
           <span>
             Permitir vagas em tempo parcial quando forem mais vantajosas
             <span className="block text-xs text-soft">
-              Se uma vaga de 20 h ou 30 h por semana (CLT art. 58-A: até 30 h, sem horas extras) já cobre o que falta, ela é
-              sugerida no lugar da vaga em tempo integral.
+              Se uma vaga de poucas horas por semana (CLT art. 58-A: até 30 h, sem horas extras), por exemplo só aos fins
+              de semana, já cobre o que falta, ela é sugerida no lugar da vaga em tempo integral.
             </span>
           </span>
         </label>

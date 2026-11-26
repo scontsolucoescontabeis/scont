@@ -31,6 +31,8 @@ export interface Funcionario {
   vaga?: boolean
   /** Contrato em tempo parcial (CLT art. 58-A): horas por semana. Só nas vagas a contratar. */
   horasSemanais?: number
+  /** Dias de trabalho por semana (tempo parcial); sem isso, 5. */
+  diasSemana?: number
 }
 
 export interface Escala {
@@ -175,6 +177,12 @@ export interface ParametrosCusto {
 
 export type ModeloEscala = 'fixo' | 'rodizio_domingo' | 'folga_movel'
 
+/** Contrato em tempo parcial: horas por semana distribuídas em `dias` dias de trabalho. */
+export interface ContratoParcial {
+  horas: number
+  dias: number
+}
+
 /** Contratações que uma proposta de escala exige (vagas já escaladas no calendário dela). */
 export interface ContratacaoProposta {
   funcaoId: string
@@ -182,7 +190,7 @@ export interface ContratacaoProposta {
   /** Total de vagas (tempo integral + parcial). */
   quantidade: number
   /** Horas semanais de cada vaga em tempo parcial (as demais, `quantidade - parciais.length`, são em tempo integral). */
-  parciais?: number[]
+  parciais?: ContratoParcial[]
 }
 
 export interface Proposta {

@@ -6,7 +6,7 @@ import { criarMedidorDeFuros, ordemDeVagasDosDados } from '../utils/vagas'
 import { corrigirTudo } from './autocorrecao'
 import { criarFuncionarios, gerarEscala, gerarPropostas, type EntradaGerador } from './gerador'
 import { minutosDe } from './datas'
-import { HORAS_PARCIAIS, gerarEscalaComVagas, gerarPropostasComVagas, ordemDasVagas, totalDeVagas } from './vagas'
+import { CONTRATOS_PARCIAIS, gerarEscalaComVagas, gerarPropostasComVagas, ordemDasVagas, totalDeVagas } from './vagas'
 
 const turnos: Turno[] = [{ id: 't1', nome: 'Comercial', inicio: '08:00', fim: '17:00', intervaloMin: 60 }]
 
@@ -182,14 +182,14 @@ describe('vaga em tempo parcial', () => {
   })
 
   it('permitindo parcial, usa a vaga de menos horas quando ela basta e cobre tudo', () => {
-    const props = gerarPropostasComVagas(e, ordem, furosDe(e), HORAS_PARCIAIS)
+    const props = gerarPropostasComVagas(e, ordem, furosDe(e), CONTRATOS_PARCIAIS)
     const comParcial = props.filter((p) => p.contratacoes?.some((c) => c.parciais?.length))
     expect(comParcial.length).toBeGreaterThan(0)
     for (const p of comParcial) {
       expect(furosDe(e)(p.escala)).toBe(0)
       const v = p.escala.funcionarios.find((f) => f.horasSemanais)!
       expect(v.nome).toMatch(/tempo parcial/)
-      expect(HORAS_PARCIAIS).toContain(v.horasSemanais)
+      expect(CONTRATOS_PARCIAIS.map((c) => c.horas)).toContain(v.horasSemanais)
       // jornada menor que a cheia, trabalhando 5 dias por semana
       const turnos = new Map(p.escala.turnos.map((t) => [t.id, t]))
       const horas = p.escala.celulas[v.id]
@@ -198,13 +198,13 @@ describe('vaga em tempo parcial', () => {
           const t = turnos.get(c.turnoId!)!
           return (minutosDe(t.fim) - minutosDe(t.inicio) + 1440) % 1440 - t.intervaloMin
         })
-      expect(Math.max(...horas)).toBeLessThanOrEqual((v.horasSemanais! * 60) / 5)
+      expect(Math.max(...horas)).toBeLessThanOrEqual((v.horasSemanais! * 60) / (v.diasSemana ?? 5))
     }
   })
 
   it('não troca por parcial quando só uma vaga inteira resolve', () => {
     const e2 = entrada([fnc('a', 'Atendente', 2)], { util: 3, sab: 3, dom: 0 })
-    for (const p of gerarPropostasComVagas(e2, ordemDo(e2), furosDe(e2), HORAS_PARCIAIS)) {
+    for (const p of gerarPropostasComVagas(e2, ordemDo(e2), furosDe(e2), CONTRATOS_PARCIAIS)) {
       expect(furosDe(e2)(p.escala)).toBe(0)
     }
   })

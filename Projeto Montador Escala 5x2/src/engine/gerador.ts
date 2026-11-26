@@ -12,6 +12,7 @@
 import type { JornadaPessoa } from './jornada'
 import type {
   CoberturaTurno,
+  ContratoParcial,
   DiaEscala,
   Empresa,
   Escala,
@@ -46,16 +47,21 @@ export interface EntradaGerador {
   /** Vagas a contratar por função (id da função → quantidade): entram na escala como "Vaga n — função". */
   vagas?: Record<string, number>
   /** Vagas em tempo parcial por função: horas semanais de cada uma (somam-se às de `vagas`). */
-  vagasParciais?: Record<string, number[]>
+  vagasParciais?: Record<string, ContratoParcial[]>
 }
 
 export const SLOT = 15
 export const NSLOTS = 1440 / SLOT
 
+/** "tempo parcial, 16 h em 2 dias" */
+export function descreverContrato(c: ContratoParcial): string {
+  return c.dias === 5 ? `tempo parcial, ${c.horas} h/semana` : `tempo parcial, ${c.horas} h em ${c.dias} dias`
+}
+
 export function criarFuncionarios(
   funcoes: Funcao[],
   vagas?: Record<string, number>,
-  parciais?: Record<string, number[]>,
+  parciais?: Record<string, ContratoParcial[]>,
 ): Funcionario[] {
   const lista: Funcionario[] = []
   for (const fn of funcoes) {
@@ -88,14 +94,15 @@ export function criarFuncionarios(
       lista.push({ id: `${fn.id}-vaga-${i}`, nome: `Vaga ${i} — ${fn.nome}`, funcaoId: fn.id, vaga: true })
     }
     // Vagas em tempo parcial (CLT art. 58-A): jornada menor, mesmos dias de trabalho e descanso.
-    ;(parciais?.[fn.id] ?? []).forEach((h, j) => {
+    ;(parciais?.[fn.id] ?? []).forEach((c, j) => {
       const n = inteiras + j + 1
       lista.push({
         id: `${fn.id}-vaga-${n}`,
-        nome: `Vaga ${n} — ${fn.nome} (tempo parcial, ${h}h)`,
+        nome: `Vaga ${n} — ${fn.nome} (${descreverContrato(c)})`,
         funcaoId: fn.id,
         vaga: true,
-        horasSemanais: h,
+        horasSemanais: c.horas,
+        diasSemana: c.dias,
       })
     })
   }
@@ -487,7 +494,14 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       f.horasSemanais
         ? // vaga em tempo parcial: carga própria, sem o horário fixo da função
           jornadaDaFuncao(
-            { ...fnc, horasSemanaisAtuais: f.horasSemanais, entrada: undefined, saida: undefined, intervaloMin: undefined },
+            {
+              ...fnc,
+              // a jornada diária sai de (horas ÷ dias de trabalho); a conta da função divide por 5
+              horasSemanaisAtuais: (f.horasSemanais * 5) / (f.diasSemana ?? 5),
+              entrada: undefined,
+              saida: undefined,
+              intervaloMin: undefined,
+            },
             teto,
           )
         : jornadaDaPessoa(fnc, pessoa, teto, regrasPessoais),
@@ -699,7 +713,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       // Dias de férias nesta semana: não trabalham nem consomem os 2 repousos.
       const aus = Array.from({ length: 7 }, (_, d) => d).filter((d) => ausente(f.id, d))
       // Repousos possíveis: 2, ou menos quando restam poucos dias fora das férias (7 → 2, 2 → 1, 1 → 0).
-      const quantos = Math.min(2, Math.max(0, 7 - aus.length - 1))
+      const quantos = Math.min(7 - (f.diasSemana ?? 5), Math.max(0, 7 - aus.length - 1))
       let rep: number[]
       if (aus.length === 7) {
         rep = []
