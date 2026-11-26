@@ -487,7 +487,12 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         }
       }
 
-      if (diaDaSemana(data) === 0) sundaysWorked.push(data)
+      if (diaDaSemana(data) === 0) {
+        // Trabalhar no domingo é previsto (o rodízio e o descanso semanal são conferidos acima); só preocupa se a
+        // semana daquele domingo não tem nenhum dia de descanso (nem ausência) para compensar.
+        const semana = Array.from({ length: 7 }, (_, k) => i + k).filter((x) => x < datas.length)
+        if (!semana.some((x) => ehRepouso(celula(f.id, x)) || celula(f.id, x)?.tipo === 'ausencia')) sundaysWorked.push(data)
+      }
       if (feriadoSet.has(data)) feriadosTrab.push(data)
     }
 
@@ -513,7 +518,7 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
         severidade: 'amarelo',
         titulo: 'Domingo trabalhado',
         mensagem: comRegra(
-          `${f.nome} trabalha em ${sundaysWorked.length} domingo(s) do período. Sem folga compensatória na semana, o domingo é pago em dobro (Súmula 146 do TST); confira também a convenção coletiva.`,
+          `${f.nome} trabalha no domingo ${sundaysWorked.map(fmtDataBR).join(', ')} sem nenhum dia de descanso na semana. Sem folga compensatória, o domingo é pago em dobro (Súmula 146 do TST); confira também a convenção coletiva.`,
           'domingoFeriadoTrabalhado',
         ),
         sugestao: 'Garanta a folga compensatória na semana e a regra de rodízio da convenção.',
