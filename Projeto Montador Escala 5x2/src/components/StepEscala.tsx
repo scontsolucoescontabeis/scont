@@ -11,7 +11,7 @@ import { Saida } from './Saida'
 
 function Feriados() {
   const feriados = useStore((s) => s.feriados)
-  const set = useStore((s) => s.set)
+  const atualizarFeriados = useStore((s) => s.atualizarFeriados)
   const [data, setData] = useState('')
   const [nome, setNome] = useState('')
 
@@ -36,11 +36,11 @@ function Feriados() {
           className="btn-sec"
           disabled={!data}
           onClick={() => {
-            set({
-              feriados: [...feriados.filter((f) => f.data !== data), { data, nome: nome || 'Feriado local' }].sort((a, b) =>
+            atualizarFeriados(
+              [...feriados.filter((f) => f.data !== data), { data, nome: nome || 'Feriado local' }].sort((a, b) =>
                 a.data.localeCompare(b.data),
               ),
-            })
+            )
             setData('')
             setNome('')
           }}
@@ -58,7 +58,7 @@ function Feriados() {
             <button
               type="button"
               aria-label={`Remover ${f.nome} ${formatarData(f.data)}`}
-              onClick={() => set({ feriados: feriados.filter((x) => x.data !== f.data) })}
+              onClick={() => atualizarFeriados(feriados.filter((x) => x.data !== f.data))}
             >
               <Trash2 size={14} aria-hidden />
             </button>
