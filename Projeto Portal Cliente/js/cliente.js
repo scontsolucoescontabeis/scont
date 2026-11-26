@@ -38,9 +38,23 @@ function mostrarAlerta(el, msg, tipo) {
 }
 function limparAlerta(el) { el.className = 'alert'; el.textContent = ''; }
 
+const ESTADOS_APP = ['seletor', 'home'];   // renderizados na área logada (barra superior)
 function mostrarEstado(nome) {
     ESTADOS.forEach(e => $('estado-' + e).classList.toggle('ativo', e === nome));
+    document.body.dataset.area = ESTADOS_APP.includes(nome) ? 'app' : 'auth';
+    fecharMenuUsuario();
 }
+
+// Barra superior: nome e iniciais do usuário (sempre via textContent/atributos).
+function preencherTopo() {
+    const nome = (perfilAtual && perfilAtual.nome) || '';
+    $('topoNome').textContent = nome;
+    $('topoNomeMenu').textContent = nome;
+    $('topoAvatar').dataset.iniciais = window.EstadoCliente.iniciais(nome);
+    $('menuUsuario').querySelector('summary')
+        .setAttribute('aria-label', nome ? `Menu do usuário: ${nome}` : 'Menu do usuário');
+}
+function fecharMenuUsuario() { const m = $('menuUsuario'); if (m) m.open = false; }
 
 function setCarregando(btn, texto) {
     btn.disabled = true;
@@ -186,11 +200,31 @@ function montarSeletor(codigos) {
         ? 'Modo administrador: escolha qualquer empresa para visualizar o portal como o cliente.'
         : 'Você tem acesso a mais de uma empresa. Selecione qual deseja acessar.';
     if (modoAdmin) $('seletorFiltro').value = '';
+    $('seletorVazio').hidden = codigos.length > 0;
+    $('btnTrocarEmpresa').hidden = true;
+    $('topoEmpresaChip').hidden = true;
+    $('bannerAdmin').hidden = true;
+    preencherTopo();
+    const nomes = lerNomes();
     codigos.forEach(cod => {
         const li = document.createElement('li');
         const b = document.createElement('button');
         b.type = 'button';
-        b.textContent = rotuloEmpresa(cod);
+        const nome = nomes[cod];
+        const avatar = document.createElement('span');
+        avatar.className = 'avatar';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.dataset.iniciais = nome ? window.EstadoCliente.iniciais(nome) : '#';
+        const info = document.createElement('span');
+        info.className = 'empresa-info';
+        const nm = document.createElement('span');
+        nm.className = 'empresa-nome';
+        nm.textContent = nome || `Empresa ${cod}`;
+        const cd = document.createElement('span');
+        cd.className = 'cod';
+        cd.textContent = 'Código ' + cod;
+        info.append(nm, ' ', cd);
+        b.append(avatar, info);
         b.addEventListener('click', () => { gravarSession(CHAVE_EMPRESA, cod); abrirHome(cod); });
         li.appendChild(b);
         ul.appendChild(li);
@@ -203,6 +237,9 @@ function abrirHome(codigo) {
     $('homeNome').textContent = (perfilAtual && perfilAtual.nome) || '';
     $('btnTrocarEmpresa').hidden = empresasAprovadas.length < 2;
     $('bannerAdmin').hidden = !modoAdmin;
+    $('topoEmpresa').textContent = rotuloEmpresa(codigo);
+    $('topoEmpresaChip').hidden = false;
+    preencherTopo();
     const cardMontador = $('cardMontador');
     const hrefMontador = window.EstadoCliente.urlMontador(codigo);
     if (hrefMontador) cardMontador.setAttribute('href', hrefMontador);
@@ -226,9 +263,23 @@ $('btnTrocarEmpresa').addEventListener('click', () => {
 
 $('seletorFiltro').addEventListener('input', () => {
     const t = window.EstadoCliente.normalizarBusca($('seletorFiltro').value);
+    let visiveis = 0;
     document.querySelectorAll('#listaEmpresas li').forEach(li => {
         li.hidden = t !== '' && !window.EstadoCliente.normalizarBusca(li.textContent).includes(t);
+        if (!li.hidden) visiveis++;
     });
+    $('seletorVazio').hidden = visiveis > 0;
+});
+
+// Menu do usuário: fecha ao clicar fora, ao escolher uma opção ou com Esc.
+document.addEventListener('click', (e) => {
+    const m = $('menuUsuario');
+    if (m.open && !m.contains(e.target)) m.open = false;
+});
+$('menuUsuario').querySelectorAll('.menu-item').forEach(b => b.addEventListener('click', fecharMenuUsuario));
+document.addEventListener('keydown', (e) => {
+    const m = $('menuUsuario');
+    if (e.key === 'Escape' && m.open) { m.open = false; m.querySelector('summary').focus(); }
 });
 
 $('loginForm').addEventListener('submit', async (e) => {

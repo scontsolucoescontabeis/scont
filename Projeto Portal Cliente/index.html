@@ -11,21 +11,24 @@
     <script src="../supabase-config.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body>
-<div class="login-container">
+<body data-area="auth">
+
+<!-- ═══ ÁREA DE ACESSO (login, cadastro, aguardando, negado) ═══ -->
+<main class="login-container area-auth">
   <div class="login-card">
-    <div class="login-header">
+    <header class="login-header">
         <img src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT">
-    </div>
+        <h1 class="login-subtitulo">Portal do Cliente</h1>
+    </header>
     <div class="login-body">
 
         <!-- LOGIN -->
-        <section id="estado-login" class="estado">
+        <section id="estado-login" class="estado" aria-label="Entrar">
             <div class="tabs">
                 <button type="button" class="tab-btn active" data-ir="login">Entrar</button>
                 <button type="button" class="tab-btn" data-ir="cadastro">Criar conta</button>
             </div>
-            <div id="alertLogin" class="alert" role="alert"></div>
+            <div id="alertLogin" class="alert" role="alert" aria-live="assertive"></div>
             <form id="loginForm">
                 <div class="form-group"><label for="loginEmail">E-mail</label>
                     <input type="email" id="loginEmail" placeholder="seu@email.com" required autocomplete="email"></div>
@@ -37,13 +40,13 @@
         </section>
 
         <!-- CADASTRO -->
-        <section id="estado-cadastro" class="estado">
+        <section id="estado-cadastro" class="estado" aria-label="Criar conta">
             <div class="tabs">
                 <button type="button" class="tab-btn" data-ir="login">Entrar</button>
                 <button type="button" class="tab-btn active" data-ir="cadastro">Criar conta</button>
             </div>
-            <div id="alertCadastro" class="alert" role="alert"></div>
-            <div id="cadastroConfirmacao" class="alert alert-success" role="status"></div>
+            <div id="alertCadastro" class="alert" role="alert" aria-live="assertive"></div>
+            <div id="cadastroConfirmacao" class="alert alert-success" role="status" aria-live="polite"></div>
             <form id="cadastroForm">
                 <div class="form-group"><label for="cadNome">Nome completo *</label>
                     <input type="text" id="cadNome" required autocomplete="name"></div>
@@ -62,60 +65,147 @@
                         <input type="tel" id="cadTelefone" placeholder="(61) 99999-9999" autocomplete="tel"></div>
                 </div>
                 <div class="form-group"><label for="cadBusca">Sua empresa *</label>
-                    <input type="text" id="cadBusca" placeholder="Nome, código ou CNPJ da empresa" autocomplete="off">
-                    <p class="dica" id="buscaDica">Digite ao menos 4 letras ou o CNPJ</p>
+                    <input type="text" id="cadBusca" placeholder="Nome, código ou CNPJ da empresa" autocomplete="off" aria-describedby="buscaDica">
+                    <p class="dica" id="buscaDica" aria-live="polite">Digite ao menos 4 letras ou o CNPJ</p>
                     <ul class="resultados" id="buscaResultados"></ul>
-                    <div class="escolhida" id="empresaEscolhida" hidden></div>
+                    <div class="escolhida" id="empresaEscolhida" role="status" hidden></div>
                 </div>
                 <button type="submit" class="btn-primary" id="btnCadastro">Solicitar acesso</button>
-                <p class="dica" style="text-align:center;margin-top:14px;">Seu acesso será analisado pela equipe SCONT.</p>
+                <p class="dica dica-centro">Seu acesso será analisado pela equipe SCONT.</p>
             </form>
         </section>
 
         <!-- AGUARDANDO -->
-        <section id="estado-aguardando" class="estado">
-            <h2>Aguardando análise</h2>
+        <section id="estado-aguardando" class="estado" aria-labelledby="tituloAguardando">
+            <div class="estado-icone estado-icone-info" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </div>
+            <h2 id="tituloAguardando">Aguardando análise</h2>
             <p class="texto">Recebemos seu pedido de acesso. A equipe SCONT irá analisá-lo e você poderá entrar assim que for aprovado.</p>
             <button type="button" class="btn-primary" data-acao="atualizar">Verificar novamente</button>
             <button type="button" class="btn-secondary" data-acao="sair">Sair</button>
         </section>
 
         <!-- NEGADO -->
-        <section id="estado-negado" class="estado">
-            <h2>Acesso não liberado</h2>
+        <section id="estado-negado" class="estado" aria-labelledby="tituloNegado">
+            <div class="estado-icone estado-icone-erro" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.7 5.7l12.6 12.6"/></svg>
+            </div>
+            <h2 id="tituloNegado">Acesso não liberado</h2>
             <p class="texto" id="negadoTexto"></p>
-            <div class="alert alert-error" id="negadoMotivo"></div>
-            <button type="button" class="btn-secondary" data-acao="sair">Sair</button>
-        </section>
-
-        <!-- SELETOR -->
-        <section id="estado-seletor" class="estado">
-            <h2>Escolha a empresa</h2>
-            <p class="texto" id="seletorTexto">Você tem acesso a mais de uma empresa. Selecione qual deseja acessar.</p>
-            <div class="form-group" id="seletorFiltroWrap" hidden>
-                <input type="search" id="seletorFiltro" placeholder="Filtrar por nome ou código da empresa" autocomplete="off">
-            </div>
-            <ul class="lista-empresas" id="listaEmpresas"></ul>
-            <button type="button" class="btn-secondary" data-acao="sair">Sair</button>
-        </section>
-
-        <!-- HOME -->
-        <section id="estado-home" class="estado">
-            <div class="alert alert-info show" id="bannerAdmin" hidden>
-                Modo administrador: você está visualizando o portal como o cliente desta empresa.
-                <a href="../admin-dashboard.html">Voltar ao painel do administrador</a>
-            </div>
-            <p class="empresa-atual">Empresa: <strong id="homeEmpresa"></strong></p>
-            <h2>Olá, <span id="homeNome"></span></h2>
-            <p class="texto">Suas ferramentas aparecerão aqui.</p>
-            <a class="cartao-ferramenta" id="cardMontador" href="#" hidden><strong>Montador de Escala 5x2</strong><span>Monte a escala 5x2 da sua equipe com os dados do RH</span></a>
-            <button type="button" class="btn-secondary" id="btnTrocarEmpresa" hidden>Trocar de empresa</button>
+            <div class="alert alert-error" id="negadoMotivo" role="status"></div>
             <button type="button" class="btn-secondary" data-acao="sair">Sair</button>
         </section>
 
     </div>
-    <div class="login-footer">© 2026 SCONT. Todos os direitos reservados.</div>
+    <footer class="login-footer">© 2026 SCONT. Todos os direitos reservados.</footer>
   </div>
+</main>
+
+<!-- ═══ ÁREA LOGADA (escolha da empresa e da ferramenta) ═══ -->
+<div class="app-shell area-app">
+    <div class="faixa-admin" id="bannerAdmin" role="note" hidden>
+        <div class="faixa-admin-inner">
+            <svg class="faixa-admin-icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/></svg>
+            <span class="faixa-admin-texto"><strong>Modo administrador</strong> — você está visualizando o portal como o cliente desta empresa.</span>
+            <a href="../admin-dashboard.html">Voltar ao painel do administrador</a>
+        </div>
+    </div>
+
+    <header class="topo">
+        <div class="topo-inner">
+            <img class="topo-logo" src="https://scontdf.com.br/wp-content/uploads/2019/11/logo-scont-1024x363.png" alt="SCONT - Portal do Cliente">
+            <div class="topo-acoes">
+                <p class="chip-empresa topo-chip" id="topoEmpresaChip" hidden>
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"/><path d="M16 9h2a2 2 0 0 1 2 2v10M3 21h18M8 7h4M8 11h4M8 15h4"/></svg>
+                    <span class="sr-only">Empresa atual:</span>
+                    <span id="topoEmpresa"></span>
+                </p>
+                <details class="menu-usuario" id="menuUsuario">
+                    <summary aria-label="Menu do usuário">
+                        <span class="avatar avatar-sm" id="topoAvatar" aria-hidden="true"></span>
+                        <span class="menu-nome" id="topoNome"></span>
+                        <svg class="menu-seta" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+                    </summary>
+                    <nav class="menu-lista" aria-label="Conta">
+                        <p class="menu-cabec">Conectado como<strong id="topoNomeMenu"></strong></p>
+                        <button type="button" class="menu-item" id="btnTrocarEmpresa" hidden>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg>
+                            Trocar de empresa
+                        </button>
+                        <button type="button" class="menu-item menu-item-sair" data-acao="sair">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                            Sair
+                        </button>
+                    </nav>
+                </details>
+            </div>
+        </div>
+    </header>
+
+    <main class="app-main" id="conteudo">
+
+        <!-- SELETOR -->
+        <section id="estado-seletor" class="estado" aria-labelledby="tituloSeletor">
+            <div class="pagina-cabec">
+                <h1 id="tituloSeletor">Escolha a empresa</h1>
+                <p class="texto" id="seletorTexto">Você tem acesso a mais de uma empresa. Selecione qual deseja acessar.</p>
+            </div>
+            <div class="busca" id="seletorFiltroWrap" hidden>
+                <label for="seletorFiltro" class="sr-only">Filtrar empresas por nome ou código</label>
+                <svg class="busca-icone" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                <input type="search" id="seletorFiltro" placeholder="Filtrar por nome ou código da empresa" autocomplete="off">
+            </div>
+            <ul class="lista-empresas" id="listaEmpresas"></ul>
+            <p class="vazio" id="seletorVazio" role="status" hidden>Nenhuma empresa encontrada</p>
+        </section>
+
+        <!-- HOME -->
+        <section id="estado-home" class="estado" aria-labelledby="tituloHome">
+            <div class="boas-vindas">
+                <div>
+                    <p class="sobretitulo">Portal do Cliente</p>
+                    <h1 id="tituloHome">Olá, <span id="homeNome"></span></h1>
+                    <p class="texto">Escolha uma ferramenta para começar.</p>
+                </div>
+                <p class="chip-empresa chip-destaque">Empresa: <strong id="homeEmpresa"></strong></p>
+            </div>
+
+            <h2 class="secao-titulo">Ferramentas</h2>
+            <div class="grade-ferramentas">
+                <a class="cartao-ferramenta" id="cardMontador" href="#" hidden>
+                    <span class="ferramenta-icone" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M7.5 13h2M11 13h2M14.5 13h2M7.5 16.5h2M11 16.5h2"/></svg>
+                    </span>
+                    <strong class="ferramenta-titulo">Montador de Escala 5x2</strong>
+                    <span class="ferramenta-desc">Monte a escala 5x2 da sua equipe com os dados do RH</span>
+                    <span class="ferramenta-abrir" aria-hidden="true">Abrir
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </span>
+                </a>
+                <div class="ferramentas-em-breve">
+                    <div class="cartao-breve" aria-disabled="true">
+                        <span class="selo-breve">Em breve</span>
+                        <span class="ferramenta-icone" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
+                        </span>
+                        <strong class="ferramenta-titulo">Solicitações à SCONT</strong>
+                        <span class="ferramenta-desc">Envie pedidos e documentos para a equipe SCONT</span>
+                    </div>
+                    <div class="cartao-breve" aria-disabled="true">
+                        <span class="selo-breve">Em breve</span>
+                        <span class="ferramenta-icone" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>
+                        </span>
+                        <strong class="ferramenta-titulo">Acompanhar demandas</strong>
+                        <span class="ferramenta-desc">Veja o andamento das suas solicitações</span>
+                    </div>
+                </div><!-- /ferramentas-em-breve -->
+            </div>
+        </section>
+
+    </main>
+    <footer class="app-footer">© 2026 SCONT. Todos os direitos reservados.</footer>
 </div>
 
 <script src="js/estado.js"></script>

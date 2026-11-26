@@ -13,6 +13,7 @@ import type {
   Escala,
   Funcao,
   ParametrosCusto,
+  Alerta,
   Proposta,
   RegrasPessoais,
   Turno,
@@ -22,6 +23,7 @@ import { mapearDadosPortal, type DadosPortal } from '../portal/mapear'
 import { carregarDadosPortal } from '../portal/supabase'
 import { carregar, limpar, salvar } from '../services/storage'
 import { analisar } from '../utils/analise'
+import * as hist from '../utils/historico'
 
 export interface Dados {
   passo: number
@@ -98,6 +100,12 @@ export interface EstadoPortal {
 
 interface Acoes {
   portal: EstadoPortal | null
+  /** Desfazer/Refazer das edições manuais da escala (não persistido). */
+  historico: hist.Historico<Escala>
+  desfazer: () => void
+  refazer: () => void
+  /** Aplica tudo o que o motor sabe corrigir (desfazível); devolve os alertas antes e depois. */
+  corrigirAutomaticamente: () => { antes: Alerta[]; depois: Alerta[] }
   /** Carrega empresa/equipe do banco (sessão do portal) e mescla com o estado salvo. */
   carregarDoPortal: (codigo: string) => Promise<void>
   set: (parcial: Partial<Dados>) => void
@@ -134,121 +142,167 @@ const inicial: Dados = { ...DADOS_PADRAO, ...salvoInicial }
 let baseBanco: Funcao[] | null = null
 /** Dados crus do banco na última carga, para re-mapear quando as regras por pessoa mudam. */
 let dadosBanco: DadosPortal | null = null
+/** Assinatura dos dados dos passos 1-3 usados na última geração; permite voltar ao Passo 4 sem perder ajustes manuais. */
+let assinaturaGeracao: string | null = null
+function assinaturaDosDados(d: Dados): string {
+  return JSON.stringify([d.empresa, d.funcoes, d.turnos, d.cobertura, d.feriados, d.inicioEscala, d.semanas, d.regrasPessoais])
+}
 const portalInicial: EstadoPortal | null = codigoPortal
   ? { codigo: codigoPortal, carregando: true, erro: null, nenhumEmpregado: false }
   : null
 
-export const useStore = create<Store>((set, get) => ({
-  ...inicial,
-  portal: portalInicial,
-  carregarDoPortal: async (codigo) => {
-    set({ portal: { codigo, carregando: true, erro: null, nenhumEmpregado: false } })
-    baseBanco = null
-    dadosBanco = null
-    const sobreposicoes = carregar<Salvo>()?.sobreposicoes
-    try {
-      const dados = await carregarDadosPortal(codigo)
-      const { nomeEmpresa, funcoes: doBanco } = mapearDadosPortal(dados, get().regrasPessoais)
-      const funcoes = aplicarSobreposicoes(doBanco, sobreposicoes)
+export const useStore = create<Store>((set, get) => {
+  /** Troca a escala por uma edição manual, guardando a anterior no histórico. */
+  const editar = (nova: Escala) => {
+    const atual = get().escala
+    if (!atual) return
+    set({ escala: nova, historico: hist.registrar(get().historico, atual) })
+  }
+  return {
+    ...inicial,
+    portal: portalInicial,
+    historico: hist.limpar(),
+    desfazer: () => {
+      const atual = get().escala
+      const r = atual && hist.desfazer(get().historico, atual)
+      if (r) set({ escala: r.valor, historico: r.h })
+    },
+    refazer: () => {
+      const atual = get().escala
+      const r = atual && hist.refazer(get().historico, atual)
+      if (r) set({ escala: r.valor, historico: r.h })
+    },
+    corrigirAutomaticamente: () => {
+      const d = get()
+      if (!d.escala) return { antes: [], depois: [] }
+      const antes = analisar(d, d.escala).alertas
+      const r = corrigirTudo(d.escala, (e) => analisar(d, e))
+      if (r.aplicadas === 0) return { antes, depois: antes }
+      editar(r.escala)
+      return { antes, depois: analisar(d, r.escala).alertas }
+    },
+    carregarDoPortal: async (codigo) => {
+      set({ portal: { codigo, carregando: true, erro: null, nenhumEmpregado: false } })
+      baseBanco = null
+      dadosBanco = null
+      const sobreposicoes = carregar<Salvo>()?.sobreposicoes
+      try {
+        const dados = await carregarDadosPortal(codigo)
+        const { nomeEmpresa, funcoes: doBanco } = mapearDadosPortal(dados, get().regrasPessoais)
+        const funcoes = aplicarSobreposicoes(doBanco, sobreposicoes)
+        baseBanco = doBanco
+        dadosBanco = dados
+        const nenhumEmpregado = !funcoes.some((f) => (f.pessoas?.length ?? 0) > 0)
+        set({
+          empresa: { ...get().empresa, nome: nomeEmpresa },
+          funcoes,
+          escala: null,
+          propostas: [],
+          comparar: [],
+          propostaAtivaId: null,
+          historico: hist.limpar(),
+          portal: { codigo, carregando: false, erro: null, nenhumEmpregado },
+        })
+      } catch (e) {
+        const erro = e instanceof Error ? e.message : 'Não foi possível carregar os dados da empresa'
+        set({ portal: { codigo, carregando: false, erro, nenhumEmpregado: false } })
+      }
+    },
+    set: (parcial) => set(parcial),
+    setEmpresa: (p) => set({ empresa: { ...get().empresa, ...p } }),
+    setRegrasPessoais: (parcial) => {
+      const regras = { ...get().regrasPessoais, ...parcial }
+      if (!baseBanco || !dadosBanco) {
+        set({ regrasPessoais: regras })
+        return
+      }
+      // Portal: preserva as edições do usuário e reaplica sobre a equipe re-mapeada com as novas regras.
+      const sob = calcularSobreposicoes(baseBanco, get().funcoes)
+      const { funcoes: doBanco } = mapearDadosPortal(dadosBanco, regras)
       baseBanco = doBanco
-      dadosBanco = dados
-      const nenhumEmpregado = !funcoes.some((f) => (f.pessoas?.length ?? 0) > 0)
       set({
-        empresa: { ...get().empresa, nome: nomeEmpresa },
-        funcoes,
+        regrasPessoais: regras,
+        funcoes: aplicarSobreposicoes(doBanco, sob),
         escala: null,
         propostas: [],
         comparar: [],
         propostaAtivaId: null,
-        portal: { codigo, carregando: false, erro: null, nenhumEmpregado },
+        historico: hist.limpar(),
       })
-    } catch (e) {
-      const erro = e instanceof Error ? e.message : 'Não foi possível carregar os dados da empresa'
-      set({ portal: { codigo, carregando: false, erro, nenhumEmpregado: false } })
-    }
-  },
-  set: (parcial) => set(parcial),
-  setEmpresa: (p) => set({ empresa: { ...get().empresa, ...p } }),
-  setRegrasPessoais: (parcial) => {
-    const regras = { ...get().regrasPessoais, ...parcial }
-    if (!baseBanco || !dadosBanco) {
-      set({ regrasPessoais: regras })
-      return
-    }
-    // Portal: preserva as edições do usuário e reaplica sobre a equipe re-mapeada com as novas regras.
-    const sob = calcularSobreposicoes(baseBanco, get().funcoes)
-    const { funcoes: doBanco } = mapearDadosPortal(dadosBanco, regras)
-    baseBanco = doBanco
-    set({
-      regrasPessoais: regras,
-      funcoes: aplicarSobreposicoes(doBanco, sob),
-      escala: null,
-      propostas: [],
-      comparar: [],
-      propostaAtivaId: null,
-    })
-  },
-  setCelula: (fid, dia, valor) => {
-    const escala = get().escala
-    if (!escala) return
-    set({ escala: aplicarCorrecao(escala, [{ funcionarioId: fid, dia, novo: valor }]) })
-  },
-  trocarCelulas: (a, b) => {
-    const escala = get().escala
-    if (!escala) return
-    const ca = escala.celulas[a.f][a.d]
-    const cb = escala.celulas[b.f][b.d]
-    set({
-      escala: aplicarCorrecao(escala, [
-        { funcionarioId: a.f, dia: a.d, novo: cb },
-        { funcionarioId: b.f, dia: b.d, novo: ca },
-      ]),
-    })
-  },
-  corrigir: (correcao) => {
-    const escala = get().escala
-    if (escala) set({ escala: aplicarCorrecao(escala, correcao) })
-  },
-  usarProposta: (id) => {
-    const p = get().propostas.find((x) => x.id === id)
-    if (p) set({ escala: p.escala, propostaAtivaId: id })
-  },
-  sugerirEscala: () => {
-    const d = get()
-    const novas = gerarPropostas({
-      empresa: d.empresa,
-      funcoes: d.funcoes,
-      turnos: d.turnos,
-      cobertura: d.cobertura,
-      feriados: d.feriados.map((f) => f.data),
-      inicio: d.inicioEscala,
-      semanas: d.semanas,
-      regrasPessoais: d.regrasPessoais,
-    })
-    const corrigidas = novas.map((p) => ({
-      ...p,
-      escala: corrigirTudo(p.escala, (e) => analisar(d, e)).escala,
-    }))
-    const ativa = corrigidas.find((p) => p.id === d.propostaAtivaId) ?? corrigidas[0]
-    set({
-      propostas: corrigidas,
-      comparar: corrigidas.map((p) => p.id),
-      escala: ativa.escala,
-      propostaAtivaId: ativa.id,
-    })
-  },
-  irParaPasso: (i) => {
-    set({ passo: i })
-    if (i === 3) get().sugerirEscala()
-  },
-  reiniciar: () => {
-    clearTimeout(timer)
-    limpar()
-    set({ ...DADOS_PADRAO })
-    const portal = get().portal
-    if (portal) void get().carregarDoPortal(portal.codigo)
-  },
-}))
+    },
+    setCelula: (fid, dia, valor) => {
+      const escala = get().escala
+      if (!escala) return
+      editar(aplicarCorrecao(escala, [{ funcionarioId: fid, dia, novo: valor }]))
+    },
+    trocarCelulas: (a, b) => {
+      const escala = get().escala
+      if (!escala) return
+      const ca = escala.celulas[a.f][a.d]
+      const cb = escala.celulas[b.f][b.d]
+      editar(
+        aplicarCorrecao(escala, [
+          { funcionarioId: a.f, dia: a.d, novo: cb },
+          { funcionarioId: b.f, dia: b.d, novo: ca },
+        ]),
+      )
+    },
+    corrigir: (correcao) => {
+      const escala = get().escala
+      if (escala) editar(aplicarCorrecao(escala, correcao))
+    },
+    usarProposta: (id) => {
+      const p = get().propostas.find((x) => x.id === id)
+      if (p) set({ escala: p.escala, propostaAtivaId: id, historico: hist.limpar() })
+    },
+    sugerirEscala: () => {
+      const d = get()
+      const novas = gerarPropostas({
+        empresa: d.empresa,
+        funcoes: d.funcoes,
+        turnos: d.turnos,
+        cobertura: d.cobertura,
+        feriados: d.feriados.map((f) => f.data),
+        inicio: d.inicioEscala,
+        semanas: d.semanas,
+        regrasPessoais: d.regrasPessoais,
+      })
+      const corrigidas = novas.map((p) => ({
+        ...p,
+        escala: corrigirTudo(p.escala, (e) => analisar(d, e)).escala,
+      }))
+      const ativa = corrigidas.find((p) => p.id === d.propostaAtivaId) ?? corrigidas[0]
+      assinaturaGeracao = assinaturaDosDados(d)
+      set({
+        propostas: corrigidas,
+        comparar: corrigidas.map((p) => p.id),
+        escala: ativa.escala,
+        propostaAtivaId: ativa.id,
+        historico: hist.limpar(),
+      })
+    },
+    irParaPasso: (i) => {
+      const d = get()
+      // Ao abrir a Escala, só regera se os passos 1-3 mudaram desde a última geração:
+      // assim voltar ao Passo 4 (ou clicar nele de novo) não apaga os ajustes manuais.
+      const manter = i === 3 && d.escala !== null && assinaturaGeracao === assinaturaDosDados(d)
+      if (manter) {
+        set({ passo: i, historico: hist.limpar() })
+        return
+      }
+      set({ passo: i, historico: hist.limpar() })
+      if (i === 3) get().sugerirEscala()
+    },
+    reiniciar: () => {
+      clearTimeout(timer)
+      limpar()
+      assinaturaGeracao = null
+      set({ ...DADOS_PADRAO, historico: hist.limpar() })
+      const portal = get().portal
+      if (portal) void get().carregarDoPortal(portal.codigo)
+    },
+  }
+})
 
 // Persistência (debounce simples); a camada real está em services/storage.ts
 let timer: ReturnType<typeof setTimeout> | undefined

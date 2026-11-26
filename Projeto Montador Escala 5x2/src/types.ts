@@ -142,11 +142,18 @@ export interface Empresa {
   compensacaoDiaria: boolean
 }
 
-/** Mínimo de pessoas: dias úteis, sábado e domingo. */
+/** Dia útil (dia da semana do JS): 1 = segunda ... 5 = sexta. */
+export type DiaUtil = 1 | 2 | 3 | 4 | 5
+
+/**
+ * Mínimo de pessoas: dias úteis, sábado e domingo. `porDia` (opcional) sobrepõe
+ * `util` em um dia útil específico; sem ele, segunda a sexta valem `util`.
+ */
 export interface MinimosDia {
   util: number
   sab: number
   dom: number
+  porDia?: Partial<Record<DiaUtil, number>>
 }
 
 /**

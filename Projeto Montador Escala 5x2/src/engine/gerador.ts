@@ -29,6 +29,7 @@ import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './da
 import { cicloDomingoDe, jornadaDaPessoa, tetoSemanalNaData, tocaNoturnoMenor } from './jornada'
 import { diasDeFerias } from './ferias'
 import { REGRAS, REGRAS_PESSOAIS_PADRAO, cicloDomingoDoSetor } from '../config/regras'
+import { gruposDiasUteis, minimoDoDia } from './minimos'
 
 export interface EntradaGerador {
   empresa: Empresa
@@ -77,36 +78,49 @@ export function criarFuncionarios(funcoes: Funcao[]): Funcionario[] {
   return lista
 }
 
-/** Regras de cobertura do motor, derivadas da configuração simples da interface. */
+/**
+ * Regras de cobertura do motor, derivadas da configuração simples da interface.
+ * Dias úteis com o mesmo mínimo formam uma regra; se todos os dias úteis abertos
+ * têm o mesmo mínimo, o id é `${turnoId}-util` (como antes do mínimo por dia),
+ * senão `${turnoId}-util-${primeiro dia do grupo}`.
+ */
 export function coberturaParaRegras(
   cobertura: Record<string, CoberturaTurno>,
   diasFuncionamento: boolean[],
   funcoes?: { id: string; nome: string }[],
 ): RegraCobertura[] {
-  const grupos: [keyof MinimosDia, number[]][] = [
+  const grupos: [keyof Omit<MinimosDia, 'porDia'>, number[]][] = [
     ['util', [1, 2, 3, 4, 5]],
     ['sab', [6]],
     ['dom', [0]],
   ]
+  /** Grupos de dias (abertos) com o mesmo mínimo e o sufixo do id de cada um. */
+  const partes = (m: MinimosDia, chave: string, dias: number[]) => {
+    const abertos = dias.filter((d) => diasFuncionamento[d])
+    if (abertos.length === 0) return []
+    const gs = gruposDiasUteis(m, abertos)
+    return gs
+      .filter((g) => g.minimo > 0)
+      .map((g) => ({ ...g, sufixo: gs.length === 1 ? chave : `${chave}-${g.dias[0]}` }))
+  }
   const regras: RegraCobertura[] = []
   for (const [turnoId, c] of Object.entries(cobertura)) {
     for (const [chave, dias] of grupos) {
-      const abertos = dias.filter((d) => diasFuncionamento[d])
-      if (c[chave] > 0 && abertos.length > 0) {
-        regras.push({ id: `${turnoId}-${chave}`, turnoId, minimo: c[chave], diasSemana: abertos })
+      for (const g of partes(c, chave, dias)) {
+        regras.push({ id: `${turnoId}-${g.sufixo}`, turnoId, minimo: g.minimo, diasSemana: g.dias })
       }
       // Mínimo por função (além do total do período).
       for (const [funcaoId, m] of Object.entries(c.porFuncao ?? {})) {
         const fn = funcoes?.find((x) => x.id === funcaoId)
         if (funcoes && !fn) continue // função removida
-        if (m[chave] > 0 && abertos.length > 0) {
+        for (const g of partes(m, chave, dias)) {
           regras.push({
-            id: `${turnoId}-${funcaoId}-${chave}`,
+            id: `${turnoId}-${funcaoId}-${g.sufixo}`,
             turnoId,
             funcaoId,
             rotulo: fn?.nome,
-            minimo: m[chave],
-            diasSemana: abertos,
+            minimo: g.minimo,
+            diasSemana: g.dias,
           })
         }
       }
@@ -117,7 +131,7 @@ export function coberturaParaRegras(
 
 function necessidade(c: MinimosDia | undefined, dow: number, aberto: boolean): number {
   if (!c || !aberto) return 0
-  return dow === 0 ? c.dom : dow === 6 ? c.sab : c.util
+  return minimoDoDia(c, dow)
 }
 
 /**
