@@ -44,6 +44,11 @@ export interface EntradaConformidade {
    * cada instante); sem eles, por igualdade de turno.
    */
   periodos?: Turno[]
+  /**
+   * Horário de funcionamento (minutos) dos dias da semana com horário próprio (0 = domingo; `undefined` = sem
+   * recorte). A cobertura mínima só vale dentro desse horário.
+   */
+  janelasDia?: ({ ini: number; fim: number } | undefined)[]
   /** Existe acordo/regime de compensação de jornada diária. */
   compensacaoDiaria: boolean
   /** Ciclo do domingo em semanas (ver `cicloDomingoDoSetor`); padrão: comércio. */
@@ -612,7 +617,9 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
           .filter((f) => !r.funcaoId || f.funcaoId === r.funcaoId)
           .map((f) => turnoDe(celula(f.id, i)))
           .filter((t): t is Turno => !!t)
+        const janela = entrada.janelasDia?.[diaDaSemana(data)]
         for (let m = Math.floor(ini / 15) * 15; m < fim; m += 15) {
+          if (janela && (m < Math.floor(janela.ini / 15) * 15 || m >= Math.ceil(janela.fim / 15) * 15)) continue
           const n = trabalhando.filter((t) => {
             const a = minutosDe(t.inicio)
             return a <= m && m < a + duracaoBrutaMin(t)
@@ -651,8 +658,14 @@ export function validarEscala(entrada: EntradaConformidade): ResultadoConformida
           0,
         )
         // Com períodos, a pessoa volta no horário que ela mesma faz (e que cobre a falta).
+        // (com horário por dia, o do mesmo dia da semana, que cabe no funcionamento daquele dia)
+        const dowAlvo = diaDaSemana(data)
+        const celulasF = escala.celulas[f.id] ?? []
         const usual = periodo
-          ? turnoDe(escala.celulas[f.id]?.find((x) => x.tipo === 'trabalho'))
+          ? turnoDe(
+              celulasF.find((x, j) => x.tipo === 'trabalho' && diaDaSemana(datas[j]) === dowAlvo) ??
+                celulasF.find((x) => x.tipo === 'trabalho'),
+            )
           : turno
         if (!usual) continue
         if (periodo) {

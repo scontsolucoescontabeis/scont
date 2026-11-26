@@ -2146,28 +2146,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
@@ -2220,10 +2198,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "dsr",
       },
       {
@@ -2232,6 +2206,32 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
       {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
       },
       {
         "tipo": "trabalho",
@@ -2252,7 +2252,63 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
     ],
     "atd-2": [
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -2278,28 +2334,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
@@ -2307,15 +2341,7 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "tipo": "dsr",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -2337,37 +2363,11 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -2396,6 +2396,62 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "dsr",
       },
       {
@@ -2432,10 +2488,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "dsr",
       },
       {
@@ -2447,60 +2499,8 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "folga",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
       },
       {
         "tipo": "folga",
@@ -2516,59 +2516,11 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
     ],
     "atd-4": [
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "dsr",
       },
       {
-        "tipo": "folga",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "dsr",
       },
       {
         "tipo": "trabalho",
@@ -2610,11 +2562,59 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
         "tipo": "dsr",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
@@ -2648,6 +2648,32 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
     ],
     "atd-5": [
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "dsr",
       },
       {
@@ -2700,19 +2726,23 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
@@ -2726,22 +2756,8 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "dsr",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
       },
       {
         "tipo": "trabalho",
@@ -2755,23 +2771,7 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "tipo": "dsr",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -2851,6 +2851,10 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "dsr",
       },
       {
@@ -2877,41 +2881,11 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
@@ -2940,11 +2914,37 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
       },
       {
         "tipo": "trabalho",
@@ -2957,11 +2957,15 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
     ],
     "atd-2": [
       {
-        "tipo": "dsr",
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
       },
       {
         "tipo": "folga",
@@ -2983,24 +2987,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
@@ -3012,19 +2998,7 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "tipo": "dsr",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -3055,6 +3029,32 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
       {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
       },
       {
         "tipo": "trabalho",
@@ -3101,28 +3101,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
@@ -3131,10 +3109,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
       },
       {
         "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -3150,43 +3124,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
       {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "dsr",
       },
       {
         "tipo": "trabalho",
@@ -3216,13 +3153,75 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
       },
     ],
     "atd-4": [
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
+        "tipo": "dsr",
       },
       {
         "tipo": "trabalho",
@@ -3235,6 +3234,36 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
       {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
       },
       {
         "tipo": "trabalho",
@@ -3242,6 +3271,39 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
       },
       {
         "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
@@ -3273,70 +3335,8 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
         "tipo": "folga",
       },
       {
-        "tipo": "dsr",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "folga",
       },
       {
         "tipo": "trabalho",
@@ -3353,94 +3353,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
     ],
     "atd-5": [
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
@@ -3465,6 +3377,94 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > avul
       {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
       },
       {
         "tipo": "trabalho",
@@ -5965,28 +5965,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
@@ -6039,10 +6017,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "dsr",
       },
       {
@@ -6051,6 +6025,32 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
       {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
       },
       {
         "tipo": "trabalho",
@@ -6071,7 +6071,63 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
     ],
     "atd-p2": [
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -6097,28 +6153,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
@@ -6126,15 +6160,7 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "tipo": "dsr",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -6156,37 +6182,11 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -6215,6 +6215,62 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "dsr",
       },
       {
@@ -6251,10 +6307,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "dsr",
       },
       {
@@ -6266,60 +6318,8 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "folga",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
       },
       {
         "tipo": "folga",
@@ -6335,59 +6335,11 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
     ],
     "atd-p4": [
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "dsr",
       },
       {
-        "tipo": "folga",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "dsr",
       },
       {
         "tipo": "trabalho",
@@ -6429,11 +6381,59 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
+      },
+      {
         "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
@@ -6533,6 +6533,10 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "dsr",
       },
       {
@@ -6559,41 +6563,11 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
@@ -6622,11 +6596,37 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
       },
       {
         "tipo": "trabalho",
@@ -6639,24 +6639,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
     ],
     "atd-p2": [
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
@@ -6668,15 +6650,7 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "tipo": "dsr",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -6737,6 +6711,32 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
       {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "folga",
       },
       {
         "tipo": "trabalho",
@@ -6783,28 +6783,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "dsr",
-      },
-      {
-        "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
@@ -6813,10 +6791,6 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
       },
       {
         "tipo": "folga",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -6899,31 +6873,57 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
       },
       {
         "tipo": "dsr",
+      },
+      {
+        "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "folga",
       },
     ],
     "atd-p4": [
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
         "tipo": "dsr",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "folga",
@@ -6974,18 +6974,25 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "turnoId": "ts-08:00-17:24-60",
       },
       {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
+      },
+      {
         "tipo": "folga",
+      },
+      {
+        "tipo": "dsr",
       },
       {
         "tipo": "trabalho",
         "turnoId": "ts-08:00-17:24-60",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
+        "tipo": "folga",
       },
       {
-        "tipo": "folga",
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",
@@ -7007,18 +7014,11 @@ exports[`férias na escala > sem férias, resultado idêntico ao de antes > nomi
         "tipo": "dsr",
       },
       {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "trabalho",
-        "turnoId": "ts-08:00-17:24-60",
-      },
-      {
-        "tipo": "dsr",
-      },
-      {
         "tipo": "folga",
+      },
+      {
+        "tipo": "trabalho",
+        "turnoId": "ts-08:00-17:24-60",
       },
       {
         "tipo": "trabalho",

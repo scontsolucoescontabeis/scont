@@ -20,6 +20,18 @@ export function intervaloParaBruto(brutoMin: number): number {
   return 0
 }
 
+/**
+ * Menor intervalo que torna legal uma jornada de duração BRUTA `brutoMin` (o intervalo sai da jornada, e a
+ * duração líquida que sobra é que define o mínimo). Usada quando o dia é mais curto que a jornada cheia.
+ */
+export function intervaloMinimoDaJornada(brutoMin: number): number {
+  const { minCurtoMinutos, minLongoMinutos } = REGRAS.intrajornada
+  for (const i of [0, minCurtoMinutos, minLongoMinutos]) {
+    if (i >= intervaloParaBruto(brutoMin - i)) return i
+  }
+  return minLongoMinutos
+}
+
 export interface JornadaPessoa {
   /** Duração bruta (entrada → saída), em minutos. */
   bruto: number

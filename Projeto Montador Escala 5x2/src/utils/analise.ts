@@ -1,6 +1,6 @@
 import { REGRAS, cicloDomingoDoSetor } from '../config/regras'
 import { validarEscala } from '../engine/conformidade'
-import { coberturaParaRegras } from '../engine/gerador'
+import { coberturaParaRegras, janelasComHorarioProprio } from '../engine/gerador'
 import { somarDias } from '../engine/datas'
 import type { Dados } from '../store/useStore'
 import type { DiaEscala, Escala, ResultadoConformidade, Turno } from '../types'
@@ -19,6 +19,7 @@ export function analisar(dados: DadosAnalise, escala: Escala): ResultadoConformi
     feriados: dados.feriados.map((f) => f.data),
     empresaFuncionaFeriados: dados.empresa.funcionaFeriados,
     periodos: dados.turnos,
+    janelasDia: janelasComHorarioProprio(dados.empresa),
     compensacaoDiaria: dados.empresa.compensacaoDiaria,
     cicloDomingoSemanas: cicloDomingoDoSetor(dados.empresa.setor),
     regras: REGRAS,
