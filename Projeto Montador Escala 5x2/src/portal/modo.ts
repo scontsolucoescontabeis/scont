@@ -1,5 +1,5 @@
 /** Funções puras do modo portal (sem I/O, sem tocar window). */
-import type { Funcao, PessoaEscala } from '../types'
+import type { Funcao, HorarioDiaPessoa, PessoaEscala } from '../types'
 
 const CHAVE_BASE = 'scont.montador-escala-5x2.v1'
 
@@ -20,8 +20,10 @@ export function chaveArmazenamento(codigo: string | null): string {
   return codigo ? `${CHAVE_BASE}:${codigo}` : CHAVE_BASE
 }
 
-type CampoEditavel = 'escalar' | 'horasSemanais' | 'entrada' | 'saida' | 'intervaloMin'
-const CAMPOS: CampoEditavel[] = ['escalar', 'horasSemanais', 'entrada', 'saida', 'intervaloMin']
+type CampoEditavel = 'escalar' | 'horasSemanais' | 'entrada' | 'saida' | 'intervaloMin' | 'jornadaDias'
+const CAMPOS: CampoEditavel[] = ['escalar', 'horasSemanais', 'entrada', 'saida', 'intervaloMin', 'jornadaDias']
+/** Igualdade por valor (jornadaDias é lista). */
+const igual = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b)
 
 /** Edição do usuário sobre uma pessoa; `null` = campo limpo (undefined). */
 export type SobreposicaoPessoa = {
@@ -30,6 +32,7 @@ export type SobreposicaoPessoa = {
   entrada?: string | null
   saida?: string | null
   intervaloMin?: number | null
+  jornadaDias?: (HorarioDiaPessoa | null)[] | null
 }
 /** funcaoId -> pessoaId -> edições. Só guarda o que difere do banco. */
 export type Sobreposicoes = Record<string, Record<string, SobreposicaoPessoa>>
@@ -44,7 +47,7 @@ export function calcularSobreposicoes(base: Funcao[], atual: Funcao[]): Sobrepos
       const a = pessoasAtuais.get(p.id)
       if (!a) continue
       const dif: Record<string, unknown> = {}
-      for (const c of CAMPOS) if (a[c] !== p[c]) dif[c] = a[c] === undefined ? null : a[c]
+      for (const c of CAMPOS) if (!igual(a[c], p[c])) dif[c] = a[c] === undefined ? null : a[c]
       if (Object.keys(dif).length > 0) (out[f.id] ??= {})[p.id] = dif as SobreposicaoPessoa
     }
   }
