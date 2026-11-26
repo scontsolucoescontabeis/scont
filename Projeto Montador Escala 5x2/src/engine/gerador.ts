@@ -26,7 +26,7 @@ import type {
   Turno,
 } from '../types'
 import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './datas'
-import { cicloDomingoDe, intervaloMinimoDaJornada, jornadaDaFuncao, jornadaDaPessoa, tetoSemanalNaData, tocaNoturnoMenor } from './jornada'
+import { cicloDomingoDe, intervaloMinimoDaJornada, jornadaDaFuncao, jornadaDaPessoa, recorteDoDia, tetoSemanalNaData, tocaNoturnoMenor } from './jornada'
 import { diasDeFerias } from './ferias'
 import { REGRAS, REGRAS_PESSOAIS_PADRAO, cicloDomingoDoSetor } from '../config/regras'
 import { gruposDiasUteis, minimoDoDia } from './minimos'
@@ -170,14 +170,16 @@ export function janelasComHorarioProprio(
   })
 }
 
-/** Zera a necessidade fora do horário de funcionamento nos dias com horário próprio (empresa fechada = ninguém). */
-function recortarAoFuncionamento(empresa: Empresa, perfil: number[][]): void {
-  janelasComHorarioProprio(empresa).forEach((j, dow) => {
-    if (!j) return
-    const de = Math.floor(j.ini / SLOT)
-    const ate = Math.ceil(j.fim / SLOT)
-    for (let s = 0; s < NSLOTS; s++) if (s < de || s >= ate) perfil[dow][s] = 0
-  })
+/** Faixas [de, ate) de um período, recortadas ao horário de funcionamento do dia quando o período o toca. */
+function faixasDoPeriodo(ini: number, fim: number, janela: { ini: number; fim: number } | undefined) {
+  let de = Math.floor(ini / SLOT)
+  let ate = Math.ceil(fim / SLOT)
+  const j = recorteDoDia(janela, ini, fim)
+  if (j) {
+    de = Math.max(de, Math.floor(j.ini / SLOT))
+    ate = Math.min(ate, Math.ceil(j.fim / SLOT))
+  }
+  return { de, ate }
 }
 
 /**
@@ -210,6 +212,7 @@ export function perfilNecessidade(
   funcaoIds?: string[],
 ): number[][] {
   const perfil = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
+  const janelas = janelasComHorarioProprio(empresa)
   for (const t of periodos) {
     const c = cobertura[t.id]
     if (!c) continue
@@ -223,12 +226,10 @@ export function perfilNecessidade(
         .reduce((acc, [, m]) => acc + necessidade(m, dow, aberto), 0)
       const n = Math.max(necessidade(c, dow, aberto), somaFuncoes)
       if (n <= 0) continue
-      for (let s = Math.floor(ini / SLOT); s < Math.ceil(fim / SLOT); s++) {
-        perfil[dow][s] = Math.max(perfil[dow][s], n)
-      }
+      const { de, ate } = faixasDoPeriodo(ini, fim, janelas[dow])
+      for (let s = de; s < ate; s++) perfil[dow][s] = Math.max(perfil[dow][s], n)
     }
   }
-  recortarAoFuncionamento(empresa, perfil)
   const semDemanda = !perfil.some((l) => l.some((n) => n > 0))
   if (semDemanda) {
     // Sem cobertura informada: exige 1 pessoa durante o horário de funcionamento.
@@ -251,6 +252,7 @@ export function perfilPorFuncao(
   funcaoIds: string[],
 ): Record<string, number[][]> {
   const out: Record<string, number[][]> = {}
+  const janelas = janelasComHorarioProprio(empresa)
   for (const t of periodos) {
     const c = cobertura[t.id]
     if (!c?.porFuncao) continue
@@ -262,13 +264,11 @@ export function perfilPorFuncao(
         const n = necessidade(m, dow, empresa.diasFuncionamento[dow])
         if (n <= 0) continue
         out[fid] ??= Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
-        for (let s = Math.floor(ini / SLOT); s < Math.ceil(fim / SLOT); s++) {
-          out[fid][dow][s] = Math.max(out[fid][dow][s], n)
-        }
+        const { de, ate } = faixasDoPeriodo(ini, fim, janelas[dow])
+        for (let s = de; s < ate; s++) out[fid][dow][s] = Math.max(out[fid][dow][s], n)
       }
     }
   }
-  for (const perfil of Object.values(out)) recortarAoFuncionamento(empresa, perfil)
   return out
 }
 
@@ -346,6 +346,96 @@ interface Horario {
   intervaloMin: number
 }
 
+/** Repouso de uma pessoa numa semana, para a busca local. */
+interface PlanoSemana {
+  f: Funcionario
+  rep: number[]
+  aus: number[]
+  /** Dias que não podem deixar de ser repouso (empresa fechada para a pessoa, trava legal). */
+  protegidos: Set<number>
+  /** Padrão aprendido (modelo fixo) nesta semana, antes dos ajustes. */
+  aprendido: number[] | null
+  /** O repouso pode ser movido (não é um padrão fixo já aprendido). */
+  movel: boolean
+}
+
+/**
+ * Busca local sobre os repousos de uma semana: troca o dia de um repouso por um dia trabalhado quando isso reduz
+ * a falta de gente (soma dos quadrados da falta, no total e por função). O domingo nunca é mexido (o rodízio dele já
+ * está decidido), nem feriado, nem dia protegido; a troca só vale se não passar de `maxSeguidos` dias seguidos.
+ * Sem falta de gente, não muda nada.
+ */
+function melhorarRepousos(
+  planos: PlanoSemana[],
+  c: {
+    presentes: number[][]
+    presentesFn: Record<string, number[][]>
+    perfil: number[][]
+    perfilFn: Record<string, number[][]>
+    spans: Map<string, number[][]>
+    maxSeguidos: number
+    diasSeguidos: Map<string, number>
+    livre: (d: number) => boolean
+  },
+): void {
+  const falta = (d: number, sl: number, fn: string) => {
+    let v = Math.max(0, c.perfil[d][sl] - c.presentes[d][sl])
+    let q = v * v
+    const pf = c.perfilFn[fn]
+    if (pf) {
+      v = Math.max(0, pf[d][sl] - c.presentesFn[fn][d][sl])
+      q += v * v
+    }
+    return q
+  }
+  // As faltas de TODAS as funções contam; as de função só para a função da pessoa que se move (as outras não mudam).
+  const local = (d: number, slots: number[], fn: string) => slots.reduce((s, sl) => s + falta(d, sl, fn), 0)
+  const mexer = (p: PlanoSemana, d: number, delta: 1 | -1) =>
+    c.spans.get(p.f.id)![d].forEach((sl) => {
+      c.presentes[d][sl] += delta
+      if (c.presentesFn[p.f.funcaoId]) c.presentesFn[p.f.funcaoId][d][sl] += delta
+    })
+  const seguidosOk = (p: PlanoSemana, rep: number[]) => {
+    let run = c.diasSeguidos.get(p.f.id)!
+    for (let d = 0; d < 7; d++) {
+      run = rep.includes(d) || p.aus.includes(d) ? 0 : run + 1
+      if (run > c.maxSeguidos) return false
+    }
+    return true
+  }
+
+  for (let passada = 0; passada < 6; passada++) {
+    let melhorou = false
+    for (const p of planos) {
+      if (!p.movel) continue
+      const sp = c.spans.get(p.f.id)!
+      for (let i = 0; i < p.rep.length; i++) {
+        const a = p.rep[i]
+        if (a === 0 || p.protegidos.has(a) || !c.livre(a)) continue
+        for (let b = 1; b < 7; b++) {
+          if (b === a || p.rep.includes(b) || p.aus.includes(b) || !c.livre(b)) continue
+          const fn = p.f.funcaoId
+          const antes = local(a, sp[a], fn) + local(b, sp[b], fn)
+          // a passa a trabalhar (+1) e b passa a ser repouso (−1)
+          mexer(p, a, 1)
+          mexer(p, b, -1)
+          const depois = local(a, sp[a], fn) + local(b, sp[b], fn)
+          const novo = p.rep.map((x) => (x === a ? b : x))
+          if (depois < antes && seguidosOk(p, novo)) {
+            p.rep = novo
+            p.aprendido = p.aprendido ? p.aprendido.map((x) => (x === a ? b : x)) : p.aprendido
+            melhorou = true
+            break
+          }
+          mexer(p, a, -1)
+          mexer(p, b, 1)
+        }
+      }
+    }
+    if (!melhorou) break
+  }
+}
+
 export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Escala {
   const { empresa, funcoes, turnos, cobertura, feriados, semanas } = entrada
   const regrasPessoais = entrada.regrasPessoais ?? REGRAS_PESSOAIS_PADRAO
@@ -361,6 +451,25 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   // 1) Horário de trabalho de cada empregado: jornada legal da função, com a
   //    entrada escolhida para cobrir as faixas do estabelecimento com menos gente.
   const { janIni, janFim } = janelaDeJornada(empresa, perfil)
+  // Limites EXATOS (minutos) da janela: a janela em faixas de 15 min arredonda (07:10 → 07:00, 22:40 → 22:45), e a
+  // jornada não deve começar antes do que a empresa/produção começa nem passar de quando termina.
+  const marcos = [
+    ...turnos.filter((t) => cobertura[t.id]).flatMap((t) => {
+      const ini = minutosDe(t.inicio)
+      return [ini, minutosDe(t.fim) <= ini ? 1440 : minutosDe(t.fim)]
+    }),
+    ...Array.from({ length: 7 }, (_, d) => d)
+      .filter((d) => empresa.diasFuncionamento[d])
+      .flatMap((d) => {
+        const h = empresa.horarios?.[d] ?? { abre: empresa.horaAbertura, fecha: empresa.horaFechamento }
+        const ini = minutosDe(h.abre)
+        return [ini, minutosDe(h.fecha) <= ini ? 1440 : minutosDe(h.fecha)]
+      }),
+  ]
+  const marcosIni = marcos.filter((m) => Math.floor(m / SLOT) === janIni)
+  const marcosFim = marcos.filter((m) => Math.ceil(m / SLOT) === janFim)
+  const iniExato = marcosIni.length > 0 ? Math.min(...marcosIni) : janIni * SLOT
+  const fimExato = marcosFim.length > 0 ? Math.max(...marcosFim) : janFim * SLOT
   const contagem = Array.from({ length: 7 }, () => new Array<number>(NSLOTS).fill(0))
   const contagemFn: Record<string, number[][]> = Object.fromEntries(
     Object.keys(perfilFn).map((id) => [id, novaGrade()]),
@@ -390,14 +499,18 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     const j = jornadas.get(f.id)!
     let ini = j.inicioFixo
     if (ini === undefined) {
-      ini = janIni * SLOT
-      const ultimo = Math.max(janIni * SLOT, janFim * SLOT - j.bruto)
+      ini = iniExato
+      const ultimo = Math.max(iniExato, fimExato - j.bruto)
       // Menor de 18 (CLT art. 404): só horários inteiramente entre 5h e 22h. Horário fixo é mantido
       // (a conformidade aponta); sem nenhum candidato diurno na janela, entra às 5h.
       const diurno = (c: number) => !f.menor || !tocaNoturnoMenor(c, j.bruto)
       if (f.menor && !diurno(ini)) ini = minutosDe(REGRAS.pessoas.menorNoturno.fim)
       let melhorPont = -Infinity
-      for (let c = janIni * SLOT; c <= ultimo; c += SLOT) {
+      // Candidatos: de 15 em 15 min a partir da abertura exata, mais o último horário que ainda termina no fechamento.
+      const candidatos: number[] = []
+      for (let c = iniExato; c <= ultimo; c += SLOT) candidatos.push(c)
+      if (candidatos[candidatos.length - 1] !== ultimo) candidatos.push(ultimo)
+      for (const c of candidatos) {
         if (!diurno(c)) continue
         let pont = 0
         for (let dow = 0; dow < 7; dow++) {
@@ -576,9 +689,13 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
       trabalhaDomingo.forEach((id) => domTrabalhados.set(id, domTrabalhados.get(id)! + 1))
     }
 
+    /** Decisão de repouso de cada pessoa nesta semana (a busca local pode mover os repousos não protegidos). */
+    const planos: PlanoSemana[] = []
     for (const f of funcionarios) {
       const spanDe = spans.get(f.id)!
       const k = posNoTurno.get(f.id)!
+      let aprendido: number[] | null = null
+      let reutilizado = false
       // Dias de férias nesta semana: não trabalham nem consomem os 2 repousos.
       const aus = Array.from({ length: 7 }, (_, d) => d).filter((d) => ausente(f.id, d))
       // Repousos possíveis: 2, ou menos quando restam poucos dias fora das férias (7 → 2, 2 → 1, 1 → 0).
@@ -588,6 +705,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
         rep = []
       } else if (modelo === 'fixo' && !rotacionaDomingo && repousoFixo.has(f.id) && !repousoFixo.get(f.id)!.some((d) => aus.includes(d))) {
         rep = repousoFixo.get(f.id)!
+        reutilizado = true
       } else {
         const folga: number[] = []
         const forcados: number[] = []
@@ -628,13 +746,11 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           quantos,
         )
         // O padrão fixo só é aprendido numa semana sem férias.
-        if (modelo === 'fixo' && aus.length === 0) {
-          if (!rotacionaDomingo) repousoFixo.set(f.id, rep)
-          else {
-            const fora = rep.filter((d) => d !== 0)
-            const antes = repousoFixo.get(f.id) ?? []
-            if (!(antes.length >= fora.length && fora.every((d) => antes.includes(d)))) repousoFixo.set(f.id, fora)
-          }
+        if (modelo === 'fixo' && aus.length === 0) aprendido = rotacionaDomingo ? rep.filter((d) => d !== 0) : [...rep]
+        // Fixo com domingo em rodízio: depois de aprendido o padrão, os repousos não se movem mais.
+        if (modelo === 'fixo' && rotacionaDomingo && (repousoFixo.get(f.id)?.length ?? 0) >= 1 && aus.length === 0) {
+          const antes = repousoFixo.get(f.id)!
+          if (antes.length >= rep.filter((d) => d !== 0).length) reutilizado = true
         }
       }
       // Travas legais: domingo de folga a cada `ciclo` semanas e no máx. 6 dias seguidos.
@@ -665,6 +781,29 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           if (presentesFn[f.funcaoId]) presentesFn[f.funcaoId][d][sl] -= 1
         }),
       )
+      planos.push({ f, rep, aus, protegidos, aprendido, movel: !reutilizado && aus.length < 7 })
+    }
+
+    // Busca local: move repousos (nunca o domingo) para dias com gente sobrando, enquanto isso reduz as faltas.
+    melhorarRepousos(planos, {
+      presentes,
+      presentesFn,
+      perfil,
+      perfilFn,
+      spans,
+      maxSeguidos,
+      diasSeguidos,
+      livre: (d) => !feriadoSet.has(somarDias(inicio, s * 7 + d)),
+    })
+
+    for (const { f, rep, aus, aprendido } of planos) {
+      // O padrão fixo (aprendido numa semana sem férias) acompanha os repousos já ajustados.
+      if (aprendido) {
+        const base = rotacionaDomingo ? rep.filter((d) => d !== 0) : [...rep]
+        const antes = repousoFixo.get(f.id) ?? []
+        if (!rotacionaDomingo) repousoFixo.set(f.id, base)
+        else if (!(antes.length >= base.length && base.every((d) => antes.includes(d)))) repousoFixo.set(f.id, base)
+      }
       // Cada semana tem 1 DSR (o domingo, quando é repouso; senão o 1º repouso) e as demais folgas.
       const dsrDia = rep.includes(0) ? 0 : rep[0]
       for (let d = 0; d < 7; d++) {

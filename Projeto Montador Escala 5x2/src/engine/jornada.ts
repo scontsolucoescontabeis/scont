@@ -12,6 +12,18 @@ export function tetoSemanalNaData(inicio: string): number {
   return limitesDaEtapa(etapaVigente(somarDias(domingoDaSemana(inicio), 6), REGRAS), REGRAS).jornadaSemanalMax
 }
 
+/**
+ * Horário de funcionamento do dia (minutos) a usar para recortar um período [ini, fim): só recorta quando o período
+ * toca esse horário; um período inteiramente fora dele (ex.: produção antes de abrir ao público) vale por inteiro.
+ */
+export function recorteDoDia(
+  janela: { ini: number; fim: number } | undefined,
+  ini: number,
+  fim: number,
+): { ini: number; fim: number } | undefined {
+  return janela && ini < janela.fim && fim > janela.ini ? janela : undefined
+}
+
 /** Intervalo mínimo para uma jornada de duração bruta `brutoMin`. */
 export function intervaloParaBruto(brutoMin: number): number {
   const { acimaDeHoras, minLongoMinutos, acimaDeHorasCurto, minCurtoMinutos } = REGRAS.intrajornada
