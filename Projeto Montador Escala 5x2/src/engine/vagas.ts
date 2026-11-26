@@ -11,6 +11,10 @@
  */
 import type { ContratacaoProposta, Escala, Funcao, ModeloEscala, Proposta } from '../types'
 import { MODELOS, gerarEscala, type EntradaGerador } from './gerador'
+import { tetoSemanalNaData } from './jornada'
+
+/** Cargas semanais (h) de tempo parcial que a busca experimenta, da menor para a maior (CLT art. 58-A: até 30 h, sem horas extras). */
+export const HORAS_PARCIAIS = [20, 30]
 
 /** Quantas vagas além das estimadas o gerador pode tentar antes de desistir. */
 export const FOLGA_DE_VAGAS = 2
@@ -73,28 +77,72 @@ export function gerarEscalaComVagas(
   modelo: ModeloEscala,
   ordem: string[],
   furos: (escala: Escala) => number,
+  horasParciais: number[] = [],
 ): EscalaComVagas {
-  let melhor: { n: number; escala: Escala; vagas: Record<string, number> } | null = null
-  let semMelhora = 0
+  type Plano = { vagas: Record<string, number>; parciais: Record<string, number[]> }
   const base = semFerias(entrada)
+  const gerar = (e: EntradaGerador, p: Plano) => {
+    const temVagas = Object.keys(p.vagas).length > 0 || Object.keys(p.parciais).length > 0
+    return gerarEscala(temVagas ? { ...e, vagas: p.vagas, vagasParciais: p.parciais } : e, modelo)
+  }
+  const resultado = (escala: Escala, p: Plano): EscalaComVagas => ({
+    escala,
+    contratacoes: entrada.funcoes
+      .filter((f) => (p.vagas[f.id] ?? 0) + (p.parciais[f.id]?.length ?? 0) > 0)
+      .map((f) => ({
+        funcaoId: f.id,
+        nome: f.nome,
+        quantidade: (p.vagas[f.id] ?? 0) + (p.parciais[f.id]?.length ?? 0),
+        ...(p.parciais[f.id]?.length ? { parciais: p.parciais[f.id] } : {}),
+      })),
+  })
+
+  let melhor: { n: number; escala: Escala; plano: Plano } | null = null
+  let semMelhora = 0
   for (let k = 0; k <= ordem.length; k++) {
-    const vagas = contar(ordem.slice(0, k))
-    const comVagas = (e: EntradaGerador) => gerarEscala(k === 0 ? e : { ...e, vagas }, modelo)
-    const escala = comVagas(entrada)
-    const n = furos(base ? comVagas(base) : escala)
+    const plano: Plano = { vagas: contar(ordem.slice(0, k)), parciais: {} }
+    const escala = gerar(entrada, plano)
+    const n = furos(base ? gerar(base, plano) : escala)
     if (!melhor || n < melhor.n) {
-      melhor = { n, escala, vagas }
+      melhor = { n, escala, plano }
       semMelhora = 0
     } else {
       semMelhora++
     }
     if (n === 0 || semMelhora >= TENTATIVAS_SEM_MELHORA) break
   }
-  const { escala, vagas } = melhor!
-  const contratacoes: ContratacaoProposta[] = entrada.funcoes
-    .filter((f) => (vagas[f.id] ?? 0) > 0)
-    .map((f) => ({ funcaoId: f.id, nome: f.nome, quantidade: vagas[f.id] }))
-  return { escala, contratacoes }
+
+  // Tempo parcial: se as vagas em tempo integral zeraram as faltas, tenta trocar as últimas 1 ou 2 por vagas de
+  // menos horas (mais baratas) e fica com a combinação mais barata que ainda cobre tudo.
+  if (melhor!.n === 0 && horasParciais.length > 0) {
+    const nVagas = Object.values(melhor!.plano.vagas).reduce((a, b) => a + b, 0)
+    const ids = ordem.slice(0, nVagas)
+    const cheias = (fid: string) => {
+      const f = entrada.funcoes.find((x) => x.id === fid)
+      const h = f && f.horasSemanaisAtuais > 0 ? f.horasSemanaisAtuais : 44
+      return Math.min(h, tetoSemanalNaData(entrada.inicio))
+    }
+    const custoCheio = ids.reduce((s, fid) => s + cheias(fid), 0)
+    const candidatos: { plano: Plano; custo: number }[] = []
+    for (const trocar of [1, 2]) {
+      if (trocar > nVagas) continue
+      for (const h of horasParciais) {
+        const inteiras = ids.slice(0, nVagas - trocar)
+        const parciaisIds = ids.slice(nVagas - trocar)
+        if (parciaisIds.some((fid) => h >= cheias(fid))) continue
+        const parciais: Record<string, number[]> = {}
+        for (const fid of parciaisIds) (parciais[fid] ??= []).push(h)
+        const custo = inteiras.reduce((s, fid) => s + cheias(fid), 0) + h * trocar
+        if (custo < custoCheio) candidatos.push({ plano: { vagas: contar(inteiras), parciais }, custo })
+      }
+    }
+    candidatos.sort((a, b) => a.custo - b.custo)
+    for (const c of candidatos) {
+      const escala = gerar(entrada, c.plano)
+      if (furos(base ? gerar(base, c.plano) : escala) === 0) return resultado(escala, c.plano)
+    }
+  }
+  return resultado(melhor!.escala, melhor!.plano)
 }
 
 /** As três propostas (modelos) já com as vagas que cada uma exige. */
@@ -102,9 +150,10 @@ export function gerarPropostasComVagas(
   entrada: EntradaGerador,
   ordem: string[],
   furos: (escala: Escala) => number,
+  horasParciais: number[] = [],
 ): Proposta[] {
   return MODELOS.map((m) => {
-    const { escala, contratacoes } = gerarEscalaComVagas(entrada, m.modelo, ordem, furos)
+    const { escala, contratacoes } = gerarEscalaComVagas(entrada, m.modelo, ordem, furos, horasParciais)
     return {
       id: m.modelo,
       modelo: m.modelo,

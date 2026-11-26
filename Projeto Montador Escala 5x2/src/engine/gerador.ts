@@ -26,7 +26,7 @@ import type {
   Turno,
 } from '../types'
 import { diaDaSemana, hhmmDe, minutosDe, domingoDaSemana, somarDias } from './datas'
-import { cicloDomingoDe, intervaloMinimoDaJornada, jornadaDaPessoa, tetoSemanalNaData, tocaNoturnoMenor } from './jornada'
+import { cicloDomingoDe, intervaloMinimoDaJornada, jornadaDaFuncao, jornadaDaPessoa, tetoSemanalNaData, tocaNoturnoMenor } from './jornada'
 import { diasDeFerias } from './ferias'
 import { REGRAS, REGRAS_PESSOAIS_PADRAO, cicloDomingoDoSetor } from '../config/regras'
 import { gruposDiasUteis, minimoDoDia } from './minimos'
@@ -45,12 +45,18 @@ export interface EntradaGerador {
   regrasPessoais?: RegrasPessoais
   /** Vagas a contratar por função (id da função → quantidade): entram na escala como "Vaga n — função". */
   vagas?: Record<string, number>
+  /** Vagas em tempo parcial por função: horas semanais de cada uma (somam-se às de `vagas`). */
+  vagasParciais?: Record<string, number[]>
 }
 
 export const SLOT = 15
 export const NSLOTS = 1440 / SLOT
 
-export function criarFuncionarios(funcoes: Funcao[], vagas?: Record<string, number>): Funcionario[] {
+export function criarFuncionarios(
+  funcoes: Funcao[],
+  vagas?: Record<string, number>,
+  parciais?: Record<string, number[]>,
+): Funcionario[] {
   const lista: Funcionario[] = []
   for (const fn of funcoes) {
     if (fn.pessoas) {
@@ -77,9 +83,21 @@ export function criarFuncionarios(funcoes: Funcao[], vagas?: Record<string, numb
       }
     }
     // Vagas a contratar: pessoas "genéricas" (sem sexo/menor/estagiário), com a jornada da função.
-    for (let i = 1; i <= (vagas?.[fn.id] ?? 0); i++) {
+    const inteiras = vagas?.[fn.id] ?? 0
+    for (let i = 1; i <= inteiras; i++) {
       lista.push({ id: `${fn.id}-vaga-${i}`, nome: `Vaga ${i} — ${fn.nome}`, funcaoId: fn.id, vaga: true })
     }
+    // Vagas em tempo parcial (CLT art. 58-A): jornada menor, mesmos dias de trabalho e descanso.
+    ;(parciais?.[fn.id] ?? []).forEach((h, j) => {
+      const n = inteiras + j + 1
+      lista.push({
+        id: `${fn.id}-vaga-${n}`,
+        nome: `Vaga ${n} — ${fn.nome} (tempo parcial, ${h}h)`,
+        funcaoId: fn.id,
+        vaga: true,
+        horasSemanais: h,
+      })
+    })
   }
   return lista
 }
@@ -333,7 +351,7 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   const regrasPessoais = entrada.regrasPessoais ?? REGRAS_PESSOAIS_PADRAO
   const inicio = domingoDaSemana(entrada.inicio)
   const dias = semanas * 7
-  const funcionarios = criarFuncionarios(funcoes, entrada.vagas)
+  const funcionarios = criarFuncionarios(funcoes, entrada.vagas, entrada.vagasParciais)
   const feriadoSet = new Set(feriados)
   const funcaoIds = funcoes.map((f) => f.id)
   const perfil = perfilNecessidade(empresa, turnos, cobertura, funcaoIds)
@@ -355,7 +373,16 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
   for (const f of funcionarios) {
     const fnc = funcoes.find((x) => x.id === f.funcaoId)!
     const pessoa: PessoaEscala | undefined = fnc.pessoas?.find((p) => `${fnc.id}-${p.id}` === f.id)
-    jornadas.set(f.id, jornadaDaPessoa(fnc, pessoa, teto, regrasPessoais))
+    jornadas.set(
+      f.id,
+      f.horasSemanais
+        ? // vaga em tempo parcial: carga própria, sem o horário fixo da função
+          jornadaDaFuncao(
+            { ...fnc, horasSemanaisAtuais: f.horasSemanais, entrada: undefined, saida: undefined, intervaloMin: undefined },
+            teto,
+          )
+        : jornadaDaPessoa(fnc, pessoa, teto, regrasPessoais),
+    )
     ausentes.set(f.id, diasDeFerias(inicio, dias, pessoa?.ferias ?? []))
   }
   const horarioDe = new Map<string, Horario>()

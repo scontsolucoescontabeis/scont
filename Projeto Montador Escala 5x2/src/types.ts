@@ -29,6 +29,8 @@ export interface Funcionario {
   estagiario?: boolean
   /** Vaga a contratar (não é uma pessoa da equipe atual): entra na proposta para cobrir a cobertura mínima. */
   vaga?: boolean
+  /** Contrato em tempo parcial (CLT art. 58-A): horas por semana. Só nas vagas a contratar. */
+  horasSemanais?: number
 }
 
 export interface Escala {
@@ -177,7 +179,10 @@ export type ModeloEscala = 'fixo' | 'rodizio_domingo' | 'folga_movel'
 export interface ContratacaoProposta {
   funcaoId: string
   nome: string
+  /** Total de vagas (tempo integral + parcial). */
   quantidade: number
+  /** Horas semanais de cada vaga em tempo parcial (as demais, `quantidade - parciais.length`, são em tempo integral). */
+  parciais?: number[]
 }
 
 export interface Proposta {

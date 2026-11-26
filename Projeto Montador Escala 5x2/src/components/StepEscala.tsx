@@ -140,7 +140,8 @@ export function StepEscala() {
                   Esta escala inclui {vagas.length} {vagas.length === 1 ? 'vaga' : 'vagas'} a contratar
                 </strong>{' '}
                 ({vagas.map((v) => v.nome).join('; ')}). Elas aparecem no calendário com a etiqueta “a contratar” e têm
-                escala proposta como as demais pessoas. Sem contratar, esses horários teriam de ser cobertos com horas
+                escala proposta como as demais pessoas (as de “tempo parcial” têm jornada menor, até 30 h por semana, CLT art.
+                58-A). Sem contratar, esses horários teriam de ser cobertos com horas
                 extras (CLT art. 59: até 2 h por dia, com adicional de 50% no mínimo), o que a ferramenta não monta; para
                 ver os furos de cobertura sem as vagas, desmarque “Incluir na escala as contratações necessárias”.
               </p>
