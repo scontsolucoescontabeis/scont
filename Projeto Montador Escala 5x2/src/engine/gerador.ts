@@ -48,6 +48,18 @@ export interface EntradaGerador {
   vagas?: Record<string, number>
   /** Vagas em tempo parcial por função: horas semanais de cada uma (somam-se às de `vagas`). */
   vagasParciais?: Record<string, ContratoParcial[]>
+  /**
+   * Horário de trabalho alterado à mão no passo 4 (id do funcionário → entrada/saída e, opcional, intervalo):
+   * vale em todos os dias de trabalho da pessoa; o resto da escala é refeito em volta dele.
+   */
+  horariosFixos?: Record<string, HorarioFixo>
+}
+
+/** Horário de trabalho fixado pelo usuário no passo 4 (HH:mm). */
+export interface HorarioFixo {
+  entrada: string
+  saida: string
+  intervaloMin?: number
 }
 
 export const SLOT = 15
@@ -508,10 +520,24 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           )
         : jornadaDaPessoa(fnc, pessoa, teto, regrasPessoais),
     )
+    // Horário alterado à mão no passo 4: vale em todos os dias de trabalho da pessoa.
+    const manual = entrada.horariosFixos?.[f.id]
+    const hManual = manual ? horarioDoDiaPessoa({ entrada: manual.entrada, saida: manual.saida }) : null
+    if (hManual) {
+      if (manual!.intervaloMin !== undefined) hManual.intervaloMin = Math.min(manual!.intervaloMin, hManual.bruto)
+      jornadas.set(f.id, { bruto: hManual.bruto, intervaloMin: hManual.intervaloMin, inicioFixo: hManual.inicio })
+    }
     ausentes.set(f.id, diasDeFerias(inicio, dias, pessoa?.ferias ?? []))
-    // Jornada por dia informada no passo 2: horário de cada dia (null = folga), usado como está.
+    // Jornada por dia informada no passo 2: horário de cada dia (null = folga), usado como está
+    // (com horário alterado no passo 4, ele substitui o horário dos dias de trabalho; as folgas ficam).
     if (!f.vaga && pessoa && temJornadaDias(pessoa)) {
-      diasFixos.set(f.id, pessoa.jornadaDias!.map((h) => horarioDoDiaPessoa(h)))
+      diasFixos.set(
+        f.id,
+        pessoa.jornadaDias!.map((h) => {
+          const x = horarioDoDiaPessoa(h)
+          return x && hManual ? { ...hManual } : x
+        }),
+      )
     }
   }
   // Quem tem jornada por dia entra primeiro na contagem: os demais escolhem o horário para cobrir o que falta.
@@ -613,6 +639,11 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
     const fixos = diasFixos.get(f.id)
     if (fixos) {
       horarioDia.set(f.id, fixos.map((x) => x ?? h))
+      continue
+    }
+    // Horário alterado no passo 4: exatamente o informado, todos os dias.
+    if (entrada.horariosFixos?.[f.id] && jornadas.get(f.id)!.inicioFixo !== undefined) {
+      horarioDia.set(f.id, Array.from({ length: 7 }, () => h))
       continue
     }
     horarioDia.set(

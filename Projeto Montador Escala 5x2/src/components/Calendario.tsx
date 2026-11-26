@@ -2,6 +2,7 @@ import { AlertTriangle, Redo2, Search, Undo2, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type DragEvent } from 'react'
 import { diaDaSemana } from '../engine/datas'
 import { useStore } from '../store/useStore'
+import type { HorarioFixo } from '../engine/gerador'
 import type { Alerta, DiaEscala, Escala, TipoDia } from '../types'
 import { DIAS_CURTOS, NOME_TIPO, SIGLA_TIPO, datasDaEscala, formatarData, rotuloTurno } from '../utils/analise'
 import { alertasDaCelula, explicacao, filtrarFuncionarios, marcasDasCelulas, opcoesDaCelula } from '../utils/passo4'
@@ -9,6 +10,84 @@ import { COR_TIPO as COR } from './cores'
 import { LegendaEscala } from './LegendaEscala'
 import { ExplicacoesAlertas, MenuCelula } from './MenuCelula'
 import { LARGURA_POPOVER, posicaoJunto } from './posicao'
+
+/** Editor do horário de trabalho de um funcionário (passo 4): aplicar refaz a escala com o horário fixo. */
+function EditorHorario({
+  escala,
+  fid,
+  nome,
+  fixo,
+  onAplicar,
+  onFechar,
+}: {
+  escala: Escala
+  fid: string
+  nome: string
+  fixo: HorarioFixo | undefined
+  onAplicar: (h: HorarioFixo | null) => void
+  onFechar: () => void
+}) {
+  // Valor inicial: o horário fixado ou o do primeiro dia trabalhado na escala atual.
+  const cel = escala.celulas[fid]?.find((c) => c.tipo === 'trabalho')
+  const turno = escala.turnos.find((t) => t.id === cel?.turnoId)
+  const [entrada, setEntrada] = useState(fixo?.entrada ?? turno?.inicio ?? '08:00')
+  const [saida, setSaida] = useState(fixo?.saida ?? turno?.fim ?? '17:00')
+  const [intervalo, setIntervalo] = useState<string>(String(fixo?.intervaloMin ?? turno?.intervaloMin ?? 60))
+  const valido = /^\d{2}:\d{2}$/.test(entrada) && /^\d{2}:\d{2}$/.test(saida) && entrada !== saida
+  return (
+    <section className="rounded-lg border-2 border-brand bg-brand-light/30 p-3 text-sm" aria-label={`Horário de trabalho de ${nome}`}>
+      <p className="mb-2 font-semibold">Horário de trabalho — {nome}</p>
+      <div className="flex flex-wrap items-end gap-3">
+        <label>
+          Entrada
+          <input type="time" className="campo w-28" value={entrada} onChange={(e) => setEntrada(e.target.value)} />
+        </label>
+        <label>
+          Saída
+          <input type="time" className="campo w-28" value={saida} onChange={(e) => setSaida(e.target.value)} />
+        </label>
+        <label>
+          Intervalo (min)
+          <input
+            type="number"
+            min={0}
+            max={240}
+            step={5}
+            className="campo w-24"
+            value={intervalo}
+            onChange={(e) => setIntervalo(e.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          className="btn-primario"
+          disabled={!valido}
+          onClick={() =>
+            onAplicar({
+              entrada,
+              saida,
+              ...(intervalo === '' ? {} : { intervaloMin: Math.min(240, Math.max(0, Math.round(Number(intervalo) || 0))) }),
+            })
+          }
+        >
+          Aplicar e refazer a escala
+        </button>
+        {fixo && (
+          <button type="button" className="btn-sec" onClick={() => onAplicar(null)}>
+            Voltar ao horário automático
+          </button>
+        )}
+        <button type="button" className="btn-sec" onClick={onFechar}>
+          Cancelar
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-soft">
+        O horário vale para todos os dias de trabalho de {nome}. O motor refaz as folgas e os horários dos demais para
+        cumprir a cobertura do passo 3; os ajustes feitos à mão nos dias são substituídos pela nova escala.
+      </p>
+    </section>
+  )
+}
 
 type Pincel = { tipo: TipoDia; turnoId?: string } | null
 type Alvo = { fid: string; dia: number; el: HTMLElement }
@@ -76,6 +155,10 @@ export function Calendario({ escala, alertas }: { escala: Escala; alertas: Alert
   const trocar = useStore((s) => s.trocarCelulas)
   const feriados = useStore((s) => s.feriados)
   const funcoes = useStore((s) => s.funcoes)
+  const horariosPasso4 = useStore((s) => s.horariosPasso4)
+  const definirHorario = useStore((s) => s.definirHorario)
+  /** Funcionário com o editor de horário aberto. */
+  const [horarioDe, setHorarioDe] = useState<string | null>(null)
   const [pincel, setPincel] = useState<Pincel>(null)
   const [menu, setMenu] = useState<Alvo | null>(null)
   const [dica, setDica] = useState<Alvo | null>(null)
@@ -212,6 +295,25 @@ export function Calendario({ escala, alertas }: { escala: Escala; alertas: Alert
         )}
       </div>
 
+      <p className="text-xs text-soft">
+        Para mudar o horário de trabalho de alguém, clique no nome da pessoa (ou troque o horário de um dia trabalhado):
+        a escala é refeita com esse horário fixo, seguindo as regras do passo 3.
+      </p>
+      {horarioDe && (
+        <EditorHorario
+          key={horarioDe}
+          escala={escala}
+          fid={horarioDe}
+          nome={nomeDe(horarioDe)}
+          fixo={horariosPasso4[horarioDe]}
+          onAplicar={(h) => {
+            definirHorario(horarioDe, h)
+            setHorarioDe(null)
+          }}
+          onFechar={() => setHorarioDe(null)}
+        />
+      )}
+
       <details className="rounded-lg border border-line p-2 text-sm">
         <summary className="cursor-pointer font-medium">Pintar vários dias de uma vez (opcional)</summary>
         <p className="my-2 text-xs text-soft">
@@ -306,7 +408,23 @@ export function Calendario({ escala, alertas }: { escala: Escala; alertas: Alert
                   scope="row"
                   className="sticky left-0 z-10 border-r border-line bg-white px-2 py-1 text-left font-medium"
                 >
-                  {f.nome}
+                  <button
+                    type="button"
+                    className="text-left underline decoration-dotted underline-offset-2 hover:text-brand"
+                    title="Alterar o horário de trabalho"
+                    aria-label={`${f.nome}: alterar o horário de trabalho`}
+                    onClick={() => {
+                      setMenu(null)
+                      setHorarioDe(f.id)
+                    }}
+                  >
+                    {f.nome}
+                  </button>
+                  {horariosPasso4[f.id] && (
+                    <span className="ml-1 whitespace-nowrap rounded bg-brand-light px-1 text-[10px] font-semibold">
+                      horário fixo
+                    </span>
+                  )}
                   {f.vaga && (
                     <span className="ml-1 whitespace-nowrap rounded bg-yellow-100 px-1 text-[10px] font-semibold text-yellow-900">
                       a contratar
