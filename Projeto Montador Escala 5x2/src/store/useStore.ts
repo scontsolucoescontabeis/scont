@@ -142,6 +142,11 @@ const inicial: Dados = { ...DADOS_PADRAO, ...salvoInicial }
 let baseBanco: Funcao[] | null = null
 /** Dados crus do banco na última carga, para re-mapear quando as regras por pessoa mudam. */
 let dadosBanco: DadosPortal | null = null
+/** Assinatura dos dados dos passos 1-3 usados na última geração; permite voltar ao Passo 4 sem perder ajustes manuais. */
+let assinaturaGeracao: string | null = null
+function assinaturaDosDados(d: Dados): string {
+  return JSON.stringify([d.empresa, d.funcoes, d.turnos, d.cobertura, d.feriados, d.inicioEscala, d.semanas, d.regrasPessoais])
+}
 const portalInicial: EstadoPortal | null = codigoPortal
   ? { codigo: codigoPortal, carregando: true, erro: null, nenhumEmpregado: false }
   : null
@@ -267,6 +272,7 @@ export const useStore = create<Store>((set, get) => {
         escala: corrigirTudo(p.escala, (e) => analisar(d, e)).escala,
       }))
       const ativa = corrigidas.find((p) => p.id === d.propostaAtivaId) ?? corrigidas[0]
+      assinaturaGeracao = assinaturaDosDados(d)
       set({
         propostas: corrigidas,
         comparar: corrigidas.map((p) => p.id),
@@ -276,12 +282,21 @@ export const useStore = create<Store>((set, get) => {
       })
     },
     irParaPasso: (i) => {
+      const d = get()
+      // Ao abrir a Escala, só regera se os passos 1-3 mudaram desde a última geração:
+      // assim voltar ao Passo 4 (ou clicar nele de novo) não apaga os ajustes manuais.
+      const manter = i === 3 && d.escala !== null && assinaturaGeracao === assinaturaDosDados(d)
+      if (manter) {
+        set({ passo: i, historico: hist.limpar() })
+        return
+      }
       set({ passo: i, historico: hist.limpar() })
       if (i === 3) get().sugerirEscala()
     },
     reiniciar: () => {
       clearTimeout(timer)
       limpar()
+      assinaturaGeracao = null
       set({ ...DADOS_PADRAO, historico: hist.limpar() })
       const portal = get().portal
       if (portal) void get().carregarDoPortal(portal.codigo)

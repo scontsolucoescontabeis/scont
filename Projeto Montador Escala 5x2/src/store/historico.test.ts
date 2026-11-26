@@ -89,3 +89,38 @@ describe('desfazer/refazer na store', () => {
     expect(s.getState().escala).toBe(editada)
   })
 })
+
+describe('navegação entre passos preserva os ajustes manuais', () => {
+  it('voltar ao Passo 4 sem mudar os dados mantém a escala editada (o histórico de desfazer zera ao trocar de passo)', async () => {
+    const s = await novaStore()
+    s.getState().irParaPasso(3)
+    const fid = s.getState().escala!.funcionarios[0].id
+    s.getState().setCelula(fid, 0, { tipo: 'ausencia' })
+    const editada = s.getState().escala!
+    s.getState().irParaPasso(2)
+    s.getState().irParaPasso(3)
+    expect(s.getState().escala).toBe(editada)
+    expect(s.getState().historico.passado).toHaveLength(0)
+    s.getState().irParaPasso(3)
+    expect(s.getState().escala).toBe(editada)
+  })
+
+  it('mudar um dado dos passos 1-3 regera a escala (ajustes anteriores saem)', async () => {
+    const s = await novaStore()
+    s.getState().irParaPasso(3)
+    const fid = s.getState().escala!.funcionarios[0].id
+    s.getState().setCelula(fid, 0, { tipo: 'ausencia' })
+    const editada = s.getState().escala!
+    s.getState().setEmpresa({ funcionaFeriados: !s.getState().empresa.funcionaFeriados })
+    s.getState().irParaPasso(3)
+    expect(s.getState().escala).not.toBe(editada)
+    expect(s.getState().historico.passado).toHaveLength(0)
+  })
+
+  it('sem escala gerada, abrir o Passo 4 gera uma', async () => {
+    const s = await novaStore()
+    expect(s.getState().escala).toBeNull()
+    s.getState().irParaPasso(3)
+    expect(s.getState().escala).not.toBeNull()
+  })
+})
