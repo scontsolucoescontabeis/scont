@@ -795,7 +795,9 @@ export function gerarEscala(entrada: EntradaGerador, modelo: ModeloEscala): Esca
           if (presentesFn[f.funcaoId]) presentesFn[f.funcaoId][d][sl] -= 1
         }),
       )
-      planos.push({ f, rep, aus, protegidos, aprendido, movel: !reutilizado && aus.length < 7 })
+      // O padrão já aprendido não é reaprendido; mas ele pode abrir uma exceção numa semana para cobrir uma falta (a busca só move
+      // repouso quando isso reduz a falta de gente; sem falta, o padrão fica como está).
+      planos.push({ f, rep, aus, protegidos, aprendido: reutilizado ? null : aprendido, movel: aus.length < 7 })
     }
 
     // Busca local: move repousos (nunca o domingo) para dias com gente sobrando, enquanto isso reduz as faltas.
