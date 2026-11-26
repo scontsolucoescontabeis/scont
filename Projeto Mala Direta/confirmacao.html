@@ -151,22 +151,15 @@
 
     _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Buscar envio pelo token
-    const { data: env, error: envErr } = await _sb
-      .from('mala_direta_envios')
-      .select('*')
-      .eq('token', TOKEN)
-      .single();
+    // Buscar envio pelo token (RPC: o anônimo não lê as tabelas da Mala Direta)
+    const { data: linhas, error: envErr } = await _sb
+      .rpc('md_confirmacao_obter', { p_token: TOKEN });
+    const env = Array.isArray(linhas) ? linhas[0] : null;
 
     if (envErr || !env) { renderErro('Link inválido ou expirado. Verifique o link e tente novamente.'); return; }
     envio = env;
 
-    // Buscar campanha para obter tipo_confirmacao
-    const { data: camp } = await _sb
-      .from('mala_direta_campanhas')
-      .select('nome, tipo_confirmacao')
-      .eq('id', env.campanha_id)
-      .single();
+    const camp = { nome: env.campanha_nome, tipo_confirmacao: env.tipo_confirmacao };
     campanha = camp;
 
     if (camp?.nome) {
@@ -251,13 +244,8 @@
     document.querySelectorAll('.btn').forEach(b => b.disabled = true);
 
     if (!_sb) _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    const { error } = await _sb
-      .from('mala_direta_envios')
-      .update({
-        status_confirmacao: status,
-        data_confirmacao: new Date().toISOString(),
-      })
-      .eq('token', TOKEN);
+    const { data: final, error } = await _sb
+      .rpc('md_confirmacao_responder', { p_token: TOKEN, p_status: status });
 
     if (error) {
       document.querySelectorAll('.btn').forEach(b => b.disabled = false);
@@ -265,6 +253,8 @@
       return;
     }
 
+    // Se já havia outra resposta registrada, mostra a existente.
+    if (final && final !== status) { renderJaRespondido(final); return; }
     renderSucesso(status);
   }
 
