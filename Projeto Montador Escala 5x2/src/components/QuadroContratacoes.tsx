@@ -27,7 +27,11 @@ export function QuadroContratacoes() {
     ? `${q.equipeAtual} pessoas, ≈ ${fmt1(q.equipeEquivalente)} em tempo integral`
     : `${q.equipeAtual} pessoas`
   const somaLinhas = q.linhasTurno.reduce((s, l) => s + l.necessarios, 0)
-  const nasPropostas = propostas.map((p) => ({ nome: p.nome, n: totalDeVagas(p.contratacoes) }))
+  const nasPropostas = propostas.map((p) => ({
+    nome: p.nome,
+    n: totalDeVagas(p.contratacoes),
+    parciais: (p.contratacoes ?? []).flatMap((c) => c.parciais ?? []),
+  }))
 
   return (
     <section className="cartao space-y-4" aria-labelledby="t-quadro">
@@ -62,7 +66,7 @@ export function QuadroContratacoes() {
       {incluir && propostas.length > 0 && (
         <p className="text-sm">
           <strong>Nas sugestões de escala:</strong>{' '}
-          {nasPropostas.map((x) => `${x.nome}: ${x.n === 0 ? 'nenhuma contratação' : `contratar ${x.n}`}`).join(' · ')}. O gerador
+          {nasPropostas.map((x) => `${x.nome}: ${x.n === 0 ? 'nenhuma contratação' : `contratar ${x.n}${x.parciais.length > 0 ? ` (${x.parciais.length} em tempo parcial)` : ''}`}`).join(' · ')}. O gerador
           acrescenta uma vaga por vez até a cobertura mínima fechar, então o número pode diferir da estimativa abaixo.
         </p>
       )}

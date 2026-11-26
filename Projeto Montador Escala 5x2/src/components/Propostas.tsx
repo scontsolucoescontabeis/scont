@@ -29,7 +29,16 @@ function Contratacoes({ proposta }: { proposta: Proposta }) {
       </p>
     )
   }
-  const lista = (proposta.contratacoes ?? []).map((c) => `${c.quantidade} ${c.nome}`).join(', ')
+  const lista = (proposta.contratacoes ?? [])
+    .flatMap((c) => {
+      const parciais = c.parciais ?? []
+      const inteiras = c.quantidade - parciais.length
+      return [
+        ...(inteiras > 0 ? [`${inteiras} ${c.nome}`] : []),
+        ...parciais.map((h) => `1 ${c.nome} em tempo parcial, ${h} h/semana`),
+      ]
+    })
+    .join(', ')
   return (
     <p className="mt-2 rounded border border-yellow-400 bg-yellow-50 p-2 text-xs text-yellow-900">
       <UserPlus size={12} className="mr-1 inline" aria-hidden />
@@ -54,6 +63,12 @@ export function Propostas() {
     propostas.filter((p) => comparar.includes(p.id)).map((p) => [p.id, resumoProposta(p.escala, analises[p.id].alertas)]),
   )
   const destaques = destaquesPropostas(resumos)
+
+  const alternarParcial = (marcado: boolean) => {
+    if (propostas.length > 0 && !confirmaPerderAjustes()) return
+    set({ permitirParcial: marcado })
+    if (propostas.length > 0) sugerirEscala()
+  }
 
   const alternarContratacoes = (marcado: boolean) => {
     if (propostas.length > 0 && !confirmaPerderAjustes()) return
@@ -120,6 +135,24 @@ export function Propostas() {
           </span>
         </span>
       </label>
+
+      {dados.incluirContratacoes && (
+        <label className="ml-6 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={dados.permitirParcial}
+            onChange={(e) => alternarParcial(e.target.checked)}
+          />
+          <span>
+            Permitir vagas em tempo parcial quando forem mais vantajosas
+            <span className="block text-xs text-soft">
+              Se uma vaga de 20 h ou 30 h por semana (CLT art. 58-A: até 30 h, sem horas extras) já cobre o que falta, ela é
+              sugerida no lugar da vaga em tempo integral.
+            </span>
+          </span>
+        </label>
+      )}
 
       {propostas.length > 0 && (
         <>
