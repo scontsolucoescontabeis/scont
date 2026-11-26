@@ -5,6 +5,7 @@ import { Campo } from "./ui";
 import { EquipeNominal } from "./EquipeNominal";
 
 const JORNADAS: { rotulo: string; horas: number }[] = [
+  { rotulo: "42h semanais", horas: 42 },
   { rotulo: "44h semanais", horas: 44 },
   { rotulo: "6x1 (44h)", horas: 44 },
   { rotulo: "40h semanais", horas: 40 },
@@ -33,8 +34,8 @@ export function StepEquipe() {
           id: `fn-${Date.now()}`,
           nome: "Nova função",
           quantidade: 1,
-          jornadaContratual: "44h semanais",
-          horasSemanaisAtuais: 44,
+          jornadaContratual: "42h semanais",
+          horasSemanaisAtuais: 42,
         },
       ],
       escala: null,
@@ -49,9 +50,11 @@ export function StepEquipe() {
             2. Sua equipe
           </h2>
           <p className="text-sm text-soft">
-            Esta é a equipe ativa cadastrada no RH. Ajuste a carga e o horário de
-            cada pessoa ou desmarque quem não deve entrar na escala. Sexo,
-            estágio e idade vêm do cadastro do RH e não são editáveis aqui.
+            Esta é a equipe ativa cadastrada no RH. Todos começam com 42 horas
+            por semana e sem horário fixo (a ferramenta escolhe o horário);
+            ajuste a carga e o horário de cada pessoa ou desmarque quem não
+            deve entrar na escala. Sexo, estágio e idade vêm do cadastro do RH
+            e não são editáveis aqui.
           </p>
         </div>
         <EquipeNominal />

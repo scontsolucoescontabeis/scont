@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mapearDadosPortal, type DadosPortal } from './mapear'
 
-type J = DadosPortal['jornadas'][number]
+type J = NonNullable<DadosPortal['jornadas']>[number]
 
 function dados(p: Partial<DadosPortal> = {}): DadosPortal {
   return { empresa: { codigo_empresa: '1', nome_empresa: 'Loja X' }, empregados: [], jornadas: [], ferias: [], ...p }
@@ -64,89 +64,22 @@ describe('mapearDadosPortal', () => {
     expect(r.funcoes[0].pessoas!.map((p) => p.nome)).toEqual(['Ágata', 'Bruno', 'Zélia'])
   })
 
-  it('jornada com linhas seg-sex 08-17 sem intervalo = 40h', () => {
-    const r = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: semana('1', '08:00', '17:00') }))
-    const p = r.funcoes[0].pessoas![0]
-    expect(p.horasSemanais).toBe(40)
-    expect(p.entrada).toBe('08:00')
-    expect(p.saida).toBe('17:00')
-    expect(p.jornadaPadrao).toBe(false)
-    expect(p.intervaloMin).toBeUndefined()
-  })
-
-  it('aceita horários com segundos', () => {
-    const r = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: semana('1', '08:00:00', '17:00:00') }))
-    const p = r.funcoes[0].pessoas![0]
-    expect(p.entrada).toBe('08:00')
-    expect(p.saida).toBe('17:00')
-  })
-
-  it('intervalo informado desconta e vira intervaloMin', () => {
-    const r = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: semana('1', '08:00', '17:30', '12:00', '13:30') }))
-    const p = r.funcoes[0].pessoas![0]
-    expect(p.intervaloMin).toBe(90)
-    expect(p.horasSemanais).toBe(40) // (570-90)=480 x5
-  })
-
-  it('intervalos diferentes: o mais comum', () => {
-    const js = [
-      j('1', 'segunda', '08:00', '17:00', '12:00', '13:00'),
-      j('1', 'terca', '08:00', '17:00', '12:00', '13:30'),
-      j('1', 'quarta', '08:00', '17:00', '12:00', '13:30'),
-    ]
+  it('jornadas do RH são ignoradas: 42h, sem entrada/saída/intervalo', () => {
+    const js = [...semana('1', '08:00', '17:30', '12:00', '13:30'), j('1', 'sabado', '08:00', '12:00')]
     const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: js })).funcoes[0].pessoas![0]
-    expect(p.intervaloMin).toBe(90)
-  })
-
-  it('entrada/saída variando: horário livre, horas somadas', () => {
-    const js = [j('1', 'segunda', '08:00', '17:00'), j('1', 'terca', '09:00', '18:00')]
-    const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: js })).funcoes[0].pessoas![0]
-    expect(p.entrada).toBeUndefined()
-    expect(p.saida).toBeUndefined()
-    expect(p.horasSemanais).toBe(16)
-    expect(p.jornadaPadrao).toBe(false)
-  })
-
-  it('sem linhas: 44h e jornadaPadrao', () => {
-    const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')] })).funcoes[0].pessoas![0]
-    expect(p.horasSemanais).toBe(44)
-    expect(p.jornadaPadrao).toBe(true)
+    expect(p.horasSemanais).toBe(42)
     expect(p.entrada).toBeUndefined()
     expect(p.saida).toBeUndefined()
     expect(p.intervaloMin).toBeUndefined()
+    expect(p.jornadaPadrao).toBe(false)
   })
 
-  it('dias sem acento reconhecidos; desconhecido ignorado', () => {
-    const js = [j('1', 'Terça', '08:00', '12:00'), j('1', 'sabado', '08:00', '12:00'), j('1', 'feriado', '08:00', '12:00'), j('1', 'DOMINGO', '08:00', '12:00')]
-    const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: js })).funcoes[0].pessoas![0]
-    expect(p.horasSemanais).toBe(12)
-  })
-
-  it('só dia desconhecido: continua jornada padrão', () => {
-    const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: [j('1', 'xyz', '08:00', '12:00')] })).funcoes[0].pessoas![0]
-    expect(p.jornadaPadrao).toBe(true)
-  })
-
-  it('entrada ou saída vazia: dia ignorado', () => {
-    const js = [j('1', 'segunda', '08:00', null), j('1', 'terca', '', '17:00'), j('1', 'quarta', '08:00', '12:00')]
-    const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: js })).funcoes[0].pessoas![0]
-    expect(p.horasSemanais).toBe(4)
-    expect(p.entrada).toBe('08:00')
-  })
-
-  it('virada de dia (+24h) limitada a 16h bruto', () => {
-    // 22:00 -> 06:00 = 8h bruto, liquido 7h (intervalo auto 60)
-    const a = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: [j('1', 'segunda', '22:00', '06:00')] })).funcoes[0].pessoas![0]
-    expect(a.horasSemanais).toBe(7)
-    // 08:00 -> 08:00 = 24h, capado em 16h; intervalo 60 => 15h
-    const b = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: [j('1', 'segunda', '08:00', '08:00')] })).funcoes[0].pessoas![0]
-    expect(b.horasSemanais).toBe(15)
-  })
-
-  it('duplicadas na mesma pessoa+dia: a última vale', () => {
-    const js = [j('1', 'segunda', '08:00', '12:00'), j('1', 'segunda', '08:00', '17:00')]
-    const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: js })).funcoes[0].pessoas![0]
-    expect(p.horasSemanais).toBe(8)
+  it('sem jornadas (campo ausente): 42h', () => {
+    const d = dados({ empregados: [emp('1', 'Ana')] })
+    delete (d as Partial<DadosPortal>).jornadas
+    const p = mapearDadosPortal(d).funcoes[0].pessoas![0]
+    expect(p.horasSemanais).toBe(42)
+    expect(p.entrada).toBeUndefined()
   })
 
   it('férias válidas ordenadas; inválidas descartadas', () => {
@@ -167,29 +100,12 @@ describe('mapearDadosPortal', () => {
     expect(r.funcoes[0].pessoas!.find((p) => p.id === '2')!.ferias).toHaveLength(1)
   })
 
-  it('horasSemanaisAtuais: mediana (ímpar e par) e jornadaContratual', () => {
-    const odd = mapearDadosPortal(
-      dados({
-        empregados: [emp('1', 'A'), emp('2', 'B'), emp('3', 'C')],
-        jornadas: [...semana('1', '08:00', '17:00'), ...semana('2', '08:00', '16:00')], // 40, 35; C padrao 44
-      }),
+  it('função: 42h semanais mesmo com jornadas no RH', () => {
+    const f = mapearDadosPortal(
+      dados({ empregados: [emp('1', 'A'), emp('2', 'B')], jornadas: [...semana('1', '08:00', '17:00'), ...semana('2', '08:00', '16:00')] }),
     ).funcoes[0]
-    expect(odd.horasSemanaisAtuais).toBe(40)
-    expect(odd.jornadaContratual).toBe('40h semanais')
-    const even = mapearDadosPortal(
-      dados({
-        empregados: [emp('1', 'A'), emp('2', 'B')],
-        jornadas: [...semana('1', '08:00', '17:00'), ...semana('2', '08:00', '16:00')], // 40, 35
-      }),
-    ).funcoes[0]
-    expect(even.horasSemanaisAtuais).toBe(37.5)
-    expect(even.jornadaContratual).toBe('38h semanais')
-  })
-
-  it('todos padrão: 44h', () => {
-    const f = mapearDadosPortal(dados({ empregados: [emp('1', 'A'), emp('2', 'B')] })).funcoes[0]
-    expect(f.horasSemanaisAtuais).toBe(44)
-    expect(f.jornadaContratual).toBe('44h semanais')
+    expect(f.horasSemanaisAtuais).toBe(42)
+    expect(f.jornadaContratual).toBe('42h semanais')
   })
 
   it('pontuação/espaços variantes do cargo viram UMA função', () => {
@@ -213,25 +129,6 @@ describe('mapearDadosPortal', () => {
     expect(new Set(a).size).toBe(a.length)
     expect(ids(lista)).toEqual(a)
     expect(ids([...lista].reverse())).toEqual(a)
-  })
-
-  it('horas limitadas a 60 (pessoa e função)', () => {
-    const dias = ['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'].map((d) => j('1', d, '00:00', '23:00'))
-    const f = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: dias })).funcoes[0]
-    expect(f.pessoas![0].horasSemanais).toBe(60)
-    expect(f.horasSemanaisAtuais).toBe(60)
-  })
-
-  it('horário na forma curta 8:00', () => {
-    const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: [j('1', 'segunda', '8:00', '17:00')] })).funcoes[0].pessoas![0]
-    expect(p.entrada).toBe('08:00')
-    expect(p.horasSemanais).toBe(8)
-  })
-
-  it('intervalo maior que o turno: líquido 0, sem NaN', () => {
-    const p = mapearDadosPortal(dados({ empregados: [emp('1', 'Ana')], jornadas: [j('1', 'segunda', '08:00', '10:00', '08:30', '13:00')] })).funcoes[0].pessoas![0]
-    expect(p.horasSemanais).toBe(0)
-    expect(p.intervaloMin).toBe(270)
   })
 })
 
@@ -261,34 +158,26 @@ describe('mapearDadosPortal — regras por pessoa', () => {
     expect(um({ tipo_empregado: undefined }).estagiario).toBe(false)
   })
 
-  it('estagiário sem jornada no banco usa a carga das regras (30 padrão; 20/40 com o argumento)', () => {
+  it('estagiário usa a carga das regras (30 padrão; 20/40 com o argumento), mesmo com jornada no banco', () => {
     const e = { tipo_empregado: 'Estagiário' }
     expect(um(e).horasSemanais).toBe(30)
+    const comJornada = um(e, semana('1', '08:00', '17:00', '12:00', '13:00'))
+    expect(comJornada.horasSemanais).toBe(30)
+    expect(comJornada.entrada).toBeUndefined()
+    expect(comJornada.intervaloMin).toBeUndefined()
     for (const h of [20, 30, 40] as const) {
       const p = mapearDadosPortal(dados({ empregados: [{ ...emp('1', 'Ana'), ...e }] }), { mulheresDomingoQuinzenal: true, estagioHorasSemanais: h }).funcoes[0].pessoas![0]
       expect(p.horasSemanais).toBe(h)
-      expect(p.jornadaPadrao).toBe(true)
     }
   })
 
-  it('estagiário com jornada no banco acima do limite é limitado; abaixo fica', () => {
-    const e = { tipo_empregado: 'Estagiário' }
-    const alta = um(e, semana('1', '08:00', '17:00', '12:00', '13:00')) // 40h
-    expect(alta.horasSemanais).toBe(30)
-    expect(alta.entrada).toBe('08:00')
-    expect(alta.saida).toBe('17:00')
-    expect(alta.intervaloMin).toBe(60)
-    const baixa = um(e, semana('1', '08:00', '12:00')) // 4h x5 = 20h menos intervalo auto
-    expect(baixa.horasSemanais).toBeLessThanOrEqual(30)
-  })
-
-  it('adulto Empregado inalterado (44 padrão; derivado com jornada)', () => {
-    expect(um({}).horasSemanais).toBe(44)
-    expect(um({}, semana('1', '08:00', '17:00', '12:00', '13:00')).horasSemanais).toBe(40)
+  it('adulto Empregado: 42h com ou sem jornada no banco', () => {
+    expect(um({}).horasSemanais).toBe(42)
+    expect(um({}, semana('1', '08:00', '17:00', '12:00', '13:00')).horasSemanais).toBe(42)
   })
 
   it('mediana do grupo continua funcionando com estagiários', () => {
     const r = mapearDadosPortal(dados({ empregados: [{ ...emp('1', 'A'), tipo_empregado: 'Estagiário' }, emp('2', 'B'), emp('3', 'C')] }))
-    expect(r.funcoes[0].horasSemanaisAtuais).toBe(44)
+    expect(r.funcoes[0].horasSemanaisAtuais).toBe(42)
   })
 })
