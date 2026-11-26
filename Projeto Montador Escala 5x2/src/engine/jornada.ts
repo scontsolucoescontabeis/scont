@@ -4,7 +4,7 @@
  * dias, limitada à jornada diária máxima, com o intervalo legal.
  */
 import { REGRAS, REGRAS_PESSOAIS_PADRAO, etapaVigente, limitesDaEtapa } from '../config/regras'
-import type { Funcao, Funcionario, PessoaEscala, RegrasPessoais } from '../types'
+import type { Funcao, Funcionario, HorarioDiaPessoa, PessoaEscala, RegrasPessoais } from '../types'
 import { domingoDaSemana, minutosDe, somarDias } from './datas'
 
 /** Teto semanal (h) da etapa vigente na semana (domingo a sábado) que contém `inicio`. */
@@ -129,4 +129,34 @@ export function tocaNoturnoMenor(ini: number, bruto: number): boolean {
     if (Math.min(fim, base + 1440 + nFim) > Math.max(ini, base + nIni)) return true
   }
   return false
+}
+
+/** Duração bruta e intervalo de um dia da jornada informada; null se entrada/saída inválidas. */
+export function horarioDoDiaPessoa(
+  h: HorarioDiaPessoa | null | undefined,
+): { inicio: number; bruto: number; intervaloMin: number } | null {
+  const ok = (v?: string) => !!v && /^\d{2}:\d{2}$/.test(v)
+  if (!h || !ok(h.entrada) || !ok(h.saida)) return null
+  const inicio = minutosDe(h.entrada)
+  const bruto = (minutosDe(h.saida) - inicio + 1440) % 1440 || 1440
+  let intervaloMin = intervaloParaBruto(bruto)
+  if (ok(h.intervaloInicio) && ok(h.intervaloFim)) {
+    const d = (minutosDe(h.intervaloFim!) - minutosDe(h.intervaloInicio!) + 1440) % 1440
+    intervaloMin = Math.min(d, bruto)
+  }
+  return { inicio, bruto, intervaloMin }
+}
+
+/** A pessoa tem jornada por dia válida (7 dias e ao menos um dia de trabalho com horário válido). */
+export function temJornadaDias(p: { jornadaDias?: (HorarioDiaPessoa | null)[] } | undefined): boolean {
+  return !!p?.jornadaDias && p.jornadaDias.length === 7 && p.jornadaDias.some((h) => horarioDoDiaPessoa(h) !== null)
+}
+
+/** Horas líquidas por semana da jornada por dia (uma casa decimal). */
+export function horasDaJornadaDias(dias: (HorarioDiaPessoa | null)[]): number {
+  const min = dias.reduce((s, h) => {
+    const x = horarioDoDiaPessoa(h)
+    return x ? s + Math.max(0, x.bruto - x.intervaloMin) : s
+  }, 0)
+  return Math.round((min / 60) * 10) / 10
 }

@@ -1,4 +1,4 @@
-import type { Funcao, PessoaEscala, RegrasPessoais } from '../types'
+import type { Funcao, HorarioDiaPessoa, PessoaEscala, RegrasPessoais } from '../types'
 
 /** Rótulo do interruptor do art. 386 da CLT (Passo 2, modo portal). */
 export const ROTULO_REGRA_MULHERES = 'Aplicar CLT art. 386 às mulheres (domingo de folga ao menos a cada 2 semanas)'
@@ -25,7 +25,7 @@ export function etiquetasPessoa(p: PessoaEscala, regras: RegrasPessoais): string
 }
 
 export type EdicaoPessoa = Partial<
-  Pick<PessoaEscala, 'escalar' | 'horasSemanais' | 'entrada' | 'saida' | 'intervaloMin'>
+  Pick<PessoaEscala, 'escalar' | 'horasSemanais' | 'entrada' | 'saida' | 'intervaloMin' | 'jornadaDias'>
 >
 
 /** Atualiza uma pessoa (imutável) e recalcula `quantidade` da função; ids desconhecidos devolvem a entrada. */
@@ -69,7 +69,8 @@ export function jornadaMaisComum(
     { n: number; j: { horasSemanais: number; entrada?: string; saida?: string; intervaloMin?: number } }
   >()
   for (const p of f.pessoas ?? []) {
-    if (!p.escalar) continue
+    // Quem tem jornada por dia não entra: o horário dela não é um só.
+    if (!p.escalar || p.jornadaDias) continue
     const j = {
       horasSemanais: p.horasSemanais ?? f.horasSemanaisAtuais,
       entrada: p.entrada ?? f.entrada,
@@ -96,4 +97,27 @@ export function normalizarIntervalo(v: number | undefined): number | undefined {
 export function normalizarHoras(v: number | undefined): number | undefined {
   if (v === undefined || Number.isNaN(v)) return undefined
   return Math.min(60, Math.max(1, Math.round(v * 10) / 10))
+}
+
+/** Dias da semana na ordem de exibição (segunda primeiro); índice 0 = domingo. */
+export const DIAS_JORNADA: { dia: number; rotulo: string }[] = [
+  { dia: 1, rotulo: 'Segunda' },
+  { dia: 2, rotulo: 'Terça' },
+  { dia: 3, rotulo: 'Quarta' },
+  { dia: 4, rotulo: 'Quinta' },
+  { dia: 5, rotulo: 'Sexta' },
+  { dia: 6, rotulo: 'Sábado' },
+  { dia: 0, rotulo: 'Domingo' },
+]
+
+/**
+ * Jornada por dia inicial de uma pessoa: segunda a sexta no horário dela (ou 08:00–17:00 com intervalo
+ * 12:00–13:00), sábado e domingo de folga.
+ */
+export function jornadaDiasInicial(p: PessoaEscala): (HorarioDiaPessoa | null)[] {
+  const base: HorarioDiaPessoa =
+    p.entrada && p.saida
+      ? { entrada: p.entrada, saida: p.saida }
+      : { entrada: '08:00', saida: '17:00', intervaloInicio: '12:00', intervaloFim: '13:00' }
+  return Array.from({ length: 7 }, (_, d) => (d === 0 || d === 6 ? null : { ...base }))
 }

@@ -87,6 +87,14 @@ export interface ResultadoConformidade {
   contagem: { vermelho: number; amarelo: number }
 }
 
+/** Horário de um dia da jornada informada pelo usuário (HH:mm). Intervalo opcional: sem ele, o mínimo legal. */
+export interface HorarioDiaPessoa {
+  entrada: string
+  saida: string
+  intervaloInicio?: string
+  intervaloFim?: string
+}
+
 /** Pessoa real (nominal) de uma função, vinda do banco no portal do cliente. */
 export interface PessoaEscala {
   id: string
@@ -98,6 +106,11 @@ export interface PessoaEscala {
   entrada?: string
   saida?: string
   intervaloMin?: number
+  /**
+   * Jornada por dia da semana informada no passo 2 (7 itens, 0 = domingo; null = folga). Quando presente, a
+   * proposta usa exatamente esses dias e horários para a pessoa (sem rodízio nem folga escolhida pelo gerador).
+   */
+  jornadaDias?: (HorarioDiaPessoa | null)[]
   ferias: { inicio: string; fim: string }[]
   /** Sexo cadastrado no banco; ausente quando não informado. Nunca vem de edição do usuário. */
   sexo?: 'F' | 'M'
