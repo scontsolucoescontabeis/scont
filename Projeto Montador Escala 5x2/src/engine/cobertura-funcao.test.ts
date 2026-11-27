@@ -131,4 +131,20 @@ describe('mínimo de pessoas por função', () => {
     expect(cx.contratar).toBeGreaterThan(0)
     expect(rep.contratar).toBe(0)
   })
+
+  it('mínimo por cargo diferente em cada dia da semana vira regras e perfil por dia', () => {
+    const c = cob({
+      util: 2, sab: 1, dom: 0,
+      porFuncao: { cx: { util: 1, sab: 1, dom: 0, porDia: { 5: 3 } } },
+    })
+    const rf = coberturaParaRegras(c, empresa.diasFuncionamento, funcoes).filter((r) => r.funcaoId === 'cx')
+    expect(rf.map((r) => [r.minimo, r.diasSemana])).toEqual([
+      [1, [1, 2, 3, 4]],
+      [3, [5]],
+      [1, [6]],
+    ])
+    const perfil = perfilNecessidade(empresa, turnos, c, ['cx', 'rep'])
+    expect(perfil[1][40]).toBe(2) // segunda: vale o total
+    expect(perfil[5][40]).toBe(3) // sexta: o mínimo do cargo passa do total
+  })
 })
