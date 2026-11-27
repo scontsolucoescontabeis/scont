@@ -15,7 +15,7 @@ import {
 } from "../engine/minimos";
 import { jornadaMaisComum } from "../portal/equipe";
 import { useStore } from "../store/useStore";
-import type { CoberturaTurno, DiaUtil, Turno } from "../types";
+import type { CoberturaTurno, DiaUtil, MinimosDia, Turno } from "../types";
 import { DIAS_CURTOS } from "../utils/analise";
 import {
   MODELOS_PERIODOS,
@@ -32,6 +32,15 @@ import { Campo, Contador } from "./ui";
 
 const MAX_AVISOS_VISIVEIS = 4;
 const VAZIO: CoberturaTurno = { util: 0, sab: 0, dom: 0 };
+const NOME_DIA = [
+  "domingo",
+  "segunda-feira",
+  "terça-feira",
+  "quarta-feira",
+  "quinta-feira",
+  "sexta-feira",
+  "sábado",
+];
 const DIA_UTIL: Record<DiaUtil, { curto: string; longo: string }> = {
   1: { curto: "Seg", longo: "segunda-feira" },
   2: { curto: "Ter", longo: "terça-feira" },
@@ -166,20 +175,15 @@ export function StepCobertura() {
     });
   };
 
-  const atualizarCobFuncao = (
+  /** Grava o mínimo de um cargo no período; sem nenhum mínimo, remove o cargo para não guardar zeros. */
+  const salvarCobFuncao = (
     id: string,
     funcaoId: string,
-    chave: "util" | "sab" | "dom",
-    v: number,
+    alterar: (m: MinimosDia) => MinimosDia,
   ) => {
     const atual = cobertura[id] ?? VAZIO;
-    const minimos = atual.porFuncao?.[funcaoId] ?? VAZIO;
-    const porFuncao = {
-      ...atual.porFuncao,
-      [funcaoId]: { ...minimos, [chave]: Math.max(0, v) },
-    };
-    // Sem nenhum mínimo, remove a função para não guardar zeros.
-    const m = porFuncao[funcaoId];
+    const m = alterar(atual.porFuncao?.[funcaoId] ?? VAZIO);
+    const porFuncao = { ...atual.porFuncao, [funcaoId]: m };
     const somaUteis = valoresDosDiasUteis(m).reduce((a, b) => a + b, 0);
     if (somaUteis + m.sab + m.dom === 0) delete porFuncao[funcaoId];
     set({
@@ -189,6 +193,33 @@ export function StepCobertura() {
       },
       ...limpar,
     });
+  };
+
+  const atualizarCobFuncao = (
+    id: string,
+    funcaoId: string,
+    chave: "util" | "sab" | "dom",
+    v: number,
+  ) =>
+    salvarCobFuncao(id, funcaoId, (m) =>
+      // Um número só de segunda a sexta: descarta valores por dia antigos.
+      chave === "util"
+        ? agruparDiasUteis(m, v)
+        : { ...m, [chave]: Math.max(0, v) },
+    );
+
+  const atualizarCobFuncaoDia = (
+    id: string,
+    funcaoId: string,
+    dow: number,
+    v: number,
+  ) => salvarCobFuncao(id, funcaoId, (m) => definirMinimoPorDia(m, dow, v));
+
+  const usarMesmoNumeroFuncao = (id: string, funcaoId: string) => {
+    setPorDiaAberto((p) => ({ ...p, [`${id}:${funcaoId}`]: false }));
+    salvarCobFuncao(id, funcaoId, (m) =>
+      agruparDiasUteis(m, minimoMaisComum(m, abertosUteis)),
+    );
   };
 
   const usarModelo = (id: ModeloPeriodosId) => {
@@ -435,23 +466,83 @@ export function StepCobertura() {
                 </summary>
                 <p className="mb-2 mt-2 text-xs text-soft">
                   Além do total acima, exija um mínimo de pessoas de um cargo
-                  neste período. Deixe 0 para não exigir. Se a soma dos cargos
-                  passar do total, vale a soma.
+                  neste período. Deixe 0 para não exigir. Use "Definir por dia"
+                  para um mínimo diferente em cada dia da semana. Se a soma dos
+                  cargos passar do total, vale a soma.
                 </p>
                 <div className="space-y-2">
                   {funcoes.map((fn) => {
                     const m = c.porFuncao?.[fn.id] ?? VAZIO;
+                    const chave = `${t.id}:${fn.id}`;
+                    const fnPorDia =
+                      grupos.util.aberto &&
+                      (porDiaAberto[chave] ?? temMinimosPorDia(m));
+                    const nome = (
+                      <p className="text-sm font-medium">
+                        {fn.nome}{" "}
+                        <span className="text-xs font-normal text-soft">
+                          ({fn.quantidade} na equipe)
+                        </span>
+                      </p>
+                    );
+                    if (fnPorDia)
+                      return (
+                        <fieldset
+                          key={fn.id}
+                          className="space-y-2 rounded-lg border border-line p-2"
+                        >
+                          <legend className="px-1">{nome}</legend>
+                          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+                            {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                              <Campo key={d} rotulo={DIAS_CURTOS[d]}>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  className="campo disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-soft"
+                                  disabled={!dias[d]}
+                                  aria-label={`Mínimo de ${fn.nome} — ${NOME_DIA[d]} — ${t.nome}`}
+                                  value={dias[d] ? minimoDoDia(m, d) : 0}
+                                  onChange={(e) =>
+                                    atualizarCobFuncaoDia(
+                                      t.id,
+                                      fn.id,
+                                      d,
+                                      Number(e.target.value),
+                                    )
+                                  }
+                                />
+                              </Campo>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-sec !py-1 text-xs"
+                            onClick={() => usarMesmoNumeroFuncao(t.id, fn.id)}
+                          >
+                            Usar o mesmo número de segunda a sexta
+                          </button>
+                        </fieldset>
+                      );
                     return (
                       <div
                         key={fn.id}
                         className="grid items-end gap-3 sm:grid-cols-4"
                       >
-                        <p className="text-sm font-medium sm:pb-2">
-                          {fn.nome}{" "}
-                          <span className="text-xs font-normal text-soft">
-                            ({fn.quantidade} na equipe)
-                          </span>
-                        </p>
+                        <div className="sm:pb-2">
+                          {nome}
+                          {grupos.util.aberto && (
+                            <button
+                              type="button"
+                              className="text-xs font-medium underline underline-offset-2"
+                              aria-label={`Definir o mínimo de ${fn.nome} por dia da semana — ${t.nome}`}
+                              onClick={() =>
+                                setPorDiaAberto((p) => ({ ...p, [chave]: true }))
+                              }
+                            >
+                              Definir por dia
+                            </button>
+                          )}
+                        </div>
                         {(["util", "sab", "dom"] as const).map((g) => (
                           <Campo
                             key={g}
